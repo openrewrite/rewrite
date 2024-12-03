@@ -33,7 +33,9 @@ class BinaryTest implements RewriteTest {
 
           // NOT inside parentheses, but verifies the parser's
           // test for "inside parentheses" condition
-          groovy("(1) + 1")
+          groovy("(1) + 1"),
+          // And combine the two cases
+          groovy("((1) + 1)")
         );
     }
 
@@ -56,6 +58,19 @@ class BinaryTest implements RewriteTest {
             """
               def a = []
               boolean b = 42 in a;
+              """
+          )
+        );
+    }
+
+    @Test
+    void withVariable() {
+        rewriteRun(
+          groovy(
+            """
+              def foo(int a) {
+                  60 + a
+              }
               """
           )
         );
@@ -207,7 +222,21 @@ class BinaryTest implements RewriteTest {
           groovy(
             """
               def foo(Map someMap) {
-                  (someMap.get("bar")).equals("baz")
+                  ((someMap.get("(bar"))).equals("baz")
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4703")
+    @Test
+    void xx() {
+        rewriteRun(
+          groovy(
+            """
+              def timestamp(int hours, int minutes, int seconds) {
+                  60 + seconds
               }
               """
           )

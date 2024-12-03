@@ -189,8 +189,8 @@ public class GroovyParserVisitor {
                 }
                 throw new GroovyParsingException(
                         "Failed to parse " + sourcePath + " at cursor position " + cursor +
-                        ". The next 10 characters in the original source are `" +
-                        source.substring(cursor, Math.min(source.length(), cursor + 10)) + "`", t);
+                                ". The next 10 characters in the original source are `" +
+                                source.substring(cursor, Math.min(source.length(), cursor + 10)) + "`", t);
             }
         }
 
@@ -308,13 +308,13 @@ public class GroovyParserVisitor {
                 }
             }
             for (org.codehaus.groovy.ast.stmt.Statement objectInitializer : clazz.getObjectInitializerStatements()) {
-                if(!(objectInitializer instanceof BlockStatement)) {
+                if (!(objectInitializer instanceof BlockStatement)) {
                     continue;
                 }
                 // A class initializer BlockStatement will be wrapped in an otherwise empty BlockStatement with the same source positions
                 // No idea why, except speculation that it is for consistency with static intiializers, but we can skip the wrapper and just visit its contents
                 BlockStatement s = (BlockStatement) objectInitializer;
-                if(s.getStatements().size() == 1 && pos(s).equals(pos(s.getStatements().get(0)))) {
+                if (s.getStatements().size() == 1 && pos(s).equals(pos(s.getStatements().get(0)))) {
                     s = (BlockStatement) s.getStatements().get(0);
                 }
                 sortedByPosition.computeIfAbsent(pos(s), i -> new ArrayList<>())
@@ -790,9 +790,9 @@ public class GroovyParserVisitor {
             //     https://docs.groovy-lang.org/latest/html/documentation/#_named_parameters_2
             // When named parameters are in use they may appear before, after, or intermixed with any positional arguments
             if (unparsedArgs.size() > 1 && unparsedArgs.get(0) instanceof MapExpression &&
-                (unparsedArgs.get(0).getLastLineNumber() > unparsedArgs.get(1).getLastLineNumber() ||
-                    (unparsedArgs.get(0).getLastLineNumber() == unparsedArgs.get(1).getLastLineNumber() &&
-                        unparsedArgs.get(0).getLastColumnNumber() > unparsedArgs.get(1).getLastColumnNumber()))) {
+                    (unparsedArgs.get(0).getLastLineNumber() > unparsedArgs.get(1).getLastLineNumber() ||
+                            (unparsedArgs.get(0).getLastLineNumber() == unparsedArgs.get(1).getLastLineNumber() &&
+                                    unparsedArgs.get(0).getLastColumnNumber() > unparsedArgs.get(1).getLastColumnNumber()))) {
 
                 // Figure out the source-code ordering of the expressions
                 MapExpression namedArgExpressions = (MapExpression) unparsedArgs.get(0);
@@ -1048,7 +1048,7 @@ public class GroovyParserVisitor {
                 J expr = visit(statement);
                 if (i == blockStatements.size() - 1 && (expr instanceof Expression)) {
                     if (parent instanceof ClosureExpression || (parent instanceof MethodNode &&
-                                                                !JavaType.Primitive.Void.equals(typeMapping.type(((MethodNode) parent).getReturnType())))) {
+                            !JavaType.Primitive.Void.equals(typeMapping.type(((MethodNode) parent).getReturnType())))) {
                         expr = new J.Return(randomId(), expr.getPrefix(), Markers.EMPTY,
                                 expr.withPrefix(EMPTY));
                         expr = expr.withMarkers(expr.getMarkers().add(new ImplicitReturn(randomId())));
@@ -1088,8 +1088,8 @@ public class GroovyParserVisitor {
             // Groovy allows catch variables to omit their type, shorthand for being of type java.lang.Exception
             // Can't use isSynthetic() here because groovy doesn't record the line number on the Parameter
             if ("java.lang.Exception".equals(param.getType().getName()) &&
-                !source.startsWith("Exception", cursor) &&
-                !source.startsWith("java.lang.Exception", cursor)) {
+                    !source.startsWith("Exception", cursor) &&
+                    !source.startsWith("java.lang.Exception", cursor)) {
                 paramType = new J.Identifier(randomId(), paramPrefix, Markers.EMPTY, emptyList(), "",
                         JavaType.ShallowClass.build("java.lang.Exception"), null);
             } else {
@@ -1714,7 +1714,7 @@ public class GroovyParserVisitor {
                 MethodNode methodNode = (MethodNode) call.getNodeMetaData().get(StaticTypesMarker.DIRECT_METHOD_CALL_TARGET);
                 JavaType.Method methodType = null;
                 if (methodNode == null && call.getObjectExpression() instanceof VariableExpression &&
-                    ((VariableExpression) call.getObjectExpression()).getAccessedVariable() != null) {
+                        ((VariableExpression) call.getObjectExpression()).getAccessedVariable() != null) {
                     // Groovy doesn't know what kind of object this method is being invoked on
                     // But if this invocation is inside a Closure we may have already enriched its parameters with types from the static type checker
                     // Use any such type information to attempt to find a matching method
@@ -1856,7 +1856,7 @@ public class GroovyParserVisitor {
         public void visitReturnStatement(ReturnStatement return_) {
             Space fmt = sourceBefore("return");
             if (return_.getExpression() instanceof ConstantExpression && isSynthetic(return_.getExpression()) &&
-                (((ConstantExpression) return_.getExpression()).getValue() == null)) {
+                    (((ConstantExpression) return_.getExpression()).getValue() == null)) {
                 queue.add(new J.Return(randomId(), fmt, Markers.EMPTY, null));
             } else {
                 queue.add(new J.Return(randomId(), fmt, Markers.EMPTY, visit(return_.getExpression())));
@@ -2078,19 +2078,21 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitVariableExpression(VariableExpression expression) {
-            JavaType type;
-            if (expression.isDynamicTyped() && expression.getAccessedVariable() != null && expression.getAccessedVariable().getType() != expression.getOriginType()) {
-                type = typeMapping.type(staticType(expression.getAccessedVariable()));
-            } else {
-                type = typeMapping.type(staticType((org.codehaus.groovy.ast.expr.Expression) expression));
-            }
-            queue.add(new J.Identifier(randomId(),
-                    sourceBefore(expression.getName()),
-                    Markers.EMPTY,
-                    emptyList(),
-                    expression.getName(),
-                    type, null)
-            );
+            queue.add(insideParentheses(expression, fmt -> {
+                JavaType type;
+                if (expression.isDynamicTyped() && expression.getAccessedVariable() != null && expression.getAccessedVariable().getType() != expression.getOriginType()) {
+                    type = typeMapping.type(staticType(expression.getAccessedVariable()));
+                } else {
+                    type = typeMapping.type(staticType((org.codehaus.groovy.ast.expr.Expression) expression));
+                }
+
+                return new J.Identifier(randomId(),
+                        sourceBefore(expression.getName()),
+                        Markers.EMPTY,
+                        emptyList(),
+                        expression.getName(),
+                        type, null);
+            }));
         }
 
         @Override
@@ -2431,16 +2433,21 @@ public class GroovyParserVisitor {
     }
 
     private @Nullable Integer getInsideParenthesesLevel(ASTNode node) {
+        System.out.println(node);
+
         Object rawIpl = node.getNodeMetaData("_INSIDE_PARENTHESES_LEVEL");
         if (rawIpl instanceof AtomicInteger) {
             // On Java 11 and newer _INSIDE_PARENTHESES_LEVEL is an AtomicInteger
+            System.out.println(">>> " + ((AtomicInteger) rawIpl).get());
             return ((AtomicInteger) rawIpl).get();
         } else if (rawIpl instanceof Integer) {
+            System.out.println(">> " + rawIpl);
             // On Java 8 _INSIDE_PARENTHESES_LEVEL is a regular Integer
             return (Integer) rawIpl;
         } else if (node instanceof TernaryExpression || node instanceof BinaryExpression || node instanceof CastExpression ||
                 (node instanceof MethodCallExpression && ((MethodCallExpression) node).getObjectExpression().getNodeMetaData("_INSIDE_PARENTHESES_LEVEL") != null)) {
             // For some expressions, there should not be a manual calculation
+            System.out.println("> null");
             return null;
         }
 
@@ -2454,6 +2461,7 @@ public class GroovyParserVisitor {
                 saveCursor++;
             }
         }
+        System.out.println("+> " + i);
         return i;
     }
 
@@ -2628,7 +2636,7 @@ public class GroovyParserVisitor {
        Can contain a J.FieldAccess, as in a variable declaration with fully qualified type parameterization:
            List<java.lang.String>
      */
-    private JContainer<Expression> visitTypeParameterizations(GenericsType @Nullable[] genericsTypes) {
+    private JContainer<Expression> visitTypeParameterizations(GenericsType @Nullable [] genericsTypes) {
         Space prefix = sourceBefore("<");
         List<JRightPadded<Expression>> parameters;
 
