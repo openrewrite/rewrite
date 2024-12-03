@@ -2443,7 +2443,7 @@ public class GroovyParserVisitor {
             // On Java 8 _INSIDE_PARENTHESES_LEVEL is a regular Integer
             return (Integer) rawIpl;
         } else if (node instanceof MethodCallExpression && source.substring(cursor).matches("(?s)^\\s*\\(.*")) {
-            // TODO make it work for methods with omitted parentheses
+            // TODO make it work well, this implementation is to naive
             String methodName = ((MethodCallExpression) node).getMethodAsString();
             Matcher leadingParentheses = Pattern.compile(".*" + methodName + "['\"]?(\\(+).*").matcher(source.substring(cursor));
             Matcher trailingParentheses = Pattern.compile(".*" + methodName + "[^)]*(\\)+).*").matcher(source.substring(cursor));
