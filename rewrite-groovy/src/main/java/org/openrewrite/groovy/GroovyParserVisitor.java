@@ -732,6 +732,8 @@ public class GroovyParserVisitor {
 
         private Expression insideParentheses(ASTNode node, Function<Space, Expression> parenthesizedTree) {
             Integer insideParenthesesLevel = getInsideParenthesesLevel(node);
+            System.out.println(node);
+            System.out.println(insideParenthesesLevel);
             if (insideParenthesesLevel != null) {
                 Stack<Space> openingParens = new Stack<>();
                 for (int i = 0; i < insideParenthesesLevel; i++) {
@@ -2440,23 +2442,16 @@ public class GroovyParserVisitor {
         } else if (rawIpl instanceof Integer) {
             // On Java 8 _INSIDE_PARENTHESES_LEVEL is a regular Integer
             return (Integer) rawIpl;
-        } else if (node instanceof TernaryExpression || node instanceof BinaryExpression || node instanceof CastExpression ||
-                (node instanceof MethodCallExpression && ((MethodCallExpression) node).getObjectExpression().getNodeMetaData("_INSIDE_PARENTHESES_LEVEL") != null)) {
-            // For some expressions, there should not be a manual calculation
-            return null;
-        }
-
-        // Calculate _INSIDE_PARENTHESES_LEVEL by hand
-        Integer i = null;
-        if (source.length() > cursor && source.charAt(cursor) == '(') {
-            i = 0;
-            int saveCursor = cursor;
-            while (source.length() > saveCursor && source.charAt(saveCursor) == '(') {
-                i++;
-                saveCursor++;
+        } else if (node instanceof MethodCallExpression && source.substring(cursor).matches("(?s)^\\s*\\(.*")) {
+            // TODO make it work for methods with omitted parentheses
+            String methodName = ((MethodCallExpression) node).getMethodAsString();
+            Matcher leadingParentheses = Pattern.compile(".*" + methodName + "['\"]?(\\(+).*").matcher(source.substring(cursor));
+            Matcher trailingParentheses = Pattern.compile(".*" + methodName + "[^)]*(\\)+).*").matcher(source.substring(cursor));
+            if (leadingParentheses.find() && trailingParentheses.find()) {
+                return trailingParentheses.group(1).length() - leadingParentheses.group(1).length();
             }
         }
-        return i;
+        return null;
     }
 
     private int getDelimiterLength() {
