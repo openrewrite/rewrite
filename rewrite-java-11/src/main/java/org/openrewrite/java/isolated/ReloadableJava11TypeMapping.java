@@ -697,7 +697,10 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
                 if (retention != null && retention.value() == RetentionPolicy.SOURCE) {
                     continue;
                 }
-                annotations.add(annotType);
+                List<JavaType.AnnotationValue> annotationValues = a.values.stream().map(attr -> new JavaType.AnnotationValue(
+                        methodDeclarationType(attr.fst, annotType), attr.snd.getValue().toString())).toList();
+                JavaType.Annotation annotation = new JavaType.Annotation(annotType, annotationValues);
+                annotations.add(annotation);
             }
         }
         return annotations;

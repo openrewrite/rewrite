@@ -17,6 +17,7 @@ package org.openrewrite.java.tree;
 
 import com.fasterxml.jackson.annotation.*;
 import lombok.AccessLevel;
+import lombok.Data;
 import lombok.Getter;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
@@ -26,6 +27,7 @@ import org.openrewrite.Incubating;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
 
+import java.lang.invoke.MethodType;
 import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Pattern;
@@ -623,6 +625,83 @@ public interface JavaType {
 
             return new ShallowClass(null, 1, fullyQualifiedName, Kind.Class, emptyList(), null, owningClass,
                     emptyList(), emptyList(), emptyList(), emptyList());
+        }
+    }
+
+    @Data
+    class AnnotationValue {
+        private final Method method;
+        private final String value;
+    }
+
+    class Annotation extends FullyQualified {
+
+        public final List<AnnotationValue> values;
+        public final FullyQualified type;
+
+        public Annotation(FullyQualified type, List<AnnotationValue> values) {
+            this.type = type;
+            this.values = values;
+        }
+
+        @Override
+        public String getFullyQualifiedName() {
+            return type.getFullyQualifiedName();
+        }
+
+        @Override
+        public FullyQualified withFullyQualifiedName(String fullyQualifiedName) {
+            return null;
+        }
+
+        @Override
+        public List<FullyQualified> getAnnotations() {
+            return type.getAnnotations();
+        }
+
+        @Override
+        public boolean hasFlags(Flag... test) {
+            return type.hasFlags();
+        }
+
+        @Override
+        public Set<Flag> getFlags() {
+            return type.getFlags();
+        }
+
+        @Override
+        public List<FullyQualified> getInterfaces() {
+            return type.getInterfaces();
+        }
+
+        @Override
+        public Kind getKind() {
+            return type.getKind();
+        }
+
+        @Override
+        public List<Variable> getMembers() {
+            return type.getMembers();
+        }
+
+        @Override
+        public List<Method> getMethods() {
+            return type.getMethods();
+        }
+
+        @Override
+        public List<JavaType> getTypeParameters() {
+            return type.getTypeParameters();
+        }
+
+        @Override
+        public @Nullable FullyQualified getOwningClass() {
+            return type.getOwningClass();
+        }
+
+        @Override
+        public @Nullable FullyQualified getSupertype() {
+            return type.getSupertype();
         }
     }
 
