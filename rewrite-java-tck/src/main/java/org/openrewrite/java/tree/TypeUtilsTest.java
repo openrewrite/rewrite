@@ -32,7 +32,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.java.tree.TypeUtils.TypePosition.*;
+import static org.openrewrite.java.tree.TypeUtils.TypePosition.Invariant;
+import static org.openrewrite.java.tree.TypeUtils.TypePosition.Out;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("ConstantConditions")

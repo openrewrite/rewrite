@@ -22,8 +22,8 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
-import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.internal.AdaptiveRadixJavaTypeCache;
+import org.openrewrite.java.internal.JavaTypeCache;
 
 import java.net.URISyntaxException;
 import java.util.Map;

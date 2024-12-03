@@ -231,8 +231,8 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
         public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
             if (resourceMatcher.matches(getCursor())) {
                 String directory = tag.getChildValue("directory").orElse(null);
-                if (tag.getChildValue("filtering").map(Boolean::valueOf).orElse(false)
-                    && directory != null) {
+                if (tag.getChildValue("filtering").map(Boolean::valueOf).orElse(false) &&
+                    directory != null) {
                     Path path = getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath();
                     try {
                         acc.filteredResourcePathsToDeclaringPoms.put(path.getParent().resolve(directory), getResolutionResult());
