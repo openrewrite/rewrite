@@ -30,6 +30,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junitpioneer.jupiter.SetSystemProperty;
 import org.openrewrite.*;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
@@ -571,6 +572,42 @@ class MavenPomDownloaderTest {
             assertThrows(MavenDownloadingException.class, () ->
               new MavenPomDownloader(emptyMap(), ctx)
                 .download(new GroupArtifactVersion("com.bad", "bad-artifact", "1"), null, null, List.of(mavenLocal)));
+        }
+
+        @Test
+        @SetSystemProperty(key = "org.openrewrite.allowPomDownloadFailure", value = "true")
+        void allowPomDowloadFailure(@TempDir Path localRepository) throws IOException, MavenDownloadingException {
+            Path localArtifact = localRepository.resolve("com/some/some-artifact");
+            assertThat(localArtifact.toFile().mkdirs()).isTrue();
+            Files.createDirectories(localArtifact.resolve("1"));
+
+            Path localPom = localRepository.resolve("com/some/some-artifact/1/some-artifact-1.pom");
+            Files.writeString(localPom,
+              //language=xml
+              """
+                 <project>
+                   <groupId>com.some</groupId>
+                   <artifactId>some-artifact</artifactId>
+                   <version>1</version>
+                 </project>
+                """
+            );
+            Path localJar = localRepository.resolve("com/some/some-artifact/1/some-artifact-1.jar");
+            Files.writeString(localJar, "");
+
+            MavenRepository mavenLocal = MavenRepository.builder()
+              .id("local")
+              .uri(localRepository.toUri().toString())
+              .snapshots(false)
+              .knownToExist(true)
+              .build();
+
+            // Do not trhow exception
+            var result = new MavenPomDownloader(emptyMap(), ctx).download(new GroupArtifactVersion("com.some", "some-artifact", "1"), null, null, List.of(mavenLocal));
+
+            assertThat(result.getGav().getGroupId()).isEqualTo("com.some");
+            assertThat(result.getGav().getArtifactId()).isEqualTo("some-artifact");
+            assertThat(result.getGav().getVersion()).isEqualTo("1");
         }
 
         @Test

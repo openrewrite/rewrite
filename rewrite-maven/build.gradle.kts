@@ -42,6 +42,7 @@ dependencies {
     testImplementation("com.squareup.okio:okio-jvm:3.9.1")
     testImplementation("org.mapdb:mapdb:latest.release")
     testImplementation("guru.nidi:graphviz-java:latest.release")
+    testImplementation("org.junit-pioneer:junit-pioneer:2.0.0")
 
     testRuntimeOnly("org.mapdb:mapdb:latest.release")
     testRuntimeOnly(project(":rewrite-java-17"))
