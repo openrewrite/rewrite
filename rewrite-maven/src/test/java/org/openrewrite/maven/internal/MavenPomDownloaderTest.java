@@ -602,7 +602,7 @@ class MavenPomDownloaderTest {
               .knownToExist(true)
               .build();
 
-            // Do not trhow exception
+            // Do not throw exception
             var result = new MavenPomDownloader(emptyMap(), ctx).download(new GroupArtifactVersion("com.some", "some-artifact", "1"), null, null, List.of(mavenLocal));
 
             assertThat(result.getGav().getGroupId()).isEqualTo("com.some");
