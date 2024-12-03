@@ -380,13 +380,6 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
                     p.append(')');
                 }
             }
-
-            if (method.getMarkers().findFirst(ClosingParenthese.class).isPresent()) {
-                System.out.println(method);
-                System.out.println("PRESENT");
-                p.append(StringUtils.repeat(")", method.getMarkers().findFirst(ClosingParenthese.class).get().getAmount()));
-            }
-
             afterSyntax(method, p);
             return method;
         }

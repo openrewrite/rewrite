@@ -1633,8 +1633,6 @@ public class GroovyParserVisitor {
         @Override
         public void visitMethodCallExpression(MethodCallExpression call) {
             queue.add(insideParentheses(call, fmt -> {
-                Markers markers = Markers.EMPTY;
-
                 ImplicitDot implicitDot = null;
                 JRightPadded<Expression> select = null;
                 if (!call.isImplicitThis()) {
@@ -1684,6 +1682,7 @@ public class GroovyParserVisitor {
                     name = name.withMarkers(name.getMarkers().add(implicitDot));
                 }
                 // Method invocations may have type information that can enrich the type information of its parameters
+                Markers markers = Markers.EMPTY;
                 if (call.getArguments() instanceof ArgumentListExpression) {
                     ArgumentListExpression args = (ArgumentListExpression) call.getArguments();
                     if (call.getNodeMetaData(StaticTypesMarker.INFERRED_TYPE) != null) {
@@ -1756,16 +1755,6 @@ public class GroovyParserVisitor {
                 } else {
                     methodType = typeMapping.methodType(methodNode);
                 }
-
-                if (source.length() > cursor && source.charAt(cursor) == ')') {
-                    int closingParenthese = 0;
-                    while (source.length() > cursor && source.charAt(cursor) == ')') {
-                        closingParenthese++;
-                        cursor++;
-                    }
-                    markers = markers.add(new ClosingParenthese(randomId(), closingParenthese));
-                }
-
                 return new J.MethodInvocation(randomId(), fmt, markers,
                         select, null, name, args, methodType);
             }));
@@ -2001,7 +1990,6 @@ public class GroovyParserVisitor {
 
             //noinspection ConstantConditions
             queue.add(new J.Try(randomId(), prefix, Markers.EMPTY, resources, body, catches, finally_));
-
         }
 
         @Override
@@ -2403,6 +2391,10 @@ public class GroovyParserVisitor {
         return baseType;
     }
 
+    /**
+     * Get all characters of the source file between the cursor and the given delimiter.
+     * The cursor will be moved past the delimiter.
+     */
     private Space sourceBefore(String untilDelim) {
         int delimIndex = positionOfNext(untilDelim);
         if (delimIndex < 0) {
@@ -2438,15 +2430,31 @@ public class GroovyParserVisitor {
         return lengthAccordingToAst;
     }
 
-    private static @Nullable Integer getInsideParenthesesLevel(ASTNode node) {
+    private @Nullable Integer getInsideParenthesesLevel(ASTNode node) {
         Object rawIpl = node.getNodeMetaData("_INSIDE_PARENTHESES_LEVEL");
         if (rawIpl instanceof AtomicInteger) {
             // On Java 11 and newer _INSIDE_PARENTHESES_LEVEL is an AtomicInteger
             return ((AtomicInteger) rawIpl).get();
-        } else {
+        } else if (rawIpl instanceof Integer) {
             // On Java 8 _INSIDE_PARENTHESES_LEVEL is a regular Integer
             return (Integer) rawIpl;
+        } else if (node instanceof TernaryExpression || node instanceof BinaryExpression || node instanceof CastExpression ||
+                (node instanceof MethodCallExpression && ((MethodCallExpression) node).getObjectExpression().getNodeMetaData("_INSIDE_PARENTHESES_LEVEL") != null)) {
+            // For some expressions, there should not be a manual calculation
+            return null;
         }
+
+        // Calculate _INSIDE_PARENTHESES_LEVEL by hand
+        Integer i = null;
+        if (source.length() > cursor && source.charAt(cursor) == '(') {
+            i = 0;
+            int saveCursor = cursor;
+            while (source.length() > saveCursor && source.charAt(saveCursor) == '(') {
+                i++;
+                saveCursor++;
+            }
+        }
+        return i;
     }
 
     private int getDelimiterLength() {
