@@ -33,7 +33,7 @@ public class MergeYaml extends Recipe {
 
     @Option(displayName = "YAML snippet",
             description = "The YAML snippet to insert. The snippet will be indented to match the style of its surroundings.",
-            example = "labels: \n\tlabel-one: \"value-one\"")
+            example = "labels:\n  label-one: \"value-one\"")
     @Language("yml")
     String yaml;
 
