@@ -68,6 +68,43 @@ class ChangeDependencyTest implements RewriteTest {
     }
 
     @Test
+    void removeOldDependenciesIfNewAlreadyPresents() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation "commons-lang:commons-lang:2.6"
+                  implementation group: "commons-lang", name: "commons-lang", version: "2.6"
+                  implementation "org.apache.commons:commons-lang3:3.11"
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation "org.apache.commons:commons-lang3:3.11"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void changeGroupIdOnly() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", null, null, null, null)),
