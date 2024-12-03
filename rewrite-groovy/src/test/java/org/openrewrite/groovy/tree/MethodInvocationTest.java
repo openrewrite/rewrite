@@ -262,4 +262,18 @@ class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4703")
+    @Test
+    void insideParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              def foo(Map someMap) {
+                  ((someMap.get("(bar"))).equals("baz")
+              }
+              """
+          )
+        );
+    }
 }

@@ -2087,7 +2087,7 @@ public class GroovyParserVisitor {
                 }
 
                 return new J.Identifier(randomId(),
-                        sourceBefore(expression.getName()),
+                        fmt.withWhitespace(fmt.getWhitespace() + sourceBefore(expression.getName()).getWhitespace()),
                         Markers.EMPTY,
                         emptyList(),
                         expression.getName(),
@@ -2433,21 +2433,16 @@ public class GroovyParserVisitor {
     }
 
     private @Nullable Integer getInsideParenthesesLevel(ASTNode node) {
-        System.out.println(node);
-
         Object rawIpl = node.getNodeMetaData("_INSIDE_PARENTHESES_LEVEL");
         if (rawIpl instanceof AtomicInteger) {
             // On Java 11 and newer _INSIDE_PARENTHESES_LEVEL is an AtomicInteger
-            System.out.println(">>> " + ((AtomicInteger) rawIpl).get());
             return ((AtomicInteger) rawIpl).get();
         } else if (rawIpl instanceof Integer) {
-            System.out.println(">> " + rawIpl);
             // On Java 8 _INSIDE_PARENTHESES_LEVEL is a regular Integer
             return (Integer) rawIpl;
         } else if (node instanceof TernaryExpression || node instanceof BinaryExpression || node instanceof CastExpression ||
                 (node instanceof MethodCallExpression && ((MethodCallExpression) node).getObjectExpression().getNodeMetaData("_INSIDE_PARENTHESES_LEVEL") != null)) {
             // For some expressions, there should not be a manual calculation
-            System.out.println("> null");
             return null;
         }
 
@@ -2461,7 +2456,6 @@ public class GroovyParserVisitor {
                 saveCursor++;
             }
         }
-        System.out.println("+> " + i);
         return i;
     }
 

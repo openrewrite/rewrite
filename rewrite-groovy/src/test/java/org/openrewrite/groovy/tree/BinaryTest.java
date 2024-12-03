@@ -217,34 +217,6 @@ class BinaryTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/4703")
     @Test
-    void extraParenthesesAroundMethodInvocationSelects() {
-        rewriteRun(
-          groovy(
-            """
-              def foo(Map someMap) {
-                  ((someMap.get("(bar"))).equals("baz")
-              }
-              """
-          )
-        );
-    }
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/4703")
-    @Test
-    void xx() {
-        rewriteRun(
-          groovy(
-            """
-              def timestamp(int hours, int minutes, int seconds) {
-                  60 + seconds
-              }
-              """
-          )
-        );
-    }
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/4703")
-    @Test
     void extraParensAroundInfixOperator() {
         rewriteRun(
           groovy(
