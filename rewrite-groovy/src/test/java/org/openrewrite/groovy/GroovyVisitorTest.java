@@ -21,6 +21,7 @@ import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.openrewrite.groovy.Assertions.groovy;
 
 class GroovyVisitorTest implements RewriteTest {
@@ -53,5 +54,42 @@ class GroovyVisitorTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void countWrapperParenthesesForMethodCalls1() {
+        //language=groovy
+        String input = "((((((someMap.get(\"baz\"))))).equals(\"baz\")))";
+        int result = GroovyParserVisitor.countWrapperParenthesesForMethodCalls(input);
+
+        assertEquals(2, result);
+    }
+
+    @Test
+    void countWrapperParenthesesForMethodCalls2() {
+        //language=groovy
+        String input = "((((someMap.get(\"(bar\")))))";
+        int result = GroovyParserVisitor.countWrapperParenthesesForMethodCalls(input);
+
+        assertEquals(4, result);
+    }
+
+    @Test
+    void countWrapperParenthesesForMethodCalls3() {
+        //language=groovy
+        String input = "((someMap.containsKey(\"foo\")) && ((someMap.get(\"foo\")).'equals' \"\"\"bar\n" +
+          "\"\"\" ))";
+        int result = GroovyParserVisitor.countWrapperParenthesesForMethodCalls(input);
+
+        assertEquals(1, result);
+    }
+
+    @Test
+    void countWrapperParenthesesForMethodCalls4() {
+        //language=groovy
+        String input = "(something?.'equals' \"s\" )";
+        int result = GroovyParserVisitor.countWrapperParenthesesForMethodCalls(input);
+
+        assertEquals(1, result);
     }
 }

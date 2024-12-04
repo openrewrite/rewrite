@@ -73,7 +73,7 @@ class CastTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              ( "" as String ).toString()
+              ((((( "" as String ))))).toString()
               """
           )
         );
@@ -84,7 +84,7 @@ class CastTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              ( (String) "" ).toString()
+              (( (String) "" )).toString()
               """
           )
         );

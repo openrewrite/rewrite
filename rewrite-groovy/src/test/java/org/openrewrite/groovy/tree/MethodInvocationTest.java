@@ -297,9 +297,9 @@ class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              static def foo(Map someMap) {((((((someMap.get("(bar")))) ).'equals'(("baz"))))}
-              //static def foo(Map someMap) {((((((someMap.get("(bar")))) ).'equals' "baz" )   )      }
+              static def foo(Map someMap) {((((((someMap.get("(bar"))))).'equals'(("baz"))))}
               """
+              //static def foo(Map someMap) {((((((someMap.get("(bar")))) ).'equals' "baz" )   )      }
           )
         );
     }
