@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class GroovyParserParentheseDiscovererTest {
 
     @Test
-    void simpleInvoke() {
+    void invoke() {
         //language=groovy
         String input = "(a.invoke())";
         int result = getInsideParenthesesLevelForMethodCalls(input);
@@ -35,16 +35,34 @@ class GroovyParserParentheseDiscovererTest {
     }
 
     @Test
-    void getInsideParenthesesLevelForMethodCalls4() {
+    void invokeWithSpacesInParenthesis() {
         //language=groovy
-        String input = "(something?.'equals' \"s\" )";
+        String input = "( ( (((a.invoke()) ) ) ) )";
+        int result = getInsideParenthesesLevelForMethodCalls(input);
+
+        assertEquals(5, result);
+    }
+
+    @Test
+    void invokeWithSpacesInParenthesis2() {
+        //language=groovy
+        String input = "(((((((someMap.get(\"(bar\"))))).equals(\"baz\") )   ) )";
+        int result = getInsideParenthesesLevelForMethodCalls(input);
+
+        assertEquals(3, result);
+    }
+
+    @Test
+    void invokeWithNullSafeAndInQuotesAndArgumentsWithoutParenthesis() {
+        //language=groovy
+        String input = "(something?.'invoke' \"s\" \"a\" )";
         int result = getInsideParenthesesLevelForMethodCalls(input);
 
         assertEquals(1, result);
     }
 
     @Test
-    void getInsideParenthesesLevelForMethodCalls1() {
+    void multipleParenthesesLeftBiggerThanRight() {
         //language=groovy
         String input = "((((((someMap.get(\"baz\"))))).equals(\"baz\")))";
         int result = getInsideParenthesesLevelForMethodCalls(input);
@@ -53,7 +71,7 @@ class GroovyParserParentheseDiscovererTest {
     }
 
     @Test
-    void getInsideParenthesesLevelForMethodCalls2() {
+    void multipleParenthesesRightBiggerThanLeft() {
         //language=groovy
         String input = "((((someMap.get(\"(bar\")))))";
         int result = getInsideParenthesesLevelForMethodCalls(input);
@@ -62,22 +80,13 @@ class GroovyParserParentheseDiscovererTest {
     }
 
     @Test
-    void getInsideParenthesesLevelForMethodCalls3() {
+    void binaryWithLinebreakInArgument() {
         //language=groovy
         String input = "((someMap.containsKey(\"foo\")) && ((someMap.get(\"foo\")).'equals' \"\"\"bar\n" +
           "\"\"\" ))";
         int result = getInsideParenthesesLevelForMethodCalls(input);
 
         assertEquals(1, result);
-    }
-
-    @Test
-    void methodInvocationWithArgumentParentheses() {
-        //language=groovy
-        String input = "(((((obj))).'equals'((\"baz\"))))";
-        int result = getInsideParenthesesLevelForMethodCalls(input);
-
-        assertEquals(2, result);
     }
 
     @SneakyThrows
