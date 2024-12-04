@@ -717,7 +717,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
                     continue;
                 }
                 List<JavaType.AnnotationValue> annotationValues = a.values.stream().map(attr -> new JavaType.AnnotationValue(
-                        methodDeclarationType(attr.fst, annotType), attr.snd.getValue().toString())).collect(Collectors.toList());;;
+                        methodDeclarationType(attr.fst, annotType), attr.snd.getValue().toString())).collect(Collectors.toList());
                 JavaType.Annotation annotation = new JavaType.Annotation(annotType, annotationValues);
                 annotations.add(annotation);
             }
