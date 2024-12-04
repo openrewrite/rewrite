@@ -731,9 +731,7 @@ public class GroovyParserVisitor {
         }
 
         private Expression insideParentheses(ASTNode node, Function<Space, Expression> parenthesizedTree) {
-            System.out.println(node);
             Integer insideParenthesesLevel = getInsideParenthesesLevel(node);
-            System.out.println(insideParenthesesLevel);
             if (insideParenthesesLevel != null) {
                 Stack<Space> openingParens = new Stack<>();
                 for (int i = 0; i < insideParenthesesLevel; i++) {
@@ -2442,54 +2440,10 @@ public class GroovyParserVisitor {
         } else if (rawIpl instanceof Integer) {
             // On Java 8 _INSIDE_PARENTHESES_LEVEL is a regular Integer
             return (Integer) rawIpl;
-        } else if (node instanceof MethodCallExpression && !(((MethodCallExpression) node).getObjectExpression() instanceof  CastExpression) &&
-                // start with a (` character with optional whitespace
-                source.substring(cursor).matches("(?s)^\\s*\\(.*")) {
-            String methodName = ((MethodCallExpression) node).getMethodAsString();
-            Matcher m = Pattern.compile("(?s)(.*" + methodName + "[^)]*\\)+).*").matcher(source.substring(cursor));
-            if (m.matches()) {
-                System.out.println(">>>>");
-                return countWrapperParenthesesForMethodCalls(m.group(1));
-            }
+        } else if (node instanceof MethodCallExpression) {
+            return GroovyParserParentheseDiscoverer.getInsideParenthesesLevel((MethodCallExpression) node, source.substring(cursor));
         }
         return null;
-    }
-
-    public static final Pattern PARENTHESES_GROUP = Pattern.compile(".+\\(([^()]+)\\).*", Pattern.DOTALL);
-    public static final Pattern HAS_SUB_PARENTHESIS = Pattern.compile("\\(+[^)]+\\)+[^)]+\\).*", Pattern.DOTALL);
-
-    /**
-     * Determines the parentheses level for given source code.
-     * @implNote Source code has to start with a `(` character (with optional whitespace).
-     */
-    private static int countWrapperParenthesesForMethodCalls(String sourceCode) {
-        System.out.println("----------------");
-        String s = sourceCode.replaceAll("\"[^\"]*\"", "<s>");
-        System.out.println("curr: " + s);
-        Matcher m = PARENTHESES_GROUP.matcher(s);
-        while (m.matches() && HAS_SUB_PARENTHESIS.matcher(s).find()) {
-            System.out.println("Remove: (" + m.group(1) + ")");
-            s = s.replaceAll("\\(" + m.group(1) + "\\)", "");
-            System.out.println("curr: " + s);
-            m = PARENTHESES_GROUP.matcher(s);
-        }
-
-        int leadingParenthesis = 0;
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            if (c == ' ' || c == '\t' || c == '\n' || c == '\r') continue;
-            else if (c == '(') leadingParenthesis++;
-            else break;
-        }
-        int trailingParenthesis = 0;
-        for (int i = s.length() - 1; i >= 0; i--) {
-            char c = s.charAt(i);
-            if (c == ' ' || c == '\t' || c == '\n' || c == '\r') continue;
-            else if (c == ')') trailingParenthesis++;
-            else break;
-        }
-
-        return Math.min(leadingParenthesis, trailingParenthesis);
     }
 
     private int getDelimiterLength() {
