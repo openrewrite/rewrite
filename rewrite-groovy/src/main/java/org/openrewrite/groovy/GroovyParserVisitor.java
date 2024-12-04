@@ -2462,8 +2462,7 @@ public class GroovyParserVisitor {
      * Determines the parentheses level for given source code.
      * @implNote Source code has to start with a `(` character (with optional whitespace).
      */
-    // TODO should not be pulic
-    public static int countWrapperParenthesesForMethodCalls(String sourceCode) {
+    private static int countWrapperParenthesesForMethodCalls(String sourceCode) {
         System.out.println("----------------");
         String s = sourceCode.replaceAll("\"[^\"]*\"", "<s>");
         System.out.println("curr: " + s);
