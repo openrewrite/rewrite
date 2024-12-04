@@ -1374,7 +1374,7 @@ public class GroovyParserVisitor {
         public void visitConstructorCallExpression(ConstructorCallExpression ctor) {
             queue.add(insideParentheses(ctor, fmt -> {
                 cursor += 3; // skip "new"
-                TypeTree clazz = visitTypeTree(ctor.getType(), ctor.getMetaDataMap().containsKey(StaticTypesMarker.INFERRED_TYPE));
+                TypeTree clazz = visitTypeTree(ctor.getType(), ctor.getNodeMetaData().containsKey(StaticTypesMarker.INFERRED_TYPE));
                 JContainer<Expression> args = visit(ctor.getArguments());
                 J.Block body = null;
                 if (ctor.isUsingAnonymousInnerClass() && ctor.getType() instanceof InnerClassNode) {
