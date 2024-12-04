@@ -463,16 +463,17 @@ public class BlockStatementTemplateGenerator {
             // If prior is a type parameter, wrap in __M__.anyT<prior>()
             // For anything else, ignore the invocation
             J.MethodInvocation m = (J.MethodInvocation) j;
+            J firstEnclosing = cursor.getParentOrThrow().firstEnclosing(J.class);
             if (m.getArguments().stream().anyMatch(arg -> referToSameElement(prior, arg))) {
                 before.insert(0, "__M__.any(");
-                if (cursor.getParentOrThrow().firstEnclosing(J.class) instanceof J.Block) {
+                if (firstEnclosing instanceof J.Block || firstEnclosing instanceof J.Case) {
                     after.append(");");
                 } else {
                     after.append(")");
                 }
             } else if (m.getTypeParameters() != null && m.getTypeParameters().stream().anyMatch(tp -> referToSameElement(prior, tp))) {
                 before.insert(0, "__M__.anyT<");
-                if (cursor.getParentOrThrow().firstEnclosing(J.class) instanceof J.Block) {
+                if (firstEnclosing instanceof J.Block || firstEnclosing instanceof J.Case) {
                     after.append(">();");
                 } else {
                     after.append(">()");
@@ -481,7 +482,7 @@ public class BlockStatementTemplateGenerator {
                 List<Comment> comments = new ArrayList<>(1);
                 comments.add(new TextComment(true, STOP_COMMENT, "", Markers.EMPTY));
                 after.append(".").append(m.withSelect(null).withComments(comments).printTrimmed(cursor.getParentOrThrow()));
-                if (cursor.getParentOrThrow().firstEnclosing(J.class) instanceof J.Block) {
+                if (firstEnclosing instanceof J.Block || firstEnclosing instanceof J.Case) {
                     after.append(";");
                 }
             }
