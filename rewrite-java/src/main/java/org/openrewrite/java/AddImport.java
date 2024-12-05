@@ -240,11 +240,10 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
 
     private class FindStaticFieldAccess extends JavaIsoVisitor<AtomicReference<Boolean>> {
         private boolean checkIsOfClassType(@Nullable JavaType type, String fullyQualifiedName) {
-            if (type == null) {
-                return false;
+            if (isOfClassType(type, fullyQualifiedName)) {
+                return true;
             }
-            return isOfClassType(type, fullyQualifiedName) ||
-                    (type instanceof JavaType.Class && isOfClassType(((JavaType.Class) type).getOwningClass(), fullyQualifiedName));
+            return type instanceof JavaType.Class && isOfClassType(((JavaType.Class) type).getOwningClass(), fullyQualifiedName);
         }
 
         @Override
