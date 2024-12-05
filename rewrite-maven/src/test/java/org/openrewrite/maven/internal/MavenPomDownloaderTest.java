@@ -576,7 +576,7 @@ class MavenPomDownloaderTest {
 
         @Test
         @SetSystemProperty(key = "org.openrewrite.allowPomDownloadFailure", value = "true")
-        void allowPomDowloadFailure(@TempDir Path localRepository) throws IOException, MavenDownloadingException {
+        void dontAllowPomDowloadFailure(@TempDir Path localRepository) throws IOException, MavenDownloadingException {
             MavenRepository mavenLocal = MavenRepository.builder()
               .id("local")
               .uri(localRepository.toUri().toString())
@@ -584,7 +584,30 @@ class MavenPomDownloaderTest {
               .knownToExist(true)
               .build();
 
-            // Do not throw exception
+            // Do not return invalid dependency.
+            assertThrows(MavenDownloadingException.class, () ->
+              new MavenPomDownloader(emptyMap(), ctx)
+                .download(new GroupArtifactVersion("com.bad", "bad-artifact", "1"), null, null, List.of(mavenLocal)));
+        }
+
+        @Test
+        @SetSystemProperty(key = "org.openrewrite.allowPomDownloadFailure", value = "true")
+        void allowPomDowloadFailure(@TempDir Path localRepository) throws IOException, MavenDownloadingException {
+            Path localArtifact = localRepository.resolve("com/some/some-artifact");
+            assertThat(localArtifact.toFile().mkdirs()).isTrue();
+            Files.createDirectories(localArtifact.resolve("1"));
+
+            Path localJar = localRepository.resolve("com/some/some-artifact/1/some-artifact-1.jar");
+            Files.writeString(localJar, "");
+
+            MavenRepository mavenLocal = MavenRepository.builder()
+              .id("local")
+              .uri(localRepository.toUri().toString())
+              .snapshots(false)
+              .knownToExist(true)
+              .build();
+
+            // Do not throw exception since we have a jar
             var result = new MavenPomDownloader(emptyMap(), ctx).download(new GroupArtifactVersion("com.some", "some-artifact", "1"), null, null, List.of(mavenLocal));
 
             assertThat(result.getGav().getGroupId()).isEqualTo("com.some");
