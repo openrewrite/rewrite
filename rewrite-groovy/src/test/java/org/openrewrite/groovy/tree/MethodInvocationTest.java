@@ -46,6 +46,21 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4615")
+    void gradleWithParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              plugins {
+                  id 'java-library'
+              }
+              def version = (rootProject.jobName.startsWith('a')) ? "latest.release" : "3.0"
+              """
+          )
+        );
+    }
+
+    @Test
     void emptyArgsWithParens() {
         rewriteRun(
           groovy("mavenCentral()")
