@@ -39,6 +39,13 @@ class RangeTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
+              ( 8..19 ).each { majorVersion ->
+                if (majorVersion == 9) return
+              }
+              """
+          ),
+          groovy(
+            """
               (((( 8..19 ))).each { majorVersion ->
                 if (majorVersion == 9) return
               })

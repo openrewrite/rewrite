@@ -24,7 +24,6 @@ import org.openrewrite.groovy.tree.G;
 import org.openrewrite.groovy.tree.GContainer;
 import org.openrewrite.groovy.tree.GRightPadded;
 import org.openrewrite.groovy.tree.GSpace;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
@@ -357,17 +356,17 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             for (int i = 0; i < args.size(); i++) {
                 JRightPadded<Expression> arg = args.get(i);
                 boolean omitParens = arg.getElement().getMarkers()
-                                             .findFirst(OmitParentheses.class)
-                                             .isPresent() ||
-                                     arg.getElement().getMarkers()
-                                             .findFirst(org.openrewrite.java.marker.OmitParentheses.class)
-                                             .isPresent();
+                        .findFirst(OmitParentheses.class)
+                        .isPresent() ||
+                        arg.getElement().getMarkers()
+                                .findFirst(org.openrewrite.java.marker.OmitParentheses.class)
+                                .isPresent();
 
                 if (i == 0 && !omitParens) {
                     p.append('(');
                 } else if (i > 0 && omitParens && (
                         !args.get(0).getElement().getMarkers().findFirst(OmitParentheses.class).isPresent() &&
-                        !args.get(0).getElement().getMarkers().findFirst(org.openrewrite.java.marker.OmitParentheses.class).isPresent()
+                                !args.get(0).getElement().getMarkers().findFirst(org.openrewrite.java.marker.OmitParentheses.class).isPresent()
                 )) {
                     p.append(')');
                 } else if (i > 0) {
@@ -380,6 +379,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
                     p.append(')');
                 }
             }
+
             afterSyntax(method, p);
             return method;
         }
@@ -387,7 +387,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         @Override
         public J visitReturn(J.Return return_, PrintOutputCapture<P> p) {
             if (return_.getMarkers().findFirst(ImplicitReturn.class).isPresent() ||
-                return_.getMarkers().findFirst(org.openrewrite.java.marker.ImplicitReturn.class).isPresent()) {
+                    return_.getMarkers().findFirst(org.openrewrite.java.marker.ImplicitReturn.class).isPresent()) {
                 visitSpace(return_.getPrefix(), Space.Location.RETURN_PREFIX, p);
                 visitMarkers(return_.getMarkers(), p);
                 visit(return_.getExpression(), p);

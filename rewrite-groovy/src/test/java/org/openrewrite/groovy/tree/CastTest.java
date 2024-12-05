@@ -73,6 +73,11 @@ class CastTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
+              ( "" as String ).toString()
+              """
+          ),
+          groovy(
+            """
               (((((( "" as String ))))).toString())
               """
           )
@@ -82,6 +87,11 @@ class CastTest implements RewriteTest {
     @Test
     void javaCastAndInvokeMethod() {
         rewriteRun(
+          groovy(
+            """
+              ( (String) "" ).toString()
+              """
+          ),
           groovy(
             """
               (((((( (String) "" )).toString()))))
