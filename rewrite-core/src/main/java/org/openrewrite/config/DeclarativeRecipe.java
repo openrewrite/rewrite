@@ -247,11 +247,6 @@ public class DeclarativeRecipe extends Recipe {
         }
 
         @Override
-        public List<Recipe> getRecipeList() {
-            return decorateWithPreconditionBellwether(bellwether, delegate.getRecipeList());
-        }
-
-        @Override
         public boolean causesAnotherCycle() {
             return delegate.causesAnotherCycle();
         }

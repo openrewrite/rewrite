@@ -33,7 +33,6 @@ configurations.named("testImplementation").configure {
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-yaml"))
-    api(project(":rewrite-xml"))
 
     api("io.micrometer:micrometer-core:1.9.+")
     api("org.jetbrains:annotations:latest.release")
@@ -54,6 +53,10 @@ dependencies {
     implementation("org.xerial.snappy:snappy-java:1.1.10.+")
 
     api("com.fasterxml.jackson.core:jackson-annotations")
+
+    // these are required for now so that `ChangeType` and `ChangePackage` can use the `Reference` trait
+    runtimeOnly(project(":rewrite-properties"))
+    runtimeOnly(project(":rewrite-xml"))
 
     implementation("org.ow2.asm:asm:latest.release")
     implementation("org.ow2.asm:asm-util:latest.release")

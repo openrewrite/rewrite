@@ -1979,21 +1979,26 @@ public interface J extends Tree {
         }
 
         public boolean isFullyQualifiedClassReference(String className) {
-            return isFullyQualifiedClassReference(this, className);
-        }
-
-        private boolean isFullyQualifiedClassReference(J.FieldAccess fieldAccess, String className) {
             if (!className.contains(".")) {
                 return false;
             }
-            if (!fieldAccess.getName().getSimpleName().equals(className.substring(className.lastIndexOf('.') + 1))) {
+            return isFullyQualifiedClassReference(this, className, className.length());
+        }
+
+        private boolean isFullyQualifiedClassReference(J.FieldAccess fieldAccess, String className, int prevDotIndex) {
+            int dotIndex = className.lastIndexOf('.', prevDotIndex - 1);
+            if (dotIndex < 0) {
+                return false;
+            }
+            String simpleName = fieldAccess.getName().getSimpleName();
+            if (!simpleName.regionMatches(0, className, dotIndex + 1, simpleName.length())) {
                 return false;
             }
             if (fieldAccess.getTarget() instanceof J.FieldAccess) {
-                return isFullyQualifiedClassReference((J.FieldAccess) fieldAccess.getTarget(), className.substring(0, className.lastIndexOf('.')));
+                return isFullyQualifiedClassReference((J.FieldAccess) fieldAccess.getTarget(), className, dotIndex);
             }
             if (fieldAccess.getTarget() instanceof Identifier) {
-                return ((Identifier) fieldAccess.getTarget()).getSimpleName().equals(className.substring(0, className.lastIndexOf('.')));
+                return ((Identifier) fieldAccess.getTarget()).getSimpleName().equals(className.substring(0, dotIndex));
             }
             return false;
         }

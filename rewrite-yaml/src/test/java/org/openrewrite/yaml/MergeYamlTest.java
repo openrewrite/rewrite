@@ -1301,18 +1301,18 @@ class MergeYamlTest implements RewriteTest {
     void mergeEmptyStructureFollowedByCopyValue() {
         rewriteRun(
           spec -> spec.recipes(
-            new MergeYaml(
-              "$.spec",
-              //language=yaml
-              """
-                empty:
-                  initially:
-                """,
-              false,
-              null,
-              null
-            ),
-            new CopyValue("$.spec.level1.level2", null, "$.spec.empty.initially", null))
+              new MergeYaml(
+                "$.spec",
+                //language=yaml
+                """
+                  empty:
+                    initially:
+                  """,
+                false,
+                null,
+                null
+              ),
+              new CopyValue("$.spec.level1.level2", null, "$.spec.empty.initially", null))
             .expectedCyclesThatMakeChanges(2),
           yaml(
             """
@@ -1339,18 +1339,18 @@ class MergeYamlTest implements RewriteTest {
     void comment() {
         rewriteRun(
           spec -> spec.recipe(
-              new MergeYaml(
-                "$",
-                //language=yaml
-                """
-                  
-                    # new stuff
-                  new-property: value
-                  """,
-                false,
-                null,
-                null
-              )),
+            new MergeYaml(
+              "$",
+              //language=yaml
+              """
+                
+                  # new stuff
+                new-property: value
+                """,
+              false,
+              null,
+              null
+            )),
           yaml(
             """
               # config
@@ -1404,6 +1404,288 @@ class MergeYamlTest implements RewriteTest {
                   foo: bar
               """
           )
+        );
+    }
+
+    @Test
+    // Mimics `org.openrewrite.quarkus.AddQuarkusProperty`
+    void addPropertyWitCommentAboveLastLine() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new MergeYaml(
+              "$",
+              //language=yaml
+              """
+                quarkus:
+                  http:
+                    # This property was added
+                    root-path: /api
+                """,
+              true,
+              null,
+              null
+            )),
+          yaml(
+            """
+              quarkus:
+                http:
+                  port: 9090
+              """,
+            """
+              quarkus:
+                http:
+                  port: 9090
+                  # This property was added
+                  root-path: /api
+              """
+          )
+        );
+    }
+
+    @Test
+    void addLiteralStyleBlockAtRoot() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.",
+              // language=yaml
+              """
+                script: |
+                  #!/bin/bash
+                  echo "hello"
+                """,
+              false, "name",
+              null)),
+          yaml(
+            """
+              some:
+                object:
+                  with: An existing value
+              """,
+            """
+              some:
+                object:
+                  with: An existing value
+              script: |
+                #!/bin/bash
+                echo "hello"
+              """)
+        );
+    }
+
+    @Test
+    void addLiteralStyleBlockWhichDoesAlreadyExist() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.some.object",
+              // language=yaml
+              """
+                script: |
+                  #!/bin/bash
+                  echo "hellow"
+                something: else
+                """,
+              false, null,
+              null)),
+          yaml(
+            """
+              some:
+                object:
+                  with: An existing value
+                  script: |
+                    #!/bin/bash
+                    echo "hello"
+              """,
+            """
+              some:
+                object:
+                  with: An existing value
+                  script: |
+                    #!/bin/bash
+                    echo "hellow"
+                  something: else
+              """)
+        );
+    }
+
+    @Test
+    void addLiteralStyleBlock() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.some.very",
+              // language=yaml
+              """
+                deep:
+                  object:
+                
+                    script: | # yaml comment
+                       #!/bin/bash
+                        echo "hello"
+                           echo "hello"
+                """,
+              false, "name",
+              null)),
+          yaml(
+            """
+              some:
+                very:
+                  deep:
+                    object:
+                      with: An existing value
+              """,
+            """
+              some:
+                very:
+                  deep:
+                    object:
+                      with: An existing value
+              
+                      script: | # yaml comment
+                         #!/bin/bash
+                          echo "hello"
+                             echo "hello"
+              """)
+        );
+    }
+
+    @Test
+    // Mimics `org.openrewrite.github.UpgradeSlackNotificationVersion2Test`
+    void upgradeSlackNotificationVersion2() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$..steps[?(@.uses =~ 'slackapi/slack-github-action@v1.*')]",
+              // language=yaml
+              """
+                with:
+                  method: chat.postMessage
+                  token: ${{ secrets.SLACK_MORTY_BOT_TOKEN }}
+                  payload: |
+                    channel: "##foo-alerts"
+                    text: ":boom: Unable run dependency check on: <${{ steps.get_failed_check_link.outputs.failed-check-link }}|${{ inputs.organization }}/${{ inputs.repository }}>"
+                """,
+              false, "name",
+              null)),
+          yaml(
+            """
+              jobs:
+                build:
+                  steps:
+                    - name: Send notification on error
+                      if: failure() && inputs.send-notification
+                      uses: slackapi/slack-github-action@v1.27.0
+                      with:
+                        channel-id: "##foo-alerts"
+                        slack-message: ":boom: Unable run dependency check on: <${{ steps.get_failed_check_link.outputs.failed-check-link }}|${{ inputs.organization }}/${{ inputs.repository }}>"
+                      env:
+                        SLACK_BOT_TOKEN: ${{ secrets.SLACK_MORTY_BOT_TOKEN }}
+              """,
+            """
+              jobs:
+                build:
+                  steps:
+                    - name: Send notification on error
+                      if: failure() && inputs.send-notification
+                      uses: slackapi/slack-github-action@v1.27.0
+                      with:
+                        channel-id: "##foo-alerts"
+                        slack-message: ":boom: Unable run dependency check on: <${{ steps.get_failed_check_link.outputs.failed-check-link }}|${{ inputs.organization }}/${{ inputs.repository }}>"
+                        method: chat.postMessage
+                        token: ${{ secrets.SLACK_MORTY_BOT_TOKEN }}
+                        payload: |
+                          channel: "##foo-alerts"
+                          text: ":boom: Unable run dependency check on: <${{ steps.get_failed_check_link.outputs.failed-check-link }}|${{ inputs.organization }}/${{ inputs.repository }}>"
+                      env:
+                        SLACK_BOT_TOKEN: ${{ secrets.SLACK_MORTY_BOT_TOKEN }}
+              """)
+        );
+    }
+
+    @Test
+    void addLiteralStyleMinusBlock() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.some.object",
+              // language=yaml
+              """
+                script: |-
+                  #!/bin/bash
+                  echo "hello"
+                """,
+              false, "name",
+              null)),
+          yaml(
+            """
+              some:
+                object:
+                  with: An existing value
+              """,
+            """
+              some:
+                object:
+                  with: An existing value
+                  script: |-
+                    #!/bin/bash
+                    echo "hello"
+              """)
+        );
+    }
+
+    @Test
+    void addFoldedStyleBlock() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.some.object",
+              // language=yaml
+              """
+                script: >
+                  #!/bin/bash
+                  echo "hello"
+                """,
+              false, "name",
+              null)),
+          yaml(
+            """
+              some:
+                object:
+                  with: An existing value
+              """,
+            """
+              some:
+                object:
+                  with: An existing value
+                  script: >
+                    #!/bin/bash
+                    echo "hello"
+              """)
+        );
+    }
+
+    @Test
+    void addFoldedStyleMinusBlock() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.some.object",
+              // language=yaml
+              """
+                script: >-
+                  #!/bin/bash
+                  echo "hello"
+                """,
+              false, "name",
+              null)),
+          yaml(
+            """
+              some:
+                object:
+                  with: An existing value
+              """,
+            """
+              some:
+                object:
+                  with: An existing value
+                  script: >-
+                    #!/bin/bash
+                    echo "hello"
+              """)
         );
     }
 }
