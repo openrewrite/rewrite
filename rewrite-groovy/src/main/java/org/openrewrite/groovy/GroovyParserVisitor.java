@@ -2441,7 +2441,7 @@ public class GroovyParserVisitor {
             // On Java 8 _INSIDE_PARENTHESES_LEVEL is a regular Integer
             return (Integer) rawIpl;
         } else if (node instanceof MethodCallExpression) {
-            return GroovyParserParentheseDiscoverer.getInsideParenthesesLevel((MethodCallExpression) node, source.substring(cursor));
+            return GroovyParserParentheseDiscoverer.getInsideParenthesesLevel((MethodCallExpression) node, source, cursor);
         }
         return null;
     }

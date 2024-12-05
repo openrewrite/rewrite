@@ -30,12 +30,17 @@ public class GroovyParserParentheseDiscoverer {
     // Eg: `((a.invoke())` does not match, `((a.invoke() && b.invoke())` does match
     private static final Pattern HAS_SUB_PARENTHESIS = Pattern.compile("\\(+[^)]+\\)+[^)]+\\).*", Pattern.DOTALL);
 
-    public static @Nullable Integer getInsideParenthesesLevel(MethodCallExpression node, String source) {
+    /**
+     * Calculates the insideParenthesesLevel for method calls, because the compiler does not set the _INSIDE_PARENTHESES_LEVEL flag for method calls.
+     */
+    public static @Nullable Integer getInsideParenthesesLevel(MethodCallExpression node, String source, int cursor) {
+        String sourceFromCursor = source.substring(cursor);
+
         // start with a (` character with optional whitespace
-        if (source.matches("(?s)^\\s*\\(.*")) {
-            String sourceNoWhitespace = source.replaceAll("\\s+", "");
+        if (sourceFromCursor.matches("(?s)^\\s*\\(.*")) {
+            String sourceNoWhitespace = sourceFromCursor.replaceAll("\\s+", "");
             // grab the source code until method and closing parenthesis
-            Matcher m = Pattern.compile("(?s)(.*" + node.getMethodAsString() + "[^)]*\\)+).*").matcher(sourceNoWhitespace);
+            Matcher m = Pattern.compile("(?s)(.*?" + node.getMethodAsString() + "[^)]*\\)+).*").matcher(sourceNoWhitespace);
             if (m.matches()) {
                 // Replace all string literals with `<s>` to prevent weird matches with the PARENTHESES_GROUP regex
                 String s = m.group(1).replaceAll("\"[^\"]*\"", "<s>");

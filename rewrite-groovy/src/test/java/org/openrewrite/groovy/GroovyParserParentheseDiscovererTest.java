@@ -32,8 +32,8 @@ class GroovyParserParentheseDiscovererTest {
         MethodCallExpression node = MockMethodCallExpression.of("invoke");
 
         //language=groovy
-        String input = "(a.invoke())";
-        Integer result = GroovyParserParentheseDiscoverer.getInsideParenthesesLevel(node, input);
+        String source = "(a.invoke())";
+        Integer result = GroovyParserParentheseDiscoverer.getInsideParenthesesLevel(node, source, 0);
 
         assertEquals(1, result);
     }
@@ -43,8 +43,8 @@ class GroovyParserParentheseDiscovererTest {
         MethodCallExpression node = MockMethodCallExpression.of("invoke");
 
         //language=groovy
-        String input = "(a.invoke(\"A\", \"\\$\", \"C?)\"))";
-        Integer result = GroovyParserParentheseDiscoverer.getInsideParenthesesLevel(node, input);
+        String source = "(a.invoke(\"A\", \"\\$\", \"C?)\"))";
+        Integer result = GroovyParserParentheseDiscoverer.getInsideParenthesesLevel(node, source, 0);
 
         assertEquals(1, result);
     }
@@ -54,8 +54,8 @@ class GroovyParserParentheseDiscovererTest {
         MethodCallExpression node = MockMethodCallExpression.of("invoke");
 
         //language=groovy
-        String input = "( ( (((a.invoke()) ) ) ) )";
-        Integer result = GroovyParserParentheseDiscoverer.getInsideParenthesesLevel(node, input);
+        String source = "( ( (((a.invoke()) ) ) ) )";
+        Integer result = GroovyParserParentheseDiscoverer.getInsideParenthesesLevel(node, source, 0);
 
         assertEquals(5, result);
     }
@@ -65,8 +65,8 @@ class GroovyParserParentheseDiscovererTest {
         MethodCallExpression node = MockMethodCallExpression.of("equals");
 
         //language=groovy
-        String input = "(((((((someMap.get(\"(bar\"))))).equals(\"baz\") )   ) )";
-        Integer result = GroovyParserParentheseDiscoverer.getInsideParenthesesLevel(node, input);
+        String source = "(((((((someMap.get(\"(bar\"))))).equals(\"baz\") )   ) )";
+        Integer result = GroovyParserParentheseDiscoverer.getInsideParenthesesLevel(node, source, 0);
 
         assertEquals(3, result);
     }
@@ -76,8 +76,8 @@ class GroovyParserParentheseDiscovererTest {
         MethodCallExpression node = MockMethodCallExpression.of("invoke");
 
         //language=groovy
-        String input = "(something?.'invoke' \"s\" \"a\" )";
-        Integer result = GroovyParserParentheseDiscoverer.getInsideParenthesesLevel(node, input);
+        String source = "(something?.'invoke' \"s\" \"a\" )";
+        Integer result = GroovyParserParentheseDiscoverer.getInsideParenthesesLevel(node, source, 0);
 
         assertEquals(1, result);
     }
@@ -87,8 +87,8 @@ class GroovyParserParentheseDiscovererTest {
         MethodCallExpression node = MockMethodCallExpression.of("equals");
 
         //language=groovy
-        String input = "((((((someMap.get(\"baz\"))))).equals(\"baz\")))";
-        Integer result = GroovyParserParentheseDiscoverer.getInsideParenthesesLevel(node, input);
+        String source = "((((((someMap.get(\"baz\"))))).equals(\"baz\")))";
+        Integer result = GroovyParserParentheseDiscoverer.getInsideParenthesesLevel(node, source, 0);
 
         assertEquals(2, result);
     }
@@ -98,8 +98,8 @@ class GroovyParserParentheseDiscovererTest {
         MethodCallExpression node = MockMethodCallExpression.of("get");
 
         //language=groovy
-        String input = "((((someMap.get(\"(bar\")))))";
-        Integer result = GroovyParserParentheseDiscoverer.getInsideParenthesesLevel(node, input);
+        String source = "((((someMap.get(\"(bar\")))))";
+        Integer result = GroovyParserParentheseDiscoverer.getInsideParenthesesLevel(node, source, 0);
 
         assertEquals(4, result);
     }
@@ -109,11 +109,22 @@ class GroovyParserParentheseDiscovererTest {
         MethodCallExpression node = MockMethodCallExpression.of("equals");
 
         //language=groovy
-        String input = "((someMap.containsKey(\"foo\")) && ((someMap.get(\"foo\")).'equals' \"\"\"bar\n" +
+        String source = "((someMap.containsKey(\"foo\")) && ((someMap.get(\"foo\")).'equals' \"\"\"bar\n" +
           "\"\"\" ))";
-        Integer result = GroovyParserParentheseDiscoverer.getInsideParenthesesLevel(node, input);
+        Integer result = GroovyParserParentheseDiscoverer.getInsideParenthesesLevel(node, source, 0);
 
         assertEquals(1, result);
+    }
+
+    @Test
+    void sourceCodeWithRepetition() {
+        MethodCallExpression node = MockMethodCallExpression.of("invoke");
+
+        //language=groovy
+        String source = "(a.invoke());((((a.invoke()))));(a.invoke())";
+        Integer result = GroovyParserParentheseDiscoverer.getInsideParenthesesLevel(node, source, 13);
+
+        assertEquals(4, result);
     }
 
     private static class MockMethodCallExpression extends MethodCallExpression {
