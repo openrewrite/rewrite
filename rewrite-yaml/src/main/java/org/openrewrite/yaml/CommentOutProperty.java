@@ -100,15 +100,15 @@ public class CommentOutProperty extends Recipe {
             public Yaml.Sequence.Entry visitSequenceEntry(Yaml.Sequence.Entry entry,
                                                           ExecutionContext ctx) {
                 indentation = entry.getPrefix();
-                if (!Boolean.FALSE.equals(commentOutProperty)) {
+                if (Boolean.FALSE.equals(commentOutProperty)) {
+                    return addBockCommentIfNecessary(entry, ctx);
+                } else {
                     if (!comment.isEmpty()) {
                         // add comment and return
                         String newPrefix = entry.getPrefix() + "# " + commentText + comment + entry.getPrefix();
                         comment = "";
                         return entry.withPrefix(newPrefix);
                     }
-                } else {
-                    return addBockCommentIfNecessary(entry, ctx);
                 }
                 return super.visitSequenceEntry(entry, ctx);
             }
@@ -136,10 +136,12 @@ public class CommentOutProperty extends Recipe {
                         comment = lastIndentation + "#" + entry.print(getCursor().getParentTreeCursor());
                     }
 
-                    if (!Boolean.FALSE.equals(commentOutProperty)) {
+                    if (Boolean.FALSE.equals(commentOutProperty)) {
+                        if (!entry.getPrefix().contains(commentText) && !isBlockCommentExists) {
+                            return entry.withPrefix(entry.getPrefix() + "# " + commentText + (entry.getPrefix().contains("\n") ? entry.getPrefix() : "\n" + entry.getPrefix()));
+                        }
+                    } else {
                         doAfterVisit(new DeleteProperty(propertyKey, null, null, null).getVisitor());
-                    } else if (!entry.getPrefix().contains(commentText) && !isBlockCommentExists) {
-                        return entry.withPrefix(entry.getPrefix() + "# " + commentText + (entry.getPrefix().contains("\n") ? entry.getPrefix() : "\n" + entry.getPrefix()));
                     }
                     return entry;
                 }
