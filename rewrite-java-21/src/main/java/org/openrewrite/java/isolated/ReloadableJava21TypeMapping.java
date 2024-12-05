@@ -707,30 +707,53 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
         if (!sym.getDeclarationAttributes().isEmpty()) {
             annotations = new ArrayList<>(sym.getDeclarationAttributes().size());
             for (Attribute.Compound a : sym.getDeclarationAttributes()) {
-                JavaType.FullyQualified annotType = TypeUtils.asFullyQualified(type(a.type));
-                if (annotType == null) {
-                    continue;
-                }
-                List<JavaType.AnnotationValue> annotationValues = new ArrayList<>();
-                for (Pair<Symbol.MethodSymbol, Attribute> attr : a.values) {
-                    JavaType.AnnotationValue annotationValue = new JavaType.AnnotationValue(
-                            methodDeclarationType(attr.fst, annotType), annotationValue(attr.snd.getValue()));
-                    annotationValues.add(annotationValue);
-                }
-                JavaType.Annotation annotation = new JavaType.Annotation(annotType, annotationValues);
+                JavaType.Annotation annotation = annotationValue(a);
+                if (annotation == null) continue;
                 annotations.add(annotation);
             }
         }
         return annotations;
     }
 
-    private @Nullable Object annotationValue(Object value) {
+    private JavaType.@Nullable Annotation annotationValue(Attribute.Compound compound) {
+        JavaType.FullyQualified annotType = TypeUtils.asFullyQualified(type(compound.type));
+        if (annotType == null) {
+            return null;
+        }
+        List<JavaType.AnnotationValue> annotationValues = new ArrayList<>();
+        for (Pair<Symbol.MethodSymbol, Attribute> attr : compound.values) {
+            JavaType.AnnotationValue annotationValue = new JavaType.AnnotationValue(
+                    methodDeclarationType(attr.fst, annotType), annotationAttributeValue(attr.snd.getValue()));
+            annotationValues.add(annotationValue);
+        }
+        return new JavaType.Annotation(annotType, annotationValues);
+    }
+
+    private @Nullable Object annotationAttributeValue(Object value) {
         if (value instanceof Symbol.VarSymbol) {
             return variableType((Symbol.VarSymbol) value);
+        } else if (value instanceof Type.ClassType) {
+            return type((Type.ClassType) value);
+        } else if (value instanceof Attribute.Array) {
+            List<@Nullable Object> list = new ArrayList<>();
+            for (Attribute attribute : ((Attribute.Array) value).values) {
+                list.add(annotationAttributeValue(attribute));
+            }
+            return list;
+        } else if (value instanceof Attribute.Class) {
+            return type(((Attribute.Class) value).classType);
+        } else if (value instanceof Attribute.Compound) {
+            return annotationValue((Attribute.Compound) value);
+        } else if (value instanceof Attribute.Constant) {
+            return annotationAttributeValue(((Attribute.Constant) value).value);
         } else if (value instanceof Attribute.Enum) {
-            return variableType(((Attribute.Enum) value).value);
+            return annotationAttributeValue(((Attribute.Enum) value).value);
         } else if (value instanceof List<?>) {
-            return ((List<?>) value).stream().map(this::annotationValue).toList();
+            List<@Nullable Object> list = new ArrayList<>();
+            for (Object o : ((List<?>) value)) {
+                list.add(annotationAttributeValue(o));
+            }
+            return list;
         } else if (value instanceof String) {
             return value;
         } else if (value instanceof Boolean) {

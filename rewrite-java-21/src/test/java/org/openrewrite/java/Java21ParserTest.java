@@ -68,15 +68,15 @@ class Java21ParserTest implements RewriteTest {
 
         // Thread.currentThread().stop();
         assertEquals("java.lang.Deprecated" ,annotation.type.getFullyQualifiedName());
-        assertEquals("since", annotation.values.get(0).getMethod().getName());
-        assertEquals("1.2", annotation.values.get(0).getValue());
-        assertEquals("forRemoval", annotation.values.get(1).getMethod().getName());
-        assertEquals(Boolean.TRUE, annotation.values.get(1).getValue());
+        assertEquals("since", annotation.getValues().get(0).getMethod().getName());
+        assertEquals("1.2", annotation.getValues().get(0).getValue());
+        assertEquals("forRemoval", annotation.getValues().get(1).getMethod().getName());
+        assertEquals(Boolean.TRUE, annotation.getValues().get(1).getValue());
 
         // Thread.currentThread().getContextClassLoader();
         mi = (J.MethodInvocation) md.getBody().getStatements().get(1);
         annotation = (JavaType.Annotation) mi.getMethodType().getAnnotations().get(0);
         assertEquals("jdk.internal.reflect.CallerSensitive" ,annotation.type.getFullyQualifiedName());
-        assertTrue(annotation.values.isEmpty());
+        assertTrue(annotation.getValues().isEmpty());
     }
 }

@@ -223,12 +223,17 @@ public interface JavaTypeMappingTest {
     @Test
     default void ignoreSourceRetentionAnnotations() {
         JavaType.Parameterized goat = goatType();
-        assertThat(goat.getAnnotations().size()).isEqualTo(1);
-        assertThat(goat.getAnnotations().get(0).getClassName()).isEqualTo("AnnotationWithRuntimeRetention");
+        assertThat(goat.getAnnotations().size()).isEqualTo(2);
+        assertThat(goat.getAnnotations()).satisfiesExactlyInAnyOrder(
+                a -> assertThat(a.getClassName()).isEqualTo("AnnotationWithRuntimeRetention"),
+                a -> assertThat(a.getClassName()).isEqualTo("AnnotationWithSourceRetention")
+        );
 
         JavaType.Method clazzMethod = methodType("clazz");
-        assertThat(clazzMethod.getAnnotations().size()).isEqualTo(1);
-        assertThat(clazzMethod.getAnnotations().get(0).getClassName()).isEqualTo("AnnotationWithRuntimeRetention");
+        assertThat(clazzMethod.getAnnotations()).satisfiesExactlyInAnyOrder(
+                a -> assertThat(a.getClassName()).isEqualTo("AnnotationWithRuntimeRetention"),
+                a -> assertThat(a.getClassName()).isEqualTo("AnnotationWithSourceRetention")
+        );
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1367")

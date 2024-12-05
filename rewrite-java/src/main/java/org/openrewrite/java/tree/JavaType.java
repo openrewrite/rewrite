@@ -49,6 +49,7 @@ public interface JavaType {
     Method[] EMPTY_METHOD_ARRAY = new Method[0];
     String[] EMPTY_STRING_ARRAY = new String[0];
     JavaType[] EMPTY_JAVA_TYPE_ARRAY = new JavaType[0];
+    AnnotationValue[] EMPTY_ANNOTATION_VALUE_ARRAY = new AnnotationValue[0];
 
     // TODO: To be removed with OpenRewrite 9
     default @Nullable Integer getManagedReference() {
@@ -638,12 +639,16 @@ public interface JavaType {
 
     class Annotation extends FullyQualified {
 
-        public final List<AnnotationValue> values;
+        public final AnnotationValue @Nullable [] values;
         public final FullyQualified type;
 
         public Annotation(FullyQualified type, List<AnnotationValue> values) {
             this.type = type;
-            this.values = values;
+            this.values = ListUtils.arrayOrNullIfEmpty(values, EMPTY_ANNOTATION_VALUE_ARRAY);
+        }
+
+        public List<AnnotationValue> getValues() {
+            return values == null ? emptyList() : Arrays.asList(values);
         }
 
         @Override
