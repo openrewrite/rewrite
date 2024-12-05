@@ -17,18 +17,11 @@ package org.openrewrite.yaml;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.yaml.Assertions.yaml;
 
 class CommentOutPropertyTest implements RewriteTest {
-
-    @Override
-    public void defaults(RecipeSpec spec) {
-        spec.recipe(new CommentOutProperty("management.metrics.binders.files.enabled", "some comments", null
-        ));
-    }
 
     @DocumentExample("comment out a map entry")
     @Test
