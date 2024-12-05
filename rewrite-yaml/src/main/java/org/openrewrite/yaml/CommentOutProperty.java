@@ -15,10 +15,9 @@
  */
 package org.openrewrite.yaml;
 
-import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
@@ -33,7 +32,6 @@ import static java.util.Spliterators.spliteratorUnknownSize;
 import static java.util.stream.StreamSupport.stream;
 
 @Value
-@AllArgsConstructor
 @EqualsAndHashCode(callSuper = false)
 public class CommentOutProperty extends Recipe {
     @Option(displayName = "Property key",
@@ -49,19 +47,8 @@ public class CommentOutProperty extends Recipe {
     @Option(example = "true", displayName = "Comment out property",
             description = "If false, property wouldn't be commented out, only comment will be added. By default, set to true",
             required = false)
+    @Nullable
     Boolean commentOutProperty;
-
-    public CommentOutProperty() {
-        this.propertyKey = "";
-        this.commentText = "";
-        this.commentOutProperty = true;
-    }
-
-    public CommentOutProperty(String propertyKey, String commentText) {
-        this.propertyKey = propertyKey;
-        this.commentText = commentText;
-        this.commentOutProperty = true;
-    }
 
     @Override
     public String getDisplayName() {
@@ -96,7 +83,7 @@ public class CommentOutProperty extends Recipe {
                 }
 
                 // Add any leftover comment to the end of document
-                if (!comment.isEmpty() && commentOutProperty) {
+                if (!comment.isEmpty() && !Boolean.FALSE.equals(commentOutProperty)) {
                     String newPrefix = String.format("%s# %s%s%s",
                             indentation,
                             commentText,
@@ -113,7 +100,7 @@ public class CommentOutProperty extends Recipe {
             public Yaml.Sequence.Entry visitSequenceEntry(Yaml.Sequence.Entry entry,
                                                           ExecutionContext ctx) {
                 indentation = entry.getPrefix();
-                if (commentOutProperty) {
+                if (!Boolean.FALSE.equals(commentOutProperty)) {
                     if (!comment.isEmpty()) {
                         // add comment and return
                         String newPrefix = entry.getPrefix() + "# " + commentText + comment + entry.getPrefix();
@@ -131,7 +118,7 @@ public class CommentOutProperty extends Recipe {
                 String lastIndentation = indentation;
                 indentation = entry.getPrefix();
 
-                if (!comment.isEmpty() && commentOutProperty) {
+                if (!comment.isEmpty() && !Boolean.FALSE.equals(commentOutProperty)) {
                     String newPrefix = entry.getPrefix() + "# " + commentText + comment + entry.getPrefix();
                     comment = "";
                     return entry.withPrefix(newPrefix);
@@ -149,10 +136,10 @@ public class CommentOutProperty extends Recipe {
                         comment = lastIndentation + "#" + entry.print(getCursor().getParentTreeCursor());
                     }
 
-                    if (commentOutProperty) {
+                    if (!Boolean.FALSE.equals(commentOutProperty)) {
                         doAfterVisit(new DeleteProperty(propertyKey, null, null, null).getVisitor());
                     } else if (!entry.getPrefix().contains(commentText) && !isBlockCommentExists) {
-                        return entry.withPrefix(entry.getPrefix() + "# " + commentText + (entry.getPrefix().contains("\n")? entry.getPrefix() : "\n" + entry.getPrefix()));
+                        return entry.withPrefix(entry.getPrefix() + "# " + commentText + (entry.getPrefix().contains("\n") ? entry.getPrefix() : "\n" + entry.getPrefix()));
                     }
                     return entry;
                 }
