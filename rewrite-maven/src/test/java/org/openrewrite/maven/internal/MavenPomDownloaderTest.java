@@ -577,24 +577,6 @@ class MavenPomDownloaderTest {
         @Test
         @SetSystemProperty(key = "org.openrewrite.allowPomDownloadFailure", value = "true")
         void allowPomDowloadFailure(@TempDir Path localRepository) throws IOException, MavenDownloadingException {
-            Path localArtifact = localRepository.resolve("com/some/some-artifact");
-            assertThat(localArtifact.toFile().mkdirs()).isTrue();
-            Files.createDirectories(localArtifact.resolve("1"));
-
-            Path localPom = localRepository.resolve("com/some/some-artifact/1/some-artifact-1.pom");
-            Files.writeString(localPom,
-              //language=xml
-              """
-                 <project>
-                   <groupId>com.some</groupId>
-                   <artifactId>some-artifact</artifactId>
-                   <version>1</version>
-                 </project>
-                """
-            );
-            Path localJar = localRepository.resolve("com/some/some-artifact/1/some-artifact-1.jar");
-            Files.writeString(localJar, "");
-
             MavenRepository mavenLocal = MavenRepository.builder()
               .id("local")
               .uri(localRepository.toUri().toString())
