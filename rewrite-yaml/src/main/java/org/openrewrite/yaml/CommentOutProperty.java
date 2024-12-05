@@ -181,7 +181,7 @@ public class CommentOutProperty extends Recipe {
                         .anyMatch(e -> propertyKey.equals(prop + "." + e.getKey().getValue()));
             }
 
-            private @NotNull String calculateCurrentKeyPath() {
+            private String calculateCurrentKeyPath() {
                 Deque<Yaml.Mapping.Entry> propertyEntries = getCursor().getPathAsStream()
                         .filter(Yaml.Mapping.Entry.class::isInstance)
                         .map(Yaml.Mapping.Entry.class::cast)
