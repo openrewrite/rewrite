@@ -776,6 +776,51 @@ class AddImportTest implements RewriteTest {
     }
 
     @Test
+    void addNamedStaticImportWhenReferenced2() {
+        rewriteRun(
+          spec -> spec.recipes(
+            toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
+                    method = super.visitMethodDeclaration(method, executionContext);
+                    method = JavaTemplate.builder("List<Builder> list = new ArrayList<>();")
+                      .imports("java.util.ArrayList", "java.util.List")
+                      .staticImports("java.util.Calendar.Builder")
+                      .build()
+                      .apply(getCursor(), method.getBody().getCoordinates().firstStatement());
+                    maybeAddImport("java.util.ArrayList");
+                    maybeAddImport("java.util.List");
+                    return method;
+                }
+            }).withMaxCycles(1),
+            toRecipe(() -> new AddImport<>("java.util.Calendar", "Builder", true))
+          ),
+          java(
+            """
+              import static java.util.Calendar.Builder;
+              
+              class A {
+                  public A() {
+                  }
+              }
+              """,
+            """
+              import java.util.ArrayList;
+              import java.util.List;
+              
+              import static java.util.Calendar.Builder;
+              
+              class A {
+                  public A() {
+                      List<Builder> list = new ArrayList<>();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void doNotAddNamedStaticImportIfNotReferenced() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.Collections", "emptyList", true))),

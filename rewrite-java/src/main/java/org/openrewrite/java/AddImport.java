@@ -239,11 +239,18 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
     }
 
     private class FindStaticFieldAccess extends JavaIsoVisitor<AtomicReference<Boolean>> {
+        private boolean checkIsOfClassType(@Nullable JavaType type, String fullyQualifiedName) {
+            if (type == null) {
+                return false;
+            }
+            return isOfClassType(type, fullyQualifiedName) || (type instanceof JavaType.Class && isOfClassType(((JavaType.Class) type).getOwningClass(), fullyQualifiedName));
+        }
+
         @Override
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, AtomicReference<Boolean> found) {
             // If the type isn't used there's no need to proceed further
             for (JavaType.Variable varType : cu.getTypesInUse().getVariables()) {
-                if (varType.getName().equals(member) && isOfClassType(varType.getType(), fullyQualifiedName)) {
+                if (checkIsOfClassType(varType.getType(), fullyQualifiedName)) {
                     return super.visitCompilationUnit(cu, found);
                 }
             }
@@ -253,8 +260,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         @Override
         public J.Identifier visitIdentifier(J.Identifier identifier, AtomicReference<Boolean> found) {
             assert getCursor().getParent() != null;
-            if (identifier.getSimpleName().equals(member) && isOfClassType(identifier.getType(), fullyQualifiedName) &&
-                !(getCursor().getParent().firstEnclosingOrThrow(J.class) instanceof J.FieldAccess)) {
+            if (identifier.getSimpleName().equals(member) && checkIsOfClassType(identifier.getType(), fullyQualifiedName) && !(getCursor().getParent().firstEnclosingOrThrow(J.class) instanceof J.FieldAccess)) {
                 found.set(true);
             }
             return identifier;
