@@ -71,7 +71,7 @@ class Java21ParserTest implements RewriteTest {
         assertEquals("since", annotation.values.get(0).getMethod().getName());
         assertEquals("1.2", annotation.values.get(0).getValue());
         assertEquals("forRemoval", annotation.values.get(1).getMethod().getName());
-        assertEquals("true", annotation.values.get(1).getValue());
+        assertEquals(Boolean.TRUE, annotation.values.get(1).getValue());
 
         // Thread.currentThread().getContextClassLoader();
         mi = (J.MethodInvocation) md.getBody().getStatements().get(1);

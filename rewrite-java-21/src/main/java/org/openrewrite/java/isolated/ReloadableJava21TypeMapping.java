@@ -18,6 +18,7 @@ package org.openrewrite.java.isolated;
 import com.sun.source.tree.Tree;
 import com.sun.tools.javac.code.*;
 import com.sun.tools.javac.tree.JCTree;
+import com.sun.tools.javac.util.Pair;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
@@ -28,8 +29,6 @@ import org.openrewrite.java.tree.TypeUtils;
 
 import javax.lang.model.type.NullType;
 import javax.lang.model.type.TypeMirror;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -47,7 +46,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
 
     public JavaType type(com.sun.tools.javac.code.@Nullable Type type) {
         if (type == null || type instanceof Type.ErrorType || type instanceof Type.PackageType || type instanceof Type.UnknownType ||
-            type instanceof NullType) {
+                type instanceof NullType) {
             return JavaType.Class.Unknown.getInstance();
         }
 
@@ -423,7 +422,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
     }
 
     private JavaType.@Nullable Variable variableType(@Nullable Symbol symbol,
-            JavaType.@Nullable FullyQualified owner) {
+                                                     JavaType.@Nullable FullyQualified owner) {
         if (!(symbol instanceof Symbol.VarSymbol)) {
             return null;
         }
@@ -593,15 +592,15 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
                 }
             }
             List<String> defaultValues = null;
-            if(methodSymbol.getDefaultValue() != null) {
-                if(methodSymbol.getDefaultValue() instanceof Attribute.Array) {
+            if (methodSymbol.getDefaultValue() != null) {
+                if (methodSymbol.getDefaultValue() instanceof Attribute.Array) {
                     defaultValues = ((Attribute.Array) methodSymbol.getDefaultValue()).getValue().stream()
                             .map(attr -> attr.getValue().toString())
                             .collect(Collectors.toList());
                 } else {
                     try {
                         defaultValues = Collections.singletonList(methodSymbol.getDefaultValue().getValue().toString());
-                    } catch(UnsupportedOperationException e) {
+                    } catch (UnsupportedOperationException e) {
                         // not all Attribute implementations define `getValue()`
                     }
                 }
@@ -703,25 +702,42 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
         }
     }
 
-    private @Nullable List<JavaType.FullyQualified> listAnnotations(Symbol symb) {
+    private @Nullable List<JavaType.FullyQualified> listAnnotations(Symbol sym) {
         List<JavaType.FullyQualified> annotations = null;
-        if (!symb.getDeclarationAttributes().isEmpty()) {
-            annotations = new ArrayList<>(symb.getDeclarationAttributes().size());
-            for (Attribute.Compound a : symb.getDeclarationAttributes()) {
+        if (!sym.getDeclarationAttributes().isEmpty()) {
+            annotations = new ArrayList<>(sym.getDeclarationAttributes().size());
+            for (Attribute.Compound a : sym.getDeclarationAttributes()) {
                 JavaType.FullyQualified annotType = TypeUtils.asFullyQualified(type(a.type));
                 if (annotType == null) {
                     continue;
                 }
-                Retention retention = a.getAnnotationType().asElement().getAnnotation(Retention.class);
-                if (retention != null && retention.value() == RetentionPolicy.SOURCE) {
-                    continue;
+                List<JavaType.AnnotationValue> annotationValues = new ArrayList<>();
+                for (Pair<Symbol.MethodSymbol, Attribute> attr : a.values) {
+                    JavaType.AnnotationValue annotationValue = new JavaType.AnnotationValue(
+                            methodDeclarationType(attr.fst, annotType), annotationValue(attr.snd.getValue()));
+                    annotationValues.add(annotationValue);
                 }
-                List<JavaType.AnnotationValue> annotationValues = a.values.stream().map(attr -> new JavaType.AnnotationValue(
-                        methodDeclarationType(attr.fst, annotType), attr.snd.getValue().toString())).collect(Collectors.toList());
                 JavaType.Annotation annotation = new JavaType.Annotation(annotType, annotationValues);
                 annotations.add(annotation);
             }
         }
         return annotations;
+    }
+
+    private @Nullable Object annotationValue(Object value) {
+        if (value instanceof Symbol.VarSymbol) {
+            return variableType((Symbol.VarSymbol) value);
+        } else if (value instanceof Attribute.Enum) {
+            return variableType(((Attribute.Enum) value).value);
+        } else if (value instanceof List<?>) {
+            return ((List<?>) value).stream().map(this::annotationValue).toList();
+        } else if (value instanceof String) {
+            return value;
+        } else if (value instanceof Boolean) {
+            return value;
+        } else if (value instanceof Integer) {
+            return value;
+        }
+        return value;
     }
 }

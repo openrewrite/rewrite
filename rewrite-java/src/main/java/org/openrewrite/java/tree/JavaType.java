@@ -15,7 +15,10 @@
  */
 package org.openrewrite.java.tree;
 
-import com.fasterxml.jackson.annotation.*;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.Getter;
@@ -27,7 +30,6 @@ import org.openrewrite.Incubating;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
 
-import java.lang.invoke.MethodType;
 import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Pattern;
@@ -631,7 +633,7 @@ public interface JavaType {
     @Data
     class AnnotationValue {
         private final Method method;
-        private final String value;
+        private final @Nullable Object value;
     }
 
     class Annotation extends FullyQualified {
