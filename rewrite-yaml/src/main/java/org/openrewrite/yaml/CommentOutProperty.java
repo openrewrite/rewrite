@@ -160,7 +160,7 @@ public class CommentOutProperty extends Recipe {
                 return super.visitMappingEntry(entry, ctx);
             }
 
-            private @NotNull Yaml.Sequence.Entry addBockCommentIfNecessary(Yaml.Sequence.Entry entry, ExecutionContext ctx) {
+            private Yaml.Sequence.Entry addBockCommentIfNecessary(Yaml.Sequence.Entry entry, ExecutionContext ctx) {
                 boolean propertyExistsInSequence = isPropertyExistsInSequence(entry);
                 if (propertyExistsInSequence) {
                     isBlockCommentExists = true;
