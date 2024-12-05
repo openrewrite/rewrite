@@ -39,7 +39,7 @@ class Java21ParserTest implements RewriteTest {
     }
 
     @Test
-    void testPreserveAnnotationsFromClasspath() throws IOException {
+    void preserveAnnotationsFromClasspath() throws IOException {
         JavaParser p = JavaParser.fromJavaVersion().build();
         /**
          *     Using these annotations in core library for testing this feature:
