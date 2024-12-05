@@ -22,7 +22,7 @@ import org.openrewrite.internal.StringUtils;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class GroovyParserParentheseDiscoverer {
+class GroovyParserParentheseDiscoverer {
     // Matches a code block including leading and trailing parenthesis
     // Eg: ((((a.invoke~~>("arg")))))<~~ or ~~>(((((( "" as String )))))<~~.toString())
     private static final Pattern PARENTHESES_GROUP = Pattern.compile(".*?(\\(+[^()]+\\)+).*", Pattern.DOTALL);
