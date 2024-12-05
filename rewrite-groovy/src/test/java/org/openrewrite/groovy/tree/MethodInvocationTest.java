@@ -268,23 +268,10 @@ class MethodInvocationTest implements RewriteTest {
     void insideParentheses() {
         rewriteRun(
           groovy(
-            """
-              static def foo(Map someMap) {
-                  ((((((someMap.get("(bar"))))).equals("baz")))
-              }
-              """
-          )
-        );
-    }
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/4703")
-    @Test
-    void insideParentheses2() {
-        rewriteRun(
-          groovy(
-            """
-              static def foo(Map someMap) {
-                  ((someMap.containsKey("foo")) && ((someMap.get("foo")).equals("bar")))
+            """              
+              static def foo(Map map) {
+                  ((map.containsKey("foo"))
+                      && ((map.get("foo")).equals("bar")))
               }
               """
           )
@@ -297,9 +284,8 @@ class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              static def foo(Map someMap) {((((((someMap.get("(bar"))))).'equals'(("baz"))))}
+              static def foo(Map someMap) {((((((someMap.get("(bar")))) ).'equals' "baz" )   )      }
               """
-              //static def foo(Map someMap) {((((((someMap.get("(bar")))) ).'equals' "baz" )   )      }
           )
         );
     }

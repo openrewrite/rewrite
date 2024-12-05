@@ -33,10 +33,13 @@ public class GroovyParserParentheseDiscoverer {
     public static @Nullable Integer getInsideParenthesesLevel(MethodCallExpression node, String source) {
         // start with a (` character with optional whitespace
         if (source.matches("(?s)^\\s*\\(.*")) {
+            String sourceNoWhitespace = source.replaceAll("\\s+", "");
             // grab the source code until method and closing parenthesis
-            Matcher m = Pattern.compile("(?s)(.*" + node.getMethodAsString() + "[^)]*\\)+).*").matcher(source);
+            Matcher m = Pattern.compile("(?s)(.*" + node.getMethodAsString() + "[^)]*\\)+).*").matcher(sourceNoWhitespace);
             if (m.matches()) {
-                return GroovyParserParentheseDiscoverer.getInsideParenthesesLevelForMethodCalls(m.group(1));
+                // Replace all string literals with `<s>` to prevent weird matches with the PARENTHESES_GROUP regex
+                String s = m.group(1).replaceAll("\"[^\"]*\"", "<s>");
+                return GroovyParserParentheseDiscoverer.getInsideParenthesesLevelForMethodCalls(s);
             }
         }
 
@@ -44,8 +47,7 @@ public class GroovyParserParentheseDiscoverer {
     }
 
     private static int getInsideParenthesesLevelForMethodCalls(String source) {
-        // Replace all string literals with `<s>` to prevent weird matches with the PARENTHESES_GROUP regex and remove spaces
-        String s = source.replaceAll("\"[^\"]*\"", "<s>").replaceAll("\\s+","");
+        String s = source;
         // lookup for first code block with parenthesis
         Matcher m = PARENTHESES_GROUP.matcher(s);
         // check if source matches any code block with parenthesis + check if there are still inner parenthesis

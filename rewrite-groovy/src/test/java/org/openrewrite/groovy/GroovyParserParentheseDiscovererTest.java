@@ -16,83 +16,124 @@
 package org.openrewrite.groovy;
 
 import lombok.SneakyThrows;
+import org.codehaus.groovy.ast.expr.Expression;
+import org.codehaus.groovy.ast.expr.MethodCallExpression;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.internal.ReflectionUtils;
+import sun.reflect.ReflectionFactory;
 
-import java.lang.reflect.Method;
+import java.lang.reflect.Constructor;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class GroovyParserParentheseDiscovererTest {
 
     @Test
     void invoke() {
+        MethodCallExpression node = MockMethodCallExpression.of("invoke");
+
         //language=groovy
         String input = "(a.invoke())";
-        int result = getInsideParenthesesLevelForMethodCalls(input);
+        Integer result = GroovyParserParentheseDiscoverer.getInsideParenthesesLevel(node, input);
+
+        assertEquals(1, result);
+    }
+
+    @Test
+    void invokeWithArguments() {
+        MethodCallExpression node = MockMethodCallExpression.of("invoke");
+
+        //language=groovy
+        String input = "(a.invoke(\"A\", \"\\$\", \"C?)\"))";
+        Integer result = GroovyParserParentheseDiscoverer.getInsideParenthesesLevel(node, input);
 
         assertEquals(1, result);
     }
 
     @Test
     void invokeWithSpacesInParenthesis() {
+        MethodCallExpression node = MockMethodCallExpression.of("invoke");
+
         //language=groovy
         String input = "( ( (((a.invoke()) ) ) ) )";
-        int result = getInsideParenthesesLevelForMethodCalls(input);
+        Integer result = GroovyParserParentheseDiscoverer.getInsideParenthesesLevel(node, input);
 
         assertEquals(5, result);
     }
 
     @Test
     void invokeWithSpacesInParenthesis2() {
+        MethodCallExpression node = MockMethodCallExpression.of("equals");
+
         //language=groovy
         String input = "(((((((someMap.get(\"(bar\"))))).equals(\"baz\") )   ) )";
-        int result = getInsideParenthesesLevelForMethodCalls(input);
+        Integer result = GroovyParserParentheseDiscoverer.getInsideParenthesesLevel(node, input);
 
         assertEquals(3, result);
     }
 
     @Test
     void invokeWithNullSafeAndInQuotesAndArgumentsWithoutParenthesis() {
+        MethodCallExpression node = MockMethodCallExpression.of("invoke");
+
         //language=groovy
         String input = "(something?.'invoke' \"s\" \"a\" )";
-        int result = getInsideParenthesesLevelForMethodCalls(input);
+        Integer result = GroovyParserParentheseDiscoverer.getInsideParenthesesLevel(node, input);
 
         assertEquals(1, result);
     }
 
     @Test
     void multipleParenthesesLeftBiggerThanRight() {
+        MethodCallExpression node = MockMethodCallExpression.of("equals");
+
         //language=groovy
         String input = "((((((someMap.get(\"baz\"))))).equals(\"baz\")))";
-        int result = getInsideParenthesesLevelForMethodCalls(input);
+        Integer result = GroovyParserParentheseDiscoverer.getInsideParenthesesLevel(node, input);
 
         assertEquals(2, result);
     }
 
     @Test
     void multipleParenthesesRightBiggerThanLeft() {
+        MethodCallExpression node = MockMethodCallExpression.of("get");
+
         //language=groovy
         String input = "((((someMap.get(\"(bar\")))))";
-        int result = getInsideParenthesesLevelForMethodCalls(input);
+        Integer result = GroovyParserParentheseDiscoverer.getInsideParenthesesLevel(node, input);
 
         assertEquals(4, result);
     }
 
     @Test
     void binaryWithLinebreakInArgument() {
+        MethodCallExpression node = MockMethodCallExpression.of("equals");
+
         //language=groovy
         String input = "((someMap.containsKey(\"foo\")) && ((someMap.get(\"foo\")).'equals' \"\"\"bar\n" +
           "\"\"\" ))";
-        int result = getInsideParenthesesLevelForMethodCalls(input);
+        Integer result = GroovyParserParentheseDiscoverer.getInsideParenthesesLevel(node, input);
 
         assertEquals(1, result);
     }
 
-    @SneakyThrows
-    private static int getInsideParenthesesLevelForMethodCalls(String input) {
-        Method method = ReflectionUtils.findMethod(GroovyParserParentheseDiscoverer.class, "getInsideParenthesesLevelForMethodCalls", String.class);
-        method.setAccessible(true);
-        return (Integer) method.invoke(null, input);
+    private static class MockMethodCallExpression extends MethodCallExpression {
+        String method = "";
+
+        @SneakyThrows
+        private static MockMethodCallExpression of(String method) {
+            Constructor<?> constructor = ReflectionFactory.getReflectionFactory().newConstructorForSerialization(MockMethodCallExpression.class, Object.class.getConstructor());
+            MockMethodCallExpression expression = (MockMethodCallExpression) constructor.newInstance();
+            expression.method = method;
+            return expression;
+        }
+
+        public MockMethodCallExpression(Expression objectExpression, String method, Expression arguments) {
+            super(null, method, null);
+        }
+
+        @Override
+        public String getMethodAsString() {
+            return method;
+        }
     }
 }
