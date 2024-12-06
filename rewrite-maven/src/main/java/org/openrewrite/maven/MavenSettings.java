@@ -24,6 +24,7 @@ import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
+import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
@@ -34,12 +35,25 @@ import org.openrewrite.maven.internal.RawRepositories;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.ProfileActivation;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
+import java.security.Key;
+import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.function.UnaryOperator;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
@@ -111,6 +125,99 @@ public class MavenSettings {
         final MavenSettings installSettings = findMavenHomeSettings().map(path -> parse(path, ctx)).orElse(null);
         return userSettings.map(mavenSettings -> mavenSettings.merge(installSettings))
                 .orElse(installSettings);
+    }
+
+    private byte[] extractPassword(@NotNull String pwd) {
+        Pattern pattern = Pattern.compile(".*?[^\\\\]?\\{(.*?)}.*");
+        Matcher matcher = pattern.matcher(pwd);
+        if (matcher.find()) {
+            return Base64.getDecoder().decode(matcher.group(1));
+        }
+        return pwd.getBytes(StandardCharsets.UTF_8);
+    }
+
+    private @Nullable String decrypt(@Nullable String fieldValue, @Nullable String password) {
+        if (fieldValue == null || fieldValue.isEmpty() || password == null) {
+            return null;
+        }
+
+        try {
+
+            byte[] encryptedText = extractPassword(fieldValue);
+
+            byte[] salt = new byte[8];
+            System.arraycopy(encryptedText, 0, salt, 0, 8);
+
+            int padLength = encryptedText[8];
+            byte[] encryptedBytes = new byte[encryptedText.length - 9 - padLength];
+            System.arraycopy(encryptedText, 9, encryptedBytes, 0, encryptedBytes.length);
+
+            byte[] keyAndIV = new byte[32];
+            byte[] pwdBytes = extractPassword(password);
+            int offset = 0;
+            while (offset < 32) {
+                java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+                digest.update(pwdBytes);
+                digest.update(salt);
+                byte[] hash = digest.digest();
+                System.arraycopy(hash, 0, keyAndIV, offset, Math.min(hash.length, 32 - offset));
+                offset += hash.length;
+            }
+
+            Key key = new SecretKeySpec(keyAndIV, 0, 16, "AES");
+            IvParameterSpec iv = new IvParameterSpec(keyAndIV, 16, 16);
+            Cipher cipher = Cipher.getInstance("AES/CBC/NoPadding");
+            cipher.init(Cipher.DECRYPT_MODE, key, iv);
+            byte[] clearBytes = cipher.doFinal(encryptedBytes);
+
+            int paddingLength = clearBytes[clearBytes.length - 1];
+            byte[] decryptedBytes = new byte[clearBytes.length - paddingLength];
+            System.arraycopy(clearBytes, 0, decryptedBytes, 0, decryptedBytes.length);
+            return new String(decryptedBytes, StandardCharsets.UTF_8);
+        } catch (NoSuchPaddingException | NoSuchAlgorithmException | BadPaddingException | IllegalBlockSizeException |
+                 InvalidKeyException | InvalidAlgorithmParameterException e) {
+            return null;
+        }
+    }
+
+    private void updateLocal(@Nullable String masterPassword) {
+        if (mavenLocal == null || masterPassword == null) {
+            return;
+        }
+
+        String password = decrypt(mavenLocal.getPassword(), masterPassword);
+        if (password != null) {
+            mavenLocal = mavenLocal.withPassword(password);
+        }
+    }
+
+    private void updateServers(@Nullable String masterPassword) {
+        if (servers == null || masterPassword == null) {
+            return;
+        }
+
+        List<Server> newServers = new ArrayList<>();
+        for (Server server : servers.servers ) {
+            String password = decrypt(server.getPassword(), masterPassword);
+            if (password != null) {
+                server = server.withPassword(password);
+            }
+            newServers.add(server);
+        }
+
+        servers.servers = newServers;
+    }
+
+    public void updatePassword(ExecutionContext ctx) {
+        MavenSecuritySettings security = MavenSecuritySettings.readMavenSecuritySettingsFromDisk(ctx);
+        if (security == null) {
+            return;
+        }
+
+        String decryptedMasterPassword = decrypt(security.getMaster(), "settings.security");
+
+        updateLocal(decryptedMasterPassword);
+        updateServers(decryptedMasterPassword);
     }
 
     public static boolean readFromDiskEnabled() {
