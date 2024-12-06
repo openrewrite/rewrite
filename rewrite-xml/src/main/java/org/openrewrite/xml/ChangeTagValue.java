@@ -84,7 +84,7 @@ public class ChangeTagValue extends Recipe {
                 if (xPathMatcher.matches(getCursor())) {
                     if (Boolean.TRUE.equals(regex) && oldValue != null) {
                         doAfterVisit(new RegexReplaceVisitor<>(tag, oldValue, newValue));
-                    } else if (oldValue == null) {
+                    } else if (oldValue == null || oldValue.equals(tag.getValue().orElse(null))) {
                         doAfterVisit(new ChangeTagValueVisitor<>(tag, newValue));
                     }
                 }

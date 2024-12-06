@@ -45,8 +45,42 @@ class ChangeTagValueTest implements RewriteTest {
               <dependency>
                   <version>2.0</version>
               </dependency>
-              """
-            , spec -> spec.path("pom.xml"))
+              """)
+        );
+    }
+
+    @Test
+    void matchExistingTagValue() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new ChangeTagValue("/dependency/version",
+              "1.0", "2.0", null)),
+          xml(
+            """
+              <dependency>
+                  <version>1.0</version>
+              </dependency>
+              """,
+            """
+              <dependency>
+                  <version>2.0</version>
+              </dependency>
+              """)
+        );
+    }
+
+    @Test
+    void noMatchExistingTagValue() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new ChangeTagValue("/dependency/version",
+              "1.0", "2.0", null)),
+          xml(
+            """
+              <dependency>
+                  <version>3.0</version>
+              </dependency>
+              """)
         );
     }
 
@@ -71,7 +105,7 @@ class ChangeTagValueTest implements RewriteTest {
                   <artifact>artifact</artifact>
                   <version>1.2.3-RELEASE</version>
               </dependency>
-              """, spec -> spec.path("pom.xml")
+              """
           )
         );
     }
@@ -98,7 +132,7 @@ class ChangeTagValueTest implements RewriteTest {
                   <artifact>artifact</artifact>
                   <version>1.2.3-RELEASE</version>
               </dependency>
-              """, spec -> spec.path("pom.xml")
+              """
           )
         );
     }
@@ -125,7 +159,7 @@ class ChangeTagValueTest implements RewriteTest {
                   <artifact>artifact</artifact>
                   <version>1.3.4</version>
               </dependency>
-              """, spec -> spec.path("pom.xml")
+              """
           )
         );
     }
