@@ -15,7 +15,6 @@
  */
 package org.openrewrite.groovy.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -182,16 +181,16 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/4705")
-    @Disabled
     @Test
     void functionWithDefAndExplicitReturnType() {
         rewriteRun(
           groovy(
-                """
-            class A {
-                def int one() { 1 }
-            }
             """
+              class A {
+                  def /*int*/ int one() { 1 }
+                  def /*Object*/ Object two() { 2 }
+              }
+              """
           )
         );
     }

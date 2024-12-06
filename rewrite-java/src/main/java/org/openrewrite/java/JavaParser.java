@@ -74,26 +74,11 @@ public interface JavaParser extends Parser {
         List<Path> artifacts = new ArrayList<>(artifactNames.length);
         List<String> missingArtifactNames = new ArrayList<>(artifactNames.length);
         for (String artifactName : artifactNames) {
-            Pattern jarPattern = Pattern.compile(artifactName + "(?:" + "-.*?" + ")?" + "\\.jar$");
-            // In a multi-project IDE classpath, some classpath entries aren't jars
-            Pattern explodedPattern = Pattern.compile("/" + artifactName + "/");
-            boolean lacking = true;
-            for (URI cpEntry : runtimeClasspath) {
-                if (!"file".equals(cpEntry.getScheme())) {
-                    // exclude any `jar` entries which could result from `Bundle-ClassPath` in `MANIFEST.MF`
-                    continue;
-                }
-                String cpEntryString = cpEntry.toString();
-                Path path = Paths.get(cpEntry);
-                if (jarPattern.matcher(cpEntryString).find() ||
-                    explodedPattern.matcher(cpEntryString).find() && path.toFile().isDirectory()) {
-                    artifacts.add(path);
-                    lacking = false;
-                    // Do not break because jarPattern matches "foo-bar-1.0.jar" and "foo-1.0.jar" to "foo"
-                }
-            }
-            if (lacking) {
+            List<Path> matchedArtifacts = filterArtifacts(artifactName, runtimeClasspath);
+            if (matchedArtifacts.isEmpty()) {
                 missingArtifactNames.add(artifactName);
+            } else {
+                artifacts.addAll(matchedArtifacts);
             }
         }
 
@@ -104,6 +89,37 @@ public interface JavaParser extends Parser {
                     ", classpath: " + runtimeClasspath);
         }
 
+        return artifacts;
+    }
+
+    /**
+     * Filters the classpath entries to find paths that match the given artifact name.
+     *
+     * @param artifactName    The artifact name to search for.
+     * @param runtimeClasspath The list of classpath URIs to search within.
+     * @return List of Paths that match the artifact name.
+     */
+    // VisibleForTesting
+    static List<Path> filterArtifacts(String artifactName, List<URI> runtimeClasspath) {
+        List<Path> artifacts = new ArrayList<>();
+        // Bazel automatically replaces '-' with '_' when generating jar files.
+        String normalizedArtifactName = artifactName.replace('-', '_');
+        Pattern jarPattern = Pattern.compile(String.format("(%s|%s)(?:-.*?)?\\.jar$", artifactName, normalizedArtifactName));
+        // In a multi-project IDE classpath, some classpath entries aren't jars
+        Pattern explodedPattern = Pattern.compile("/" + artifactName + "/");
+        for (URI cpEntry : runtimeClasspath) {
+            if (!"file".equals(cpEntry.getScheme())) {
+                // exclude any `jar` entries which could result from `Bundle-ClassPath` in `MANIFEST.MF`
+                continue;
+            }
+            String cpEntryString = cpEntry.toString();
+            Path path = Paths.get(cpEntry);
+            if (jarPattern.matcher(cpEntryString).find() ||
+                explodedPattern.matcher(cpEntryString).find() && path.toFile().isDirectory()) {
+                artifacts.add(path);
+                // Do not break because jarPattern matches "foo-bar-1.0.jar" and "foo-1.0.jar" to "foo"
+            }
+        }
         return artifacts;
     }
 

@@ -32,7 +32,6 @@ import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
@@ -140,8 +139,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return new DependencyVersionState();
     }
 
-    private static final MethodMatcher DEPENDENCY_DSL_MATCHER = new MethodMatcher("DependencyHandlerSpec *(..)");
-
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(DependencyVersionState acc) {
 
@@ -163,7 +160,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
                 GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
 
-                if (gradleDependencyMatcher.get(getCursor()).isPresent() || DEPENDENCY_DSL_MATCHER.matches(m)) {
+                if (gradleDependencyMatcher.get(getCursor()).isPresent()) {
                     if (m.getArguments().get(0) instanceof G.MapEntry) {
                         String groupId = null;
                         String artifactId = null;
@@ -374,15 +371,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
         @Override
         public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-            if ("constraints".equals(method.getSimpleName()) || "project".equals(method.getSimpleName())) {
-                // don't mess with anything inside a constraints block, leave that to UpgradeTransitiveDependency version recipe
-                // `project` dependencies should also be skipped
-                return method;
-            }
             J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
             GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
 
-            if (gradleDependencyMatcher.get(getCursor()).isPresent() || DEPENDENCY_DSL_MATCHER.matches(m)) {
+            if (gradleDependencyMatcher.get(getCursor()).isPresent()) {
                 List<Expression> depArgs = m.getArguments();
                 if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry) {
                     m = updateDependency(m, ctx);
