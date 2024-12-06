@@ -112,6 +112,35 @@ public class GroovyParserVisitor {
         return olderThanGroovy3;
     }
 
+    /**
+     *  Groovy methods can be declared with "def" AND a return type
+     *  In these cases the "def" is semantically meaningless but needs to be preserved for source code accuracy
+     *  If there is both a def and a return type, this method returns a RedundantDef object and advances the cursor
+     *  position past the "def" keyword, leaving the return type to be parsed as normal.
+     *  In any other situation an empty Optional is returned and the cursor is not advanced.
+     */
+    private Optional<RedundantDef> maybeRedundantDef(ClassNode type, String name) {
+        int saveCursor = cursor;
+        Space defPrefix = whitespace();
+        if(source.startsWith("def", cursor)) {
+            skip("def");
+            // The def is redundant only when it is followed by the method's return type
+            // I hope no one puts an annotation between "def" and the return type
+            int cursorBeforeReturnType = cursor;
+            int lengthOfTypePrefix = indexOfNextNonWhitespace(cursorBeforeReturnType, source) - cursorBeforeReturnType;
+            // Differentiate between the next token being the method/variable name and it being the return type
+            if (!source.startsWith(name, cursorBeforeReturnType + lengthOfTypePrefix)) {
+                TypeTree returnType = visitTypeTree(type);
+                if (source.startsWith(returnType.toString(), cursorBeforeReturnType + lengthOfTypePrefix)) {
+                    cursor = cursorBeforeReturnType;
+                    return Optional.of(new RedundantDef(randomId(), defPrefix));
+                }
+            }
+        }
+        cursor = saveCursor;
+        return Optional.empty();
+    }
+
     public G.CompilationUnit visit(SourceUnit unit, ModuleNode ast) throws GroovyParsingException {
         NavigableMap<LineColumn, List<ASTNode>> sortedByPosition = new TreeMap<>();
         for (org.codehaus.groovy.ast.stmt.Statement s : ast.getStatementBlock().getStatements()) {
@@ -491,6 +520,7 @@ public class GroovyParserVisitor {
 
             List<J.Annotation> annotations = visitAndGetAnnotations(method);
             List<J.Modifier> modifiers = visitModifiers(method.getModifiers());
+            Optional<RedundantDef> redundantDef = maybeRedundantDef(method.getReturnType(), method.getName());
             TypeTree returnType = visitTypeTree(method.getReturnType());
 
             // Method name might be in quotes
@@ -564,7 +594,8 @@ public class GroovyParserVisitor {
                     bodyVisitor.visit(method.getCode());
 
             queue.add(new J.MethodDeclaration(
-                    randomId(), fmt, Markers.EMPTY,
+                    randomId(), fmt,
+                    redundantDef.map(Markers.EMPTY::add).orElse(Markers.EMPTY),
                     annotations,
                     modifiers,
                     null,
@@ -1387,12 +1418,13 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitDeclarationExpression(DeclarationExpression expression) {
+            Optional<RedundantDef> redundantDef = maybeRedundantDef(expression.getVariableExpression().getType(), expression.getVariableExpression().getName());
             TypeTree typeExpr = visitVariableExpressionType(expression.getVariableExpression());
 
             J.VariableDeclarations.NamedVariable namedVariable;
             if (expression.isMultipleAssignmentDeclaration()) {
                 // def (a, b) = [1, 2]
-                throw new UnsupportedOperationException("FIXME");
+                throw new UnsupportedOperationException("Parsing multiple assignment (e.g.: def (a, b) = [1, 2]) is not implemented");
             } else {
                 J.Identifier name = visit(expression.getVariableExpression());
                 namedVariable = new J.VariableDeclarations.NamedVariable(
@@ -1415,7 +1447,7 @@ public class GroovyParserVisitor {
             J.VariableDeclarations variableDeclarations = new J.VariableDeclarations(
                     randomId(),
                     EMPTY,
-                    Markers.EMPTY,
+                    redundantDef.map(Markers.EMPTY::add).orElse(Markers.EMPTY),
                     emptyList(),
                     emptyList(),
                     typeExpr,

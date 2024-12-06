@@ -562,6 +562,8 @@ public class BlockStatementTemplateGenerator {
             before.insert(0, ev.getName());
         } else if (j instanceof J.EnumValueSet) {
             after.append(";");
+        } else if (j instanceof J.Case) {
+            after.append(";");
         }
         contextTemplate(next(cursor), j, before, after, insertionPoint, REPLACEMENT);
     }
