@@ -107,7 +107,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
 
             // No need to add imports if the class to import is in java.lang, or if the classes are within the same package
             if (("java.lang".equals(packageName) && StringUtils.isBlank(member)) || (cu.getPackageDeclaration() != null &&
-                                                                                     packageName.equals(cu.getPackageDeclaration().getExpression().printTrimmed(getCursor())))) {
+                    packageName.equals(cu.getPackageDeclaration().getExpression().printTrimmed(getCursor())))) {
                 return cu;
             }
 
@@ -119,10 +119,10 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                 String ending = i.getQualid().getSimpleName();
                 if (member == null) {
                     return !i.isStatic() && i.getPackageName().equals(packageName) &&
-                           (ending.equals(typeName) || "*".equals(ending));
+                            (ending.equals(typeName) || "*".equals(ending));
                 }
                 return i.isStatic() && i.getTypeName().equals(fullyQualifiedName) &&
-                       (ending.equals(member) || "*".equals(ending));
+                        (ending.equals(member) || "*".equals(ending));
             })) {
                 return cu;
             }
@@ -133,7 +133,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                     new JLeftPadded<>(member == null ? Space.EMPTY : Space.SINGLE_SPACE,
                             member != null, Markers.EMPTY),
                     TypeTree.build(fullyQualifiedName +
-                                   (member == null ? "" : "." + member)).withPrefix(Space.SINGLE_SPACE),
+                            (member == null ? "" : "." + member)).withPrefix(Space.SINGLE_SPACE),
                     null);
 
             List<JRightPadded<J.Import>> imports = new ArrayList<>(cu.getPadding().getImports());
@@ -214,7 +214,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
             //Non-static imports, we just look for field accesses.
             for (NameTree t : FindTypes.find(compilationUnit, fullyQualifiedName)) {
                 if ((!(t instanceof J.FieldAccess) || !((J.FieldAccess) t).isFullyQualifiedClassReference(fullyQualifiedName)) &&
-                    isTypeReference(t)) {
+                        isTypeReference(t)) {
                     return true;
                 }
             }
@@ -226,7 +226,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
             if (invocation instanceof J.MethodInvocation) {
                 J.MethodInvocation mi = (J.MethodInvocation) invocation;
                 if (mi.getSelect() == null &&
-                    ("*".equals(member) || mi.getName().getSimpleName().equals(member))) {
+                        ("*".equals(member) || mi.getName().getSimpleName().equals(member))) {
                     return true;
                 }
             }
@@ -239,11 +239,18 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
     }
 
     private class FindStaticFieldAccess extends JavaIsoVisitor<AtomicReference<Boolean>> {
+        private boolean checkIsOfClassType(@Nullable JavaType type, String fullyQualifiedName) {
+            if (isOfClassType(type, fullyQualifiedName)) {
+                return true;
+            }
+            return type instanceof JavaType.Class && isOfClassType(((JavaType.Class) type).getOwningClass(), fullyQualifiedName);
+        }
+
         @Override
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, AtomicReference<Boolean> found) {
             // If the type isn't used there's no need to proceed further
             for (JavaType.Variable varType : cu.getTypesInUse().getVariables()) {
-                if (varType.getName().equals(member) && isOfClassType(varType.getType(), fullyQualifiedName)) {
+                if (checkIsOfClassType(varType.getType(), fullyQualifiedName)) {
                     return super.visitCompilationUnit(cu, found);
                 }
             }
@@ -253,8 +260,9 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         @Override
         public J.Identifier visitIdentifier(J.Identifier identifier, AtomicReference<Boolean> found) {
             assert getCursor().getParent() != null;
-            if (identifier.getSimpleName().equals(member) && isOfClassType(identifier.getType(), fullyQualifiedName) &&
-                !(getCursor().getParent().firstEnclosingOrThrow(J.class) instanceof J.FieldAccess)) {
+            if (identifier.getSimpleName().equals(member) &&
+                    checkIsOfClassType(identifier.getType(), fullyQualifiedName) &&
+                    !(getCursor().getParent().firstEnclosingOrThrow(J.class) instanceof J.FieldAccess)) {
                 found.set(true);
             }
             return identifier;

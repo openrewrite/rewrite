@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -42,6 +43,7 @@ class DeleteMethodArgumentTest implements RewriteTest {
         spec.parser(JavaParser.fromJavaVersion().dependsOn(b));
     }
 
+    @DocumentExample
     @Test
     void deleteMiddleArgumentDeclarative() {
         rewriteRun(
