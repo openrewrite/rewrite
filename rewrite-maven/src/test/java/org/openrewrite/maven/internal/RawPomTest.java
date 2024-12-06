@@ -82,6 +82,41 @@ class RawPomTest {
     }
 
     @Test
+    void modulesAndSubProjects() {
+        RawPom pom = RawPom.parse(
+          //language=xml
+          new ByteArrayInputStream("""
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+            
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+            
+                  <modules>
+                    <module>my-module</module>
+                    <module>my-other-module</module>
+                  </modules>
+            
+                  <subprojects>
+                    <subproject>my-subproject</subproject>
+                    <subproject>my-other-subproject</subproject>
+                  </subprojects>
+                </project>
+            """.getBytes()),
+          null
+        );
+
+        assertThat(pom).isNotNull();
+        //noinspection DataFlowIssue
+        assertThat(pom.getSubprojects()).isNotNull();
+        //noinspection DataFlowIssue
+        assertThat(pom.getModules()).isNotNull();
+        assertThat(pom.getSubprojects().getSubprojects()).hasSize(2);
+        assertThat(pom.getModules().getModules()).hasSize(2);
+    }
+
+    @Test
     void serializePluginFlags() {
         RawPom pom = RawPom.parse(
           //language=xml

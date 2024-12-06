@@ -218,7 +218,7 @@ public class Space {
     }
 
     @SuppressWarnings("ConstantConditions")
-    public static <P extends Proto> List<ProtoRightPadded<P>> formatLastSuffix(@Nullable List<ProtoRightPadded<P>> trees,
+    public static <P extends Proto> @Nullable List<ProtoRightPadded<P>> formatLastSuffix(@Nullable List<ProtoRightPadded<P>> trees,
                                                                                Space suffix) {
         if (trees == null) {
             return null;
@@ -235,7 +235,7 @@ public class Space {
 
         return trees;
     }
-    
+
     public static <P extends Proto> List<P> formatFirstPrefix(List<P> trees, Space prefix) {
         if (!trees.isEmpty() && !trees.get(0).getPrefix().equals(prefix)) {
             List<P> formattedTrees = new ArrayList<>(trees);

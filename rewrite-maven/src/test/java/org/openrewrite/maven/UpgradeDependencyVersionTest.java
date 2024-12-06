@@ -854,6 +854,124 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
+    @Test
+    void upgradeVersionDefinedViaImplicitPropertyInDependencyManagementBom() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.flywaydb", "flyway-core", "10.15.0", "", true, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>my-child</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.flywaydb</groupId>
+                          <artifactId>flyway-core</artifactId>
+                      </dependency>
+                  </dependencies>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.springframework.boot</groupId>
+                              <artifactId>spring-boot-dependencies</artifactId>
+                              <version>3.3.0</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>my-child</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.flywaydb</groupId>
+                          <artifactId>flyway-core</artifactId>
+                          <version>10.15.0</version>
+                      </dependency>
+                  </dependencies>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.springframework.boot</groupId>
+                              <artifactId>spring-boot-dependencies</artifactId>
+                              <version>3.3.0</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+
+    @Test
+    void upgradeVersionDefinedViaExplicitPropertyInDependencyManagement() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.projectlombok", "lombok", "1.18.30", "", true, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>my-child</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <lombok.version>1.18.22</lombok.version>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.projectlombok</groupId>
+                          <artifactId>lombok</artifactId>
+                      </dependency>
+                  </dependencies>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                          <groupId>org.projectlombok</groupId>
+                          <artifactId>lombok</artifactId>
+                          <version>${lombok.version}</version>
+                      </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>my-child</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <lombok.version>1.18.30</lombok.version>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.projectlombok</groupId>
+                          <artifactId>lombok</artifactId>
+                      </dependency>
+                  </dependencies>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                          <groupId>org.projectlombok</groupId>
+                          <artifactId>lombok</artifactId>
+                          <version>${lombok.version}</version>
+                      </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4193")
     @Test
     void upgradeVersionDefinedViaImplicitPropertyInRemoteParent() {

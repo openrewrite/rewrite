@@ -16,6 +16,7 @@
 package org.openrewrite.hcl.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -71,10 +72,46 @@ class HclCommentTest implements RewriteTest {
                   myvar = {
                     # below {attributes}
                     myattribute = "myvalue"
-
+              
                     # add more attributes {here}
                   }
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void inLineCommentsNextLineAttribute() {
+        rewriteRun(
+          hcl(
+            """
+              # test
+              /*
+               multiline
+              */
+              resource {
+                  # test
+                  // test
+                  a = 1
+                  // test 3
+              }
+              """
+          )
+        );
+    }
+
+    @ExpectedToFail
+    @Issue("https://github.com/openrewrite/rewrite/issues/4611")
+    @Test
+    void commentAsTheLastLine() {
+        rewriteRun(
+          hcl(
+            """
+              locals {
+                a = 3
+              }
+              # Nice code, right?
               """
           )
         );

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.hcl;
 
+import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.hcl.tree.Hcl;
 import org.openrewrite.test.SourceSpec;
@@ -25,23 +26,23 @@ import java.util.function.Consumer;
 public class Assertions {
     private Assertions() {}
 
-    public static SourceSpecs hcl(@Nullable String before) {
+    public static SourceSpecs hcl(@Nullable @Language("hcl") String before) {
         return hcl(before, s -> {
         });
     }
 
-    public static SourceSpecs hcl(@Nullable String before, Consumer<SourceSpec<Hcl.ConfigFile>> spec) {
+    public static SourceSpecs hcl(@Nullable @Language("hcl") String before, Consumer<SourceSpec<Hcl.ConfigFile>> spec) {
         SourceSpec<Hcl.ConfigFile> hcl = new SourceSpec<>(Hcl.ConfigFile.class, null, HclParser.builder(), before, null);
         spec.accept(hcl);
         return hcl;
     }
 
-    public static SourceSpecs hcl(@Nullable String before, @Nullable String after) {
+    public static SourceSpecs hcl(@Nullable @Language("hcl") String before, @Nullable @Language("hcl") String after) {
         return hcl(before, after, s -> {
         });
     }
 
-    public static SourceSpecs hcl(@Nullable String before, @Nullable String after, Consumer<SourceSpec<Hcl.ConfigFile>> spec) {
+    public static SourceSpecs hcl(@Nullable @Language("hcl") String before, @Nullable @Language("hcl") String after, Consumer<SourceSpec<Hcl.ConfigFile>> spec) {
         SourceSpec<Hcl.ConfigFile> hcl = new SourceSpec<>(Hcl.ConfigFile.class, null, HclParser.builder(),  before, s -> after);
         spec.accept(hcl);
         return hcl;

@@ -388,7 +388,7 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         return expression;
     }
 
-    public <T> HclLeftPadded<T> visitLeftPadded(HclLeftPadded<T> left, HclLeftPadded.Location loc, P p) {
+    public <T> @Nullable HclLeftPadded<T> visitLeftPadded(HclLeftPadded<T> left, HclLeftPadded.Location loc, P p) {
         setCursor(new Cursor(getCursor(), left));
 
         Space before = visitSpace(left.getBefore(), loc.getBeforeLocation(), p);
@@ -408,7 +408,7 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         return (before == left.getBefore() && t == left.getElement()) ? left : new HclLeftPadded<>(before, t, left.getMarkers());
     }
 
-    public <T> HclRightPadded<T> visitRightPadded(@Nullable HclRightPadded<T> right, HclRightPadded.Location loc, P p) {
+    public <T> @Nullable HclRightPadded<T> visitRightPadded(@Nullable HclRightPadded<T> right, HclRightPadded.Location loc, P p) {
         if (right == null) {
             //noinspection ConstantConditions
             return null;

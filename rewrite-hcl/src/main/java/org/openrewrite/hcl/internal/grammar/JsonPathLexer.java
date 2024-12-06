@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 the original author or authors.
+ * Copyright 2024 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,11 +31,11 @@ public class JsonPathLexer extends Lexer {
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		WS=1, UTF_8_BOM=2, MATCHES_REGEX_OPEN=3, LBRACE=4, RBRACE=5, LBRACK=6, 
-		RBRACK=7, LPAREN=8, RPAREN=9, AT=10, DOT=11, DOT_DOT=12, ROOT=13, WILDCARD=14, 
-		COLON=15, QUESTION=16, CONTAINS=17, Identifier=18, StringLiteral=19, PositiveNumber=20, 
-		NegativeNumber=21, NumericLiteral=22, COMMA=23, TICK=24, QUOTE=25, MATCHES=26, 
-		LOGICAL_OPERATOR=27, AND=28, OR=29, EQUALITY_OPERATOR=30, EQ=31, NE=32, 
+		WS=1, UTF_8_BOM=2, MATCHES_REGEX_OPEN=3, LBRACE=4, RBRACE=5, LBRACK=6,
+		RBRACK=7, LPAREN=8, RPAREN=9, AT=10, DOT=11, DOT_DOT=12, ROOT=13, WILDCARD=14,
+		COLON=15, QUESTION=16, CONTAINS=17, Identifier=18, StringLiteral=19, PositiveNumber=20,
+		NegativeNumber=21, NumericLiteral=22, COMMA=23, TICK=24, QUOTE=25, MATCHES=26,
+		LOGICAL_OPERATOR=27, AND=28, OR=29, EQUALITY_OPERATOR=30, EQ=31, NE=32,
 		TRUE=33, FALSE=34, NULL=35, MATCHES_REGEX_CLOSE=36, S=37, REGEX=38;
 	public static final int
 		MATCHES_REGEX=1;
@@ -49,12 +49,12 @@ public class JsonPathLexer extends Lexer {
 
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"WS", "UTF_8_BOM", "MATCHES_REGEX_OPEN", "LBRACE", "RBRACE", "LBRACK", 
-			"RBRACK", "LPAREN", "RPAREN", "AT", "DOT", "DOT_DOT", "ROOT", "WILDCARD", 
-			"COLON", "QUESTION", "CONTAINS", "Identifier", "StringLiteral", "PositiveNumber", 
-			"NegativeNumber", "NumericLiteral", "COMMA", "TICK", "QUOTE", "MATCHES", 
-			"LOGICAL_OPERATOR", "AND", "OR", "EQUALITY_OPERATOR", "EQ", "NE", "TRUE", 
-			"FALSE", "NULL", "ESCAPE_SEQUENCE", "UNICODE", "HEX_DIGIT", "SAFE_CODE_POINT", 
+			"WS", "UTF_8_BOM", "MATCHES_REGEX_OPEN", "LBRACE", "RBRACE", "LBRACK",
+			"RBRACK", "LPAREN", "RPAREN", "AT", "DOT", "DOT_DOT", "ROOT", "WILDCARD",
+			"COLON", "QUESTION", "CONTAINS", "Identifier", "StringLiteral", "PositiveNumber",
+			"NegativeNumber", "NumericLiteral", "COMMA", "TICK", "QUOTE", "MATCHES",
+			"LOGICAL_OPERATOR", "AND", "OR", "EQUALITY_OPERATOR", "EQ", "NE", "TRUE",
+			"FALSE", "NULL", "ESCAPE_SEQUENCE", "UNICODE", "HEX_DIGIT", "SAFE_CODE_POINT",
 			"EXPONENT_PART", "MINUS", "MATCHES_REGEX_CLOSE", "S", "REGEX"
 		};
 	}
@@ -62,20 +62,20 @@ public class JsonPathLexer extends Lexer {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, null, "'\\uFEFF'", null, "'{'", "'}'", "'['", "']'", "'('", "')'", 
-			"'@'", "'.'", "'..'", "'$'", "'*'", "':'", "'?'", "'contains'", null, 
-			null, null, null, null, "','", "'''", "'\"'", "'=~'", null, "'&&'", "'||'", 
+			null, null, "'\\uFEFF'", null, "'{'", "'}'", "'['", "']'", "'('", "')'",
+			"'@'", "'.'", "'..'", "'$'", "'*'", "':'", "'?'", "'contains'", null,
+			null, null, null, null, "','", "'''", "'\"'", "'=~'", null, "'&&'", "'||'",
 			null, "'=='", "'!='", "'true'", "'false'", "'null'"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "WS", "UTF_8_BOM", "MATCHES_REGEX_OPEN", "LBRACE", "RBRACE", "LBRACK", 
-			"RBRACK", "LPAREN", "RPAREN", "AT", "DOT", "DOT_DOT", "ROOT", "WILDCARD", 
-			"COLON", "QUESTION", "CONTAINS", "Identifier", "StringLiteral", "PositiveNumber", 
-			"NegativeNumber", "NumericLiteral", "COMMA", "TICK", "QUOTE", "MATCHES", 
-			"LOGICAL_OPERATOR", "AND", "OR", "EQUALITY_OPERATOR", "EQ", "NE", "TRUE", 
+			null, "WS", "UTF_8_BOM", "MATCHES_REGEX_OPEN", "LBRACE", "RBRACE", "LBRACK",
+			"RBRACK", "LPAREN", "RPAREN", "AT", "DOT", "DOT_DOT", "ROOT", "WILDCARD",
+			"COLON", "QUESTION", "CONTAINS", "Identifier", "StringLiteral", "PositiveNumber",
+			"NegativeNumber", "NumericLiteral", "COMMA", "TICK", "QUOTE", "MATCHES",
+			"LOGICAL_OPERATOR", "AND", "OR", "EQUALITY_OPERATOR", "EQ", "NE", "TRUE",
 			"FALSE", "NULL", "MATCHES_REGEX_CLOSE", "S", "REGEX"
 		};
 	}

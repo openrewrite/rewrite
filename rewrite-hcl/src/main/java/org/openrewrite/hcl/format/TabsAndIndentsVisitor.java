@@ -125,7 +125,7 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
     }
 
     @Override
-    public <T> HclRightPadded<T> visitRightPadded(@Nullable HclRightPadded<T> right, HclRightPadded.Location loc, P p) {
+    public <T> @Nullable HclRightPadded<T> visitRightPadded(@Nullable HclRightPadded<T> right, HclRightPadded.Location loc, P p) {
         if (right == null) {
             //noinspection ConstantConditions
             return null;

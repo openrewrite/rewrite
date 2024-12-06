@@ -29,8 +29,10 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -154,15 +156,82 @@ class JavaParserTest implements RewriteTest {
         rewriteRun(
           java(
             source,
-            spec -> spec.afterRecipe(cu -> assertThat(cu.getSourcePath()).isEqualTo(Path.of("my","example","PublicClass.java")))
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getSourcePath()).isEqualTo(Path.of("my", "example", "PublicClass.java")))
           )
         );
     }
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1895")
-    void moduleInfo(){
+    void moduleInfo() {
         // Ignored until properly handled: https://github.com/openrewrite/rewrite/issues/4054#issuecomment-2267605739
         assertFalse(JavaParser.fromJavaVersion().build().accept(Path.of("src/main/java/foo/module-info.java")));
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/pull/4624")
+    void shouldParseComments() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  /*
+                   * public Some getOther() { return other; }
+                   *
+                   *//**
+                   * Sets the value of the other property.
+                   *
+                   * @param value allowed object is {@link Some }
+                   *
+                   *//*
+                   * public void setOther(Some value) { this.other =
+                   * value; }
+                   */
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getClasses().get(0).getBody().getEnd().getComments())
+              .extracting("text")
+              .containsExactly(
+                """
+                  
+                       * public Some getOther() { return other; }
+                       *
+                       \
+                  """,
+                """
+                  *
+                       * Sets the value of the other property.
+                       *
+                       * @param value allowed object is {@link Some }
+                       *
+                       \
+                  """,
+                """
+                  
+                       * public void setOther(Some value) { this.other =
+                       * value; }
+                       \
+                  """
+              ))
+          )
+        );
+    }
+
+    @Test
+    void filterArtifacts() {
+        List<URI> classpath = List.of(
+          URI.create("file:/.m2/repository/com/google/guava/guava-24.1.1/com_google_guava_guava-24.1.1.jar"),
+          URI.create("file:/.m2/repository/org/threeten/threeten-extra-1.5.0/org_threeten_threeten_extra-1.5.0.jar"),
+          URI.create("file:/.m2/repository/com/amazonaws/aws-java-sdk-s3-1.11.546/com_amazonaws_aws_java_sdk_s3-1.11.546.jar"),
+          URI.create("file:/.m2/repository/org/openrewrite/rewrite-java/8.41.1/rewrite-java-8.41.1.jar")
+        );
+        assertThat(JavaParser.filterArtifacts("threeten-extra", classpath))
+          .containsOnly(Paths.get("/.m2/repository/org/threeten/threeten-extra-1.5.0/org_threeten_threeten_extra-1.5.0.jar"));
+        assertThat(JavaParser.filterArtifacts("guava", classpath))
+          .containsOnly(Paths.get("/.m2/repository/com/google/guava/guava-24.1.1/com_google_guava_guava-24.1.1.jar"));
+        assertThat(JavaParser.filterArtifacts("aws-java-sdk-s3", classpath))
+          .containsOnly(Paths.get("/.m2/repository/com/amazonaws/aws-java-sdk-s3-1.11.546/com_amazonaws_aws_java_sdk_s3-1.11.546.jar"));
+        assertThat(JavaParser.filterArtifacts("rewrite-java", classpath))
+          .containsOnly(Paths.get("/.m2/repository/org/openrewrite/rewrite-java/8.41.1/rewrite-java-8.41.1.jar"));
     }
 }

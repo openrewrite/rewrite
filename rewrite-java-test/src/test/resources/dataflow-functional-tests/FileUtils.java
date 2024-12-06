@@ -18,6 +18,7 @@ package org.apache.commons.io;
 
 import org.apache.commons.io.filefilter.*;
 import org.apache.commons.io.output.NullOutputStream;
+import org.jspecify.annotations.Nullable;
 
 import java.io.*;
 import java.net.URL;
@@ -515,7 +516,7 @@ public class FileUtils {
      * @return the equivalent <code>File</code> object, or <code>null</code>
      *  if the URL's protocol is not <code>file</code>
      */
-    public static File toFile(URL url) {
+    public static @Nullable File toFile(URL url) {
         if (url == null || !"file".equalsIgnoreCase(url.getProtocol())) {
             return null;
         } else {

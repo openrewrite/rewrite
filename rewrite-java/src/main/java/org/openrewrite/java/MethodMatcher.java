@@ -98,8 +98,9 @@ public class MethodMatcher {
                 CharStreams.fromString(signature))));
 
         new MethodSignatureParserBaseVisitor<Void>() {
+
             @Override
-            public Void visitMethodPattern(MethodSignatureParser.MethodPatternContext ctx) {
+            public @Nullable Void visitMethodPattern(MethodSignatureParser.MethodPatternContext ctx) {
                 MethodSignatureParser.TargetTypePatternContext targetTypePatternContext = ctx.targetTypePattern();
                 String pattern = new TypeVisitor().visitTargetTypePattern(targetTypePatternContext);
                 targetTypeAspectJ = pattern;
@@ -137,7 +138,7 @@ public class MethodMatcher {
     }
 
     private static boolean matchAllArguments(MethodSignatureParser.FormalsPatternContext context) {
-        return context.dotDot() != null && context.formalsPatternAfterDotDot() == null;
+        return context.dotDot() != null && context.formalsPatternAfterDotDot().isEmpty();
     }
 
     private static boolean isPlainIdentifier(MethodSignatureParser.TargetTypePatternContext context) {
@@ -341,6 +342,10 @@ public class MethodMatcher {
             method.getSelect() instanceof J.Identifier &&
             !matchesSelectBySimpleNameAlone(((J.Identifier) method.getSelect()))) {
             return false;
+        }
+
+        if (argumentPattern == ANY_ARGUMENTS_PATTERN) {
+            return true;
         }
 
         final String argumentSignature = argumentsFromExpressionTypes(method);

@@ -29,6 +29,7 @@ import java.util.concurrent.*;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class RemoteFileTest {
 
@@ -36,6 +37,8 @@ class RemoteFileTest {
     void gradleWrapperProperties() throws Exception {
         URL distributionUrl = requireNonNull(RemoteFileTest.class.getClassLoader().getResource("gradle-wrapper.properties"));
         ExecutionContext ctx = new InMemoryExecutionContext();
+        RemoteExecutionContextView.view(ctx).setArtifactCache(new LocalRemoteArtifactCache(
+          Paths.get(System.getProperty("user.home") + "/.rewrite/remote/gradleWrapperProperties")));
         HttpSenderExecutionContextView.view(ctx)
           .setLargeFileHttpSender(new MockHttpSender(distributionUrl::openStream));
 
@@ -51,15 +54,40 @@ class RemoteFileTest {
     }
 
     @Test
+    void gradleWrapperDownloadFails() throws Exception {
+        URL distributionUrl = requireNonNull(RemoteFileTest.class.getClassLoader().getResource("gradle-wrapper.properties"));
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        RemoteExecutionContextView.view(ctx).setArtifactCache(new LocalRemoteArtifactCache(
+          Paths.get(System.getProperty("user.home") + "/.rewrite/remote/gradleWrapperDownloadFails")));
+        HttpSenderExecutionContextView.view(ctx)
+          .setLargeFileHttpSender(new MockHttpSender(408));
+
+        RemoteArchive remoteFile = Remote
+          .builder(
+            Paths.get("gradle/wrapper/gradle-wrapper.properties"),
+            distributionUrl.toURI()
+          )
+          .build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar");
+
+
+        assertThatThrownBy(() -> getInputStreamSize(remoteFile.getInputStream(ctx)))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessage("Failed to download " + distributionUrl.toURI() + " to artifact cache");
+    }
+
+    @Test
     void gradleWrapperPropertiesConcurrent() throws Exception {
         int executionCount = 5;
         ExecutorService executorService = Executors.newFixedThreadPool(executionCount);
         CompletionService<Long> completionService = new ExecutorCompletionService<>(executorService);
+        LocalRemoteArtifactCache localRemoteArtifactCache = new LocalRemoteArtifactCache(
+          Paths.get(System.getProperty("user.home") + "/.rewrite/remote/gradleWrapperPropertiesConcurrent"));
         for (int i = 0; i < executionCount; i++) {
             completionService.submit(() -> {
                 URL distributionUrl = requireNonNull(RemoteFileTest.class.getClassLoader().getResource("gradle-wrapper.properties"));
 
                 ExecutionContext ctx = new InMemoryExecutionContext();
+                RemoteExecutionContextView.view(ctx).setArtifactCache(localRemoteArtifactCache);
                 HttpSenderExecutionContextView.view(ctx)
                   .setLargeFileHttpSender(new MockHttpSender(distributionUrl::openStream));
 

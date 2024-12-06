@@ -19,21 +19,21 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
+import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.gradle.util.ChangeStringLiteral;
 import org.openrewrite.gradle.util.Dependency;
 import org.openrewrite.gradle.util.DependencyStringNotationConverter;
-import org.openrewrite.groovy.GroovyVisitor;
+import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.semver.DependencyMatcher;
 
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 import static java.util.Objects.requireNonNull;
 
@@ -86,16 +86,36 @@ public class ChangeDependencyClassifier extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new IsBuildGradle<>(), new GroovyVisitor<ExecutionContext>() {
+        return Preconditions.check(new IsBuildGradle<>(), new GroovyIsoVisitor<ExecutionContext>() {
             final DependencyMatcher depMatcher = requireNonNull(DependencyMatcher.build(groupId + ":" + artifactId).getValue());
-            final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
+
+            GradleProject gradleProject;
 
             @Override
-            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
+            public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
+                Optional<GradleProject> maybeGp = cu.getMarkers().findFirst(GradleProject.class);
+                if (!maybeGp.isPresent()) {
+                    return cu;
+                }
 
-                if (!((gradleDependencyMatcher.get(getCursor()).isPresent() || dependencyDsl.matches(m)) && (StringUtils.isBlank(configuration) || m.getSimpleName().equals(configuration)))) {
+                gradleProject = maybeGp.get();
+
+                G.CompilationUnit g = super.visitCompilationUnit(cu, ctx);
+                if (g != cu) {
+                    g = g.withMarkers(g.getMarkers().setByType(updateGradleModel(gradleProject)));
+                }
+                return g;
+            }
+
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher()
+                        .configuration(configuration)
+                        .groupId(groupId)
+                        .artifactId(artifactId);
+
+                if (!gradleDependencyMatcher.get(getCursor()).isPresent()) {
                     return m;
                 }
 
@@ -104,8 +124,7 @@ public class ChangeDependencyClassifier extends Recipe {
                     String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                     if (gav != null) {
                         Dependency dependency = DependencyStringNotationConverter.parse(gav);
-                        if (dependency != null && dependency.getVersion() != null && !Objects.equals(newClassifier, dependency.getClassifier()) &&
-                            depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion())) {
+                        if (dependency != null && dependency.getVersion() != null && !Objects.equals(newClassifier, dependency.getClassifier())) {
                             Dependency newDependency = dependency.withClassifier(newClassifier);
                             m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, newDependency.toStringNotation())));
                         }
@@ -157,10 +176,7 @@ public class ChangeDependencyClassifier extends Recipe {
                         }
                         index++;
                     }
-                    if (groupId == null || artifactId == null ||
-                        (version == null && !depMatcher.matches(groupId, artifactId)) ||
-                        (version != null && !depMatcher.matches(groupId, artifactId, version)) ||
-                        Objects.equals(newClassifier, classifier)) {
+                    if (groupId == null || artifactId == null || Objects.equals(newClassifier, classifier)) {
                         return m;
                     }
 
@@ -187,12 +203,122 @@ public class ChangeDependencyClassifier extends Recipe {
                             }));
                         }
                     }
+                } else if (depArgs.get(0) instanceof G.MapLiteral) {
+                    G.MapLiteral map = (G.MapLiteral) depArgs.get(0);
+                    G.MapEntry classifierEntry = null;
+                    String groupId = null;
+                    String artifactId = null;
+                    String classifier = null;
 
+                    String groupDelimiter = "'";
+                    G.MapEntry mapEntry = null;
+                    String classifierStringDelimiter = null;
+                    int index = 0;
+                    for (Expression e : depArgs) {
+                        if (!(e instanceof G.MapEntry)) {
+                            continue;
+                        }
+                        G.MapEntry arg = (G.MapEntry) e;
+                        if (!(arg.getKey() instanceof J.Literal) || !(arg.getValue() instanceof J.Literal)) {
+                            continue;
+                        }
+                        J.Literal key = (J.Literal) arg.getKey();
+                        J.Literal value = (J.Literal) arg.getValue();
+                        if (!(key.getValue() instanceof String) || !(value.getValue() instanceof String)) {
+                            continue;
+                        }
+                        String keyValue = (String) key.getValue();
+                        String valueValue = (String) value.getValue();
+                        if ("group".equals(keyValue)) {
+                            groupId = valueValue;
+                            if (value.getValueSource() != null) {
+                                groupDelimiter = value.getValueSource().substring(0, value.getValueSource().indexOf(valueValue));
+                            }
+                        } else if ("name".equals(keyValue)) {
+                            if (index > 0 && mapEntry == null) {
+                                mapEntry = arg;
+                            }
+                            artifactId = valueValue;
+                        } else if ("classifier".equals(keyValue)) {
+                            if (value.getValueSource() != null) {
+                                classifierStringDelimiter = value.getValueSource().substring(0, value.getValueSource().indexOf(valueValue));
+                            }
+                            classifierEntry = arg;
+                            classifier = valueValue;
+                        }
+                        index++;
+                    }
+                    if (groupId == null || artifactId == null || Objects.equals(newClassifier, classifier)) {
+                        return m;
+                    }
+
+                    if (classifier == null) {
+                        String delimiter = groupDelimiter;
+                        G.MapEntry finalMapEntry = mapEntry;
+                        J.Literal keyLiteral = new J.Literal(Tree.randomId(), mapEntry == null ? Space.EMPTY : mapEntry.getKey().getPrefix(), Markers.EMPTY, "classifier", "classifier", null, JavaType.Primitive.String);
+                        J.Literal valueLiteral = new J.Literal(Tree.randomId(), mapEntry == null ? Space.EMPTY : mapEntry.getValue().getPrefix(), Markers.EMPTY, newClassifier, delimiter + newClassifier + delimiter, null, JavaType.Primitive.String);
+                        m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
+                            G.MapLiteral mapLiteral = (G.MapLiteral) arg;
+                            return mapLiteral.withElements(ListUtils.concat(mapLiteral.getElements(), new G.MapEntry(Tree.randomId(), finalMapEntry == null ? Space.EMPTY : finalMapEntry.getPrefix(), Markers.EMPTY, JRightPadded.build(keyLiteral), valueLiteral, null)));
+                        }));
+                    } else {
+                        G.MapEntry finalClassifier = classifierEntry;
+                        if (newClassifier == null) {
+                            m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
+                                G.MapLiteral mapLiteral = (G.MapLiteral) arg;
+                                return mapLiteral.withElements(ListUtils.map(mapLiteral.getElements(), e -> e == finalClassifier ? null : e));
+                            }));
+                        } else {
+                            String delimiter = classifierStringDelimiter; // `classifierStringDelimiter` cannot be null
+                            m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
+                                G.MapLiteral mapLiteral = (G.MapLiteral) arg;
+                                return mapLiteral.withElements(ListUtils.map(mapLiteral.getElements(), e -> {
+                                    if (e == finalClassifier) {
+                                        return finalClassifier.withValue(((J.Literal) finalClassifier.getValue())
+                                                .withValue(newClassifier)
+                                                .withValueSource(delimiter + newClassifier + delimiter));
+                                    }
+                                    return e;
+                                }));
+                            }));
+                        }
+                    }
                 }
 
                 return m;
             }
+
+            private GradleProject updateGradleModel(GradleProject gp) {
+                Map<String, GradleDependencyConfiguration> nameToConfiguration = gp.getNameToConfiguration();
+                Map<String, GradleDependencyConfiguration> newNameToConfiguration = new HashMap<>(nameToConfiguration.size());
+                boolean anyChanged = false;
+                for (GradleDependencyConfiguration gdc : nameToConfiguration.values()) {
+                    if (!StringUtils.isBlank(configuration) && !configuration.equals(gdc.getName())) {
+                        newNameToConfiguration.put(gdc.getName(), gdc);
+                        continue;
+                    }
+
+                    GradleDependencyConfiguration newGdc = gdc;
+                    newGdc = newGdc.withRequested(ListUtils.map(gdc.getRequested(), requested -> {
+                        if (depMatcher.matches(requested.getGroupId(), requested.getArtifactId()) && !Objects.equals(requested.getClassifier(), newClassifier)) {
+                            return requested.withClassifier(newClassifier);
+                        }
+                        return requested;
+                    }));
+                    newGdc = newGdc.withDirectResolved(ListUtils.map(gdc.getDirectResolved(), resolved -> {
+                        if (depMatcher.matches(resolved.getGroupId(), resolved.getArtifactId()) && !Objects.equals(resolved.getClassifier(), newClassifier)) {
+                            return resolved.withClassifier(newClassifier);
+                        }
+                        return resolved;
+                    }));
+                    anyChanged |= newGdc != gdc;
+                    newNameToConfiguration.put(newGdc.getName(), newGdc);
+                }
+                if (anyChanged) {
+                    gp = gp.withNameToConfiguration(newNameToConfiguration);
+                }
+                return gp;
+            }
         });
     }
-
 }

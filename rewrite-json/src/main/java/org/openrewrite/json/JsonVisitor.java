@@ -97,7 +97,7 @@ public class JsonVisitor<P> extends TreeVisitor<Json, P> {
     }
 
     @SuppressWarnings("ConstantConditions")
-    public <T extends Json> JsonRightPadded<T> visitRightPadded(@Nullable JsonRightPadded<T> right, P p) {
+    public <T extends Json> @Nullable JsonRightPadded<T> visitRightPadded(@Nullable JsonRightPadded<T> right, P p) {
         if (right == null) {
             //noinspection ConstantConditions
             return null;
