@@ -16,9 +16,11 @@
 package org.openrewrite.yaml.trait;
 
 import lombok.Value;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.*;
+import org.openrewrite.Cursor;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
 import org.openrewrite.trait.Reference;
 import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.yaml.tree.Yaml;
@@ -28,7 +30,6 @@ import java.util.Set;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
-@Incubating(since = "8.40.3")
 @Value
 public class YamlReference implements Reference {
     Cursor cursor;
@@ -61,8 +62,29 @@ public class YamlReference implements Reference {
         throw new IllegalArgumentException("cursor.getValue() must be an Yaml.Scalar but is: " + tree.getClass());
     }
 
+    private static class Matcher extends SimpleTraitMatcher<YamlReference> {
+        private static final Predicate<String> javaFullyQualifiedTypePattern = Pattern.compile(
+                "\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*(?:\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*)*")
+                .asPredicate();
+
+        @Override
+        protected @Nullable YamlReference test(Cursor cursor) {
+            Object value = cursor.getValue();
+            if (value instanceof Yaml.Scalar &&
+                    javaFullyQualifiedTypePattern.test(((Yaml.Scalar) value).getValue())) {
+                return new YamlReference(cursor, determineKind(((Yaml.Scalar) value).getValue()));
+            }
+            return null;
+        }
+
+        private Kind determineKind(String value) {
+            return Character.isUpperCase(value.charAt(value.lastIndexOf('.') + 1)) ? Kind.TYPE : Kind.PACKAGE;
+        }
+    }
+
     @SuppressWarnings("unused")
-    static class SpringApplicationYamlReferenceProvider implements Reference.Provider {
+    public static class Provider implements Reference.Provider {
+
         private static final Predicate<String> applicationPropertiesMatcher = Pattern.compile("^application(-\\w+)?\\.(yaml|yml)$").asPredicate();
 
         @Override
@@ -78,23 +100,6 @@ public class YamlReference implements Reference {
                 return reference.getTree();
             }).visit(sourceFile, 0);
             return references;
-        }
-
-        private static class Matcher extends SimpleTraitMatcher<YamlReference> {
-            private static final Pattern javaFullyQualifiedTypePattern = Pattern.compile("\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*(?:\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*)*");
-
-            @Override
-            protected @Nullable YamlReference test(Cursor cursor) {
-                Object value = cursor.getValue();
-                if (value instanceof Yaml.Scalar && javaFullyQualifiedTypePattern.matcher(((Yaml.Scalar) value).getValue()).matches()) {
-                    return new YamlReference(cursor, determineKind(((Yaml.Scalar) value).getValue()));
-                }
-                return null;
-            }
-
-            private Kind determineKind(String value) {
-                return Character.isUpperCase(value.charAt(value.lastIndexOf('.') + 1)) ? Kind.TYPE : Kind.PACKAGE;
-            }
         }
     }
 }

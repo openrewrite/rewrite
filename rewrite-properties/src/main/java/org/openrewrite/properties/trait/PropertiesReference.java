@@ -53,9 +53,6 @@ public class PropertiesReference implements Reference {
         return true;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public Tree rename(Renamer renamer, Cursor cursor, ExecutionContext ctx) {
         Tree tree = cursor.getValue();
@@ -67,7 +64,7 @@ public class PropertiesReference implements Reference {
         return tree;
     }
 
-    public static class Matcher extends SimpleTraitMatcher<PropertiesReference> {
+    private static class Matcher extends SimpleTraitMatcher<PropertiesReference> {
         private static final Predicate<String> javaFullyQualifiedTypeMatcher = Pattern.compile(
                 "\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*(?:\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*)*").asPredicate();
 
@@ -75,7 +72,7 @@ public class PropertiesReference implements Reference {
         protected @Nullable PropertiesReference test(Cursor cursor) {
             Object value = cursor.getValue();
             if (value instanceof Properties.Entry &&
-                javaFullyQualifiedTypeMatcher.test(((Properties.Entry) value).getValue().getText())) {
+                    javaFullyQualifiedTypeMatcher.test(((Properties.Entry) value).getValue().getText())) {
                 return new PropertiesReference(cursor, determineKind(((Properties.Entry) value).getValue().getText()));
             }
             return null;
@@ -88,7 +85,13 @@ public class PropertiesReference implements Reference {
 
     @SuppressWarnings("unused")
     public static class Provider implements Reference.Provider {
+
         private static final Predicate<String> applicationPropertiesMatcher = Pattern.compile("^application(-\\w+)?\\.properties$").asPredicate();
+
+        @Override
+        public boolean isAcceptable(SourceFile sourceFile) {
+            return sourceFile instanceof Properties.File && applicationPropertiesMatcher.test(sourceFile.getSourcePath().getFileName().toString());
+        }
 
         @Override
         public Set<Reference> getReferences(SourceFile sourceFile) {
@@ -98,11 +101,6 @@ public class PropertiesReference implements Reference {
                 return reference.getTree();
             }).visit(sourceFile, 0);
             return references;
-        }
-
-        @Override
-        public boolean isAcceptable(SourceFile sourceFile) {
-            return sourceFile instanceof Properties.File && applicationPropertiesMatcher.test(sourceFile.getSourcePath().getFileName().toString());
         }
     }
 }
