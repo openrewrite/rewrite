@@ -82,8 +82,9 @@ public class YamlParser implements org.openrewrite.Parser {
                         Yaml.Documents docs = (Yaml.Documents) sourceFile;
                         // ensure there is always at least one Document, even in an empty yaml file
                         if (docs.getDocuments().isEmpty()) {
-                            return docs.withDocuments(singletonList(new Yaml.Document(randomId(), "", Markers.EMPTY,
-                                    false, new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null), null)));
+                            Yaml.Document.End end = new Yaml.Document.End(randomId(), "", Markers.EMPTY, false);
+                            Yaml.Mapping mapping = new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null);
+                            return docs.withDocuments(singletonList(new Yaml.Document(randomId(), "", Markers.EMPTY, false, mapping, end)));
                         }
                         return docs;
                     }
@@ -157,7 +158,7 @@ public class YamlParser implements org.openrewrite.Parser {
                                 Markers.EMPTY,
                                 ((DocumentStartEvent) event).getExplicit(),
                                 new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null),
-                                null
+                                new Yaml.Document.End(randomId(), "", Markers.EMPTY, false)
                         );
                         lastEnd = event.getEndMark().getIndex();
                         break;

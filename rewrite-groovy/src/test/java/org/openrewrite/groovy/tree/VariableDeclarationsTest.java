@@ -32,7 +32,7 @@ import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
-@SuppressWarnings("GroovyUnusedAssignment")
+@SuppressWarnings({"GroovyUnusedAssignment", "DataFlowIssue", "GrUnnecessaryDefModifier"})
 class VariableDeclarationsTest implements RewriteTest {
 
     @Test
@@ -46,6 +46,13 @@ class VariableDeclarationsTest implements RewriteTest {
     void finalKeyword() {
         rewriteRun(
           groovy("final a = 1")
+        );
+    }
+
+    @Test
+    void nestedGenerics() {
+        rewriteRun(
+          groovy("final map = new HashMap<String, List<String>>()")
         );
     }
 
@@ -178,6 +185,34 @@ class VariableDeclarationsTest implements RewriteTest {
                 }, cu, new ArrayList<>(), J.VariableDeclarations.class, v -> v);
                 assertThat(variables.get(0).getLeadingAnnotations()).hasSize(1);
             })
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4702")
+    @Disabled
+    @Test
+    void nestedTypeParameters() {
+        rewriteRun(
+          groovy(
+                """
+            class A {
+                def map = new HashMap<String, List<String>>()
+            }
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4705")
+    @Test
+    void defAndExplicitReturnType() {
+        rewriteRun(
+          groovy(
+            """
+              def /*int*/ int one = 1
+              def /*Object*/ Object two = 2
+              """
           )
         );
     }

@@ -9,7 +9,7 @@
         <packageUrl regex="true">^pkg:maven/com\.squareup\.okio/okio@.*$</packageUrl>
         <cve>CVE-2023-3635</cve>
     </suppress>
-    <suppress until="2024-12-12">
+    <suppress until="2025-01-02Z">
         <notes><![CDATA[
         file name: develocity-gradle-plugin-3.17.6.jar: junit-platform-engine-1.10.3.jar
         sev: CRITICAL
@@ -19,7 +19,7 @@
         <cve>CVE-2023-45163</cve>
         <cve>CVE-2023-5964</cve>
     </suppress>
-    <suppress until="2024-12-12">
+    <suppress until="2025-01-02Z">
         <notes><![CDATA[
         file name: gradle-enterprise-gradle-plugin-3.17.6.jar
         ]]></notes>

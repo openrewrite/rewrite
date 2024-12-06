@@ -688,25 +688,16 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             for (JavaType.Method method : classType.getMethods()) {
                 if (method.getName().equals(ref.memberName.toString())) {
                     if (ref.paramTypes != null) {
-                        for (JCTree param : ref.paramTypes) {
-                            for (JavaType testParamType : method.getParameterTypes()) {
-                                Type paramType = attr.attribType(param, symbol);
-                                if (testParamType instanceof JavaType.GenericTypeVariable) {
-                                    List<JavaType> bounds = ((JavaType.GenericTypeVariable) testParamType).getBounds();
-                                    if (bounds.isEmpty() && paramType.tsym != null && "java.lang.Object".equals(paramType.tsym.getQualifiedName().toString())) {
-                                        return method;
-                                    }
-                                    for (JavaType bound : bounds) {
-                                        if (paramTypeMatches(bound, paramType)) {
-                                            return method;
-                                        }
-                                    }
-                                    continue nextMethod;
-                                }
-
-                                if (paramTypeMatches(testParamType, paramType)) {
-                                    continue nextMethod;
-                                }
+                        List<JavaType> parameterTypes = method.getParameterTypes();
+                        if (ref.paramTypes.size() != parameterTypes.size()) {
+                            continue;
+                        }
+                        for (int i = 0; i < ref.paramTypes.size(); i++) {
+                            JCTree param = ref.paramTypes.get(i);
+                            JavaType testParamType = parameterTypes.get(i);
+                            Type paramType = attr.attribType(param, symbol);
+                            if (!paramTypeMatches(testParamType, paramType)) {
+                                continue nextMethod;
                             }
                         }
                     }
@@ -727,13 +718,25 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         return null;
     }
 
-    private boolean paramTypeMatches(JavaType testParamType, Type paramType) {
-        if (paramType instanceof Type.ClassType) {
-            JavaType.FullyQualified fqTestParamType = TypeUtils.asFullyQualified(testParamType);
-            return fqTestParamType == null || !fqTestParamType.getFullyQualifiedName().equals(((Symbol.ClassSymbol) paramType.tsym)
-                    .fullname.toString());
+    private boolean paramTypeMatches(JavaType parameterType, Type javadocType) {
+        return paramTypeMatches(parameterType, typeMapping.type(javadocType));
+    }
+
+    // Javadoc type references typically don't have generic type parameters
+    private static boolean paramTypeMatches(JavaType parameterType, JavaType mappedJavadocType) {
+        if (parameterType instanceof JavaType.Array && mappedJavadocType instanceof JavaType.Array) {
+            if (((JavaType.Array) parameterType).getElemType() instanceof JavaType.Primitive) {
+                return TypeUtils.isAssignableTo(parameterType, mappedJavadocType, TypeUtils.TypePosition.In);
+            }
+            return paramTypeMatches(((JavaType.Array) parameterType).getElemType(), ((JavaType.Array) mappedJavadocType).getElemType());
+        } else if (parameterType instanceof JavaType.GenericTypeVariable && !((JavaType.GenericTypeVariable) parameterType).getBounds().isEmpty()) {
+            return paramTypeMatches(((JavaType.GenericTypeVariable) parameterType).getBounds().get(0), mappedJavadocType);
+        } else if (parameterType instanceof JavaType.GenericTypeVariable) {
+            return TypeUtils.isObject(mappedJavadocType);
+        } else if (parameterType instanceof JavaType.Parameterized && !(mappedJavadocType instanceof JavaType.Parameterized)) {
+            return paramTypeMatches(((JavaType.Parameterized) parameterType).getType(), mappedJavadocType);
         }
-        return false;
+        return TypeUtils.isAssignableTo(parameterType, mappedJavadocType, TypeUtils.TypePosition.In);
     }
 
     private JavaType.@Nullable Variable fieldReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {

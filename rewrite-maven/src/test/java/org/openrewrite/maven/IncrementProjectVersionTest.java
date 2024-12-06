@@ -35,18 +35,54 @@ class IncrementProjectVersionTest implements RewriteTest {
     void changeProjectVersion() {
         rewriteRun(
           pomXml(
-           """
-              <project>
-                  <groupId>org.openrewrite</groupId>
-                  <artifactId>rewrite-maven</artifactId>
-                  <version>8.40.1-SNAPSHOT</version>
-              </project>
-              """,
+            """
+               <project>
+                   <groupId>org.openrewrite</groupId>
+                   <artifactId>rewrite-maven</artifactId>
+                   <version>8.40.1-SNAPSHOT</version>
+               </project>
+               """,
             """
               <project>
                   <groupId>org.openrewrite</groupId>
                   <artifactId>rewrite-maven</artifactId>
                   <version>8.41.0-SNAPSHOT</version>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeProjectVersionShouldNotUpdateDependencyVersion() {
+        rewriteRun(
+          pomXml(
+            """
+               <project>
+                   <groupId>org.openrewrite</groupId>
+                   <artifactId>rewrite-maven</artifactId>
+                   <version>8.40.1-SNAPSHOT</version>
+                   <dependencies>
+                       <dependency>
+                           <groupId>com.google.guava</groupId>
+                           <artifactId>guava</artifactId>
+                           <version>29.0-jre</version>
+                       </dependency>
+                   </dependencies>
+               </project>
+               """,
+            """
+              <project>
+                  <groupId>org.openrewrite</groupId>
+                  <artifactId>rewrite-maven</artifactId>
+                  <version>8.41.0-SNAPSHOT</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>29.0-jre</version>
+                      </dependency>
+                  </dependencies>
               </project>
               """
           )

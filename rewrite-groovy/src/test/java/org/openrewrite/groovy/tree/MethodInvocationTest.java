@@ -16,6 +16,7 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -40,6 +41,22 @@ class MethodInvocationTest implements RewriteTest {
                   api 'com.google.guava:guava:23.0'
                   testImplementation 'junit:junit:4.+'
               }
+              """
+          )
+        );
+    }
+
+    @ExpectedToFail("Parentheses with method invocation is not yet supported")
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4615")
+    void gradleWithParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              plugins {
+                  id 'java-library'
+              }
+              def version = (rootProject.jobName.startsWith('a')) ? "latest.release" : "3.0"
               """
           )
         );
@@ -258,6 +275,35 @@ class MethodInvocationTest implements RewriteTest {
                   isEmpty("")
                 }
               }
+              """
+          )
+        );
+    }
+
+    @ExpectedToFail("Parentheses with method invocation is not yet supported")
+    @Issue("https://github.com/openrewrite/rewrite/issues/4703")
+    @Test
+    void insideParentheses() {
+        rewriteRun(
+          groovy(
+            """              
+              static def foo(Map map) {
+                  ((map.containsKey("foo"))
+                      && ((map.get("foo")).equals("bar")))
+              }
+              """
+          )
+        );
+    }
+
+    @ExpectedToFail("Parentheses with method invocation is not yet supported")
+    @Issue("https://github.com/openrewrite/rewrite/issues/4703")
+    @Test
+    void insideParenthesesWithoutNewLineAndEscapedMethodName() {
+        rewriteRun(
+          groovy(
+            """
+              static def foo(Map someMap) {((((((someMap.get("(bar")))) ).'equals' "baz" )   )      }
               """
           )
         );

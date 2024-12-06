@@ -16,6 +16,7 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -80,11 +81,35 @@ class CastTest implements RewriteTest {
     }
 
     @Test
+    @ExpectedToFail("Parentheses with method invocation is not yet supported")
+    void groovyCastAndInvokeMethodWithParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              (((((( "" as String ))))).toString())
+              """
+          )
+        );
+    }
+
+    @Test
     void javaCastAndInvokeMethod() {
         rewriteRun(
           groovy(
             """
               ( (String) "" ).toString()
+              """
+          )
+        );
+    }
+
+    @ExpectedToFail("Parentheses with method invocation is not yet supported")
+    @Test
+    void javaCastAndInvokeMethodWithParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              (((((( (String) "" )).toString()))))
               """
           )
         );

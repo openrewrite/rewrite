@@ -143,6 +143,18 @@ public class FindMissingTypes extends Recipe {
                     // A different object in one implies a type has changed, either in the method signature or deeper in the type tree.
                     mi = SearchResult.found(mi, "MethodInvocation#name#type is not the same instance as the MethodType of MethodInvocation.");
                 }
+                if (type != null) {
+                    int argCount = 0;
+                    for (Expression argument : mi.getArguments()) {
+                        if (!(argument instanceof J.Empty)) {
+                            argCount++;
+                        }
+                    }
+                    int minCount = type.hasFlags(Flag.Varargs) ? type.getParameterTypes().size() - 1 : type.getParameterTypes().size();
+                    if (argCount < minCount) {
+                        mi = SearchResult.found(mi, "argument count mismatch: " + argCount + " != " + type.getParameterTypes().size());
+                    }
+                }
             }
             return mi;
         }
