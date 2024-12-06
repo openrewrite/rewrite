@@ -280,6 +280,18 @@ class MethodInvocationTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/4703")
     @Test
+    void insideParenthesesSimple() {
+        rewriteRun(
+          groovy(
+            """              
+              ((a.invoke "b" ))
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4703")
+    @Test
     void insideParentheses() {
         rewriteRun(
           groovy(
