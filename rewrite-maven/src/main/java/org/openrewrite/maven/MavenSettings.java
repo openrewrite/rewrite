@@ -127,7 +127,7 @@ public class MavenSettings {
                 .orElse(installSettings);
     }
 
-    private byte[] extractPassword(@NotNull String pwd) {
+    private byte[] extractPassword(String pwd) {
         Pattern pattern = Pattern.compile(".*?[^\\\\]?\\{(.*?)}.*");
         Matcher matcher = pattern.matcher(pwd);
         if (matcher.find()) {
