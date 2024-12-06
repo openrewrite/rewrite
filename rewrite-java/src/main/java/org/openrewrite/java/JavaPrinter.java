@@ -428,8 +428,8 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
                         getCursor()
                                 .dropParentUntil(
                                         c -> c instanceof Switch ||
-                                                c instanceof SwitchExpression ||
-                                                c == Cursor.ROOT_VALUE
+                                             c instanceof SwitchExpression ||
+                                             c == Cursor.ROOT_VALUE
                                 )
                                 .getValue();
                 if (aSwitch instanceof SwitchExpression) {
@@ -848,6 +848,13 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
             p.append(']');
         }
         if (multiVariable.getVarargs() != null) {
+            if (p.out.charAt(p.out.length() - 1) == ']') {
+                int posToCheck = p.out.length() - 2;
+                while (p.out.charAt(posToCheck) != '[') {
+                    posToCheck--;
+                }
+                p.out.delete(posToCheck, p.out.length());
+            }
             visitSpace(multiVariable.getVarargs(), Space.Location.VARARGS, p);
             p.append("...");
         }
