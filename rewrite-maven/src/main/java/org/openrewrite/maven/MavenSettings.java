@@ -126,7 +126,7 @@ public class MavenSettings {
                 .orElse(installSettings);
     }
 
-    void updatePasswords(ExecutionContext ctx) {
+    void maybeDecryptPasswords(ExecutionContext ctx) {
         MavenSecuritySettings security = MavenSecuritySettings.readMavenSecuritySettingsFromDisk(ctx);
         if (security == null) {
             return;

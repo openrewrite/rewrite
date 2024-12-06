@@ -44,7 +44,7 @@ public class MavenSecuritySettings {
     @Nullable
     String master;
 
-    public static @Nullable MavenSecuritySettings parse(Parser.Input source, ExecutionContext ctx) {
+    private static @Nullable MavenSecuritySettings parse(Parser.Input source, ExecutionContext ctx) {
         try {
             return new Interpolator().interpolate(
                     MavenXmlMapper.readMapper().readValue(source.getSource(ctx), MavenSecuritySettings.class));
@@ -54,7 +54,7 @@ public class MavenSecuritySettings {
         }
     }
 
-    public static @Nullable MavenSecuritySettings parse(Path settingsPath, ExecutionContext ctx) {
+    private static @Nullable MavenSecuritySettings parse(Path settingsPath, ExecutionContext ctx) {
         return parse(new Parser.Input(settingsPath, () -> {
             try {
                 return Files.newInputStream(settingsPath);
@@ -98,7 +98,7 @@ public class MavenSecuritySettings {
         }
     }
 
-    public MavenSecuritySettings merge(@Nullable MavenSecuritySettings installSettings) {
+    private MavenSecuritySettings merge(@Nullable MavenSecuritySettings installSettings) {
         return installSettings == null ? this : new MavenSecuritySettings(
             master == null ? installSettings.master : master
         );

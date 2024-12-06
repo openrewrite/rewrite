@@ -40,7 +40,7 @@ public class Assertions {
             MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
             MavenSettings settings = MavenSettings.readMavenSettingsFromDisk(mctx);
             if (settings != null) {
-                settings.updatePasswords(mctx);
+                settings.maybeDecryptPasswords(mctx);
             }
             mctx.setMavenSettings(settings);
         }
