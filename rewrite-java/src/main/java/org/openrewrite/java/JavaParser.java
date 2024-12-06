@@ -77,8 +77,9 @@ public interface JavaParser extends Parser {
             List<Path> matchedArtifacts = filterArtifacts(artifactName, runtimeClasspath);
             if (matchedArtifacts.isEmpty()) {
                 missingArtifactNames.add(artifactName);
+            } else {
+                artifacts.addAll(matchedArtifacts);
             }
-            artifacts.addAll(matchedArtifacts);
         }
 
         if (!missingArtifactNames.isEmpty()) {
@@ -103,7 +104,7 @@ public interface JavaParser extends Parser {
         List<Path> artifacts = new ArrayList<>();
         // Bazel automatically replaces '-' with '_' when generating jar files.
         String normalizedArtifactName = artifactName.replace('-', '_');
-        Pattern jarPattern = Pattern.compile("(" + artifactName + "|" + normalizedArtifactName + ")" + "(?:" + "-.*?" + ")?" + "\\.jar$");
+        Pattern jarPattern = Pattern.compile(String.format("(%s|%s)(?:-.*?)?\\.jar$", artifactName, normalizedArtifactName));
         // In a multi-project IDE classpath, some classpath entries aren't jars
         Pattern explodedPattern = Pattern.compile("/" + artifactName + "/");
         for (URI cpEntry : runtimeClasspath) {
