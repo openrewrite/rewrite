@@ -31,7 +31,9 @@ class TernaryTest implements RewriteTest {
 
           // NOT inside parentheses, but verifies the parser's
           // test for "inside parentheses" condition
-          groovy("(true) ? 1 : 2")
+          groovy("(true) ? 1 : 2"),
+          // And combine the two cases
+          groovy("((true) ? 1 : 2)")
         );
     }
 
