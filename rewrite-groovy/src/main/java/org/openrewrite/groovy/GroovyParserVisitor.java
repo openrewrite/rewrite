@@ -218,8 +218,8 @@ public class GroovyParserVisitor {
                 }
                 throw new GroovyParsingException(
                         "Failed to parse " + sourcePath + " at cursor position " + cursor +
-                        ". The next 10 characters in the original source are `" +
-                        source.substring(cursor, Math.min(source.length(), cursor + 10)) + "`", t);
+                                ". The next 10 characters in the original source are `" +
+                                source.substring(cursor, Math.min(source.length(), cursor + 10)) + "`", t);
             }
         }
 
@@ -761,8 +761,26 @@ public class GroovyParserVisitor {
             return ts;
         }
 
+        private Stack<ParenthesesHandler> parenthesesStack = new Stack<>();
+
+        @RequiredArgsConstructor
+        private class ParenthesesHandler {
+            private final int offset;
+            private final Space before;
+
+            public Expression handle(Expression expr, Space after) {
+                cursor++;
+                return new J.Parentheses<>(randomId(), before, Markers.EMPTY, new JRightPadded<J>(expr, after, Markers.EMPTY));
+            }
+        }
+
         private Expression insideParentheses(ASTNode node, Function<Space, Expression> parenthesizedTree) {
+            System.out.println(node);
+
+
             Integer insideParenthesesLevel = getInsideParenthesesLevel(node);
+            System.out.println("insideParenthesesLevel: " + insideParenthesesLevel);
+            // AST contains information about the parentheses level, so apply it directly
             if (insideParenthesesLevel != null) {
                 Stack<Space> openingParens = new Stack<>();
                 for (int i = 0; i < insideParenthesesLevel; i++) {
@@ -770,8 +788,68 @@ public class GroovyParserVisitor {
                 }
                 Expression parenthesized = parenthesizedTree.apply(whitespace());
                 for (int i = 0; i < insideParenthesesLevel; i++) {
-                    parenthesized = new J.Parentheses<>(randomId(), openingParens.pop(), Markers.EMPTY,
-                            padRight(parenthesized, sourceBefore(")")));
+                    parenthesized = new J.Parentheses<>(randomId(), openingParens.pop(), Markers.EMPTY, padRight(parenthesized, sourceBefore(")")));
+                }
+                return parenthesized;
+            }
+
+            int saveCursor = cursor;
+            Space prefix = whitespace();
+            /*if (node instanceof CastExpression) {
+                // FIXME
+                return parenthesizedTree.apply(prefix);
+            }*/
+
+            Expression expr;
+            if (source.charAt(cursor) == '(') {
+                cursor++;
+                parenthesesStack.push(new ParenthesesHandler(saveCursor, prefix));
+                expr = insideParentheses(node, parenthesizedTree);
+            } else {
+                expr = parenthesizedTree.apply(prefix);
+            }
+
+            int saveCursor2 = cursor;
+            Space after = whitespace();
+            if (cursor < source.length() && source.charAt(cursor) == ')' && !parenthesesStack.isEmpty() &&
+                    (parenthesesStack.peek().offset == saveCursor || parenthesesStack.peek().offset + 1 == saveCursor)) {
+                return parenthesesStack.pop().handle(expr, after);
+            } else {
+                cursor = saveCursor2;
+            }
+            return expr;
+        }
+
+
+        private Expression insideParenthesesForMethodInvocation(ASTNode node, Function<Space, Expression> parenthesizedTree) {
+            System.out.println(node);
+            System.out.println(source.charAt(cursor));
+
+            Space x = whitespace();
+
+           /* if (source.charAt(cursor) == '(') {
+                parentheses.push(() -> p)
+            }*/
+
+
+
+            return parenthesizedTree.apply(whitespace());
+        }
+
+        private Expression insideParenthesesOld(ASTNode node, Function<Space, Expression> parenthesizedTree) {
+            System.out.println(node);
+            System.out.println(source.charAt(cursor));
+
+            Integer insideParenthesesLevel = getInsideParenthesesLevel(node);
+            // AST contains information about the parentheses level, so apply it directly
+            if (insideParenthesesLevel != null) {
+                Stack<Space> openingParens = new Stack<>();
+                for (int i = 0; i < insideParenthesesLevel; i++) {
+                    openingParens.push(sourceBefore("("));
+                }
+                Expression parenthesized = parenthesizedTree.apply(whitespace());
+                for (int i = 0; i < insideParenthesesLevel; i++) {
+                    parenthesized = new J.Parentheses<>(randomId(), openingParens.pop(), Markers.EMPTY, padRight(parenthesized, sourceBefore(")")));
                 }
                 return parenthesized;
             }
@@ -821,9 +899,9 @@ public class GroovyParserVisitor {
             //     https://docs.groovy-lang.org/latest/html/documentation/#_named_parameters_2
             // When named parameters are in use they may appear before, after, or intermixed with any positional arguments
             if (unparsedArgs.size() > 1 && unparsedArgs.get(0) instanceof MapExpression &&
-                (unparsedArgs.get(0).getLastLineNumber() > unparsedArgs.get(1).getLastLineNumber() ||
-                    (unparsedArgs.get(0).getLastLineNumber() == unparsedArgs.get(1).getLastLineNumber() &&
-                        unparsedArgs.get(0).getLastColumnNumber() > unparsedArgs.get(1).getLastColumnNumber()))) {
+                    (unparsedArgs.get(0).getLastLineNumber() > unparsedArgs.get(1).getLastLineNumber() ||
+                            (unparsedArgs.get(0).getLastLineNumber() == unparsedArgs.get(1).getLastLineNumber() &&
+                                    unparsedArgs.get(0).getLastColumnNumber() > unparsedArgs.get(1).getLastColumnNumber()))) {
 
                 // Figure out the source-code ordering of the expressions
                 MapExpression namedArgExpressions = (MapExpression) unparsedArgs.get(0);
@@ -1119,8 +1197,8 @@ public class GroovyParserVisitor {
             // Groovy allows catch variables to omit their type, shorthand for being of type java.lang.Exception
             // Can't use isSynthetic() here because groovy doesn't record the line number on the Parameter
             if ("java.lang.Exception".equals(param.getType().getName()) &&
-                !source.startsWith("Exception", cursor) &&
-                !source.startsWith("java.lang.Exception", cursor)) {
+                    !source.startsWith("Exception", cursor) &&
+                    !source.startsWith("java.lang.Exception", cursor)) {
                 paramType = new J.Identifier(randomId(), paramPrefix, Markers.EMPTY, emptyList(), "",
                         JavaType.ShallowClass.build("java.lang.Exception"), null);
             } else {
@@ -1888,7 +1966,7 @@ public class GroovyParserVisitor {
         public void visitReturnStatement(ReturnStatement return_) {
             Space fmt = sourceBefore("return");
             if (return_.getExpression() instanceof ConstantExpression && isSynthetic(return_.getExpression()) &&
-                (((ConstantExpression) return_.getExpression()).getValue() == null)) {
+                    (((ConstantExpression) return_.getExpression()).getValue() == null)) {
                 queue.add(new J.Return(randomId(), fmt, Markers.EMPTY, null));
             } else {
                 queue.add(new J.Return(randomId(), fmt, Markers.EMPTY, visit(return_.getExpression())));
@@ -2317,6 +2395,10 @@ public class GroovyParserVisitor {
         return delimIndex > source.length() - untilDelim.length() ? -1 : delimIndex;
     }
 
+    /**
+     * Get all whitespace characters of the source file between the cursor and the first non whitespace character.
+     * The cursor will be moved before the next non whitespace character.
+     */
     private Space whitespace() {
         String prefix = source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
         cursor += prefix.length();
@@ -2464,15 +2546,18 @@ public class GroovyParserVisitor {
         return lengthAccordingToAst;
     }
 
-    private static @Nullable Integer getInsideParenthesesLevel(ASTNode node) {
+    private @Nullable Integer getInsideParenthesesLevel(ASTNode node) {
         Object rawIpl = node.getNodeMetaData("_INSIDE_PARENTHESES_LEVEL");
         if (rawIpl instanceof AtomicInteger) {
             // On Java 11 and newer _INSIDE_PARENTHESES_LEVEL is an AtomicInteger
             return ((AtomicInteger) rawIpl).get();
-        } else {
+        } else if (rawIpl instanceof Integer) {
             // On Java 8 _INSIDE_PARENTHESES_LEVEL is a regular Integer
             return (Integer) rawIpl;
-        }
+        }/* else if (node instanceof MethodCallExpression) {
+            return GroovyParserParentheseDiscoverer.getInsideParenthesesLevel((MethodCallExpression) node, source, cursor);
+        }*/
+        return null;
     }
 
     private int getDelimiterLength() {
@@ -2646,7 +2731,7 @@ public class GroovyParserVisitor {
        Can contain a J.FieldAccess, as in a variable declaration with fully qualified type parameterization:
            List<java.lang.String>
      */
-    private JContainer<Expression> visitTypeParameterizations(GenericsType @Nullable[] genericsTypes) {
+    private JContainer<Expression> visitTypeParameterizations(GenericsType @Nullable [] genericsTypes) {
         Space prefix = sourceBefore("<");
         List<JRightPadded<Expression>> parameters;
 

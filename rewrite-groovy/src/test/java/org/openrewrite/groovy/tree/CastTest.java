@@ -81,7 +81,6 @@ class CastTest implements RewriteTest {
     }
 
     @Test
-    @ExpectedToFail("Parentheses with method invocation is not yet supported")
     void groovyCastAndInvokeMethodWithParentheses() {
         rewriteRun(
           groovy(
@@ -103,7 +102,6 @@ class CastTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("Parentheses with method invocation is not yet supported")
     @Test
     void javaCastAndInvokeMethodWithParentheses() {
         rewriteRun(
