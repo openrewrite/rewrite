@@ -44,7 +44,7 @@ public class YamlReference implements Reference {
         if (getTree() instanceof Yaml.Scalar) {
             return ((Yaml.Scalar) getTree()).getValue();
         }
-        throw new IllegalArgumentException("getTree() must be an Yaml.Document: " + getTree().getClass());
+        throw new IllegalArgumentException("getTree() must be an Yaml.Scalar: " + getTree().getClass());
     }
 
     @Override
@@ -52,9 +52,6 @@ public class YamlReference implements Reference {
         return true;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public Tree rename(Renamer renamer, Cursor cursor, ExecutionContext ctx) {
         Tree tree = cursor.getValue();
@@ -65,7 +62,7 @@ public class YamlReference implements Reference {
     }
 
     @SuppressWarnings("unused")
-    public static class SpringApplicationYamlReferenceProvider implements Reference.Provider {
+    static class SpringApplicationYamlReferenceProvider implements Reference.Provider {
         private static final Predicate<String> applicationPropertiesMatcher = Pattern.compile("^application(-\\w+)?\\.(yaml|yml)$").asPredicate();
 
         @Override
@@ -74,7 +71,7 @@ public class YamlReference implements Reference {
         }
 
         @Override
-        public @NonNull Set<Reference> getReferences(SourceFile sourceFile) {
+        public Set<Reference> getReferences(SourceFile sourceFile) {
             Set<Reference> references = new HashSet<>();
             new Matcher().asVisitor(reference -> {
                 references.add(reference);
