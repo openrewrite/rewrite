@@ -15,10 +15,8 @@
  */
 package org.openrewrite.xml;
 
-import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
-import lombok.NoArgsConstructor;
-import lombok.Data;
+import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
@@ -26,10 +24,8 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-@AllArgsConstructor
+@Value
 @EqualsAndHashCode(callSuper = false)
-@NoArgsConstructor
-@Data
 public class ChangeTagValue extends Recipe {
 
     @Option(displayName = "Element name",
@@ -79,21 +75,13 @@ public class ChangeTagValue extends Recipe {
                     // then change the value to the newValue supplied
                     if (!Boolean.TRUE.equals(regex) &&
                             (oldValue == null || oldValue.equals(tag.getValue().orElse(null)))) {
-                        doAfterVisit(new ChangeTagValueVisitor<>(tag, oldValue, newValue, Boolean.FALSE));
+                        doAfterVisit(new ChangeTagValueVisitor<>(tag, newValue));
                     } else if (Boolean.TRUE.equals(regex) && oldValue != null) {
-                        doAfterVisit(new ChangeTagValueVisitor<>(tag, oldValue, newValue, Boolean.TRUE));
+                        doAfterVisit(new FindAndReplaceTagTextVisitor<>(tag, oldValue, newValue, Boolean.TRUE));
                     }
                 }
                 return super.visitTag(tag, ctx);
             }
         };
-    }
-
-    public ChangeTagValue(final String elementName, final @Nullable String oldValue,
-                          final String newValue) {
-        this.elementName = elementName;
-        this.oldValue = oldValue;
-        this.regex = Boolean.FALSE;
-        this.newValue = newValue;
     }
 }

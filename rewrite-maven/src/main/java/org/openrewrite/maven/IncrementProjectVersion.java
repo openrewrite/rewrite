@@ -170,7 +170,8 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, S
                     return t;
                 }
                 t = t.withMarkers(t.getMarkers().add(new AlreadyIncremented(randomId())));
-                return (Xml.Tag) new ChangeTagValue("version", null, newVersion).getVisitor()
+                return (Xml.Tag) new ChangeTagValue("version", null, newVersion, null)
+                        .getVisitor()
                         .visitNonNull(t, ctx);
             }
         };
