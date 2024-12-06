@@ -24,7 +24,6 @@ import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
-import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
@@ -127,13 +126,27 @@ public class MavenSettings {
                 .orElse(installSettings);
     }
 
-    private byte[] extractPassword(String pwd) {
-        Pattern pattern = Pattern.compile(".*?[^\\\\]?\\{(.*?)}.*");
-        Matcher matcher = pattern.matcher(pwd);
-        if (matcher.find()) {
-            return Base64.getDecoder().decode(matcher.group(1));
+    void updatePasswords(ExecutionContext ctx) {
+        MavenSecuritySettings security = MavenSecuritySettings.readMavenSecuritySettingsFromDisk(ctx);
+        if (security == null) {
+            return;
         }
-        return pwd.getBytes(StandardCharsets.UTF_8);
+
+        String decryptedMasterPassword = decrypt(security.getMaster(), "settings.security");
+        if (decryptedMasterPassword != null) {
+            if (mavenLocal != null) {
+                String password = decrypt(mavenLocal.getPassword(), decryptedMasterPassword);
+                if (password != null) {
+                    mavenLocal = mavenLocal.withPassword(password);
+                }
+            }
+            if (servers != null) {
+                servers.servers = ListUtils.map(servers.servers, server -> {
+                    String password = decrypt(server.getPassword(), decryptedMasterPassword);
+                    return password == null ? server : server.withPassword(password);
+                });
+            }
+        }
     }
 
     private @Nullable String decrypt(@Nullable String fieldValue, @Nullable String password) {
@@ -142,7 +155,6 @@ public class MavenSettings {
         }
 
         try {
-
             byte[] encryptedText = extractPassword(fieldValue);
 
             byte[] salt = new byte[8];
@@ -180,44 +192,13 @@ public class MavenSettings {
         }
     }
 
-    private void updateLocal(@Nullable String masterPassword) {
-        if (mavenLocal == null || masterPassword == null) {
-            return;
+    private byte[] extractPassword(String pwd) {
+        Pattern pattern = Pattern.compile(".*?[^\\\\]?\\{(.*?)}.*");
+        Matcher matcher = pattern.matcher(pwd);
+        if (matcher.find()) {
+            return Base64.getDecoder().decode(matcher.group(1));
         }
-
-        String password = decrypt(mavenLocal.getPassword(), masterPassword);
-        if (password != null) {
-            mavenLocal = mavenLocal.withPassword(password);
-        }
-    }
-
-    private void updateServers(@Nullable String masterPassword) {
-        if (servers == null || masterPassword == null) {
-            return;
-        }
-
-        List<Server> newServers = new ArrayList<>();
-        for (Server server : servers.servers ) {
-            String password = decrypt(server.getPassword(), masterPassword);
-            if (password != null) {
-                server = server.withPassword(password);
-            }
-            newServers.add(server);
-        }
-
-        servers.servers = newServers;
-    }
-
-    public void updatePassword(ExecutionContext ctx) {
-        MavenSecuritySettings security = MavenSecuritySettings.readMavenSecuritySettingsFromDisk(ctx);
-        if (security == null) {
-            return;
-        }
-
-        String decryptedMasterPassword = decrypt(security.getMaster(), "settings.security");
-
-        updateLocal(decryptedMasterPassword);
-        updateServers(decryptedMasterPassword);
+        return pwd.getBytes(StandardCharsets.UTF_8);
     }
 
     public static boolean readFromDiskEnabled() {
@@ -265,7 +246,7 @@ public class MavenSettings {
         if (profiles != null) {
             for (Profile profile : profiles.getProfiles()) {
                 if (profile.isActive(activeProfiles) || (this.activeProfiles != null &&
-                                                         profile.isActive(this.activeProfiles.getActiveProfiles()))) {
+                        profile.isActive(this.activeProfiles.getActiveProfiles()))) {
                     if (profile.repositories != null) {
                         for (RawRepositories.Repository repository : profile.repositories.getRepositories()) {
                             activeRepositories.put(repository.getId(), repository);
@@ -516,7 +497,8 @@ public class MavenSettings {
     @JsonIgnoreProperties(value = "httpHeaders")
     public static class ServerConfiguration {
         @JacksonXmlProperty(localName = "property")
-        @JacksonXmlElementWrapper(localName = "httpHeaders", useWrapping = true) // wrapping is disabled by default on MavenXmlMapper
+        @JacksonXmlElementWrapper(localName = "httpHeaders", useWrapping = true)
+        // wrapping is disabled by default on MavenXmlMapper
         @Nullable
         List<HttpHeader> httpHeaders;
 
