@@ -183,7 +183,7 @@ class ChangeTagValueTest implements RewriteTest {
     class FindAndReplaceTagTextVisitorTest {
 
         @Test
-        void testFindAndReplace() {
+        void findAndReplace() {
             rewriteRun(
               spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
                   @Override
