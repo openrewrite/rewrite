@@ -212,8 +212,11 @@ public class MavenSettings {
     }
 
     public static boolean readFromDiskEnabled() {
+        return true;
+/*
         final String propertyValue = System.getProperty("org.openrewrite.test.readMavenSettingsFromDisk");
         return propertyValue != null && !propertyValue.equalsIgnoreCase("false");
+*/
     }
 
     private static Path userSettingsPath() {

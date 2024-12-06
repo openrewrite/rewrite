@@ -59,14 +59,14 @@ public class MavenSecuritySettings {
             try {
                 return Files.newInputStream(settingsPath);
             } catch (IOException e) {
-                ctx.getOnError().accept(new IOException("Failed to read security-settings.xml at " + settingsPath, e));
+                ctx.getOnError().accept(new IOException("Failed to read settings-security.xml at " + settingsPath, e));
                 return null;
             }
         }), ctx);
     }
 
     public static @Nullable MavenSecuritySettings readMavenSecuritySettingsFromDisk(ExecutionContext ctx) {
-        final Optional<MavenSecuritySettings> userSettings = Optional.of(userSettingsPath())
+        final Optional<MavenSecuritySettings> userSettings = Optional.of(userSecuritySettingsPath())
                 .filter(MavenSecuritySettings::exists)
                 .map(path -> parse(path, ctx));
         final MavenSecuritySettings installSettings = findMavenHomeSettings().map(path -> parse(path, ctx)).orElse(null);
@@ -74,14 +74,14 @@ public class MavenSecuritySettings {
                 .orElse(installSettings);
     }
 
-    private static Path userSettingsPath() {
-        return Paths.get(System.getProperty("user.home")).resolve(".m2/security-settings.xml");
+    private static Path userSecuritySettingsPath() {
+        return Paths.get(System.getProperty("user.home")).resolve(".m2/settings-security.xml");
     }
 
     private static Optional<Path> findMavenHomeSettings() {
         for (String envVariable : Arrays.asList("MVN_HOME", "M2_HOME", "MAVEN_HOME")) {
             for (String s : Optional.ofNullable(System.getenv(envVariable)).map(Arrays::asList).orElse(emptyList())) {
-                Path resolve = Paths.get(s).resolve("conf/security-settings.xml");
+                Path resolve = Paths.get(s).resolve("conf/settings-security.xml");
                 if (exists(resolve)) {
                     return Optional.of(resolve);
                 }
