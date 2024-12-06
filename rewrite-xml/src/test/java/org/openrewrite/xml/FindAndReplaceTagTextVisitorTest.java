@@ -120,7 +120,7 @@ class FindAndReplaceTagTextVisitorTest implements RewriteTest {
                     }
                 })),
                 xml(
-                   """
+                  """
                    <executions>
                        <execution>
                            <configs/>
@@ -149,11 +149,11 @@ class FindAndReplaceTagTextVisitorTest implements RewriteTest {
                     }
                 })),
                 xml(
-                        """
-                        <dependency>
-                            <version>2.0</version>
-                        </dependency>
-                        """
+                  """
+                   <dependency>
+                       <version>2.0</version>
+                   </dependency>
+                   """
                 )
         );
     }
