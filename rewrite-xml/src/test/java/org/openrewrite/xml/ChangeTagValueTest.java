@@ -15,10 +15,15 @@
  */
 package org.openrewrite.xml;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.xml.tree.Xml;
 
+import static java.util.Objects.requireNonNull;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.xml.Assertions.xml;
 
 class ChangeTagValueTest implements RewriteTest {
@@ -50,7 +55,7 @@ class ChangeTagValueTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(
             new ChangeTagValue("/dependency/version",
-              "SNAPSHOT", "RELEASE", Boolean.TRUE)
+              "SNAPSHOT", "RELEASE", true)
           ),
           xml(
             """
@@ -77,7 +82,7 @@ class ChangeTagValueTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(
             new ChangeTagValue("/dependency/version",
-              "$", "-RELEASE", Boolean.TRUE)
+              "$", "-RELEASE", true)
           ),
           xml(
             """
@@ -104,7 +109,7 @@ class ChangeTagValueTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(
             new ChangeTagValue("/dependency/version",
-              "(\\d).(\\d).(\\d)", "$1.$3.4", Boolean.TRUE)
+              "(\\d).(\\d).(\\d)", "$1.$3.4", true)
           ),
           xml(
             """
@@ -123,5 +128,153 @@ class ChangeTagValueTest implements RewriteTest {
               """, spec -> spec.path("pom.xml")
           )
         );
+    }
+
+    @Test
+    void replacedExactlyOnce() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeTagValue(
+            "/tag",
+            "(aaa)",
+            "$1-aaa",
+            true)),
+          xml(
+            "<tag>aaa</tag>",
+            "<tag>aaa-aaa</tag>"
+          )
+        );
+    }
+
+    @Nested
+    class FindAndReplaceTagTextVisitorTest {
+
+        @Test
+        void testFindAndReplace() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
+                  @Override
+                  public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
+                      doAfterVisit(new ChangeTagValue.RegexReplaceVisitor<>(
+                        (Xml.Tag) requireNonNull(x.getRoot().getContent()).get(0),
+                        "2.0",
+                        "3.0")
+                      );
+                      return super.visitDocument(x, ctx);
+                  }
+              })),
+              xml(
+                """
+                  <dependency>
+                      <version>
+                          2.0
+                      </version>
+                  </dependency>
+                  """,
+                """ 
+                  <dependency>
+                      <version>
+                          3.0
+                      </version>
+                  </dependency>
+                  """
+              )
+            );
+        }
+
+        @Test
+        void changeContentSubstring() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
+                  @Override
+                  public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
+                      doAfterVisit(new ChangeTagValue.RegexReplaceVisitor<>(
+                        requireNonNull(x.getRoot()),
+                        "SNAPSHOT",
+                        "RELEASE")
+                      );
+                      return super.visitDocument(x, ctx);
+                  }
+              })),
+              xml(
+                "<tag>1.2.3-SNAPSHOT</tag>",
+                "<tag>1.2.3-RELEASE</tag>"
+              )
+            );
+        }
+
+        @Test
+        void doNothingIfPatternDoesNotMatch() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
+                  @Override
+                  public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
+                      doAfterVisit(new ChangeTagValue.RegexReplaceVisitor<>(
+                        (Xml.Tag) requireNonNull(x.getRoot().getContent()).get(0),
+                        "7.0",
+                        "8.0")
+                      );
+                      return super.visitDocument(x, ctx);
+                  }
+              })),
+              xml(
+                """
+                  <executions>
+                      <execution>
+                          <configs/>
+                          <goals/>
+                      </execution>
+                  </executions>
+                  """
+              )
+            );
+        }
+
+        @Test
+        void doNothingForNonTextNotFound() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
+                  @Override
+                  public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
+                      doAfterVisit(new ChangeTagValue.RegexReplaceVisitor<>(
+                        (Xml.Tag) requireNonNull(x.getRoot().getContent()).get(0),
+                        "7.0",
+                        "8.0")
+                      );
+                      return super.visitDocument(x, ctx);
+                  }
+              })),
+              xml(
+                """
+                  <dependency>
+                      <version>2.0</version>
+                  </dependency>
+                  """
+              )
+            );
+        }
+
+        @Test
+        void skipsChildIfNotText() {
+            rewriteRun(
+              spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
+                  @Override
+                  public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
+                      doAfterVisit(new ChangeTagValue.RegexReplaceVisitor<>(
+                        (Xml.Tag) requireNonNull(x.getRoot().getContent()).get(0),
+                        "invalid",
+                        "2.0")
+                      );
+                      return super.visitDocument(x, ctx);
+                  }
+              })),
+              xml(
+                """
+                  <dependency>
+                      <version><invalid/></version>
+                  </dependency>
+                  """
+              )
+            );
+        }
     }
 }
