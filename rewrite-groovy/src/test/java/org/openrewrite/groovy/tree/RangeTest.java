@@ -16,6 +16,7 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
@@ -42,6 +43,20 @@ class RangeTest implements RewriteTest {
               ( 8..19 ).each { majorVersion ->
                 if (majorVersion == 9) return
               }
+              """
+          )
+        );
+    }
+
+    @ExpectedToFail("Parentheses with method invocation is not yet supported")
+    @Test
+    void parenthesizedAndInvokeMethodWithParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              (((( 8..19 ))).each { majorVersion ->
+                if (majorVersion == 9) return
+              })
               """
           )
         );
