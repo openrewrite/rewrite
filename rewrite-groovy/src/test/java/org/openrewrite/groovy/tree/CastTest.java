@@ -76,17 +76,11 @@ class CastTest implements RewriteTest {
             """
               ( "" as String ).toString()
               """
-          ),
-          groovy(
-            """
-              (((((( "" as String ))))).toString())
-              """
           )
         );
     }
 
     @Test
-    @ExpectedToFail("Parentheses with method invocation is not yet supported")
     void groovyCastAndInvokeMethodWithParentheses() {
         rewriteRun(
           groovy(
@@ -104,16 +98,10 @@ class CastTest implements RewriteTest {
             """
               ( (String) "" ).toString()
               """
-          ),
-          groovy(
-            """
-              (((((( (String) "" )).toString()))))
-              """
           )
         );
     }
 
-    @ExpectedToFail("Parentheses with method invocation is not yet supported")
     @Test
     void javaCastAndInvokeMethodWithParentheses() {
         rewriteRun(

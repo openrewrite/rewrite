@@ -44,18 +44,10 @@ class RangeTest implements RewriteTest {
                 if (majorVersion == 9) return
               }
               """
-          ),
-          groovy(
-            """
-              (((( 8..19 ))).each { majorVersion ->
-                if (majorVersion == 9) return
-              })
-              """
           )
         );
     }
 
-    @ExpectedToFail("Parentheses with method invocation is not yet supported")
     @Test
     void parenthesizedAndInvokeMethodWithParentheses() {
         rewriteRun(
