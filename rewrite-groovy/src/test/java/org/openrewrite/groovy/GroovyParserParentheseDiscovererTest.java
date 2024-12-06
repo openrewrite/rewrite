@@ -19,6 +19,7 @@ import lombok.SneakyThrows;
 import org.codehaus.groovy.ast.expr.Expression;
 import org.codehaus.groovy.ast.expr.MethodCallExpression;
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import sun.reflect.ReflectionFactory;
 
 import java.lang.reflect.Constructor;
@@ -134,6 +135,29 @@ class GroovyParserParentheseDiscovererTest {
 
         //language=groovy
         String source = "(a.invoke());((((a.invoke()))));(a.invoke())";
+        Integer result = GroovyParserParentheseDiscoverer.getInsideParenthesesLevel(node, source, 13);
+
+        assertEquals(4, result);
+    }
+
+    @Test
+    @ExpectedToFail("Comments are not yet working...")
+    void comments() {
+        MethodCallExpression node = MockMethodCallExpression.of("equals");
+
+        //language=groovy
+        String source = """
+          // comment
+          ((someMap./* comment */containsKey("f/* no-com"+
+
+          "ment */oo")) && /* multi line 
+           comment
+           */((someMap.get("foo")).'equals' ""\"bar
+          ""\" ))
+          /* comment
+          
+           */
+          """;
         Integer result = GroovyParserParentheseDiscoverer.getInsideParenthesesLevel(node, source, 13);
 
         assertEquals(4, result);
