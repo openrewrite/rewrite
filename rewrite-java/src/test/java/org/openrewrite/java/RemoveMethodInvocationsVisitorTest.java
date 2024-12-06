@@ -15,13 +15,14 @@
  */
 package org.openrewrite.java;
 
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Recipe;
 import org.openrewrite.test.RewriteTest;
 
-import java.util.List;
 
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -486,6 +487,56 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                       } catch (Exception e) {
                       } finally {
                       }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeStaticMethodFromImport() {
+        rewriteRun(
+          spec -> spec.recipe(createRemoveMethodsRecipe("java.util.Collections emptyList()")),
+          // language=java
+          java(
+            """
+              import static java.util.Collections.emptyList;
+              
+              class Test {
+                  void method() {
+                      List<Object> emptyList = emptyList();
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void method() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeStaticMethod() {
+        rewriteRun(
+          spec -> spec.recipe(createRemoveMethodsRecipe("java.util.Collections emptyList()")),
+          // language=java
+          java(
+            """
+              import java.util.Collections;
+              
+              class Test {
+                  void method() {
+                      List<Object> emptyList = Collections.emptyList();
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void method() {
                   }
               }
               """
