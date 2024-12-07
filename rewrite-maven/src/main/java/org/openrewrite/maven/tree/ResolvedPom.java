@@ -397,19 +397,17 @@ public class ResolvedPom {
         private void resolveParentPropertiesAndRepositoriesRecursively(List<Pom> pomAncestry) throws MavenDownloadingException {
             Pom pom = pomAncestry.get(0);
 
+            List<Profile> reallyActiveProfiles = pom.activeProfiles(activeProfiles);
+
             //Resolve properties
-            for (Profile profile : pom.getProfiles()) {
-                if (profile.isActive(activeProfiles)) {
-                    mergeProperties(profile.getProperties(), pom);
-                }
+            for (Profile profile : reallyActiveProfiles) {
+                mergeProperties(profile.getProperties(), pom);
             }
             mergeProperties(pom.getProperties(), pom);
 
             //Resolve repositories (which may rely on properties ^^^)
-            for (Profile profile : pom.getProfiles()) {
-                if (profile.isActive(activeProfiles)) {
-                    mergeRepositories(profile.getRepositories());
-                }
+            for (Profile profile : reallyActiveProfiles) {
+                mergeRepositories(profile.getRepositories());
             }
             mergeRepositories(pom.getRepositories());
 
@@ -431,11 +429,11 @@ public class ResolvedPom {
         private void resolveParentDependenciesRecursively(List<Pom> pomAncestry) throws MavenDownloadingException {
             Pom pom = pomAncestry.get(0);
 
-            for (Profile profile : pom.getProfiles()) {
-                if (profile.isActive(activeProfiles)) {
-                    mergeDependencyManagement(profile.getDependencyManagement(), pomAncestry);
-                    mergeRequestedDependencies(profile.getDependencies());
-                }
+            List<Profile> reallyActiveProfiles = pom.activeProfiles(activeProfiles);
+
+            for (Profile profile : reallyActiveProfiles) {
+                mergeDependencyManagement(profile.getDependencyManagement(), pomAncestry);
+                mergeRequestedDependencies(profile.getDependencies());
             }
 
             mergeDependencyManagement(pom.getDependencyManagement(), pomAncestry);
