@@ -122,8 +122,14 @@ public class MavenSettings {
                 .filter(MavenSettings::exists)
                 .map(path -> parse(path, ctx));
         final MavenSettings installSettings = findMavenHomeSettings().map(path -> parse(path, ctx)).orElse(null);
-        return userSettings.map(mavenSettings -> mavenSettings.merge(installSettings))
+        MavenSettings settings = userSettings.map(mavenSettings -> mavenSettings.merge(installSettings))
                 .orElse(installSettings);
+
+        if (settings != null) {
+            settings.maybeDecryptPasswords(ctx);
+        }
+
+        return settings;
     }
 
     void maybeDecryptPasswords(ExecutionContext ctx) {
@@ -187,12 +193,12 @@ public class MavenSettings {
             System.arraycopy(clearBytes, 0, decryptedBytes, 0, decryptedBytes.length);
             return new String(decryptedBytes, StandardCharsets.UTF_8);
         } catch (NoSuchPaddingException | NoSuchAlgorithmException | BadPaddingException | IllegalBlockSizeException |
-                 InvalidKeyException | InvalidAlgorithmParameterException e) {
+                 InvalidKeyException | InvalidAlgorithmParameterException | IllegalArgumentException e) {
             return null;
         }
     }
 
-    private byte[] extractPassword(String pwd) {
+    private byte[] extractPassword(String pwd) throws IllegalArgumentException {
         Pattern pattern = Pattern.compile(".*?[^\\\\]?\\{(.*?)}.*");
         Matcher matcher = pattern.matcher(pwd);
         if (matcher.find()) {

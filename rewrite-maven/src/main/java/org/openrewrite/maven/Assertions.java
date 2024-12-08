@@ -38,11 +38,7 @@ public class Assertions {
     static void customizeExecutionContext(ExecutionContext ctx) {
         if (MavenSettings.readFromDiskEnabled()) {
             MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
-            MavenSettings settings = MavenSettings.readMavenSettingsFromDisk(mctx);
-            if (settings != null) {
-                settings.maybeDecryptPasswords(mctx);
-            }
-            mctx.setMavenSettings(settings);
+            mctx.setMavenSettings(MavenSettings.readMavenSettingsFromDisk(mctx));
         }
     }
 
