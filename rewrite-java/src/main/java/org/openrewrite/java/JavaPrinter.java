@@ -227,7 +227,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         beforeSyntax(assert_, Space.Location.ASSERT_PREFIX, p);
         p.append("assert");
         visit(assert_.getCondition(), p);
-        visitLeftPadded(":", assert_.getDetail(), JLeftPadded.Location.ASSERT_DETAIL, p);
+        visitLeftPadded(":", assert_.getPadding().getDetail(), JLeftPadded.Location.ASSERT_DETAIL, p);
         afterSyntax(assert_, p);
         return assert_;
     }
