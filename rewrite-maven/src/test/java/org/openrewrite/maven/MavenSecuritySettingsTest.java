@@ -27,7 +27,7 @@ import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class MavenSettingsSecurityTest {
+class MavenSecuritySettingsTest {
 
     private static final String MASTER_PASS_ENCRYPTED = "FyoLIiN2Fx8HpT8O0aBsTn2/s3pYmtLRRCpoWPzhN4A="; // "master"
     private static final String USER_PASS_ENCRYPTED = "ERozWEamSJoHRBT+wVx51V2Emr9PazZR9txMntZPlJc="; // "testpass"
@@ -54,6 +54,60 @@ class MavenSettingsSecurityTest {
     void decryptCredentials() throws IOException {
         // Create settings-security.xml with master password
         Files.writeString(tempDir.resolve(".m2/settings-security.xml"),
+          //language=xml
+          """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <settingsSecurity>
+                <master>{%s}</master>
+            </settingsSecurity>
+            """.formatted(MASTER_PASS_ENCRYPTED));
+
+        // Create settings.xml with encrypted password
+        Files.writeString(tempDir.resolve(".m2/settings.xml"),
+          //language=xml
+          """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <settings>
+                <servers>
+                    <server>
+                        <id>test-server</id>
+                        <username>admin</username>
+                        <password>{%s}</password>
+                    </server>
+                </servers>
+            </settings>
+            """.formatted(USER_PASS_ENCRYPTED));
+
+        // Use the public API to read settings
+        var ctx = new InMemoryExecutionContext(t -> {
+            throw new RuntimeException(t);
+        });
+        MavenSettings settings = MavenSettings.readMavenSettingsFromDisk(ctx);
+        assert settings != null && settings.getServers() != null;
+        assertThat(settings.getServers().getServers())
+          .hasSize(1)
+          .first()
+          .satisfies(server -> {
+              assertThat(server.getId()).isEqualTo("test-server");
+              assertThat(server.getUsername()).isEqualTo("admin");
+              assertThat(server.getPassword()).isEqualTo(USER_PASS_DECRYPTED);
+          });
+    }
+
+    @Test
+    void relocatedCredentials() throws IOException {
+        // Create settings-security.xml with relocation
+        Path relocated = tempDir.resolve(".m2/relocation-settings-security.xml");
+        Files.writeString(tempDir.resolve(".m2/settings-security.xml"),
+          //language=xml
+          """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <settingsSecurity>
+                <relocation>%s</relocation>
+            </settingsSecurity>
+            """.formatted(relocated));
+        // Create relocation-settings-security.xml with master password
+        Files.writeString(relocated,
           //language=xml
           """
             <?xml version="1.0" encoding="UTF-8"?>

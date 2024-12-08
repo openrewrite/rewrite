@@ -55,8 +55,12 @@ import static java.util.Collections.emptyList;
 @AllArgsConstructor
 @JacksonXmlRootElement(localName = "settingsSecurity")
 public class MavenSecuritySettings {
+
     @Nullable
     String master;
+
+    @Nullable
+    String relocation;
 
     private static @Nullable MavenSecuritySettings parse(Parser.Input source, ExecutionContext ctx) {
         try {
@@ -80,12 +84,17 @@ public class MavenSecuritySettings {
     }
 
     public static @Nullable MavenSecuritySettings readMavenSecuritySettingsFromDisk(ExecutionContext ctx) {
-        final Optional<MavenSecuritySettings> userSettings = Optional.of(userSecuritySettingsPath())
+        Optional<MavenSecuritySettings> userSettings = Optional.of(userSecuritySettingsPath())
                 .filter(MavenSecuritySettings::exists)
                 .map(path -> parse(path, ctx));
-        final MavenSecuritySettings installSettings = findMavenHomeSettings().map(path -> parse(path, ctx)).orElse(null);
-        return userSettings.map(mavenSecuritySettings -> mavenSecuritySettings.merge(installSettings))
+        MavenSecuritySettings installSettings = findMavenHomeSettings().map(path -> parse(path, ctx)).orElse(null);
+        MavenSecuritySettings mergedSettings = userSettings
+                .map(mavenSecuritySettings -> mavenSecuritySettings.merge(installSettings))
                 .orElse(installSettings);
+        if (mergedSettings != null && mergedSettings.relocation != null) {
+            return mergedSettings.merge(parse(Paths.get(mergedSettings.relocation), ctx));
+        }
+        return mergedSettings;
     }
 
     private static Path userSecuritySettingsPath() {
@@ -114,7 +123,8 @@ public class MavenSecuritySettings {
 
     private MavenSecuritySettings merge(@Nullable MavenSecuritySettings installSettings) {
         return installSettings == null ? this : new MavenSecuritySettings(
-                master == null ? installSettings.master : master
+                master == null ? installSettings.master : master,
+                relocation == null ? installSettings.relocation : relocation
         );
     }
 
@@ -139,7 +149,8 @@ public class MavenSecuritySettings {
 
         public MavenSecuritySettings interpolate(MavenSecuritySettings mavenSecuritySettings) {
             return new MavenSecuritySettings(
-                    interpolate(mavenSecuritySettings.master)
+                    interpolate(mavenSecuritySettings.master),
+                    interpolate(mavenSecuritySettings.relocation)
             );
         }
 
