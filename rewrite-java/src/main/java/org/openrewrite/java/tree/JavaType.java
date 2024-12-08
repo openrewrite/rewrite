@@ -20,6 +20,7 @@ import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.AccessLevel;
+import lombok.Data;
 import lombok.Getter;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
@@ -48,6 +49,7 @@ public interface JavaType {
     Method[] EMPTY_METHOD_ARRAY = new Method[0];
     String[] EMPTY_STRING_ARRAY = new String[0];
     JavaType[] EMPTY_JAVA_TYPE_ARRAY = new JavaType[0];
+    AnnotationValue[] EMPTY_ANNOTATION_VALUE_ARRAY = new AnnotationValue[0];
 
     // TODO: To be removed with OpenRewrite 9
     default @Nullable Integer getManagedReference() {
@@ -626,6 +628,87 @@ public interface JavaType {
 
             return new ShallowClass(null, 1, fullyQualifiedName, Kind.Class, emptyList(), null, owningClass,
                     emptyList(), emptyList(), emptyList(), emptyList());
+        }
+    }
+
+    @Data
+    class AnnotationValue {
+        private final Method method;
+        private final @Nullable Object value;
+    }
+
+    class Annotation extends FullyQualified {
+
+        public final AnnotationValue @Nullable [] values;
+        public final FullyQualified type;
+
+        public Annotation(FullyQualified type, List<AnnotationValue> values) {
+            this.type = type;
+            this.values = ListUtils.arrayOrNullIfEmpty(values, EMPTY_ANNOTATION_VALUE_ARRAY);
+        }
+
+        public List<AnnotationValue> getValues() {
+            return values == null ? emptyList() : Arrays.asList(values);
+        }
+
+        @Override
+        public String getFullyQualifiedName() {
+            return type.getFullyQualifiedName();
+        }
+
+        @Override
+        public FullyQualified withFullyQualifiedName(String fullyQualifiedName) {
+            return null;
+        }
+
+        @Override
+        public List<FullyQualified> getAnnotations() {
+            return type.getAnnotations();
+        }
+
+        @Override
+        public boolean hasFlags(Flag... test) {
+            return type.hasFlags();
+        }
+
+        @Override
+        public Set<Flag> getFlags() {
+            return type.getFlags();
+        }
+
+        @Override
+        public List<FullyQualified> getInterfaces() {
+            return type.getInterfaces();
+        }
+
+        @Override
+        public Kind getKind() {
+            return type.getKind();
+        }
+
+        @Override
+        public List<Variable> getMembers() {
+            return type.getMembers();
+        }
+
+        @Override
+        public List<Method> getMethods() {
+            return type.getMethods();
+        }
+
+        @Override
+        public List<JavaType> getTypeParameters() {
+            return type.getTypeParameters();
+        }
+
+        @Override
+        public @Nullable FullyQualified getOwningClass() {
+            return type.getOwningClass();
+        }
+
+        @Override
+        public @Nullable FullyQualified getSupertype() {
+            return type.getSupertype();
         }
     }
 

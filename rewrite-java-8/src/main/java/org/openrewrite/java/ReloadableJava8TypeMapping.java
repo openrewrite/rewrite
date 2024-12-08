@@ -27,8 +27,6 @@ import org.openrewrite.java.tree.TypeUtils;
 
 import javax.lang.model.type.NullType;
 import javax.lang.model.type.TypeMirror;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -694,11 +692,10 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
                 if (annotType == null) {
                     continue;
                 }
-                Retention retention = a.getAnnotationType().asElement().getAnnotation(Retention.class);
-                if (retention != null && retention.value() == RetentionPolicy.SOURCE) {
-                    continue;
-                }
-                annotations.add(annotType);
+                List<JavaType.AnnotationValue> annotationValues = a.values.stream().map(attr -> new JavaType.AnnotationValue(
+                        methodDeclarationType(attr.fst, annotType), attr.snd.getValue().toString())).collect(Collectors.toList());
+                JavaType.Annotation annotation = new JavaType.Annotation(annotType, annotationValues);
+                annotations.add(annotation);
             }
         }
         return annotations;

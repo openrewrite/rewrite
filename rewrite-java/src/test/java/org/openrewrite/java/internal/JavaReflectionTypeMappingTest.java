@@ -22,9 +22,11 @@ import org.openrewrite.java.JavaTypeMappingTest;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 @SuppressWarnings("ConstantConditions")
 class JavaReflectionTypeMappingTest implements JavaTypeMappingTest {
-    JavaReflectionTypeMapping typeMapping = new JavaReflectionTypeMapping(new JavaTypeCache());
+    JavaReflectionTypeMapping typeMapping = new JavaReflectionTypeMapping(new AdaptiveRadixJavaTypeCache());
     JavaType.Parameterized goat = TypeUtils.asParameterized(typeMapping.type(JavaTypeGoat.class));
 
     @Override
@@ -56,4 +58,19 @@ class JavaReflectionTypeMappingTest implements JavaTypeMappingTest {
     @Override
     public void enumTypeB() {
     }
+
+    @Test
+    @Override
+    public void ignoreSourceRetentionAnnotations() {
+        JavaType.Parameterized goat = goatType();
+        assertThat(goat.getAnnotations()).satisfiesExactlyInAnyOrder(
+          a -> assertThat(a.getClassName()).isEqualTo("AnnotationWithRuntimeRetention")
+        );
+
+        JavaType.Method clazzMethod = methodType("clazz");
+        assertThat(clazzMethod.getAnnotations()).satisfiesExactlyInAnyOrder(
+          a -> assertThat(a.getClassName()).isEqualTo("AnnotationWithRuntimeRetention")
+        );
+    }
+
 }
