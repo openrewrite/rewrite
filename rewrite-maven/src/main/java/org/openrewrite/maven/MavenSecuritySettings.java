@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2024 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,13 +24,27 @@ import org.openrewrite.Parser;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.maven.internal.MavenXmlMapper;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
+import java.security.Key;
+import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Optional;
 import java.util.function.UnaryOperator;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
 
@@ -100,7 +114,7 @@ public class MavenSecuritySettings {
 
     private MavenSecuritySettings merge(@Nullable MavenSecuritySettings installSettings) {
         return installSettings == null ? this : new MavenSecuritySettings(
-            master == null ? installSettings.master : master
+                master == null ? installSettings.master : master
         );
     }
 
@@ -125,12 +139,65 @@ public class MavenSecuritySettings {
 
         public MavenSecuritySettings interpolate(MavenSecuritySettings mavenSecuritySettings) {
             return new MavenSecuritySettings(
-                interpolate(mavenSecuritySettings.master)
+                    interpolate(mavenSecuritySettings.master)
             );
         }
 
         private @Nullable String interpolate(@Nullable String s) {
             return s == null ? null : propertyPlaceholders.replacePlaceholders(s, propertyResolver);
         }
+    }
+
+    @Nullable
+    String decrypt(@Nullable String fieldValue, @Nullable String password) {
+        if (fieldValue == null || fieldValue.isEmpty() || password == null) {
+            return null;
+        }
+
+        try {
+            byte[] encryptedText = extractPassword(fieldValue);
+
+            byte[] salt = new byte[8];
+            System.arraycopy(encryptedText, 0, salt, 0, 8);
+
+            int padLength = encryptedText[8];
+            byte[] encryptedBytes = new byte[encryptedText.length - 9 - padLength];
+            System.arraycopy(encryptedText, 9, encryptedBytes, 0, encryptedBytes.length);
+
+            byte[] keyAndIV = new byte[32];
+            byte[] pwdBytes = extractPassword(password);
+            int offset = 0;
+            while (offset < 32) {
+                java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+                digest.update(pwdBytes);
+                digest.update(salt);
+                byte[] hash = digest.digest();
+                System.arraycopy(hash, 0, keyAndIV, offset, Math.min(hash.length, 32 - offset));
+                offset += hash.length;
+            }
+
+            Key key = new SecretKeySpec(keyAndIV, 0, 16, "AES");
+            IvParameterSpec iv = new IvParameterSpec(keyAndIV, 16, 16);
+            Cipher cipher = Cipher.getInstance("AES/CBC/NoPadding");
+            cipher.init(Cipher.DECRYPT_MODE, key, iv);
+            byte[] clearBytes = cipher.doFinal(encryptedBytes);
+
+            int paddingLength = clearBytes[clearBytes.length - 1];
+            byte[] decryptedBytes = new byte[clearBytes.length - paddingLength];
+            System.arraycopy(clearBytes, 0, decryptedBytes, 0, decryptedBytes.length);
+            return new String(decryptedBytes, StandardCharsets.UTF_8);
+        } catch (NoSuchPaddingException | NoSuchAlgorithmException | BadPaddingException | IllegalBlockSizeException |
+                 InvalidKeyException | InvalidAlgorithmParameterException | IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private byte[] extractPassword(String pwd) throws IllegalArgumentException {
+        Pattern pattern = Pattern.compile(".*?[^\\\\]?\\{(.*?)}.*");
+        Matcher matcher = pattern.matcher(pwd);
+        if (matcher.find()) {
+            return Base64.getDecoder().decode(matcher.group(1));
+        }
+        return pwd.getBytes(StandardCharsets.UTF_8);
     }
 }

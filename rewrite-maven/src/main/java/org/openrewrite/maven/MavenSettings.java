@@ -138,74 +138,23 @@ public class MavenSettings {
             return;
         }
 
-        String decryptedMasterPassword = decrypt(security.getMaster(), "settings.security");
+        String decryptedMasterPassword = security.decrypt(security.getMaster(), "settings.security");
         if (decryptedMasterPassword != null) {
             if (mavenLocal != null) {
-                String password = decrypt(mavenLocal.getPassword(), decryptedMasterPassword);
+                String password = security.decrypt(mavenLocal.getPassword(), decryptedMasterPassword);
                 if (password != null) {
                     mavenLocal = mavenLocal.withPassword(password);
                 }
             }
             if (servers != null) {
                 servers.servers = ListUtils.map(servers.servers, server -> {
-                    String password = decrypt(server.getPassword(), decryptedMasterPassword);
+                    String password = security.decrypt(server.getPassword(), decryptedMasterPassword);
                     return password == null ? server : server.withPassword(password);
                 });
             }
         }
     }
 
-    private @Nullable String decrypt(@Nullable String fieldValue, @Nullable String password) {
-        if (fieldValue == null || fieldValue.isEmpty() || password == null) {
-            return null;
-        }
-
-        try {
-            byte[] encryptedText = extractPassword(fieldValue);
-
-            byte[] salt = new byte[8];
-            System.arraycopy(encryptedText, 0, salt, 0, 8);
-
-            int padLength = encryptedText[8];
-            byte[] encryptedBytes = new byte[encryptedText.length - 9 - padLength];
-            System.arraycopy(encryptedText, 9, encryptedBytes, 0, encryptedBytes.length);
-
-            byte[] keyAndIV = new byte[32];
-            byte[] pwdBytes = extractPassword(password);
-            int offset = 0;
-            while (offset < 32) {
-                java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
-                digest.update(pwdBytes);
-                digest.update(salt);
-                byte[] hash = digest.digest();
-                System.arraycopy(hash, 0, keyAndIV, offset, Math.min(hash.length, 32 - offset));
-                offset += hash.length;
-            }
-
-            Key key = new SecretKeySpec(keyAndIV, 0, 16, "AES");
-            IvParameterSpec iv = new IvParameterSpec(keyAndIV, 16, 16);
-            Cipher cipher = Cipher.getInstance("AES/CBC/NoPadding");
-            cipher.init(Cipher.DECRYPT_MODE, key, iv);
-            byte[] clearBytes = cipher.doFinal(encryptedBytes);
-
-            int paddingLength = clearBytes[clearBytes.length - 1];
-            byte[] decryptedBytes = new byte[clearBytes.length - paddingLength];
-            System.arraycopy(clearBytes, 0, decryptedBytes, 0, decryptedBytes.length);
-            return new String(decryptedBytes, StandardCharsets.UTF_8);
-        } catch (NoSuchPaddingException | NoSuchAlgorithmException | BadPaddingException | IllegalBlockSizeException |
-                 InvalidKeyException | InvalidAlgorithmParameterException | IllegalArgumentException e) {
-            return null;
-        }
-    }
-
-    private byte[] extractPassword(String pwd) throws IllegalArgumentException {
-        Pattern pattern = Pattern.compile(".*?[^\\\\]?\\{(.*?)}.*");
-        Matcher matcher = pattern.matcher(pwd);
-        if (matcher.find()) {
-            return Base64.getDecoder().decode(matcher.group(1));
-        }
-        return pwd.getBytes(StandardCharsets.UTF_8);
-    }
 
     public static boolean readFromDiskEnabled() {
         final String propertyValue = System.getProperty("org.openrewrite.test.readMavenSettingsFromDisk");
