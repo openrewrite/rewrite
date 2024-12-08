@@ -17,6 +17,7 @@ package org.openrewrite.maven.tree;
 
 import org.jspecify.annotations.Nullable;
 
+import java.time.Duration;
 import java.util.List;
 
 @SuppressWarnings("unused")
@@ -33,7 +34,13 @@ public interface ResolutionEventListener {
     default void download(GroupArtifactVersion gav) {
     }
 
+    default void downloadMetadataSuccess(MavenMetadata mavenMetadata, @Nullable ResolvedPom containing, Duration duration) {
+    }
+
     default void downloadSuccess(ResolvedGroupArtifactVersion gav, @Nullable ResolvedPom containing) {
+    }
+
+    default void downloadSuccess(ResolvedGroupArtifactVersion gav, @Nullable ResolvedPom containing, Duration duration) {
     }
 
     /**
