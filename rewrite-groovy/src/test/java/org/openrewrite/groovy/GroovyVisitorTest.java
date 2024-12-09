@@ -54,4 +54,40 @@ class GroovyVisitorTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void multipleAssignmentsAtOneLine() {
+        rewriteRun(
+          groovy(
+            """
+            def startItem = '|  ', endItem = '  |'
+            def repeatLength = startItem.length() + output.length() + endItem.length()
+            println("\\n" + ("-" * repeatLength) + "\\n" + startItem + output + endItem + "\\n" + ("-" * repeatLength))
+            """
+          )
+        );
+    }
+
+    @Test
+    void multipleAssignmentsAtOneLineSimple() {
+        rewriteRun(
+          groovy(
+            """
+             def a = '1', b = '2'
+            """
+          )
+        );
+    }
+
+    @Test
+    void multipleAssignmentsAtMultipleLine() {
+        rewriteRun(
+          groovy(
+            """
+             def a = '1'    ,  
+                b = '2'
+            """
+          )
+        );
+    }
 }

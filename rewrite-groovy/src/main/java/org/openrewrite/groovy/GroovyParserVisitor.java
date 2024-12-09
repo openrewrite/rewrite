@@ -2080,18 +2080,25 @@ public class GroovyParserVisitor {
 
             if (expression.isDynamicTyped()) {
                 Space prefix = whitespace();
-                String keyword;
-                if (source.substring(cursor).startsWith("final")) {
-                    keyword = "final";
+                StringBuilder keyword = new StringBuilder();
+                if (source.charAt(cursor) == ',') {
+                    while (!Character.isLetterOrDigit(source.charAt(cursor))) {
+                        keyword.append(source.charAt(cursor));
+                        cursor++;
+                    }
                 } else {
-                    keyword = source.substring(cursor, cursor + 3);
+                    if (source.substring(cursor).startsWith("final")) {
+                        keyword = new StringBuilder("final");
+                    } else {
+                        keyword = new StringBuilder(source.substring(cursor, cursor + 3));
+                    }
+                    cursor += keyword.length();
                 }
-                cursor += keyword.length();
                 return new J.Identifier(randomId(),
                         prefix,
                         Markers.EMPTY,
                         emptyList(),
-                        keyword,
+                        keyword.toString(),
                         type, null);
             }
             Space prefix = sourceBefore(expression.getOriginType().getUnresolvedName());
