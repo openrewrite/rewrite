@@ -108,6 +108,16 @@ class JavaParserTest implements RewriteTest {
     }
 
     @Test
+    void getParserClasspathDownloadCreateRequiredFolder(@TempDir Path temp) throws Exception {
+        Path updatedTemp = Path.of(temp.toString(), "someFolder");
+        assertThat(updatedTemp.toFile().exists()).isFalse();
+        JavaParserExecutionContextView ctx = JavaParserExecutionContextView.view(new InMemoryExecutionContext());
+        ctx.setParserClasspathDownloadTarget(updatedTemp.toFile());
+        ctx.getParserClasspathDownloadTarget();
+        assertThat(updatedTemp.toFile().exists()).isTrue();
+    }
+
+    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3222")
     void parseFromByteArray() {
         try (ScanResult scan = new ClassGraph().scan()) {
