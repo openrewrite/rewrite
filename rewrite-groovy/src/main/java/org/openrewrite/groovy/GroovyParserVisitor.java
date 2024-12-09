@@ -39,9 +39,9 @@ import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.marker.Semicolon;
 import org.openrewrite.java.marker.TrailingComma;
-import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.math.BigDecimal;
@@ -122,7 +122,7 @@ public class GroovyParserVisitor {
     private Optional<RedundantDef> maybeRedundantDef(ClassNode type, String name) {
         int saveCursor = cursor;
         Space defPrefix = whitespace();
-        if(source.startsWith("def", cursor)) {
+        if (source.startsWith("def", cursor)) {
             skip("def");
             // The def is redundant only when it is followed by the method's return type
             // I hope no one puts an annotation between "def" and the return type
@@ -182,8 +182,8 @@ public class GroovyParserVisitor {
         for (ClassNode aClass : ast.getClasses()) {
             if (aClass.getSuperClass() == null ||
                 !("groovy.lang.Script".equals(aClass.getSuperClass().getName()) ||
-                     "RewriteGradleProject".equals(aClass.getSuperClass().getName()) ||
-                     "RewriteSettings".equals(aClass.getSuperClass().getName()))) {
+                  "RewriteGradleProject".equals(aClass.getSuperClass().getName()) ||
+                  "RewriteSettings".equals(aClass.getSuperClass().getName()))) {
                 sortedByPosition.computeIfAbsent(pos(aClass), i -> new ArrayList<>()).add(aClass);
             }
         }
@@ -1419,6 +1419,10 @@ public class GroovyParserVisitor {
         @Override
         public void visitDeclarationExpression(DeclarationExpression expression) {
             Optional<RedundantDef> redundantDef = maybeRedundantDef(expression.getVariableExpression().getType(), expression.getVariableExpression().getName());
+
+            /* The identifier of this type is one of the following: the name of a type, `final`, `def`, `var` or `,`
+             The latter because MultiVariable declarations are returned as separate `DeclarationExpression` by the
+             Groovy AST */
             TypeTree typeExpr = visitVariableExpressionType(expression.getVariableExpression());
 
             J.VariableDeclarations.NamedVariable namedVariable;
