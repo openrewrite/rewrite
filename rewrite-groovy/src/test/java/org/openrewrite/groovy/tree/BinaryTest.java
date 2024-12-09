@@ -218,14 +218,27 @@ class BinaryTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/4703")
     @Test
+    void cxds() {
+        rewriteRun(
+          groovy(
+            """
+              def differenceInDays(int time) {
+                  return (int) ((time)/(1000*60*60*24))
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4703")
+    @Test
     void extraParensAroundInfixOxxxperator() {
         rewriteRun(
           groovy(
             """
               def timestamp(int hours, int minutes, int seconds) {
-                  Math.abs(minutes)
-                  hours * 60
-                  (hours) * 60
+                  30 * (hours)
+                  (((((hours))))) * 30
               }
               """
           )

@@ -113,16 +113,16 @@ public class GroovyParserVisitor {
     }
 
     /**
-     *  Groovy methods can be declared with "def" AND a return type
-     *  In these cases the "def" is semantically meaningless but needs to be preserved for source code accuracy
-     *  If there is both a def and a return type, this method returns a RedundantDef object and advances the cursor
-     *  position past the "def" keyword, leaving the return type to be parsed as normal.
-     *  In any other situation an empty Optional is returned and the cursor is not advanced.
+     * Groovy methods can be declared with "def" AND a return type
+     * In these cases the "def" is semantically meaningless but needs to be preserved for source code accuracy
+     * If there is both a def and a return type, this method returns a RedundantDef object and advances the cursor
+     * position past the "def" keyword, leaving the return type to be parsed as normal.
+     * In any other situation an empty Optional is returned and the cursor is not advanced.
      */
     private Optional<RedundantDef> maybeRedundantDef(ClassNode type, String name) {
         int saveCursor = cursor;
         Space defPrefix = whitespace();
-        if(source.startsWith("def", cursor)) {
+        if (source.startsWith("def", cursor)) {
             skip("def");
             // The def is redundant only when it is followed by the method's return type
             // I hope no one puts an annotation between "def" and the return type
@@ -181,9 +181,9 @@ public class GroovyParserVisitor {
 
         for (ClassNode aClass : ast.getClasses()) {
             if (aClass.getSuperClass() == null ||
-                !("groovy.lang.Script".equals(aClass.getSuperClass().getName()) ||
-                     "RewriteGradleProject".equals(aClass.getSuperClass().getName()) ||
-                     "RewriteSettings".equals(aClass.getSuperClass().getName()))) {
+                    !("groovy.lang.Script".equals(aClass.getSuperClass().getName()) ||
+                            "RewriteGradleProject".equals(aClass.getSuperClass().getName()) ||
+                            "RewriteSettings".equals(aClass.getSuperClass().getName()))) {
                 sortedByPosition.computeIfAbsent(pos(aClass), i -> new ArrayList<>()).add(aClass);
             }
         }
@@ -770,51 +770,70 @@ public class GroovyParserVisitor {
 
             public Expression handle(Expression expr, Space after) {
                 cursor++;
-                return new J.Parentheses<>(randomId(), before, Markers.EMPTY, new JRightPadded<J>(expr, after, Markers.EMPTY));
+                return new J.Parentheses<>(randomId(), before, Markers.EMPTY, padRight(expr, after));
             }
         }
 
         private Expression insideParentheses(ASTNode node, Function<Space, Expression> parenthesizedTree) {
-            System.out.println(node);
+            System.out.println("I->" + node);
+
+            int saveCursor = cursor;
+            Space prefix = whitespace();
 
 
-            Integer insideParenthesesLevel = getInsideParenthesesLevel(node);
-            System.out.println("insideParenthesesLevel: " + insideParenthesesLevel);
+            /*Integer insideParenthesesLevel = getInsideParenthesesLevel(node);
+            System.out.println("insideParenthesesLevel: " + insideParenthesesLevel + " => " + cursor);
             // AST contains information about the parentheses level, so apply it directly
             if (insideParenthesesLevel != null) {
-                Stack<Space> openingParens = new Stack<>();
+                Deque<Space> openingParens = new ArrayDeque<>();
                 for (int i = 0; i < insideParenthesesLevel; i++) {
-                    openingParens.push(sourceBefore("("));
+                    System.out.println(" HIER!!! ====> " + cursor);
+                    if (source.charAt(cursor - 1) == '(' && !parenthesesStack.isEmpty()) {
+                        System.out.println("POP!");
+                        openingParens.offerLast(parenthesesStack.pop().before);
+                    } else {
+                        openingParens.push(sourceBefore("("));
+                    }
                 }
+                System.out.println("EN BOOM: " + cursor);
                 Expression parenthesized = parenthesizedTree.apply(whitespace());
                 for (int i = 0; i < insideParenthesesLevel; i++) {
                     parenthesized = new J.Parentheses<>(randomId(), openingParens.pop(), Markers.EMPTY, padRight(parenthesized, sourceBefore(")")));
                 }
                 return parenthesized;
-            }
+            }*/
 
-            int saveCursor = cursor;
-            Space prefix = whitespace();
+            //return parenthesizedTree.apply(whitespace());
+
+
+
+
+            //System.out.println("EAT WHITESPACE: " + cursor);
             /*if (node instanceof CastExpression) {
                 // FIXME
                 return parenthesizedTree.apply(prefix);
             }*/
 
             Expression expr;
-            if (source.charAt(cursor) == '(') {
+            if (source.charAt(cursor) == '(' && (!(node instanceof CastExpression) || ((CastExpression) node).isCoerce())) {
+                System.out.println("INSIDE PARENTHESES => " + cursor);
                 cursor++;
                 parenthesesStack.push(new ParenthesesHandler(saveCursor, prefix));
                 expr = insideParentheses(node, parenthesizedTree);
             } else {
+                //System.out.println("NOT INSIDE PARENTHESES");
                 expr = parenthesizedTree.apply(prefix);
+                //System.out.println("APPLY, AND THEN: " + cursor);
             }
 
             int saveCursor2 = cursor;
             Space after = whitespace();
             if (cursor < source.length() && source.charAt(cursor) == ')' && !parenthesesStack.isEmpty() &&
                     (parenthesesStack.peek().offset == saveCursor || parenthesesStack.peek().offset + 1 == saveCursor)) {
+                System.out.println("HANDLE PARENTHESES");
                 return parenthesesStack.pop().handle(expr, after);
             } else {
+                //System.out.println("RESET WHITESPACE TO: " + saveCursor2);
                 cursor = saveCursor2;
             }
             return expr;
@@ -830,7 +849,6 @@ public class GroovyParserVisitor {
            /* if (source.charAt(cursor) == '(') {
                 parentheses.push(() -> p)
             }*/
-
 
 
             return parenthesizedTree.apply(whitespace());
@@ -1267,22 +1285,20 @@ public class GroovyParserVisitor {
         @Override
         public void visitCastExpression(CastExpression cast) {
             queue.add(insideParentheses(cast, prefix -> {
-                // Might be looking at a Java-style cast "(type)object" or a groovy-style cast "object as type"
-                if (source.charAt(cursor) == '(') {
-                    cursor++; // skip '('
-                    return new J.TypeCast(randomId(), prefix, Markers.EMPTY,
-                            new J.ControlParentheses<>(randomId(), EMPTY, Markers.EMPTY,
-                                    new JRightPadded<>(visitTypeTree(cast.getType()), sourceBefore(")"), Markers.EMPTY)
-                            ),
-                            visit(cast.getExpression()));
-                } else {
+                System.out.println("visitCastExpression isCoerce: " + cast.isCoerce() + " =>> " + cursor);
+
+                if (cast.isCoerce()) { // a groovy-style cast "object as type"
                     Expression expr = visit(cast.getExpression());
                     Space asPrefix = sourceBefore("as");
-
+                    System.out.println("visitCastExpression CUUUURSSOOOOOR: " + cursor);
                     return new J.TypeCast(randomId(), prefix, new Markers(randomId(), singletonList(new AsStyleTypeCast(randomId()))),
-                            new J.ControlParentheses<>(randomId(), EMPTY, Markers.EMPTY,
-                                    new JRightPadded<>(visitTypeTree(cast.getType()), asPrefix, Markers.EMPTY)),
+                            new J.ControlParentheses<>(randomId(), EMPTY, Markers.EMPTY, padRight(visitTypeTree(cast.getType()), asPrefix)),
                             expr);
+                } else { // a Java-style cast"(type)object"
+                    cursor++; // skip '('
+                    return new J.TypeCast(randomId(), prefix, Markers.EMPTY,
+                            new J.ControlParentheses<>(randomId(), EMPTY, Markers.EMPTY, padRight(visitTypeTree(cast.getType()), sourceBefore(")"))),
+                            visit(cast.getExpression()));
                 }
             }));
         }
@@ -1369,6 +1385,7 @@ public class GroovyParserVisitor {
         @Override
         public void visitConstantExpression(ConstantExpression expression) {
             queue.add(insideParentheses(expression, fmt -> {
+                System.out.println("visitConstantExpression CUUUURSSOOOOOR: " + cursor);
                 JavaType.Primitive jType;
                 // The unaryPlus is not included in the expression and must be handled through the source.
                 String text = expression.getText();
@@ -1768,6 +1785,9 @@ public class GroovyParserVisitor {
                     // or to workaround names that are also keywords in groovy
                     methodNameExpression = source.charAt(cursor) + methodNameExpression + source.charAt(cursor);
                 }
+
+
+                System.out.println("visitMethodCallExpression CUUUURSSOOOOOR: " + cursor);
 
                 Space prefix = whitespace();
                 if (methodNameExpression.equals(source.substring(cursor, cursor + methodNameExpression.length()))) {
@@ -2188,6 +2208,7 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitVariableExpression(VariableExpression expression) {
+            System.out.println("...VariableExpression... => " + cursor);
             queue.add(insideParentheses(expression, fmt -> {
                 JavaType type;
                 if (expression.isDynamicTyped() && expression.getAccessedVariable() != null && expression.getAccessedVariable().getType() != expression.getOriginType()) {

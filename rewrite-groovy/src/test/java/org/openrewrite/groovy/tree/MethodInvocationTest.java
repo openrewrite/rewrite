@@ -283,7 +283,7 @@ class MethodInvocationTest implements RewriteTest {
     void insideParenthesesSimple() {
         rewriteRun(
           groovy(
-            """              
+            """
               ((a.invoke "b" ))
               """
           )

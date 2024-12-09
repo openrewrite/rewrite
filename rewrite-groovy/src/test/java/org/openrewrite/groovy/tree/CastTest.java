@@ -26,6 +26,18 @@ import static org.openrewrite.groovy.Assertions.groovy;
 class CastTest implements RewriteTest {
 
     @Test
+    void javaStyleCastNew() {
+        rewriteRun(
+          groovy(
+            """
+              String foo = ( String ) "hallo"
+              String bar = "hallo" as String
+              """
+          )
+        );
+    }
+
+    @Test
     void javaStyleCast() {
         rewriteRun(
           groovy(
@@ -74,7 +86,7 @@ class CastTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              ( "" as String ).toString()
+              ( "x" as String     ).toString()
               """
           )
         );
