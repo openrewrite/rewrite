@@ -2077,38 +2077,17 @@ public class GroovyParserVisitor {
 
         public TypeTree visitVariableExpressionType(VariableExpression expression) {
             JavaType type = typeMapping.type(staticType(((org.codehaus.groovy.ast.expr.Expression) expression)));
-
-            if (expression.isDynamicTyped()) {
-                Space prefix = whitespace();
-                StringBuilder keyword = new StringBuilder();
-                if (source.charAt(cursor) == ',') {
-                    keyword.append(',');
-                } else {
-                    if (source.substring(cursor).startsWith("final")) {
-                        keyword.append("final");
-                    } else {
-                        keyword.append(source, cursor, cursor + 3);
-                    }
-                }
-                cursor += keyword.length();
-                return new J.Identifier(randomId(),
-                        prefix,
-                        Markers.EMPTY,
-                        emptyList(),
-                        keyword.toString(),
-                        type, null);
-            }
             Space prefix = whitespace();
-            StringBuilder simpleName = new StringBuilder();
+            StringBuilder keyword = new StringBuilder();
             while (!Character.isWhitespace(source.charAt(cursor))) {
-                simpleName.append(source.charAt(cursor));
+                keyword.append(source.charAt(cursor));
                 cursor++;
             }
             J.Identifier ident = new J.Identifier(randomId(),
                     EMPTY,
                     Markers.EMPTY,
                     emptyList(),
-                    simpleName.toString(),
+                    keyword.toString(),
                     type, null);
             if (expression.getOriginType().getGenericsTypes() != null) {
                 return new J.ParameterizedType(randomId(), prefix, Markers.EMPTY, ident, visitTypeParameterizations(
