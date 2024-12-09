@@ -2098,12 +2098,17 @@ public class GroovyParserVisitor {
                         keyword.toString(),
                         type, null);
             }
-            Space prefix = sourceBefore(expression.getOriginType().getUnresolvedName());
+            Space prefix = whitespace();
+            StringBuilder simpleName = new StringBuilder();
+            while (!Character.isWhitespace(source.charAt(cursor))) {
+                simpleName.append(source.charAt(cursor));
+                cursor++;
+            }
             J.Identifier ident = new J.Identifier(randomId(),
                     EMPTY,
                     Markers.EMPTY,
                     emptyList(),
-                    expression.getOriginType().getUnresolvedName(),
+                    simpleName.toString(),
                     type, null);
             if (expression.getOriginType().getGenericsTypes() != null) {
                 return new J.ParameterizedType(randomId(), prefix, Markers.EMPTY, ident, visitTypeParameterizations(

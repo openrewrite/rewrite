@@ -80,11 +80,23 @@ class GroovyVisitorTest implements RewriteTest {
     }
 
     @Test
-    void multipleAssignmentsAtMultipleLine() {
+    void multipleAssignmentsAtMultipleLineDynamicType() {
         rewriteRun(
           groovy(
             """
              def a = '1'    ,  
+                b = '2'
+            """
+          )
+        );
+    }
+
+    @Test
+    void multipleAssignmentsAtMultipleLineStaticType() {
+        rewriteRun(
+          groovy(
+            """
+             String a = '1'    ,  
                 b = '2'
             """
           )
