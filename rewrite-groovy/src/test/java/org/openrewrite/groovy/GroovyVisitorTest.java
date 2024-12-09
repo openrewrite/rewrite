@@ -73,7 +73,7 @@ class GroovyVisitorTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-             def a = '1', b = '2'
+            def a = '1', b = '2'
             """
           )
         );
