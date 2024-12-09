@@ -765,10 +765,14 @@ public class GroovyParserVisitor {
 
         @RequiredArgsConstructor
         private class ParenthesesHandler {
-            private final int offset;
+            //private final int offset;
             private final Space before;
 
             public Expression handle(Expression expr, Space after) {
+                System.out.println("HANDLE!! -> " + expr);
+                System.out.println(before);
+                System.out.println(after);
+
                 cursor++;
                 return new J.Parentheses<>(randomId(), before, Markers.EMPTY, padRight(expr, after));
             }
@@ -779,29 +783,30 @@ public class GroovyParserVisitor {
 
             int saveCursor = cursor;
             Space prefix = whitespace();
+            System.out.println("WHITESPACE -> " +prefix+ " -> AST known level: " + getInsideParenthesesLevel(node));
 
 
-            /*Integer insideParenthesesLevel = getInsideParenthesesLevel(node);
-            System.out.println("insideParenthesesLevel: " + insideParenthesesLevel + " => " + cursor);
+            Integer insideParenthesesLevel = getInsideParenthesesLevel(node);
+            //System.out.println("insideParenthesesLevel: " + insideParenthesesLevel + " => " + cursor);
             // AST contains information about the parentheses level, so apply it directly
             if (insideParenthesesLevel != null) {
                 Deque<Space> openingParens = new ArrayDeque<>();
                 for (int i = 0; i < insideParenthesesLevel; i++) {
-                    System.out.println(" HIER!!! ====> " + cursor);
-                    if (source.charAt(cursor - 1) == '(' && !parenthesesStack.isEmpty()) {
-                        System.out.println("POP!");
+                    //System.out.println(" HIER!!! ====> " + cursor);
+                    //if (source.charAt(cursor - 1) == '(' && !parenthesesStack.isEmpty()) {
+                        //System.out.println("POP!");
                         openingParens.offerLast(parenthesesStack.pop().before);
-                    } else {
-                        openingParens.push(sourceBefore("("));
-                    }
+                    //} else {
+                    //    openingParens.push(sourceBefore("("));
+                    //}
                 }
-                System.out.println("EN BOOM: " + cursor);
+                //System.out.println("EN BOOM: " + cursor);
                 Expression parenthesized = parenthesizedTree.apply(whitespace());
                 for (int i = 0; i < insideParenthesesLevel; i++) {
                     parenthesized = new J.Parentheses<>(randomId(), openingParens.pop(), Markers.EMPTY, padRight(parenthesized, sourceBefore(")")));
                 }
                 return parenthesized;
-            }*/
+            }
 
             //return parenthesizedTree.apply(whitespace());
 
@@ -818,18 +823,20 @@ public class GroovyParserVisitor {
             if (source.charAt(cursor) == '(' && (!(node instanceof CastExpression) || ((CastExpression) node).isCoerce())) {
                 System.out.println("INSIDE PARENTHESES => " + cursor);
                 cursor++;
-                parenthesesStack.push(new ParenthesesHandler(saveCursor, prefix));
+                System.out.println("SAVE CURSOR: " + saveCursor + " == PREFIX <" + prefix + ">");
+                parenthesesStack.push(new ParenthesesHandler(/*saveCursor,*/ prefix));
                 expr = insideParentheses(node, parenthesizedTree);
             } else {
-                //System.out.println("NOT INSIDE PARENTHESES");
+                System.out.println("NOT INSIDE PARENTHESES ==> " + cursor);
                 expr = parenthesizedTree.apply(prefix);
-                //System.out.println("APPLY, AND THEN: " + cursor);
+                System.out.println("APPLY, AND THEN: " + cursor);
             }
 
             int saveCursor2 = cursor;
             Space after = whitespace();
-            if (cursor < source.length() && source.charAt(cursor) == ')' && !parenthesesStack.isEmpty() &&
-                    (parenthesesStack.peek().offset == saveCursor || parenthesesStack.peek().offset + 1 == saveCursor)) {
+            System.out.println("AND GOOOO: " + cursor);
+            if (cursor < source.length() && source.charAt(cursor) == ')' && !parenthesesStack.isEmpty() /*&&
+                    (parenthesesStack.peek().offset == saveCursor || parenthesesStack.peek().offset + 1 == saveCursor)*/) {
                 System.out.println("HANDLE PARENTHESES");
                 return parenthesesStack.pop().handle(expr, after);
             } else {
@@ -1285,7 +1292,7 @@ public class GroovyParserVisitor {
         @Override
         public void visitCastExpression(CastExpression cast) {
             queue.add(insideParentheses(cast, prefix -> {
-                System.out.println("visitCastExpression isCoerce: " + cast.isCoerce() + " =>> " + cursor);
+                System.out.println("visitCastExpression isCoerce: " + cast.isCoerce() + " =>> " + cursor + " | PREFIX: "  + prefix);
 
                 if (cast.isCoerce()) { // a groovy-style cast "object as type"
                     Expression expr = visit(cast.getExpression());
@@ -1764,6 +1771,8 @@ public class GroovyParserVisitor {
                 JRightPadded<Expression> select = null;
                 if (!call.isImplicitThis()) {
                     Expression selectExpr = visit(call.getObjectExpression());
+
+                    System.out.println("visitMethodCallExpression CUUUURSSOOOOOR: " + cursor);
                     int saveCursor = cursor;
                     Space afterSelect = whitespace();
                     if (source.charAt(cursor) == '.' || source.charAt(cursor) == '?' || source.charAt(cursor) == '*') {
@@ -1785,9 +1794,6 @@ public class GroovyParserVisitor {
                     // or to workaround names that are also keywords in groovy
                     methodNameExpression = source.charAt(cursor) + methodNameExpression + source.charAt(cursor);
                 }
-
-
-                System.out.println("visitMethodCallExpression CUUUURSSOOOOOR: " + cursor);
 
                 Space prefix = whitespace();
                 if (methodNameExpression.equals(source.substring(cursor, cursor + methodNameExpression.length()))) {

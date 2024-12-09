@@ -290,6 +290,17 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void lotOfSpacesAroundConstantWithParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              (  ( (    "x"         )        ).toString()       )
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4703")
     @Test
     void insideParentheses() {

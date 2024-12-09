@@ -86,7 +86,7 @@ class CastTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              ( "x" as String     ).toString()
+              ( "x" as String      ).toString()
               """
           )
         );
