@@ -520,6 +520,32 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
     }
 
     @Test
+    void removeStaticMethodFromImportWithAssignment() {
+        rewriteRun(
+          spec -> spec.recipe(createRemoveMethodsRecipe("java.util.Collections emptyList()")),
+          // language=java
+          java(
+            """
+              import static java.util.Collections.emptyList;
+              
+              class Test {
+                  void method() {
+                      List<Object> emptyList = emptyList();
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void method() {
+                      List<Object> emptyList;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void removeStaticMethod() {
         rewriteRun(
           spec -> spec.recipe(createRemoveMethodsRecipe("org.junit.jupiter.api.Assertions assertTrue(..)")),
@@ -537,6 +563,32 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
             """
               class Test {
                   void method() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeStaticMethodWithAssignment() {
+        rewriteRun(
+          spec -> spec.recipe(createRemoveMethodsRecipe("java.util.Collections emptyList()")),
+          // language=java
+          java(
+            """
+              import java.util.Collections;
+              
+              class Test {
+                  void method() {
+                      List<Object> emptyList = Collections.emptyList();
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void method() {
+                      List<Object> emptyList;
                   }
               }
               """
