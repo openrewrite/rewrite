@@ -21,6 +21,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.Value;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
@@ -48,6 +49,7 @@ public interface JavaType {
     Method[] EMPTY_METHOD_ARRAY = new Method[0];
     String[] EMPTY_STRING_ARRAY = new String[0];
     JavaType[] EMPTY_JAVA_TYPE_ARRAY = new JavaType[0];
+    Annotation.ElementValue[] EMPTY_ANNOTATION_VALUE_ARRAY = new Annotation.ElementValue[0];
 
     // TODO: To be removed with OpenRewrite 9
     default @Nullable Integer getManagedReference() {
@@ -323,16 +325,16 @@ public interface JavaType {
 
         public boolean isAssignableTo(String fullyQualifiedName) {
             return TypeUtils.fullyQualifiedNamesAreEqual(getFullyQualifiedName(), fullyQualifiedName) ||
-                    getInterfaces().stream().anyMatch(anInterface -> anInterface.isAssignableTo(fullyQualifiedName)) ||
-                    (getSupertype() != null && getSupertype().isAssignableTo(fullyQualifiedName));
+                   getInterfaces().stream().anyMatch(anInterface -> anInterface.isAssignableTo(fullyQualifiedName)) ||
+                   (getSupertype() != null && getSupertype().isAssignableTo(fullyQualifiedName));
         }
 
         public boolean isAssignableFrom(@Nullable JavaType type) {
             if (type instanceof FullyQualified) {
                 FullyQualified clazz = (FullyQualified) type;
                 return TypeUtils.fullyQualifiedNamesAreEqual(getFullyQualifiedName(), clazz.getFullyQualifiedName()) ||
-                        isAssignableFrom(clazz.getSupertype()) ||
-                        clazz.getInterfaces().stream().anyMatch(this::isAssignableFrom);
+                       isAssignableFrom(clazz.getSupertype()) ||
+                       clazz.getInterfaces().stream().anyMatch(this::isAssignableFrom);
             } else if (type instanceof GenericTypeVariable) {
                 GenericTypeVariable generic = (GenericTypeVariable) type;
                 for (JavaType bound : generic.getBounds()) {
@@ -577,7 +579,7 @@ public interface JavaType {
             if (o == null || getClass() != o.getClass()) return false;
             Class aClass = (Class) o;
             return TypeUtils.fullyQualifiedNamesAreEqual(fullyQualifiedName, aClass.fullyQualifiedName) &&
-                    (typeParameters == null && aClass.typeParameters == null || typeParameters != null && Arrays.equals(typeParameters, aClass.typeParameters));
+                   (typeParameters == null && aClass.typeParameters == null || typeParameters != null && Arrays.equals(typeParameters, aClass.typeParameters));
         }
 
         @Override
@@ -626,6 +628,112 @@ public interface JavaType {
 
             return new ShallowClass(null, 1, fullyQualifiedName, Kind.Class, emptyList(), null, owningClass,
                     emptyList(), emptyList(), emptyList(), emptyList());
+        }
+    }
+
+    class Annotation extends FullyQualified {
+
+        private final FullyQualified type;
+        private final ElementValue @Nullable [] values;
+
+        public Annotation(FullyQualified type, List<ElementValue> values) {
+            this.type = type;
+            this.values = ListUtils.arrayOrNullIfEmpty(values, EMPTY_ANNOTATION_VALUE_ARRAY);
+        }
+
+        public FullyQualified getType() {
+            return type;
+        }
+
+        public List<ElementValue> getValues() {
+            return values == null ? emptyList() : Arrays.asList(values);
+        }
+
+        @Override
+        public String getFullyQualifiedName() {
+            return type.getFullyQualifiedName();
+        }
+
+        @Override
+        public FullyQualified withFullyQualifiedName(String fullyQualifiedName) {
+            return this;
+        }
+
+        @Override
+        public List<FullyQualified> getAnnotations() {
+            return type.getAnnotations();
+        }
+
+        @Override
+        public boolean hasFlags(Flag... test) {
+            return type.hasFlags(test);
+        }
+
+        @Override
+        public Set<Flag> getFlags() {
+            return type.getFlags();
+        }
+
+        @Override
+        public List<FullyQualified> getInterfaces() {
+            return type.getInterfaces();
+        }
+
+        @Override
+        public Kind getKind() {
+            return type.getKind();
+        }
+
+        @Override
+        public List<Variable> getMembers() {
+            return type.getMembers();
+        }
+
+        @Override
+        public List<Method> getMethods() {
+            return type.getMethods();
+        }
+
+        @Override
+        public List<JavaType> getTypeParameters() {
+            return type.getTypeParameters();
+        }
+
+        @Override
+        public @Nullable FullyQualified getOwningClass() {
+            return type.getOwningClass();
+        }
+
+        @Override
+        public @Nullable FullyQualified getSupertype() {
+            return type.getSupertype();
+        }
+
+        public interface ElementValue {
+            Method getElement();
+
+            Object getValue();
+        }
+
+        @Value
+        public static class SingleElementValue implements ElementValue {
+            Method element;
+            Object value;
+        }
+
+        @Value
+        public static class ArrayElementValue implements ElementValue {
+            Method element;
+            Object[] values;
+
+            @Override
+            public Object getValue() {
+                return getValues();
+            }
+
+            public List<?> getValues() {
+                return Arrays.asList(values);
+            }
         }
     }
 
@@ -854,7 +962,7 @@ public interface JavaType {
             if (o == null || getClass() != o.getClass()) return false;
             GenericTypeVariable that = (GenericTypeVariable) o;
             return name.equals(that.name) && variance == that.variance &&
-                    (variance == Variance.INVARIANT && bounds == null && that.bounds == null || bounds != null && Arrays.equals(bounds, that.bounds));
+                   (variance == Variance.INVARIANT && bounds == null && that.bounds == null || bounds != null && Arrays.equals(bounds, that.bounds));
         }
 
         @Override
@@ -1358,9 +1466,9 @@ public interface JavaType {
             if (o == null || getClass() != o.getClass()) return false;
             Method method = (Method) o;
             return Objects.equals(declaringType, method.declaringType) &&
-                    name.equals(method.name) &&
-                    Objects.equals(returnType, method.returnType) &&
-                    Arrays.equals(parameterTypes, method.parameterTypes);
+                   name.equals(method.name) &&
+                   Objects.equals(returnType, method.returnType) &&
+                   Arrays.equals(parameterTypes, method.parameterTypes);
         }
 
         @Override
