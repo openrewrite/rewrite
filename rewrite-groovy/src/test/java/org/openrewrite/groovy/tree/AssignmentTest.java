@@ -40,7 +40,8 @@ class AssignmentTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              final def x = "s"
+              final def x = "x"
+              def final y = "y"
               """
           )
         );
