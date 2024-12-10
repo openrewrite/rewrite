@@ -42,6 +42,7 @@ class AssignmentTest implements RewriteTest {
             """
               final def x = "x"
               def final y = "y"
+              final z = "z"
               """
           )
         );
