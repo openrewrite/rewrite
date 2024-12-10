@@ -526,6 +526,8 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
           // language=java
           java(
             """
+              import java.util.List;
+              
               import static java.util.Collections.emptyList;
               
               class Test {
@@ -571,12 +573,13 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
           // language=java
           java(
             """
+              import java.util.List;
               import java.util.Collections;
               
               class Test {
                   void method() {
-                      List<Object> emptyList = Collections.emptyList();
-                      emptyList.isEmpty();
+                      List<String> l = Collections.emptyList();
+                      l.size();
                   }
               }
               """
