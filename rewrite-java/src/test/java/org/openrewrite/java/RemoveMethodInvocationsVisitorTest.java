@@ -520,7 +520,7 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
     }
 
     @Test
-    void removeStaticMethodFromImportWithAssignment() {
+    void keepStaticMethodFromImportWithAssignment() {
         rewriteRun(
           spec -> spec.recipe(createRemoveMethodsRecipe("java.util.Collections emptyList()")),
           // language=java
@@ -533,6 +533,28 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
               class Test {
                   void method() {
                       List<Object> emptyList = emptyList();
+                      emptyList.isEmpty();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepStaticMethodFromImportWithAssignment2() {
+        rewriteRun(
+          spec -> spec.recipe(createRemoveMethodsRecipe("java.util.Collections emptyList()")),
+          // language=java
+          java(
+            """
+              import java.util.List;
+              
+              import static java.util.Collections.emptyList;
+              
+              class Test {
+                  List<Object> emptyList = emptyList();
+                  void method() {
                       emptyList.isEmpty();
                   }
               }
@@ -567,7 +589,7 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
     }
 
     @Test
-    void removeStaticMethodWithAssignment() {
+    void keepStaticMethodWithAssignment() {
         rewriteRun(
           spec -> spec.recipe(createRemoveMethodsRecipe("java.util.Collections emptyList()")),
           // language=java
@@ -579,6 +601,27 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
               class Test {
                   void method() {
                       List<Object> emptyList = Collections.emptyList();
+                      emptyList.size();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepStaticMethodWithAssignment2() {
+        rewriteRun(
+          spec -> spec.recipe(createRemoveMethodsRecipe("java.util.Collections emptyList()")),
+          // language=java
+          java(
+            """
+              import java.util.List;
+              import java.util.Collections;
+              
+              class Test {
+                  List<Object> emptyList = Collections.emptyList();
+                  void method() {
                       emptyList.size();
                   }
               }

@@ -77,15 +77,15 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
         J.MethodInvocation m = (J.MethodInvocation) expression;
         boolean isStatic = m.getMethodType().hasFlags(Flag.Static);
 
-        if (m.getSelect() == null && !isStatic) {
+        if ((m.getSelect() == null && !isStatic) || (isStatic && !isStatementInParentBlock(m))) {
             return expression;
         }
 
-        boolean isStatementOrStatic = isStatement() || isStatic;
+        boolean isStatement = isStatement();
 
         if (matchers.entrySet().stream().anyMatch(entry -> matches(m, entry.getKey(), entry.getValue()))) {
             boolean hasSameReturnType = m.getSelect() != null && TypeUtils.isAssignableTo(m.getMethodType().getReturnType(), m.getSelect().getType());
-            boolean removable = (isStatementOrStatic && depth == 0) || hasSameReturnType;
+            boolean removable = ((isStatement || isStatic) && (depth == 0)) || hasSameReturnType;
             if (!removable) {
                 return expression;
             }
@@ -100,7 +100,7 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
                     selectAfter.add(getSelectAfter(m));
                     return m.getSelect();
                 } else {
-                    if (isStatementOrStatic) {
+                    if (isStatement) {
                         return null;
                     } else if (isLambdaBody) {
                         return ToBeRemoved.withMarker(J.Block.createEmptyBlock());
@@ -135,6 +135,11 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
                                                 p instanceof JContainer ||
                                                 p == Cursor.ROOT_VALUE
         ).getValue() instanceof J.Block;
+    }
+
+    private boolean isStatementInParentBlock(Statement method) {
+        J.Block parentBlock = getCursor().firstEnclosing(J.Block.class);
+        return parentBlock == null || parentBlock.getStatements().contains(method);
     }
 
     private boolean isLambdaBody() {
