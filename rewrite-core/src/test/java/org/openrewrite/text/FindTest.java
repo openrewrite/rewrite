@@ -144,6 +144,25 @@ class FindTest implements RewriteTest {
           )
         );
     }
+    @Test
+    void regexMatchingWhitespaceWithoutMultilineWithDotall() {
+        rewriteRun(
+          spec -> spec.recipe(new Find("One.Two$", true, true, false, true, null)),
+          //language=csv
+          text( // the `.` above matches the space character on the same line
+            """
+              Zero
+              One Two
+              Three
+              """,
+            """
+              Zero
+              ~~>One Two
+              Three
+              """
+          )
+        );
+    }
 
     @Test
     void regexWithoutMultilineAndWithDotAll() {
@@ -197,15 +216,15 @@ class FindTest implements RewriteTest {
           spec -> spec.recipe(new Find("^This.*below\\.$", true, true, true, true, null)),
           text(
             """
-              This is text.
+              The first line.
               This is a line below.
               This is a line above.
               This is text.
               This is a line below.
               """,
             """
-              ~~>This is text.
-              This is a line below.
+              The first line.
+              ~~>This is a line below.
               This is a line above.
               This is text.
               This is a line below.
