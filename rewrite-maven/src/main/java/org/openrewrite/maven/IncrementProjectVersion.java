@@ -165,13 +165,15 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, S
                     return t;
                 }
                 String newVersion = acc.get(new GroupArtifact(
-                        t.getChildValue("groupId").orElse(null), t.getChildValue("artifactId").orElse(null)));
-                if (newVersion == null || newVersion.equals(t.getChildValue("version").orElse(null))) {
+                        t.getChildValue("groupId").orElse(null),
+                        t.getChildValue("artifactId").orElse(null)));
+                String oldVersion = t.getChildValue("version").orElse(null);
+                if (newVersion == null || newVersion.equals(oldVersion)) {
                     return t;
                 }
                 t = t.withMarkers(t.getMarkers().add(new AlreadyIncremented(randomId())));
-                return (Xml.Tag) new ChangeTagValue("version", null, newVersion).getVisitor()
-                        .visitNonNull(t, ctx);
+                return (Xml.Tag) new ChangeTagValue("version", oldVersion, newVersion, null)
+                        .getVisitor().visitNonNull(t, ctx);
             }
         };
     }

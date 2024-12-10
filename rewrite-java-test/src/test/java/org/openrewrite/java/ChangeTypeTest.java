@@ -31,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.properties.Assertions.properties;
 import static org.openrewrite.xml.Assertions.xml;
+import static org.openrewrite.yaml.Assertions.yaml;
 
 @SuppressWarnings("ConstantConditions")
 class ChangeTypeTest implements RewriteTest {
@@ -2077,6 +2078,30 @@ class ChangeTypeTest implements RewriteTest {
               a.property=java.lang.Integer
               b.property=String
               """, spec -> spec.path("application.properties"))
+        );
+    }
+
+    @Test
+    void changeTypeInYaml() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.lang.String", "java.lang.Integer", true)),
+          yaml(
+            """
+              root:
+                  a: java.lang.String
+                  b: java.lang.StringBuilder
+                  c: java.lang.test.String
+                  d: String
+              """,
+            """
+              root:
+                  a: java.lang.Integer
+                  b: java.lang.StringBuilder
+                  c: java.lang.test.String
+                  d: String
+              """,
+            spec -> spec.path("application.yaml")
+          )
         );
     }
 }

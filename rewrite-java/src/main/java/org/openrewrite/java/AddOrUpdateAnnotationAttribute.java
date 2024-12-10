@@ -85,7 +85,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
         return Preconditions.check(new UsesType<>(annotationType, false), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.Annotation visitAnnotation(J.Annotation a, ExecutionContext ctx) {
-                J.Annotation original = a;
+                J.Annotation original = super.visitAnnotation(a, ctx);
                 if (!TypeUtils.isOfClassType(a.getType(), annotationType)) {
                     return a;
                 }
