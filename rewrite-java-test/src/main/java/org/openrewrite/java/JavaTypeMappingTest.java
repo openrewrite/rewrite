@@ -221,7 +221,7 @@ public interface JavaTypeMappingTest {
     }
 
     @Test
-    default void ignoreSourceRetentionAnnotations() {
+    default void includeSourceRetentionAnnotations() {
         JavaType.Parameterized goat = goatType();
         assertThat(goat.getAnnotations()).satisfiesExactlyInAnyOrder(
                 a -> assertThat(a.getClassName()).isEqualTo("AnnotationWithRuntimeRetention"),

@@ -26,7 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SuppressWarnings("ConstantConditions")
 class JavaReflectionTypeMappingTest implements JavaTypeMappingTest {
-    JavaReflectionTypeMapping typeMapping = new JavaReflectionTypeMapping(new AdaptiveRadixJavaTypeCache());
+    JavaReflectionTypeMapping typeMapping = new JavaReflectionTypeMapping(new JavaTypeCache());
     JavaType.Parameterized goat = TypeUtils.asParameterized(typeMapping.type(JavaTypeGoat.class));
 
     @Override
@@ -61,7 +61,8 @@ class JavaReflectionTypeMappingTest implements JavaTypeMappingTest {
 
     @Test
     @Override
-    public void ignoreSourceRetentionAnnotations() {
+    // The JavaReflectionTypeMapping cannot include source retention annotations
+    public void includeSourceRetentionAnnotations() {
         JavaType.Parameterized goat = goatType();
         assertThat(goat.getAnnotations()).satisfiesExactlyInAnyOrder(
           a -> assertThat(a.getClassName()).isEqualTo("AnnotationWithRuntimeRetention")
