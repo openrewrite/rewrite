@@ -716,7 +716,8 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
 
     private Object annotationElementValue(Object value) {
         if (value instanceof Symbol.VarSymbol) {
-            return requireNonNull(variableType((Symbol.VarSymbol) value));
+            JavaType.Variable mapped = variableType((Symbol.VarSymbol) value);
+            return mapped != null ? mapped : JavaType.Unknown.getInstance();
         } else if (value instanceof Type.ClassType) {
             return type((Type.ClassType) value);
         } else if (value instanceof Attribute.Array) {
@@ -734,7 +735,8 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
         } else if (value instanceof Attribute.Class) {
             return type(((Attribute.Class) value).classType);
         } else if (value instanceof Attribute.Compound) {
-            return requireNonNull(annotationType((Attribute.Compound) value));
+            JavaType.Annotation mapped = annotationType((Attribute.Compound) value);
+            return mapped != null ? mapped : JavaType.Unknown.getInstance();
         } else if (value instanceof Attribute.Constant) {
             return annotationElementValue(((Attribute.Constant) value).value);
         } else if (value instanceof Attribute.Enum) {
