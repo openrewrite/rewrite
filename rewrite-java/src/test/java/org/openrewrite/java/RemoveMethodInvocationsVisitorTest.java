@@ -534,14 +534,6 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                       emptyList.isEmpty();
                   }
               }
-              """,
-            """
-              class Test {
-                  void method() {
-                      List<Object> emptyList;
-                      emptyList.isEmpty();
-                  }
-              }
               """
           )
         );
@@ -584,14 +576,6 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
               class Test {
                   void method() {
                       List<Object> emptyList = Collections.emptyList();
-                      emptyList.isEmpty();
-                  }
-              }
-              """,
-            """
-              class Test {
-                  void method() {
-                      List<Object> emptyList;
                       emptyList.isEmpty();
                   }
               }
