@@ -25,6 +25,28 @@ import static org.openrewrite.groovy.Assertions.groovy;
 class AssignmentTest implements RewriteTest {
 
     @Test
+    void simple() {
+        rewriteRun(
+          groovy(
+            """
+              def x = "s"
+              """
+          )
+        );
+    }
+
+    @Test
+    void simpleWithFinal() {
+        rewriteRun(
+          groovy(
+            """
+              final def x = "s"
+              """
+          )
+        );
+    }
+
+    @Test
     void concat() {
         rewriteRun(
           groovy(
@@ -88,6 +110,54 @@ class AssignmentTest implements RewriteTest {
               def d = 00001
               def e = 000001
               """
+          )
+        );
+    }
+
+    @Test
+    void multipleAssignmentsAtOneLine() {
+        rewriteRun(
+          groovy(
+            """
+            def startItem = '|  ', endItem = '  |'
+            def repeatLength = startItem.length() + output.length() + endItem.length()
+            println("\\n" + ("-" * repeatLength) + "\\n" + startItem + output + endItem + "\\n" + ("-" * repeatLength))
+            """
+          )
+        );
+    }
+
+    @Test
+    void multipleAssignmentsAtOneLineSimple() {
+        rewriteRun(
+          groovy(
+            """
+            def a = '1', b = '2'
+            """
+          )
+        );
+    }
+
+    @Test
+    void multipleAssignmentsAtMultipleLineDynamicType() {
+        rewriteRun(
+          groovy(
+            """
+             def a = '1'    ,  
+                b = '2'
+            """
+          )
+        );
+    }
+
+    @Test
+    void multipleAssignmentsAtMultipleLineStaticType() {
+        rewriteRun(
+          groovy(
+            """
+             String a = '1'    ,  
+                b = '2'
+            """
           )
         );
     }
