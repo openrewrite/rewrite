@@ -578,8 +578,8 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
               
               class Test {
                   void method() {
-                      List<String> l = Collections.emptyList();
-                      l.size();
+                      List<Object> emptyList = Collections.emptyList();
+                      emptyList.size();
                   }
               }
               """
