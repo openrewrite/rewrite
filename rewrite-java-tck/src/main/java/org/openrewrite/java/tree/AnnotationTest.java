@@ -421,6 +421,7 @@ class AnnotationTest implements RewriteTest {
               import java.lang.annotation.Target;
               
               @Target(ElementType.TYPE)
+              @A
               private @interface A {
                   A[] value() default @A;
               }
@@ -453,8 +454,8 @@ class AnnotationTest implements RewriteTest {
     }
 
     @Test
-    @MinimumJava21
-    void testPreserveAnnotationsFromClasspath() {
+    @MinimumJava21 // Because of `@Deprecated#forRemoval`
+    void annotationElementValues() {
         JavaParser p = JavaParser.fromJavaVersion().build();
         /*
          *     Using these annotations in core library for testing this feature:

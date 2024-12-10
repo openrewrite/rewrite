@@ -17,18 +17,11 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.SourceFile;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class Java21ParserTest implements RewriteTest {
 
@@ -36,47 +29,5 @@ class Java21ParserTest implements RewriteTest {
     void shouldLoadResourceFromClasspath() throws IOException {
         Files.deleteIfExists(Paths.get(System.getProperty("user.home"), ".rewrite", "classpath", "jackson-annotations-2.17.1.jar"));
         rewriteRun(spec -> spec.parser(JavaParser.fromJavaVersion().classpathFromResources(new InMemoryExecutionContext(), "jackson-annotations")));
-    }
-
-    @Test
-    void testPreserveAnnotationsFromClasspath() {
-        JavaParser p = JavaParser.fromJavaVersion().build();
-        /*
-         *     Using these annotations in core library for testing this feature:
-         *
-         *     @Deprecated(since="1.2", forRemoval=true)
-         *     public final void stop()
-         *
-         *     @CallerSensitive
-         *     public ClassLoader getContextClassLoader() {
-         */
-        List<SourceFile> sourceFiles = p.parse(
-            """
-              class Test {
-                public void test() {
-                  Thread.currentThread().stop();
-                  Thread.currentThread().getContextClassLoader();
-                }
-              }
-              """
-          ).toList();
-        J.CompilationUnit cu = (J.CompilationUnit) sourceFiles.get(0);
-
-        J.MethodDeclaration md = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
-        J.MethodInvocation mi = (J.MethodInvocation) md.getBody().getStatements().get(0);
-        JavaType.Annotation annotation = (JavaType.Annotation) mi.getMethodType().getAnnotations().get(0);
-
-        // Thread.currentThread().stop();
-        assertEquals("java.lang.Deprecated" ,annotation.getType().getFullyQualifiedName());
-        assertEquals("since", annotation.getValues().get(0).getElement().getName());
-        assertEquals("1.2", annotation.getValues().get(0).getValue());
-        assertEquals("forRemoval", annotation.getValues().get(1).getElement().getName());
-        assertEquals(Boolean.TRUE, annotation.getValues().get(1).getValue());
-
-        // Thread.currentThread().getContextClassLoader();
-        mi = (J.MethodInvocation) md.getBody().getStatements().get(1);
-        annotation = (JavaType.Annotation) mi.getMethodType().getAnnotations().get(0);
-        assertEquals("jdk.internal.reflect.CallerSensitive" ,annotation.getType().getFullyQualifiedName());
-        assertTrue(annotation.getValues().isEmpty());
     }
 }
