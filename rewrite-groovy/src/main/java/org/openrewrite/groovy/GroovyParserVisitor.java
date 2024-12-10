@@ -2085,7 +2085,7 @@ public class GroovyParserVisitor {
             StringBuilder keyword = new StringBuilder();
 
             if (expression.isDynamicTyped() || source.charAt(cursor) == ',') {
-                getKeyword(expression.getName(), keyword);
+                keyword.append(getKeyword(expression.getName()));
             } else {
                 keyword.append(expression.getOriginType().getUnresolvedName());
                 cursor += keyword.length();
@@ -2171,31 +2171,33 @@ public class GroovyParserVisitor {
         }
     }
 
-    private void getKeyword(String variableName, StringBuilder keyword) {
+    private String getKeyword(String variableName) {
+        String retVal;
         String leftover = source.substring(cursor);
         if (leftover.startsWith("final")) {
-            keyword.append("final");
+            retVal = "final";
             cursor += 5;
         } else if (leftover.startsWith("var")) {
-            keyword.append("var");
+            retVal = "var";
             cursor += 3;
         } else if (leftover.startsWith("def")) {
-            keyword.append("def");
+            retVal = "def";
             cursor += 3;
         } else if (leftover.startsWith(",")) {
-            keyword.append(",");
+            retVal = ",";
             cursor++;
         } else {
-            throw new IllegalStateException("Ran into unknown or unimplemented identifier");
+            throw new IllegalStateException("Ran into unknown or unimplemented identifier at " + leftover.substring(0, 10));
         }
         int saveCursor = cursor;
         Space space = whitespace();
         if (source.substring(cursor).startsWith(variableName)) {
             cursor = saveCursor;
         } else {
-            keyword.append(space.getWhitespace());
-            getKeyword(variableName, keyword);
+            retVal += space.getWhitespace();
+            retVal += getKeyword(variableName);
         }
+        return retVal;
     }
 
     // handle the obscure case where there are empty parens ahead of a closure

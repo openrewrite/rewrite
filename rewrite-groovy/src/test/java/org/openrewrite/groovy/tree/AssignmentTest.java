@@ -16,10 +16,19 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.Parser;
+import org.openrewrite.groovy.GroovyParsingException;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
+import java.nio.file.Paths;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.groovy.Assertions.groovy;
+import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
 
 @SuppressWarnings({"GroovyUnusedAssignment", "GrUnnecessarySemicolon"})
 class AssignmentTest implements RewriteTest {
@@ -132,10 +141,10 @@ class AssignmentTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-            def startItem = '|  ', endItem = '  |'
-            def repeatLength = startItem.length() + output.length() + endItem.length()
-            println("\\n" + ("-" * repeatLength) + "\\n" + startItem + output + endItem + "\\n" + ("-" * repeatLength))
-            """
+              def startItem = '|  ', endItem = '  |'
+              def repeatLength = startItem.length() + output.length() + endItem.length()
+              println("\\n" + ("-" * repeatLength) + "\\n" + startItem + output + endItem + "\\n" + ("-" * repeatLength))
+              """
           )
         );
     }
@@ -145,8 +154,8 @@ class AssignmentTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-            def a = '1', b = '2'
-            """
+              def a = '1', b = '2'
+              """
           )
         );
     }
@@ -156,9 +165,9 @@ class AssignmentTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-             def a = '1'    ,  
-                b = '2'
-            """
+               def a = '1'    ,  
+                  b = '2'
+              """
           )
         );
     }
@@ -168,9 +177,9 @@ class AssignmentTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-             String a = '1'    ,  
-                b = '2'
-            """
+               String a = '1'    ,  
+                  b = '2'
+              """
           )
         );
     }
