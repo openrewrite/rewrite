@@ -295,16 +295,16 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             LambdaStyle ls = lambda.getMarkers().findFirst(LambdaStyle.class)
                     .orElse(new LambdaStyle(null, false, !lambda.getParameters().getParameters().isEmpty()));
             boolean parenthesized = lambda.getParameters().isParenthesized();
-            if(!ls.isJavaStyle()) {
+            if (!ls.isJavaStyle()) {
                 p.append('{');
             }
             visitMarkers(lambda.getParameters().getMarkers(), p);
             visitSpace(lambda.getParameters().getPrefix(), Space.Location.LAMBDA_PARAMETERS_PREFIX, p);
-            if(parenthesized) {
+            if (parenthesized) {
                 p.append('(');
             }
             visitRightPadded(lambda.getParameters().getPadding().getParameters(), JRightPadded.Location.LAMBDA_PARAM, ",", p);
-            if(parenthesized) {
+            if (parenthesized) {
                 p.append(')');
             }
             if (ls.isArrow()) {
@@ -318,7 +318,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             } else {
                 visit(lambda.getBody(), p);
             }
-            if(!ls.isJavaStyle()) {
+            if (!ls.isJavaStyle()) {
                 p.append('}');
             }
             afterSyntax(lambda, p);
@@ -358,6 +358,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             afterSyntax(forEachLoop, p);
             return forEachLoop;
         }
+
         @Override
         public J visitMethodDeclaration(J.MethodDeclaration method, PrintOutputCapture<P> p) {
             beforeSyntax(method, Space.Location.METHOD_DECLARATION_PREFIX, p);

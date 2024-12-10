@@ -16,13 +16,57 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.Parser;
+import org.openrewrite.groovy.GroovyParsingException;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
+import java.nio.file.Paths;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.groovy.Assertions.groovy;
+import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
 
 @SuppressWarnings({"GroovyUnusedAssignment", "GrUnnecessarySemicolon"})
 class AssignmentTest implements RewriteTest {
+
+    @Test
+    void noKeyword() {
+        rewriteRun(
+          groovy(
+            """
+              x = "s"
+              """
+          )
+        );
+    }
+
+    @Test
+    void simple() {
+        rewriteRun(
+          groovy(
+            """
+              def x = "s"
+              """
+          )
+        );
+    }
+
+    @Test
+    void simpleWithFinal() {
+        rewriteRun(
+          groovy(
+            """
+              final def x = "x"
+              def final y = "y"
+              final z = "z"
+              """
+          )
+        );
+    }
 
     @Test
     void concat() {
@@ -87,6 +131,54 @@ class AssignmentTest implements RewriteTest {
               def c = 0001
               def d = 00001
               def e = 000001
+              """
+          )
+        );
+    }
+
+    @Test
+    void multipleAssignmentsAtOneLine() {
+        rewriteRun(
+          groovy(
+            """
+              def startItem = '|  ', endItem = '  |'
+              def repeatLength = startItem.length() + output.length() + endItem.length()
+              println("\\n" + ("-" * repeatLength) + "\\n" + startItem + output + endItem + "\\n" + ("-" * repeatLength))
+              """
+          )
+        );
+    }
+
+    @Test
+    void multipleAssignmentsAtOneLineSimple() {
+        rewriteRun(
+          groovy(
+            """
+              def a = '1', b = '2'
+              """
+          )
+        );
+    }
+
+    @Test
+    void multipleAssignmentsAtMultipleLineDynamicType() {
+        rewriteRun(
+          groovy(
+            """
+               def a = '1'    ,  
+                  b = '2'
+              """
+          )
+        );
+    }
+
+    @Test
+    void multipleAssignmentsAtMultipleLineStaticType() {
+        rewriteRun(
+          groovy(
+            """
+               String a = '1'    ,  
+                  b = '2'
               """
           )
         );
