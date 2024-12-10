@@ -2084,7 +2084,7 @@ public class GroovyParserVisitor {
             Space prefix = whitespace();
             StringBuilder keyword = new StringBuilder();
 
-            if (expression.isDynamicTyped()) {
+            if (expression.isDynamicTyped() || source.charAt(cursor) == ',') {
                 while (!Character.isWhitespace(source.charAt(cursor))) {
                     keyword.append(source.charAt(cursor));
                     cursor++;
