@@ -2179,11 +2179,9 @@ public class GroovyParserVisitor {
         } else if (leftover.startsWith("var")) {
             keyword.append("var");
             cursor += 3;
-
         } else if (leftover.startsWith("def")) {
             keyword.append("def");
             cursor += 3;
-
         } else if (leftover.startsWith(",")) {
             keyword.append(",");
             cursor++;
