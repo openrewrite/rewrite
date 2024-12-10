@@ -173,7 +173,6 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
     }
 
     @Test
-    @ExpectedToFail
     void removeWithoutSelect() {
         rewriteRun(
           spec -> spec.recipe(createRemoveMethodsRecipe("Test foo()")),
@@ -487,37 +486,6 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                       } catch (Exception e) {
                       } finally {
                       }
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void removeLocalMethodInvocation() {
-        rewriteRun(
-          spec -> spec.recipe(createRemoveMethodsRecipe("a.A b(..)")),
-          // language=java
-          java(
-            """
-              package a;
-              
-              class A {
-                  void a() {
-                      b();
-                  }
-                  void b() {
-                  }
-              }
-              """,
-            """
-              package a;
-              
-              class A {
-                  void a() {
-                  }
-                  void b() {
                   }
               }
               """

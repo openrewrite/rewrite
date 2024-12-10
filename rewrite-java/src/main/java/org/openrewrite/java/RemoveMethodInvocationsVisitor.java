@@ -77,7 +77,7 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
         J.MethodInvocation m = (J.MethodInvocation) expression;
         boolean isStatic = m.getMethodType().hasFlags(Flag.Static);
 
-        if ((m.getSelect() == null && !isStatic) || (isStatic && !isStatementInParentBlock(m))) {
+        if (isStatic && !isStatementInParentBlock(m)) {
             return expression;
         }
 
@@ -92,7 +92,7 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
 
             maybeRemoveImport(m.getMethodType().getDeclaringType());
 
-            if (isStatic) {
+            if (m.getSelect() == null) {
                 return null;
             } else if (m.getSelect() instanceof J.Identifier || m.getSelect() instanceof J.NewClass) {
                 boolean keepSelect = depth != 0;
