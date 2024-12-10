@@ -85,7 +85,7 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
 
         if (matchers.entrySet().stream().anyMatch(entry -> matches(m, entry.getKey(), entry.getValue()))) {
             boolean hasSameReturnType = m.getSelect() != null && TypeUtils.isAssignableTo(m.getMethodType().getReturnType(), m.getSelect().getType());
-            boolean removable = ((isStatement || isStatic) && (depth == 0)) || hasSameReturnType;
+            boolean removable = ((isStatement || isStatic) && depth == 0) || hasSameReturnType;
             if (!removable) {
                 return expression;
             }
