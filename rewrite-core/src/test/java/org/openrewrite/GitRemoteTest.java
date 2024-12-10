@@ -110,6 +110,16 @@ public class GitRemoteTest {
         assertThat(remote.getRepositoryName()).isEqualTo(expectedRepositoryName);
     }
 
+    @Test
+    void parseRegisteredRemoteWithAlternate() {
+        GitRemote.Parser parser = new GitRemote.Parser().registerRemote(GitRemote.Service.Bitbucket, URI.create("https://bitbucket.moderne.ninja/stash"), List.of(URI.create("ssh://bitbucket.moderne.ninja:7999/stash")));
+        GitRemote remote = parser.parse("ssh://bitbucket.moderne.ninja:7999/stash/org/repo.git");
+        assertThat(remote.getOrigin()).isEqualTo("bitbucket.moderne.ninja/stash");
+        assertThat(remote.getPath()).isEqualTo("org/repo");
+        assertThat(remote.getOrganization()).isEqualTo("org");
+        assertThat(remote.getRepositoryName()).isEqualTo("repo");
+    }
+
     @ParameterizedTest
     @CsvSource(textBlock = """
       https://scm.company.com/very/long/context/path/org/repo.git,
@@ -260,18 +270,18 @@ public class GitRemoteTest {
 
     @ParameterizedTest
     @CsvSource(textBlock = """
-      GitHub, GitHub
-      GITLAB, GitLab
-      bitbucket, Bitbucket
-      BitbucketCloud, BitbucketCloud
-      Bitbucket Cloud, BitbucketCloud
-      BITBUCKET_CLOUD, BitbucketCloud
-      AzureDevOps, AzureDevOps
-      AZURE_DEVOPS, AzureDevOps
-      Azure DevOps, AzureDevOps
-      idontknow, Unknown
-    """)
-    void findServiceForName(String name, GitRemote.Service service){
+        GitHub, GitHub
+        GITLAB, GitLab
+        bitbucket, Bitbucket
+        BitbucketCloud, BitbucketCloud
+        Bitbucket Cloud, BitbucketCloud
+        BITBUCKET_CLOUD, BitbucketCloud
+        AzureDevOps, AzureDevOps
+        AZURE_DEVOPS, AzureDevOps
+        Azure DevOps, AzureDevOps
+        idontknow, Unknown
+      """)
+    void findServiceForName(String name, GitRemote.Service service) {
         assertThat(GitRemote.Service.forName(name)).isEqualTo(service);
     }
 
