@@ -2083,9 +2083,15 @@ public class GroovyParserVisitor {
             JavaType type = typeMapping.type(staticType(((org.codehaus.groovy.ast.expr.Expression) expression)));
             Space prefix = whitespace();
             StringBuilder keyword = new StringBuilder();
-            while (!Character.isWhitespace(source.charAt(cursor))) {
-                keyword.append(source.charAt(cursor));
-                cursor++;
+
+            if (expression.isDynamicTyped()) {
+                while (!Character.isWhitespace(source.charAt(cursor))) {
+                    keyword.append(source.charAt(cursor));
+                    cursor++;
+                }
+            } else {
+                keyword.append(expression.getOriginType().getUnresolvedName());
+                cursor += keyword.length();
             }
             J.Identifier ident = new J.Identifier(randomId(),
                     EMPTY,
