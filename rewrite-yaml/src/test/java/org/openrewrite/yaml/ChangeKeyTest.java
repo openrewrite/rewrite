@@ -133,7 +133,7 @@ class ChangeKeyTest implements RewriteTest {
     void relocatesPropertyWithVariableInfix() {
         rewriteRun(
           spec -> spec.recipe(new ChangeKey(
-            "\\$.spring.security.saml2.relyingparty.registration.*[?(@.identityprovider)]",
+            "$.spring.security.saml2.relyingparty.registration.*[?(@.identityprovider)]",
             "assertingparty"
           )),
           yaml(
@@ -157,8 +157,8 @@ class ChangeKeyTest implements RewriteTest {
                       saml2:
                         relyingparty:
                           registration:
-                            idpone:
-                              assertingparty:
+                            assertingparty:
+                              identityprovider:
                                 entity-id: https://idpone.com
                                 sso-url: https://idpone.com
                                 verification:
