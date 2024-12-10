@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.properties.trait;
+package org.openrewrite.yaml.trait;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
@@ -21,9 +21,9 @@ import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
-import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.trait.Reference;
 import org.openrewrite.trait.SimpleTraitMatcher;
+import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -31,7 +31,7 @@ import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
 @Value
-public class PropertiesReference implements Reference {
+public class YamlReference implements Reference {
     Cursor cursor;
     Kind kind;
 
@@ -42,10 +42,10 @@ public class PropertiesReference implements Reference {
 
     @Override
     public String getValue() {
-        if (getTree() instanceof Properties.Entry) {
-            return ((Properties.Entry) getTree()).getValue().getText();
+        if (getTree() instanceof Yaml.Scalar) {
+            return ((Yaml.Scalar) getTree()).getValue();
         }
-        throw new IllegalArgumentException("getTree() must be an Properties.Entry: " + getTree().getClass());
+        throw new IllegalArgumentException("getTree() must be an Yaml.Scalar: " + getTree().getClass());
     }
 
     @Override
@@ -56,24 +56,23 @@ public class PropertiesReference implements Reference {
     @Override
     public Tree rename(Renamer renamer, Cursor cursor, ExecutionContext ctx) {
         Tree tree = cursor.getValue();
-        if (tree instanceof Properties.Entry) {
-            Properties.Entry entry = (Properties.Entry) tree;
-            String newValueText = renamer.rename(this);
-            return entry.withValue(entry.getValue().withText(newValueText));
+        if (tree instanceof Yaml.Scalar) {
+            return ((Yaml.Scalar) tree).withValue(renamer.rename(this));
         }
-        return tree;
+        throw new IllegalArgumentException("cursor.getValue() must be an Yaml.Scalar but is: " + tree.getClass());
     }
 
-    private static class Matcher extends SimpleTraitMatcher<PropertiesReference> {
-        private static final Predicate<String> javaFullyQualifiedTypeMatcher = Pattern.compile(
-                "\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*(?:\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*)*").asPredicate();
+    private static class Matcher extends SimpleTraitMatcher<YamlReference> {
+        private static final Predicate<String> javaFullyQualifiedTypePattern = Pattern.compile(
+                "\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*(?:\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*)*")
+                .asPredicate();
 
         @Override
-        protected @Nullable PropertiesReference test(Cursor cursor) {
+        protected @Nullable YamlReference test(Cursor cursor) {
             Object value = cursor.getValue();
-            if (value instanceof Properties.Entry &&
-                    javaFullyQualifiedTypeMatcher.test(((Properties.Entry) value).getValue().getText())) {
-                return new PropertiesReference(cursor, determineKind(((Properties.Entry) value).getValue().getText()));
+            if (value instanceof Yaml.Scalar &&
+                    javaFullyQualifiedTypePattern.test(((Yaml.Scalar) value).getValue())) {
+                return new YamlReference(cursor, determineKind(((Yaml.Scalar) value).getValue()));
             }
             return null;
         }
@@ -86,11 +85,11 @@ public class PropertiesReference implements Reference {
     @SuppressWarnings("unused")
     public static class Provider implements Reference.Provider {
 
-        private static final Predicate<String> applicationPropertiesMatcher = Pattern.compile("^application(-\\w+)?\\.properties$").asPredicate();
+        private static final Predicate<String> applicationPropertiesMatcher = Pattern.compile("^application(-\\w+)?\\.(yaml|yml)$").asPredicate();
 
         @Override
         public boolean isAcceptable(SourceFile sourceFile) {
-            return sourceFile instanceof Properties.File && applicationPropertiesMatcher.test(sourceFile.getSourcePath().getFileName().toString());
+            return sourceFile instanceof Yaml.Documents && applicationPropertiesMatcher.test(sourceFile.getSourcePath().getFileName().toString());
         }
 
         @Override

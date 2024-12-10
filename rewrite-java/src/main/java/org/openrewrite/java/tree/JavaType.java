@@ -104,7 +104,7 @@ public interface JavaType {
             this.throwableTypes = arrayOrNullIfEmpty(throwableTypes, EMPTY_JAVA_TYPE_ARRAY);
         }
 
-        MultiCatch(JavaType @Nullable[] throwableTypes) {
+        MultiCatch(JavaType @Nullable [] throwableTypes) {
             this.throwableTypes = nullIfEmpty(throwableTypes);
         }
 
@@ -112,7 +112,7 @@ public interface JavaType {
         MultiCatch() {
         }
 
-        private JavaType[] throwableTypes;
+        private JavaType @Nullable [] throwableTypes;
 
         public List<JavaType> getThrowableTypes() {
             if (throwableTypes == null) {
@@ -145,7 +145,7 @@ public interface JavaType {
             this.bounds = arrayOrNullIfEmpty(bounds, EMPTY_JAVA_TYPE_ARRAY);
         }
 
-        Intersection(JavaType @Nullable[] throwableTypes) {
+        Intersection(JavaType @Nullable [] throwableTypes) {
             this.bounds = nullIfEmpty(throwableTypes);
         }
 
@@ -153,7 +153,7 @@ public interface JavaType {
         Intersection() {
         }
 
-        private JavaType[] bounds;
+        private JavaType @Nullable [] bounds;
 
         public List<JavaType> getBounds() {
             if (bounds == null) {
@@ -322,16 +322,16 @@ public interface JavaType {
 
         public boolean isAssignableTo(String fullyQualifiedName) {
             return TypeUtils.fullyQualifiedNamesAreEqual(getFullyQualifiedName(), fullyQualifiedName) ||
-                   getInterfaces().stream().anyMatch(anInterface -> anInterface.isAssignableTo(fullyQualifiedName)) ||
-                   (getSupertype() != null && getSupertype().isAssignableTo(fullyQualifiedName));
+                    getInterfaces().stream().anyMatch(anInterface -> anInterface.isAssignableTo(fullyQualifiedName)) ||
+                    (getSupertype() != null && getSupertype().isAssignableTo(fullyQualifiedName));
         }
 
         public boolean isAssignableFrom(@Nullable JavaType type) {
             if (type instanceof FullyQualified) {
                 FullyQualified clazz = (FullyQualified) type;
                 return TypeUtils.fullyQualifiedNamesAreEqual(getFullyQualifiedName(), clazz.getFullyQualifiedName()) ||
-                       isAssignableFrom(clazz.getSupertype()) ||
-                       clazz.getInterfaces().stream().anyMatch(this::isAssignableFrom);
+                        isAssignableFrom(clazz.getSupertype()) ||
+                        clazz.getInterfaces().stream().anyMatch(this::isAssignableFrom);
             } else if (type instanceof GenericTypeVariable) {
                 GenericTypeVariable generic = (GenericTypeVariable) type;
                 for (JavaType bound : generic.getBounds()) {
@@ -374,7 +374,7 @@ public interface JavaType {
         Kind kind;
 
         @NonFinal
-        JavaType @Nullable[] typeParameters;
+        JavaType @Nullable [] typeParameters;
 
         @With
         @Nullable
@@ -388,7 +388,7 @@ public interface JavaType {
 
 
         @NonFinal
-        FullyQualified @Nullable[] annotations;
+        FullyQualified @Nullable [] annotations;
 
         public Class(@Nullable Integer managedReference, long flagsBitMap, String fullyQualifiedName,
                      Kind kind, @Nullable List<JavaType> typeParameters, @Nullable FullyQualified supertype, @Nullable FullyQualified owningClass,
@@ -410,9 +410,9 @@ public interface JavaType {
         }
 
         Class(@Nullable Integer managedReference, long flagsBitMap, String fullyQualifiedName,
-              Kind kind, JavaType @Nullable[] typeParameters, @Nullable FullyQualified supertype, @Nullable FullyQualified owningClass,
-                FullyQualified @Nullable[] annotations, FullyQualified @Nullable[] interfaces,
-                Variable @Nullable[] members, Method @Nullable[] methods) {
+              Kind kind, JavaType @Nullable [] typeParameters, @Nullable FullyQualified supertype, @Nullable FullyQualified owningClass,
+              FullyQualified @Nullable [] annotations, FullyQualified @Nullable [] interfaces,
+              Variable @Nullable [] members, Method @Nullable [] methods) {
             this.managedReference = managedReference;
             this.flagsBitMap = flagsBitMap & Flag.VALID_CLASS_FLAGS;
             this.fullyQualifiedName = fullyQualifiedName;
@@ -447,7 +447,7 @@ public interface JavaType {
 
 
         @NonFinal
-        FullyQualified @Nullable[] interfaces;
+        FullyQualified @Nullable [] interfaces;
 
         @Override
         public List<FullyQualified> getInterfaces() {
@@ -465,7 +465,7 @@ public interface JavaType {
 
 
         @NonFinal
-        Variable @Nullable[] members;
+        Variable @Nullable [] members;
 
         @Override
         public List<Variable> getMembers() {
@@ -483,7 +483,7 @@ public interface JavaType {
 
 
         @NonFinal
-        Method @Nullable[] methods;
+        Method @Nullable [] methods;
 
         @Override
         public List<Method> getMethods() {
@@ -556,9 +556,9 @@ public interface JavaType {
             return this;
         }
 
-        public Class unsafeSet(JavaType @Nullable[] typeParameters, @Nullable FullyQualified supertype, @Nullable FullyQualified owningClass,
-                FullyQualified @Nullable[] annotations, FullyQualified @Nullable[] interfaces,
-                Variable @Nullable[] members, Method @Nullable[] methods) {
+        public Class unsafeSet(JavaType @Nullable [] typeParameters, @Nullable FullyQualified supertype, @Nullable FullyQualified owningClass,
+                               FullyQualified @Nullable [] annotations, FullyQualified @Nullable [] interfaces,
+                               Variable @Nullable [] members, Method @Nullable [] methods) {
             //noinspection DuplicatedCode
             this.typeParameters = ListUtils.nullIfEmpty(typeParameters);
             this.supertype = supertype;
@@ -576,7 +576,7 @@ public interface JavaType {
             if (o == null || getClass() != o.getClass()) return false;
             Class aClass = (Class) o;
             return TypeUtils.fullyQualifiedNamesAreEqual(fullyQualifiedName, aClass.fullyQualifiedName) &&
-                   (typeParameters == null && aClass.typeParameters == null || typeParameters != null && Arrays.equals(typeParameters, aClass.typeParameters));
+                    (typeParameters == null && aClass.typeParameters == null || typeParameters != null && Arrays.equals(typeParameters, aClass.typeParameters));
         }
 
         @Override
@@ -746,7 +746,7 @@ public interface JavaType {
         FullyQualified type;
 
         @NonFinal
-        JavaType @Nullable[] typeParameters;
+        JavaType @Nullable [] typeParameters;
 
         public Parameterized(@Nullable Integer managedReference, @Nullable FullyQualified type,
                              @Nullable List<JavaType> typeParameters) {
@@ -758,7 +758,7 @@ public interface JavaType {
         }
 
         Parameterized(@Nullable Integer managedReference, @Nullable FullyQualified type,
-                JavaType @Nullable[] typeParameters) {
+                      JavaType @Nullable [] typeParameters) {
             this.managedReference = managedReference;
             this.type = unknownIfNull(type);
             this.typeParameters = nullIfEmpty(typeParameters);
@@ -798,7 +798,7 @@ public interface JavaType {
             return this;
         }
 
-        public Parameterized unsafeSet(@Nullable FullyQualified type, JavaType @Nullable[] typeParameters) {
+        public Parameterized unsafeSet(@Nullable FullyQualified type, JavaType @Nullable [] typeParameters) {
             assert type != this;
             this.type = unknownIfNull(type);
             this.typeParameters = ListUtils.nullIfEmpty(typeParameters);
@@ -898,7 +898,7 @@ public interface JavaType {
         Variance variance;
 
         @NonFinal
-        JavaType @Nullable[] bounds;
+        JavaType @Nullable [] bounds;
 
         public GenericTypeVariable(@Nullable Integer managedReference, String name, Variance variance, @Nullable List<JavaType> bounds) {
             this(
@@ -909,7 +909,7 @@ public interface JavaType {
             );
         }
 
-        GenericTypeVariable(@Nullable Integer managedReference, String name, Variance variance, JavaType @Nullable[] bounds) {
+        GenericTypeVariable(@Nullable Integer managedReference, String name, Variance variance, JavaType @Nullable [] bounds) {
             this.managedReference = managedReference;
             this.name = name;
             this.variance = variance;
@@ -945,7 +945,7 @@ public interface JavaType {
             return this;
         }
 
-        public GenericTypeVariable unsafeSet(String name, Variance variance, JavaType @Nullable[] bounds) {
+        public GenericTypeVariable unsafeSet(String name, Variance variance, JavaType @Nullable [] bounds) {
             this.name = name;
             this.variance = variance;
             this.bounds = ListUtils.nullIfEmpty(bounds);
@@ -958,7 +958,7 @@ public interface JavaType {
             if (o == null || getClass() != o.getClass()) return false;
             GenericTypeVariable that = (GenericTypeVariable) o;
             return name.equals(that.name) && variance == that.variance &&
-                   (variance == Variance.INVARIANT && bounds == null && that.bounds == null || bounds != null && Arrays.equals(bounds, that.bounds));
+                    (variance == Variance.INVARIANT && bounds == null && that.bounds == null || bounds != null && Arrays.equals(bounds, that.bounds));
         }
 
         @Override
@@ -986,9 +986,9 @@ public interface JavaType {
 
 
         @NonFinal
-        FullyQualified @Nullable[] annotations;
+        FullyQualified @Nullable [] annotations;
 
-        public Array(@Nullable Integer managedReference, @Nullable JavaType elemType, FullyQualified @Nullable[] annotations) {
+        public Array(@Nullable Integer managedReference, @Nullable JavaType elemType, FullyQualified @Nullable [] annotations) {
             this.managedReference = managedReference;
             this.elemType = unknownIfNull(elemType);
             this.annotations = ListUtils.nullIfEmpty(annotations);
@@ -1020,7 +1020,7 @@ public interface JavaType {
             return this;
         }
 
-        public Array unsafeSet(JavaType elemType, FullyQualified @Nullable[] annotations) {
+        public Array unsafeSet(JavaType elemType, FullyQualified @Nullable [] annotations) {
             this.elemType = unknownIfNull(elemType);
             this.annotations = ListUtils.nullIfEmpty(annotations);
             return this;
@@ -1206,16 +1206,16 @@ public interface JavaType {
 
 
         @NonFinal
-        String @Nullable[] parameterNames;
+        String @Nullable [] parameterNames;
 
         @NonFinal
-        JavaType @Nullable[] parameterTypes;
+        JavaType @Nullable [] parameterTypes;
 
         @NonFinal
-        FullyQualified @Nullable[] thrownExceptions;
+        FullyQualified @Nullable [] thrownExceptions;
 
         @NonFinal
-        FullyQualified @Nullable[] annotations;
+        FullyQualified @Nullable [] annotations;
 
         @Incubating(since = "7.34.0")
         @Nullable
@@ -1249,9 +1249,9 @@ public interface JavaType {
         }
 
         public Method(@Nullable Integer managedReference, long flagsBitMap, @Nullable FullyQualified declaringType, String name,
-                      @Nullable JavaType returnType, String @Nullable[] parameterNames,
-                JavaType @Nullable[] parameterTypes, FullyQualified @Nullable[] thrownExceptions,
-                FullyQualified @Nullable[] annotations, @Nullable List<String> defaultValue) {
+                      @Nullable JavaType returnType, String @Nullable [] parameterNames,
+                      JavaType @Nullable [] parameterTypes, FullyQualified @Nullable [] thrownExceptions,
+                      FullyQualified @Nullable [] annotations, @Nullable List<String> defaultValue) {
             this.managedReference = managedReference;
             this.flagsBitMap = flagsBitMap & Flag.VALID_FLAGS;
             this.declaringType = unknownIfNull(declaringType);
@@ -1289,9 +1289,9 @@ public interface JavaType {
 
         public Method unsafeSet(@Nullable FullyQualified declaringType,
                                 @Nullable JavaType returnType,
-                JavaType @Nullable[] parameterTypes,
-                FullyQualified @Nullable[] thrownExceptions,
-                FullyQualified @Nullable[] annotations) {
+                                JavaType @Nullable [] parameterTypes,
+                                FullyQualified @Nullable [] thrownExceptions,
+                                FullyQualified @Nullable [] annotations) {
             this.declaringType = unknownIfNull(declaringType);
             this.returnType = unknownIfNull(returnType);
             this.parameterTypes = ListUtils.nullIfEmpty(parameterTypes);
@@ -1462,9 +1462,9 @@ public interface JavaType {
             if (o == null || getClass() != o.getClass()) return false;
             Method method = (Method) o;
             return Objects.equals(declaringType, method.declaringType) &&
-                   name.equals(method.name) &&
-                   Objects.equals(returnType, method.returnType) &&
-                   Arrays.equals(parameterTypes, method.parameterTypes);
+                    name.equals(method.name) &&
+                    Objects.equals(returnType, method.returnType) &&
+                    Arrays.equals(parameterTypes, method.parameterTypes);
         }
 
         @Override
@@ -1500,7 +1500,7 @@ public interface JavaType {
         JavaType type;
 
         @NonFinal
-        FullyQualified @Nullable[] annotations;
+        FullyQualified @Nullable [] annotations;
 
         public Variable(@Nullable Integer managedReference, long flagsBitMap, String name, @Nullable JavaType owner,
                         @Nullable JavaType type, @Nullable List<FullyQualified> annotations) {
@@ -1515,7 +1515,7 @@ public interface JavaType {
         }
 
         Variable(@Nullable Integer managedReference, long flagsBitMap, String name, @Nullable JavaType owner,
-                 @Nullable JavaType type, FullyQualified @Nullable[] annotations) {
+                 @Nullable JavaType type, FullyQualified @Nullable [] annotations) {
             this.managedReference = managedReference;
             this.flagsBitMap = flagsBitMap & Flag.VALID_FLAGS;
             this.name = name;
