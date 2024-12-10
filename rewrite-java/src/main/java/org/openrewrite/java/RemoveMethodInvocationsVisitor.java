@@ -69,26 +69,32 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
         return j;
     }
 
-    private @Nullable J removeMethods(Expression expression, int depth, boolean isLambdaBody, Stack<Space> selectAfter) {
-        if (!(expression instanceof J.MethodInvocation)) {
+    private @Nullable J removeMethods(@Nullable Expression expression, int depth, boolean isLambdaBody, Stack<Space> selectAfter) {
+        if (!(expression instanceof J.MethodInvocation) || ((J.MethodInvocation) expression).getMethodType() == null) {
+            return expression;
+        }
+
+        J.MethodInvocation m = (J.MethodInvocation) expression;
+        boolean isStatic = m.getMethodType().hasFlags(Flag.Static);
+
+        if (m.getSelect() == null && !isStatic) {
             return expression;
         }
 
         boolean isStatement = isStatement();
-        J.MethodInvocation m = (J.MethodInvocation) expression;
-
-        if (m.getMethodType() == null || m.getSelect() == null) {
-            return expression;
-        }
 
         if (matchers.entrySet().stream().anyMatch(entry -> matches(m, entry.getKey(), entry.getValue()))) {
-            boolean hasSameReturnType = TypeUtils.isAssignableTo(m.getMethodType().getReturnType(), m.getSelect().getType());
+            boolean hasSameReturnType = m.getSelect() != null && TypeUtils.isAssignableTo(m.getMethodType().getReturnType(), m.getSelect().getType());
             boolean removable = (isStatement && depth == 0) || hasSameReturnType;
             if (!removable) {
                 return expression;
             }
 
-            if (m.getSelect() instanceof J.Identifier || m.getSelect() instanceof J.NewClass) {
+            maybeRemoveImport(m.getMethodType().getDeclaringType());
+
+            if (isStatic) {
+                return null;
+            } else if (m.getSelect() instanceof J.Identifier || m.getSelect() instanceof J.NewClass) {
                 boolean keepSelect = depth != 0;
                 if (keepSelect) {
                     selectAfter.add(getSelectAfter(m));
@@ -241,7 +247,7 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
 
     @Value
     @With
-    static class ToBeRemoved implements Marker {
+    private static class ToBeRemoved implements Marker {
         UUID id;
         static <J2 extends J> J2 withMarker(J2 j) {
             return j.withMarkers(j.getMarkers().addIfAbsent(new ToBeRemoved(randomId())));

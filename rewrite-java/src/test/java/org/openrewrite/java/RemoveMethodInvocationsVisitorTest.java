@@ -497,15 +497,15 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
     @Test
     void removeStaticMethodFromImport() {
         rewriteRun(
-          spec -> spec.recipe(createRemoveMethodsRecipe("java.util.Collections emptyList()")),
+          spec -> spec.recipe(createRemoveMethodsRecipe("org.junit.jupiter.api.Assertions assertTrue(..)")),
           // language=java
           java(
             """
-              import static java.util.Collections.emptyList;
+              import static org.junit.jupiter.api.Assertions.assertTrue;
               
               class Test {
                   void method() {
-                      List<Object> emptyList = emptyList();
+                      assertTrue(true);
                   }
               }
               """,
@@ -522,15 +522,15 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
     @Test
     void removeStaticMethod() {
         rewriteRun(
-          spec -> spec.recipe(createRemoveMethodsRecipe("java.util.Collections emptyList()")),
+          spec -> spec.recipe(createRemoveMethodsRecipe("org.junit.jupiter.api.Assertions assertTrue(..)")),
           // language=java
           java(
             """
-              import java.util.Collections;
+              import org.junit.jupiter.api.Assertions;
               
               class Test {
                   void method() {
-                      List<Object> emptyList = Collections.emptyList();
+                      Assertions.assertTrue(true);
                   }
               }
               """,
