@@ -785,8 +785,31 @@ public class GroovyParserVisitor {
             Space prefix = whitespace();
             System.out.println("WHITESPACE -> " +prefix+ " -> AST known level: " + getInsideParenthesesLevel(node));
 
+            /*
+              The biggest problem I encounter is the following, having this code of `lotOfSpacesAroundConstantWithParentheses` test (yes, with all those whitespace):
 
-            Integer insideParenthesesLevel = getInsideParenthesesLevel(node);
+              (                  (     (  "x"         )).toString()       )
+              ^                      ^
+              |                      |
+      outer parenthese            2 parenthesis of
+      of MethodCallExpression        ConstantExpression
+
+              Now the algorithm start running:
+                 1. <no whitespace> and then `(`            => >MethodCallExpression is passed down to next cycle (recursive `insideParentheses`, line 851)
+                 2. <lot of whitespaces> and then `(`       => MethodCallExpression is passed down to next cycle
+                 3. <some more whitespaces> and then `(`    => MethodCallExpression is passed down to next cycle
+                 3. <two whitespaces> and then "x"          => we arrived at the ConstantExpression!
+              BUT the MethodCallExpression is not yet handled, so that's gonna be done first: `parenthesizedTree.apply(prefix);`
+                    (to make it more complex, the MethodCallExpression will call the ConstantExpression, because it will call `visit(call.getObjectExpression())`)
+              The `prefix` here is the two whitespaces, applied to the MethodCallExpression. But that's actually wrong, because it should be applied to the prefix of the `ConstantExpression`.
+
+              We could kinda fix this to combine the new code, with the old `getInsideParenthesesLevel(node)`. See below in comments.
+              The AST still knows the wrapping level of the ConstantExpression (that is 2), so maybe we could apply that first.
+                    WARNING: Notice you still needs to pop from the parenthesesStack, because at that point you already have parsed all opening parenthesis...
+             */
+
+
+            /*Integer insideParenthesesLevel = getInsideParenthesesLevel(node);
             //System.out.println("insideParenthesesLevel: " + insideParenthesesLevel + " => " + cursor);
             // AST contains information about the parentheses level, so apply it directly
             if (insideParenthesesLevel != null) {
@@ -806,7 +829,7 @@ public class GroovyParserVisitor {
                     parenthesized = new J.Parentheses<>(randomId(), openingParens.pop(), Markers.EMPTY, padRight(parenthesized, sourceBefore(")")));
                 }
                 return parenthesized;
-            }
+            }*/
 
             //return parenthesizedTree.apply(whitespace());
 
