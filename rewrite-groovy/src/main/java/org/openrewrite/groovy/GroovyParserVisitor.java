@@ -39,9 +39,9 @@ import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.marker.Semicolon;
 import org.openrewrite.java.marker.TrailingComma;
-import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.math.BigDecimal;
@@ -122,7 +122,7 @@ public class GroovyParserVisitor {
     private Optional<RedundantDef> maybeRedundantDef(ClassNode type, String name) {
         int saveCursor = cursor;
         Space defPrefix = whitespace();
-        if(source.startsWith("def", cursor)) {
+        if (source.startsWith("def", cursor)) {
             skip("def");
             // The def is redundant only when it is followed by the method's return type
             // I hope no one puts an annotation between "def" and the return type
@@ -1419,6 +1419,10 @@ public class GroovyParserVisitor {
         @Override
         public void visitDeclarationExpression(DeclarationExpression expression) {
             Optional<RedundantDef> redundantDef = maybeRedundantDef(expression.getVariableExpression().getType(), expression.getVariableExpression().getName());
+
+            /* The identifier of this type is one of the following: the name of a type, `final`, `def`, `var` or `,`
+             The latter because MultiVariable declarations are returned as separate `DeclarationExpression` by the
+             Groovy AST */
             TypeTree typeExpr = visitVariableExpressionType(expression.getVariableExpression());
 
             J.VariableDeclarations.NamedVariable namedVariable;
@@ -2077,29 +2081,17 @@ public class GroovyParserVisitor {
 
         public TypeTree visitVariableExpressionType(VariableExpression expression) {
             JavaType type = typeMapping.type(staticType(((org.codehaus.groovy.ast.expr.Expression) expression)));
-
-            if (expression.isDynamicTyped()) {
-                Space prefix = whitespace();
-                String keyword;
-                if (source.substring(cursor).startsWith("final")) {
-                    keyword = "final";
-                } else {
-                    keyword = source.substring(cursor, cursor + 3);
-                }
-                cursor += keyword.length();
-                return new J.Identifier(randomId(),
-                        prefix,
-                        Markers.EMPTY,
-                        emptyList(),
-                        keyword,
-                        type, null);
+            Space prefix = whitespace();
+            StringBuilder keyword = new StringBuilder();
+            while (!Character.isWhitespace(source.charAt(cursor))) {
+                keyword.append(source.charAt(cursor));
+                cursor++;
             }
-            Space prefix = sourceBefore(expression.getOriginType().getUnresolvedName());
             J.Identifier ident = new J.Identifier(randomId(),
                     EMPTY,
                     Markers.EMPTY,
                     emptyList(),
-                    expression.getOriginType().getUnresolvedName(),
+                    keyword.toString(),
                     type, null);
             if (expression.getOriginType().getGenericsTypes() != null) {
                 return new J.ParameterizedType(randomId(), prefix, Markers.EMPTY, ident, visitTypeParameterizations(
