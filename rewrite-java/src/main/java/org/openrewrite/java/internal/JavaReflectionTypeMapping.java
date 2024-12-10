@@ -153,7 +153,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
                 annotations = new ArrayList<>(clazz.getDeclaredAnnotations().length);
                 for (Annotation a : clazz.getDeclaredAnnotations()) {
                     JavaType.FullyQualified type = (JavaType.FullyQualified) type(a.annotationType());
-                    annotations.add(type);
+                    annotations.add(new JavaType.Annotation(type, emptyList()));
                 }
             }
 
@@ -298,7 +298,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             annotations = new ArrayList<>(field.getDeclaredAnnotations().length);
             for (Annotation a : field.getDeclaredAnnotations()) {
                 JavaType.FullyQualified type = (JavaType.FullyQualified) type(a.annotationType());
-                annotations.add(type);
+                annotations.add(new JavaType.Annotation(type, emptyList()));
             }
         }
 
@@ -359,7 +359,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             annotations = new ArrayList<>(method.getDeclaredAnnotations().length);
             for (Annotation a : method.getDeclaredAnnotations()) {
                 JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) type(a.annotationType());
-                annotations.add(fullyQualified);
+                annotations.add(new JavaType.Annotation(fullyQualified, emptyList()));
             }
         }
 
@@ -465,7 +465,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             annotations = new ArrayList<>(method.getDeclaredAnnotations().length);
             for (Annotation a : method.getDeclaredAnnotations()) {
                 JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) type(a.annotationType());
-                annotations.add(fullyQualified);
+                annotations.add(new JavaType.Annotation(fullyQualified, emptyList()));
             }
         }
 

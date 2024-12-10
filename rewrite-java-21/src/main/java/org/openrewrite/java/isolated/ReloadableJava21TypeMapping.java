@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.singletonList;
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 
 @RequiredArgsConstructor
@@ -707,7 +708,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
         if (!sym.getDeclarationAttributes().isEmpty()) {
             annotations = new ArrayList<>(sym.getDeclarationAttributes().size());
             for (Attribute.Compound a : sym.getDeclarationAttributes()) {
-                JavaType.Annotation annotation = annotationValue(a);
+                JavaType.Annotation annotation = annotationType(a);
                 if (annotation == null) continue;
                 annotations.add(annotation);
             }
@@ -715,51 +716,50 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
         return annotations;
     }
 
-    private JavaType.@Nullable Annotation annotationValue(Attribute.Compound compound) {
+    private JavaType.@Nullable Annotation annotationType(Attribute.Compound compound) {
         JavaType.FullyQualified annotType = TypeUtils.asFullyQualified(type(compound.type));
         if (annotType == null) {
             return null;
         }
-        List<JavaType.AnnotationValue> annotationValues = new ArrayList<>();
+        List<JavaType.Annotation.ElementValue> elementValues = new ArrayList<>();
         for (Pair<Symbol.MethodSymbol, Attribute> attr : compound.values) {
-            JavaType.AnnotationValue annotationValue = new JavaType.AnnotationValue(
-                    methodDeclarationType(attr.fst, annotType), annotationAttributeValue(attr.snd.getValue()));
-            annotationValues.add(annotationValue);
+            Object value = annotationElementValue(attr.snd.getValue());
+            JavaType.Method element = requireNonNull(methodDeclarationType(attr.fst, annotType));
+            JavaType.Annotation.ElementValue elementValue = value instanceof Object[] ?
+                    new JavaType.Annotation.ArrayElementValue(element, ((Object[]) value)) :
+                    new JavaType.Annotation.SingleElementValue(element, value);
+            elementValues.add(elementValue);
         }
-        return new JavaType.Annotation(annotType, annotationValues);
+        return new JavaType.Annotation(annotType, elementValues);
     }
 
-    private @Nullable Object annotationAttributeValue(Object value) {
+    private Object annotationElementValue(Object value) {
         if (value instanceof Symbol.VarSymbol) {
-            return variableType((Symbol.VarSymbol) value);
+            return requireNonNull(variableType((Symbol.VarSymbol) value));
         } else if (value instanceof Type.ClassType) {
             return type((Type.ClassType) value);
         } else if (value instanceof Attribute.Array) {
             List<@Nullable Object> list = new ArrayList<>();
             for (Attribute attribute : ((Attribute.Array) value).values) {
-                list.add(annotationAttributeValue(attribute));
+                list.add(annotationElementValue(attribute));
             }
-            return list;
-        } else if (value instanceof Attribute.Class) {
-            return type(((Attribute.Class) value).classType);
-        } else if (value instanceof Attribute.Compound) {
-            return annotationValue((Attribute.Compound) value);
-        } else if (value instanceof Attribute.Constant) {
-            return annotationAttributeValue(((Attribute.Constant) value).value);
-        } else if (value instanceof Attribute.Enum) {
-            return annotationAttributeValue(((Attribute.Enum) value).value);
+            return list.toArray(new Object[0]);
         } else if (value instanceof List<?>) {
             List<@Nullable Object> list = new ArrayList<>();
             for (Object o : ((List<?>) value)) {
-                list.add(annotationAttributeValue(o));
+                list.add(annotationElementValue(o));
             }
-            return list;
-        } else if (value instanceof String) {
-            return value;
-        } else if (value instanceof Boolean) {
-            return value;
-        } else if (value instanceof Integer) {
-            return value;
+            return list.toArray(new Object[0]);
+        } else if (value instanceof Attribute.Class) {
+            return type(((Attribute.Class) value).classType);
+        } else if (value instanceof Attribute.Compound) {
+            return requireNonNull(annotationType((Attribute.Compound) value));
+        } else if (value instanceof Attribute.Constant) {
+            return annotationElementValue(((Attribute.Constant) value).value);
+        } else if (value instanceof Attribute.Enum) {
+            return annotationElementValue(((Attribute.Enum) value).value);
+        } else if (value instanceof Attribute.Error) {
+            return JavaType.Unknown.getInstance();
         }
         return value;
     }

@@ -39,9 +39,9 @@ class Java21ParserTest implements RewriteTest {
     }
 
     @Test
-    void testPreserveAnnotationsFromClasspath() throws IOException {
+    void testPreserveAnnotationsFromClasspath() {
         JavaParser p = JavaParser.fromJavaVersion().build();
-        /**
+        /*
          *     Using these annotations in core library for testing this feature:
          *
          *     @Deprecated(since="1.2", forRemoval=true)
@@ -67,16 +67,16 @@ class Java21ParserTest implements RewriteTest {
         JavaType.Annotation annotation = (JavaType.Annotation) mi.getMethodType().getAnnotations().get(0);
 
         // Thread.currentThread().stop();
-        assertEquals("java.lang.Deprecated" ,annotation.type.getFullyQualifiedName());
-        assertEquals("since", annotation.getValues().get(0).getMethod().getName());
+        assertEquals("java.lang.Deprecated" ,annotation.getType().getFullyQualifiedName());
+        assertEquals("since", annotation.getValues().get(0).getElement().getName());
         assertEquals("1.2", annotation.getValues().get(0).getValue());
-        assertEquals("forRemoval", annotation.getValues().get(1).getMethod().getName());
+        assertEquals("forRemoval", annotation.getValues().get(1).getElement().getName());
         assertEquals(Boolean.TRUE, annotation.getValues().get(1).getValue());
 
         // Thread.currentThread().getContextClassLoader();
         mi = (J.MethodInvocation) md.getBody().getStatements().get(1);
         annotation = (JavaType.Annotation) mi.getMethodType().getAnnotations().get(0);
-        assertEquals("jdk.internal.reflect.CallerSensitive" ,annotation.type.getFullyQualifiedName());
+        assertEquals("jdk.internal.reflect.CallerSensitive" ,annotation.getType().getFullyQualifiedName());
         assertTrue(annotation.getValues().isEmpty());
     }
 }

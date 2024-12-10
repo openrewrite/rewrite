@@ -30,11 +30,11 @@ import org.openrewrite.java.tree.TypeUtils;
 import javax.lang.model.type.NullType;
 import javax.lang.model.type.TypeMirror;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.singletonList;
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 
 @RequiredArgsConstructor
@@ -257,7 +257,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
             List<JavaType.FullyQualified> interfaces = null;
             if (symType.interfaces_field != null) {
                 interfaces = new ArrayList<>(symType.interfaces_field.length());
-                for (com.sun.tools.javac.code.Type iParam : symType.interfaces_field) {
+                for (Type iParam : symType.interfaces_field) {
                     JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(iParam));
                     if (javaType != null) {
                         interfaces.add(javaType);
@@ -457,7 +457,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
      * @param symbol     The method symbol.
      * @return Method type attribution.
      */
-    public JavaType.@Nullable Method methodInvocationType(com.sun.tools.javac.code.@Nullable Type selectType, @Nullable Symbol symbol) {
+    public JavaType.@Nullable Method methodInvocationType(@Nullable Type selectType, @Nullable Symbol symbol) {
         if (selectType == null || selectType instanceof Type.ErrorType || symbol == null || symbol.kind == Kinds.Kind.ERR || symbol.type instanceof Type.UnknownType) {
             return null;
         }
@@ -506,7 +506,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
 
             if (!methodType.argtypes.isEmpty()) {
                 parameterTypes = new ArrayList<>(methodType.argtypes.size());
-                for (com.sun.tools.javac.code.Type argtype : methodType.argtypes) {
+                for (Type argtype : methodType.argtypes) {
                     if (argtype != null) {
                         JavaType javaType = type(argtype);
                         parameterTypes.add(javaType);
@@ -588,7 +588,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
                             .collect(Collectors.toList());
                 } else {
                     try {
-                        defaultValues = Collections.singletonList(methodSymbol.getDefaultValue().getValue().toString());
+                        defaultValues = singletonList(methodSymbol.getDefaultValue().getValue().toString());
                     } catch (UnsupportedOperationException e) {
                         // not all Attribute implementations define `getValue()`
                     }
@@ -662,7 +662,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
 
                 if (!mt.argtypes.isEmpty()) {
                     parameterTypes = new ArrayList<>(mt.argtypes.size());
-                    for (com.sun.tools.javac.code.Type argtype : mt.argtypes) {
+                    for (Type argtype : mt.argtypes) {
                         if (argtype != null) {
                             JavaType javaType = type(argtype);
                             parameterTypes.add(javaType);
@@ -696,7 +696,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
         if (!sym.getDeclarationAttributes().isEmpty()) {
             annotations = new ArrayList<>(sym.getDeclarationAttributes().size());
             for (Attribute.Compound a : sym.getDeclarationAttributes()) {
-                JavaType.Annotation annotation = annotationValue(a);
+                JavaType.Annotation annotation = annotationType(a);
                 if (annotation == null) continue;
                 annotations.add(annotation);
             }
@@ -704,51 +704,50 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
         return annotations;
     }
 
-    private JavaType.@Nullable Annotation annotationValue(Attribute.Compound compound) {
+    private JavaType.@Nullable Annotation annotationType(Attribute.Compound compound) {
         JavaType.FullyQualified annotType = TypeUtils.asFullyQualified(type(compound.type));
         if (annotType == null) {
             return null;
         }
-        List<JavaType.AnnotationValue> annotationValues = new ArrayList<>();
+        List<JavaType.Annotation.ElementValue> elementValues = new ArrayList<>();
         for (Pair<Symbol.MethodSymbol, Attribute> attr : compound.values) {
-            JavaType.AnnotationValue annotationValue = new JavaType.AnnotationValue(
-                    methodDeclarationType(attr.fst, annotType), annotationAttributeValue(attr.snd.getValue()));
-            annotationValues.add(annotationValue);
+            Object value = annotationElementValue(attr.snd.getValue());
+            JavaType.Method element = requireNonNull(methodDeclarationType(attr.fst, annotType));
+            JavaType.Annotation.ElementValue elementValue = value instanceof Object[] ?
+                    new JavaType.Annotation.ArrayElementValue(element, ((Object[]) value)) :
+                    new JavaType.Annotation.SingleElementValue(element, value);
+            elementValues.add(elementValue);
         }
-        return new JavaType.Annotation(annotType, annotationValues);
+        return new JavaType.Annotation(annotType, elementValues);
     }
 
-    private @Nullable Object annotationAttributeValue(Object value) {
+    private Object annotationElementValue(Object value) {
         if (value instanceof Symbol.VarSymbol) {
-            return variableType((Symbol.VarSymbol) value);
+            return requireNonNull(variableType((Symbol.VarSymbol) value));
         } else if (value instanceof Type.ClassType) {
             return type((Type.ClassType) value);
         } else if (value instanceof Attribute.Array) {
             List<@Nullable Object> list = new ArrayList<>();
             for (Attribute attribute : ((Attribute.Array) value).values) {
-                list.add(annotationAttributeValue(attribute));
+                list.add(annotationElementValue(attribute));
             }
-            return list;
-        } else if (value instanceof Attribute.Class) {
-            return type(((Attribute.Class) value).classType);
-        } else if (value instanceof Attribute.Compound) {
-            return annotationValue((Attribute.Compound) value);
-        } else if (value instanceof Attribute.Constant) {
-            return annotationAttributeValue(((Attribute.Constant) value).value);
-        } else if (value instanceof Attribute.Enum) {
-            return annotationAttributeValue(((Attribute.Enum) value).value);
+            return list.toArray(new Object[0]);
         } else if (value instanceof List<?>) {
             List<@Nullable Object> list = new ArrayList<>();
             for (Object o : ((List<?>) value)) {
-                list.add(annotationAttributeValue(o));
+                list.add(annotationElementValue(o));
             }
-            return list;
-        } else if (value instanceof String) {
-            return value;
-        } else if (value instanceof Boolean) {
-            return value;
-        } else if (value instanceof Integer) {
-            return value;
+            return list.toArray(new Object[0]);
+        } else if (value instanceof Attribute.Class) {
+            return type(((Attribute.Class) value).classType);
+        } else if (value instanceof Attribute.Compound) {
+            return requireNonNull(annotationType((Attribute.Compound) value));
+        } else if (value instanceof Attribute.Constant) {
+            return annotationElementValue(((Attribute.Constant) value).value);
+        } else if (value instanceof Attribute.Enum) {
+            return annotationElementValue(((Attribute.Enum) value).value);
+        } else if (value instanceof Attribute.Error) {
+            return JavaType.Unknown.getInstance();
         }
         return value;
     }

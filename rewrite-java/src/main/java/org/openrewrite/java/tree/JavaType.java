@@ -19,10 +19,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
-import lombok.AccessLevel;
-import lombok.Data;
-import lombok.Getter;
-import lombok.With;
+import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
@@ -49,7 +46,7 @@ public interface JavaType {
     Method[] EMPTY_METHOD_ARRAY = new Method[0];
     String[] EMPTY_STRING_ARRAY = new String[0];
     JavaType[] EMPTY_JAVA_TYPE_ARRAY = new JavaType[0];
-    AnnotationValue[] EMPTY_ANNOTATION_VALUE_ARRAY = new AnnotationValue[0];
+    Annotation.ElementValue[] EMPTY_ANNOTATION_VALUE_ARRAY = new Annotation.ElementValue[0];
 
     // TODO: To be removed with OpenRewrite 9
     default @Nullable Integer getManagedReference() {
@@ -631,23 +628,21 @@ public interface JavaType {
         }
     }
 
-    @Data
-    class AnnotationValue {
-        private final Method method;
-        private final @Nullable Object value;
-    }
-
     class Annotation extends FullyQualified {
 
-        public final AnnotationValue @Nullable [] values;
-        public final FullyQualified type;
+        private final FullyQualified type;
+        private final ElementValue @Nullable [] values;
 
-        public Annotation(FullyQualified type, List<AnnotationValue> values) {
+        public Annotation(FullyQualified type, List<ElementValue> values) {
             this.type = type;
             this.values = ListUtils.arrayOrNullIfEmpty(values, EMPTY_ANNOTATION_VALUE_ARRAY);
         }
 
-        public List<AnnotationValue> getValues() {
+        public FullyQualified getType() {
+            return type;
+        }
+
+        public List<ElementValue> getValues() {
             return values == null ? emptyList() : Arrays.asList(values);
         }
 
@@ -658,7 +653,7 @@ public interface JavaType {
 
         @Override
         public FullyQualified withFullyQualifiedName(String fullyQualifiedName) {
-            return null;
+            return this;
         }
 
         @Override
@@ -668,7 +663,7 @@ public interface JavaType {
 
         @Override
         public boolean hasFlags(Flag... test) {
-            return type.hasFlags();
+            return type.hasFlags(test);
         }
 
         @Override
@@ -709,6 +704,32 @@ public interface JavaType {
         @Override
         public @Nullable FullyQualified getSupertype() {
             return type.getSupertype();
+        }
+
+        public interface ElementValue {
+            Method getElement();
+            Object getValue();
+        }
+
+        @Value
+        public static class SingleElementValue implements ElementValue {
+            Method element;
+            Object value;
+        }
+
+        @Value
+        public static class ArrayElementValue implements ElementValue {
+            Method element;
+            Object[] values;
+
+            @Override
+            public Object getValue() {
+                return getValues();
+            }
+
+            public List<?> getValues() {
+                return Arrays.asList(values);
+            }
         }
     }
 
