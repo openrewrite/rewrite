@@ -25,6 +25,17 @@ import static org.openrewrite.groovy.Assertions.groovy;
 class AssignmentTest implements RewriteTest {
 
     @Test
+    void noKeyword() {
+        rewriteRun(
+          groovy(
+            """
+              x = "s"
+              """
+          )
+        );
+    }
+
+    @Test
     void simple() {
         rewriteRun(
           groovy(
