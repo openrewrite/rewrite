@@ -58,6 +58,7 @@ dependencies {
         // because gradle-api fatjars this implementation already
         exclude("ch.qos.logback", "logback-classic")
     }
+    testImplementation("org.junit-pioneer:junit-pioneer:2.0.0")
 
     testImplementation("org.openrewrite.gradle.tooling:model:$latest")
 
