@@ -542,7 +542,7 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
     }
 
     @Test
-    void keepStaticMethodFromImportWithAssignment2() {
+    void keepStaticMethodFromImportClassField() {
         rewriteRun(
           spec -> spec.recipe(createRemoveMethodsRecipe("java.util.Collections emptyList()")),
           // language=java
@@ -610,7 +610,7 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
     }
 
     @Test
-    void keepStaticMethodWithAssignment2() {
+    void keepStaticMethodClassField() {
         rewriteRun(
           spec -> spec.recipe(createRemoveMethodsRecipe("java.util.Collections emptyList()")),
           // language=java
