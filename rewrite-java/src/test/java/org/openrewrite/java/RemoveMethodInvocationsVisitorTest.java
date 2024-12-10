@@ -15,13 +15,14 @@
  */
 package org.openrewrite.java;
 
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Recipe;
 import org.openrewrite.test.RewriteTest;
 
-import java.util.List;
 
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -172,7 +173,6 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
     }
 
     @Test
-    @ExpectedToFail
     void removeWithoutSelect() {
         rewriteRun(
           spec -> spec.recipe(createRemoveMethodsRecipe("Test foo()")),
@@ -486,6 +486,142 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                       } catch (Exception e) {
                       } finally {
                       }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeStaticMethodFromImport() {
+        rewriteRun(
+          spec -> spec.recipe(createRemoveMethodsRecipe("org.junit.jupiter.api.Assertions assertTrue(..)")),
+          // language=java
+          java(
+            """
+              import static org.junit.jupiter.api.Assertions.assertTrue;
+              
+              class Test {
+                  void method() {
+                      assertTrue(true);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void method() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepStaticMethodFromImportWithAssignment() {
+        rewriteRun(
+          spec -> spec.recipe(createRemoveMethodsRecipe("java.util.Collections emptyList()")),
+          // language=java
+          java(
+            """
+              import java.util.List;
+              
+              import static java.util.Collections.emptyList;
+              
+              class Test {
+                  void method() {
+                      List<Object> emptyList = emptyList();
+                      emptyList.isEmpty();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepStaticMethodFromImportClassField() {
+        rewriteRun(
+          spec -> spec.recipe(createRemoveMethodsRecipe("java.util.Collections emptyList()")),
+          // language=java
+          java(
+            """
+              import java.util.List;
+              
+              import static java.util.Collections.emptyList;
+              
+              class Test {
+                  List<Object> emptyList = emptyList();
+                  void method() {
+                      emptyList.isEmpty();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeStaticMethod() {
+        rewriteRun(
+          spec -> spec.recipe(createRemoveMethodsRecipe("org.junit.jupiter.api.Assertions assertTrue(..)")),
+          // language=java
+          java(
+            """
+              import org.junit.jupiter.api.Assertions;
+              
+              class Test {
+                  void method() {
+                      Assertions.assertTrue(true);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void method() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepStaticMethodWithAssignment() {
+        rewriteRun(
+          spec -> spec.recipe(createRemoveMethodsRecipe("java.util.Collections emptyList()")),
+          // language=java
+          java(
+            """
+              import java.util.List;
+              import java.util.Collections;
+              
+              class Test {
+                  void method() {
+                      List<Object> emptyList = Collections.emptyList();
+                      emptyList.size();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepStaticMethodClassField() {
+        rewriteRun(
+          spec -> spec.recipe(createRemoveMethodsRecipe("java.util.Collections emptyList()")),
+          // language=java
+          java(
+            """
+              import java.util.List;
+              import java.util.Collections;
+              
+              class Test {
+                  List<Object> emptyList = Collections.emptyList();
+                  void method() {
+                      emptyList.size();
                   }
               }
               """
