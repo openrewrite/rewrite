@@ -30,7 +30,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.junitpioneer.jupiter.SetSystemProperty;
 import org.openrewrite.*;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
@@ -1056,6 +1055,60 @@ class MavenPomDownloaderTest {
                   .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
                   .username("${env.ARTIFACTORY_USERNAME}")
                   .password("${env.ARTIFACTORY_USERNAME}")
+                  .build());
+
+                assertDoesNotThrow(() -> downloader.download(gav, null, null, repositories));
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Test
+        void pomNotFoundWithNoJarShouldThrow() {
+            var downloader = new MavenPomDownloader(emptyMap(), ctx);
+            var gav = new GroupArtifactVersion("fred", "fred", "1");
+            try (MockWebServer mockRepo = getMockServer()) {
+                mockRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest recordedRequest) {
+                        assert recordedRequest.getPath() != null;
+                        return new MockResponse().setResponseCode(404).setBody("");
+                    }
+                });
+                mockRepo.start();
+                var repositories = List.of(MavenRepository.builder()
+                  .id("id")
+                  .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                  .username("user")
+                  .password("pass")
+                  .build());
+
+                assertThrows(MavenDownloadingException.class,() -> downloader.download(gav, null, null, repositories));
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Test
+        void pomNotFoundWithJarFoundShouldntThrow() {
+            var downloader = new MavenPomDownloader(emptyMap(), ctx);
+            var gav = new GroupArtifactVersion("fred", "fred", "1");
+            try (MockWebServer mockRepo = getMockServer()) {
+                mockRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest recordedRequest) {
+                        assert recordedRequest.getPath() != null;
+                        if (recordedRequest.getPath().endsWith("fred/fred/1/fred-1.pom"))
+                            return new MockResponse().setResponseCode(404).setBody("");
+                        return new MockResponse().setResponseCode(200).setBody("some bytes so the jar isn't empty");
+                    }
+                });
+                mockRepo.start();
+                var repositories = List.of(MavenRepository.builder()
+                  .id("id")
+                  .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                  .username("user")
+                  .password("pass")
                   .build());
 
                 assertDoesNotThrow(() -> downloader.download(gav, null, null, repositories));
