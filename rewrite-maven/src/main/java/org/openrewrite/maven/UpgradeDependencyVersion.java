@@ -27,7 +27,6 @@ import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
-import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
@@ -151,7 +150,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         // if the resolved dependency exists AND it does not represent an artifact that was parsed
                         // as a source file, attempt to find a new version.
                         try {
-                            String newerVersion = MavenDependency.findNewerVersion(d.getGroupId(), d.getArtifactId(),  d.getVersion(), getResolutionResult(), metadataFailures,
+                            String newerVersion = MavenDependency.findNewerVersion(d.getGroupId(), d.getArtifactId(), d.getVersion(), getResolutionResult(), metadataFailures,
                                     versionComparator, ctx);
                             if (newerVersion != null) {
                                 Optional<Xml.Tag> version = tag.getChild("version");
@@ -202,7 +201,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator accumulator) {
         return new MavenIsoVisitor<ExecutionContext>() {
-            private final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
             private final VersionComparator versionComparator =
                     requireNonNull(Semver.validate(newVersion, versionPattern).getValue());
 
@@ -242,7 +240,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     return e.warn(t);
                 }
 
-                if (t != tag && PROJECT_MATCHER.matches(getCursor())) {
+                if (t != tag && isProjectTag()) {
                     maybeUpdateModel();
                     doAfterVisit(new RemoveRedundantDependencyVersions(groupId, artifactId, (RemoveRedundantDependencyVersions.Comparator) null, null).getVisitor());
                 }
@@ -300,10 +298,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         } else if (Boolean.TRUE.equals(overrideManagedVersion)) {
                             ResolvedManagedDependency dm = findManagedDependency(t);
                             // if a managed dependency is expressed as a property, change the property value
+                            // do this only when a requested bom is absent, otherwise changing property has no effect
                             if (dm != null &&
                                 dm.getRequested().getVersion() != null &&
                                 dm.getRequested().getVersion().startsWith("${") &&
-                                !implicitlyDefinedVersionProperties.contains(dm.getRequested().getVersion())) {
+                                !implicitlyDefinedVersionProperties.contains(dm.getRequested().getVersion()) &&
+                                dm.getRequestedBom() == null) {
                                 doAfterVisit(new ChangePropertyValue(dm.getRequested().getVersion().substring(2,
                                         dm.getRequested().getVersion().length() - 1),
                                         newerVersion, overrideManagedVersion, false).getVisitor());

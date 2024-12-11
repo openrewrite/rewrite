@@ -33,7 +33,6 @@ configurations.named("testImplementation").configure {
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-yaml"))
-    api(project(":rewrite-xml"))
 
     api("io.micrometer:micrometer-core:1.9.+")
     api("org.jetbrains:annotations:latest.release")
@@ -55,6 +54,10 @@ dependencies {
 
     api("com.fasterxml.jackson.core:jackson-annotations")
 
+    // these are required for now so that `ChangeType` and `ChangePackage` can use the `Reference` trait
+    runtimeOnly(project(":rewrite-properties"))
+    runtimeOnly(project(":rewrite-xml"))
+
     implementation("org.ow2.asm:asm:latest.release")
     implementation("org.ow2.asm:asm-util:latest.release")
 
@@ -64,6 +67,7 @@ dependencies {
     testRuntimeOnly(project(":rewrite-java-17"))
     testImplementation("com.tngtech.archunit:archunit:1.0.1")
     testImplementation("com.tngtech.archunit:archunit-junit5:1.0.1")
+    testImplementation("org.junit-pioneer:junit-pioneer:2.0.0")
 
     // For use in ClassGraphTypeMappingTest
     testRuntimeOnly("org.eclipse.persistence:org.eclipse.persistence.core:3.0.2")

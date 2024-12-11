@@ -80,7 +80,7 @@ public class MissingOptionExample extends Recipe {
                             }
                         }
 
-                        AddOrUpdateAnnotationAttribute addOrUpdateAnnotationAttribute = new AddOrUpdateAnnotationAttribute(ORG_OPENREWRITE_OPTION, "example", "TODO Provide a usage example for the docs", true);
+                        AddOrUpdateAnnotationAttribute addOrUpdateAnnotationAttribute = new AddOrUpdateAnnotationAttribute(ORG_OPENREWRITE_OPTION, "example", "TODO Provide a usage example for the docs", true, false);
                         return (J.Annotation) addOrUpdateAnnotationAttribute.getVisitor().visitNonNull(an, ctx, getCursor().getParent());
                     }
                 });

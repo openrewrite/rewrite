@@ -20,6 +20,7 @@ import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTree;
+import org.antlr.v4.runtime.tree.RuleNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
@@ -48,28 +49,28 @@ import static java.util.Collections.disjoint;
 public class JsonPathMatcher {
 
     private final String jsonPath;
+    private JsonPathParser.@Nullable JsonPathContext parsed;
 
     public JsonPathMatcher(String jsonPath) {
         this.jsonPath = jsonPath;
     }
 
     public <T> Optional<T> find(Cursor cursor) {
-        LinkedList<Tree> cursorPath = cursor.getPathAsStream()
-                .filter(o -> o instanceof Tree)
-                .map(Tree.class::cast)
-                .collect(Collectors.toCollection(LinkedList::new));
+        return find0(cursor, resolvedAncestors(cursor));
+    }
+
+    private <T> Optional<T> find0(Cursor cursor, List<Tree> cursorPath) {
         if (cursorPath.isEmpty()) {
             return Optional.empty();
         }
-        Collections.reverse(cursorPath);
 
         Tree start;
         if (jsonPath.startsWith(".") && !jsonPath.startsWith("..")) {
             start = cursor.getValue();
         } else {
-            start = cursorPath.peekFirst();
+            start = cursorPath.get(0);
         }
-        JsonPathParser.JsonPathContext ctx = jsonPath().jsonPath();
+        JsonPathParser.JsonPathContext ctx = parse();
         // The stop may be optimized by interpreting the ExpressionContext and pre-determining the last visit.
         JsonPathParser.ExpressionContext stop = (JsonPathParser.ExpressionContext) ctx.children.get(ctx.children.size() - 1);
         @SuppressWarnings("ConstantConditions") JsonPathParserVisitor<Object> v = new JsonPathParserHclVisitor(cursorPath, start, stop, false);
@@ -80,8 +81,8 @@ public class JsonPathMatcher {
     }
 
     public boolean matches(Cursor cursor) {
-        List<Object> cursorPath = cursor.getPathAsStream().collect(Collectors.toList());
-        return find(cursor).map(o -> {
+        List<Tree> cursorPath = resolvedAncestors(cursor);
+        return find0(cursor, cursorPath).map(o -> {
             if (o instanceof List) {
                 //noinspection unchecked
                 List<Object> l = (List<Object>) o;
@@ -90,6 +91,22 @@ public class JsonPathMatcher {
                 return Objects.equals(o, cursor.getValue());
             }
         }).orElse(false);
+    }
+
+    private static List<Tree> resolvedAncestors(Cursor cursor) {
+        ArrayDeque<Tree> deque = new ArrayDeque<>();
+        for (Iterator<Object> it = cursor.getPath(Tree.class::isInstance); it.hasNext(); ) {
+            Tree tree = (Tree) it.next();
+            deque.addFirst(tree);
+        }
+        return new ArrayList<>(deque);
+    }
+
+    private JsonPathParser.JsonPathContext parse() {
+        if (parsed == null) {
+            parsed = jsonPath().jsonPath();
+        }
+        return parsed;
     }
 
     private JsonPathParser jsonPath() {
@@ -119,6 +136,11 @@ public class JsonPathMatcher {
         @Override
         protected Object aggregateResult(Object aggregate, Object nextResult) {
             return (scope = nextResult);
+        }
+
+        @Override
+        protected boolean shouldVisitNextChild(RuleNode node, Object currentResult) {
+            return scope != null;
         }
 
         @Override

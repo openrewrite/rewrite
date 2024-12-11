@@ -25,6 +25,7 @@ import org.openrewrite.groovy.tree.GContainer;
 import org.openrewrite.groovy.tree.GRightPadded;
 import org.openrewrite.groovy.tree.GSpace;
 import org.openrewrite.java.JavaPrinter;
+import org.openrewrite.java.marker.CompactConstructor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
@@ -258,22 +259,52 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             return t;
         }
 
+
+        @Override
+        public J visitVariableDeclarations(J.VariableDeclarations multiVariable, PrintOutputCapture<P> p) {
+            beforeSyntax(multiVariable, Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
+            visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
+            visit(multiVariable.getLeadingAnnotations(), p);
+            for (J.Modifier m : multiVariable.getModifiers()) {
+                visitModifier(m, p);
+            }
+            multiVariable.getMarkers().findFirst(RedundantDef.class).ifPresent(def -> {
+                visitSpace(def.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p);
+                p.append("def");
+            });
+            visit(multiVariable.getTypeExpression(), p);
+            // For backwards compatibility.
+            for (JLeftPadded<Space> dim : multiVariable.getDimensionsBeforeName()) {
+                visitSpace(dim.getBefore(), Space.Location.DIMENSION_PREFIX, p);
+                p.append('[');
+                visitSpace(dim.getElement(), Space.Location.DIMENSION, p);
+                p.append(']');
+            }
+            if (multiVariable.getVarargs() != null) {
+                visitSpace(multiVariable.getVarargs(), Space.Location.VARARGS, p);
+                p.append("...");
+            }
+            visitRightPadded(multiVariable.getPadding().getVariables(), JRightPadded.Location.NAMED_VARIABLE, ",", p);
+            afterSyntax(multiVariable, p);
+            return multiVariable;
+        }
+
         @Override
         public J visitLambda(J.Lambda lambda, PrintOutputCapture<P> p) {
             beforeSyntax(lambda, Space.Location.LAMBDA_PREFIX, p);
             LambdaStyle ls = lambda.getMarkers().findFirst(LambdaStyle.class)
                     .orElse(new LambdaStyle(null, false, !lambda.getParameters().getParameters().isEmpty()));
             boolean parenthesized = lambda.getParameters().isParenthesized();
-            if(!ls.isJavaStyle()) {
+            if (!ls.isJavaStyle()) {
                 p.append('{');
             }
             visitMarkers(lambda.getParameters().getMarkers(), p);
             visitSpace(lambda.getParameters().getPrefix(), Space.Location.LAMBDA_PARAMETERS_PREFIX, p);
-            if(parenthesized) {
+            if (parenthesized) {
                 p.append('(');
             }
             visitRightPadded(lambda.getParameters().getPadding().getParameters(), JRightPadded.Location.LAMBDA_PARAM, ",", p);
-            if(parenthesized) {
+            if (parenthesized) {
                 p.append(')');
             }
             if (ls.isArrow()) {
@@ -287,7 +318,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             } else {
                 visit(lambda.getBody(), p);
             }
-            if(!ls.isJavaStyle()) {
+            if (!ls.isJavaStyle()) {
                 p.append('}');
             }
             afterSyntax(lambda, p);
@@ -329,6 +360,40 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
+        public J visitMethodDeclaration(J.MethodDeclaration method, PrintOutputCapture<P> p) {
+            beforeSyntax(method, Space.Location.METHOD_DECLARATION_PREFIX, p);
+            visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
+            visit(method.getLeadingAnnotations(), p);
+            for (J.Modifier m : method.getModifiers()) {
+                visitModifier(m, p);
+            }
+            J.TypeParameters typeParameters = method.getAnnotations().getTypeParameters();
+            if (typeParameters != null) {
+                visit(typeParameters.getAnnotations(), p);
+                visitSpace(typeParameters.getPrefix(), Space.Location.TYPE_PARAMETERS, p);
+                visitMarkers(typeParameters.getMarkers(), p);
+                p.append('<');
+                visitRightPadded(typeParameters.getPadding().getTypeParameters(), JRightPadded.Location.TYPE_PARAMETER, ",", p);
+                p.append('>');
+            }
+            method.getMarkers().findFirst(RedundantDef.class).ifPresent(def -> {
+                visitSpace(def.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p);
+                p.append("def");
+            });
+            visit(method.getReturnTypeExpression(), p);
+            visit(method.getAnnotations().getName().getAnnotations(), p);
+            visit(method.getName(), p);
+            if (!method.getMarkers().findFirst(CompactConstructor.class).isPresent()) {
+                visitContainer("(", method.getPadding().getParameters(), JContainer.Location.METHOD_DECLARATION_PARAMETERS, ",", ")", p);
+            }
+            visitContainer("throws", method.getPadding().getThrows(), JContainer.Location.THROWS, ",", null, p);
+            visit(method.getBody(), p);
+            visitLeftPadded("default", method.getPadding().getDefaultValue(), JLeftPadded.Location.METHOD_DECLARATION_DEFAULT_VALUE, p);
+            afterSyntax(method, p);
+            return method;
+        }
+
+        @Override
         public J visitMethodInvocation(J.MethodInvocation method, PrintOutputCapture<P> p) {
             beforeSyntax(method, Space.Location.METHOD_INVOCATION_PREFIX, p);
 
@@ -353,29 +418,32 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
 
             visitSpace(argContainer.getBefore(), Space.Location.METHOD_INVOCATION_ARGUMENTS, p);
             List<JRightPadded<Expression>> args = argContainer.getPadding().getElements();
+            boolean argsAreAllClosures = args.stream().allMatch(it -> it.getElement() instanceof J.Lambda);
+            boolean hasParentheses = true;
+            boolean applyTrailingLambdaParenthese = true;
             for (int i = 0; i < args.size(); i++) {
                 JRightPadded<Expression> arg = args.get(i);
-                boolean omitParens = arg.getElement().getMarkers()
-                                             .findFirst(OmitParentheses.class)
-                                             .isPresent() ||
-                                     arg.getElement().getMarkers()
-                                             .findFirst(org.openrewrite.java.marker.OmitParentheses.class)
-                                             .isPresent();
+                boolean omitParensCurrElem = arg.getElement().getMarkers().findFirst(OmitParentheses.class).isPresent() ||
+                        arg.getElement().getMarkers().findFirst(org.openrewrite.java.marker.OmitParentheses.class).isPresent();
 
-                if (i == 0 && !omitParens) {
-                    p.append('(');
-                } else if (i > 0 && omitParens && (
-                        !args.get(0).getElement().getMarkers().findFirst(OmitParentheses.class).isPresent() &&
-                        !args.get(0).getElement().getMarkers().findFirst(org.openrewrite.java.marker.OmitParentheses.class).isPresent()
-                )) {
-                    p.append(')');
-                } else if (i > 0) {
+                if (i == 0) {
+                    if (omitParensCurrElem) {
+                        hasParentheses = false;
+                    } else {
+                        p.append('(');
+                    }
+                }  else if (hasParentheses && omitParensCurrElem) { // first trailing lambda, eg: `stage('Build..') {}`, should close the method
+                    if (applyTrailingLambdaParenthese) { // apply once, to support multiple closures: `foo("baz") {} {}
+                        p.append(')');
+                        applyTrailingLambdaParenthese = false;
+                    }
+                } else if (hasParentheses || !argsAreAllClosures) {
                     p.append(',');
                 }
 
                 visitRightPadded(arg, JRightPadded.Location.METHOD_INVOCATION_ARGUMENT, p);
 
-                if (i == args.size() - 1 && !omitParens) {
+                if (i == args.size() - 1 && !omitParensCurrElem) {
                     p.append(')');
                 }
             }

@@ -46,7 +46,10 @@ public class CreateYamlFile extends ScanningRecipe<AtomicBoolean> {
     @Language("yml")
     @Option(displayName = "File contents",
             description = "Multiline text content for the file.",
-            example = "a:\nproperty: value\nanother:\nproperty: value",
+            example = "a:\n" +
+                      "  property: value\n" +
+                      "another:\n" +
+                      "  property: value",
             required = false)
     @Nullable
     String fileContents;

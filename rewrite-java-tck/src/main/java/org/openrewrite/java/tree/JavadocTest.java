@@ -1616,14 +1616,14 @@ class JavadocTest implements RewriteTest {
     void paramNoDescriptionWithCRLF() {
         rewriteRun(
           java("" +
-                          "import org.foo;\r\n" +
-                          "\r\n" +
-                          "public class A {\r\n" +
-                          "    /**\r\n" +
-                          "     * @param arg0\r\n" +
-                          "     */\r\n" +
-                          "    void method(String arg0) {}\r\n" +
-                          "}"
+               "import org.foo;\r\n" +
+               "\r\n" +
+               "public class A {\r\n" +
+               "    /**\r\n" +
+               "     * @param arg0\r\n" +
+               "     */\r\n" +
+               "    void method(String arg0) {}\r\n" +
+               "}"
           )
         );
     }
@@ -1662,7 +1662,7 @@ class JavadocTest implements RewriteTest {
         rewriteRun(
           java("" +
             "/**\n" +
-            " * <p>Values are converted to strings using {@link java.util.Arrays#compare(Comparable[], Comparable[])}}.\n" +
+            " * <p>Values are converted to strings using {@link java.util.Arrays#compare(Comparable[], Comparable[])}.\n" +
             " */\n" +
             "class A {}"
           )
@@ -1751,7 +1751,6 @@ class JavadocTest implements RewriteTest {
               /**
                * DEFINE TENANCY TenantB AS <TenantB OCID>
                * ENDORSE GROUP <TenantA user group name> TO {OBJECTSTORAGE_NAMESPACE_READ} IN TENANCY TenantB
-               *
                * DEFINE TENANCY TenantA AS <TenantA OCID>
                * DEFINE GROUP TenantAGroup AS <TenantA user group OCID>
                * ADMIT GROUP TenantAGroup OF TENANCY TenantA TO {OBJECTSTORAGE_NAMESPACE_READ} IN TENANCY

@@ -27,6 +27,7 @@ import java.util.Objects;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
+@SuppressWarnings({"GrUnnecessaryDefModifier", "GrMethodMayBeStatic"})
 class MethodDeclarationTest implements RewriteTest {
 
     @Test
@@ -174,6 +175,21 @@ class MethodDeclarationTest implements RewriteTest {
             """
               def 'some test scenario description'() {}
               'some test scenario description'()
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4705")
+    @Test
+    void functionWithDefAndExplicitReturnType() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  def /*int*/ int one() { 1 }
+                  def /*Object*/ Object two() { 2 }
+              }
               """
           )
         );
