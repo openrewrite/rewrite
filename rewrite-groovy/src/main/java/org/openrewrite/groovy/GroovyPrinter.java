@@ -419,7 +419,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             visitSpace(argContainer.getBefore(), Space.Location.METHOD_INVOCATION_ARGUMENTS, p);
             List<JRightPadded<Expression>> args = argContainer.getPadding().getElements();
             boolean argsAreAllClosures = args.stream().allMatch(it -> it.getElement() instanceof J.Lambda);
-            boolean omitParentheses = false;
+            boolean hasParentheses = true;
             boolean applyTrailingLambdaParenthese = true;
             for (int i = 0; i < args.size(); i++) {
                 JRightPadded<Expression> arg = args.get(i);
@@ -428,16 +428,16 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
 
                 if (i == 0) {
                     if (omitParensCurrElem) {
-                        omitParentheses = true;
+                        hasParentheses = false;
                     } else {
                         p.append('(');
                     }
-                }  else if (!omitParentheses && omitParensCurrElem) { // first trailing lambda, eg: `stage('Build..') {}`, should close the method
+                }  else if (hasParentheses && omitParensCurrElem) { // first trailing lambda, eg: `stage('Build..') {}`, should close the method
                     if (applyTrailingLambdaParenthese) { // apply once, to support multiple closures: `foo("baz") {} {}
                         p.append(')');
                         applyTrailingLambdaParenthese = false;
                     }
-                } else if (!(omitParentheses && argsAreAllClosures)) {
+                } else if (hasParentheses || !argsAreAllClosures) {
                     p.append(',');
                 }
 
