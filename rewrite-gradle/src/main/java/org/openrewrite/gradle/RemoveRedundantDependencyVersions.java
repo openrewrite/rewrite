@@ -28,6 +28,7 @@ import org.openrewrite.gradle.util.DependencyStringNotationConverter;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -37,7 +38,10 @@ import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.ResolvedPom;
-import org.openrewrite.semver.*;
+import org.openrewrite.semver.ExactVersion;
+import org.openrewrite.semver.LatestIntegration;
+import org.openrewrite.semver.Semver;
+import org.openrewrite.semver.VersionComparator;
 
 import java.util.*;
 
@@ -98,7 +102,6 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        DependencyMatcher dependencyMatcher = new DependencyMatcher(groupPattern == null ? "*" : groupPattern, artifactPattern == null ? "*" : artifactPattern, null);
         return Preconditions.check(
                 new IsBuildGradle<>(),
                 new GroovyIsoVisitor<ExecutionContext>() {
@@ -197,14 +200,17 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                         J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
-                        Optional<GradleDependency> maybeGradleDependency = new GradleDependency.Matcher().get(getCursor());
+                        Optional<GradleDependency> maybeGradleDependency = new GradleDependency.Matcher()
+                                .groupId(groupPattern)
+                                .artifactId(artifactPattern)
+                                .get(getCursor());
                         if (!maybeGradleDependency.isPresent()) {
                             return m;
                         }
 
                         GradleDependency gradleDependency = maybeGradleDependency.get();
                         ResolvedDependency d = gradleDependency.getResolvedDependency();
-                        if (!dependencyMatcher.matches(d.getGroupId(), d.getArtifactId())) {
+                        if (StringUtils.isBlank(d.getVersion())) {
                             return m;
                         }
 
@@ -216,12 +222,15 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                 }
                             }
                         }
-                        for (GradleDependencyConfiguration configuration : gp.getConfiguration(m.getSimpleName()).allExtendsFrom()) {
-                            if (platforms.containsKey(configuration.getName())) {
-                                for (ResolvedPom platform : platforms.get(configuration.getName())) {
-                                    String managedVersion = platform.getManagedVersion(d.getGroupId(), d.getArtifactId(), null, d.getRequested().getClassifier());
-                                    if (matchesComparator(managedVersion, d.getVersion())) {
-                                        return maybeRemoveVersion(m);
+                        GradleDependencyConfiguration gdc = gp.getConfiguration(m.getSimpleName());
+                        if (gdc != null) {
+                            for (GradleDependencyConfiguration configuration : gdc.allExtendsFrom()) {
+                                if (platforms.containsKey(configuration.getName())) {
+                                    for (ResolvedPom platform : platforms.get(configuration.getName())) {
+                                        String managedVersion = platform.getManagedVersion(d.getGroupId(), d.getArtifactId(), null, d.getRequested().getClassifier());
+                                        if (matchesComparator(managedVersion, d.getVersion())) {
+                                            return maybeRemoveVersion(m);
+                                        }
                                     }
                                 }
                             }
