@@ -233,10 +233,20 @@ public class GitRemoteTest {
     }
 
     @Test
+    void shouldNotReplaceExistingWellKnownServer(){
+        GitRemote.Parser parser = new GitRemote.Parser()
+          .registerRemote(GitRemote.Service.GitHub, URI.create("https://github.com"), List.of(URI.create("ssh://notgithub.com")));
+
+        assertThat(parser.findRemoteServer("github.com").getUris())
+          .containsExactlyInAnyOrder(URI.create("https://github.com"), URI.create("ssh://github.com"));
+    }
+
+    @Test
     void findRemote() {
         GitRemote.Parser parser = new GitRemote.Parser()
           .registerRemote(GitRemote.Service.Bitbucket, URI.create("scm.company.com/stash"), Collections.emptyList());
         assertThat(parser.findRemoteServer("github.com").getService()).isEqualTo(GitRemote.Service.GitHub);
+        assertThat(parser.findRemoteServer("https://github.com").getService()).isEqualTo(GitRemote.Service.GitHub);
         assertThat(parser.findRemoteServer("gitlab.com").getService()).isEqualTo(GitRemote.Service.GitLab);
         assertThat(parser.findRemoteServer("bitbucket.org").getService()).isEqualTo(GitRemote.Service.BitbucketCloud);
         assertThat(parser.findRemoteServer("dev.azure.com").getService()).isEqualTo(GitRemote.Service.AzureDevOps);
