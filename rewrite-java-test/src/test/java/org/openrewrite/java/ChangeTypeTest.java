@@ -25,6 +25,7 @@ import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
+import org.openrewrite.test.TypeValidation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -2072,10 +2073,12 @@ class ChangeTypeTest implements RewriteTest {
           properties(
             """
               a.property=java.lang.String
+              c.property=java.lang.StringBuilder
               b.property=String
               """,
             """
               a.property=java.lang.Integer
+              c.property=java.lang.StringBuilder
               b.property=String
               """, spec -> spec.path("application.properties"))
         );
@@ -2101,6 +2104,56 @@ class ChangeTypeTest implements RewriteTest {
                   d: String
               """,
             spec -> spec.path("application.yaml")
+          )
+        );
+    }
+
+    @Test
+    void testRecipe() {
+        // language=java
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.all())
+            .recipe(new ChangeType("org.codehaus.jackson.annotate.JsonIgnoreProperties", "com.fasterxml.jackson.annotation.JsonIgnoreProperties", false))
+            .parser(JavaParser.fromJavaVersion()
+              .dependsOn(
+                """
+                  package org.codehaus.jackson.annotate;
+                  public @interface JsonIgnoreProperties {
+                      boolean ignoreUnknown() default false;
+                  }
+                  """,
+                """
+                  package org.codehaus.jackson.annotate;
+                  public @interface JsonIgnore {
+                  }
+                  """
+              )
+            ),
+          java(
+            """
+              import org.codehaus.jackson.annotate.JsonIgnore;
+              import org.codehaus.jackson.annotate.JsonIgnoreProperties;
+              
+              @JsonIgnoreProperties(ignoreUnknown = true)
+              public class myClass {
+                  @JsonIgnore
+                  public boolean isDirty() {
+                      return false;
+                  }
+              }
+              """,
+            """
+              import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+              import org.codehaus.jackson.annotate.JsonIgnore;
+              
+              @JsonIgnoreProperties(ignoreUnknown = true)
+              public class myClass {
+                  @JsonIgnore
+                  public boolean isDirty() {
+                      return false;
+                  }
+              }
+              """
           )
         );
     }
