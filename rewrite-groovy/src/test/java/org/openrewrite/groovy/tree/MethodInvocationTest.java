@@ -35,11 +35,6 @@ class MethodInvocationTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
-              copySpec {
-                  from { 'src/main/webapp' } { exclude "**/*.jpg" }
-                  rename '(.+)-staging(.+)', '$1$2'
-              }
 
               dependencies {
                   implementation 'org.hibernate:hibernate-core:3.6.7.Final'
@@ -200,6 +195,20 @@ class MethodInvocationTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/4766")
     @Test
+    void gradleFileWithMultipleClosuresWithoutParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              copySpec {
+                  from { 'src/main/webapp' } { exclude "**/*.jpg" }
+                  rename '(.+)-staging(.+)', '$1$2'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void multipleClosureArgumentsWithoutParentheses() {
         rewriteRun(
           groovy(
@@ -212,7 +221,6 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/4766")
     @Test
     void multipleClosureArgumentsWithParentheses() {
         rewriteRun(
@@ -226,7 +234,6 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/4766")
     @Test
     void multipleArgumentsWithClosuresAndNonClosuresWithoutParentheses() {
         rewriteRun(
@@ -240,7 +247,6 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/4766")
     @Test
     void trailingClosures() {
         rewriteRun(
