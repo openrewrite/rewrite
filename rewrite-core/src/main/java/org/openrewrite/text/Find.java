@@ -28,6 +28,7 @@ import org.openrewrite.table.TextMatches;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -91,6 +92,18 @@ public class Find extends Recipe {
     @Nullable
     String filePattern;
 
+    private static LinkedList<Integer> findAllNewLineIndexes(String input) {
+        LinkedList<Integer> indexes = new LinkedList<>();
+        int index = input.indexOf('\n'); // Find the first occurrence
+
+        while (index != -1) {
+            indexes.add(index); // Add the index to the list
+            index = input.indexOf('\n', index + 1); // Find the next occurrence
+        }
+
+        return indexes;
+    }
+
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
 
@@ -123,24 +136,38 @@ public class Find extends Recipe {
                     return sourceFile;
                 }
                 matcher.reset();
+
+                String sourceFilePath = sourceFile.getSourcePath().toString();
+
                 List<PlainText.Snippet> snippets = new ArrayList<>();
                 int previousEnd = 0;
+
+                LinkedList<Integer> newlineIndexes = findAllNewLineIndexes(rawText);
+                int lastNewLineIndex = -1;
+
                 while (matcher.find()) {
                     int matchStart = matcher.start();
                     snippets.add(snippet(rawText.substring(previousEnd, matchStart)));
                     snippets.add(SearchResult.found(snippet(rawText.substring(matchStart, matcher.end()))));
                     previousEnd = matcher.end();
 
-                    int startLine = Math.max(0, rawText.substring(0, matchStart).lastIndexOf('\n') + 1);
+                    while (!newlineIndexes.isEmpty() && newlineIndexes.peek() < matchStart) {
+                        lastNewLineIndex = newlineIndexes.pop();
+                    }
+                    int startLine = Math.max(0, lastNewLineIndex + 1);
+
                     int endLine = rawText.indexOf('\n', matcher.end());
                     if (endLine == -1) {
                         endLine = rawText.length();
                     }
 
                     textMatches.insertRow(ctx, new TextMatches.Row(
-                            sourceFile.getSourcePath().toString(),
-                            rawText.substring(startLine, matcher.start()) + "~~>" +
-                            rawText.substring(matcher.start(), endLine)
+                            sourceFilePath,
+                            new StringBuilder(endLine - startLine + 3)
+                                    .append(rawText, startLine, matcher.start())
+                                    .append("~~>")
+                                    .append(rawText, matcher.start(), endLine)
+                                    .toString()
                     ));
                 }
                 snippets.add(snippet(rawText.substring(previousEnd)));
@@ -160,8 +187,8 @@ public class Find extends Recipe {
         return visitor;
     }
 
-
     private static PlainText.Snippet snippet(String text) {
         return new PlainText.Snippet(Tree.randomId(), Markers.EMPTY, text);
     }
+
 }
