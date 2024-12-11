@@ -70,6 +70,18 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
+    void noParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              def foo(String a, String b, String c, String d) {}
+              foo "a", "b", "c", "d"
+              """
+          )
+        );
+    }
+
+    @Test
     @SuppressWarnings("GroovyVariableNotAssigned")
     void nullSafeDereference() {
         rewriteRun(
@@ -179,6 +191,35 @@ class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4766")
+    @Test
+    void multipleClosureArguments() {
+        rewriteRun(
+          groovy(
+            """
+              def acceptsClosure(Closure a, Closure b) {}
+              acceptsClosure { println(it) } {
+                  println(it)
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4766")
+    @Test
+    void multipleArgumentsWithClosuresAndNonClosuresWithoutParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              def combination(String a, Closure b, Closure c, String d) {}
+              combination "a", { println(it) }, { println(it) }, "d"
+              """
+          )
+        );
+    }
+
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1236")
     @Test
