@@ -2189,12 +2189,8 @@ public class GroovyParserVisitor {
         } else {
             throw new IllegalStateException("Ran into unknown or unimplemented identifier at " + leftover.substring(0, 10));
         }
-        int saveCursor = cursor;
-        Space space = whitespace();
-        if (source.substring(cursor).startsWith(variableName)) {
-            cursor = saveCursor;
-        } else {
-            retVal += space.getWhitespace();
+        if (!source.substring(indexOfNextNonWhitespace(cursor, source)).startsWith(variableName)) {
+            retVal += whitespace().getWhitespace();
             retVal += getKeyword(variableName);
         }
         return retVal;
