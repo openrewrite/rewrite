@@ -45,11 +45,10 @@ public class JavaParserExecutionContextView extends DelegatingExecutionContext {
     public File getParserClasspathDownloadTarget() {
         File target = getMessage(PARSER_CLASSPATH_DOWNLOAD_LOCATION);
         if (target == null) {
-            File defaultTarget = new File(System.getProperty("user.home") + "/.rewrite/classpath");
-            if (!defaultTarget.mkdirs() && !defaultTarget.exists()) {
-                throw new UncheckedIOException(new IOException("Failed to create directory " + defaultTarget.getAbsolutePath()));
-            }
-            return defaultTarget;
+            target = new File(System.getProperty("user.home") + "/.rewrite/classpath");
+        }
+        if (!target.mkdirs() && !target.exists()) {
+            throw new UncheckedIOException(new IOException("Failed to create directory " + target.getAbsolutePath()));
         }
         return target;
     }
