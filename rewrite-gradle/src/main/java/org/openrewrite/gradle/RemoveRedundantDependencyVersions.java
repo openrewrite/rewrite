@@ -121,8 +121,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                             final MethodMatcher enforcedPlatformMatcher = new MethodMatcher("org.gradle.api.artifacts.dsl.DependencyHandler enforcedPlatform(..)");
 
                             @Override
-                            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
-                                J.MethodInvocation m = super.visitMethodInvocation(method, p);
+                            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                                 if (!platformMatcher.matches(m) && !enforcedPlatformMatcher.matches(m)) {
                                     return m;
                                 }
@@ -134,10 +134,10 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                     }
 
                                     Dependency dependency = DependencyStringNotationConverter.parse((String) l.getValue());
-                                    MavenPomDownloader mpd = new MavenPomDownloader(p);
+                                    MavenPomDownloader mpd = new MavenPomDownloader(ctx);
                                     try {
                                         ResolvedPom platformPom = mpd.download(new GroupArtifactVersion(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion()), null, null, gp.getMavenRepositories())
-                                                .resolve(Collections.emptyList(), mpd, p);
+                                                .resolve(Collections.emptyList(), mpd, ctx);
                                         platforms.computeIfAbsent(getCursor().getParent(1).firstEnclosing(J.MethodInvocation.class).getSimpleName(), k -> new ArrayList<>()).add(platformPom);
                                     } catch (MavenDownloadingException e) {
                                         return m;
@@ -180,10 +180,10 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                         return m;
                                     }
 
-                                    MavenPomDownloader mpd = new MavenPomDownloader(p);
+                                    MavenPomDownloader mpd = new MavenPomDownloader(ctx);
                                     try {
                                         ResolvedPom platformPom = mpd.download(new GroupArtifactVersion(groupId, artifactId, version), null, null, gp.getMavenRepositories())
-                                                .resolve(Collections.emptyList(), mpd, p);
+                                                .resolve(Collections.emptyList(), mpd, ctx);
                                         platforms.computeIfAbsent(getCursor().getParent(1).firstEnclosing(J.MethodInvocation.class).getSimpleName(), k -> new ArrayList<>()).add(platformPom);
                                     } catch (MavenDownloadingException e) {
                                         return m;
