@@ -26,10 +26,7 @@ import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
 import org.openrewrite.table.TextMatches;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -92,10 +89,14 @@ public class Find extends Recipe {
     @Nullable
     String filePattern;
 
-    private static LinkedList<Integer> findAllNewLineIndexes(String input) {
-        LinkedList<Integer> indexes = new LinkedList<>();
-        int index = input.indexOf('\n'); // Find the first occurrence
+    private static Deque<Integer> findAllNewLineIndexes(String input, int offset) {
+        ArrayDeque<Integer> indexes = new ArrayDeque<>();
+        int index = input.lastIndexOf('\n', offset); // Find the first occurrence
+        if (index != -1) {
+            indexes.add(index);
+        }
 
+        index = input.indexOf('\n', offset); // Find occurrence after the offset
         while (index != -1) {
             indexes.add(index); // Add the index to the list
             index = input.indexOf('\n', index + 1); // Find the next occurrence
@@ -142,12 +143,12 @@ public class Find extends Recipe {
                 List<PlainText.Snippet> snippets = new ArrayList<>();
                 int previousEnd = 0;
 
-                LinkedList<Integer> newlineIndexes = null;
+                Deque<Integer> newlineIndexes = null;
                 int lastNewLineIndex = -1;
 
                 while (matcher.find()) {
                     if (newlineIndexes == null) {
-                        newlineIndexes = findAllNewLineIndexes(rawText);
+                        newlineIndexes = findAllNewLineIndexes(rawText, matcher.start());
                     }
 
                     int matchStart = matcher.start();
