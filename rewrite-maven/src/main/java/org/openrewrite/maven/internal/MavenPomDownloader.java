@@ -567,37 +567,47 @@ public class MavenPomDownloader {
 
                     try {
                         File f = new File(uri);
+                        File jar = f.toPath().resolveSibling(gav.getArtifactId() + '-' + versionMaybeDatedSnapshot + ".jar").toFile();
 
                         //NOTE: The pom may exist without a .jar artifact if the pom packaging is "pom"
-                        if (!f.exists()) {
+                        //      a jar may also exists without a pom
+                        if (!f.exists() && !jar.exists()) {
                             continue;
                         }
 
-                        try (FileInputStream fis = new FileInputStream(f)) {
-                            RawPom rawPom = RawPom.parse(fis, Objects.equals(versionMaybeDatedSnapshot, gav.getVersion()) ? null : versionMaybeDatedSnapshot);
-                            Pom pom = rawPom.toPom(inputPath, repo).withGav(resolvedGav);
-
-                            if (pom.getPackaging() == null || pom.hasJarPackaging()) {
-                                File jar = f.toPath().resolveSibling(gav.getArtifactId() + '-' + versionMaybeDatedSnapshot + ".jar").toFile();
-                                if (!jar.exists() || jar.length() == 0) {
-                                    // The jar has not been downloaded, making this dependency unusable.
-                                    continue;
-                                }
+                        RawPom rawPom;
+                        if (f.exists()) {
+                            try (FileInputStream fis = new FileInputStream(f)) {
+                                rawPom = RawPom.parse(fis, Objects.equals(versionMaybeDatedSnapshot, gav.getVersion()) ? null : versionMaybeDatedSnapshot);
                             }
-
-                            if (repo.getUri().equals(MavenRepository.MAVEN_LOCAL_DEFAULT.getUri())) {
-                                // so that the repository path is the same regardless of username
-                                pom = pom.withRepository(MavenRepository.MAVEN_LOCAL_USER_NEUTRAL);
-                            }
-
-                            if (!Objects.equals(versionMaybeDatedSnapshot, pom.getVersion())) {
-                                pom = pom.withGav(pom.getGav().withDatedSnapshotVersion(versionMaybeDatedSnapshot));
-                            }
-                            mavenCache.putPom(resolvedGav, pom);
-                            ctx.getResolutionListener().downloadSuccess(resolvedGav, containingPom);
-                            sample.stop(timer.tags("outcome", "from maven local").register(Metrics.globalRegistry));
-                            return pom;
+                        } else {
+                            // infer rawPom from jar
+                            rawPom = new RawPom(null, null, gav.getGroupId(), gav.getArtifactId(), gav.getVersion(), null,
+                                    null, null, null, "jar", null, null, null,
+                                    null, null, null, null, null, null);
                         }
+
+                        Pom pom = rawPom.toPom(inputPath, repo).withGav(resolvedGav);
+
+                        if (pom.getPackaging() == null || pom.hasJarPackaging()) {
+                            if (!jar.exists() || jar.length() == 0) {
+                                // The jar has not been downloaded, making this dependency unusable.
+                                continue;
+                            }
+                        }
+
+                        if (repo.getUri().equals(MavenRepository.MAVEN_LOCAL_DEFAULT.getUri())) {
+                            // so that the repository path is the same regardless of username
+                            pom = pom.withRepository(MavenRepository.MAVEN_LOCAL_USER_NEUTRAL);
+                        }
+
+                        if (!Objects.equals(versionMaybeDatedSnapshot, pom.getVersion())) {
+                            pom = pom.withGav(pom.getGav().withDatedSnapshotVersion(versionMaybeDatedSnapshot));
+                        }
+                        mavenCache.putPom(resolvedGav, pom);
+                        ctx.getResolutionListener().downloadSuccess(resolvedGav, containingPom);
+                        sample.stop(timer.tags("outcome", "from maven local").register(Metrics.globalRegistry));
+                        return pom;
                     } catch (IOException e) {
                         // unable to read the pom from a file-based repository.
                         repositoryResponses.put(repo, e.getMessage());
@@ -638,13 +648,8 @@ public class MavenPomDownloader {
         }
         ctx.getResolutionListener().downloadError(gav, uris, (containingPom == null) ? null : containingPom.getRequested());
         sample.stop(timer.tags("outcome", "unavailable").register(Metrics.globalRegistry));
-        if (allowPomDownloadFailure()) {
-            ResolvedGroupArtifactVersion dummy = new ResolvedGroupArtifactVersion(null, gav.getGroupId(), gav.getArtifactId(), gav.getVersion(), null);
-            return new Pom(null, null, null, dummy, null, null, null, null, null, null, null, null, null, null, null, null, null);
-        } else {
-            throw new MavenDownloadingException("Unable to download POM: " + gav + '.', null, originalGav)
+        throw new MavenDownloadingException("Unable to download POM: " + gav + '.', null, originalGav)
                     .setRepositoryResponses(repositoryResponses);
-        }
     }
 
     /**

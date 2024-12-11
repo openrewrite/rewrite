@@ -598,7 +598,7 @@ class MavenPomDownloaderTest {
             Files.createDirectories(localArtifact.resolve("1"));
 
             Path localJar = localRepository.resolve("com/some/some-artifact/1/some-artifact-1.jar");
-            Files.writeString(localJar, "");
+            Files.writeString(localJar, "some content not to be emtpy");
 
             MavenRepository mavenLocal = MavenRepository.builder()
               .id("local")
