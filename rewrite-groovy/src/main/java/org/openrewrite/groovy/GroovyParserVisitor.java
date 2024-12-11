@@ -885,9 +885,12 @@ public class GroovyParserVisitor {
         }
 
         public boolean endsWithClosures(List<org.codehaus.groovy.ast.expr.Expression> list) {
-            boolean foundNonClosure = false;
+            if (!(list.get(list.size() - 1) instanceof ClosureExpression)) {
+                return false;
+            }
 
-            for (int i = list.size() - 1; i >= 0; i--) {
+            boolean foundNonClosure = false;
+            for (int i = list.size() - 2; i >= 0; i--) {
                 if (list.get(i) instanceof ClosureExpression) {
                     if (foundNonClosure) {
                         return false;
@@ -897,7 +900,7 @@ public class GroovyParserVisitor {
                 }
             }
 
-            return list.get(list.size() - 1) instanceof ClosureExpression;
+            return true;
         }
 
         @Override
