@@ -116,6 +116,14 @@ public class GitRemote {
             return buildUri(remote.service, remote.origin, remote.path, protocol);
         }
 
+        /**
+         * Build a {@link URI} clone url from components, if that protocol is supported (configured) by the matched server
+         * @param service  the type of SCM service
+         * @param origin   the origin of the SCM service, any protocol will be stripped (and not used for matching)
+         * @param path     the path to the repository
+         * @param protocol the protocol to use. Supported protocols: ssh, http, https
+         * @return
+         */
         public URI buildUri(Service service, String origin, String path, String protocol) {
             if (!ALLOWED_PROTOCOLS.contains(protocol)) {
                 throw new IllegalArgumentException("Invalid protocol: " + protocol + ". Must be one of: " + ALLOWED_PROTOCOLS);
@@ -207,11 +215,17 @@ public class GitRemote {
             return this;
         }
 
+        /**
+         * Find a registered remote server by an origin.
+         * @param origin the origin of the server. Any protocol will be stripped (and not used to match)
+         * @return The server if found, or an unknown type server with a normalized url/origin if not found.
+         */
         public RemoteServer findRemoteServer(String origin) {
-            return servers.stream().filter(server -> server.origin.equalsIgnoreCase(origin))
+            String strippedOrigin = stripProtocol(origin);
+            return servers.stream().filter(server -> server.origin.equalsIgnoreCase(strippedOrigin))
                     .findFirst()
                     .orElseGet(() -> {
-                        URI normalizedUri = normalize(origin);
+                        URI normalizedUri = normalize(strippedOrigin);
                         String normalizedOrigin = normalizedUri.getHost() + maybePort(normalizedUri.getPort(), normalizedUri.getScheme());
                         return new RemoteServer(Service.Unknown, normalizedOrigin, normalizedUri);
                     });
