@@ -146,11 +146,6 @@ public class MavenPomDownloader {
         this.mirrors = this.ctx.getMirrors(this.ctx.getSettings());
     }
 
-    private boolean allowPomDownloadFailure() {
-        final String propertyValue = System.getProperty("org.openrewrite.allowPomDownloadFailure");
-        return propertyValue != null && !propertyValue.equalsIgnoreCase("false");
-    }
-
     byte[] sendRequest(HttpSender.Request request) throws IOException, HttpSenderResponseException {
         long start = System.nanoTime();
         try {
