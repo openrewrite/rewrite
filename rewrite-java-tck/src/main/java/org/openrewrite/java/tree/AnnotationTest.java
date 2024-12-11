@@ -435,7 +435,7 @@ class AnnotationTest implements RewriteTest {
                 JavaType.Annotation a = (JavaType.Annotation) type.getAnnotations().get(0);
                 assertThat(a.getValues()).satisfiesExactly(
                   v -> {
-                      assertThat(a.getMethods()).contains(v.getElement());
+                      assertThat(v.getElement()).isIn(a.getMethods());
                       assertThat((List<JavaType.Annotation>) (((JavaType.Annotation.ArrayElementValue) v).getValues())).satisfiesExactly(
                         a1 -> {
                             assertThat(a1.getType()).isSameAs(a.getType());
@@ -484,9 +484,9 @@ class AnnotationTest implements RewriteTest {
 
         // Thread.currentThread().stop();
         assertEquals("java.lang.Deprecated" ,annotation.getType().getFullyQualifiedName());
-        assertEquals("since", annotation.getValues().get(0).getElement().getName());
+        assertEquals("since", ((JavaType.Method) annotation.getValues().get(0).getElement()).getName());
         assertEquals("1.2", annotation.getValues().get(0).getValue());
-        assertEquals("forRemoval", annotation.getValues().get(1).getElement().getName());
+        assertEquals("forRemoval", ((JavaType.Method) annotation.getValues().get(1).getElement()).getName());
         assertEquals(Boolean.TRUE, annotation.getValues().get(1).getValue());
 
         // Thread.currentThread().getContextClassLoader();

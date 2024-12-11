@@ -631,22 +631,34 @@ public interface JavaType {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     class Annotation extends FullyQualified {
 
-        private final FullyQualified type;
-        private final ElementValue @Nullable [] values;
+        @Getter
+        @With
+        final FullyQualified type;
+
+        final ElementValue @Nullable [] values;
 
         public Annotation(FullyQualified type, List<ElementValue> values) {
-            this.type = type;
-            this.values = ListUtils.arrayOrNullIfEmpty(values, EMPTY_ANNOTATION_VALUE_ARRAY);
+            this(type, arrayOrNullIfEmpty(values, EMPTY_ANNOTATION_VALUE_ARRAY));
         }
 
-        public FullyQualified getType() {
-            return type;
+        Annotation(FullyQualified type, ElementValue @Nullable [] values) {
+            this.type = type;
+            this.values = nullIfEmpty(values);
         }
 
         public List<ElementValue> getValues() {
             return values == null ? emptyList() : Arrays.asList(values);
+        }
+
+        public Annotation withValues(@Nullable List<ElementValue> values) {
+            ElementValue[] valuesArray = arrayOrNullIfEmpty(values, EMPTY_ANNOTATION_VALUE_ARRAY);
+            if (Arrays.equals(valuesArray, this.values)) {
+                return this;
+            }
+            return new Annotation(type, valuesArray);
         }
 
         @Override
@@ -656,7 +668,7 @@ public interface JavaType {
 
         @Override
         public FullyQualified withFullyQualifiedName(String fullyQualifiedName) {
-            return this;
+            return withType(type.withFullyQualifiedName(fullyQualifiedName));
         }
 
         @Override
@@ -710,20 +722,20 @@ public interface JavaType {
         }
 
         public interface ElementValue {
-            Method getElement();
+            JavaType getElement();
 
             Object getValue();
         }
 
         @Value
         public static class SingleElementValue implements ElementValue {
-            Method element;
+            JavaType element;
             Object value;
         }
 
         @Value
         public static class ArrayElementValue implements ElementValue {
-            Method element;
+            JavaType element;
             Object[] values;
 
             @Override
