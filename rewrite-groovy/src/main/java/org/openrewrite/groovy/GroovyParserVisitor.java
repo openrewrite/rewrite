@@ -871,7 +871,7 @@ public class GroovyParserVisitor {
                     } else if (!(arg instanceof J.Lambda && lastArgumentsAreAllClosures && !hasParentheses)) {
                         after = whitespace();
                         if (source.charAt(cursor) == ')') {
-                            // next possible argument is a trailing closure and will have an OmitParentheses marker
+                            // next argument(s), if they exists, are trailing closures and will have an OmitParentheses marker
                             hasParentheses = false;
                         }
                         cursor++;
