@@ -70,6 +70,19 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
+    void noParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              class SomeObject {}
+              def foo(String a, int b, SomeObject c, String d) {}
+              foo "a", 3, new SomeObject(), "d"
+              """
+          )
+        );
+    }
+
+    @Test
     @SuppressWarnings("GroovyVariableNotAssigned")
     void nullSafeDereference() {
         rewriteRun(
@@ -175,6 +188,72 @@ class MethodInvocationTest implements RewriteTest {
               acceptsClosure {
                   println(it)
               }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4766")
+    @Test
+    void gradleFileWithMultipleClosuresWithoutParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              copySpec {
+                  from { 'src/main/webapp' } { exclude "**/*.jpg" }
+                  rename '(.+)-staging(.+)', '$1$2'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void multipleClosureArgumentsWithoutParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              def foo(Closure a, Closure b, Closure c) {}
+              foo {     }    {        } {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void multipleClosureArgumentsWithParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              def foo(Closure a, Closure b, Closure c) {}
+              foo({ }, { }, {
+              })
+              """
+          )
+        );
+    }
+
+    @Test
+    void multipleArgumentsWithClosuresAndNonClosuresWithoutParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              def foo(String a, Closure b, Closure c, String d) {}
+              foo "a", { },            {
+              }, "d"
+              """
+          )
+        );
+    }
+
+    @Test
+    void trailingClosures() {
+        rewriteRun(
+          groovy(
+            """
+              def foo(String a, int b, String c, Closure d, Closure e, Closure f) {}
+              foo("bar", 3, "baz") {       }           { } {}
               """
           )
         );

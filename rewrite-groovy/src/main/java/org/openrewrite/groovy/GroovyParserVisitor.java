@@ -805,11 +805,11 @@ public class GroovyParserVisitor {
             int saveCursor = cursor;
             Space beforeOpenParen = whitespace();
 
-            OmitParentheses omitParentheses = null;
+            boolean hasParentheses = true;
             if (source.charAt(cursor) == '(') {
                 cursor++;
             } else {
-                omitParentheses = new OmitParentheses(randomId());
+                hasParentheses = false;
                 beforeOpenParen = EMPTY;
                 cursor = saveCursor;
             }
@@ -853,25 +853,26 @@ public class GroovyParserVisitor {
 
             if (unparsedArgs.isEmpty()) {
                 args.add(JRightPadded.build((Expression) new J.Empty(randomId(), whitespace(), Markers.EMPTY))
-                        .withAfter(omitParentheses == null ? sourceBefore(")") : EMPTY));
+                        .withAfter(hasParentheses ? sourceBefore(")") : EMPTY));
             } else {
+                boolean lastArgumentsAreAllClosures = endsWithClosures(expression.getExpressions());
                 for (int i = 0; i < unparsedArgs.size(); i++) {
                     org.codehaus.groovy.ast.expr.Expression rawArg = unparsedArgs.get(i);
                     Expression arg = visit(rawArg);
-                    if (omitParentheses != null) {
-                        arg = arg.withMarkers(arg.getMarkers().add(omitParentheses));
+                    if (!hasParentheses) {
+                        arg = arg.withMarkers(arg.getMarkers().add(new OmitParentheses(randomId())));
                     }
 
                     Space after = EMPTY;
                     if (i == unparsedArgs.size() - 1) {
-                        if (omitParentheses == null) {
+                        if (hasParentheses) {
                             after = sourceBefore(")");
                         }
-                    } else {
+                    } else if (!(arg instanceof J.Lambda && lastArgumentsAreAllClosures && !hasParentheses)) {
                         after = whitespace();
                         if (source.charAt(cursor) == ')') {
-                            // the next argument will have an OmitParentheses marker
-                            omitParentheses = new OmitParentheses(randomId());
+                            // next argument(s), if they exists, are trailing closures and will have an OmitParentheses marker
+                            hasParentheses = false;
                         }
                         cursor++;
                     }
@@ -881,6 +882,25 @@ public class GroovyParserVisitor {
             }
 
             queue.add(JContainer.build(beforeOpenParen, args, Markers.EMPTY));
+        }
+
+        public boolean endsWithClosures(List<org.codehaus.groovy.ast.expr.Expression> list) {
+            if (!(list.get(list.size() - 1) instanceof ClosureExpression)) {
+                return false;
+            }
+
+            boolean foundNonClosure = false;
+            for (int i = list.size() - 2; i >= 0; i--) {
+                if (list.get(i) instanceof ClosureExpression) {
+                    if (foundNonClosure) {
+                        return false;
+                    }
+                } else {
+                    foundNonClosure = true;
+                }
+            }
+
+            return true;
         }
 
         @Override
