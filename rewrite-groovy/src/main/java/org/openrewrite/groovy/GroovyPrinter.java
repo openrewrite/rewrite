@@ -295,16 +295,16 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             LambdaStyle ls = lambda.getMarkers().findFirst(LambdaStyle.class)
                     .orElse(new LambdaStyle(null, false, !lambda.getParameters().getParameters().isEmpty()));
             boolean parenthesized = lambda.getParameters().isParenthesized();
-            if(!ls.isJavaStyle()) {
+            if (!ls.isJavaStyle()) {
                 p.append('{');
             }
             visitMarkers(lambda.getParameters().getMarkers(), p);
             visitSpace(lambda.getParameters().getPrefix(), Space.Location.LAMBDA_PARAMETERS_PREFIX, p);
-            if(parenthesized) {
+            if (parenthesized) {
                 p.append('(');
             }
             visitRightPadded(lambda.getParameters().getPadding().getParameters(), JRightPadded.Location.LAMBDA_PARAM, ",", p);
-            if(parenthesized) {
+            if (parenthesized) {
                 p.append(')');
             }
             if (ls.isArrow()) {
@@ -318,7 +318,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             } else {
                 visit(lambda.getBody(), p);
             }
-            if(!ls.isJavaStyle()) {
+            if (!ls.isJavaStyle()) {
                 p.append('}');
             }
             afterSyntax(lambda, p);
@@ -358,6 +358,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             afterSyntax(forEachLoop, p);
             return forEachLoop;
         }
+
         @Override
         public J visitMethodDeclaration(J.MethodDeclaration method, PrintOutputCapture<P> p) {
             beforeSyntax(method, Space.Location.METHOD_DECLARATION_PREFIX, p);
@@ -417,35 +418,55 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
 
             visitSpace(argContainer.getBefore(), Space.Location.METHOD_INVOCATION_ARGUMENTS, p);
             List<JRightPadded<Expression>> args = argContainer.getPadding().getElements();
+            boolean lastArgumentsAreAllClosures = endsWithClosures(args);
+            boolean omitParentheses = false;
+            boolean applyTrailingLambdaParenthese = true;
             for (int i = 0; i < args.size(); i++) {
                 JRightPadded<Expression> arg = args.get(i);
-                boolean omitParens = arg.getElement().getMarkers()
-                                             .findFirst(OmitParentheses.class)
-                                             .isPresent() ||
-                                     arg.getElement().getMarkers()
-                                             .findFirst(org.openrewrite.java.marker.OmitParentheses.class)
-                                             .isPresent();
+                boolean omitParensCurrElem = arg.getElement().getMarkers().findFirst(OmitParentheses.class).isPresent() ||
+                        arg.getElement().getMarkers().findFirst(org.openrewrite.java.marker.OmitParentheses.class).isPresent();
 
-                if (i == 0 && !omitParens) {
-                    p.append('(');
-                } else if (i > 0 && omitParens && (
-                        !args.get(0).getElement().getMarkers().findFirst(OmitParentheses.class).isPresent() &&
-                        !args.get(0).getElement().getMarkers().findFirst(org.openrewrite.java.marker.OmitParentheses.class).isPresent()
-                )) {
-                    p.append(')');
-                } else if (i > 0) {
+                if (i == 0) {
+                    if (omitParensCurrElem) {
+                        omitParentheses = true;
+                    } else {
+                        p.append('(');
+                    }
+                }  else if (!omitParentheses && omitParensCurrElem) {
+                    // trailing lambda, eg: `stage('Build..') {}`
+                    if (applyTrailingLambdaParenthese) {
+                        p.append(')');
+                        applyTrailingLambdaParenthese = false;
+                    }
+                } else if (!omitParentheses || !lastArgumentsAreAllClosures) {
                     p.append(',');
                 }
 
                 visitRightPadded(arg, JRightPadded.Location.METHOD_INVOCATION_ARGUMENT, p);
 
-                if (i == args.size() - 1 && !omitParens) {
+                if (i == args.size() - 1 && !omitParensCurrElem) {
                     p.append(')');
                 }
             }
 
             afterSyntax(method, p);
             return method;
+        }
+
+        public boolean endsWithClosures(List<JRightPadded<Expression>> list) {
+            boolean foundNonClosure = false;
+
+            for (int i = list.size() - 1; i >= 0; i--) {
+                if (list.get(i).getElement() instanceof J.Lambda) {
+                    if (foundNonClosure) {
+                        return false;
+                    }
+                } else {
+                    foundNonClosure = true;
+                }
+            }
+
+            return list.get(list.size() - 1).getElement() instanceof J.Lambda;
         }
 
         @Override

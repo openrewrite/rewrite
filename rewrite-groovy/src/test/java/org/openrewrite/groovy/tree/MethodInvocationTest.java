@@ -74,8 +74,9 @@ class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              def foo(String a, String b, String c, String d) {}
-              foo "a", "b", "c", "d"
+              class SomeObject {}
+              def foo(String a, int b, SomeObject c, String d) {}
+              foo "a", 3, new SomeObject(), "d"
               """
           )
         );
@@ -194,14 +195,27 @@ class MethodInvocationTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/4766")
     @Test
-    void multipleClosureArguments() {
+    void multipleClosureArgumentsWithoutParentheses() {
         rewriteRun(
           groovy(
             """
-              def acceptsClosure(Closure a, Closure b) {}
-              acceptsClosure { println(it) } {
-                  println(it)
+              def acceptsClosure(Closure a, Closure b, Closure c) {}
+              acceptsClosure {     }    {        } {
               }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4766")
+    @Test
+    void multipleClosureArgumentsWithParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              def acceptsClosure(Closure a, Closure b, Closure c) {}
+              acceptsClosure({ }, { }, {
+              })
               """
           )
         );
@@ -214,12 +228,25 @@ class MethodInvocationTest implements RewriteTest {
           groovy(
             """
               def combination(String a, Closure b, Closure c, String d) {}
-              combination "a", { println(it) }, { println(it) }, "d"
+              combination "a", { },            {
+              }, "d"
               """
           )
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/4766")
+    @Test
+    void trailingClosures() {
+        rewriteRun(
+          groovy(
+            """
+              def foo(String a, String b, Closure c, Closure d, Closure e) {}
+              foo("bar", "baz") {       }           { } {}
+              """
+          )
+        );
+    }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1236")
     @Test

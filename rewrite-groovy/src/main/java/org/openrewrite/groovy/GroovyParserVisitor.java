@@ -855,6 +855,7 @@ public class GroovyParserVisitor {
                 args.add(JRightPadded.build((Expression) new J.Empty(randomId(), whitespace(), Markers.EMPTY))
                         .withAfter(omitParentheses == null ? sourceBefore(")") : EMPTY));
             } else {
+                boolean lastArgumentsAreAllClosures = endsWithClosures(expression.getExpressions());
                 for (int i = 0; i < unparsedArgs.size(); i++) {
                     org.codehaus.groovy.ast.expr.Expression rawArg = unparsedArgs.get(i);
                     Expression arg = visit(rawArg);
@@ -866,6 +867,15 @@ public class GroovyParserVisitor {
                     if (i == unparsedArgs.size() - 1) {
                         if (omitParentheses == null) {
                             after = sourceBefore(")");
+                        }
+                    } else if (lastArgumentsAreAllClosures && omitParentheses != null) {
+                        if (!(arg instanceof J.Lambda)) {
+                            after = whitespace();
+                            if (source.charAt(cursor) == ')') {
+                                // the next argument will have an OmitParentheses marker
+                                omitParentheses = new OmitParentheses(randomId());
+                            }
+                            cursor++;
                         }
                     } else {
                         after = whitespace();
@@ -881,6 +891,22 @@ public class GroovyParserVisitor {
             }
 
             queue.add(JContainer.build(beforeOpenParen, args, Markers.EMPTY));
+        }
+
+        public boolean endsWithClosures(List<org.codehaus.groovy.ast.expr.Expression> list) {
+            boolean foundNonClosure = false;
+
+            for (int i = list.size() - 1; i >= 0; i--) {
+                if (list.get(i) instanceof ClosureExpression) {
+                    if (foundNonClosure) {
+                        return false;
+                    }
+                } else {
+                    foundNonClosure = true;
+                }
+            }
+
+            return list.get(list.size() - 1) instanceof ClosureExpression;
         }
 
         @Override
