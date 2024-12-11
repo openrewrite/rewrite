@@ -35,6 +35,11 @@ class MethodInvocationTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
+              
+              copySpec {
+                  from { 'src/main/webapp' } { exclude "**/*.jpg" }
+                  rename '(.+)-staging(.+)', '$1$2'
+              }
 
               dependencies {
                   implementation 'org.hibernate:hibernate-core:3.6.7.Final'
