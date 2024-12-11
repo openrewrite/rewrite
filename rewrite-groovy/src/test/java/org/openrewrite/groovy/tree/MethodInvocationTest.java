@@ -204,8 +204,8 @@ class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              def acceptsClosure(Closure a, Closure b, Closure c) {}
-              acceptsClosure {     }    {        } {
+              def foo(Closure a, Closure b, Closure c) {}
+              foo {     }    {        } {
               }
               """
           )
@@ -218,8 +218,8 @@ class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              def acceptsClosure(Closure a, Closure b, Closure c) {}
-              acceptsClosure({ }, { }, {
+              def foo(Closure a, Closure b, Closure c) {}
+              foo({ }, { }, {
               })
               """
           )
@@ -232,8 +232,8 @@ class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              def combination(String a, Closure b, Closure c, String d) {}
-              combination "a", { },            {
+              def foo(String a, Closure b, Closure c, String d) {}
+              foo "a", { },            {
               }, "d"
               """
           )
