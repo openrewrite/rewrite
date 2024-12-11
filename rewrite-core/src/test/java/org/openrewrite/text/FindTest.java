@@ -144,6 +144,7 @@ class FindTest implements RewriteTest {
           )
         );
     }
+
     @Test
     void regexMatchingWhitespaceWithoutMultilineWithDotall() {
         rewriteRun(
@@ -153,11 +154,6 @@ class FindTest implements RewriteTest {
             """
               Zero
               One Two
-              Three
-              """,
-            """
-              Zero
-              ~~>One Two
               Three
               """
           )

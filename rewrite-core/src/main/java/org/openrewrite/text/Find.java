@@ -142,10 +142,14 @@ public class Find extends Recipe {
                 List<PlainText.Snippet> snippets = new ArrayList<>();
                 int previousEnd = 0;
 
-                LinkedList<Integer> newlineIndexes = findAllNewLineIndexes(rawText);
+                LinkedList<Integer> newlineIndexes = null;
                 int lastNewLineIndex = -1;
 
                 while (matcher.find()) {
+                    if (newlineIndexes == null) {
+                        newlineIndexes = findAllNewLineIndexes(rawText);
+                    }
+
                     int matchStart = matcher.start();
                     snippets.add(snippet(rawText.substring(previousEnd, matchStart)));
                     snippets.add(SearchResult.found(snippet(rawText.substring(matchStart, matcher.end()))));
