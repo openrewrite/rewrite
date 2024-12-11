@@ -2109,7 +2109,7 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
-    void testRecipe() {
+    void noRenameOfTypeWithMatchingPrefix() {
         // language=java
         rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.all())

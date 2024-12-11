@@ -1991,7 +1991,7 @@ public interface J extends Tree {
                 return false;
             }
             String simpleName = fieldAccess.getName().getSimpleName();
-            if (!simpleName.regionMatches(0, className, dotIndex + 1, className.length())) {
+            if (!simpleName.regionMatches(0, className, dotIndex + 1, Math.max(className.length() - dotIndex - 1, simpleName.length()))) {
                 return false;
             }
             if (fieldAccess.getTarget() instanceof J.FieldAccess) {
