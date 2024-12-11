@@ -238,7 +238,7 @@ public class GitRemoteTest {
           .registerRemote(GitRemote.Service.GitHub, URI.create("https://github.com"), List.of(URI.create("ssh://notgithub.com")));
 
         assertThat(parser.findRemoteServer("github.com").getUris())
-          .containsExactlyInAnyOrder(URI.create("https://github.com"), URI.create("ssh://github.com"));
+          .containsExactlyInAnyOrder(URI.create("https://github.com"), URI.create("ssh://git@github.com"));
     }
 
     @Test
