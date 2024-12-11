@@ -868,16 +868,7 @@ public class GroovyParserVisitor {
                         if (omitParentheses == null) {
                             after = sourceBefore(")");
                         }
-                    } else if (lastArgumentsAreAllClosures && omitParentheses != null) {
-                        if (!(arg instanceof J.Lambda)) {
-                            after = whitespace();
-                            if (source.charAt(cursor) == ')') {
-                                // the next argument will have an OmitParentheses marker
-                                omitParentheses = new OmitParentheses(randomId());
-                            }
-                            cursor++;
-                        }
-                    } else {
+                    } else if (!(arg instanceof J.Lambda) || !(lastArgumentsAreAllClosures && omitParentheses != null)) {
                         after = whitespace();
                         if (source.charAt(cursor) == ')') {
                             // the next argument will have an OmitParentheses marker

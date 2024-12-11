@@ -418,7 +418,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
 
             visitSpace(argContainer.getBefore(), Space.Location.METHOD_INVOCATION_ARGUMENTS, p);
             List<JRightPadded<Expression>> args = argContainer.getPadding().getElements();
-            boolean lastArgumentsAreAllClosures = endsWithClosures(args);
+            boolean argsAreAllClosures = args.stream().allMatch(it -> it.getElement() instanceof J.Lambda);
             boolean omitParentheses = false;
             boolean applyTrailingLambdaParenthese = true;
             for (int i = 0; i < args.size(); i++) {
@@ -432,13 +432,12 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
                     } else {
                         p.append('(');
                     }
-                }  else if (!omitParentheses && omitParensCurrElem) {
-                    // trailing lambda, eg: `stage('Build..') {}`
-                    if (applyTrailingLambdaParenthese) {
+                }  else if (!omitParentheses && omitParensCurrElem) { // first trailing lambda, eg: `stage('Build..') {}`, should close the method
+                    if (applyTrailingLambdaParenthese) { // apply once, to support multiple closures: `foo("baz") {} {}
                         p.append(')');
                         applyTrailingLambdaParenthese = false;
                     }
-                } else if (!omitParentheses || !lastArgumentsAreAllClosures) {
+                } else if (!(omitParentheses && argsAreAllClosures)) {
                     p.append(',');
                 }
 
@@ -451,22 +450,6 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
 
             afterSyntax(method, p);
             return method;
-        }
-
-        public boolean endsWithClosures(List<JRightPadded<Expression>> list) {
-            boolean foundNonClosure = false;
-
-            for (int i = list.size() - 1; i >= 0; i--) {
-                if (list.get(i).getElement() instanceof J.Lambda) {
-                    if (foundNonClosure) {
-                        return false;
-                    }
-                } else {
-                    foundNonClosure = true;
-                }
-            }
-
-            return list.get(list.size() - 1).getElement() instanceof J.Lambda;
         }
 
         @Override

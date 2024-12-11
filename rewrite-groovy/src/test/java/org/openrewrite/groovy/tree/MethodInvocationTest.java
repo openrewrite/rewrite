@@ -241,8 +241,8 @@ class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              def foo(String a, String b, Closure c, Closure d, Closure e) {}
-              foo("bar", "baz") {       }           { } {}
+              def foo(String a, int b, String c, Closure d, Closure e, Closure f) {}
+              foo("bar", 3, "baz") {       }           { } {}
               """
           )
         );
