@@ -577,6 +577,8 @@ public class MavenPomDownloader {
                                 rawPom = RawPom.parse(fis, Objects.equals(versionMaybeDatedSnapshot, gav.getVersion()) ? null : versionMaybeDatedSnapshot);
                             }
                         } else {
+                            // Record the absense of the pom file
+                            ctx.getResolutionListener().downloadError(gav, uris, (containingPom == null) ? null : containingPom.getRequested());
                             // infer rawPom from jar
                             rawPom = rawPomFromGav(gav);
                         }
@@ -621,6 +623,9 @@ public class MavenPomDownloader {
                             if (!e.isClientSideException() || !jarExistsForPomUri(repo, uri.toString())) {
                                 throw e;
                             }
+                            // Record the absense of the pom file
+                            ctx.getResolutionListener().downloadError(gav, uris, (containingPom == null) ? null : containingPom.getRequested());
+
                             // Continue with a recreated pom
                             rawPom = rawPomFromGav(gav);
                         }
