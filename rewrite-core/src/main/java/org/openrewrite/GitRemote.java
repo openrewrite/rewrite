@@ -149,7 +149,7 @@ public class GitRemote {
                         .orElseGet(() -> {
                             URI normalizedUri = Parser.normalize(origin);
                             if (!normalizedUri.getScheme().equals(protocol)) {
-                                throw new IllegalStateException("No matching server found that supports " + protocol + " for origin: " + origin);
+                                throw new IllegalStateException("Unable to build clone URL. No matching server found that supports " + protocol + " for origin: " + origin);
                             }
                             return normalizedUri;
                         });
