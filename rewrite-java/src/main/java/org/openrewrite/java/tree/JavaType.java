@@ -19,7 +19,9 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
-import lombok.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.With;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
@@ -628,6 +630,7 @@ public interface JavaType {
         }
     }
 
+    @JsonIdentityInfo(generator = ObjectIdGenerators.None.class)
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     class Annotation extends FullyQualified {
 
@@ -724,34 +727,71 @@ public interface JavaType {
             return type.getSupertype();
         }
 
+        @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c", include = JsonTypeInfo.As.PROPERTY)
         public interface ElementValue {
             JavaType getElement();
 
             Object getValue();
         }
 
-        @Value
-        @AllArgsConstructor
+        @Getter
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         public static class SingleElementValue implements ElementValue {
             @NonFinal
             JavaType element;
 
             @NonFinal
-            Object value;
+            @Nullable
+            Object constantValue;
+
+            @NonFinal
+            @Nullable
+            JavaType referenceValue;
+
+            public SingleElementValue(JavaType element, Object value) {
+                this.element = element;
+                if (value instanceof JavaType) {
+                    this.referenceValue = (JavaType) value;
+                } else {
+                    this.constantValue = value;
+                }
+            }
 
             @JsonCreator
             SingleElementValue() {
             }
+
+            @Override
+            public Object getValue() {
+                return constantValue != null ? constantValue : referenceValue;
+            }
         }
 
-        @Value
-        @AllArgsConstructor
+        @Getter
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         public static class ArrayElementValue implements ElementValue {
             @NonFinal
             JavaType element;
 
             @NonFinal
-            Object[] values;
+            Object @Nullable [] constantValues;
+
+            @NonFinal
+            JavaType @Nullable [] referenceValues;
+
+            public ArrayElementValue(JavaType element, Object[] values) {
+                this.element = element;
+                if (values.length == 0) {
+                    this.constantValues = null;
+                    this.referenceValues = null;
+                } else if (values instanceof JavaType[]) {
+                    this.referenceValues = (JavaType[]) values;
+                } else if (values[0] instanceof JavaType) {
+                    this.referenceValues = Arrays.copyOf(values, values.length, JavaType[].class);
+                } else {
+                    this.constantValues = values;
+                }
+            }
 
             @JsonCreator
             ArrayElementValue() {
@@ -763,7 +803,7 @@ public interface JavaType {
             }
 
             public List<?> getValues() {
-                return Arrays.asList(values);
+                return Arrays.asList(constantValues != null ? constantValues : referenceValues);
             }
         }
     }
