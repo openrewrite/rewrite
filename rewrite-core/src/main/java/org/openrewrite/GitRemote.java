@@ -118,11 +118,13 @@ public class GitRemote {
 
         /**
          * Build a {@link URI} clone url from components, if that protocol is supported (configured) by the matched server
+         *
          * @param service  the type of SCM service
          * @param origin   the origin of the SCM service, any protocol will be stripped (and not used for matching)
          * @param path     the path to the repository
          * @param protocol the protocol to use. Supported protocols: ssh, http, https
-         * @return
+         * @return the clone URL if it could be created.
+         * @throws IllegalArgumentException if the protocol is not supported by the server.
          */
         public URI buildUri(Service service, String origin, String path, String protocol) {
             if (!ALLOWED_PROTOCOLS.contains(protocol)) {
@@ -147,7 +149,7 @@ public class GitRemote {
                         .orElseGet(() -> {
                             URI normalizedUri = Parser.normalize(origin);
                             if (!normalizedUri.getScheme().equals(protocol)) {
-                                throw new IllegalStateException("No matching server found that supports ssh for origin: " + origin);
+                                throw new IllegalStateException("No matching server found that supports " + protocol + " for origin: " + origin);
                             }
                             return normalizedUri;
                         });
@@ -217,6 +219,7 @@ public class GitRemote {
 
         /**
          * Find a registered remote server by an origin.
+         *
          * @param origin the origin of the server. Any protocol will be stripped (and not used to match)
          * @return The server if found, or an unknown type server with a normalized url/origin if not found.
          */
@@ -374,14 +377,16 @@ public class GitRemote {
         public RemoteServer(Service service, String origin, Collection<URI> uris) {
             this.service = service;
             this.origin = origin;
-            this.uris.addAll(uris);
+            this.uris.addAll(uris.stream().map(URI::toString)
+                    .map(Parser::normalize)
+                    .collect(Collectors.toList()));
         }
 
         private GitRemote.Parser.@Nullable RemoteServerMatch match(URI normalizedUri) {
             String lowerCaseNormalizedUri = normalizedUri.toString().toLowerCase(Locale.ENGLISH);
             for (URI uri : uris) {
-                String normalizedServerUri = Parser.normalize(uri.toString()).toString().toLowerCase(Locale.ENGLISH);
-                if (lowerCaseNormalizedUri.startsWith(normalizedServerUri)) {
+                String lowerCaseServerUri = uri.toString().toLowerCase(Locale.ENGLISH);
+                if (lowerCaseNormalizedUri.startsWith(lowerCaseServerUri)) {
                     return new Parser.RemoteServerMatch(service, origin, uri);
                 }
             }

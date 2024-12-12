@@ -180,25 +180,25 @@ public class GitRemoteTest {
     @ParameterizedTest
     @CsvSource(textBlock = """
       GitHub, github.com, org/repo, https, https://github.com/org/repo.git
-      GitHub, github.com, org/repo, ssh, ssh://git@github.com/org/repo.git
+      GitHub, github.com, org/repo, ssh, ssh://github.com/org/repo.git
       GitHub, https://github.com, org/repo, https, https://github.com/org/repo.git
-      GitHub, https://github.com, org/repo, ssh, ssh://git@github.com/org/repo.git
+      GitHub, https://github.com, org/repo, ssh, ssh://github.com/org/repo.git
       
       GitLab, gitlab.com, group/subgroup/repo, https, https://gitlab.com/group/subgroup/repo.git
-      GitLab, gitlab.com, group/subgroup/repo, ssh, ssh://git@gitlab.com/group/subgroup/repo.git
+      GitLab, gitlab.com, group/subgroup/repo, ssh, ssh://gitlab.com/group/subgroup/repo.git
       AzureDevOps, dev.azure.com, org/project/repo, https, https://dev.azure.com/org/project/_git/repo
-      AzureDevOps, dev.azure.com, org/project/repo, ssh, ssh://git@ssh.dev.azure.com/v3/org/project/repo
+      AzureDevOps, dev.azure.com, org/project/repo, ssh, ssh://ssh.dev.azure.com/v3/org/project/repo
       BitbucketCloud, bitbucket.org, org/repo, https, https://bitbucket.org/org/repo.git
-      BitbucketCloud, bitbucket.org, org/repo, ssh, ssh://git@bitbucket.org/org/repo.git
+      BitbucketCloud, bitbucket.org, org/repo, ssh, ssh://bitbucket.org/org/repo.git
       
       Bitbucket, scm.company.com/context/bitbucket, org/repo, https, https://scm.company.com/context/bitbucket/scm/org/repo.git
       Bitbucket, scm.company.com/context/bitbucket, org/repo, http, http://scm.company.com/context/bitbucket/scm/org/repo.git
-      Bitbucket, scm.company.com/context/bitbucket, org/repo, ssh, ssh://git@scm.company.com:7999/context/bitbucket/org/repo.git
+      Bitbucket, scm.company.com/context/bitbucket, org/repo, ssh, ssh://scm.company.com:7999/context/bitbucket/org/repo.git
       GitHub, scm.company.com/context/github, org/repo, https, https://scm.company.com/context/github/org/repo.git
-      GitHub, scm.company.com/context/github, org/repo, ssh, ssh://git@scm.company.com/context/github/org/repo.git
+      GitHub, scm.company.com/context/github, org/repo, ssh, ssh://scm.company.com/context/github/org/repo.git
       GitLab, scm.company.com/context/gitlab, group/subgroup/repo, https, https://scm.company.com/context/gitlab/group/subgroup/repo.git
       GitLab, scm.company.com:8443/context/gitlab, group/subgroup/repo, https, https://scm.company.com:8443/context/gitlab/group/subgroup/repo.git
-      GitLab, scm.company.com/context/gitlab, group/subgroup/repo, ssh, ssh://git@scm.company.com:8022/context/gitlab/group/subgroup/repo.git
+      GitLab, scm.company.com/context/gitlab, group/subgroup/repo, ssh, ssh://scm.company.com:8022/context/gitlab/group/subgroup/repo.git
       
       Bitbucket, scm.company.com:12345/context/bitbucket, org/repo, https, https://scm.company.com:12345/context/bitbucket/scm/org/repo.git
       Bitbucket, scm.company.com:12346/context/bitbucket, org/repo, https, https://scm.company.com:12345/context/bitbucket/scm/org/repo.git
@@ -238,7 +238,7 @@ public class GitRemoteTest {
           .registerRemote(GitRemote.Service.GitHub, URI.create("https://github.com"), List.of(URI.create("ssh://notgithub.com")));
 
         assertThat(parser.findRemoteServer("github.com").getUris())
-          .containsExactlyInAnyOrder(URI.create("https://github.com"), URI.create("ssh://git@github.com"));
+          .containsExactlyInAnyOrder(URI.create("https://github.com"), URI.create("ssh://github.com"));
     }
 
     @Test
