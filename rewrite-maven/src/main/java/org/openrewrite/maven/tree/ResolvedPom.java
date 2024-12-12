@@ -34,6 +34,7 @@ import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenDownloadingExceptions;
 import org.openrewrite.maven.MavenExecutionContextView;
+import org.openrewrite.maven.cache.LocalMavenArtifactCache;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
@@ -41,13 +42,17 @@ import org.openrewrite.maven.internal.VersionRequirement;
 import org.openrewrite.maven.tree.ManagedDependency.Defined;
 import org.openrewrite.maven.tree.ManagedDependency.Imported;
 import org.openrewrite.maven.tree.Plugin.Execution;
+import org.openrewrite.maven.utilities.MavenArtifactDownloader;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.*;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
@@ -524,7 +529,7 @@ public class ResolvedPom {
                         boolean found = false;
                         for (Dependency reqDep : requestedDependencies) {
                             if (reqDep.getGav().getGroupId().equals(incReqDep.getGav().getGroupId()) &&
-                                reqDep.getArtifactId().equals(incReqDep.getArtifactId())) {
+                                    reqDep.getArtifactId().equals(incReqDep.getArtifactId())) {
                                 found = true;
                                 break;
                             }
@@ -665,7 +670,7 @@ public class ResolvedPom {
                     // PHASE
                     String mergedPhase = currentExecution.getPhase();
                     if (incomingExecution.getPhase() != null &&
-                        !Objects.equals(mergedPhase, incomingExecution.getPhase())) {
+                            !Objects.equals(mergedPhase, incomingExecution.getPhase())) {
                         mergedPhase = incomingExecution.getPhase();
                     }
                     // CONFIGURATION
@@ -838,8 +843,8 @@ public class ResolvedPom {
                 Pom pom = pomAncestry.get(i);
                 ResolvedGroupArtifactVersion alreadyResolvedGav = pom.getGav();
                 if (alreadyResolvedGav.getGroupId().equals(groupArtifactVersion.getGroupId()) &&
-                    alreadyResolvedGav.getArtifactId().equals(groupArtifactVersion.getArtifactId()) &&
-                    alreadyResolvedGav.getVersion().equals(groupArtifactVersion.getVersion())) {
+                        alreadyResolvedGav.getArtifactId().equals(groupArtifactVersion.getArtifactId()) &&
+                        alreadyResolvedGav.getVersion().equals(groupArtifactVersion.getVersion())) {
                     return true;
                 }
             }
@@ -921,12 +926,16 @@ public class ResolvedPom {
                     }
 
                     if ((d.getGav().getGroupId() != null && d.getGav().getGroupId().startsWith("${") && d.getGav().getGroupId().endsWith("}")) ||
-                        (d.getGav().getArtifactId().startsWith("${") && d.getGav().getArtifactId().endsWith("}")) ||
-                        (d.getGav().getVersion() != null && d.getGav().getVersion().startsWith("${") && d.getGav().getVersion().endsWith("}"))) {
+                            (d.getGav().getArtifactId().startsWith("${") && d.getGav().getArtifactId().endsWith("}")) ||
+                            (d.getGav().getVersion() != null && d.getGav().getVersion().startsWith("${") && d.getGav().getVersion().endsWith("}"))) {
                         throw new MavenDownloadingException("Could not resolve property", null, d.getGav());
                     }
 
-                    Pom dPom = downloader.download(d.getGav(), null, dd.definedIn, getRepositories());
+                    Pom dPom = downloadPom(downloader, dd, depth, MavenExecutionContextView.view(ctx));
+                    if (dPom == null) {
+                        // Pom was not found, but jar was present: continue on; Maven tolerates this as well
+                        continue;
+                    }
 
                     MavenPomCache cache = MavenExecutionContextView.view(ctx).getPomCache();
                     ResolvedPom resolvedPom = cache.getResolvedDependencyPom(dPom.getGav());
@@ -977,7 +986,7 @@ public class ResolvedPom {
                             d2 = d2.withExclusions(ListUtils.concatAll(d2.getExclusions(), d.getExclusions()));
                             for (GroupArtifact exclusion : d.getExclusions()) {
                                 if (matchesGlob(getValue(d2.getGroupId()), getValue(exclusion.getGroupId())) &&
-                                    matchesGlob(getValue(d2.getArtifactId()), getValue(exclusion.getArtifactId()))) {
+                                        matchesGlob(getValue(d2.getArtifactId()), getValue(exclusion.getArtifactId()))) {
                                     if (resolved.getEffectiveExclusions().isEmpty()) {
                                         resolved.unsafeSetEffectiveExclusions(new ArrayList<>());
                                     }
@@ -1013,10 +1022,64 @@ public class ResolvedPom {
         return dependencies;
     }
 
+    private @Nullable Pom downloadPom(MavenPomDownloader downloader, DependencyAndDependent dd, int depth, MavenExecutionContextView ctx) throws MavenDownloadingException {
+        GroupArtifactVersion gav = dd.getDependency().getGav();
+        try {
+            return downloader.download(gav, null, dd.definedIn, getRepositories());
+        } catch (MavenDownloadingException e) {
+            try {
+                // Maven tolerates missing POMs when the .jar is present; match that here
+                if (downloadJar(downloader, dd, depth, ctx) != null) {
+                    // The jar was found; Do record the download error, similar to the message Maven reports
+                    List<String> uris = getRepositories().stream().map(MavenRepository::getUri).collect(toList());
+                    ctx.getResolutionListener().downloadError(gav, uris, dd.getDefinedIn().getRequested());
+                    return null;
+                }
+            } catch (Throwable t) {
+                // There was an error downloading the jar; bubble up the original exception
+            }
+            // The .jar was not found; bubble up the original exception
+            throw e;
+        }
+    }
+
+    private @Nullable Path downloadJar(MavenPomDownloader downloader, DependencyAndDependent dd, int depth, MavenExecutionContextView ctx) {
+        Path mavenLocal = Paths.get(System.getProperty("user.home"), ".m2", "repository");
+        MavenArtifactDownloader artifactDownloader = new MavenArtifactDownloader(
+                new LocalMavenArtifactCache(mavenLocal), ctx.getSettings(), ex -> {
+            // We already log the failure to download the pom; no need to log the failure to download the jar
+        });
+        Collection<MavenRepository> mavenRepositories = downloader.distinctNormalizedRepositories(
+                getRepositories(), dd.getDefinedIn(), dd.getDependency().getVersion());
+        for (MavenRepository repository : mavenRepositories) {
+            // Recreate a dummy Pom to represent the missing .pom
+            ResolvedGroupArtifactVersion dummy = new ResolvedGroupArtifactVersion(
+                    repository.getUri(),
+                    dd.getDependency().getGroupId(),
+                    dd.getDependency().getArtifactId(),
+                    dd.getDependency().getVersion(),
+                    null);
+            ResolvedDependency resolvedDependency = new ResolvedDependency(
+                    repository,
+                    dummy,
+                    dd.getDependency(),
+                    emptyList(),
+                    emptyList(),
+                    null,
+                    null,
+                    null,
+                    depth,
+                    emptyList()
+            );
+            return artifactDownloader.downloadArtifact(resolvedDependency);
+        }
+        return null;
+    }
+
     private boolean contains(List<ResolvedDependency> dependencies, GroupArtifact ga, @Nullable String classifier) {
         for (ResolvedDependency it : dependencies) {
             if (it.getGroupId().equals(ga.getGroupId()) && it.getArtifactId().equals(ga.getArtifactId()) &&
-                (Objects.equals(classifier, it.getClassifier()))) {
+                    (Objects.equals(classifier, it.getClassifier()))) {
                 return true;
             }
         }

@@ -681,7 +681,7 @@ public class MavenPomDownloader {
         return gav.getVersion();
     }
 
-    Collection<MavenRepository> distinctNormalizedRepositories(
+    public Collection<MavenRepository> distinctNormalizedRepositories(
             List<MavenRepository> repositories,
             @Nullable ResolvedPom containingPom,
             @Nullable String acceptsVersion) {
