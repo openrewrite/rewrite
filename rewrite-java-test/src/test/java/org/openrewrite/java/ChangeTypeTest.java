@@ -209,7 +209,7 @@ class ChangeTypeTest implements RewriteTest {
               
               class Test {
                   List p;
-                  List p2;
+                  java.util.List p2;
                   java.util.List p3;
               }
               """
@@ -2152,6 +2152,68 @@ class ChangeTypeTest implements RewriteTest {
                   public boolean isDirty() {
                       return false;
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeTypeOfInnerClass() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("foo.A$Builder", "bar.A$Builder", true))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+                """
+                  package foo;
+                  
+                  public class A {
+                    public A.Builder builder() {
+                      return new A.Builder();
+                    }
+                  
+                    public static class Builder {
+                      public A build() {
+                        return new A();
+                      }
+                    }
+                  }
+                  """,
+                """
+                  package bar;
+                  
+                  public class A {
+                    public A.Builder builder() {
+                      return new A.Builder();
+                    }
+                  
+                    public static class Builder {
+                      public A build() {
+                        return new A();
+                      }
+                    }
+                  }
+                  """
+              )
+            ),
+          java(
+            """
+              import foo.A;
+              import foo.A.Builder;
+              
+              class Test {
+                A test() {
+                    A.Builder b = A.builder();
+                    return b.build();
+                }
+              }
+              """, """
+              import foo.A;
+              
+              class Test {
+                A test() {
+                    bar.A.Builder b = A.builder();
+                    return b.build();
+                }
               }
               """
           )

@@ -1986,12 +1986,18 @@ public interface J extends Tree {
         }
 
         private boolean isFullyQualifiedClassReference(J.FieldAccess fieldAccess, String className, int prevDotIndex) {
+            if (fieldAccess.getName().getFieldType() == null &&
+                fieldAccess.getName().getType() instanceof JavaType.FullyQualified &&
+                ((JavaType.FullyQualified) fieldAccess.getName().getType()).getFullyQualifiedName().equals(className)) {
+                return true;
+            }
+
             int dotIndex = className.lastIndexOf('.', prevDotIndex - 1);
             if (dotIndex < 0) {
                 return false;
             }
             String simpleName = fieldAccess.getName().getSimpleName();
-            if (!simpleName.regionMatches(0, className, dotIndex + 1, prevDotIndex - dotIndex - 1)) {
+            if (!simpleName.regionMatches(0, className, dotIndex + 1, Math.max(simpleName.length(), prevDotIndex - dotIndex - 1))) {
                 return false;
             }
             if (fieldAccess.getTarget() instanceof J.FieldAccess) {
