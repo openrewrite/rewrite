@@ -64,7 +64,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
 
     @DocumentExample
     @Test
-    void foo() {
+    void skipMissingTypeAttribution() {
         rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).build()),
           java(

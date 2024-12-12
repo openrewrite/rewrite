@@ -1980,6 +1980,7 @@ public interface J extends Tree {
 
         public boolean isFullyQualifiedClassReference(String className) {
             if (getName().getFieldType() == null && getName().getType() instanceof JavaType.FullyQualified &&
+                !(getName().getType() instanceof JavaType.Unknown) &&
                 TypeUtils.fullyQualifiedNamesAreEqual(((JavaType.FullyQualified) getName().getType()).getFullyQualifiedName(), className)) {
                 return true;
             } else if (!className.contains(".")) {
