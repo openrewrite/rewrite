@@ -131,7 +131,6 @@ public class GitRemote {
                 throw new IllegalStateException("Invalid protocol: " + protocol + ". Must be one of: " + ALLOWED_PROTOCOLS);
             }
             URI selectedBaseUrl;
-
             if (service == Service.Unknown) {
                 if (PORT_PATTERN.matcher(origin).find()) {
                     throw new IllegalArgumentException("Unable to determine protocol/port combination for an unregistered origin with a port: " + origin);
@@ -144,7 +143,7 @@ public class GitRemote {
                                 .anyMatch(o -> o.equalsIgnoreCase(stripProtocol(origin)))
                         )
                         .flatMap(server -> server.getUris().stream())
-                        .filter(uri -> uri.getScheme().equals(protocol))
+                        .filter(uri -> Parser.normalize(uri).getScheme().equals(protocol))
                         .findFirst()
                         .orElseGet(() -> {
                             URI normalizedUri = Parser.normalize(origin);
@@ -302,6 +301,10 @@ public class GitRemote {
 
         private static final Pattern PORT_PATTERN = Pattern.compile(":\\d+(/.+)(/.+)+");
 
+        static URI normalize(URI url) {
+            return normalize(url.toString());
+        }
+
         static URI normalize(String url) {
             try {
                 URIish uri = new URIish(url);
@@ -377,16 +380,14 @@ public class GitRemote {
         public RemoteServer(Service service, String origin, Collection<URI> uris) {
             this.service = service;
             this.origin = origin;
-            this.uris.addAll(uris.stream().map(URI::toString)
-                    .map(Parser::normalize)
-                    .collect(Collectors.toList()));
+            this.uris.addAll(uris);
         }
 
         private GitRemote.Parser.@Nullable RemoteServerMatch match(URI normalizedUri) {
             String lowerCaseNormalizedUri = normalizedUri.toString().toLowerCase(Locale.ENGLISH);
             for (URI uri : uris) {
-                String lowerCaseServerUri = uri.toString().toLowerCase(Locale.ENGLISH);
-                if (lowerCaseNormalizedUri.startsWith(lowerCaseServerUri)) {
+                String normalizedServerUri = Parser.normalize(uri.toString()).toString().toLowerCase(Locale.ENGLISH);
+                if (lowerCaseNormalizedUri.startsWith(normalizedServerUri)) {
                     return new Parser.RemoteServerMatch(service, origin, uri);
                 }
             }
@@ -397,10 +398,11 @@ public class GitRemote {
             Set<String> origins = new LinkedHashSet<>();
             origins.add(origin);
             for (URI uri : uris) {
-                URI normalized = Parser.normalize(uri.toString());
+                URI normalized = Parser.normalize(uri);
                 origins.add(Parser.stripProtocol(normalized.toString()));
             }
             return origins;
         }
+
     }
 }
