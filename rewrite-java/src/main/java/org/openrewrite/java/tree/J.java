@@ -1979,10 +1979,14 @@ public interface J extends Tree {
         }
 
         public boolean isFullyQualifiedClassReference(String className) {
-            if (!className.contains(".")) {
+            if (getName().getFieldType() == null && getName().getType() instanceof JavaType.FullyQualified &&
+                !(getName().getType() instanceof JavaType.Unknown) &&
+                TypeUtils.fullyQualifiedNamesAreEqual(((JavaType.FullyQualified) getName().getType()).getFullyQualifiedName(), className)) {
+                return true;
+            } else if (!className.contains(".")) {
                 return false;
             }
-            return isFullyQualifiedClassReference(this, className, className.length());
+            return isFullyQualifiedClassReference(this, TypeUtils.toFullyQualifiedName(className), className.length());
         }
 
         private boolean isFullyQualifiedClassReference(J.FieldAccess fieldAccess, String className, int prevDotIndex) {
@@ -1991,7 +1995,7 @@ public interface J extends Tree {
                 return false;
             }
             String simpleName = fieldAccess.getName().getSimpleName();
-            if (!simpleName.regionMatches(0, className, dotIndex + 1, simpleName.length())) {
+            if (!simpleName.regionMatches(0, className, dotIndex + 1, Math.max(simpleName.length(), prevDotIndex - dotIndex - 1))) {
                 return false;
             }
             if (fieldAccess.getTarget() instanceof J.FieldAccess) {
