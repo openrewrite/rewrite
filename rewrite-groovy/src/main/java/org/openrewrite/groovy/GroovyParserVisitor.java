@@ -235,7 +235,7 @@ public class GroovyParserVisitor {
                 null,
                 pkg,
                 statements,
-                format(source.substring(cursor))
+                format(source, cursor, source.length())
         );
     }
 
@@ -2455,9 +2455,14 @@ public class GroovyParserVisitor {
             return EMPTY; // unable to find this delimiter
         }
 
-        String prefix = source.substring(cursor, delimIndex);
-        cursor += prefix.length() + untilDelim.length(); // advance past the delimiter
-        return Space.format(prefix);
+        if (delimIndex == cursor) {
+            cursor += untilDelim.length();
+            return EMPTY;
+        }
+
+        Space space = format(source, cursor, delimIndex);
+        cursor = delimIndex + untilDelim.length(); // advance past the delimiter
+        return space;
     }
 
     /**
