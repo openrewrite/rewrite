@@ -128,7 +128,7 @@ public class GitRemote {
          */
         public URI buildUri(Service service, String origin, String path, String protocol) {
             if (!ALLOWED_PROTOCOLS.contains(protocol)) {
-                throw new IllegalArgumentException("Invalid protocol: " + protocol + ". Must be one of: " + ALLOWED_PROTOCOLS);
+                throw new IllegalStateException("Invalid protocol: " + protocol + ". Must be one of: " + ALLOWED_PROTOCOLS);
             }
             URI selectedBaseUrl;
 
