@@ -25,7 +25,6 @@ import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
-import org.openrewrite.test.TypeValidation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -2112,8 +2111,7 @@ class ChangeTypeTest implements RewriteTest {
     void noRenameOfTypeWithMatchingPrefix() {
         // language=java
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.all())
-            .recipe(new ChangeType("org.codehaus.jackson.annotate.JsonIgnoreProperties", "com.fasterxml.jackson.annotation.JsonIgnoreProperties", false))
+          spec -> spec.recipe(new ChangeType("org.codehaus.jackson.annotate.JsonIgnoreProperties", "com.fasterxml.jackson.annotation.JsonIgnoreProperties", false))
             .parser(JavaParser.fromJavaVersion()
               .dependsOn(
                 """
