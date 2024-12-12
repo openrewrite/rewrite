@@ -26,8 +26,6 @@ dependencies {
     // needed by AddDependency
     implementation(project(":rewrite-java"))
 
-    compileOnly("guru.nidi:graphviz-java:latest.release")
-
     compileOnly("org.rocksdb:rocksdbjni:latest.release")
     compileOnly(project(":rewrite-yaml"))
     implementation(project(":rewrite-properties"))
@@ -41,7 +39,6 @@ dependencies {
     testImplementation("com.squareup.okhttp3:okhttp-tls:4.+")
     testImplementation("com.squareup.okio:okio-jvm:3.9.1")
     testImplementation("org.mapdb:mapdb:latest.release")
-    testImplementation("guru.nidi:graphviz-java:latest.release")
 
     testRuntimeOnly("org.mapdb:mapdb:latest.release")
     testRuntimeOnly(project(":rewrite-java-17"))
