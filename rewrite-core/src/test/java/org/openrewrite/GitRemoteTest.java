@@ -233,10 +233,20 @@ public class GitRemoteTest {
     }
 
     @Test
+    void shouldNotReplaceExistingWellKnownServer(){
+        GitRemote.Parser parser = new GitRemote.Parser()
+          .registerRemote(GitRemote.Service.GitHub, URI.create("https://github.com"), List.of(URI.create("ssh://notgithub.com")));
+
+        assertThat(parser.findRemoteServer("github.com").getUris())
+          .containsExactlyInAnyOrder(URI.create("https://github.com"), URI.create("ssh://git@github.com"));
+    }
+
+    @Test
     void findRemote() {
         GitRemote.Parser parser = new GitRemote.Parser()
           .registerRemote(GitRemote.Service.Bitbucket, URI.create("scm.company.com/stash"), Collections.emptyList());
         assertThat(parser.findRemoteServer("github.com").getService()).isEqualTo(GitRemote.Service.GitHub);
+        assertThat(parser.findRemoteServer("https://github.com").getService()).isEqualTo(GitRemote.Service.GitHub);
         assertThat(parser.findRemoteServer("gitlab.com").getService()).isEqualTo(GitRemote.Service.GitLab);
         assertThat(parser.findRemoteServer("bitbucket.org").getService()).isEqualTo(GitRemote.Service.BitbucketCloud);
         assertThat(parser.findRemoteServer("dev.azure.com").getService()).isEqualTo(GitRemote.Service.AzureDevOps);
@@ -265,18 +275,18 @@ public class GitRemoteTest {
 
     @ParameterizedTest
     @CsvSource(textBlock = """
-      GitHub, GitHub
-      GITLAB, GitLab
-      bitbucket, Bitbucket
-      BitbucketCloud, BitbucketCloud
-      Bitbucket Cloud, BitbucketCloud
-      BITBUCKET_CLOUD, BitbucketCloud
-      AzureDevOps, AzureDevOps
-      AZURE_DEVOPS, AzureDevOps
-      Azure DevOps, AzureDevOps
-      idontknow, Unknown
-    """)
-    void findServiceForName(String name, GitRemote.Service service){
+        GitHub, GitHub
+        GITLAB, GitLab
+        bitbucket, Bitbucket
+        BitbucketCloud, BitbucketCloud
+        Bitbucket Cloud, BitbucketCloud
+        BITBUCKET_CLOUD, BitbucketCloud
+        AzureDevOps, AzureDevOps
+        AZURE_DEVOPS, AzureDevOps
+        Azure DevOps, AzureDevOps
+        idontknow, Unknown
+      """)
+    void findServiceForName(String name, GitRemote.Service service) {
         assertThat(GitRemote.Service.forName(name)).isEqualTo(service);
     }
 
