@@ -118,18 +118,19 @@ public class GitRemote {
 
         /**
          * Build a {@link URI} clone url from components, if that protocol is supported (configured) by the matched server
+         *
          * @param service  the type of SCM service
          * @param origin   the origin of the SCM service, any protocol will be stripped (and not used for matching)
          * @param path     the path to the repository
          * @param protocol the protocol to use. Supported protocols: ssh, http, https
-         * @return
+         * @return the clone URL if it could be created.
+         * @throws IllegalArgumentException if the protocol is not supported by the server.
          */
         public URI buildUri(Service service, String origin, String path, String protocol) {
             if (!ALLOWED_PROTOCOLS.contains(protocol)) {
                 throw new IllegalArgumentException("Invalid protocol: " + protocol + ". Must be one of: " + ALLOWED_PROTOCOLS);
             }
             URI selectedBaseUrl;
-
             if (service == Service.Unknown) {
                 if (PORT_PATTERN.matcher(origin).find()) {
                     throw new IllegalArgumentException("Unable to determine protocol/port combination for an unregistered origin with a port: " + origin);
@@ -142,12 +143,12 @@ public class GitRemote {
                                 .anyMatch(o -> o.equalsIgnoreCase(stripProtocol(origin)))
                         )
                         .flatMap(server -> server.getUris().stream())
-                        .filter(uri -> uri.getScheme().equals(protocol))
+                        .filter(uri -> Parser.normalize(uri).getScheme().equals(protocol))
                         .findFirst()
                         .orElseGet(() -> {
                             URI normalizedUri = Parser.normalize(origin);
                             if (!normalizedUri.getScheme().equals(protocol)) {
-                                throw new IllegalStateException("No matching server found that supports ssh for origin: " + origin);
+                                throw new IllegalArgumentException("Unable to build clone URL. No matching server found that supports " + protocol + " for origin: " + origin);
                             }
                             return normalizedUri;
                         });
@@ -217,6 +218,7 @@ public class GitRemote {
 
         /**
          * Find a registered remote server by an origin.
+         *
          * @param origin the origin of the server. Any protocol will be stripped (and not used to match)
          * @return The server if found, or an unknown type server with a normalized url/origin if not found.
          */
@@ -298,6 +300,10 @@ public class GitRemote {
         }
 
         private static final Pattern PORT_PATTERN = Pattern.compile(":\\d+(/.+)(/.+)+");
+
+        static URI normalize(URI url) {
+            return normalize(url.toString());
+        }
 
         static URI normalize(String url) {
             try {
@@ -392,10 +398,11 @@ public class GitRemote {
             Set<String> origins = new LinkedHashSet<>();
             origins.add(origin);
             for (URI uri : uris) {
-                URI normalized = Parser.normalize(uri.toString());
+                URI normalized = Parser.normalize(uri);
                 origins.add(Parser.stripProtocol(normalized.toString()));
             }
             return origins;
         }
+
     }
 }
