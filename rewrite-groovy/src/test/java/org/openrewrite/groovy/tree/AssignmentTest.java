@@ -16,19 +16,10 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
-import org.openrewrite.Parser;
-import org.openrewrite.groovy.GroovyParsingException;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.test.SourceSpec;
 
-import java.nio.file.Paths;
-import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.groovy.Assertions.groovy;
-import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
 
 @SuppressWarnings({"GroovyUnusedAssignment", "GrUnnecessarySemicolon"})
 class AssignmentTest implements RewriteTest {

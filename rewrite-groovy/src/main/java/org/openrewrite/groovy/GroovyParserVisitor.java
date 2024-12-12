@@ -1467,7 +1467,7 @@ public class GroovyParserVisitor {
             queue.add(variableDeclarations);
         }
 
-        private Optional<MultiVariable> maybeMultiVariable(){
+        private Optional<MultiVariable> maybeMultiVariable() {
             int saveCursor = cursor;
             Space commaPrefix = whitespace();
             if (source.startsWith(",", cursor)) {
@@ -2206,31 +2206,6 @@ public class GroovyParserVisitor {
         private <T> T pollQueue() {
             return (T) queue.poll();
         }
-    }
-
-    private String getKeyword(String variableName) {
-        String retVal;
-        String leftover = source.substring(cursor);
-        if (leftover.startsWith("final")) {
-            retVal = "final";
-            cursor += 5;
-        } else if (leftover.startsWith("var")) {
-            retVal = "var";
-            cursor += 3;
-        } else if (leftover.startsWith("def")) {
-            retVal = "def";
-            cursor += 3;
-        } else if (leftover.startsWith(",")) {
-            retVal = ",";
-            cursor++;
-        } else {
-            throw new IllegalStateException("Ran into unknown or unimplemented identifier at " + leftover.substring(0, 10));
-        }
-        if (!source.substring(indexOfNextNonWhitespace(cursor, source)).startsWith(variableName)) {
-            retVal += whitespace().getWhitespace();
-            retVal += getKeyword(variableName);
-        }
-        return retVal;
     }
 
     // handle the obscure case where there are empty parens ahead of a closure
