@@ -100,7 +100,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
             }
         }
         if (asBinary != j) {
-            j = j.withPrefix(asBinary.getPrefix());
+            j = j.withPrefix(asBinary.getPrefix().withWhitespace(asBinary.getPrefix().getWhitespace() + asBinary.getLeft().getPrefix().getWhitespace()));
         }
         return j;
     }

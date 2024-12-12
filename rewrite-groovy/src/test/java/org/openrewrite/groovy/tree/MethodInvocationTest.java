@@ -16,7 +16,6 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -46,7 +45,6 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("Parentheses with method invocation is not yet supported")
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4615")
     void gradleWithParentheses() {
@@ -280,7 +278,29 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("Parentheses with method invocation is not yet supported")
+    @Issue("https://github.com/openrewrite/rewrite/issues/4703")
+    @Test
+    void insideParenthesesSimple() {
+        rewriteRun(
+          groovy(
+            """
+              ((a.invoke "b" ))
+              """
+          )
+        );
+    }
+
+    @Test
+    void lotOfSpacesAroundConstantWithParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              (  ( (    "x"         )        ).toString()       )
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4703")
     @Test
     void insideParentheses() {
@@ -296,7 +316,6 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("Parentheses with method invocation is not yet supported")
     @Issue("https://github.com/openrewrite/rewrite/issues/4703")
     @Test
     void insideParenthesesWithoutNewLineAndEscapedMethodName() {

@@ -39,9 +39,9 @@ import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.marker.Semicolon;
 import org.openrewrite.java.marker.TrailingComma;
-import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.math.BigDecimal;
@@ -113,16 +113,16 @@ public class GroovyParserVisitor {
     }
 
     /**
-     *  Groovy methods can be declared with "def" AND a return type
-     *  In these cases the "def" is semantically meaningless but needs to be preserved for source code accuracy
-     *  If there is both a def and a return type, this method returns a RedundantDef object and advances the cursor
-     *  position past the "def" keyword, leaving the return type to be parsed as normal.
-     *  In any other situation an empty Optional is returned and the cursor is not advanced.
+     * Groovy methods can be declared with "def" AND a return type
+     * In these cases the "def" is semantically meaningless but needs to be preserved for source code accuracy
+     * If there is both a def and a return type, this method returns a RedundantDef object and advances the cursor
+     * position past the "def" keyword, leaving the return type to be parsed as normal.
+     * In any other situation an empty Optional is returned and the cursor is not advanced.
      */
     private Optional<RedundantDef> maybeRedundantDef(ClassNode type, String name) {
         int saveCursor = cursor;
         Space defPrefix = whitespace();
-        if(source.startsWith("def", cursor)) {
+        if (source.startsWith("def", cursor)) {
             skip("def");
             // The def is redundant only when it is followed by the method's return type
             // I hope no one puts an annotation between "def" and the return type
@@ -182,8 +182,8 @@ public class GroovyParserVisitor {
         for (ClassNode aClass : ast.getClasses()) {
             if (aClass.getSuperClass() == null ||
                 !("groovy.lang.Script".equals(aClass.getSuperClass().getName()) ||
-                     "RewriteGradleProject".equals(aClass.getSuperClass().getName()) ||
-                     "RewriteSettings".equals(aClass.getSuperClass().getName()))) {
+                  "RewriteGradleProject".equals(aClass.getSuperClass().getName()) ||
+                  "RewriteSettings".equals(aClass.getSuperClass().getName()))) {
                 sortedByPosition.computeIfAbsent(pos(aClass), i -> new ArrayList<>()).add(aClass);
             }
         }
@@ -761,21 +761,44 @@ public class GroovyParserVisitor {
             return ts;
         }
 
+        @Value
+        class ParensPosition {
+            int cursor;
+            Space prefix;
+        }
+
+        Stack<ParensPosition> openingParens = new Stack<>();
+
         private Expression insideParentheses(ASTNode node, Function<Space, Expression> parenthesizedTree) {
-            Integer insideParenthesesLevel = getInsideParenthesesLevel(node);
-            if (insideParenthesesLevel != null) {
-                Stack<Space> openingParens = new Stack<>();
-                for (int i = 0; i < insideParenthesesLevel; i++) {
-                    openingParens.push(sourceBefore("("));
+            int count = 0;
+            Space prefix = whitespace();
+            while (source.charAt(cursor) == '(') {
+                cursor++;
+                openingParens.push(new ParensPosition(cursor, prefix));
+                prefix = whitespace();
+                count++;
+            }
+            if (count != 0) {
+                Expression parenthesized = parenthesizedTree.apply(prefix);
+                if (openingParens.size() < count){
+                    count = openingParens.size();
                 }
-                Expression parenthesized = parenthesizedTree.apply(whitespace());
-                for (int i = 0; i < insideParenthesesLevel; i++) {
-                    parenthesized = new J.Parentheses<>(randomId(), openingParens.pop(), Markers.EMPTY,
+                for (int i = count; i > 0; i--) {
+                    parenthesized = new J.Parentheses<>(randomId(), openingParens.pop().getPrefix(), Markers.EMPTY,
                             padRight(parenthesized, sourceBefore(")")));
                 }
                 return parenthesized;
             }
-            return parenthesizedTree.apply(whitespace());
+            Integer insideParenthesesLevel = getInsideParenthesesLevel(node);
+            if (insideParenthesesLevel != null) {
+                Expression parenthesized = parenthesizedTree.apply(prefix);
+                for (int i = insideParenthesesLevel; i > 0; i--) {
+                    parenthesized = new J.Parentheses<>(randomId(), openingParens.pop().getPrefix(), Markers.EMPTY,
+                            padRight(parenthesized, sourceBefore(")")));
+                }
+                return parenthesized;
+            }
+            return parenthesizedTree.apply(prefix);
         }
 
         private Statement labeled(org.codehaus.groovy.ast.stmt.Statement statement, Supplier<Statement> labeledTree) {
@@ -822,8 +845,8 @@ public class GroovyParserVisitor {
             // When named parameters are in use they may appear before, after, or intermixed with any positional arguments
             if (unparsedArgs.size() > 1 && unparsedArgs.get(0) instanceof MapExpression &&
                 (unparsedArgs.get(0).getLastLineNumber() > unparsedArgs.get(1).getLastLineNumber() ||
-                    (unparsedArgs.get(0).getLastLineNumber() == unparsedArgs.get(1).getLastLineNumber() &&
-                        unparsedArgs.get(0).getLastColumnNumber() > unparsedArgs.get(1).getLastColumnNumber()))) {
+                 (unparsedArgs.get(0).getLastLineNumber() == unparsedArgs.get(1).getLastLineNumber() &&
+                  unparsedArgs.get(0).getLastColumnNumber() > unparsedArgs.get(1).getLastColumnNumber()))) {
 
                 // Figure out the source-code ordering of the expressions
                 MapExpression namedArgExpressions = (MapExpression) unparsedArgs.get(0);
@@ -909,6 +932,10 @@ public class GroovyParserVisitor {
         public void visitBinaryExpression(BinaryExpression binary) {
             queue.add(insideParentheses(binary, fmt -> {
                 Expression left = visit(binary.getLeftExpression());
+                if (left instanceof J.Parentheses) {
+                    left = ((J.Parentheses<?>) left).withTree(((J.Parentheses<?>) left).getTree().withPrefix(fmt));
+                    fmt = EMPTY;
+                }
                 Space opPrefix = whitespace();
                 boolean assignment = false;
                 boolean instanceOf = false;
@@ -1079,7 +1106,7 @@ public class GroovyParserVisitor {
                 J expr = visit(statement);
                 if (i == blockStatements.size() - 1 && (expr instanceof Expression)) {
                     if (parent instanceof ClosureExpression || (parent instanceof MethodNode &&
-                            !JavaType.Primitive.Void.equals(typeMapping.type(((MethodNode) parent).getReturnType())))) {
+                                                                !JavaType.Primitive.Void.equals(typeMapping.type(((MethodNode) parent).getReturnType())))) {
                         expr = new J.Return(randomId(), expr.getPrefix(), Markers.EMPTY,
                                 expr.withPrefix(EMPTY));
                         expr = expr.withMarkers(expr.getMarkers().add(new ImplicitReturn(randomId())));
@@ -1332,19 +1359,21 @@ public class GroovyParserVisitor {
                     jType = JavaType.Primitive.String;
                     // String literals value returned by getValue()/getText() has already processed sequences like "\\" -> "\"
                     int length = sourceLengthOfString(expression);
-                    // this is an attribute selector
-                    if (source.startsWith("@" + value, cursor)) {
-                        length += 1;
-                    }
-                    text = source.substring(cursor, cursor + length);
+                    String start = source.substring(cursor);
                     int delimiterLength = 0;
-                    if (text.startsWith("$/")) {
+                    if (start.startsWith("$/")) {
                         delimiterLength = 2;
-                    } else if (text.startsWith("\"\"\"") || text.startsWith("'''")) {
+                    } else if (start.startsWith("\"\"\"") || start.startsWith("'''")) {
                         delimiterLength = 3;
-                    } else if (text.startsWith("/") || text.startsWith("\"") || text.startsWith("'")) {
+                    } else if (start.startsWith("/") || start.startsWith("\"") || start.startsWith("'")) {
                         delimiterLength = 1;
                     }
+                    boolean attributeSelector = false;
+                    // this is an attribute selector
+                    if (source.startsWith("@" + value, cursor)) {
+                        attributeSelector = true;
+                    }
+                    text = source.substring(cursor, cursor + length + (attributeSelector ? 1 : 0));
                     value = text.substring(delimiterLength, text.length() - delimiterLength);
                 } else if (expression.isNullExpression()) {
                     if (source.startsWith("null", cursor)) {
@@ -1746,7 +1775,7 @@ public class GroovyParserVisitor {
                 MethodNode methodNode = (MethodNode) call.getNodeMetaData().get(StaticTypesMarker.DIRECT_METHOD_CALL_TARGET);
                 JavaType.Method methodType = null;
                 if (methodNode == null && call.getObjectExpression() instanceof VariableExpression &&
-                        ((VariableExpression) call.getObjectExpression()).getAccessedVariable() != null) {
+                    ((VariableExpression) call.getObjectExpression()).getAccessedVariable() != null) {
                     // Groovy doesn't know what kind of object this method is being invoked on
                     // But if this invocation is inside a Closure we may have already enriched its parameters with types from the static type checker
                     // Use any such type information to attempt to find a matching method
@@ -2646,7 +2675,7 @@ public class GroovyParserVisitor {
        Can contain a J.FieldAccess, as in a variable declaration with fully qualified type parameterization:
            List<java.lang.String>
      */
-    private JContainer<Expression> visitTypeParameterizations(GenericsType @Nullable[] genericsTypes) {
+    private JContainer<Expression> visitTypeParameterizations(GenericsType @Nullable [] genericsTypes) {
         Space prefix = sourceBefore("<");
         List<JRightPadded<Expression>> parameters;
 

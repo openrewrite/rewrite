@@ -26,6 +26,18 @@ import static org.openrewrite.groovy.Assertions.groovy;
 class CastTest implements RewriteTest {
 
     @Test
+    void javaStyleCastNew() {
+        rewriteRun(
+          groovy(
+            """
+              String foo = ( String ) "hallo"
+              String bar = "hallo" as String
+              """
+          )
+        );
+    }
+
+    @Test
     void javaStyleCast() {
         rewriteRun(
           groovy(
@@ -74,14 +86,13 @@ class CastTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              ( "" as String ).toString()
+              ( "x" as String      ).toString()
               """
           )
         );
     }
 
     @Test
-    @ExpectedToFail("Parentheses with method invocation is not yet supported")
     void groovyCastAndInvokeMethodWithParentheses() {
         rewriteRun(
           groovy(
@@ -103,7 +114,6 @@ class CastTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("Parentheses with method invocation is not yet supported")
     @Test
     void javaCastAndInvokeMethodWithParentheses() {
         rewriteRun(
