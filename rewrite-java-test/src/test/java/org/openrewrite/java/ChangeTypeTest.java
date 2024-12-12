@@ -2109,7 +2109,6 @@ class ChangeTypeTest implements RewriteTest {
 
     @Test
     void noRenameOfTypeWithMatchingPrefix() {
-        // language=java
         rewriteRun(
           spec -> spec.recipe(new ChangeType("org.codehaus.jackson.annotate.JsonIgnoreProperties", "com.fasterxml.jackson.annotation.JsonIgnoreProperties", false))
             .parser(JavaParser.fromJavaVersion()
