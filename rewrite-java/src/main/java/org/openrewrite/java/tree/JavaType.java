@@ -19,10 +19,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.Value;
-import lombok.With;
+import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
@@ -636,9 +633,11 @@ public interface JavaType {
 
         @Getter
         @With
-        final FullyQualified type;
+        @NonFinal
+        FullyQualified type;
 
-        final ElementValue @Nullable [] values;
+        @NonFinal
+        ElementValue @Nullable [] values;
 
         public Annotation(FullyQualified type, List<ElementValue> values) {
             this(type, arrayOrNullIfEmpty(values, EMPTY_ANNOTATION_VALUE_ARRAY));
@@ -647,6 +646,10 @@ public interface JavaType {
         Annotation(FullyQualified type, ElementValue @Nullable [] values) {
             this.type = type;
             this.values = nullIfEmpty(values);
+        }
+
+        @JsonCreator
+        Annotation() {
         }
 
         public List<ElementValue> getValues() {
@@ -728,15 +731,31 @@ public interface JavaType {
         }
 
         @Value
+        @AllArgsConstructor
         public static class SingleElementValue implements ElementValue {
+            @NonFinal
             JavaType element;
+
+            @NonFinal
             Object value;
+
+            @JsonCreator
+            SingleElementValue() {
+            }
         }
 
         @Value
+        @AllArgsConstructor
         public static class ArrayElementValue implements ElementValue {
+            @NonFinal
             JavaType element;
+
+            @NonFinal
             Object[] values;
+
+            @JsonCreator
+            ArrayElementValue() {
+            }
 
             @Override
             public Object getValue() {
