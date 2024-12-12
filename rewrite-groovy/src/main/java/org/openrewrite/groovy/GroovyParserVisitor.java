@@ -1419,10 +1419,8 @@ public class GroovyParserVisitor {
         @Override
         public void visitDeclarationExpression(DeclarationExpression expression) {
             Optional<RedundantDef> redundantDef = maybeRedundantDef(expression.getVariableExpression().getType(), expression.getVariableExpression().getName());
-
-            /* The identifier of this type is one of the following: the name of a type, `final`, `def`, `var` or `,`
-             The latter because MultiVariable declarations are returned as separate `DeclarationExpression` by the
-             Groovy AST */
+            Optional<MultiVariable> multiVariable = maybeMultiVariable();
+            List<J.Modifier> modifiers = getModifiers();
             TypeTree typeExpr = visitVariableExpressionType(expression.getVariableExpression());
 
             J.VariableDeclarations.NamedVariable namedVariable;
@@ -1451,16 +1449,57 @@ public class GroovyParserVisitor {
             J.VariableDeclarations variableDeclarations = new J.VariableDeclarations(
                     randomId(),
                     EMPTY,
-                    redundantDef.map(Markers.EMPTY::add).orElse(Markers.EMPTY),
+                    Markers.EMPTY,
                     emptyList(),
-                    emptyList(),
+                    modifiers,
                     typeExpr,
                     null,
                     emptyList(),
                     singletonList(JRightPadded.build(namedVariable))
             );
+            if (redundantDef.isPresent()) {
+                variableDeclarations = variableDeclarations.withMarkers(variableDeclarations.getMarkers().add(redundantDef.get()));
+            }
+            if (multiVariable.isPresent()) {
+                variableDeclarations = variableDeclarations.withMarkers(variableDeclarations.getMarkers().add(multiVariable.get()));
+            }
 
             queue.add(variableDeclarations);
+        }
+
+        private Optional<MultiVariable> maybeMultiVariable(){
+            int saveCursor = cursor;
+            Space commaPrefix = whitespace();
+            if (source.startsWith(",", cursor)) {
+                skip(",");
+                return Optional.of(new MultiVariable(randomId(), commaPrefix));
+            }
+            cursor = saveCursor;
+            return Optional.empty();
+        }
+
+        private List<J.Modifier> getModifiers() {
+            List<J.Modifier> modifiers = new ArrayList<>();
+            int saveCursor = cursor;
+            Space prefix = whitespace();
+            while (source.startsWith("def", cursor) || source.startsWith("var", cursor) || source.startsWith("final", cursor)) {
+                if (source.regionMatches(cursor, "var", 0, 3)) {
+                    modifiers.add(new J.Modifier(randomId(), prefix, Markers.EMPTY, "var", J.Modifier.Type.LanguageExtension, emptyList()));
+                    cursor += 3;
+                } else if (source.regionMatches(cursor, "def", 0, 3)) {
+                    modifiers.add(new J.Modifier(randomId(), prefix, Markers.EMPTY, "def", J.Modifier.Type.LanguageExtension, emptyList()));
+                    cursor += 3;
+                } else if (source.regionMatches(cursor, "final", 0, 5)) {
+                    modifiers.add(new J.Modifier(randomId(), prefix, Markers.EMPTY, "final", J.Modifier.Type.LanguageExtension, emptyList()));
+                    cursor += 5;
+                } else {
+                    break;
+                }
+                saveCursor = cursor;
+                prefix = whitespace();
+            }
+            cursor = saveCursor;
+            return modifiers;
         }
 
         @Override
@@ -2082,19 +2121,17 @@ public class GroovyParserVisitor {
         public TypeTree visitVariableExpressionType(VariableExpression expression) {
             JavaType type = typeMapping.type(staticType(((org.codehaus.groovy.ast.expr.Expression) expression)));
             Space prefix = whitespace();
-            String keyword;
+            String typeName = "";
 
-            if (expression.isDynamicTyped() || source.charAt(cursor) == ',') {
-                keyword = getKeyword(expression.getName());
-            } else {
-                keyword = expression.getOriginType().getUnresolvedName();
-                cursor += keyword.length();
+            if (!expression.isDynamicTyped() && source.startsWith(expression.getOriginType().getUnresolvedName(), cursor)) {
+                typeName = expression.getOriginType().getUnresolvedName();
+                cursor += typeName.length();
             }
             J.Identifier ident = new J.Identifier(randomId(),
                     EMPTY,
                     Markers.EMPTY,
                     emptyList(),
-                    keyword,
+                    typeName,
                     type, null);
             if (expression.getOriginType().getGenericsTypes() != null) {
                 return new J.ParameterizedType(randomId(), prefix, Markers.EMPTY, ident, visitTypeParameterizations(
