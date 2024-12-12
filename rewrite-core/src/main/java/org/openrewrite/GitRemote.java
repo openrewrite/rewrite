@@ -128,7 +128,7 @@ public class GitRemote {
          */
         public URI buildUri(Service service, String origin, String path, String protocol) {
             if (!ALLOWED_PROTOCOLS.contains(protocol)) {
-                throw new IllegalStateException("Invalid protocol: " + protocol + ". Must be one of: " + ALLOWED_PROTOCOLS);
+                throw new IllegalArgumentException("Invalid protocol: " + protocol + ". Must be one of: " + ALLOWED_PROTOCOLS);
             }
             URI selectedBaseUrl;
             if (service == Service.Unknown) {
@@ -148,7 +148,7 @@ public class GitRemote {
                         .orElseGet(() -> {
                             URI normalizedUri = Parser.normalize(origin);
                             if (!normalizedUri.getScheme().equals(protocol)) {
-                                throw new IllegalStateException("Unable to build clone URL. No matching server found that supports " + protocol + " for origin: " + origin);
+                                throw new IllegalArgumentException("Unable to build clone URL. No matching server found that supports " + protocol + " for origin: " + origin);
                             }
                             return normalizedUri;
                         });
