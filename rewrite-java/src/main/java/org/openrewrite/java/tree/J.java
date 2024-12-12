@@ -1979,19 +1979,16 @@ public interface J extends Tree {
         }
 
         public boolean isFullyQualifiedClassReference(String className) {
-            if (!className.contains(".")) {
+            if (getName().getFieldType() == null && getName().getType() instanceof JavaType.FullyQualified &&
+                ((JavaType.FullyQualified) getName().getType()).getFullyQualifiedName().equals(className)) {
+                return true;
+            } else if (!className.contains(".")) {
                 return false;
             }
-            return isFullyQualifiedClassReference(this, className, className.length());
+            return isFullyQualifiedClassReference(this, className.replace('$', '.'), className.length());
         }
 
         private boolean isFullyQualifiedClassReference(J.FieldAccess fieldAccess, String className, int prevDotIndex) {
-            if (fieldAccess.getName().getFieldType() == null &&
-                fieldAccess.getName().getType() instanceof JavaType.FullyQualified &&
-                ((JavaType.FullyQualified) fieldAccess.getName().getType()).getFullyQualifiedName().equals(className)) {
-                return true;
-            }
-
             int dotIndex = className.lastIndexOf('.', prevDotIndex - 1);
             if (dotIndex < 0) {
                 return false;
