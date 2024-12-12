@@ -1092,7 +1092,7 @@ class MavenPomDownloaderTest {
         }
 
         @Test
-        @DisplayName("Don't throw exception if there is no pom and but there is jar for the artifact")
+        @DisplayName("Don't throw exception if there is no pom and but there is a jar for the artifact")
         @Issue("https://github.com/openrewrite/rewrite/issues/4687")
         void pomNotFoundWithJarFoundShouldntThrow() {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);

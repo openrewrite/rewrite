@@ -23,6 +23,7 @@ import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import lombok.Getter;
 import lombok.Value;
+import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
@@ -577,9 +578,7 @@ public class MavenPomDownloader {
                             }
                         } else {
                             // infer rawPom from jar
-                            rawPom = new RawPom(null, null, gav.getGroupId(), gav.getArtifactId(), gav.getVersion(), null,
-                                    null, null, null, "jar", null, null, null,
-                                    null, null, null, null, null, null);
+                            rawPom = rawPomFromGav(gav);
                         }
 
                         Pom pom = rawPom.toPom(inputPath, repo).withGav(resolvedGav);
@@ -609,13 +608,26 @@ public class MavenPomDownloader {
                     }
                 } else {
                     try {
-                        byte[] responseBody = requestAsAuthenticatedOrAnonymous(repo, uri.toString());
+                        RawPom rawPom;
 
+                        try {
+                            byte[] responseBody = requestAsAuthenticatedOrAnonymous(repo, uri.toString());
+                            rawPom = RawPom.parse(
+                                    new ByteArrayInputStream(responseBody),
+                                    Objects.equals(versionMaybeDatedSnapshot, gav.getVersion()) ? null : versionMaybeDatedSnapshot
+                            );
+                        } catch (HttpSenderResponseException e) {
+                            if (e.isClientSideException()) {
+                                //If the exception is a common, client-side exception, cache try to get the jar
+                                String jaruri = uri.toString().replace(".pom", ".jar");
+                                requestAsAuthenticatedOrAnonymous(repo, jaruri);
+                                rawPom = rawPomFromGav(gav);
+                            } else {
+                                repositoryResponses.put(repo, e.getMessage());
+                                throw e;
+                            }
+                        }
                         Path inputPath = Paths.get(gav.getGroupId(), gav.getArtifactId(), gav.getVersion());
-                        RawPom rawPom = RawPom.parse(
-                                new ByteArrayInputStream(responseBody),
-                                Objects.equals(versionMaybeDatedSnapshot, gav.getVersion()) ? null : versionMaybeDatedSnapshot
-                        );
                         Pom pom = rawPom.toPom(inputPath, repo).withGav(resolvedGav);
                         if (!Objects.equals(versionMaybeDatedSnapshot, pom.getVersion())) {
                             pom = pom.withGav(pom.getGav().withDatedSnapshotVersion(versionMaybeDatedSnapshot));
@@ -645,6 +657,14 @@ public class MavenPomDownloader {
         sample.stop(timer.tags("outcome", "unavailable").register(Metrics.globalRegistry));
         throw new MavenDownloadingException("Unable to download POM: " + gav + '.', null, originalGav)
                     .setRepositoryResponses(repositoryResponses);
+    }
+
+    private RawPom rawPomFromGav(GroupArtifactVersion gav) {
+        RawPom rawPom;
+        rawPom = new RawPom(null, null, gav.getGroupId(), gav.getArtifactId(), gav.getVersion(), null,
+                null, null, null, "jar", null, null, null,
+                null, null, null, null, null, null);
+        return rawPom;
     }
 
     /**
