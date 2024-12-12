@@ -16,6 +16,7 @@
 package org.openrewrite.maven.tree;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.assertj.core.util.Arrays;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Nested;
@@ -29,6 +30,7 @@ import org.openrewrite.test.RewriteTest;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -320,21 +322,24 @@ class ResolvedPomTest implements RewriteTest {
             MavenRepository mavenLocal = createMavenRepository(localRepository, "local");
             createJarFile(localRepository);
 
-            AtomicBoolean downloadError = new AtomicBoolean(false);
+            List<List<@Nullable Object>> downloadErrorArgs = new ArrayList<>();
             MavenExecutionContextView ctx = MavenExecutionContextView.view(new InMemoryExecutionContext(Throwable::printStackTrace));
             ctx.setRepositories(List.of(mavenLocal));
             ctx.setResolutionListener(new ResolutionEventListener() {
                 @Override
                 public void downloadError(GroupArtifactVersion gav, List<String> attemptedUris, @Nullable Pom containing) {
-                    System.out.println("Failed to download = " + gav + " from " + attemptedUris);
-                    downloadError.set(true);
+                    List<Object> list = new ArrayList<>();
+                    list.add(gav);
+                    list.add(attemptedUris);
+                    list.add(containing);
+                    downloadErrorArgs.add(list);
                 }
             });
             rewriteRun(
               spec -> spec.executionContext(ctx),
               pomXml(POM_WITH_DEPENDENCY)
             );
-            assertTrue(downloadError.get(), "Expected a download error to be triggered");
+            assertThat(downloadErrorArgs).hasSize(1);
         }
 
         @Test
@@ -343,21 +348,24 @@ class ResolvedPomTest implements RewriteTest {
             MavenRepository mavenLocal2 = createMavenRepository(localRepository2, "local2");
             createJarFile(localRepository2);
 
-            AtomicBoolean downloadError = new AtomicBoolean(false);
+            List<List<@Nullable Object>> downloadErrorArgs = new ArrayList<>();
             MavenExecutionContextView ctx = MavenExecutionContextView.view(new InMemoryExecutionContext(Throwable::printStackTrace));
             ctx.setRepositories(List.of(mavenLocal, mavenLocal2));
             ctx.setResolutionListener(new ResolutionEventListener() {
                 @Override
                 public void downloadError(GroupArtifactVersion gav, List<String> attemptedUris, @Nullable Pom containing) {
-                    System.out.println("Failed to download = " + gav + " from " + attemptedUris);
-                    downloadError.set(true);
+                    List<Object> list = new ArrayList<>();
+                    list.add(gav);
+                    list.add(attemptedUris);
+                    list.add(containing);
+                    downloadErrorArgs.add(list);
                 }
             });
             rewriteRun(
               spec -> spec.executionContext(ctx),
               pomXml(POM_WITH_DEPENDENCY)
             );
-            assertTrue(downloadError.get(), "Expected a download error to be triggered");
+            assertThat(downloadErrorArgs).hasSize(1);
         }
 
         private static void createJarFile(Path localRepository1) throws IOException {
