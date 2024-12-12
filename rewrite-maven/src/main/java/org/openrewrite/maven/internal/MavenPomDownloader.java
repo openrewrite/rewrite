@@ -23,7 +23,6 @@ import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import lombok.Getter;
 import lombok.Value;
-import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
@@ -220,7 +219,7 @@ public class MavenPomDownloader {
                 .normalize();
         Pom parentPom = projectPoms.get(parentPath);
         return parentPom != null && parentPom.getGav().getGroupId().equals(parent.getGav().getGroupId()) &&
-               parentPom.getGav().getArtifactId().equals(parent.getGav().getArtifactId()) ? parentPom : null;
+                parentPom.getGav().getArtifactId().equals(parent.getGav().getArtifactId()) ? parentPom : null;
     }
 
     public MavenMetadata downloadMetadata(GroupArtifact groupArtifact, @Nullable ResolvedPom containingPom, List<MavenRepository> repositories) throws MavenDownloadingException {
@@ -260,9 +259,9 @@ public class MavenPomDownloader {
                 try {
                     String scheme = URI.create(repo.getUri()).getScheme();
                     String baseUri = repo.getUri() + (repo.getUri().endsWith("/") ? "" : "/") +
-                                     requireNonNull(gav.getGroupId()).replace('.', '/') + '/' +
-                                     gav.getArtifactId() + '/' +
-                                     (gav.getVersion() == null ? "" : gav.getVersion() + '/');
+                            requireNonNull(gav.getGroupId()).replace('.', '/') + '/' +
+                            gav.getArtifactId() + '/' +
+                            (gav.getVersion() == null ? "" : gav.getVersion() + '/');
 
                     if ("file".equals(scheme)) {
                         // A maven repository can be expressed as a URI with a file scheme
@@ -357,8 +356,8 @@ public class MavenPomDownloader {
 
         String scheme = URI.create(repo.getUri()).getScheme();
         String uri = repo.getUri() + (repo.getUri().endsWith("/") ? "" : "/") +
-                     requireNonNull(gav.getGroupId()).replace('.', '/') + '/' +
-                     gav.getArtifactId() + '/';
+                requireNonNull(gav.getGroupId()).replace('.', '/') + '/' +
+                gav.getArtifactId() + '/';
 
         try {
             MavenMetadata.Versioning versioning;
@@ -497,7 +496,7 @@ public class MavenPomDownloader {
         // The requested gav might itself have an unresolved placeholder in the version, so also check raw values
         for (Pom projectPom : projectPoms.values()) {
             if (!projectPom.getGroupId().equals(gav.getGroupId()) ||
-                !projectPom.getArtifactId().equals(gav.getArtifactId())) {
+                    !projectPom.getArtifactId().equals(gav.getArtifactId())) {
                 continue;
             }
 
@@ -513,7 +512,7 @@ public class MavenPomDownloader {
         }
 
         if (containingPom != null && containingPom.getRequested().getSourcePath() != null &&
-            !StringUtils.isBlank(relativePath) && !relativePath.contains(":")) {
+                !StringUtils.isBlank(relativePath) && !relativePath.contains(":")) {
             Path folderContainingPom = containingPom.getRequested().getSourcePath().getParent();
             if (folderContainingPom != null) {
                 Pom maybeLocalPom = projectPoms.get(folderContainingPom.resolve(Paths.get(relativePath, "pom.xml"))
@@ -522,9 +521,9 @@ public class MavenPomDownloader {
                 // So double check that the GAV coordinates match so that we don't get a relative path from a remote
                 // pom like ".." or "../.." which coincidentally _happens_ to have led to an unrelated pom on the local filesystem
                 if (maybeLocalPom != null &&
-                    gav.getGroupId().equals(maybeLocalPom.getGroupId()) &&
-                    gav.getArtifactId().equals(maybeLocalPom.getArtifactId()) &&
-                    gav.getVersion().equals(maybeLocalPom.getVersion())) {
+                        gav.getGroupId().equals(maybeLocalPom.getGroupId()) &&
+                        gav.getArtifactId().equals(maybeLocalPom.getArtifactId()) &&
+                        gav.getVersion().equals(maybeLocalPom.getVersion())) {
                     return maybeLocalPom;
                 }
             }
@@ -553,27 +552,28 @@ public class MavenPomDownloader {
 
             if (result == null) {
                 URI uri = URI.create(repo.getUri() + (repo.getUri().endsWith("/") ? "" : "/") +
-                                     requireNonNull(gav.getGroupId()).replace('.', '/') + '/' +
-                                     gav.getArtifactId() + '/' +
-                                     gav.getVersion() + '/' +
-                                     gav.getArtifactId() + '-' + versionMaybeDatedSnapshot + ".pom");
+                        requireNonNull(gav.getGroupId()).replace('.', '/') + '/' +
+                        gav.getArtifactId() + '/' +
+                        gav.getVersion() + '/' +
+                        gav.getArtifactId() + '-' + versionMaybeDatedSnapshot + ".pom");
                 uris.add(uri.toString());
                 if ("file".equals(uri.getScheme())) {
                     Path inputPath = Paths.get(gav.getGroupId(), gav.getArtifactId(), gav.getVersion());
 
                     try {
-                        File f = new File(uri);
-                        File jar = f.toPath().resolveSibling(gav.getArtifactId() + '-' + versionMaybeDatedSnapshot + ".jar").toFile();
+                        File pomFile = new File(uri);
+                        File jarFile = pomFile.toPath().resolveSibling(gav.getArtifactId() + '-' + versionMaybeDatedSnapshot + ".jar").toFile();
 
-                        //NOTE: The pom may exist without a .jar artifact if the pom packaging is "pom"
-                        //      a jar may also exists without a pom
-                        if (!f.exists() && !jar.exists()) {
+                        //NOTE:
+                        // - The pom may exist without a .jar artifact if the pom packaging is "pom"
+                        // - The jar may exist without a pom, if manually installed
+                        if (!pomFile.exists() && !jarFile.exists()) {
                             continue;
                         }
 
                         RawPom rawPom;
-                        if (f.exists()) {
-                            try (FileInputStream fis = new FileInputStream(f)) {
+                        if (pomFile.exists()) {
+                            try (FileInputStream fis = new FileInputStream(pomFile)) {
                                 rawPom = RawPom.parse(fis, Objects.equals(versionMaybeDatedSnapshot, gav.getVersion()) ? null : versionMaybeDatedSnapshot);
                             }
                         } else {
@@ -584,7 +584,7 @@ public class MavenPomDownloader {
                         Pom pom = rawPom.toPom(inputPath, repo).withGav(resolvedGav);
 
                         if (pom.getPackaging() == null || pom.hasJarPackaging()) {
-                            if (!jar.exists() || jar.length() == 0) {
+                            if (!jarFile.exists() || jarFile.length() == 0) {
                                 // The jar has not been downloaded, making this dependency unusable.
                                 continue;
                             }
@@ -609,7 +609,6 @@ public class MavenPomDownloader {
                 } else {
                     try {
                         RawPom rawPom;
-
                         try {
                             byte[] responseBody = requestAsAuthenticatedOrAnonymous(repo, uri.toString());
                             rawPom = RawPom.parse(
@@ -617,15 +616,13 @@ public class MavenPomDownloader {
                                     Objects.equals(versionMaybeDatedSnapshot, gav.getVersion()) ? null : versionMaybeDatedSnapshot
                             );
                         } catch (HttpSenderResponseException e) {
-                            if (e.isClientSideException()) {
-                                //If the exception is a common, client-side exception, cache try to get the jar
-                                String jaruri = uri.toString().replace(".pom", ".jar");
-                                requestAsAuthenticatedOrAnonymous(repo, jaruri);
-                                rawPom = rawPomFromGav(gav);
-                            } else {
-                                repositoryResponses.put(repo, e.getMessage());
+                            repositoryResponses.put(repo, e.getMessage());
+                            // When `pom` is not found, try to see if `jar` exists for the same GAV
+                            if (!e.isClientSideException() || !jarExistsForPomUri(repo, uri.toString())) {
                                 throw e;
                             }
+                            // Continue with a recreated pom
+                            rawPom = rawPomFromGav(gav);
                         }
                         Path inputPath = Paths.get(gav.getGroupId(), gav.getArtifactId(), gav.getVersion());
                         Pom pom = rawPom.toPom(inputPath, repo).withGav(resolvedGav);
@@ -656,15 +653,13 @@ public class MavenPomDownloader {
         ctx.getResolutionListener().downloadError(gav, uris, (containingPom == null) ? null : containingPom.getRequested());
         sample.stop(timer.tags("outcome", "unavailable").register(Metrics.globalRegistry));
         throw new MavenDownloadingException("Unable to download POM: " + gav + '.', null, originalGav)
-                    .setRepositoryResponses(repositoryResponses);
+                .setRepositoryResponses(repositoryResponses);
     }
 
     private RawPom rawPomFromGav(GroupArtifactVersion gav) {
-        RawPom rawPom;
-        rawPom = new RawPom(null, null, gav.getGroupId(), gav.getArtifactId(), gav.getVersion(), null,
+        return new RawPom(null, null, gav.getGroupId(), gav.getArtifactId(), gav.getVersion(), null,
                 null, null, null, "jar", null, null, null,
                 null, null, null, null, null, null);
-        return rawPom;
     }
 
     /**
@@ -688,9 +683,9 @@ public class MavenPomDownloader {
         if (gav.getVersion() != null && gav.getVersion().endsWith("-SNAPSHOT")) {
             for (ResolvedGroupArtifactVersion pinnedSnapshotVersion : new MavenExecutionContextView(ctx).getPinnedSnapshotVersions()) {
                 if (pinnedSnapshotVersion.getDatedSnapshotVersion() != null &&
-                    pinnedSnapshotVersion.getGroupId().equals(gav.getGroupId()) &&
-                    pinnedSnapshotVersion.getArtifactId().equals(gav.getArtifactId()) &&
-                    pinnedSnapshotVersion.getVersion().equals(gav.getVersion())) {
+                        pinnedSnapshotVersion.getGroupId().equals(gav.getGroupId()) &&
+                        pinnedSnapshotVersion.getArtifactId().equals(gav.getArtifactId()) &&
+                        pinnedSnapshotVersion.getVersion().equals(gav.getVersion())) {
                     return pinnedSnapshotVersion.getDatedSnapshotVersion();
                 }
             }
@@ -878,6 +873,34 @@ public class MavenPomDownloader {
             }
             return new ReachabilityResult(Reachability.UNREACHABLE, t);
         }
+    }
+
+    private boolean jarExistsForPomUri(MavenRepository repo, String pomUrl) {
+        String jarUrl = pomUrl.replaceAll("\\.pom$", ".jar");
+        try {
+            try {
+                return Failsafe.with(retryPolicy).get(() -> {
+                    HttpSender.Request authenticated = applyAuthenticationAndTimeoutToRequest(repo, httpSender.get(jarUrl)).build();
+                    try (HttpSender.Response response = httpSender.send(authenticated)) {
+                        return response.isSuccessful();
+                    }
+                });
+            } catch (FailsafeException failsafeException) {
+                Throwable cause = failsafeException.getCause();
+                if (cause instanceof HttpSenderResponseException && hasCredentials(repo) &&
+                        ((HttpSenderResponseException) cause).isClientSideException()) {
+                    return Failsafe.with(retryPolicy).get(() -> {
+                        HttpSender.Request unauthenticated = httpSender.get(jarUrl).build();
+                        try (HttpSender.Response response = httpSender.send(unauthenticated)) {
+                            return response.isSuccessful();
+                        }
+                    });
+                }
+            }
+        } catch (Throwable e) {
+            // Not interested in exceptions downloading the jar; we'll throw the original exception for the pom
+        }
+        return false;
     }
 
 
