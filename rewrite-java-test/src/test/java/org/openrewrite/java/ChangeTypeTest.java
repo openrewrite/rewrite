@@ -2108,6 +2108,7 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4773")
     void noRenameOfTypeWithMatchingPrefix() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType("org.codehaus.jackson.annotate.JsonIgnoreProperties", "com.fasterxml.jackson.annotation.JsonIgnoreProperties", false))
@@ -2156,6 +2157,7 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4764")
     void changeTypeOfInnerClass() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType("foo.A$Builder", "bar.A$Builder", true))
