@@ -1980,12 +1980,12 @@ public interface J extends Tree {
 
         public boolean isFullyQualifiedClassReference(String className) {
             if (getName().getFieldType() == null && getName().getType() instanceof JavaType.FullyQualified &&
-                ((JavaType.FullyQualified) getName().getType()).getFullyQualifiedName().equals(className)) {
+                TypeUtils.fullyQualifiedNamesAreEqual(((JavaType.FullyQualified) getName().getType()).getFullyQualifiedName(), className)) {
                 return true;
             } else if (!className.contains(".")) {
                 return false;
             }
-            return isFullyQualifiedClassReference(this, className.replace('$', '.'), className.length());
+            return isFullyQualifiedClassReference(this, TypeUtils.toFullyQualifiedName(className), className.length());
         }
 
         private boolean isFullyQualifiedClassReference(J.FieldAccess fieldAccess, String className, int prevDotIndex) {
