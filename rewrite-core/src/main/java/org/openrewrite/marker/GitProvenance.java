@@ -195,9 +195,9 @@ public class GitProvenance implements Marker {
             if (environment instanceof JenkinsBuildEnvironment) {
                 JenkinsBuildEnvironment jenkinsBuildEnvironment = (JenkinsBuildEnvironment) environment;
                 try (Repository repository = new RepositoryBuilder().findGitDir(projectDir.toFile()).build()) {
-                    String branch = jenkinsBuildEnvironment.getLocalBranch() != null
-                            ? jenkinsBuildEnvironment.getLocalBranch()
-                            : localBranchName(repository, jenkinsBuildEnvironment.getBranch());
+                    String branch = jenkinsBuildEnvironment.getLocalBranch() != null ?
+                            jenkinsBuildEnvironment.getLocalBranch() :
+                            localBranchName(repository, jenkinsBuildEnvironment.getBranch());
                     return fromGitConfig(repository, branch, getChangeset(repository), gitRemoteParser);
                 } catch (IllegalArgumentException | GitAPIException e) {
                     // Silently ignore if the project directory is not a git repository

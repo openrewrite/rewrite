@@ -16,12 +16,20 @@
 package org.openrewrite.xml;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.trait.Reference;
 import org.openrewrite.xml.tree.Xml;
 
+import java.nio.file.Paths;
+
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.xml.Assertions.xml;
@@ -69,6 +77,23 @@ class XmlParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void lowerCaseDocType() {
+        rewriteRun(
+          xml(
+            //language=html
+            """
+              <!doctype html>
+              <html lang="en">
+                <body>
+                  <h2><s:property value="messageStore.message" /></h2>
+                </body>
+              </html>
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2189")
     @Test
     void specialCharacters() {
@@ -91,6 +116,39 @@ class XmlParserTest implements RewriteTest {
                   <bean id="myBean"/>
               </beans>
               """
+          )
+        );
+    }
+
+    @Test
+    void javaReferenceDocument() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <beans xmlns="http://www.springframework.org/schema/beans"
+                  xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+                <bean id="testBean" class="org.springframework.beans.TestBean" scope="prototype">
+                  <property name="age" value="10"/>
+                  <property name="sibling">
+                      <bean class="org.springframework.beans.TestBean">
+                          <property name="age" value="11" class="java.lang.Integer"/>
+                          <property name="someName">
+                              <value>java.lang.String</value>
+                          </property>
+                          <property name="someOtherName">
+                              <value>java.lang</value>
+                          </property>
+                      </bean>
+                  </property>
+                </bean>
+              </beans>
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                assertThat(doc.getReferences().getReferences().stream().anyMatch(typeRef -> typeRef.getValue().equals("java.lang.String"))).isTrue();
+                assertThat(doc.getReferences().getReferences().stream().anyMatch(typeRef -> typeRef.getKind().equals(Reference.Kind.TYPE))).isTrue();
+                assertThat(doc.getReferences().getReferences().stream().anyMatch(typeRef -> typeRef.getKind().equals(Reference.Kind.PACKAGE))).isTrue();
+            })
           )
         );
     }
@@ -229,7 +287,7 @@ class XmlParserTest implements RewriteTest {
             """
               <?xml version="1.0" encoding="UTF-8"?>
               <!DOCTYPE configuration >
-
+              
               <configuration scan="true">
                   <root>
                       <level>WARN</level>
@@ -371,5 +429,29 @@ class XmlParserTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @DisabledOnOs(OS.WINDOWS)
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "foo.xml",
+      "proj.csproj",
+      "/foo/bar/baz.jsp",
+      "packages.config"
+    })
+    void acceptWithValidPaths(String path) {
+        assertThat(new XmlParser().accept(Paths.get(path))).isTrue();
+    }
+
+    @DisabledOnOs(OS.WINDOWS)
+    @ParameterizedTest
+    @ValueSource(strings = {
+      ".xml",
+      "foo.xml.",
+      "file.cpp",
+      "/foo/bar/baz.xml.txt"
+    })
+    void acceptWithInvalidPaths(String path) {
+        assertThat(new XmlParser().accept(Paths.get(path))).isFalse();
     }
 }

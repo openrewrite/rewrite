@@ -136,9 +136,9 @@ class JavaTemplateMatchTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitBinary(J.Binary binary, ExecutionContext ctx) {
-                  return JavaTemplate.matches("#{i:any(int)} == 1 && #{i} == #{j:any(int)}", getCursor())
-                    ? SearchResult.found(binary)
-                    : super.visitBinary(binary, ctx);
+                  return JavaTemplate.matches("#{i:any(int)} == 1 && #{i} == #{j:any(int)}", getCursor()) ?
+                    SearchResult.found(binary) :
+                    super.visitBinary(binary, ctx);
               }
           })),
           java(

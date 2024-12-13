@@ -26,6 +26,7 @@ import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
+import org.openrewrite.xml.AddOrUpdateChild;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.TagNameComparator;
@@ -38,6 +39,7 @@ import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
+import static org.openrewrite.maven.tree.Parent.DEFAULT_RELATIVE_PATH;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -74,7 +76,8 @@ public class ChangeParentPom extends Recipe {
     String newVersion;
 
     @Option(displayName = "Old relative path",
-            description = "The relativePath of the maven parent pom to be changed away from.",
+            description = "The relativePath of the maven parent pom to be changed away from. " +
+                          "Use an empty String to match `<relativePath />`, use `../pom.xml` to match the default value.",
             example = "../../pom.xml",
             required = false)
     @Nullable
@@ -158,7 +161,7 @@ public class ChangeParentPom extends Recipe {
 
                     if (matchesGlob(resolvedPom.getValue(tag.getChildValue("groupId").orElse(null)), oldGroupId) &&
                         matchesGlob(resolvedPom.getValue(tag.getChildValue("artifactId").orElse(null)), oldArtifactId) &&
-                        (oldRelativePath == null || matchesGlob(resolvedPom.getValue(tag.getChildValue("relativePath").orElse(null)), oldRelativePath))) {
+                        (oldRelativePath == null || matchesGlob(determineRelativePath(tag, resolvedPom), oldRelativePath))) {
                         String oldVersion = resolvedPom.getValue(tag.getChildValue("version").orElse(null));
                         assert oldVersion != null;
                         String currentGroupId = tag.getChildValue("groupId").orElse(oldGroupId);
@@ -211,9 +214,15 @@ public class ChangeParentPom extends Recipe {
                             }
 
                             // Update or add relativePath
-                            if (oldRelativePath != null && !oldRelativePath.equals(targetRelativePath)) {
-                                changeParentTagVisitors.add(new ChangeTagValueVisitor<>(t.getChild("relativePath").get(), targetRelativePath));
-                            } else if (mismatches(tag.getChild("relativePath").orElse(null), targetRelativePath)) {
+                            Optional<Xml.Tag> existingRelativePath = t.getChild("relativePath");
+                            if (oldRelativePath != null && !oldRelativePath.equals(targetRelativePath) && existingRelativePath.isPresent()) {
+                                if (StringUtils.isBlank(targetRelativePath)) {
+                                    // ChangeTagValueVisitor would keep the closing tag
+                                    changeParentTagVisitors.add(new AddOrUpdateChild<>(t, Xml.Tag.build("<relativePath />")));
+                                } else {
+                                    changeParentTagVisitors.add(new ChangeTagValueVisitor<>(existingRelativePath.get(), targetRelativePath));
+                                }
+                            } else if (mismatches(existingRelativePath.orElse(null), targetRelativePath)) {
                                 final Xml.Tag relativePathTag;
                                 if (StringUtils.isBlank(targetRelativePath)) {
                                     relativePathTag = Xml.Tag.build("<relativePath />");
@@ -281,7 +290,15 @@ public class ChangeParentPom extends Recipe {
         });
     }
 
-    private static Pattern PROPERTY_PATTERN = Pattern.compile("\\$\\{([^}]+)}");
+    private static @Nullable String determineRelativePath(Xml.Tag tag, ResolvedPom resolvedPom) {
+        Optional<Xml.Tag> relativePath = tag.getChild("relativePath");
+        if (relativePath.isPresent()) {
+            return resolvedPom.getValue(relativePath.get().getValue().orElse(""));
+        }
+        return DEFAULT_RELATIVE_PATH;
+    }
+
+    private static final Pattern PROPERTY_PATTERN = Pattern.compile("\\$\\{([^}]+)}");
 
     private static Map<String, String> getPropertiesInUse(Xml.Document pomXml, ExecutionContext ctx) {
         Map<String, String> properties = new HashMap<>();
@@ -309,8 +326,8 @@ public class ChangeParentPom extends Recipe {
             }
 
             private boolean isGlobalProperty(String propertyName) {
-                return propertyName.startsWith("project.") || propertyName.startsWith("env.")
-                        || propertyName.startsWith("settings.") || propertyName.equals("basedir");
+                return propertyName.startsWith("project.") || propertyName.startsWith("env.") ||
+                        propertyName.startsWith("settings.") || propertyName.equals("basedir");
             }
         }.visit(pomXml, ctx);
         return properties;
@@ -326,7 +343,19 @@ public class ChangeParentPom extends Recipe {
                 .filter(dep -> dep.getVersion() == null)
                 // Dependencies explicitly managed by the current pom require no changes
                 .filter(dep -> locallyManaged.stream()
-                        .noneMatch(localManagedDep -> localManagedDep.getGroupId().equals(dep.getGroupId()) && localManagedDep.getArtifactId().equals(dep.getArtifactId())))
+                        .noneMatch(localManagedDep -> {
+                            String resolvedGroupId = resolvedPom.getValue(localManagedDep.getGroupId());
+                            String resolvedArtifactId = resolvedPom.getValue(localManagedDep.getArtifactId());
+                            if (resolvedArtifactId.contains("${")) {
+                                Map<String, String> properties = resolvedPom.getProperties();
+                                resolvedArtifactId = ResolvedPom.placeholderHelper.replacePlaceholders(resolvedArtifactId, properties::get);
+                            }
+                            if (resolvedGroupId.contains("${")) {
+                                Map<String, String> properties = resolvedPom.getProperties();
+                                resolvedGroupId = ResolvedPom.placeholderHelper.replacePlaceholders(resolvedGroupId, properties::get);
+                            }
+                            return resolvedGroupId.equals(dep.getGroupId()) && resolvedArtifactId.equals(dep.getArtifactId());
+                        }))
                 .map(dep -> new GroupArtifactVersion(dep.getGroupId(), dep.getArtifactId(), null))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
 
@@ -338,7 +367,19 @@ public class ChangeParentPom extends Recipe {
                 .filter(dep -> requestedWithoutExplicitVersion.contains(dep.getGav().withVersion(null)))
                 // Exclude dependencies managed by a bom imported by the current pom
                 .filter(dep -> dep.getBomGav() == null || locallyManaged.stream()
-                        .noneMatch(localManagedDep -> localManagedDep.getGroupId().equals(dep.getBomGav().getGroupId()) && localManagedDep.getArtifactId().equals(dep.getBomGav().getArtifactId())))
+                        .noneMatch(localManagedDep -> {
+                            String resolvedGroupId = resolvedPom.getValue(localManagedDep.getGroupId());
+                            String resolvedArtifactId = resolvedPom.getValue(localManagedDep.getArtifactId());
+                            if (resolvedArtifactId.contains("${")) {
+                                Map<String, String> properties = resolvedPom.getProperties();
+                                resolvedArtifactId = ResolvedPom.placeholderHelper.replacePlaceholders(resolvedArtifactId, properties::get);
+                            }
+                            if (resolvedGroupId.contains("${")) {
+                                Map<String, String> properties = resolvedPom.getProperties();
+                                resolvedGroupId = ResolvedPom.placeholderHelper.replacePlaceholders(resolvedGroupId, properties::get);
+                            }
+                            return resolvedGroupId.equals(dep.getBomGav().getGroupId()) && resolvedArtifactId.equals(dep.getBomGav().getArtifactId());
+                        }))
                 .collect(Collectors.toList());
 
         if(depsWithoutExplicitVersion.isEmpty()) {
@@ -384,8 +425,8 @@ public class ChangeParentPom extends Recipe {
         @Override
         public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
             Xml.Tag t = super.visitTag(tag, ctx);
-            if (isPropertyTag() && key.equals(tag.getName())
-                && !value.equals(tag.getValue().orElse(null))) {
+            if (isPropertyTag() && key.equals(tag.getName()) &&
+                !value.equals(tag.getValue().orElse(null))) {
                 t = (Xml.Tag) new ChangeTagValueVisitor<>(tag, value).visitNonNull(t, ctx);
             }
             return t;

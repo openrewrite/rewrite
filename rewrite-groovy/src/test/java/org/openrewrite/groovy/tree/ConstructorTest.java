@@ -36,6 +36,24 @@ class ConstructorTest implements RewriteTest {
     }
 
     @Test
+    void declaration() {
+        rewriteRun(
+          groovy(
+            """
+              class Pair {
+                  String first
+                  String second
+                  Pair(String first, String second) {
+                      this.first = first
+                      this.second = second
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void anonymousClassDeclarationClosedOverVariable() {
         rewriteRun(
           groovy(

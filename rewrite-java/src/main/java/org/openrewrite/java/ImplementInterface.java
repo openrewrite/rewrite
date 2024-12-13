@@ -40,8 +40,8 @@ public class ImplementInterface<P> extends JavaIsoVisitor<P> {
 
     public ImplementInterface(J.ClassDeclaration scope, String interface_, @Nullable List<Expression> typeParameters) {
         this(scope, ListUtils.nullIfEmpty(typeParameters) != null ?
-                new JavaType.Parameterized(null, JavaType.ShallowClass.build(interface_), typeParameters.stream().map(Expression::getType).collect(Collectors.toList()))
-                : JavaType.ShallowClass.build(interface_),
+                new JavaType.Parameterized(null, JavaType.ShallowClass.build(interface_), typeParameters.stream().map(Expression::getType).collect(Collectors.toList())) :
+                JavaType.ShallowClass.build(interface_),
                 typeParameters
         );
     }

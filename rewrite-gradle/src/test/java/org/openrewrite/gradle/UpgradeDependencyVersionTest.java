@@ -139,6 +139,38 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void deeplyNestedProjectDependency() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+              
+              dependencies {
+                implementation project(":foo:bar:baz:qux:quux")
+              }
+              """,
+            spec -> spec.path("build.gradle")
+          ),
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+              """,
+            spec -> spec.path("foo/bar/baz/qux/quux/build.gradle")
+          ),
+          settingsGradle(
+            """
+              rootProject.name = 'my-project'
+              include("foo:bar:baz:qux:quux")
+              """
+          )
+        );
+    }
+
+    @Test
     void varargsDependency() {
         rewriteRun(
           buildGradle(
@@ -1045,6 +1077,29 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   id("java")
               }
               apply from: 'dependencies.gradle'
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4655")
+    void issue4655() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+              
+              repositories {
+                mavenCentral()
+              }
+              
+              version='ORC-246-1-SNAPSHOT'
+              dependencies {
+                implementation "com.veon.eurasia.oraculum:jira-api:$version"
+              }
               """
           )
         );

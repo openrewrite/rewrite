@@ -16,6 +16,7 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -45,10 +46,39 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
+    @ExpectedToFail("Parentheses with method invocation is not yet supported")
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4615")
+    void gradleWithParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              plugins {
+                  id 'java-library'
+              }
+              def version = (rootProject.jobName.startsWith('a')) ? "latest.release" : "3.0"
+              """
+          )
+        );
+    }
+
     @Test
     void emptyArgsWithParens() {
         rewriteRun(
           groovy("mavenCentral()")
+        );
+    }
+
+    @Test
+    void noParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              class SomeObject {}
+              def foo(String a, int b, SomeObject c, String d) {}
+              foo "a", 3, new SomeObject(), "d"
+              """
+          )
         );
     }
 
@@ -163,6 +193,72 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/4766")
+    @Test
+    void gradleFileWithMultipleClosuresWithoutParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              copySpec {
+                  from { 'src/main/webapp' } { exclude "**/*.jpg" }
+                  rename '(.+)-staging(.+)', '$1$2'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void multipleClosureArgumentsWithoutParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              def foo(Closure a, Closure b, Closure c) {}
+              foo {     }    {        } {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void multipleClosureArgumentsWithParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              def foo(Closure a, Closure b, Closure c) {}
+              foo({ }, { }, {
+              })
+              """
+          )
+        );
+    }
+
+    @Test
+    void multipleArgumentsWithClosuresAndNonClosuresWithoutParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              def foo(String a, Closure b, Closure c, String d) {}
+              foo "a", { },            {
+              }, "d"
+              """
+          )
+        );
+    }
+
+    @Test
+    void trailingClosures() {
+        rewriteRun(
+          groovy(
+            """
+              def foo(String a, int b, String c, Closure d, Closure e, Closure f) {}
+              foo("bar", 3, "baz") {       }           { } {}
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1236")
     @Test
     @SuppressWarnings("GroovyAssignabilityCheck")
@@ -258,6 +354,35 @@ class MethodInvocationTest implements RewriteTest {
                   isEmpty("")
                 }
               }
+              """
+          )
+        );
+    }
+
+    @ExpectedToFail("Parentheses with method invocation is not yet supported")
+    @Issue("https://github.com/openrewrite/rewrite/issues/4703")
+    @Test
+    void insideParentheses() {
+        rewriteRun(
+          groovy(
+            """              
+              static def foo(Map map) {
+                  ((map.containsKey("foo"))
+                      && ((map.get("foo")).equals("bar")))
+              }
+              """
+          )
+        );
+    }
+
+    @ExpectedToFail("Parentheses with method invocation is not yet supported")
+    @Issue("https://github.com/openrewrite/rewrite/issues/4703")
+    @Test
+    void insideParenthesesWithoutNewLineAndEscapedMethodName() {
+        rewriteRun(
+          groovy(
+            """
+              static def foo(Map someMap) {((((((someMap.get("(bar")))) ).'equals' "baz" )   )      }
               """
           )
         );

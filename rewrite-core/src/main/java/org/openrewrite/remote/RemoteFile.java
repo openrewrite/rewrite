@@ -69,7 +69,11 @@ public class RemoteFile implements Remote {
             Path localFile = cache.compute(uri, () -> {
                 //noinspection resource
                 HttpSender.Response response = httpSender.get(uri.toString()).send();
-                return response.getBody();
+                if (response.isSuccessful()) {
+                    return response.getBody();
+                } else {
+                    throw new IllegalStateException("Failed to download " + uri + " to artifact cache got an " + response.getCode());
+                }
             }, ctx.getOnError());
 
             if (localFile == null) {

@@ -142,8 +142,10 @@ TemplateStringLiteral
 
 TemplateStringLiteralChar
     : ~[\n\r%$"]
-    | '$' ~[{]
-    | '%' ~[{]
+    | '$' '$'
+    | '$' {_input.LA(1) != '{'}?
+    | '%' '%'
+    | '%' {_input.LA(1) != '{'}?
     | EscapeSequence
     ;
 

@@ -16,11 +16,12 @@
 package org.openrewrite.java.isolated;
 
 
+import com.sun.source.doctree.DocCommentTree;
 import com.sun.source.tree.*;
 import com.sun.source.util.TreePathScanner;
+import com.sun.tools.javac.code.Attribute;
 import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol;
-import com.sun.tools.javac.tree.DCTree;
 import com.sun.tools.javac.tree.DocCommentTable;
 import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
@@ -43,6 +44,8 @@ import org.openrewrite.style.NamedStyles;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.Name;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.*;
@@ -424,7 +427,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         JLeftPadded<TypeTree> extendings = node.getExtendsClause() == null ? null :
-                padLeft(sourceBefore("extends"), convertOrNull(node.getExtendsClause()));
+                padLeft(sourceBefore("extends"), convert(node.getExtendsClause()));
 
         JContainer<TypeTree> implementings = null;
         if (node.getImplementsClause() != null && !node.getImplementsClause().isEmpty()) {
@@ -688,7 +691,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                                 commaDelim.apply(t)
                 );
 
-        JRightPadded<Expression> condition = convertOrNull(node.getCondition(), semiDelim);
+        JRightPadded<Expression> condition = convert(node.getCondition(), semiDelim);
         if (condition == null) {
             condition = padRight(new J.Empty(randomId(), sourceBefore(";"), Markers.EMPTY), EMPTY);
         }
@@ -959,7 +962,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         List<J.Annotation> returnTypeAnnotations = collectAnnotations(annotationPosTable);
-        TypeTree returnType = convertOrNull(node.getReturnType());
+        TypeTree returnType = convert(node.getReturnType());
         if (returnType != null && !returnTypeAnnotations.isEmpty()) {
             returnType = new J.AnnotatedType(randomId(), Space.EMPTY, Markers.EMPTY,
                     returnTypeAnnotations, returnType);
@@ -1006,7 +1009,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 JContainer.build(sourceBefore("throws"), convertAll(node.getThrows(), commaDelim, noDelim),
                         Markers.EMPTY);
 
-        J.Block body = convertOrNull(node.getBody());
+        J.Block body = convert(node.getBody());
 
         JLeftPadded<Expression> defaultValue = node.getDefaultValue() == null ? null :
                 padLeft(sourceBefore("default"), convert(node.getDefaultValue()));
@@ -1032,9 +1035,9 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             while (elementType instanceof JCArrayTypeTree) {
                 elementType = ((JCArrayTypeTree) elementType).elemtype;
             }
-            typeExpr = convertOrNull(elementType);
+            typeExpr = convert(elementType);
         } else {
-            typeExpr = convertOrNull(jcVarType);
+            typeExpr = convert(jcVarType);
         }
 
         List<? extends ExpressionTree> nodeDimensions = node.getDimensions();
@@ -1084,7 +1087,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         // for enum definitions with anonymous class initializers, endPos of node identifier will be -1
-        TypeTree clazz = endPos(node.getIdentifier()) >= 0 ? convertOrNull(node.getIdentifier()) : null;
+        TypeTree clazz = endPos(node.getIdentifier()) >= 0 ? convert(node.getIdentifier()) : null;
 
         JContainer<Expression> args;
         if (positionOfNext("(", '{') > -1) {
@@ -1193,7 +1196,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
     @Override
     public J visitReturn(ReturnTree node, Space fmt) {
         skip("return");
-        Expression expression = convertOrNull(node.getExpression());
+        Expression expression = convert(node.getExpression());
         return new J.Return(randomId(), fmt, Markers.EMPTY, expression);
     }
 
@@ -1542,8 +1545,14 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 // this is a lambda parameter with an inferred type expression
                 typeExpr = null;
             } else {
-                typeExpr = new J.Identifier(randomId(), sourceBefore("var"), Markers.EMPTY, emptyList(), "var", typeMapping.type(vartype), null);
-                typeExpr = typeExpr.withMarkers(typeExpr.getMarkers().add(JavaVarKeyword.build()));
+                boolean lombokVal = isLombokVal(node);
+                typeExpr = new J.Identifier(randomId(),
+                        sourceBefore(lombokVal ? "val" : "var"),
+                        Markers.build(singletonList(JavaVarKeyword.build())),
+                        emptyList(),
+                        lombokVal ? "val" : "var",
+                        typeMapping.type(vartype),
+                        null);
             }
         } else if (vartype instanceof JCArrayTypeTree) {
             JCExpression elementType = vartype;
@@ -1555,12 +1564,16 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                     elementType = ((JCArrayTypeTree) elementType).elemtype;
                 }
             }
-            String check = source.substring(elementType.getEndPosition(endPosTable)).trim();
-            typeExpr = check.startsWith("@") || check.startsWith("[") ? convert(vartype) :
+            int idx = indexOfNextNonWhitespace(elementType.getEndPosition(endPosTable), source);
+            typeExpr = idx != -1 && (source.charAt(idx) == '[' || source.charAt(idx) == '@') ? convert(vartype) :
                     // we'll capture the array dimensions in a bit, just convert the element type
                     convert(elementType);
         } else {
             typeExpr = convert(vartype);
+        }
+
+        if (typeExpr == null && node.declaredUsingVar()) {
+            typeExpr = new J.Identifier(randomId(), sourceBefore("var"), Markers.build(singletonList(JavaVarKeyword.build())), emptyList(), "var", typeMapping.type(vartype), null);
         }
 
         if (typeExpr != null && !typeExprAnnotations.isEmpty()) {
@@ -1596,7 +1609,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                             new J.VariableDeclarations.NamedVariable(randomId(), namedVarPrefix, Markers.EMPTY,
                                     name,
                                     dimensionsAfterName,
-                                    n.init != null ? padLeft(sourceBefore("="), convertOrNull(n.init)) : null,
+                                    n.init != null ? padLeft(sourceBefore("="), convert(n.init)) : null,
                                     (JavaType.Variable) typeMapping.type(n)
                             ),
                             i == nodes.size() - 1 ? EMPTY : sourceBefore(",")
@@ -1653,7 +1666,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 bound = null;
         }
 
-        return new J.Wildcard(randomId(), fmt, Markers.EMPTY, bound, convertOrNull(wildcard.inner));
+        return new J.Wildcard(randomId(), fmt, Markers.EMPTY, bound, convert(wildcard.inner));
     }
 
     /**
@@ -1661,57 +1674,71 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
      * Conversion utilities
      * --------------
      */
-
-    private <J2 extends J> J2 convert(Tree t) {
+    private <J2 extends J> @Nullable J2 convert(@Nullable Tree t) {
+        if (t == null) {
+            return null;
+        }
         try {
-            String prefix = source.substring(cursor, max(((JCTree) t).getStartPosition(), cursor));
+            String prefix = source.substring(cursor, Math.max(cursor, getActualStartPosition((JCTree) t)));
             cursor += prefix.length();
-            @SuppressWarnings("unchecked") J2 j = (J2) scan(t, formatWithCommentTree(prefix, (JCTree) t, docCommentTable.getCommentTree((JCTree) t)));
+            // Java 21 and 23 have a different return type from getCommentTree; with reflection we can support both
+            Method getCommentTreeMethod = DocCommentTable.class.getMethod("getCommentTree", JCTree.class);
+            DocCommentTree commentTree = (DocCommentTree) getCommentTreeMethod.invoke(docCommentTable, t);
+            @SuppressWarnings("unchecked") J2 j = (J2) scan(t, formatWithCommentTree(prefix, (JCTree) t, commentTree));
             return j;
+        } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException ex) {
+            reportJavaParsingException(ex);
+            throw new IllegalStateException("Failed to invoke getCommentTree method", ex);
         } catch (Throwable ex) {
-            // this SHOULD never happen, but is here simply as a diagnostic measure in the event of unexpected exceptions
-            StringBuilder message = new StringBuilder("Failed to convert for the following cursor stack:");
-            message.append("--- BEGIN PATH ---\n");
-
-            List<Tree> paths = stream(getCurrentPath().spliterator(), false).toList();
-            for (int i = paths.size(); i-- > 0; ) {
-                JCTree tree = (JCTree) paths.get(i);
-                if (tree instanceof JCCompilationUnit) {
-                    message.append("JCCompilationUnit(sourceFile = ").append(((JCCompilationUnit) tree).sourcefile.getName()).append(")\n");
-                } else if (tree instanceof JCClassDecl) {
-                    message.append("JCClassDecl(name = ").append(((JCClassDecl) tree).name).append(", line = ").append(lineNumber(tree)).append(")\n");
-                } else if (tree instanceof JCVariableDecl) {
-                    message.append("JCVariableDecl(name = ").append(((JCVariableDecl) tree).name).append(", line = ").append(lineNumber(tree)).append(")\n");
-                } else {
-                    message.append(tree.getClass().getSimpleName()).append("(line = ").append(lineNumber(tree)).append(")\n");
-                }
-            }
-
-            message.append("--- END PATH ---\n");
-
-            ctx.getOnError().accept(new JavaParsingException(message.toString(), ex));
+            reportJavaParsingException(ex);
             throw ex;
         }
     }
 
-    private <J2 extends J> JRightPadded<J2> convert(Tree t, Function<Tree, Space> suffix) {
+    private static int getActualStartPosition(JCTree t) {
+        // not sure if this is a bug in Lombok, but the variable's start position is after the `val` annotation
+        if (t instanceof JCVariableDecl && isLombokVal((JCVariableDecl) t)) {
+            return ((JCVariableDecl) t).mods.annotations.get(0).getStartPosition();
+        }
+        return t.getStartPosition();
+    }
+
+    private void reportJavaParsingException(Throwable ex) {
+        // this SHOULD never happen, but is here simply as a diagnostic measure in the event of unexpected exceptions
+        StringBuilder message = new StringBuilder("Failed to convert for the following cursor stack:");
+        message.append("--- BEGIN PATH ---\n");
+
+        List<Tree> paths = stream(getCurrentPath().spliterator(), false).toList();
+        for (int i = paths.size(); i-- > 0; ) {
+            JCTree tree = (JCTree) paths.get(i);
+            if (tree instanceof JCCompilationUnit) {
+                message.append("JCCompilationUnit(sourceFile = ").append(((JCCompilationUnit) tree).sourcefile.getName()).append(")\n");
+            } else if (tree instanceof JCClassDecl) {
+                message.append("JCClassDecl(name = ").append(((JCClassDecl) tree).name).append(", line = ").append(lineNumber(tree)).append(")\n");
+            } else if (tree instanceof JCVariableDecl) {
+                message.append("JCVariableDecl(name = ").append(((JCVariableDecl) tree).name).append(", line = ").append(lineNumber(tree)).append(")\n");
+            } else {
+                message.append(tree.getClass().getSimpleName()).append("(line = ").append(lineNumber(tree)).append(")\n");
+            }
+        }
+
+        message.append("--- END PATH ---\n");
+
+        ctx.getOnError().accept(new JavaParsingException(message.toString(), ex));
+    }
+
+    private <J2 extends @Nullable J> @Nullable JRightPadded<J2> convert(@Nullable Tree t, Function<Tree, Space> suffix) {
+        if (t == null) {
+            return null;
+        }
         J2 j = convert(t);
-        @SuppressWarnings("ConstantConditions") JRightPadded<J2> rightPadded = j == null ? null :
-                new JRightPadded<>(j, suffix.apply(t), Markers.EMPTY);
+        JRightPadded<J2> rightPadded = new JRightPadded<>(j, suffix.apply(t), Markers.EMPTY);
         cursor(max(endPos(t), cursor)); // if there is a non-empty suffix, the cursor may have already moved past it
         return rightPadded;
     }
 
     private long lineNumber(Tree tree) {
         return source.substring(0, ((JCTree) tree).getStartPosition()).chars().filter(c -> c == '\n').count() + 1;
-    }
-
-    private <T extends J> @Nullable T convertOrNull(@Nullable Tree t) {
-        return t == null ? null : convert(t);
-    }
-
-    private <J2 extends J> @Nullable JRightPadded<J2> convertOrNull(@Nullable Tree t, Function<Tree, Space> suffix) {
-        return t == null ? null : convert(t, suffix);
     }
 
     private <J2 extends J> List<J2> convertAll(List<? extends Tree> trees) {
@@ -1761,6 +1788,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             case BREAK:
             case CONTINUE:
             case DO_WHILE_LOOP:
+            case IMPORT:
             case METHOD_INVOCATION:
             case NEW_CLASS:
             case RETURN:
@@ -1792,6 +1820,9 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
         Map<Integer, List<Tree>> treesGroupedByStartPosition = new LinkedHashMap<>();
         for (Tree t : trees) {
+            if (isLombokGenerated(t)) {
+                continue;
+            }
             treesGroupedByStartPosition.computeIfAbsent(((JCTree) t).getStartPosition(), k -> new ArrayList<>(1)).add(t);
         }
 
@@ -1815,6 +1846,53 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         return converted;
+    }
+
+    private static boolean isLombokVal(JCTree.JCVariableDecl t) {
+        if (t.sym != null && t.sym.getMetadata() != null) {
+            for (Attribute.Compound a : t.sym.getDeclarationAttributes()) {
+                if ("lombok.val".equals(a.type.toString())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean isLombokGenerated(Tree t) {
+        Symbol sym = null;
+        if (t instanceof JCAnnotation) {
+            t = ((JCAnnotation) t).getAnnotationType();
+        }
+        if (t instanceof JCIdent) {
+            sym = ((JCIdent) t).sym;
+        } else if (t instanceof JCTree.JCMethodDecl) {
+            sym = ((JCMethodDecl) t).sym;
+        } else if (t instanceof JCTree.JCClassDecl) {
+            sym = ((JCClassDecl) t).sym;
+        } else if (t instanceof JCTree.JCVariableDecl) {
+            sym = ((JCVariableDecl) t).sym;
+        }
+        return isLombokGenerated(sym);
+    }
+
+    private static boolean isLombokGenerated(@Nullable Symbol sym) {
+        if (sym == null) {
+            return false;
+        }
+        // Lombok val is represented as a @lombok.val on a "final" modifier, neither which appear in source
+        if ("lombok.val".equals(sym.getQualifiedName().toString())) {
+            return true;
+        }
+        if (sym.getMetadata() == null) {
+            return false;
+        }
+        for (Attribute.Compound a : sym.getDeclarationAttributes()) {
+            if ("lombok.Generated".equals(a.type.toString())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -1890,7 +1968,8 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                         case '*':
                             if (c2 == '/') {
                                 inMultiLineComment = false;
-                                delimIndex += 2;
+                                delimIndex++;
+                                continue;
                             }
                             break;
                     }
@@ -1992,13 +2071,18 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         int keywordStartIdx = -1;
         for (int i = cursor; i < source.length(); i++) {
             if (annotationPosTable.containsKey(i)) {
-                J.Annotation annotation = convert(annotationPosTable.get(i));
+                JCAnnotation jcAnnotation = annotationPosTable.get(i);
+                // Skip over lombok's "@val" annotation which does not actually appear in source
+                if (isLombokGenerated(jcAnnotation.getAnnotationType())) {
+                    continue;
+                }
+                J.Annotation annotation = convert(jcAnnotation);
                 if (afterFirstModifier) {
                     currentAnnotations.add(annotation);
                 } else {
                     leadingAnnotations.add(annotation);
                 }
-                i = cursor -1;
+                i = cursor - 1;
                 lastAnnotationPosition = cursor;
                 continue;
             }
@@ -2112,7 +2196,11 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         boolean inMultilineComment = false;
         for (int i = cursor; i <= maxAnnotationPosition && i < source.length(); i++) {
             if (annotationPosTable.containsKey(i)) {
-                annotations.add(convert(annotationPosTable.get(i)));
+                JCAnnotation jcAnnotation = annotationPosTable.get(i);
+                if (isLombokGenerated(jcAnnotation)) {
+                    continue;
+                }
+                annotations.add(convert(jcAnnotation));
                 i = cursor;
                 continue;
             }
@@ -2139,7 +2227,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         return annotations;
     }
 
-    Space formatWithCommentTree(String prefix, JCTree tree, DCTree.@Nullable DCDocComment commentTree) {
+    Space formatWithCommentTree(String prefix, JCTree tree, @Nullable DocCommentTree commentTree) {
         Space fmt = format(prefix);
         if (commentTree != null) {
             List<Comment> comments = fmt.getComments();

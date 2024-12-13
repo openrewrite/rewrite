@@ -91,7 +91,7 @@ public class FindPlugins extends Recipe {
                 // Even if we couldn't find a declaration the metadata might show the plugin is in use
                 GradleProject gp = s.getMarkers().findFirst(GradleProject.class).orElse(null);
                 if (!found.get() && gp != null && gp.getPlugins().stream()
-                            .anyMatch(it -> pluginId.equals(it.getId()))) {
+                        .anyMatch(it -> pluginId.equals(it.getId()))) {
                     s = SearchResult.found(s);
                 }
 
@@ -117,17 +117,18 @@ public class FindPlugins extends Recipe {
 
         MethodMatcher idMatcher = new MethodMatcher("PluginSpec id(..)", false);
         MethodMatcher versionMatcher = new MethodMatcher("Plugin version(..)", false);
-        List<GradlePlugin> pluginsWithVersion = plugins.stream().flatMap(plugin -> {
-            if (versionMatcher.matches(plugin) && idMatcher.matches(plugin.getSelect())) {
-                return Stream.of(new GradlePlugin(
-                        plugin,
-                        requireNonNull(((J.Literal) requireNonNull(((J.MethodInvocation) plugin.getSelect()))
-                                .getArguments().get(0)).getValue()).toString(),
-                        requireNonNull(((J.Literal) plugin.getArguments().get(0)).getValue()).toString()
-                ));
-            }
-            return Stream.empty();
-        }).collect(toList());
+        List<GradlePlugin> pluginsWithVersion = plugins.stream()
+                .flatMap(plugin -> {
+                    if (versionMatcher.matches(plugin) && idMatcher.matches(plugin.getSelect()) && plugin.getArguments().get(0) instanceof J.Literal) {
+                        return Stream.of(new GradlePlugin(
+                                plugin,
+                                requireNonNull(((J.Literal) requireNonNull(((J.MethodInvocation) plugin.getSelect()))
+                                        .getArguments().get(0)).getValue()).toString(),
+                                requireNonNull(((J.Literal) plugin.getArguments().get(0)).getValue()).toString()
+                        ));
+                    }
+                    return Stream.empty();
+                }).collect(toList());
         List<GradlePlugin> pluginsWithoutVersion = plugins.stream().flatMap(plugin -> {
             if (idMatcher.matches(plugin) && pluginsWithVersion.stream()
                     .noneMatch(it -> it.getPluginId().equals(plugin.getSimpleName()))) {

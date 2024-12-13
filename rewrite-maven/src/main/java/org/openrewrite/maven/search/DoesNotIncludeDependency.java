@@ -64,8 +64,8 @@ public class DoesNotIncludeDependency extends Recipe {
 
     @Override
     public String getDescription() {
-        return "A precondition which returns false if visiting a Maven pom which includes the specified dependency in the classpath of some scope. "
-                + "For compatibility with multimodule projects, this should most often be applied as a precondition.";
+        return "A precondition which returns false if visiting a Maven pom which includes the specified dependency in the classpath of some scope. " +
+                "For compatibility with multimodule projects, this should most often be applied as a precondition.";
     }
 
     @Override

@@ -127,8 +127,8 @@ public class ChangeStaticFieldToMethod extends Recipe {
                     method = (J.MethodInvocation) newArray.getInitializer().get(0);
                 }
                 if (method == null || method.getMethodType() == null) {
-                    throw new IllegalArgumentException("Error while changing a static field to a method. The generated template using a the new class ["
-                                                       + newClass + "] and the method [" + newMethodName + "] resulted in a null method type.");
+                    throw new IllegalArgumentException("Error while changing a static field to a method. The generated template using a the new class [" +
+                                                       newClass + "] and the method [" + newMethodName + "] resulted in a null method type.");
                 }
                 if (tree.getType() != null) {
                     JavaType.Method mt = method.getMethodType().withReturnType(tree.getType());

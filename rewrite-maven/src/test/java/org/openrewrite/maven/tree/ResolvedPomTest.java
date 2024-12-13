@@ -16,9 +16,20 @@
 package org.openrewrite.maven.tree;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Issue;
+import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.test.RewriteTest;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -277,5 +288,98 @@ class ResolvedPomTest implements RewriteTest {
             })
           )
         );
+    }
+
+    @Nested
+    @Issue("https://github.com/openrewrite/rewrite/issues/4687")
+    class TolerateMissingPom {
+
+        @Language("xml")
+        private static final String POM_WITH_DEPENDENCY = """
+          <project>
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>foo</groupId>
+              <artifactId>bar</artifactId>
+              <version>1.0-SNAPSHOT</version>
+              <dependencies>
+                  <dependency>
+                      <groupId>com.some</groupId>
+                      <artifactId>some-artifact</artifactId>
+                      <version>1</version>
+                  </dependency>
+              </dependencies>
+          </project>
+          """;
+
+        @TempDir
+        Path localRepository;
+        @TempDir
+        Path localRepository2;
+
+        @Test
+        void singleRepositoryContainingJar() throws IOException {
+            MavenRepository mavenLocal = createMavenRepository(localRepository, "local");
+            createJarFile(localRepository);
+
+            List<List<@Nullable Object>> downloadErrorArgs = new ArrayList<>();
+            MavenExecutionContextView ctx = MavenExecutionContextView.view(new InMemoryExecutionContext(Throwable::printStackTrace));
+            ctx.setRepositories(List.of(mavenLocal));
+            ctx.setResolutionListener(new ResolutionEventListener() {
+                @Override
+                public void downloadError(GroupArtifactVersion gav, List<String> attemptedUris, @Nullable Pom containing) {
+                    List<Object> list = new ArrayList<>();
+                    list.add(gav);
+                    list.add(attemptedUris);
+                    list.add(containing);
+                    downloadErrorArgs.add(list);
+                }
+            });
+            rewriteRun(
+              spec -> spec.executionContext(ctx),
+              pomXml(POM_WITH_DEPENDENCY)
+            );
+            assertThat(downloadErrorArgs).hasSize(1);
+        }
+
+        @Test
+        void twoRepositoriesSecondContainingJar() throws IOException {
+            MavenRepository mavenLocal = createMavenRepository(localRepository, "local");
+            MavenRepository mavenLocal2 = createMavenRepository(localRepository2, "local2");
+            createJarFile(localRepository2);
+
+            List<List<@Nullable Object>> downloadErrorArgs = new ArrayList<>();
+            MavenExecutionContextView ctx = MavenExecutionContextView.view(new InMemoryExecutionContext(Throwable::printStackTrace));
+            ctx.setRepositories(List.of(mavenLocal, mavenLocal2));
+            ctx.setResolutionListener(new ResolutionEventListener() {
+                @Override
+                public void downloadError(GroupArtifactVersion gav, List<String> attemptedUris, @Nullable Pom containing) {
+                    List<Object> list = new ArrayList<>();
+                    list.add(gav);
+                    list.add(attemptedUris);
+                    list.add(containing);
+                    downloadErrorArgs.add(list);
+                }
+            });
+            rewriteRun(
+              spec -> spec.executionContext(ctx),
+              pomXml(POM_WITH_DEPENDENCY)
+            );
+            assertThat(downloadErrorArgs).hasSize(1);
+        }
+
+        private static void createJarFile(Path localRepository1) throws IOException {
+            Path localJar = localRepository1.resolve("com/some/some-artifact/1/some-artifact-1.jar");
+            assertThat(localJar.getParent().toFile().mkdirs()).isTrue();
+            Files.writeString(localJar, "some content not to be empty");
+        }
+
+        private static MavenRepository createMavenRepository(Path localRepository, String name) {
+            return MavenRepository.builder()
+              .id(name)
+              .uri(localRepository.toUri().toString())
+              .snapshots(false)
+              .knownToExist(true)
+              .build();
+        }
     }
 }

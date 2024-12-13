@@ -269,9 +269,9 @@ public class TreeVisitingPrinter extends TreeVisitor<Tree, ExecutionContext> {
         }
 
         // print current visiting element
-        String typeName = tree instanceof J
-            ? tree.getClass().getCanonicalName().substring(tree.getClass().getPackage().getName().length() + 1)
-            : tree.getClass().getCanonicalName();
+        String typeName = tree instanceof J ?
+            tree.getClass().getCanonicalName().substring(tree.getClass().getPackage().getName().length() + 1) :
+            tree.getClass().getCanonicalName();
 
         if (skipUnvisitedElement) {
             boolean leftPadded = diffPos >= 0;

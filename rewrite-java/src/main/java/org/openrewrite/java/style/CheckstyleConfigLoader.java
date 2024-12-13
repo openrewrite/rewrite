@@ -551,8 +551,8 @@ public class CheckstyleConfigLoader {
         }
 
         public boolean prop(String key, boolean defaultValue) {
-            return properties.containsKey(key) ? parseBoolean(properties.get(key))
-                    : defaultValue;
+            return properties.containsKey(key) ? parseBoolean(properties.get(key)) :
+                    defaultValue;
         }
 
         @Override

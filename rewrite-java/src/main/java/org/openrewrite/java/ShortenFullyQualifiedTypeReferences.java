@@ -44,9 +44,9 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Any fully qualified references to Java types will be replaced with corresponding simple "
-               + "names and import statements, provided that it doesn't result in "
-               + "any conflicts with other imports or types declared in the local compilation unit.";
+        return "Any fully qualified references to Java types will be replaced with corresponding simple " +
+               "names and import statements, provided that it doesn't result in " +
+               "any conflicts with other imports or types declared in the local compilation unit.";
     }
 
     @Override

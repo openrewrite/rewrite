@@ -54,9 +54,9 @@ public class AddPropertyVisitor extends MavenIsoVisitor<ExecutionContext> {
 
     @Override
     public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-        if (!Boolean.TRUE.equals(preserveExistingValue)
-            && isPropertyTag() && key.equals(tag.getName())
-            && !value.equals(tag.getValue().orElse(null))) {
+        if (!Boolean.TRUE.equals(preserveExistingValue) &&
+            isPropertyTag() && key.equals(tag.getName()) &&
+            !value.equals(tag.getValue().orElse(null))) {
             doAfterVisit(new ChangeTagValueVisitor<>(tag, value));
         }
         return super.visitTag(tag, ctx);

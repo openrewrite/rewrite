@@ -80,7 +80,7 @@ public class RemoveDependency extends Recipe {
                 Scope checkScope = scope != null ? Scope.fromName(scope) : null;
                 ResolvedDependency dependency = findDependency(tag, checkScope);
                 if (dependency != null) {
-                    doAfterVisit(new RemoveContentVisitor<>(tag, true));
+                    doAfterVisit(new RemoveContentVisitor<>(tag, true, true));
                     maybeUpdateModel();
                 }
             }

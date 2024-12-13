@@ -55,7 +55,7 @@ public class RemoveXmlTag extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (xPathMatcher.matches(getCursor())) {
-                    doAfterVisit(new RemoveContentVisitor<>(tag, true));
+                    doAfterVisit(new RemoveContentVisitor<>(tag, true, true));
                 }
                 return super.visitTag(tag, ctx);
             }

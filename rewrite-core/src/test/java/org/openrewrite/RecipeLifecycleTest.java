@@ -25,6 +25,7 @@ import org.openrewrite.config.Environment;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.config.YamlResourceLoader;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.RecipesThatMadeChanges;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.FindAndReplace;
 import org.openrewrite.text.PlainText;
@@ -106,6 +107,56 @@ class RecipeLifecycleTest implements RewriteTest {
             "test.recipe"
           ),
           text(null, "first", spec -> spec.path("test.txt")));
+    }
+
+    @Test
+    void errorDuringScanningPhase() {
+        rewriteRun(
+          spec -> spec.recipe(new ErrorDuringScanningPhase())
+            .executionContext(new InMemoryExecutionContext()),
+          text("hello",
+            "hello",
+            spec -> spec.afterRecipe(t -> assertThat(t.getMarkers().findFirst(RecipesThatMadeChanges.class))
+              .isNotEmpty()
+              .get()
+              .as("Exception thrown in the scanning phase should record the responsible recipe")
+              .matches(m -> "org.openrewrite.RecipeLifecycleTest$ErrorDuringScanningPhase".equals(m.getRecipes().iterator().next().get(0).getDescriptor().getName()))
+            )
+        ));
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false)
+    static class ErrorDuringScanningPhase extends ScanningRecipe<Integer> {
+
+        @Override
+        public Integer getInitialValue(ExecutionContext ctx) {
+            return 0;
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getScanner(Integer acc) {
+            //noinspection NullableProblems
+            return new TreeVisitor<>() {
+                @Override
+                public Tree visit(Tree tree, ExecutionContext ctx) {
+                    if (tree.getMarkers().findFirst(RecipesThatMadeChanges.class).isPresent()) {
+                        return tree;
+                    }
+                    throw new IllegalStateException("");
+                }
+            };
+        }
+
+        @Override
+        public String getDisplayName() {
+            return "Throw exception";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Throws an exception in the scanning phase.";
+        }
     }
 
     @Value

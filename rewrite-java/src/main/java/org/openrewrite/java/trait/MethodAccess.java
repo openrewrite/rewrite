@@ -41,8 +41,13 @@ public class MethodAccess implements Trait<MethodCall> {
 
     @RequiredArgsConstructor
     public static class Matcher extends SimpleTraitMatcher<MethodAccess> {
+        @Nullable
         private final MethodMatcher methodMatcher;
         private Predicate<@Nullable JavaType> returnsTest = m -> true;
+
+        public Matcher() {
+            methodMatcher = null;
+        }
 
         public Matcher(String methodPattern) {
             this(new MethodMatcher(methodPattern));
@@ -87,9 +92,7 @@ public class MethodAccess implements Trait<MethodCall> {
             Object value = cursor.getValue();
             JavaType.Method methodType = ((MethodCall) value).getMethodType();
             JavaType returnType = methodType == null ? null : methodType.getReturnType();
-
-            return methodMatcher.matches(((Expression) value)) &&
-                   returnsTest.test(returnType) ?
+            return returnsTest.test(returnType) && (methodMatcher == null || methodMatcher.matches((Expression) value)) ?
                     new MethodAccess(cursor) :
                     null;
         }

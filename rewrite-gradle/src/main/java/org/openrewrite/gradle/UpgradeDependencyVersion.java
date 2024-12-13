@@ -32,7 +32,6 @@ import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
@@ -140,8 +139,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
         return new DependencyVersionState();
     }
 
-    private static final MethodMatcher DEPENDENCY_DSL_MATCHER = new MethodMatcher("DependencyHandlerSpec *(..)");
-
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(DependencyVersionState acc) {
 
@@ -163,7 +160,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
                 GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
 
-                if (gradleDependencyMatcher.get(getCursor()).isPresent() || DEPENDENCY_DSL_MATCHER.matches(m)) {
+                if (gradleDependencyMatcher.get(getCursor()).isPresent()) {
                     if (m.getArguments().get(0) instanceof G.MapEntry) {
                         String groupId = null;
                         String artifactId = null;
@@ -374,14 +371,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
         @Override
         public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-            if ("constraints".equals(method.getSimpleName())) {
-                // don't mess with anything inside a constraints block, leave that to UpgradeTransitiveDependency version recipe
-                return method;
-            }
             J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
             GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
 
-            if (gradleDependencyMatcher.get(getCursor()).isPresent() || DEPENDENCY_DSL_MATCHER.matches(m)) {
+            if (gradleDependencyMatcher.get(getCursor()).isPresent()) {
                 List<Expression> depArgs = m.getArguments();
                 if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry) {
                     m = updateDependency(m, ctx);
@@ -434,9 +427,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         return arg;
                     }
                     Dependency dep = DependencyStringNotationConverter.parse(gav);
-                    if (dep != null && dependencyMatcher.matches(dep.getGroupId(), dep.getArtifactId())
-                        && dep.getVersion() != null
-                        && !dep.getVersion().startsWith("$")) {
+                    if (dep != null && dependencyMatcher.matches(dep.getGroupId(), dep.getArtifactId()) &&
+                        dep.getVersion() != null &&
+                        !dep.getVersion().startsWith("$")) {
                         Object scanResult = acc.gaToNewVersion.get(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()));
                         if (scanResult instanceof Exception) {
                             getCursor().putMessage(UPDATE_VERSION_ERROR_KEY, scanResult);
@@ -472,9 +465,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 m = Markup.warn(m, err);
             }
             List<Expression> depArgs = m.getArguments();
-            if (depArgs.size() >= 3 && depArgs.get(0) instanceof G.MapEntry
-                && depArgs.get(1) instanceof G.MapEntry
-                && depArgs.get(2) instanceof G.MapEntry) {
+            if (depArgs.size() >= 3 && depArgs.get(0) instanceof G.MapEntry &&
+                depArgs.get(1) instanceof G.MapEntry &&
+                depArgs.get(2) instanceof G.MapEntry) {
                 Expression groupValue = ((G.MapEntry) depArgs.get(0)).getValue();
                 Expression artifactValue = ((G.MapEntry) depArgs.get(1)).getValue();
                 if (!(groupValue instanceof J.Literal) || !(artifactValue instanceof J.Literal)) {

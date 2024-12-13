@@ -98,23 +98,23 @@ public class ChangePropertyValue extends Recipe {
 
         // returns null if value should not change
         private Properties.@Nullable Value updateValue(Properties.Value value) {
-            Properties.Value updatedValue = value.withText(Boolean.TRUE.equals(regex)
-                    ? value.getText().replaceAll(oldValue, newValue)
-                    : newValue);
+            Properties.Value updatedValue = value.withText(Boolean.TRUE.equals(regex) ?
+                    value.getText().replaceAll(oldValue, newValue) :
+                    newValue);
             return updatedValue.getText().equals(value.getText()) ? null : updatedValue;
         }
 
         private boolean matchesPropertyKey(String prop) {
-            return !Boolean.FALSE.equals(relaxedBinding)
-                    ? NameCaseConvention.matchesGlobRelaxedBinding(prop, propertyKey)
-                    : StringUtils.matchesGlob(prop, propertyKey);
+            return !Boolean.FALSE.equals(relaxedBinding) ?
+                    NameCaseConvention.matchesGlobRelaxedBinding(prop, propertyKey) :
+                    StringUtils.matchesGlob(prop, propertyKey);
         }
 
         private boolean matchesOldValue(Properties.Value value) {
             return StringUtils.isNullOrEmpty(oldValue) ||
-                   (Boolean.TRUE.equals(regex)
-                           ? Pattern.compile(oldValue).matcher(value.getText()).find()
-                           : value.getText().equals(oldValue));
+                   (Boolean.TRUE.equals(regex) ?
+                           Pattern.compile(oldValue).matcher(value.getText()).find() :
+                           value.getText().equals(oldValue));
         }
     }
 

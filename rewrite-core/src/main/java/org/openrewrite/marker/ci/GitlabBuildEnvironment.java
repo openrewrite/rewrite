@@ -56,9 +56,9 @@ public class GitlabBuildEnvironment implements BuildEnvironment {
 
     @Override
     public GitProvenance buildGitProvenance() throws IncompleteGitConfigException {
-        if (StringUtils.isBlank(ciRepositoryUrl)
-            || StringUtils.isBlank(ciCommitRefName)
-            || StringUtils.isBlank(ciCommitSha)) {
+        if (StringUtils.isBlank(ciRepositoryUrl) ||
+            StringUtils.isBlank(ciCommitRefName) ||
+            StringUtils.isBlank(ciCommitSha)) {
             throw new IncompleteGitConfigException();
         }
         return new GitProvenance(UUID.randomUUID(), ciRepositoryUrl, ciCommitRefName, ciCommitSha,

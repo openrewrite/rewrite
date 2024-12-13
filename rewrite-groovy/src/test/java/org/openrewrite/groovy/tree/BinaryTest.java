@@ -15,13 +15,14 @@
  */
 package org.openrewrite.groovy.tree;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
-@SuppressWarnings({"GroovyUnusedAssignment", "GrUnnecessarySemicolon", "UnnecessaryQualifiedReference"})
+@SuppressWarnings({"GroovyUnusedAssignment", "GrUnnecessarySemicolon", "UnnecessaryQualifiedReference", "GrMethodMayBeStatic"})
 class BinaryTest implements RewriteTest {
 
     @SuppressWarnings("GroovyConstantConditional")
@@ -33,7 +34,9 @@ class BinaryTest implements RewriteTest {
 
           // NOT inside parentheses, but verifies the parser's
           // test for "inside parentheses" condition
-          groovy("(1) + 1")
+          groovy("(1) + 1"),
+          // And combine the two cases
+          groovy("((1) + 1)")
         );
     }
 
@@ -56,6 +59,19 @@ class BinaryTest implements RewriteTest {
             """
               def a = []
               boolean b = 42 in a;
+              """
+          )
+        );
+    }
+
+    @Test
+    void withVariable() {
+        rewriteRun(
+          groovy(
+            """
+              def foo(int a) {
+                  60 + a
+              }
               """
           )
         );
@@ -195,6 +211,23 @@ class BinaryTest implements RewriteTest {
           groovy(
             """
               def foo = ("-" * 4)
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4703")
+    @Test
+    void extraParensAroundInfixOperator() {
+        rewriteRun(
+          groovy(
+            """
+              def timestamp(int hours, int minutes, int seconds) {
+                  (hours) * 60 * 60 + (minutes * 60) + seconds
+              }
+              def differenceInDays(int time) {
+                  return (int) ((time)/(1000*60*60*24))
+              }
               """
           )
         );

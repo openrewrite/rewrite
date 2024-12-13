@@ -134,7 +134,7 @@ public interface J extends Tree {
         }
 
         /**
-         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(J)} instead.
+         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(Cursor)} instead.
          */
         @Deprecated
         public List<Annotation> getAllAnnotations() {
@@ -218,7 +218,7 @@ public interface J extends Tree {
         }
 
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             return annotationType.getType();
         }
 
@@ -1222,6 +1222,12 @@ public interface J extends Tree {
         @Nullable
         JLeftPadded<TypeTree> extendings;
 
+        /**
+         * This is used to access the parent class.
+         *
+         * @return The parent class of the ClassDeclaration. If the ClassDeclaration is a class, this will return the
+         * class specified by the 'extends' keyword. If the ClassDeclaration is an interface, this will return null.
+         */
         public @Nullable TypeTree getExtends() {
             return extendings == null ? null : extendings.getElement();
         }
@@ -1233,6 +1239,13 @@ public interface J extends Tree {
         @Nullable
         JContainer<TypeTree> implementings;
 
+        /**
+         * This is used to access the parent interfaces.
+         *
+         * @return A list of the parent interfaces of the ClassDeclaration. If the ClassDeclaration is a class, this
+         * will return the interfaces specified by the 'implements' keyword. If the ClassDeclaration is an interface,
+         * this will return the interfaces specified by the 'extends' keyword.
+         */
         public @Nullable List<TypeTree> getImplements() {
             return implementings == null ? null : implementings.getElements();
         }
@@ -1279,7 +1292,7 @@ public interface J extends Tree {
         }
 
         /**
-         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(J)} instead.
+         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(Cursor)} instead.
          */
         @Deprecated
         // gather annotations from everywhere they may occur
@@ -1760,7 +1773,7 @@ public interface J extends Tree {
         Markers markers;
 
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             return null;
         }
 
@@ -1966,21 +1979,30 @@ public interface J extends Tree {
         }
 
         public boolean isFullyQualifiedClassReference(String className) {
-            return isFullyQualifiedClassReference(this, className);
-        }
-
-        private boolean isFullyQualifiedClassReference(J.FieldAccess fieldAccess, String className) {
-            if (!className.contains(".")) {
+            if (getName().getFieldType() == null && getName().getType() instanceof JavaType.FullyQualified &&
+                !(getName().getType() instanceof JavaType.Unknown) &&
+                TypeUtils.fullyQualifiedNamesAreEqual(((JavaType.FullyQualified) getName().getType()).getFullyQualifiedName(), className)) {
+                return true;
+            } else if (!className.contains(".")) {
                 return false;
             }
-            if (!fieldAccess.getName().getSimpleName().equals(className.substring(className.lastIndexOf('.') + 1))) {
+            return isFullyQualifiedClassReference(this, TypeUtils.toFullyQualifiedName(className), className.length());
+        }
+
+        private boolean isFullyQualifiedClassReference(J.FieldAccess fieldAccess, String className, int prevDotIndex) {
+            int dotIndex = className.lastIndexOf('.', prevDotIndex - 1);
+            if (dotIndex < 0) {
+                return false;
+            }
+            String simpleName = fieldAccess.getName().getSimpleName();
+            if (!simpleName.regionMatches(0, className, dotIndex + 1, Math.max(simpleName.length(), prevDotIndex - dotIndex - 1))) {
                 return false;
             }
             if (fieldAccess.getTarget() instanceof J.FieldAccess) {
-                return isFullyQualifiedClassReference((J.FieldAccess) fieldAccess.getTarget(), className.substring(0, className.lastIndexOf('.')));
+                return isFullyQualifiedClassReference((J.FieldAccess) fieldAccess.getTarget(), className, dotIndex);
             }
             if (fieldAccess.getTarget() instanceof Identifier) {
-                return ((Identifier) fieldAccess.getTarget()).getSimpleName().equals(className.substring(0, className.lastIndexOf('.')));
+                return ((Identifier) fieldAccess.getTarget()).getSimpleName().equals(className.substring(0, dotIndex));
             }
             return false;
         }
@@ -3674,7 +3696,7 @@ public interface J extends Tree {
         }
 
         /**
-         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(J)} instead.
+         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(Cursor)} instead.
          */
         @Deprecated
         // gather annotations from everywhere they may occur
@@ -4014,6 +4036,11 @@ public interface J extends Tree {
         @With
         @Getter
         List<Annotation> annotations;
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitModifier(this, p);
+        }
 
         /**
          * @deprecated Use {@link #Modifier(UUID, Space, Markers, String, Type, List)} instead.
@@ -4830,7 +4857,7 @@ public interface J extends Tree {
         }
 
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             J2 element = tree.getElement();
             if (element instanceof Expression) {
                 return ((Expression) element).getType();
@@ -5792,7 +5819,7 @@ public interface J extends Tree {
         }
 
         /**
-         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(J)} instead.
+         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(Cursor)} instead.
          */
         @Deprecated
         // gather annotations from everywhere they may occur
@@ -5898,16 +5925,16 @@ public interface J extends Tree {
 
             public Cursor getDeclaringScope(Cursor cursor) {
                 return cursor.dropParentUntil(it ->
-                        it instanceof J.Block
-                        || it instanceof J.Lambda
-                        || it instanceof J.MethodDeclaration
-                        || it == Cursor.ROOT_VALUE);
+                        it instanceof J.Block ||
+                        it instanceof J.Lambda ||
+                        it instanceof J.MethodDeclaration ||
+                        it == Cursor.ROOT_VALUE);
             }
 
             public boolean isField(Cursor cursor) {
                 Cursor declaringScope = getDeclaringScope(cursor);
-                return declaringScope.getValue() instanceof J.Block
-                       && declaringScope.getParentTreeCursor().getValue() instanceof J.ClassDeclaration;
+                return declaringScope.getValue() instanceof J.Block &&
+                       declaringScope.getParentTreeCursor().getValue() instanceof J.ClassDeclaration;
             }
 
             public Padding getPadding() {
@@ -6096,7 +6123,7 @@ public interface J extends Tree {
         NameTree boundedType;
 
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             return null;
         }
 

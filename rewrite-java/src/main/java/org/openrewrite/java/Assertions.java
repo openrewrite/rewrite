@@ -28,7 +28,10 @@ import org.openrewrite.java.marker.JavaVersion;
 import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.test.*;
+import org.openrewrite.test.SourceSpec;
+import org.openrewrite.test.SourceSpecs;
+import org.openrewrite.test.TypeValidation;
+import org.openrewrite.test.UncheckedConsumer;
 
 import java.nio.file.Path;
 import java.util.*;
@@ -60,8 +63,8 @@ public class Assertions {
     }
 
     private static void assertValidTypes(TypeValidation typeValidation, J sf) {
-        if (typeValidation.identifiers() || typeValidation.methodInvocations() || typeValidation.methodDeclarations() || typeValidation.classDeclarations()
-                || typeValidation.constructorInvocations()) {
+        if (typeValidation.identifiers() || typeValidation.methodInvocations() || typeValidation.methodDeclarations() || typeValidation.classDeclarations() ||
+            typeValidation.constructorInvocations()) {
             List<FindMissingTypes.MissingTypeResult> missingTypeResults = FindMissingTypes.findMissingTypes(sf);
             missingTypeResults = missingTypeResults.stream()
                     .filter(missingType -> {
@@ -83,8 +86,12 @@ public class Assertions {
                     })
                     .collect(Collectors.toList());
             if (!missingTypeResults.isEmpty()) {
-                throw new IllegalStateException("LST contains missing or invalid type information\n" + missingTypeResults.stream().map(v -> v.getPath() + "\n" + v.getPrintedTree())
-                        .collect(Collectors.joining("\n\n")));
+                String missingTypes = missingTypeResults.stream()
+                        .map(v -> v.getPath() + "\n" + v.getPrintedTree())
+                        .collect(Collectors.joining("\n\n"));
+                throw new IllegalStateException(
+                        "LST contains missing or invalid type information\n" + missingTypes +
+                        "\nhttps://docs.openrewrite.org/reference/faq#im-seeing-lst-contains-missing-or-invalid-type-information-in-my-recipe-unit-tests-how-to-resolve");
             }
         }
     }

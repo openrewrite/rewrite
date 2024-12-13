@@ -14,6 +14,7 @@ package com.amazonaws.serverless.proxy.internal;
 
 import com.amazonaws.serverless.proxy.model.ContainerConfig;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -80,20 +81,19 @@ public final class SecurityUtils {
      * @param s The string to be cleaned
      * @return A copy of the original string without CRLF characters
      */
-    public static String crlf(String s) {
+    public static @Nullable String crlf(String s) {
         if (s == null) {
             return null;
         }
         return s.replaceAll("[\r\n]", "");
     }
 
-
     /**
      * Escapes all special characters in a java string
      * @param s The string to be cleaned
      * @return The escaped string
      */
-    public static String encode(String s) {
+    public static @Nullable String encode(String s) {
         if (s == null) {
             return null;
         }
@@ -188,7 +188,7 @@ public final class SecurityUtils {
      * @throws IllegalArgumentException If the given path is not valid or outside of /tmp
      */
     @SuppressFBWarnings("PATH_TRAVERSAL_IN")
-    public static String getValidFilePath(final String inputPath, boolean isWrite) {
+    public static @Nullable String getValidFilePath(final String inputPath, boolean isWrite) {
         if (inputPath == null || "".equals(inputPath.trim())) {
             return null;
         }

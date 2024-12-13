@@ -20,6 +20,7 @@ import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTree;
+import org.antlr.v4.runtime.tree.RuleNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
@@ -33,7 +34,6 @@ import org.openrewrite.yaml.tree.Yaml;
 import java.util.*;
 import java.util.function.BiPredicate;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.disjoint;
 
@@ -48,33 +48,31 @@ import static java.util.Collections.disjoint;
 public class JsonPathMatcher {
 
     private final String jsonPath;
+    private JsonPathParser.@Nullable JsonPathContext parsed;
 
     public JsonPathMatcher(String jsonPath) {
         this.jsonPath = jsonPath;
     }
 
     public <T> Optional<T> find(Cursor cursor) {
-        LinkedList<Tree> cursorPath = cursor.getPathAsStream()
-                .filter(o -> o instanceof Tree)
-                .map(Tree.class::cast)
-                .map(t -> new ReplaceAliasWithAnchorValueVisitor<Integer>()
-                        .visitNonNull(t, 0))
-                .collect(Collectors.toCollection(LinkedList::new));
+        return find0(cursor, resolvedAncestors(cursor));
+    }
+
+    private <T> Optional<T> find0(Cursor cursor, List<Tree> cursorPath) {
         if (cursorPath.isEmpty()) {
             return Optional.empty();
         }
-        Collections.reverse(cursorPath);
 
         Tree start;
         if (jsonPath.startsWith(".") && !jsonPath.startsWith("..")) {
             start = cursor.getValue();
         } else {
-            start = cursorPath.peekFirst();
+            start = cursorPath.get(0);
         }
-        JsonPathParser.JsonPathContext ctx = jsonPath().jsonPath();
+        JsonPathParser.JsonPathContext ctx = parse();
         // The stop may be optimized by interpreting the ExpressionContext and pre-determining the last visit.
         JsonPathParser.ExpressionContext stop = (JsonPathParser.ExpressionContext) ctx.children.get(ctx.children.size() - 1);
-        @SuppressWarnings("ConstantConditions") JsonPathParserVisitor<Object> v = new JsonPathMatcher.JsonPathYamlVisitor(cursorPath, start, stop, false);
+        @SuppressWarnings("ConstantConditions") JsonPathParserVisitor<Object> v = new JsonPathYamlVisitor(cursorPath, start, stop, false);
         Object result = v.visit(ctx);
 
         //noinspection unchecked
@@ -82,16 +80,9 @@ public class JsonPathMatcher {
     }
 
     public boolean matches(Cursor cursor) {
-        Object cursorValue = new ReplaceAliasWithAnchorValueVisitor<Integer>().visit((Tree)cursor.getValue(), 0);
-        List<Object> cursorPath = cursor.getPathAsStream()
-                .map(cp -> {
-                    if (cp instanceof Yaml) {
-                        cp = new ReplaceAliasWithAnchorValueVisitor<Integer>().visit((Yaml) cp, 0);
-                    }
-                    return cp;
-                })
-                .collect(Collectors.toList());
-        return find(cursor).map(o -> {
+        List<Tree> cursorPath = resolvedAncestors(cursor);
+        Object cursorValue = cursorPath.get(cursorPath.size() - 1);
+        return find0(cursor, cursorPath).map(o -> {
             if (o instanceof List) {
                 //noinspection unchecked
                 List<Object> l = (List<Object>) o;
@@ -100,6 +91,50 @@ public class JsonPathMatcher {
                 return Objects.equals(o, cursorValue);
             }
         }).orElse(false);
+    }
+
+    private static List<Tree> resolvedAncestors(Cursor cursor) {
+        ArrayDeque<Tree> deque = new ArrayDeque<>();
+        Map<Tree, Tree> resolved = new IdentityHashMap<>();
+        for (Iterator<Object> it = cursor.getPath(Tree.class::isInstance); it.hasNext(); ) {
+            Tree tree = (Tree) it.next();
+            if (tree instanceof Yaml.Document) {
+                tree = new ReplaceAliasWithAnchorValueVisitor<Integer>() {
+                    @Override
+                    public @Nullable Yaml visit(@Nullable Tree tree, Integer p) {
+                        // NOTE: not calling `super.visit()` for performance reasons
+                        if (tree instanceof Yaml) {
+                            Yaml updated = ((Yaml) tree).acceptYaml(this, p);
+                            if (updated != tree) {
+                                resolved.put(tree, updated);
+                            }
+                            return updated;
+                        }
+                        return (Yaml) tree;
+                    }
+                }.visitNonNull(tree, 0);
+                deque.addFirst(tree);
+                break;
+            }
+            deque.addFirst(tree);
+        }
+        ArrayList<Tree> list = new ArrayList<>(deque);
+        if (!resolved.isEmpty()) {
+            for (int i = 0; i < list.size(); i++) {
+                Tree tree = list.get(i);
+                if (resolved.containsKey(tree)) {
+                    list.set(i, resolved.get(tree));
+                }
+            }
+        }
+        return list;
+    }
+
+    private JsonPathParser.JsonPathContext parse() {
+        if (parsed == null) {
+            parsed = jsonPath().jsonPath();
+        }
+        return parsed;
     }
 
     private JsonPathParser jsonPath() {
@@ -132,16 +167,26 @@ public class JsonPathMatcher {
         }
 
         @Override
+        protected boolean shouldVisitNextChild(RuleNode node, Object currentResult) {
+            return scope != null;
+        }
+
+        @Override
         public Object visitJsonPath(JsonPathParser.JsonPathContext ctx) {
-            if (ctx.ROOT() != null || "[".equals(ctx.start.getText())) {
-                scope = cursorPath.stream()
-                        .filter(t -> t instanceof Yaml.Mapping)
-                        .findFirst()
-                        .orElseGet(() -> cursorPath.stream()
-                                .filter(t -> t instanceof Yaml.Document && ((Yaml.Document) t).getBlock() instanceof Yaml.Mapping)
-                                .map(t -> ((Yaml.Document) t).getBlock())
-                                .findFirst()
-                                .orElse(null));
+            MATCH:
+            if (ctx.ROOT() != null || ctx.start.getType() == JsonPathLexer.LBRACK) {
+                Tree first = cursorPath.get(0);
+                if (first instanceof Yaml.Document) {
+                    scope = ((Yaml.Document) first).getBlock();
+                    break MATCH;
+                }
+                for (Tree tree : cursorPath) {
+                    if (tree instanceof Yaml.Mapping) {
+                        scope = tree;
+                        break MATCH;
+                    }
+                }
+                scope = null;
             }
             return super.visitJsonPath(ctx);
         }
@@ -154,7 +199,7 @@ public class JsonPathMatcher {
         }
 
         @Override
-        public Object visitRecursiveDecent(JsonPathParser.RecursiveDecentContext ctx) {
+        public @Nullable Object visitRecursiveDecent(JsonPathParser.RecursiveDecentContext ctx) {
             if (scope == null) {
                 return null;
             }
@@ -167,7 +212,7 @@ public class JsonPathMatcher {
             if (previous.indexOf(current) - 1 < 0 || "$".equals(previous.get(previous.indexOf(current) - 1).getText())) {
                 List<Object> results = new ArrayList<>();
                 for (Tree path : cursorPath) {
-                    JsonPathMatcher.JsonPathYamlVisitor v = new JsonPathMatcher.JsonPathYamlVisitor(cursorPath, path, null, false);
+                    JsonPathYamlVisitor v = new JsonPathYamlVisitor(cursorPath, path, null, false);
                     for (int i = 1; i < ctx.getChildCount(); i++) {
                         result = v.visit(ctx.getChild(i));
                         if (result != null) {
@@ -178,7 +223,7 @@ public class JsonPathMatcher {
                 return results;
                 // Otherwise, the recursive descent is scoped to the previous match. `$.foo..['find-in-foo']`.
             } else {
-                JsonPathMatcher.JsonPathYamlVisitor v = new JsonPathMatcher.JsonPathYamlVisitor(cursorPath, scope, null, true);
+                JsonPathYamlVisitor v = new JsonPathYamlVisitor(cursorPath, scope, null, true);
                 for (int i = 1; i < ctx.getChildCount(); i++) {
                     result = v.visit(ctx.getChild(i));
                     if (result != null) {
@@ -190,16 +235,18 @@ public class JsonPathMatcher {
         }
 
         @Override
-        public Object visitBracketOperator(JsonPathParser.BracketOperatorContext ctx) {
+        public @Nullable Object visitBracketOperator(JsonPathParser.BracketOperatorContext ctx) {
             if (!ctx.property().isEmpty()) {
                 if (ctx.property().size() == 1) {
                     return visitProperty(ctx.property(0));
                 }
 
                 // Return a list if more than 1 property is specified.
-                return ctx.property().stream()
-                        .map(this::visitProperty)
-                        .collect(Collectors.toList());
+                List<Object> list = new ArrayList<>();
+                for (JsonPathParser.PropertyContext propertyContext : ctx.property()) {
+                    list.add(visitProperty(propertyContext));
+                }
+                return list;
             } else if (ctx.slice() != null) {
                 return visitSlice(ctx.slice());
             } else if (ctx.indexes() != null) {
@@ -229,7 +276,7 @@ public class JsonPathMatcher {
 
             // A wildcard will use these initial values, so it is not checked in the conditions.
             int start = 0;
-            int limit = Integer.MAX_VALUE;
+            int limit = results.size();
 
             if (ctx.PositiveNumber() != null) {
                 // [:n], Selects the first n elements of the array.
@@ -245,10 +292,7 @@ public class JsonPathMatcher {
                 limit = ctx.end() != null ? Integer.parseInt(ctx.end().getText()) + 1 : limit;
             }
 
-            return results.stream()
-                    .skip(start)
-                    .limit(limit)
-                    .collect(Collectors.toList());
+            return results.subList(start, Math.min(start + limit, results.size()));
         }
 
         @Override
@@ -280,7 +324,7 @@ public class JsonPathMatcher {
         }
 
         @Override
-        public Object visitProperty(JsonPathParser.PropertyContext ctx) {
+        public @Nullable Object visitProperty(JsonPathParser.PropertyContext ctx) {
             if (scope instanceof Yaml.Mapping) {
                 Yaml.Mapping mapping = (Yaml.Mapping) scope;
                 if (isRecursiveDescent) {
@@ -325,36 +369,31 @@ public class JsonPathMatcher {
                 scope = member.getValue();
                 return visitProperty(ctx);
             } else if (scope instanceof Yaml.Sequence) {
-                Object matches = ((Yaml.Sequence) scope).getEntries().stream()
-                        .map(o -> {
-                            scope = o;
-                            return visitProperty(ctx);
-                        })
-                        .filter(Objects::nonNull)
-                        .collect(Collectors.toList());
+                List<Object> matches = new ArrayList<>();
+                for (Yaml.Sequence.Entry entry : ((Yaml.Sequence) scope).getEntries()) {
+                    scope = entry;
+                    Object result = visitProperty(ctx);
+                    if (result != null) {
+                        matches.add(result);
+                    }
+                }
                 return getResultFromList(matches);
             } else if (scope instanceof Yaml.Sequence.Entry) {
                 Yaml.Sequence.Entry entry = (Yaml.Sequence.Entry) scope;
                 scope = entry.getBlock();
                 return visitProperty(ctx);
             } else if (scope instanceof List) {
-                List<Object> results = ((List<Object>) scope).stream()
-                        .map(o -> {
-                            scope = o;
-                            return visitProperty(ctx);
-                        })
-                        .filter(Objects::nonNull)
-                        .collect(Collectors.toList());
-                // Unwrap lists of results from visitProperty to match the position of the cursor.
                 List<Object> matches = new ArrayList<>();
-                for (Object result : results) {
+                for (Object object : ((List<Object>) scope)) {
+                    scope = object;
+                    Object result = visitProperty(ctx);
                     if (result instanceof List) {
+                        // Unwrap lists of results from visitProperty to match the position of the cursor.
                         matches.addAll(((List<Object>) result));
-                    } else {
+                    } else if (result != null) {
                         matches.add(result);
                     }
                 }
-
                 return getResultFromList(matches);
             }
 
@@ -362,7 +401,7 @@ public class JsonPathMatcher {
         }
 
         @Override
-        public Object visitWildcard(JsonPathParser.WildcardContext ctx) {
+        public @Nullable Object visitWildcard(JsonPathParser.WildcardContext ctx) {
             if (scope instanceof Yaml.Mapping) {
                 Yaml.Mapping mapping = (Yaml.Mapping) scope;
                 return mapping.getEntries();
@@ -370,25 +409,27 @@ public class JsonPathMatcher {
                 Yaml.Mapping.Entry member = (Yaml.Mapping.Entry) scope;
                 return member.getValue();
             } else if (scope instanceof Yaml.Sequence) {
-                Object matches = ((Yaml.Sequence) scope).getEntries().stream()
-                        .map(o -> {
-                            scope = o;
-                            return visitWildcard(ctx);
-                        })
-                        .filter(Objects::nonNull)
-                        .collect(Collectors.toList());
+                List<Object> matches = new ArrayList<>();
+                for (Yaml.Sequence.Entry entry : ((Yaml.Sequence) scope).getEntries()) {
+                    scope = entry;
+                    Object result = visitWildcard(ctx);
+                    if (result != null) {
+                        matches.add(result);
+                    }
+                }
                 return getResultFromList(matches);
             } else if (scope instanceof Yaml.Sequence.Entry) {
                 Yaml.Sequence.Entry entry = (Yaml.Sequence.Entry) scope;
                 return entry.getBlock();
             } else if (scope instanceof List) {
-                List<Object> results = ((List<Object>) scope).stream()
-                        .map(o -> {
-                            scope = o;
-                            return visitWildcard(ctx);
-                        })
-                        .filter(Objects::nonNull)
-                        .collect(Collectors.toList());
+                List<Object> results = new ArrayList<>();
+                for (Object object : ((List<Object>) scope)) {
+                    scope = object;
+                    Object result = visitWildcard(ctx);
+                    if (result != null) {
+                        results.add(result);
+                    }
+                }
 
                 List<Object> matches = new ArrayList<>();
                 if (stop != null && stop == getExpressionContext(ctx)) {
@@ -399,7 +440,7 @@ public class JsonPathMatcher {
                     for (Object result : results) {
                         if (result instanceof List) {
                             matches.addAll(((List<Object>) result));
-                        } else {
+                        } else if (result != null) {
                             matches.add(result);
                         }
                     }
@@ -426,7 +467,7 @@ public class JsonPathMatcher {
         }
 
         @Override
-        public Object visitUnaryExpression(JsonPathParser.UnaryExpressionContext ctx) {
+        public @Nullable Object visitUnaryExpression(JsonPathParser.UnaryExpressionContext ctx) {
             if (ctx.AT() != null) {
                 if (scope instanceof Yaml.Scalar) {
                     if (ctx.Identifier() == null && ctx.StringLiteral() == null) {
@@ -459,20 +500,14 @@ public class JsonPathMatcher {
                         return getResultFromList(entry.getBlock());
                     }
                 } else if (scope instanceof List) {
-                    List<Object> results = ((List<Object>) scope).stream()
-                            .map(o -> {
-                                scope = o;
-                                return visitUnaryExpression(ctx);
-                            })
-                            .filter(Objects::nonNull)
-                            .collect(Collectors.toList());
-
-                    // Unwrap lists of results from visitUnaryExpression to match the position of the cursor.
                     List<Object> matches = new ArrayList<>();
-                    for (Object result : results) {
+                    for (Object object : ((List<Object>) scope)) {
+                        scope = object;
+                        Object result = visitUnaryExpression(ctx);
                         if (result instanceof List) {
+                            // Unwrap lists of results from visitUnaryExpression to match the position of the cursor.
                             matches.addAll(((List<Object>) result));
-                        } else {
+                        } else if (result != null) {
                             matches.add(result);
                         }
                     }
@@ -487,7 +522,7 @@ public class JsonPathMatcher {
         }
 
         @Override
-        public Object visitRegexExpression(JsonPathParser.RegexExpressionContext ctx) {
+        public @Nullable Object visitRegexExpression(JsonPathParser.RegexExpressionContext ctx) {
             if (scope == null || scope instanceof List && ((List<Object>) scope).isEmpty()) {
                 return null;
             }
@@ -512,7 +547,7 @@ public class JsonPathMatcher {
 
         // Checks if a string contains the specified substring (case-sensitive), or an array contains the specified element.
         @Override
-        public Object visitContainsExpression(JsonPathParser.ContainsExpressionContext ctx) {
+        public @Nullable Object visitContainsExpression(JsonPathParser.ContainsExpressionContext ctx) {
             Object originalScope = scope;
             if (ctx.children.get(0) instanceof JsonPathParser.UnaryExpressionContext) {
                 Object lhs = visitUnaryExpression(ctx.unaryExpression());
@@ -526,11 +561,13 @@ public class JsonPathMatcher {
                     Yaml.Mapping.Entry entry = (Yaml.Mapping.Entry) lhs;
                     if (entry.getValue() instanceof Yaml.Sequence) {
                         Yaml.Sequence sequence = (Yaml.Sequence) entry.getValue();
-                        if (sequence.getEntries().stream()
-                                .filter(o -> o.getBlock() instanceof Yaml.Scalar)
-                                .map(o -> (Yaml.Scalar) o.getBlock())
-                                .anyMatch(o -> o.getValue().contains(String.valueOf(rhs)))) {
-                            return originalScope;
+                        for (Yaml.Sequence.Entry o : sequence.getEntries()) {
+                            if (o.getBlock() instanceof Yaml.Scalar) {
+                                Yaml.Scalar block = (Yaml.Scalar) o.getBlock();
+                                if (block.getValue().contains(String.valueOf(rhs))) {
+                                    return originalScope;
+                                }
+                            }
                         }
                     } else if (entry.getValue() instanceof Yaml.Scalar) {
                         Yaml.Scalar scalar = (Yaml.Scalar) entry.getValue();
@@ -562,7 +599,7 @@ public class JsonPathMatcher {
         }
 
         @Override
-        public Object visitBinaryExpression(JsonPathParser.BinaryExpressionContext ctx) {
+        public @Nullable Object visitBinaryExpression(JsonPathParser.BinaryExpressionContext ctx) {
             Object lhs = ctx.children.get(0);
             Object rhs = ctx.children.get(2);
 
@@ -585,8 +622,8 @@ public class JsonPathMatcher {
                 scope = scopeOfLogicalOp;
                 rhs = getBinaryExpressionResult(rhs);
                 if ("&&".equals(operator) &&
-                        ((lhs != null && (!(lhs instanceof List) || !((List<Object>) lhs).isEmpty())) &&
-                                (rhs != null && (!(rhs instanceof List) || !((List<Object>) rhs).isEmpty())))) {
+                    ((lhs != null && (!(lhs instanceof List) || !((List<Object>) lhs).isEmpty())) &&
+                     (rhs != null && (!(rhs instanceof List) || !((List<Object>) rhs).isEmpty())))) {
                     // Return the result of the evaluated expression.
                     if (lhs instanceof Yaml) {
                         return rhs;
@@ -600,8 +637,8 @@ public class JsonPathMatcher {
                     }
                     return scopeOfLogicalOp;
                 } else if ("||".equals(operator) &&
-                        ((lhs != null && (!(lhs instanceof List) || !((List<Object>) lhs).isEmpty())) ||
-                                (rhs != null && (!(rhs instanceof List) || !((List<Object>) rhs).isEmpty())))) {
+                           ((lhs != null && (!(lhs instanceof List) || !((List<Object>) lhs).isEmpty())) ||
+                            (rhs != null && (!(rhs instanceof List) || !((List<Object>) rhs).isEmpty())))) {
                     return scopeOfLogicalOp;
                 }
             } else if (ctx.EQUALITY_OPERATOR() != null) {
@@ -672,14 +709,14 @@ public class JsonPathMatcher {
                 Yaml.Mapping mapping = (Yaml.Mapping) lhs;
                 for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
                     if (entry.getValue() instanceof Yaml.Scalar &&
-                            checkObjectEquality(((Yaml.Scalar) entry.getValue()).getValue(), operator, rhs)) {
+                        checkObjectEquality(((Yaml.Scalar) entry.getValue()).getValue(), operator, rhs)) {
                         return mapping;
                     }
                 }
             } else if (lhs instanceof Yaml.Mapping.Entry) {
                 Yaml.Mapping.Entry entry = (Yaml.Mapping.Entry) lhs;
                 if (entry.getValue() instanceof Yaml.Scalar &&
-                        checkObjectEquality(((Yaml.Scalar) entry.getValue()).getValue(), operator, rhs)) {
+                    checkObjectEquality(((Yaml.Scalar) entry.getValue()).getValue(), operator, rhs)) {
                     return entry;
                 }
             } else if (lhs instanceof Yaml.Scalar) {
@@ -749,10 +786,14 @@ public class JsonPathMatcher {
             } else if (result instanceof Yaml.Mapping) {
                 return ((Yaml.Mapping) result).getEntries();
             } else if (result instanceof List) {
-                return ((List<Object>) result).stream()
-                        .map(this::getValue)
-                        .filter(Objects::nonNull)
-                        .collect(Collectors.toList());
+                List<Object> list = new ArrayList<>();
+                for (Object o : ((List<Object>) result)) {
+                    Object value = getValue(o);
+                    if (value != null) {
+                        list.add(value);
+                    }
+                }
+                return list;
             } else if (result instanceof Yaml.Sequence) {
                 return ((Yaml.Sequence) result).getEntries();
             } else if (result instanceof Yaml.Scalar) {

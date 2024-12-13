@@ -36,11 +36,11 @@ public class JSON5Parser extends Parser {
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		T__0=1, T__1=2, T__2=3, T__3=4, T__4=5, T__5=6, SINGLE_LINE_COMMENT=7, 
-		MULTI_LINE_COMMENT=8, LITERAL=9, STRING=10, NUMBER=11, NUMERIC_LITERAL=12, 
+		T__0=1, T__1=2, T__2=3, T__3=4, T__4=5, T__5=6, SINGLE_LINE_COMMENT=7,
+		MULTI_LINE_COMMENT=8, LITERAL=9, STRING=10, NUMBER=11, NUMERIC_LITERAL=12,
 		SYMBOL=13, IDENTIFIER=14, WS=15, UTF_8_BOM=16;
 	public static final int
-		RULE_json5 = 0, RULE_obj = 1, RULE_member = 2, RULE_key = 3, RULE_value = 4, 
+		RULE_json5 = 0, RULE_obj = 1, RULE_member = 2, RULE_key = 3, RULE_value = 4,
 		RULE_arr = 5, RULE_number = 6;
 	private static String[] makeRuleNames() {
 		return new String[] {
@@ -51,15 +51,15 @@ public class JSON5Parser extends Parser {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, "'{'", "','", "'}'", "':'", "'['", "']'", null, null, null, null, 
+			null, "'{'", "','", "'}'", "':'", "'['", "']'", null, null, null, null,
 			null, null, null, null, null, "'\\uFEFF'"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, null, null, null, null, null, null, "SINGLE_LINE_COMMENT", "MULTI_LINE_COMMENT", 
-			"LITERAL", "STRING", "NUMBER", "NUMERIC_LITERAL", "SYMBOL", "IDENTIFIER", 
+			null, null, null, null, null, null, null, "SINGLE_LINE_COMMENT", "MULTI_LINE_COMMENT",
+			"LITERAL", "STRING", "NUMBER", "NUMERIC_LITERAL", "SYMBOL", "IDENTIFIER",
 			"WS", "UTF_8_BOM"
 		};
 	}
@@ -226,7 +226,7 @@ public class JSON5Parser extends Parser {
 						setState(22);
 						member();
 						}
-						} 
+						}
 					}
 					setState(27);
 					_errHandler.sync(this);
@@ -519,7 +519,7 @@ public class JSON5Parser extends Parser {
 						setState(53);
 						value();
 						}
-						} 
+						}
 					}
 					setState(58);
 					_errHandler.sync(this);

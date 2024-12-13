@@ -266,7 +266,7 @@ public class ProtoVisitor<P> extends TreeVisitor<Proto, P> {
         return space;
     }
 
-    public <P2 extends Proto> ProtoContainer<P2> visitContainer(@Nullable ProtoContainer<P2> container, P p) {
+    public <P2 extends Proto> @Nullable ProtoContainer<P2> visitContainer(@Nullable ProtoContainer<P2> container, P p) {
         if(container == null) {
             //noinspection ConstantConditions
             return null;
@@ -284,7 +284,7 @@ public class ProtoVisitor<P> extends TreeVisitor<Proto, P> {
                 ProtoContainer.build(before, ps, container.getMarkers());
     }
 
-    public <T> ProtoLeftPadded<T> visitLeftPadded(ProtoLeftPadded<T> left, P p) {
+    public <T> @Nullable ProtoLeftPadded<T> visitLeftPadded(ProtoLeftPadded<T> left, P p) {
         setCursor(new Cursor(getCursor(), left));
 
         Space before = visitSpace(left.getBefore(), p);
@@ -305,7 +305,7 @@ public class ProtoVisitor<P> extends TreeVisitor<Proto, P> {
     }
 
     @SuppressWarnings("ConstantConditions")
-    public <T> ProtoRightPadded<T> visitRightPadded(@Nullable ProtoRightPadded<T> right, P p) {
+    public <T> @Nullable ProtoRightPadded<T> visitRightPadded(@Nullable ProtoRightPadded<T> right, P p) {
         if (right == null) {
             //noinspection ConstantConditions
             return null;

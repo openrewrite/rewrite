@@ -53,12 +53,12 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
     @Nullable Boolean appendNewline;
 
     @Option(displayName = "Existing file strategy",
-            description = "Determines behavior if a file exists at this location prior to Rewrite execution.\n\n"
-                          + "- `Continue`: append new content to existing file contents. If existing file is not plaintext, recipe does nothing.\n"
-                          + "- `Replace`: remove existing content from file.\n"
-                          + "- `Leave`: *(default)* do nothing. Existing file is fully preserved.\n\n"
-                          + "Note: this only affects the first interaction with the specified file per Rewrite execution.\n"
-                          + "Subsequent instances of this recipe in the same Rewrite execution will always append.",
+            description = "Determines behavior if a file exists at this location prior to Rewrite execution.\n\n" +
+                          "- `Continue`: append new content to existing file contents. If existing file is not plaintext, recipe does nothing.\n" +
+                          "- `Replace`: remove existing content from file.\n" +
+                          "- `Leave`: *(default)* do nothing. Existing file is fully preserved.\n\n" +
+                          "Note: this only affects the first interaction with the specified file per Rewrite execution.\n" +
+                          "Subsequent instances of this recipe in the same Rewrite execution will always append.",
             valid = {"Continue", "Replace", "Leave"},
             required = false)
     @Nullable Strategy existingFileStrategy;

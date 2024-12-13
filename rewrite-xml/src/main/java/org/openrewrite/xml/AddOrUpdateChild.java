@@ -78,6 +78,6 @@ public class AddOrUpdateChild<P> extends XmlVisitor<P> {
      */
     public static Xml.Tag addOrUpdateChild(Xml.Tag parentScope, Xml.Tag parent, Xml.Tag child, Cursor parentCursor) {
         //noinspection ConstantConditions
-        return (Xml.Tag) new AddOrUpdateChild<Void>(parent, child).visitNonNull(parentScope, null, parentCursor);
+        return (Xml.Tag) new AddOrUpdateChild<Integer>(parent, child).visitNonNull(parentScope, 0, parentCursor);
     }
 }

@@ -22,12 +22,14 @@ import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.test.SourceSpec;
 
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.java.Assertions.*;
+import static org.openrewrite.java.Assertions.addTypesToSourceSet;
+import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.srcMainJava;
+import static org.openrewrite.java.Assertions.version;
 
 class OrderImportsTest implements RewriteTest {
 
@@ -241,27 +243,6 @@ class OrderImportsTest implements RewriteTest {
     @Test
     void springCloudFormat() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(
-            singletonList(
-              new NamedStyles(
-                randomId(), "spring", "spring", "spring", emptySet(), singletonList(
-                ImportLayoutStyle.builder()
-                  .classCountToUseStarImport(999)
-                  .nameCountToUseStarImport(999)
-                  .importPackage("java.*")
-                  .blankLine()
-                  .importPackage("javax.*")
-                  .blankLine()
-                  .importAllOthers()
-                  .blankLine()
-                  .importPackage("org.springframework.*")
-                  .blankLine()
-                  .importStaticAllOthers()
-                  .build()
-              )
-              )
-            )
-          )),
           java(
             """
               import java.io.ByteArrayOutputStream;
@@ -288,7 +269,23 @@ class OrderImportsTest implements RewriteTest {
               import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.toAsyncPredicate;
               
               class A {}
-              """
+              """,
+            spec -> spec.markers(new NamedStyles(
+              randomId(), "spring", "Spring", "Spring", emptySet(), singletonList(
+              ImportLayoutStyle.builder()
+                .classCountToUseStarImport(999)
+                .nameCountToUseStarImport(999)
+                .importPackage("java.*")
+                .blankLine()
+                .importPackage("javax.*")
+                .blankLine()
+                .importAllOthers()
+                .blankLine()
+                .importPackage("org.springframework.*")
+                .blankLine()
+                .importStaticAllOthers()
+                .build()
+            )))
           )
         );
     }
@@ -439,26 +436,6 @@ class OrderImportsTest implements RewriteTest {
     @Test
     void blankLinesBetweenImports() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(
-            singletonList(
-              new NamedStyles(
-                randomId(),
-                "custom",
-                "custom style",
-                null,
-                emptySet(),
-                singletonList(
-                  ImportLayoutStyle.builder()
-                    .classCountToUseStarImport(9999)
-                    .nameCountToUseStarImport(9999)
-                    .importStaticAllOthers()
-                    .blankLine()
-                    .importAllOthers()
-                    .blankLine()
-                    .build()
-                )
-              )
-            ))),
           java(
             """
               import java.util.List;
@@ -473,7 +450,23 @@ class OrderImportsTest implements RewriteTest {
               
               class Test {
               }
-              """
+              """,
+            spec -> spec.markers(new NamedStyles(
+              randomId(),
+              "Custom",
+              "Custom style",
+              null,
+              emptySet(),
+              singletonList(
+                ImportLayoutStyle.builder()
+                  .classCountToUseStarImport(9999)
+                  .nameCountToUseStarImport(9999)
+                  .importStaticAllOthers()
+                  .blankLine()
+                  .importAllOthers()
+                  .blankLine()
+                  .build()))
+            )
           )
         );
     }
@@ -522,29 +515,6 @@ class OrderImportsTest implements RewriteTest {
     @Test
     void doNotFoldImports() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(
-            singletonList(
-              new NamedStyles(
-                randomId(),
-                "custom",
-                "custom style",
-                null,
-                emptySet(),
-                singletonList(
-                  ImportLayoutStyle.builder()
-                    .classCountToUseStarImport(2147483647)
-                    .nameCountToUseStarImport(2147483647)
-                    .importPackage("java.*")
-                    .blankLine()
-                    .importPackage("javax.*")
-                    .blankLine()
-                    .importAllOthers()
-                    .blankLine()
-                    .importStaticAllOthers()
-                    .build()
-                )
-              )
-            ))),
           java(
             """
               import java.util.ArrayList;
@@ -562,7 +532,26 @@ class OrderImportsTest implements RewriteTest {
               
               public class C {
               }
-              """
+              """,
+            spec -> spec.markers(new NamedStyles(
+              randomId(),
+              "custom",
+              "Custom style",
+              null,
+              emptySet(),
+              singletonList(
+                ImportLayoutStyle.builder()
+                  .classCountToUseStarImport(2147483647)
+                  .nameCountToUseStarImport(2147483647)
+                  .importPackage("java.*")
+                  .blankLine()
+                  .importPackage("javax.*")
+                  .blankLine()
+                  .importAllOthers()
+                  .blankLine()
+                  .importStaticAllOthers()
+                  .build()))
+            )
           )
         );
     }
@@ -662,25 +651,21 @@ class OrderImportsTest implements RewriteTest {
     @Test
     void foldPackageWithExistingImports() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(
-            singletonList(
-              new NamedStyles(
-                randomId(), "test", "test", "test", emptySet(), singletonList(
-                ImportLayoutStyle.builder()
-                  .packageToFold("java.util.*", false)
-                  .importAllOthers()
-                  .importStaticAllOthers()
-                  .build()
-              )
-              )
-            ))),
           java(
             """
               import java.util.List;
               """,
             """
               import java.util.*;
-              """
+              """,
+            spec -> spec.markers(new NamedStyles(
+              randomId(), "test", "Test", "Test", emptySet(), singletonList(
+              ImportLayoutStyle.builder()
+                .packageToFold("java.util.*", false)
+                .importAllOthers()
+                .importStaticAllOthers()
+                .build()))
+            )
           )
         );
     }

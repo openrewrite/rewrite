@@ -35,7 +35,7 @@ class UnsafeReplaceJavaType extends UnsafeJavaTypeVisitor<Integer> {
     Set<JavaType> stack = Collections.newSetFromMap(new IdentityHashMap<>());
 
     @Override
-    public JavaType visit(@Nullable JavaType javaType, Integer p) {
+    public @Nullable JavaType visit(@Nullable JavaType javaType, Integer p) {
         if (javaType == null) {
             //noinspection ConstantConditions
             return null;

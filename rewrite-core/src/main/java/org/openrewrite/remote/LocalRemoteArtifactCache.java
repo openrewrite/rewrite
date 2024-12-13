@@ -17,6 +17,7 @@ package org.openrewrite.remote;
 
 import org.jspecify.annotations.Nullable;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -46,24 +47,28 @@ public class LocalRemoteArtifactCache implements RemoteArtifactCache {
 
     @Override
     public @Nullable Path put(URI uri, InputStream artifactInputStream, Consumer<Throwable> onError) {
-        try {
+        synchronized (this) {
             Path artifact = cacheDir.resolve(UUID.randomUUID() + ".tmp");
             try (InputStream is = artifactInputStream) {
                 Files.copy(is, artifact, StandardCopyOption.REPLACE_EXISTING);
-            }
-            Path cachedArtifact = cacheDir.resolve(hashUri(uri));
-            synchronized (this) {
+                Path cachedArtifact = cacheDir.resolve(hashUri(uri));
                 if (!Files.exists(cachedArtifact)) {
                     Files.move(artifact, cachedArtifact, StandardCopyOption.ATOMIC_MOVE,
                             StandardCopyOption.REPLACE_EXISTING);
-                } else {
-                    Files.delete(artifact);
+                }
+                return cachedArtifact;
+            } catch (Exception e) {
+                onError.accept(e);
+                return null;
+            } finally {
+                if (Files.exists(artifact)) {
+                    try {
+                        Files.delete(artifact);
+                    } catch (IOException ignored) {
+                        // Suppress
+                    }
                 }
             }
-            return cachedArtifact;
-        } catch (Exception e) {
-            onError.accept(e);
-            return null;
         }
     }
 

@@ -128,9 +128,9 @@ public class UpgradePluginVersion extends Recipe {
                         final String versionLookup;
                         if (maybeVersionValue.isPresent()) {
                             String versionValue = maybeVersionValue.get();
-                            versionLookup = versionValue.startsWith("${")
-                                    ? super.getResolutionResult().getPom().getValue(versionValue.trim())
-                                    : versionValue;
+                            versionLookup = versionValue.startsWith("${") ?
+                                    super.getResolutionResult().getPom().getValue(versionValue.trim()) :
+                                    versionValue;
                         } else {
                             versionLookup = "0.0.0";
                         }
@@ -182,8 +182,10 @@ public class UpgradePluginVersion extends Recipe {
                 if (versionTag.isPresent()) {
                     String version = versionTag.get().getValue().orElse(null);
                     if (version != null) {
-                        if (version.trim().startsWith("${") && !newVersion.equals(getResolutionResult().getPom().getValue(version.trim()))) {
-                            doAfterVisit(new ChangePropertyValue(version, newVersion, false, false).getVisitor());
+                        if (version.trim().startsWith("${")) {
+                            if (!newVersion.equals(getResolutionResult().getPom().getValue(version.trim()))) {
+                                doAfterVisit(new ChangePropertyValue(version, newVersion, false, false).getVisitor());
+                            }
                         } else if (!newVersion.equals(version)) {
                             doAfterVisit(new ChangeTagValueVisitor<>(versionTag.get(), newVersion));
                         }

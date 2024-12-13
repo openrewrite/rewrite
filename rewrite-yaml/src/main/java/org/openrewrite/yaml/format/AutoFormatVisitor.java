@@ -36,41 +36,40 @@ public class AutoFormatVisitor<P> extends YamlIsoVisitor<P> {
     }
 
     @Override
-    public @Nullable Yaml preVisit(Yaml tree, P p) {
+    public Yaml preVisit(Yaml tree, P p) {
         stopAfterPreVisit();
         Yaml.Documents docs = getCursor().firstEnclosingOrThrow(Yaml.Documents.class);
         Cursor cursor = getCursor().getParentOrThrow();
 
-        Yaml y = new NormalizeFormatVisitor<>(stopAfter).visit(tree, p, cursor.fork());
+        Yaml y = new NormalizeFormatVisitor<>(stopAfter).visitNonNull(tree, p, cursor.fork());
 
-        y = new MinimumViableSpacingVisitor<>(stopAfter).visit(y, p, cursor.fork());
+        y = new MinimumViableSpacingVisitor<>(stopAfter).visitNonNull(y, p, cursor.fork());
 
         y = new IndentsVisitor<>(Optional.ofNullable(docs.getStyle(IndentsStyle.class))
                 .orElse(Autodetect.tabsAndIndents(docs, YamlDefaultStyles.indents())), stopAfter)
-                .visit(y, p, cursor.fork());
+                .visitNonNull(y, p, cursor.fork());
 
         y = new NormalizeLineBreaksVisitor<>(Optional.ofNullable(docs.getStyle(GeneralFormatStyle.class))
                 .orElse(Autodetect.generalFormat(docs)), stopAfter)
-                .visit(y, p, cursor.fork());
+                .visitNonNull(y, p, cursor.fork());
 
         return y;
     }
 
     @Override
     public Yaml.Documents visitDocuments(Yaml.Documents documents, P p) {
-        Yaml.Documents y = (Yaml.Documents) new NormalizeFormatVisitor<>(stopAfter).visit(documents, p);
+        Yaml.Documents y = (Yaml.Documents) new NormalizeFormatVisitor<>(stopAfter).visitNonNull(documents, p);
 
-        y = (Yaml.Documents) new MinimumViableSpacingVisitor<>(stopAfter).visit(y, p);
+        y = (Yaml.Documents) new MinimumViableSpacingVisitor<>(stopAfter).visitNonNull(y, p);
 
         y = (Yaml.Documents) new IndentsVisitor<>(Optional.ofNullable(documents.getStyle(IndentsStyle.class))
                 .orElse(Autodetect.tabsAndIndents(y, YamlDefaultStyles.indents())), stopAfter)
-                .visit(documents, p);
+                .visitNonNull(documents, p);
 
         y = (Yaml.Documents) new NormalizeLineBreaksVisitor<>(Optional.ofNullable(documents.getStyle(GeneralFormatStyle.class))
                 .orElse(Autodetect.generalFormat(y)), stopAfter)
-                .visit(documents, p);
+                .visitNonNull(documents, p);
 
-        assert y != null;
         return y;
     }
 

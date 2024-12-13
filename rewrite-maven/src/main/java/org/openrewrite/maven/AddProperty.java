@@ -76,8 +76,8 @@ public class AddProperty extends Recipe {
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 String parentValue = getResolutionResult().getPom().getRequested().getProperties().get(key);
-                if ((Boolean.TRUE.equals(trustParent) && (parentValue == null || value.equals(parentValue)))
-                        || value.equals(getResolutionResult().getPom().getProperties().get(key))) {
+                if ((Boolean.TRUE.equals(trustParent) && (parentValue == null || value.equals(parentValue))) ||
+                        value.equals(getResolutionResult().getPom().getProperties().get(key))) {
                     return document;
                 }
 

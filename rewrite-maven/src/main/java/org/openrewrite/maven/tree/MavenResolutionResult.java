@@ -30,6 +30,7 @@ import java.util.*;
 import java.util.function.Predicate;
 
 import static java.util.Collections.emptyList;
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @SuppressWarnings("unused")
@@ -68,6 +69,7 @@ public class MavenResolutionResult implements Marker {
 
     public List<String> getActiveProfiles() {
         // for backwards compatibility with ASTs that were serialized before activeProfiles was added
+        //noinspection ConstantValue
         return activeProfiles == null ? emptyList() : activeProfiles;
     }
 
@@ -173,7 +175,8 @@ public class MavenResolutionResult implements Marker {
                 dependencies.put(scope, pom.resolveDependencies(scope, downloader, ctx));
             } catch (MavenDownloadingExceptions e) {
                 for (MavenDownloadingException exception : e.getExceptions()) {
-                    if (exceptionsInLowerScopes.computeIfAbsent(new GroupArtifact(exception.getRoot().getGroupId(),
+                    if (exceptionsInLowerScopes.computeIfAbsent(new GroupArtifact(
+                            exception.getRoot().getGroupId() == null ? "" : exception.getRoot().getGroupId(),
                             exception.getRoot().getArtifactId()), ga -> new HashSet<>()).add(exception.getFailedOn())) {
                         exceptions = MavenDownloadingExceptions.append(exceptions, exception);
                     }
@@ -190,8 +193,28 @@ public class MavenResolutionResult implements Marker {
         return getProjectPomsRecursive(new HashMap<>());
     }
 
+    /**
+     * Often recipes operating on multi-module projects will prefer to make changes to the parent pom rather than in multiple child poms.
+     * But if the parent isn't in the same repository as the child, the recipe would need to be applied to the child poms.
+     *
+     * @return true when the parent pom of the current pom is present in the same repository as the current pom
+     */
+    public boolean parentPomIsProjectPom() {
+        if (getParent() == null) {
+            return false;
+        }
+        ResolvedGroupArtifactVersion parentGav = getParent().getPom().getGav();
+        return getProjectPoms().values().stream()
+                .map(Pom::getGav)
+                .anyMatch(gav -> gav.equals(parentGav));
+    }
+
+    public boolean isMultiModulePom() {
+        return getPom().getSubprojects() == null || !getPom().getSubprojects().isEmpty();
+    }
+
     private Map<Path, Pom> getProjectPomsRecursive(Map<Path, Pom> projectPoms) {
-        projectPoms.put(pom.getRequested().getSourcePath(), pom.getRequested());
+        projectPoms.put(requireNonNull(pom.getRequested().getSourcePath()), pom.getRequested());
         if (parent != null) {
             parent.getProjectPomsRecursive(projectPoms);
         }

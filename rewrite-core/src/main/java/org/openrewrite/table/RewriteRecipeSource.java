@@ -53,6 +53,7 @@ public class RewriteRecipeSource extends DataTable<RewriteRecipeSource.Row> {
 
     public enum RecipeType {
         Java,
+        Refaster,
         Yaml
     }
 }
