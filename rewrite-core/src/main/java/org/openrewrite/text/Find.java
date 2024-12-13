@@ -130,6 +130,7 @@ public class Find extends Recipe {
                 int previousEnd = 0;
 
                 int lastNewLineIndex = -1;
+                int nextNewLineIndex = -1;
                 boolean isFirstMatch = true;
 
                 while (matcher.find()) {
@@ -141,10 +142,9 @@ public class Find extends Recipe {
                     // For the first match, search backwards
                     if (isFirstMatch) {
                         lastNewLineIndex = rawText.lastIndexOf('\n', matchStart);
+                        nextNewLineIndex = rawText.indexOf('\n', lastNewLineIndex + 1);
                         isFirstMatch = false;
-                    } else {
-                        int nextNewLineIndex = rawText.indexOf('\n', lastNewLineIndex + 1);
-
+                    } else if (nextNewLineIndex != -1 && nextNewLineIndex < matchStart) {
                         // Advance lastNewLineIndex while before match start
                         while (nextNewLineIndex != -1 && nextNewLineIndex < matchStart) {
                             lastNewLineIndex = nextNewLineIndex;
