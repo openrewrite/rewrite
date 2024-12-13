@@ -422,29 +422,32 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
 
             visitSpace(argContainer.getBefore(), Space.Location.METHOD_INVOCATION_ARGUMENTS, p);
             List<JRightPadded<Expression>> args = argContainer.getPadding().getElements();
+            boolean argsAreAllClosures = args.stream().allMatch(it -> it.getElement() instanceof J.Lambda);
+            boolean hasParentheses = true;
+            boolean applyTrailingLambdaParenthese = true;
             for (int i = 0; i < args.size(); i++) {
                 JRightPadded<Expression> arg = args.get(i);
-                boolean omitParens = arg.getElement().getMarkers()
-                                             .findFirst(OmitParentheses.class)
-                                             .isPresent() ||
-                                     arg.getElement().getMarkers()
-                                             .findFirst(org.openrewrite.java.marker.OmitParentheses.class)
-                                             .isPresent();
+                boolean omitParensCurrElem = arg.getElement().getMarkers().findFirst(OmitParentheses.class).isPresent() ||
+                        arg.getElement().getMarkers().findFirst(org.openrewrite.java.marker.OmitParentheses.class).isPresent();
 
-                if (i == 0 && !omitParens) {
-                    p.append('(');
-                } else if (i > 0 && omitParens && (
-                        !args.get(0).getElement().getMarkers().findFirst(OmitParentheses.class).isPresent() &&
-                        !args.get(0).getElement().getMarkers().findFirst(org.openrewrite.java.marker.OmitParentheses.class).isPresent()
-                )) {
-                    p.append(')');
-                } else if (i > 0) {
+                if (i == 0) {
+                    if (omitParensCurrElem) {
+                        hasParentheses = false;
+                    } else {
+                        p.append('(');
+                    }
+                }  else if (hasParentheses && omitParensCurrElem) { // first trailing lambda, eg: `stage('Build..') {}`, should close the method
+                    if (applyTrailingLambdaParenthese) { // apply once, to support multiple closures: `foo("baz") {} {}
+                        p.append(')');
+                        applyTrailingLambdaParenthese = false;
+                    }
+                } else if (hasParentheses || !argsAreAllClosures) {
                     p.append(',');
                 }
 
                 visitRightPadded(arg, JRightPadded.Location.METHOD_INVOCATION_ARGUMENT, p);
 
-                if (i == args.size() - 1 && !omitParens) {
+                if (i == args.size() - 1 && !omitParensCurrElem) {
                     p.append(')');
                 }
             }
