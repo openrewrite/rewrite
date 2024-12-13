@@ -122,7 +122,6 @@ public class Find extends Recipe {
                 if (!matcher.find()) {
                     return sourceFile;
                 }
-                matcher.reset();
 
                 String sourceFilePath = sourceFile.getSourcePath().toString();
 
@@ -133,7 +132,7 @@ public class Find extends Recipe {
                 int nextNewLineIndex = -1;
                 boolean isFirstMatch = true;
 
-                while (matcher.find()) {
+                do {
                     int matchStart = matcher.start();
                     snippets.add(snippet(rawText.substring(previousEnd, matchStart)));
                     snippets.add(SearchResult.found(snippet(rawText.substring(matchStart, matcher.end()))));
@@ -167,7 +166,7 @@ public class Find extends Recipe {
                                     .append(rawText, matchStart, endLine)
                                     .toString()
                     ));
-                }
+                } while (matcher.find());
                 snippets.add(snippet(rawText.substring(previousEnd)));
                 return plainText.withText("").withSnippets(snippets);
             }
