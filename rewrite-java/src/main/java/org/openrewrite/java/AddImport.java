@@ -110,8 +110,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                 return cu;
             }
             // Nor if the classes are within the same package
-            if (!isRecord() && // Record's late addition to `java.lang` might conflict with user class
-                    cu.getPackageDeclaration() != null &&
+            if (!"Record".equals(typeName) && cu.getPackageDeclaration() != null &&
                     packageName.equals(cu.getPackageDeclaration().getExpression().printTrimmed(getCursor()))) {
                 return cu;
             }
@@ -120,13 +119,13 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                 return cu;
             }
 
-            if (cu.getImports().stream().anyMatch(i -> {
+            if (!"Record".equals(typeName) && cu.getImports().stream().anyMatch(i -> {
                 String ending = i.getQualid().getSimpleName();
                 if (member == null) {
-                    return !isRecord() && !i.isStatic() && i.getPackageName().equals(packageName) &&
+                    return !i.isStatic() && i.getPackageName().equals(packageName) &&
                             (ending.equals(typeName) || "*".equals(ending));
                 }
-                return !isRecord() && i.isStatic() && i.getTypeName().equals(fullyQualifiedName) &&
+                return i.isStatic() && i.getTypeName().equals(fullyQualifiedName) &&
                         (ending.equals(member) || "*".equals(ending));
             })) {
                 return cu;
@@ -179,10 +178,6 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
             j = cu;
         }
         return j;
-    }
-
-    private boolean isRecord() {
-        return "Record".equals(typeName);
     }
 
     private List<JRightPadded<J.Import>> checkCRLF(JavaSourceFile cu, List<JRightPadded<J.Import>> newImports) {
