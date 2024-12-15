@@ -35,6 +35,8 @@ dependencies {
     implementation("org.apache.commons:commons-text:latest.release")
 
     testImplementation(project(":rewrite-test"))
+
+    testImplementation("com.squareup.okhttp3:okhttp:4.+")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.+")
     testImplementation("com.squareup.okhttp3:okhttp-tls:4.+")
     testImplementation("com.squareup.okio:okio-jvm:3.9.1")
