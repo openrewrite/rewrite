@@ -106,7 +106,8 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
             }
 
             // No need to add imports if the class to import is in java.lang, or if the classes are within the same package
-            if (("java.lang".equals(packageName) && StringUtils.isBlank(member)) || (cu.getPackageDeclaration() != null &&
+            if (("java.lang".equals(packageName) && StringUtils.isBlank(member)) ||
+                (!"Record".equals(typeName) && cu.getPackageDeclaration() != null &&
                     packageName.equals(cu.getPackageDeclaration().getExpression().printTrimmed(getCursor())))) {
                 return cu;
             }

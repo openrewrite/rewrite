@@ -185,6 +185,47 @@ class AddImportTest implements RewriteTest {
     }
 
     @Test
+    void forceImportNoJavaRecord() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("com.acme.bank.Record", null, false))),
+          //language=java
+          java(
+            """
+              package com.acme.bank;
+
+              class Foo {
+              }
+              """,
+            """
+              package com.acme.bank;
+
+              import com.acme.bank.Record;
+
+              class Foo {
+              }
+              """,
+            spec -> spec.markers(javaVersion(11))
+          )
+        );
+    }
+
+    @Test
+    void forceImportJavaRecord() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.lang.Record", null, false))),
+          //language=java
+          java(
+            """
+              package com.acme.bank;
+
+              class Foo {
+              }
+              """,
+            spec -> spec.markers(javaVersion(11))
+          )
+        );
+    }
+    @Test
     void dontImportJavaLang() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.lang.String", null, false))),
