@@ -110,8 +110,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                 return cu;
             }
             // Nor if the classes are within the same package
-            if (!"Record".equals(typeName) && // Record's late addition to `java.lang` might conflict with user class
-                    cu.getPackageDeclaration() != null &&
+            if (!"Record".equals(typeName) && cu.getPackageDeclaration() != null &&
                     packageName.equals(cu.getPackageDeclaration().getExpression().printTrimmed(getCursor()))) {
                 return cu;
             }
@@ -120,7 +119,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                 return cu;
             }
 
-            if (cu.getImports().stream().anyMatch(i -> {
+            if (!"Record".equals(typeName) && cu.getImports().stream().anyMatch(i -> {
                 String ending = i.getQualid().getSimpleName();
                 if (member == null) {
                     return !i.isStatic() && i.getPackageName().equals(packageName) &&
@@ -143,19 +142,17 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
 
             List<JRightPadded<J.Import>> imports = new ArrayList<>(cu.getPadding().getImports());
 
-            if (imports.isEmpty() && !cu.getClasses().isEmpty()) {
-                if (cu.getPackageDeclaration() == null) {
-                    // leave javadocs on the class and move other comments up to the import
-                    // (which could include license headers and the like)
-                    Space firstClassPrefix = cu.getClasses().get(0).getPrefix();
-                    importToAdd = importToAdd.withPrefix(firstClassPrefix
-                            .withComments(ListUtils.map(firstClassPrefix.getComments(), comment -> comment instanceof Javadoc ? null : comment))
-                            .withWhitespace(""));
+            if (imports.isEmpty() && !cu.getClasses().isEmpty() && cu.getPackageDeclaration() == null) {
+                // leave javadocs on the class and move other comments up to the import
+                // (which could include license headers and the like)
+                Space firstClassPrefix = cu.getClasses().get(0).getPrefix();
+                importToAdd = importToAdd.withPrefix(firstClassPrefix
+                        .withComments(ListUtils.map(firstClassPrefix.getComments(), comment -> comment instanceof Javadoc ? null : comment))
+                        .withWhitespace(""));
 
-                    cu = cu.withClasses(ListUtils.mapFirst(cu.getClasses(), clazz ->
-                            clazz.withComments(ListUtils.map(clazz.getComments(), comment -> comment instanceof Javadoc ? comment : null))
-                    ));
-                }
+                cu = cu.withClasses(ListUtils.mapFirst(cu.getClasses(), clazz ->
+                        clazz.withComments(ListUtils.map(clazz.getComments(), comment -> comment instanceof Javadoc ? comment : null))
+                ));
             }
 
             ImportLayoutStyle layoutStyle = Optional.ofNullable(((SourceFile) cu).getStyle(ImportLayoutStyle.class))
