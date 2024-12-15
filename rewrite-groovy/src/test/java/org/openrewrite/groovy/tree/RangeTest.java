@@ -48,7 +48,6 @@ class RangeTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("Parentheses with method invocation is not yet supported")
     @Test
     void parenthesizedAndInvokeMethodWithParentheses() {
         rewriteRun(
