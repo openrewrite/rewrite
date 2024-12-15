@@ -110,7 +110,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                 return cu;
             }
             // Nor if the classes are within the same package
-            if (!"Record".equals(typeName) && // Record's late addition to `java.lang` might conflict with user class
+            if (!isRecord() && // Record's late addition to `java.lang` might conflict with user class
                     cu.getPackageDeclaration() != null &&
                     packageName.equals(cu.getPackageDeclaration().getExpression().printTrimmed(getCursor()))) {
                 return cu;
@@ -123,10 +123,10 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
             if (cu.getImports().stream().anyMatch(i -> {
                 String ending = i.getQualid().getSimpleName();
                 if (member == null) {
-                    return !i.isStatic() && i.getPackageName().equals(packageName) &&
+                    return !isRecord() && !i.isStatic() && i.getPackageName().equals(packageName) &&
                             (ending.equals(typeName) || "*".equals(ending));
                 }
-                return i.isStatic() && i.getTypeName().equals(fullyQualifiedName) &&
+                return !isRecord()  && i.isStatic() && i.getTypeName().equals(fullyQualifiedName) &&
                         (ending.equals(member) || "*".equals(ending));
             })) {
                 return cu;
@@ -143,8 +143,8 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
 
             List<JRightPadded<J.Import>> imports = new ArrayList<>(cu.getPadding().getImports());
 
-            if (imports.isEmpty() && !cu.getClasses().isEmpty()) {
-                if (cu.getPackageDeclaration() == null) {
+            if (imports.isEmpty() && !cu.getClasses().isEmpty() &&
+                cu.getPackageDeclaration() == null) {
                     // leave javadocs on the class and move other comments up to the import
                     // (which could include license headers and the like)
                     Space firstClassPrefix = cu.getClasses().get(0).getPrefix();
@@ -155,7 +155,6 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                     cu = cu.withClasses(ListUtils.mapFirst(cu.getClasses(), clazz ->
                             clazz.withComments(ListUtils.map(clazz.getComments(), comment -> comment instanceof Javadoc ? comment : null))
                     ));
-                }
             }
 
             ImportLayoutStyle layoutStyle = Optional.ofNullable(((SourceFile) cu).getStyle(ImportLayoutStyle.class))
@@ -181,6 +180,10 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
             j = cu;
         }
         return j;
+    }
+
+    private boolean isRecord() {
+        return "Record".equals(typeName);
     }
 
     private List<JRightPadded<J.Import>> checkCRLF(JavaSourceFile cu, List<JRightPadded<J.Import>> newImports) {

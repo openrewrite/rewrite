@@ -210,6 +210,36 @@ class AddImportTest implements RewriteTest {
           )
         );
     }
+    @Issue("https://github.com/openrewrite/rewrite-migrate-java/issues/540")
+    @Test
+    void forceImportNoJavaRecord2() {
+        // Add import for a class named `Record`, even within the same package, to avoid conflicts with java.lang.Record
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("com.acme.bank.Record", null, false))),
+          //language=java
+          java(
+            """
+              package com.acme.bank;
+              
+              import com.acme.bank.*;
+              
+              class Foo {
+              }
+              """,
+            """
+              package com.acme.bank;
+              
+              import com.acme.bank.*;
+              
+              import com.acme.bank.Record;
+
+              class Foo {
+              }
+              """,
+            spec -> spec.markers(javaVersion(11))
+          )
+        );
+    }
 
     @Issue("https://github.com/openrewrite/rewrite-migrate-java/issues/540")
     @Test
