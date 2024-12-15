@@ -126,7 +126,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                     return !isRecord() && !i.isStatic() && i.getPackageName().equals(packageName) &&
                             (ending.equals(typeName) || "*".equals(ending));
                 }
-                return !isRecord()  && i.isStatic() && i.getTypeName().equals(fullyQualifiedName) &&
+                return !isRecord() && i.isStatic() && i.getTypeName().equals(fullyQualifiedName) &&
                         (ending.equals(member) || "*".equals(ending));
             })) {
                 return cu;
@@ -143,18 +143,17 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
 
             List<JRightPadded<J.Import>> imports = new ArrayList<>(cu.getPadding().getImports());
 
-            if (imports.isEmpty() && !cu.getClasses().isEmpty() &&
-                cu.getPackageDeclaration() == null) {
-                    // leave javadocs on the class and move other comments up to the import
-                    // (which could include license headers and the like)
-                    Space firstClassPrefix = cu.getClasses().get(0).getPrefix();
-                    importToAdd = importToAdd.withPrefix(firstClassPrefix
-                            .withComments(ListUtils.map(firstClassPrefix.getComments(), comment -> comment instanceof Javadoc ? null : comment))
-                            .withWhitespace(""));
+            if (imports.isEmpty() && !cu.getClasses().isEmpty() && cu.getPackageDeclaration() == null) {
+                // leave javadocs on the class and move other comments up to the import
+                // (which could include license headers and the like)
+                Space firstClassPrefix = cu.getClasses().get(0).getPrefix();
+                importToAdd = importToAdd.withPrefix(firstClassPrefix
+                        .withComments(ListUtils.map(firstClassPrefix.getComments(), comment -> comment instanceof Javadoc ? null : comment))
+                        .withWhitespace(""));
 
-                    cu = cu.withClasses(ListUtils.mapFirst(cu.getClasses(), clazz ->
-                            clazz.withComments(ListUtils.map(clazz.getComments(), comment -> comment instanceof Javadoc ? comment : null))
-                    ));
+                cu = cu.withClasses(ListUtils.mapFirst(cu.getClasses(), clazz ->
+                        clazz.withComments(ListUtils.map(clazz.getComments(), comment -> comment instanceof Javadoc ? comment : null))
+                ));
             }
 
             ImportLayoutStyle layoutStyle = Optional.ofNullable(((SourceFile) cu).getStyle(ImportLayoutStyle.class))

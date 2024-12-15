@@ -210,6 +210,7 @@ class AddImportTest implements RewriteTest {
           )
         );
     }
+
     @Issue("https://github.com/openrewrite/rewrite-migrate-java/issues/540")
     @Test
     void forceImportNoJavaRecord2() {
@@ -232,7 +233,7 @@ class AddImportTest implements RewriteTest {
               import com.acme.bank.*;
               
               import com.acme.bank.Record;
-
+              
               class Foo {
               }
               """,
