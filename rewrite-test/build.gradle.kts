@@ -8,6 +8,7 @@ dependencies {
     compileOnly("io.micrometer:micrometer-core:latest.release")
     api("org.junit.jupiter:junit-jupiter-api")
     api("org.junit.jupiter:junit-jupiter-params")
+    api("org.junit.platform:junit-platform-launcher")
 
     implementation("org.assertj:assertj-core:latest.release")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-csv")
