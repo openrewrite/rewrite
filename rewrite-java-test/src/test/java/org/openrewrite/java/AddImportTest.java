@@ -210,7 +210,7 @@ class AddImportTest implements RewriteTest {
     }
 
     @Test
-    void forceImportJavaRecord() {
+    void notForceImportJavaRecord() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.lang.Record", null, false))),
           //language=java
