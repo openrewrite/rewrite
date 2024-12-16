@@ -27,8 +27,8 @@ import org.openrewrite.java.TypeMatcher;
 import org.openrewrite.java.table.TypeUses;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.SearchResult;
-import org.openrewrite.trait.Trait;
 import org.openrewrite.trait.Reference;
+import org.openrewrite.trait.Trait;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -206,11 +206,14 @@ public class FindTypes extends Recipe {
 
         private <J2 extends TypedTree> J2 found(J2 j, ExecutionContext ctx) {
             JavaType.FullyQualified fqn = TypeUtils.asFullyQualified(j.getType());
-            typeUses.insertRow(ctx, new TypeUses.Row(
-                    getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath().toString(),
-                    j.printTrimmed(getCursor().getParentTreeCursor()),
-                    fqn == null ? j.getType().toString() : fqn.getFullyQualifiedName()
-            ));
+            if (!j.getMarkers().findFirst(SearchResult.class).isPresent()) {
+                // Avoid double-counting results in the data table
+                typeUses.insertRow(ctx, new TypeUses.Row(
+                        getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath().toString(),
+                        j.printTrimmed(getCursor().getParentTreeCursor()),
+                        fqn == null ? j.getType().toString() : fqn.getFullyQualifiedName()
+                ));
+            }
             return SearchResult.found(j);
         }
     }

@@ -47,6 +47,10 @@ class FindTypesTest implements RewriteTest {
     @Test
     void simpleName() {
         rewriteRun(
+          spec -> spec.dataTable(TypeUses.Row.class, rows -> assertThat(rows)
+            .containsExactly(
+              new TypeUses.Row("B.java", "A1", "a.A1")
+            )),
           java(
             """
               import a.A1;

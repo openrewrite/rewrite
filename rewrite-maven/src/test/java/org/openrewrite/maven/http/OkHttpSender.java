@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.ipc.http;
+package org.openrewrite.maven.http;
 
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.RequestBody;
 import okhttp3.ResponseBody;
+import org.openrewrite.ipc.http.HttpSender;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;

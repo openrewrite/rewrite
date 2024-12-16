@@ -29,8 +29,10 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -103,6 +105,16 @@ class JavaParserTest implements RewriteTest {
           .matches(path -> path.endsWith("guava-31.0-jre.jar"),
             "classpathFromResources should return guava-31.0-jre.jar from resources, even when the target " +
             "directory contains guava-30.0-jre.jar which has the same prefix");
+    }
+
+    @Test
+    void getParserClasspathDownloadCreateRequiredFolder(@TempDir Path temp) throws Exception {
+        Path updatedTemp = Path.of(temp.toString(), "someFolder");
+        assertThat(updatedTemp.toFile().exists()).isFalse();
+        JavaParserExecutionContextView ctx = JavaParserExecutionContextView.view(new InMemoryExecutionContext());
+        ctx.setParserClasspathDownloadTarget(updatedTemp.toFile());
+        ctx.getParserClasspathDownloadTarget();
+        assertThat(updatedTemp.toFile().exists()).isTrue();
     }
 
     @Test
@@ -213,5 +225,23 @@ class JavaParserTest implements RewriteTest {
               ))
           )
         );
+    }
+
+    @Test
+    void filterArtifacts() {
+        List<URI> classpath = List.of(
+          URI.create("file:/.m2/repository/com/google/guava/guava-24.1.1/com_google_guava_guava-24.1.1.jar"),
+          URI.create("file:/.m2/repository/org/threeten/threeten-extra-1.5.0/org_threeten_threeten_extra-1.5.0.jar"),
+          URI.create("file:/.m2/repository/com/amazonaws/aws-java-sdk-s3-1.11.546/com_amazonaws_aws_java_sdk_s3-1.11.546.jar"),
+          URI.create("file:/.m2/repository/org/openrewrite/rewrite-java/8.41.1/rewrite-java-8.41.1.jar")
+        );
+        assertThat(JavaParser.filterArtifacts("threeten-extra", classpath))
+          .containsOnly(Paths.get("/.m2/repository/org/threeten/threeten-extra-1.5.0/org_threeten_threeten_extra-1.5.0.jar"));
+        assertThat(JavaParser.filterArtifacts("guava", classpath))
+          .containsOnly(Paths.get("/.m2/repository/com/google/guava/guava-24.1.1/com_google_guava_guava-24.1.1.jar"));
+        assertThat(JavaParser.filterArtifacts("aws-java-sdk-s3", classpath))
+          .containsOnly(Paths.get("/.m2/repository/com/amazonaws/aws-java-sdk-s3-1.11.546/com_amazonaws_aws_java_sdk_s3-1.11.546.jar"));
+        assertThat(JavaParser.filterArtifacts("rewrite-java", classpath))
+          .containsOnly(Paths.get("/.m2/repository/org/openrewrite/rewrite-java/8.41.1/rewrite-java-8.41.1.jar"));
     }
 }
