@@ -99,6 +99,62 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void mockito() {
+        rewriteRun(recipeSpec -> {
+              recipeSpec.beforeRecipe(withToolingApi())
+                .recipe(new UpgradeDependencyVersion("org.mockito", "*", "4.11.0", null));
+          },
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                testImplementation("org.mockito:mockito-junit-jupiter:3.12.4")
+              }
+              """,
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                testImplementation("org.mockito:mockito-junit-jupiter:4.11.0")
+              }
+              """,
+            spec -> spec.afterRecipe(after -> {
+                Optional<GradleProject> maybeGp = after.getMarkers().findFirst(GradleProject.class);
+                assertThat(maybeGp).isPresent();
+                GradleProject gp = maybeGp.get();
+                GradleDependencyConfiguration testCompileClasspath = gp.getConfiguration("testCompileClasspath");
+                assertThat(testCompileClasspath).isNotNull();
+                assertThat(
+                  testCompileClasspath.getRequested().stream()
+                    .filter(dep -> "org.mockito".equals(dep.getGroupId()) && "mockito-junit-jupiter".equals(dep.getArtifactId()))
+                    .findAny())
+                  .as("GradleProject requested dependencies should have been updated with the new version of mockito")
+                  .isPresent();
+                assertThat(
+                  testCompileClasspath.getResolved().stream()
+                    .filter(dep -> "org.mockito".equals(dep.getGroupId()) && "mockito-junit-jupiter".equals(dep.getArtifactId()) && "4.11.0".equals(dep.getVersion()))
+                    .findAny())
+                  .as("GradleProject resolved dependencies should have been updated with the new version of mockito")
+                  .isPresent();
+            })
+          )
+        );
+    }
+
+    @Test
     void updateVersionInVariable() {
         rewriteRun(
           buildGradle(
