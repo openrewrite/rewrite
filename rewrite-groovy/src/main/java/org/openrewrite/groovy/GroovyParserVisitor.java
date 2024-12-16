@@ -1438,6 +1438,7 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitDeclarationExpression(DeclarationExpression expression) {
+            Space prefix = whitespace();
             Optional<RedundantDef> redundantDef = maybeRedundantDef(expression.getVariableExpression().getType(), expression.getVariableExpression().getName());
             Optional<MultiVariable> multiVariable = maybeMultiVariable();
             List<J.Modifier> modifiers = getModifiers();
@@ -1468,7 +1469,7 @@ public class GroovyParserVisitor {
 
             J.VariableDeclarations variableDeclarations = new J.VariableDeclarations(
                     randomId(),
-                    EMPTY,
+                    prefix,
                     Markers.EMPTY,
                     emptyList(),
                     modifiers,
