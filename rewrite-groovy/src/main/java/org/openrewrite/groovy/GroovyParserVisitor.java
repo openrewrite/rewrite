@@ -761,44 +761,36 @@ public class GroovyParserVisitor {
             return ts;
         }
 
-        @Value
-        class ParensPosition {
-            int cursor;
-            Space prefix;
-        }
+        Stack<Space> openingParens = new Stack<>();
 
-        Stack<ParensPosition> openingParens = new Stack<>();
-
-        private Expression insideParentheses(ASTNode node, Function<Space, Expression> parenthesizedTree) {
+        private Expression insideParentheses(ASTNode node, Supplier<Expression> parenthesizedTree) {
             int count = 0;
-            Space prefix = whitespace();
-            while (source.charAt(cursor) == '(') {
+            while (source.charAt(indexOfNextNonWhitespace(cursor, source)) == '(') {
+                openingParens.push(whitespace());
                 cursor++;
-                openingParens.push(new ParensPosition(cursor, prefix));
-                prefix = whitespace();
                 count++;
             }
             if (count != 0) {
-                Expression parenthesized = parenthesizedTree.apply(prefix);
+                Expression parenthesized = parenthesizedTree.get();
                 if (openingParens.size() < count){
                     count = openingParens.size();
                 }
                 for (int i = count; i > 0; i--) {
-                    parenthesized = new J.Parentheses<>(randomId(), openingParens.pop().getPrefix(), Markers.EMPTY,
+                    parenthesized = new J.Parentheses<>(randomId(), openingParens.pop(), Markers.EMPTY,
                             padRight(parenthesized, sourceBefore(")")));
                 }
                 return parenthesized;
             }
             Integer insideParenthesesLevel = getInsideParenthesesLevel(node);
             if (insideParenthesesLevel != null) {
-                Expression parenthesized = parenthesizedTree.apply(prefix);
+                Expression parenthesized = parenthesizedTree.get();
                 for (int i = insideParenthesesLevel; i > 0; i--) {
-                    parenthesized = new J.Parentheses<>(randomId(), openingParens.pop().getPrefix(), Markers.EMPTY,
+                    parenthesized = new J.Parentheses<>(randomId(), openingParens.pop(), Markers.EMPTY,
                             padRight(parenthesized, sourceBefore(")")));
                 }
                 return parenthesized;
             }
-            return parenthesizedTree.apply(prefix);
+            return parenthesizedTree.get();
         }
 
         private Statement labeled(org.codehaus.groovy.ast.stmt.Statement statement, Supplier<Statement> labeledTree) {
@@ -930,11 +922,14 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitBinaryExpression(BinaryExpression binary) {
-            queue.add(insideParentheses(binary, fmt -> {
+            queue.add(insideParentheses(binary, () -> {
+                Space leftPrefix = null;
+                if (binary.getLeftExpression() instanceof BinaryExpression) {
+                    leftPrefix = whitespace();
+                }
                 Expression left = visit(binary.getLeftExpression());
-                if (left instanceof J.Parentheses) {
-                    left = ((J.Parentheses<?>) left).withTree(((J.Parentheses<?>) left).getTree().withPrefix(fmt));
-                    fmt = EMPTY;
+                if (leftPrefix != null && !leftPrefix.getWhitespace().isEmpty()) {
+                    left = left.withPrefix(leftPrefix);
                 }
                 Space opPrefix = whitespace();
                 boolean assignment = false;
@@ -1058,19 +1053,19 @@ public class GroovyParserVisitor {
                 Expression right = visit(binary.getRightExpression());
 
                 if (assignment) {
-                    return new J.Assignment(randomId(), fmt, Markers.EMPTY,
+                    return new J.Assignment(randomId(), EMPTY, Markers.EMPTY,
                             left, JLeftPadded.build(right).withBefore(opPrefix),
                             typeMapping.type(binary.getType()));
                 } else if (instanceOf) {
-                    return new J.InstanceOf(randomId(), fmt, Markers.EMPTY,
+                    return new J.InstanceOf(randomId(), EMPTY, Markers.EMPTY,
                             JRightPadded.build(left).withAfter(opPrefix), right, null,
                             typeMapping.type(binary.getType()));
                 } else if (assignOp != null) {
-                    return new J.AssignmentOperation(randomId(), fmt, Markers.EMPTY,
+                    return new J.AssignmentOperation(randomId(), EMPTY, Markers.EMPTY,
                             left, JLeftPadded.build(assignOp).withBefore(opPrefix),
                             right, typeMapping.type(binary.getType()));
                 } else if (binaryOp != null) {
-                    return new J.Binary(randomId(), fmt, Markers.EMPTY,
+                    return new J.Binary(randomId(), EMPTY, Markers.EMPTY,
                             left, JLeftPadded.build(binaryOp).withBefore(opPrefix),
                             right, typeMapping.type(binary.getType()));
                 } else if (gBinaryOp != null) {
@@ -1078,7 +1073,7 @@ public class GroovyParserVisitor {
                     if (gBinaryOp == G.Binary.Type.Access) {
                         after = sourceBefore("]");
                     }
-                    return new G.Binary(randomId(), fmt, Markers.EMPTY,
+                    return new G.Binary(randomId(), EMPTY, Markers.EMPTY,
                             left, JLeftPadded.build(gBinaryOp).withBefore(opPrefix),
                             right, after, typeMapping.type(binary.getType()));
                 }
@@ -1215,7 +1210,8 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitCastExpression(CastExpression cast) {
-            queue.add(insideParentheses(cast, prefix -> {
+            queue.add(insideParentheses(cast, () -> {
+                Space prefix = whitespace();
                 // Might be looking at a Java-style cast "(type)object" or a groovy-style cast "object as type"
                 if (source.charAt(cursor) == '(') {
                     cursor++; // skip '('
@@ -1317,9 +1313,10 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitConstantExpression(ConstantExpression expression) {
-            queue.add(insideParentheses(expression, fmt -> {
+            queue.add(insideParentheses(expression, () -> {
                 JavaType.Primitive jType;
                 // The unaryPlus is not included in the expression and must be handled through the source.
+                Space prefix = whitespace();
                 String text = expression.getText();
                 Object value = expression.getValue();
                 ClassNode type = expression.getType();
@@ -1384,7 +1381,7 @@ public class GroovyParserVisitor {
                     jType = JavaType.Primitive.Null;
                 } else if (expression instanceof AnnotationConstantExpression) {
                     classVisitor.visitAnnotation((AnnotationNode) value);
-                    return ((Expression) classVisitor.pollQueue()).withPrefix(fmt);
+                    return ((Expression) classVisitor.pollQueue()).withPrefix(prefix);
                 } else {
                     throw new IllegalStateException("Unexpected constant type " + type);
                 }
@@ -1401,14 +1398,15 @@ public class GroovyParserVisitor {
                         cursor++;
                     }
                 }
-                return new J.Literal(randomId(), fmt, Markers.EMPTY, value, text,
+                return new J.Literal(randomId(), prefix, Markers.EMPTY, value, text,
                         null, jType);
             }));
         }
 
         @Override
         public void visitConstructorCallExpression(ConstructorCallExpression ctor) {
-            queue.add(insideParentheses(ctor, fmt -> {
+            queue.add(insideParentheses(ctor, () -> {
+                Space prefix = whitespace();
                 cursor += 3; // skip "new"
                 TypeTree clazz = visitTypeTree(ctor.getType(), ctor.getNodeMetaData().containsKey(StaticTypesMarker.INFERRED_TYPE));
                 JContainer<Expression> args = visit(ctor.getArguments());
@@ -1417,7 +1415,7 @@ public class GroovyParserVisitor {
                     body = classVisitor.visitClassBlock(ctor.getType());
                 }
                 MethodNode methodNode = (MethodNode) ctor.getNodeMetaData().get(StaticTypesMarker.DIRECT_METHOD_CALL_TARGET);
-                return new J.NewClass(randomId(), fmt, Markers.EMPTY, null, EMPTY,
+                return new J.NewClass(randomId(), prefix, Markers.EMPTY, null, EMPTY,
                         clazz, args, body, typeMapping.methodType(methodNode));
             }));
         }
@@ -1437,11 +1435,12 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitNotExpression(NotExpression expression) {
-            queue.add(insideParentheses(expression, fmt -> {
+            queue.add(insideParentheses(expression, () -> {
+                Space prefix = whitespace();
                 skip("!");
                 JLeftPadded<J.Unary.Type> op = padLeft(EMPTY, J.Unary.Type.Not);
                 Expression expr = visit(expression.getExpression());
-                return new J.Unary(randomId(), fmt, Markers.EMPTY, op, expr, typeMapping.type(expression.getType()));
+                return new J.Unary(randomId(), prefix, Markers.EMPTY, op, expr, typeMapping.type(expression.getType()));
             }));
         }
 
@@ -1693,7 +1692,7 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitMethodCallExpression(MethodCallExpression call) {
-            queue.add(insideParentheses(call, fmt -> {
+            queue.add(insideParentheses(call, () -> {
                 ImplicitDot implicitDot = null;
                 JRightPadded<Expression> select = null;
                 if (!call.isImplicitThis()) {
@@ -1816,7 +1815,7 @@ public class GroovyParserVisitor {
                 } else {
                     methodType = typeMapping.methodType(methodNode);
                 }
-                return new J.MethodInvocation(randomId(), fmt, markers,
+                return new J.MethodInvocation(randomId(), EMPTY, markers,
                         select, null, name, args, methodType);
             }));
         }
@@ -1887,7 +1886,7 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitPropertyExpression(PropertyExpression prop) {
-            queue.add(insideParentheses(prop, fmt -> {
+            queue.add(insideParentheses(prop, () -> {
                 Expression target = visit(prop.getObjectExpression());
                 Space beforeDot = prop.isSpreadSafe() ? sourceBefore("*.") :
                         sourceBefore(prop.isSafe() ? "?." : ".");
@@ -1901,13 +1900,13 @@ public class GroovyParserVisitor {
                 } else if (prop.isSafe()) {
                     name = name.withMarkers(name.getMarkers().add(new NullSafe(randomId())));
                 }
-                return new J.FieldAccess(randomId(), fmt, Markers.EMPTY, target, padLeft(beforeDot, (J.Identifier) name), null);
+                return new J.FieldAccess(randomId(), EMPTY, Markers.EMPTY, target, padLeft(beforeDot, (J.Identifier) name), null);
             }));
         }
 
         @Override
         public void visitRangeExpression(RangeExpression range) {
-            queue.add(insideParentheses(range, fmt -> new G.Range(randomId(), fmt, Markers.EMPTY,
+            queue.add(insideParentheses(range, () -> new G.Range(randomId(), whitespace(), Markers.EMPTY,
                     visit(range.getFrom()),
                     JLeftPadded.build(range.isInclusive()).withBefore(sourceBefore(range.isInclusive() ? ".." : "..>")),
                     visit(range.getTo()))));
@@ -1926,9 +1925,9 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitShortTernaryExpression(ElvisOperatorExpression ternary) {
-            queue.add(insideParentheses(ternary, fmt -> {
+            queue.add(insideParentheses(ternary, () -> {
                 Expression trueExpr = visit(ternary.getBooleanExpression());
-                J.Ternary elvis = new J.Ternary(randomId(), fmt, Markers.EMPTY,
+                J.Ternary elvis = new J.Ternary(randomId(), EMPTY, Markers.EMPTY,
                         trueExpr,
                         padLeft(sourceBefore("?"), trueExpr),
                         padLeft(sourceBefore(":"), visit(ternary.getFalseExpression())),
@@ -1966,7 +1965,7 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitTernaryExpression(TernaryExpression ternary) {
-            queue.add(insideParentheses(ternary, fmt -> new J.Ternary(randomId(), fmt, Markers.EMPTY,
+            queue.add(insideParentheses(ternary, () -> new J.Ternary(randomId(), whitespace(), Markers.EMPTY,
                     visit(ternary.getBooleanExpression()),
                     padLeft(sourceBefore("?"), visit(ternary.getTrueExpression())),
                     padLeft(sourceBefore(":"), visit(ternary.getFalseExpression())),
@@ -2139,7 +2138,7 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitVariableExpression(VariableExpression expression) {
-            queue.add(insideParentheses(expression, fmt -> {
+            queue.add(insideParentheses(expression, () -> {
                 JavaType type;
                 if (expression.isDynamicTyped() && expression.getAccessedVariable() != null && expression.getAccessedVariable().getType() != expression.getOriginType()) {
                     type = typeMapping.type(staticType(expression.getAccessedVariable()));
@@ -2148,7 +2147,7 @@ public class GroovyParserVisitor {
                 }
 
                 return new J.Identifier(randomId(),
-                        fmt.withWhitespace(fmt.getWhitespace() + sourceBefore(expression.getName()).getWhitespace()),
+                        sourceBefore(expression.getName()),
                         Markers.EMPTY,
                         emptyList(),
                         expression.getName(),

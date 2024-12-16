@@ -34,26 +34,42 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
 
         if (asBinary.getOperator() == J.Binary.Type.And) {
             if (isLiteralFalse(asBinary.getLeft())) {
-                j = asBinary.getLeft();
+                if (isLiteralFalse(asBinary.getRight())) {
+                    j = asBinary.getLeft();
+                } else {
+                    j = asBinary.getRight().withPrefix(asBinary.getLeft().getPrefix());
+                }
             } else if (isLiteralFalse(asBinary.getRight())) {
-                j = asBinary.getRight().withPrefix(asBinary.getRight().getPrefix().withWhitespace(""));
+                j = asBinary.getRight().withPrefix(asBinary.getLeft().getPrefix());
             } else if (isLiteralTrue(asBinary.getLeft())) {
-                j = asBinary.getRight();
+                if (isLiteralTrue(asBinary.getRight())) {
+                    j = asBinary.getLeft();
+                } else {
+                    j = asBinary.getRight().withPrefix(asBinary.getLeft().getPrefix());
+                }
             } else if (isLiteralTrue(asBinary.getRight())) {
-                j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(""));
+                j = asBinary.getLeft();
             } else if (!(asBinary.getLeft() instanceof MethodCall) &&
                        SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
                 j = asBinary.getLeft();
             }
         } else if (asBinary.getOperator() == J.Binary.Type.Or) {
             if (isLiteralTrue(asBinary.getLeft())) {
-                j = asBinary.getLeft();
+                if (isLiteralTrue(asBinary.getRight())) {
+                    j = asBinary.getLeft();
+                } else {
+                    j = asBinary.getRight().withPrefix(asBinary.getLeft().getPrefix());
+                }
             } else if (isLiteralTrue(asBinary.getRight())) {
-                j = asBinary.getRight().withPrefix(asBinary.getRight().getPrefix().withWhitespace(""));
+                j = asBinary.getRight().withPrefix(asBinary.getLeft().getPrefix());
             } else if (isLiteralFalse(asBinary.getLeft())) {
-                j = asBinary.getRight();
+                if (isLiteralFalse(asBinary.getRight())) {
+                    j = asBinary.getLeft();
+                } else {
+                    j = asBinary.getRight().withPrefix(asBinary.getLeft().getPrefix());
+                }
             } else if (isLiteralFalse(asBinary.getRight())) {
-                j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(""));
+                j = asBinary.getLeft();
             } else if (!(asBinary.getLeft() instanceof MethodCall) &&
                        SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
                 j = asBinary.getLeft();
@@ -61,15 +77,23 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         } else if (asBinary.getOperator() == J.Binary.Type.Equal) {
             if (isLiteralTrue(asBinary.getLeft())) {
                 if (shouldSimplifyEqualsOn(asBinary.getRight())) {
-                    j = asBinary.getRight().withPrefix(asBinary.getRight().getPrefix().withWhitespace(""));
+                    if (isLiteralTrue(asBinary.getRight())) {
+                        j = asBinary.getLeft();
+                    } else {
+                        j = asBinary.getRight().withPrefix(asBinary.getLeft().getPrefix());
+                    }
                 }
             } else if (isLiteralTrue(asBinary.getRight())) {
                 if (shouldSimplifyEqualsOn(asBinary.getLeft())) {
-                    j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(" "));
+                    j = asBinary.getLeft();
                 }
             } else if (isLiteralFalse(asBinary.getLeft())) {
                 if (shouldSimplifyEqualsOn(asBinary.getRight())) {
-                    j = not(asBinary.getRight());
+                    if (isLiteralFalse(asBinary.getRight())) {
+                        j = asBinary.getLeft();
+                    } else {
+                        j = asBinary.getRight().withPrefix(asBinary.getLeft().getPrefix());
+                    }
                 }
             } else if (isLiteralFalse(asBinary.getRight())) {
                 if (shouldSimplifyEqualsOn(asBinary.getLeft())) {
@@ -81,11 +105,11 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         } else if (asBinary.getOperator() == J.Binary.Type.NotEqual) {
             if (isLiteralFalse(asBinary.getLeft())) {
                 if (shouldSimplifyEqualsOn(asBinary.getRight())) {
-                    j = asBinary.getRight().withPrefix(asBinary.getRight().getPrefix().withWhitespace(""));
+                    j = asBinary.getRight().withPrefix(asBinary.getLeft().getPrefix());
                 }
             } else if (isLiteralFalse(asBinary.getRight())) {
                 if (shouldSimplifyEqualsOn(asBinary.getLeft())) {
-                    j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(" "));
+                    j = asBinary.getLeft();
                 }
             } else if (isLiteralTrue(asBinary.getLeft())) {
                 if (shouldSimplifyEqualsOn(asBinary.getRight())) {
@@ -249,7 +273,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         if (isEmpty.matches(asMethod) &&
             select instanceof J.Literal &&
             select.getType() == JavaType.Primitive.String) {
-            return booleanLiteral(method, J.Literal.isLiteralValue(select, ""));
+            return booleanLiteral(method, J.Literal.isLiteralValue(select, "")).withPrefix(select.getPrefix());
         }
         return j;
     }
