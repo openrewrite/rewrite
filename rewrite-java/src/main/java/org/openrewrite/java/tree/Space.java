@@ -55,7 +55,7 @@ public class Space {
     }
 
     @JsonCreator
-    public static @Nullable Space build(@Nullable String whitespace, List<Comment> comments) {
+    public static Space build(@Nullable String whitespace, List<Comment> comments) {
         if (comments.isEmpty()) {
             if (whitespace == null || whitespace.isEmpty()) {
                 return Space.EMPTY;
@@ -286,13 +286,17 @@ public class Space {
                     printedWs.append(spaces[(i - lastNewline) % 10]);
                 } else if (c == '\t') {
                     printedWs.append(tabs[(i - lastNewline) % 10]);
+                } else {
+                    // should never happen (probably a bug in the parser)
+                    printedWs.append(c);
                 }
             }
         }
+        String whitespaces = printedWs.toString();
 
         return "Space(" +
-               "comments=<" + (comments.size() == 1 ? "1 comment" : comments.size() + " comments") +
-               ">, whitespace='" + printedWs + "')";
+                "comments=<" + (comments.size() == 1 ? "1 comment" : comments.size() + " comments") + ">, " +
+                "whitespace=" + (whitespaces.isEmpty() ? "<empty>" : "'" + whitespaces + "'") + ")";
     }
 
     public enum Location {

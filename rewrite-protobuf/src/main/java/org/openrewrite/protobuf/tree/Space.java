@@ -53,7 +53,7 @@ public class Space {
     }
 
     @JsonCreator
-    public static @Nullable Space build(@Nullable String whitespace, List<Comment> comments) {
+    public static Space build(@Nullable String whitespace, List<Comment> comments) {
         if (comments.isEmpty()) {
             if (whitespace == null || whitespace.isEmpty()) {
                 return Space.EMPTY;
@@ -235,7 +235,7 @@ public class Space {
 
         return trees;
     }
-    
+
     public static <P extends Proto> List<P> formatFirstPrefix(List<P> trees, Space prefix) {
         if (!trees.isEmpty() && !trees.get(0).getPrefix().equals(prefix)) {
             List<P> formattedTrees = new ArrayList<>(trees);

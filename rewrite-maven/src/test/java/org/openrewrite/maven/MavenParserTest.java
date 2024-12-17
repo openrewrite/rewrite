@@ -36,7 +36,7 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Parser;
-import org.openrewrite.ipc.http.OkHttpSender;
+import org.openrewrite.maven.http.OkHttpSender;
 import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.test.RewriteTest;

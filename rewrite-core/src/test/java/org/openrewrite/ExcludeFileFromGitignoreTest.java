@@ -58,6 +58,23 @@ class ExcludeFileFromGitignoreTest implements RewriteTest {
     }
 
     @Test
+    void addNegationIfFolderNameMatch() {
+        rewriteRun(
+          spec -> spec.recipe(new ExcludeFileFromGitignore(List.of("test/"))),
+          text(
+            """
+              test
+              """,
+            """
+              test
+              !/test/
+              """,
+            spec -> spec.path(".gitignore")
+          )
+        );
+    }
+
+    @Test
     void addNegationIfNestedFileNameMatch() {
         rewriteRun(
           spec -> spec.recipe(new ExcludeFileFromGitignore(List.of("directory/test.yml"))),
@@ -75,6 +92,23 @@ class ExcludeFileFromGitignoreTest implements RewriteTest {
     }
 
     @Test
+    void addNegationIfNestedFolderNameMatch() {
+        rewriteRun(
+          spec -> spec.recipe(new ExcludeFileFromGitignore(List.of("test/file.yaml"))),
+          text(
+            """
+              test
+              """,
+            """
+              test
+              !/test/file.yaml
+              """,
+            spec -> spec.path(".gitignore")
+          )
+        );
+    }
+
+    @Test
     void commentsAndEmptyLinesUntouched() {
         rewriteRun(
           spec -> spec.recipe(new ExcludeFileFromGitignore(List.of("directory/test.yml"))),
@@ -83,12 +117,18 @@ class ExcludeFileFromGitignoreTest implements RewriteTest {
               # comment
               
               test.yml
+              # comment
+              
+              file.yaml
               """,
             """
               # comment
               
               test.yml
               !/directory/test.yml
+              # comment
+              
+              file.yaml
               """,
             spec -> spec.path(".gitignore")
           )
@@ -334,16 +374,43 @@ class ExcludeFileFromGitignoreTest implements RewriteTest {
     }
 
     @Test
-    void ignoreWildcardedDirectory() {
+    void ignoreWildcardedDirectoryAtStart() {
         rewriteRun(
-          spec -> spec.recipe(new ExcludeFileFromGitignore(List.of("directory/nested/"))),
+          spec -> spec.recipe(new ExcludeFileFromGitignore(List.of("directory/nested/", "files/nesting/deeply/file.txt"))),
           text(
             """
               /**/nested/
+              /**/nesting/
               """,
             """
               /**/nested/
               !/directory/nested/
+              /**/nesting/*
+              !/files/nesting/
+              /files/nesting/*
+              !/files/nesting/deeply/
+              /files/nesting/deeply/*
+              !/files/nesting/deeply/file.txt
+              """,
+            spec -> spec.path(".gitignore")
+          )
+        );
+    }
+
+    @Test
+    void ignoreWildcardedDirectoryAtEnd() {
+        rewriteRun(
+          spec -> spec.recipe(new ExcludeFileFromGitignore(List.of("directory/nested/", "files/nested"))),
+          text(
+            """
+              /directory/**/
+              /files/**/
+              """,
+            """
+              /directory/**/
+              !/directory/nested/
+              /files/**/
+              !/files/nested
               """,
             spec -> spec.path(".gitignore")
           )
@@ -353,17 +420,20 @@ class ExcludeFileFromGitignoreTest implements RewriteTest {
     @Test
     void ignoreWildcardedFile() {
         rewriteRun(
-          spec -> spec.recipe(new ExcludeFileFromGitignore(List.of("directory/test.yml", "directory/other.txt"))),
+          spec -> spec.recipe(new ExcludeFileFromGitignore(List.of("directory/test.yml", "directory/other.txt", "/directory/nested/application.yaml"))),
           text(
             """
               /test.*
               /*.txt
+              /nested/*.yaml
               """,
             """
               /test.*
               !/test.yml
               /*.txt
               !/other.txt
+              /nested/*.yaml
+              !/nested/application.yaml
               """,
             spec -> spec.path("directory/.gitignore")
           )
@@ -382,9 +452,9 @@ class ExcludeFileFromGitignoreTest implements RewriteTest {
               """,
             """
               test.yml
-              !/nested/test.yml
               otherfile.yml
               nested/test.yml
+              !/nested/test.yml
               """,
             spec -> spec.path(".gitignore")
           )
@@ -414,6 +484,129 @@ class ExcludeFileFromGitignoreTest implements RewriteTest {
               # comment 3
               end-of-file/file.yml
               !/end-of-file/file.yml
+              """,
+            spec -> spec.path(".gitignore")
+          )
+        );
+    }
+
+    @Test
+    void wrongExactNegationPositionedBeforeIgnoreMovesToCorrectPosition() {
+        rewriteRun(
+          spec -> spec.recipe(new ExcludeFileFromGitignore(List.of("directory/test.yml"))),
+          text(
+            """
+              !/directory/test.yml
+              /directory/*
+              """,
+            """
+              /directory/*
+              !/directory/test.yml
+              """,
+            spec -> spec.path(".gitignore")
+          )
+        );
+    }
+
+    @Test
+    void wrongNonExactNegationPositionedBeforeIgnoreDoesNotGetChanged() {
+        rewriteRun(
+          spec -> spec.recipe(new ExcludeFileFromGitignore(List.of("directory/test.yml"))),
+          text(
+            """
+              !directory/test.yml
+              /directory/*
+              """,
+            """
+              !directory/test.yml
+              /directory/*
+              !/directory/test.yml
+              """,
+            spec -> spec.path(".gitignore")
+          )
+        );
+    }
+
+    @Test
+    void whenMultipleFilesInTheSameDirectoryTheyDoNotGetOverwritten() {
+        rewriteRun(
+          spec -> spec.recipe(new ExcludeFileFromGitignore(List.of("gradlew", "gradlew.bat","gradle/wrapper/gradle-wrapper.jar", "gradle/wrapper/gradle-wrapper.properties"))),
+          text(
+            """
+              gradlew
+              gradlew.bat
+              /gradle/
+              """,
+            """
+              gradlew
+              !/gradlew
+              gradlew.bat
+              !/gradlew.bat
+              /gradle/*
+              !/gradle/wrapper/
+              /gradle/wrapper/*
+              !/gradle/wrapper/gradle-wrapper.properties
+              !/gradle/wrapper/gradle-wrapper.jar
+              """,
+            spec -> spec.path(".gitignore")
+          )
+        );
+    }
+
+    @Test
+    void multiWildcardNoDirectoryEntries() {
+        rewriteRun(
+          spec -> spec.recipe(new ExcludeFileFromGitignore(List.of("gradle/wrapper/gradle-wrapper.jar", "gradle/wrapper/gradle-wrapper.properties"))),
+          text(
+            """
+              /gradle/**
+              """, """
+              /gradle/**
+              !/gradle/wrapper/
+              /gradle/wrapper/**
+              !/gradle/wrapper/gradle-wrapper.properties
+              !/gradle/wrapper/gradle-wrapper.jar
+              """,
+            spec -> spec.path(".gitignore")
+          )
+        );
+    }
+
+    @Test
+    void noActionOnWrappedWildcardPath() {
+        rewriteRun(
+          spec -> spec.recipe(new ExcludeFileFromGitignore(List.of("gradle/nested/files/test.txt"))),
+          text(
+            """
+              /gradle/**/files/
+              gradle/**/files
+              gradle/**/files/
+              """,
+            spec -> spec.path(".gitignore")
+          )
+        );
+    }
+
+    @Test
+    void noActionOnMultiWildcardEntriesOnly() {
+        rewriteRun(
+          spec -> spec.recipe(new ExcludeFileFromGitignore(List.of("gradlew", "gradlew.bat","gradle/wrapper/gradle-wrapper.jar", "gradle/wrapper/gradle-wrapper.properties"))),
+          text(
+            """
+              **/gradlew
+              gradlew.bat
+              /gradle/**
+              """,
+            """
+              **/gradlew
+              !/gradlew
+              gradlew.bat
+              !/gradlew.bat
+              /gradle/**
+              !/gradle/wrapper/
+              /gradle/wrapper/**
+              !/gradle/wrapper/gradle-wrapper.properties
+              !/gradle/wrapper/gradle-wrapper.jar
               """,
             spec -> spec.path(".gitignore")
           )

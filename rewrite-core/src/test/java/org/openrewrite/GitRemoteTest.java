@@ -31,7 +31,11 @@ public class GitRemoteTest {
     @ParameterizedTest
     @CsvSource(textBlock = """
       https://github.com/org/repo, github.com, org/repo, org, repo
+      https://github.com/1org/repo, github.com, 1org/repo, 1org, repo
+      https://github.com/1234/repo, github.com, 1234/repo, 1234, repo
       git@github.com:org/repo.git, github.com, org/repo, org, repo
+      git@github.com:1org/1repo.git, github.com, 1org/1repo, 1org, 1repo
+      git@github.com:1234/1repo.git, github.com, 1234/1repo, 1234, 1repo
       ssh://github.com/org/repo.git, github.com, org/repo, org, repo
       
       https://gitlab.com/group/repo.git, gitlab.com, group/repo, group, repo
@@ -41,6 +45,7 @@ public class GitRemoteTest {
       
       https://bitbucket.org/PRJ/repo, bitbucket.org, PRJ/repo, PRJ, repo
       git@bitbucket.org:PRJ/repo.git, bitbucket.org, PRJ/repo, PRJ, repo
+      git@bitbucket.org:1PRJ/repo.git, bitbucket.org, 1PRJ/repo, 1PRJ, repo
       ssh://bitbucket.org/PRJ/repo.git, bitbucket.org, PRJ/repo, PRJ, repo
       
       https://org@dev.azure.com/org/project/_git/repo, dev.azure.com, org/project/repo, org/project, repo
@@ -228,10 +233,20 @@ public class GitRemoteTest {
     }
 
     @Test
+    void shouldNotReplaceExistingWellKnownServer(){
+        GitRemote.Parser parser = new GitRemote.Parser()
+          .registerRemote(GitRemote.Service.GitHub, URI.create("https://github.com"), List.of(URI.create("ssh://notgithub.com")));
+
+        assertThat(parser.findRemoteServer("github.com").getUris())
+          .containsExactlyInAnyOrder(URI.create("https://github.com"), URI.create("ssh://git@github.com"));
+    }
+
+    @Test
     void findRemote() {
         GitRemote.Parser parser = new GitRemote.Parser()
           .registerRemote(GitRemote.Service.Bitbucket, URI.create("scm.company.com/stash"), Collections.emptyList());
         assertThat(parser.findRemoteServer("github.com").getService()).isEqualTo(GitRemote.Service.GitHub);
+        assertThat(parser.findRemoteServer("https://github.com").getService()).isEqualTo(GitRemote.Service.GitHub);
         assertThat(parser.findRemoteServer("gitlab.com").getService()).isEqualTo(GitRemote.Service.GitLab);
         assertThat(parser.findRemoteServer("bitbucket.org").getService()).isEqualTo(GitRemote.Service.BitbucketCloud);
         assertThat(parser.findRemoteServer("dev.azure.com").getService()).isEqualTo(GitRemote.Service.AzureDevOps);
@@ -260,18 +275,18 @@ public class GitRemoteTest {
 
     @ParameterizedTest
     @CsvSource(textBlock = """
-      GitHub, GitHub
-      GITLAB, GitLab
-      bitbucket, Bitbucket
-      BitbucketCloud, BitbucketCloud
-      Bitbucket Cloud, BitbucketCloud
-      BITBUCKET_CLOUD, BitbucketCloud
-      AzureDevOps, AzureDevOps
-      AZURE_DEVOPS, AzureDevOps
-      Azure DevOps, AzureDevOps
-      idontknow, Unknown
-    """)
-    void findServiceForName(String name, GitRemote.Service service){
+        GitHub, GitHub
+        GITLAB, GitLab
+        bitbucket, Bitbucket
+        BitbucketCloud, BitbucketCloud
+        Bitbucket Cloud, BitbucketCloud
+        BITBUCKET_CLOUD, BitbucketCloud
+        AzureDevOps, AzureDevOps
+        AZURE_DEVOPS, AzureDevOps
+        Azure DevOps, AzureDevOps
+        idontknow, Unknown
+      """)
+    void findServiceForName(String name, GitRemote.Service service) {
         assertThat(GitRemote.Service.forName(name)).isEqualTo(service);
     }
 
