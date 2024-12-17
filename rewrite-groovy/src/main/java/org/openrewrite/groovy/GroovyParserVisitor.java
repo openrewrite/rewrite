@@ -1504,13 +1504,13 @@ public class GroovyParserVisitor {
             int saveCursor = cursor;
             Space prefix = whitespace();
             while (source.startsWith("def", cursor) || source.startsWith("var", cursor) || source.startsWith("final", cursor)) {
-                if (source.regionMatches(cursor, "var", 0, 3)) {
+                if (source.startsWith("var", cursor)) {
                     modifiers.add(new J.Modifier(randomId(), prefix, Markers.EMPTY, "var", J.Modifier.Type.LanguageExtension, emptyList()));
                     cursor += 3;
-                } else if (source.regionMatches(cursor, "def", 0, 3)) {
+                } else if (source.startsWith("def", cursor)) {
                     modifiers.add(new J.Modifier(randomId(), prefix, Markers.EMPTY, "def", J.Modifier.Type.LanguageExtension, emptyList()));
                     cursor += 3;
-                } else if (source.regionMatches(cursor, "final", 0, 5)) {
+                } else if (source.startsWith("final", cursor)) {
                     modifiers.add(new J.Modifier(randomId(), prefix, Markers.EMPTY, "final", J.Modifier.Type.LanguageExtension, emptyList()));
                     cursor += 5;
                 } else {
