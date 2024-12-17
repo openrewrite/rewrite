@@ -26,13 +26,11 @@ import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.HashSet;
 import java.util.Optional;
-import java.util.Set;
 import java.util.regex.Pattern;
 
 @Value
-class SpringReference implements Reference {
+public class SpringReference implements Reference {
     Cursor cursor;
     Kind kind;
 
@@ -115,18 +113,7 @@ class SpringReference implements Reference {
         }
     }
 
-    @SuppressWarnings("unused")
-    public static class Provider implements Reference.Provider {
-
-        @Override
-        public Set<Reference> getReferences(SourceFile sourceFile) {
-            Set<Reference> references = new HashSet<>();
-            new Matcher().asVisitor(reference -> {
-                references.add(reference);
-                return reference.getTree();
-            }).visit(sourceFile, 0);
-            return references;
-        }
+    public static class Provider implements Reference.Provider<SpringReference> {
 
         @Override
         public boolean isAcceptable(SourceFile sourceFile) {
@@ -142,6 +129,11 @@ class SpringReference implements Reference {
                 }
             }
             return false;
+        }
+
+        @Override
+        public SimpleTraitMatcher<SpringReference> getMatcher() {
+            return new Matcher();
         }
     }
 }

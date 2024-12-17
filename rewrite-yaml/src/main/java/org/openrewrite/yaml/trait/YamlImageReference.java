@@ -38,7 +38,7 @@ public class YamlImageReference extends YamlReference {
 
     public static class Provider extends YamlProvider {
         @Override
-        SimpleTraitMatcher<YamlReference> getMatcher() {
+        public SimpleTraitMatcher<YamlReference> getMatcher() {
             return new SimpleTraitMatcher<YamlReference>() {
                 private final Predicate<String> image = Pattern.compile("image").asPredicate();
                 private final AtomicBoolean found = new AtomicBoolean(false);

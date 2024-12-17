@@ -17,6 +17,7 @@ package org.openrewrite.trait;
 
 import org.openrewrite.*;
 
+import java.util.HashSet;
 import java.util.Set;
 
 @Incubating(since = "8.39.0")
@@ -51,11 +52,19 @@ public interface Reference extends Trait<Tree> {
         throw new UnsupportedOperationException();
     }
 
-    interface Provider {
-
-        Set<Reference> getReferences(SourceFile sourceFile);
-
+    interface Provider<U extends Reference> {
         boolean isAcceptable(SourceFile sourceFile);
+
+        SimpleTraitMatcher<U> getMatcher();
+
+        default Set<Reference> getReferences(SourceFile sourceFile) {
+            Set<Reference> references = new HashSet<>();
+            getMatcher().asVisitor(reference -> {
+                references.add(reference);
+                return reference.getTree();
+            }).visit(sourceFile, 0);
+            return references;
+        }
     }
 
     interface Matcher {

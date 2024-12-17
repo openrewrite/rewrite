@@ -17,11 +17,7 @@ package org.openrewrite.yaml.trait;
 
 import org.openrewrite.SourceFile;
 import org.openrewrite.trait.Reference;
-import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.yaml.tree.Yaml;
-
-import java.util.HashSet;
-import java.util.Set;
 
 public abstract class YamlReference implements Reference {
     @Override
@@ -37,22 +33,10 @@ public abstract class YamlReference implements Reference {
         return true;
     }
 
-    static abstract class YamlProvider implements Reference.Provider {
-        abstract SimpleTraitMatcher<YamlReference> getMatcher();
-
+    static abstract class YamlProvider implements Reference.Provider<YamlReference> {
         @Override
         public boolean isAcceptable(SourceFile sourceFile) {
             return sourceFile instanceof Yaml.Documents;
-        }
-
-        @Override
-        public Set<Reference> getReferences(SourceFile sourceFile) {
-            Set<Reference> references = new HashSet<>();
-            getMatcher().asVisitor(reference -> {
-                references.add(reference);
-                return reference.getTree();
-            }).visit(sourceFile, 0);
-            return references;
         }
     }
 }

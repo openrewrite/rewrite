@@ -43,7 +43,7 @@ public class YamlApplicationConfigReference extends YamlReference {
         }
 
         @Override
-        SimpleTraitMatcher<YamlReference> getMatcher() {
+        public SimpleTraitMatcher<YamlReference> getMatcher() {
             return new SimpleTraitMatcher<YamlReference>() {
                 private final Predicate<String> javaFullyQualifiedTypePattern = Pattern.compile(
                                 "\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*(?:\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*)*")

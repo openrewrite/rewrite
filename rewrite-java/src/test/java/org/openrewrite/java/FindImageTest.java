@@ -17,11 +17,9 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.java.table.ImageSourceFiles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.text;
 import static org.openrewrite.yaml.Assertions.yaml;
 
@@ -32,7 +30,6 @@ class FindImageTest implements RewriteTest {
     public void defaults(RecipeSpec spec) {
         spec.recipe(new FindImage());
     }
-
 
     @DocumentExample
     @Test
@@ -114,7 +111,7 @@ class FindImageTest implements RewriteTest {
               ENTRYPOINT ["java","-jar","/app.jar"]
               """,
             """
-              ~~(FROM openjdk:8-jdk-alpine)~~>FROM openjdk:8-jdk-alpine
+              ~~(openjdk:8-jdk-alpine)~~>FROM openjdk:8-jdk-alpine
               ARG JAR_FILE=target/*.jar
               COPY ${JAR_FILE} app.jar
               ENTRYPOINT ["java","-jar","/app.jar"]
