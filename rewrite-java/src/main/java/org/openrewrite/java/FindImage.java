@@ -15,17 +15,14 @@
  */
 package org.openrewrite.java;
 
-import lombok.EqualsAndHashCode;
-import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.table.ImageSourceFiles;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.trait.Reference;
 
 import java.nio.file.Path;
 
-@Value
-@EqualsAndHashCode(callSuper = false)
 public class FindImage extends Recipe {
     transient ImageSourceFiles results = new ImageSourceFiles(this);
 
@@ -50,6 +47,7 @@ public class FindImage extends Recipe {
                     Path sourcePath = sourceFile.getSourcePath();
                     for (Reference ref : sourceFile.getReferences().findMatches(new ImageMatcher())) {
                         results.insertRow(ctx, new ImageSourceFiles.Row(sourcePath.toString(), tree.getClass().getSimpleName(), ref.getValue()));
+                        return SearchResult.found(tree, ref.getValue());
                     }
                 }
                 return tree;
