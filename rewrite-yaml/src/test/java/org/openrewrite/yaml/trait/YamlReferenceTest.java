@@ -88,7 +88,6 @@ class YamlReferenceTest implements RewriteTest {
     void noReferencesInMismatchedFilenames(String filename) {
         rewriteRun(
           yaml(
-
             YAML,
             spec -> spec.path(filename).afterRecipe(doc -> assertThat(doc.getReferences().getReferences()).isEmpty())
           )
