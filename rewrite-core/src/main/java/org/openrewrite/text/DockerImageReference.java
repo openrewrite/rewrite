@@ -17,6 +17,9 @@ public class DockerImageReference implements Reference {
         return Kind.IMAGE;
     }
 
+    // TODO:
+    // - casing: https://docs.docker.com/reference/build-checks/from-as-casing/
+    // - multi-stage: https://stackoverflow.com/questions/33322103/multiple-froms-what-it-means
     public static class Provider implements Reference.Provider<DockerImageReference> {
         @Override
         public boolean isAcceptable(SourceFile sourceFile) {
