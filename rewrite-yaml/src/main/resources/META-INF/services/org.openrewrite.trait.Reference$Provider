@@ -1,1 +1,2 @@
-org.openrewrite.yaml.trait.YamlReference$Provider
+org.openrewrite.yaml.trait.YamlApplicationConfigReference$Provider
+org.openrewrite.yaml.trait.YamlImageReference$Provider

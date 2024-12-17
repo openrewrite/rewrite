@@ -24,7 +24,8 @@ public interface Reference extends Trait<Tree> {
 
     enum Kind {
         TYPE,
-        PACKAGE
+        PACKAGE,
+        IMAGE
     }
 
     Kind getKind();
