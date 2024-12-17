@@ -23,7 +23,7 @@ public class DockerImageReference implements Reference {
             if (sourceFile instanceof PlainText) {
                 PlainText text = (PlainText) sourceFile;
                 String fileName = text.getSourcePath().toFile().getName();
-                return (fileName.equals("Dockerfile") || fileName.equals("Containerfile")) && text.getText().contains("FROM");
+                return (fileName.endsWith("Dockerfile") || fileName.equals("Containerfile")) && text.getText().contains("FROM");
             }
             return false;
         }
