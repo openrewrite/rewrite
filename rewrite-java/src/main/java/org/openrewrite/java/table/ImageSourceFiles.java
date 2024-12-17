@@ -22,6 +22,7 @@ import org.openrewrite.DataTable;
 import org.openrewrite.Recipe;
 
 @JsonIgnoreType
+// TODO: Remove this file, we will use the `DockerBaseImages` in the rewrite-docker module
 public class ImageSourceFiles extends DataTable<ImageSourceFiles.Row> {
 
     public ImageSourceFiles(Recipe recipe) {

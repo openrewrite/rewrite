@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.text;
 import static org.openrewrite.yaml.Assertions.yaml;
 
+// TODO: Remove this file, we will use the `FindDockerImageUses` in the rewrite-docker module
 class FindImageTest implements RewriteTest {
 
     @Override

@@ -23,6 +23,7 @@ import org.openrewrite.trait.Reference;
 
 import java.nio.file.Path;
 
+// TODO: Remove this file, we will use the `FindDockerImageUses` in the rewrite-docker module
 public class FindImage extends Recipe {
     transient ImageSourceFiles results = new ImageSourceFiles(this);
 
