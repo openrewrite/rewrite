@@ -1211,11 +1211,10 @@ public class GroovyParserVisitor {
         @Override
         public void visitCastExpression(CastExpression cast) {
             queue.add(insideParentheses(cast, () -> {
-                Space prefix = whitespace();
                 // Might be looking at a Java-style cast "(type)object" or a groovy-style cast "object as type"
-                if (source.charAt(cursor) == '(') {
-                    cursor++; // skip '('
-                    return new J.TypeCast(randomId(), prefix, Markers.EMPTY,
+                Integer insideParenthesesLevel = getInsideParenthesesLevel(cast);
+                if (!cast.isCoerce()) {
+                    return new J.TypeCast(randomId(), openingParens.pop(), Markers.EMPTY,
                             new J.ControlParentheses<>(randomId(), EMPTY, Markers.EMPTY,
                                     new JRightPadded<>(visitTypeTree(cast.getType()), sourceBefore(")"), Markers.EMPTY)
                             ),
@@ -1224,7 +1223,7 @@ public class GroovyParserVisitor {
                     Expression expr = visit(cast.getExpression());
                     Space asPrefix = sourceBefore("as");
 
-                    return new J.TypeCast(randomId(), prefix, new Markers(randomId(), singletonList(new AsStyleTypeCast(randomId()))),
+                    return new J.TypeCast(randomId(), openingParens.pop(), new Markers(randomId(), singletonList(new AsStyleTypeCast(randomId()))),
                             new J.ControlParentheses<>(randomId(), EMPTY, Markers.EMPTY,
                                     new JRightPadded<>(visitTypeTree(cast.getType()), asPrefix, Markers.EMPTY)),
                             expr);
