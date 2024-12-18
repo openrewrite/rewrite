@@ -1554,7 +1554,8 @@ class MavenParserTest implements RewriteTest {
             mavenCtx.setMavenSettings(settings);
 
             rewriteRun(recipeSpec -> recipeSpec.executionContext(mavenCtx),
-              pomXml("""
+              pomXml(
+                    """
                 <project>
                     <groupId>some.group</groupId>
                     <artifactId>some.artifact</artifactId>
