@@ -20,6 +20,7 @@ import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.yaml.tree.Yaml;
 
@@ -134,7 +135,8 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
             if (getCursor().getMessage(REMOVE_PREFIX, false)) {
                 List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) getCursor().getValue()).getEntries();
-                return mapping.withEntries(mapLast(mapping.getEntries(), it -> it.withPrefix(linebreak() + grabAfterFirstLineBreak(entries.get(entries.size() - 1)))));
+                return mapping.withEntries(mapLast(mapping.getEntries(), it ->
+                        it.withPrefix(linebreak() + substringOfAfterFirstLineBreak(entries.get(entries.size() - 1).getPrefix()))));
             }
 
             return mapping;
@@ -166,8 +168,8 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 if (keyMatches(existingEntry, incomingEntry)) {
                     Yaml.Block value = incomingEntry.getValue();
                     if (shouldAutoFormat && incomingEntry.getValue() instanceof Yaml.Scalar && hasLineBreak(((Yaml.Scalar) value).getValue())) {
-                        Yaml.Block newValue = value.withMarkers(value.getMarkers().add(new MultilineScalarChanged(randomId(), false)));
-                        value = autoFormat(newValue, p);
+                        MultilineScalarChanged marker = new MultilineScalarChanged(randomId(), false, calculateMultilineIndent(incomingEntry));
+                        value = autoFormat(value.withMarkers(value.getMarkers().add(marker)), p);
                     }
                     Yaml mergedYaml = new MergeYamlVisitor<>(existingEntry.getValue(), value, acceptTheirs, objectIdentifyingProperty, shouldAutoFormat)
                             .visitNonNull(existingEntry.getValue(), p, new Cursor(cursor, existingEntry));
@@ -185,7 +187,8 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 }
             }
             if (shouldAutoFormat && it.getValue() instanceof Yaml.Scalar && hasLineBreak(((Yaml.Scalar) it.getValue()).getValue())) {
-                it = it.withValue(it.getValue().withMarkers(it.getValue().getMarkers().add(new MultilineScalarChanged(randomId(), true))));
+                MultilineScalarChanged marker = new MultilineScalarChanged(randomId(), true, calculateMultilineIndent(it));
+                it = it.withValue(it.getValue().withMarkers(it.getValue().getMarkers().add(marker)));
             }
             return shouldAutoFormat ? autoFormat(it, p, cursor) : it;
         }));
@@ -220,13 +223,13 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                     // get comment from next element in same mapping block
                     for (int i = 0; i < entries.size() - 1; i++) {
                         if (entries.get(i).getValue().equals(getCursor().getValue())) {
-                            comment = grabBeforeFirstLineBreak(entries.get(i + 1));
+                            comment = substringOfBeforeFirstLineBreak(entries.get(i + 1).getPrefix());
                             break;
                         }
                     }
                     // or retrieve it for last item from next element (could potentially be much higher in the tree)
                     if (comment == null && hasLineBreak(entries.get(entries.size() - 1).getPrefix())) {
-                        comment = grabBeforeFirstLineBreak(entries.get(entries.size() - 1));
+                        comment = substringOfBeforeFirstLineBreak(entries.get(entries.size() - 1).getPrefix());
                     }
                 }
 
@@ -247,7 +250,8 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         for (int i = 0; i < m1Entries.size() - 1; i++) {
             if (m1Entries.get(i).getValue() instanceof Yaml.Mapping && mutatedEntries.get(i).getValue() instanceof Yaml.Mapping &&
                 ((Yaml.Mapping) m1Entries.get(i).getValue()).getEntries().size() < ((Yaml.Mapping) mutatedEntries.get(i).getValue()).getEntries().size()) {
-                mutatedEntries.set(i + 1, mutatedEntries.get(i + 1).withPrefix(linebreak() + grabAfterFirstLineBreak(mutatedEntries.get(i + 1))));
+                mutatedEntries.set(i + 1, mutatedEntries.get(i + 1).withPrefix(
+                        linebreak() + substringOfAfterFirstLineBreak(mutatedEntries.get(i + 1).getPrefix())));
             }
         }
     }
@@ -317,19 +321,26 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         }
     }
 
-    private String grabBeforeFirstLineBreak(Yaml.Mapping.Entry entry) {
-        String[] parts = LINE_BREAK.split(entry.getPrefix());
-        return parts.length > 0 ? parts[0] : "";
-    }
-
-    private String grabAfterFirstLineBreak(Yaml.Mapping.Entry entry) {
-        String[] parts = LINE_BREAK.split(entry.getPrefix());
-        return parts.length > 1 ? String.join(linebreak(), Arrays.copyOfRange(parts, 1, parts.length)) : "";
-    }
-
     private Yaml.Scalar mergeScalar(Yaml.Scalar y1, Yaml.Scalar y2) {
         String s1 = y1.getValue();
         String s2 = y2.getValue();
         return !s1.equals(s2) && !acceptTheirs ? y1.withValue(s2) : y1;
+    }
+
+    private String substringOfBeforeFirstLineBreak(String s) {
+        String[] lines = LINE_BREAK.split(s);
+        return lines.length > 0 ? lines[0] : "";
+    }
+
+    private String substringOfAfterFirstLineBreak(String s) {
+        String[] lines = LINE_BREAK.split(s);
+        return lines.length > 1 ? String.join(linebreak(), Arrays.copyOfRange(lines, 1, lines.length)) : "";
+    }
+
+    private int calculateMultilineIndent(Yaml.Mapping.Entry entry) {
+        String[] lines = LINE_BREAK.split(entry.getPrefix());
+        int keyIndent  = (lines.length > 1 ? lines[lines.length - 1] : "").length();
+        int indent = StringUtils.minCommonIndentLevel(substringOfAfterFirstLineBreak(((Yaml.Scalar) entry.getValue()).getValue()));
+        return Math.max(indent - keyIndent, 0);
     }
 }

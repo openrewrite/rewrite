@@ -131,7 +131,7 @@ public class StringUtils {
      * @param text A string with zero or more line breaks.
      * @return The minimum count of white space characters preceding each line of content.
      */
-    private static int minCommonIndentLevel(String text) {
+    public static int minCommonIndentLevel(String text) {
         int minIndent = Integer.MAX_VALUE;
         int whiteSpaceCount = 0;
         boolean contentEncountered = false;
