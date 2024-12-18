@@ -22,6 +22,8 @@ import org.openrewrite.marker.SearchResult;
 import org.openrewrite.trait.Reference;
 
 import java.nio.file.Path;
+import java.util.Collection;
+import java.util.stream.Collectors;
 
 // TODO: Remove this file, we will use the `FindDockerImageUses` in the rewrite-docker module
 public class FindImage extends Recipe {
@@ -43,13 +45,18 @@ public class FindImage extends Recipe {
 
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                // TODO improve: `if (sourceFile instanceof PlainText && references.size() > 1)` then all markers are set at beginning
+
                 if (tree instanceof SourceFileWithReferences) {
                     SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
                     Path sourcePath = sourceFile.getSourcePath();
-                    for (Reference ref : sourceFile.getReferences().findMatches(new ImageMatcher())) {
-                        results.insertRow(ctx, new ImageSourceFiles.Row(sourcePath.toString(), tree.getClass().getSimpleName(), ref.getValue()));
-                        return SearchResult.found(tree, ref.getValue());
-                    }
+                    Collection<Reference> references = sourceFile.getReferences().findMatches(new ImageMatcher());
+                    String value = references.stream()
+                            .map(Reference::getValue)
+                            .peek(it -> results.insertRow(ctx, new ImageSourceFiles.Row(sourcePath.toString(), tree.getClass().getSimpleName(), it)))
+                            .sorted()
+                            .collect(Collectors.joining("|"));
+                    return SearchResult.found(tree, value);
                 }
                 return tree;
             }

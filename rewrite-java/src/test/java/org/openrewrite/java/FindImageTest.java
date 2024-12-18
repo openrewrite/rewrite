@@ -111,24 +111,24 @@ class FindImageTest implements RewriteTest {
               COPY app.go .
               RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o app .
               
-              FROM alpine:latest
-              RUN apk --no-cache add ca-certificates
-              WORKDIR /root/
-              COPY --from=builder /go/src/github.com/alexellis/href-counter/app .
-              CMD ["./app"]
+              from alpine:latest
+              run apk --no-cache add ca-certificates
+              workdir /root/
+              copy --from=builder /go/src/github.com/alexellis/href-counter/app .
+              cmd ["./app"]
               """,
             """
-              ~~(golang:1.7.3)~~>FROM golang:1.7.3 as builder
+              ~~(alpine:latest|golang:1.7.3)~~>FROM golang:1.7.3 as builder
               WORKDIR /go/src/github.com/alexellis/href-counter/
               RUN go get -d -v golang.org/x/net/html
               COPY app.go .
               RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o app .
               
-              ~~(alpine:latest)~~>FROM alpine:latest
-              RUN apk --no-cache add ca-certificates
-              WORKDIR /root/
-              COPY --from=builder /go/src/github.com/alexellis/href-counter/app .
-              CMD ["./app"]
+              from alpine:latest
+              run apk --no-cache add ca-certificates
+              workdir /root/
+              copy --from=builder /go/src/github.com/alexellis/href-counter/app .
+              cmd ["./app"]
               """,
             spec -> spec.path("Dockerfile")
           )

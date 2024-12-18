@@ -3,9 +3,11 @@ package org.openrewrite.text;
 import lombok.Value;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.trait.Reference;
-import org.openrewrite.trait.SimpleTraitMatcher;
+
+import java.util.HashSet;
+import java.util.Set;
+import java.util.regex.Pattern;
 
 @Value
 public class DockerImageReference implements Reference {
@@ -17,37 +19,30 @@ public class DockerImageReference implements Reference {
         return Kind.IMAGE;
     }
 
-    // TODO:
-    // - casing: https://docs.docker.com/reference/build-checks/from-as-casing/
-    // - multi-stage: https://stackoverflow.com/questions/33322103/multiple-froms-what-it-means
-    public static class Provider extends AbstractProvider<DockerImageReference> {
+    public static class Provider implements Reference.Provider {
+        private static final Pattern FROM = Pattern.compile("FROM\\s+([\\w:.-]*)", Pattern.CASE_INSENSITIVE);
+
         @Override
         public boolean isAcceptable(SourceFile sourceFile) {
             if (sourceFile instanceof PlainText) {
                 PlainText text = (PlainText) sourceFile;
                 String fileName = text.getSourcePath().toFile().getName();
-                return (fileName.endsWith("Dockerfile") || fileName.equals("Containerfile")) && text.getText().contains("FROM");
+                return (fileName.endsWith("Dockerfile") || fileName.equals("Containerfile")) && FROM.matcher(text.getText()).find();
             }
             return false;
         }
 
         @Override
-        public SimpleTraitMatcher<DockerImageReference> getMatcher() {
-            return new SimpleTraitMatcher<DockerImageReference>() {
-                @Override
-                protected DockerImageReference test(Cursor cursor) {
-                    String text = ((PlainText) cursor.getValue()).getText();
-                    int index = StringUtils.indexOfNextNonWhitespace(text.indexOf("FROM") + 4, text);
-                    StringBuilder image = new StringBuilder();
-                    for (char c : text.substring(index).toCharArray()) {
-                        if (Character.isWhitespace(c)) {
-                            break;
-                        }
-                        image.append(c);
-                    }
-                    return new DockerImageReference(cursor, image.toString());
-                }
-            };
+        public Set<Reference> getReferences(SourceFile sourceFile) {
+            Set<Reference> references = new HashSet<>();
+            java.util.regex.Matcher m = FROM.matcher(((PlainText) sourceFile).getText());
+            Cursor c = new Cursor(null, Cursor.ROOT_VALUE);
+
+            while (m.find()) {
+                references.add(new DockerImageReference(c, m.group(1)));
+            }
+
+            return references;
         }
     }
 }
