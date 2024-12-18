@@ -20,7 +20,7 @@ public class DockerImageReference implements Reference {
     // TODO:
     // - casing: https://docs.docker.com/reference/build-checks/from-as-casing/
     // - multi-stage: https://stackoverflow.com/questions/33322103/multiple-froms-what-it-means
-    public static class Provider implements Reference.Provider<DockerImageReference> {
+    public static class Provider extends AbstractProvider<DockerImageReference> {
         @Override
         public boolean isAcceptable(SourceFile sourceFile) {
             if (sourceFile instanceof PlainText) {

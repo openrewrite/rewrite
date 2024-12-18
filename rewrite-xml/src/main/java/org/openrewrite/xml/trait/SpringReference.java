@@ -113,7 +113,7 @@ public class SpringReference implements Reference {
         }
     }
 
-    public static class Provider implements Reference.Provider<SpringReference> {
+    public static class Provider extends AbstractProvider<SpringReference> {
 
         @Override
         public boolean isAcceptable(SourceFile sourceFile) {

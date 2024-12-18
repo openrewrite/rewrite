@@ -52,12 +52,18 @@ public interface Reference extends Trait<Tree> {
         throw new UnsupportedOperationException();
     }
 
-    interface Provider<U extends Reference> {
+    interface Provider {
+
+        Set<Reference> getReferences(SourceFile sourceFile);
+
         boolean isAcceptable(SourceFile sourceFile);
+    }
 
-        SimpleTraitMatcher<U> getMatcher();
+    abstract class AbstractProvider<U extends Reference> implements Provider {
+        protected abstract SimpleTraitMatcher<U> getMatcher();
 
-        default Set<Reference> getReferences(SourceFile sourceFile) {
+        @Override
+        public Set<Reference> getReferences(SourceFile sourceFile) {
             Set<Reference> references = new HashSet<>();
             getMatcher().asVisitor(reference -> {
                 references.add(reference);

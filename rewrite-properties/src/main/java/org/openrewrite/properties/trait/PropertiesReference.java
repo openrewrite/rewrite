@@ -50,7 +50,7 @@ public class PropertiesReference implements Reference {
     }
 
     @SuppressWarnings("unused")
-    public static class Provider implements Reference.Provider<PropertiesReference> {
+    public static class Provider extends AbstractProvider<PropertiesReference> {
         private static final Predicate<String> applicationPropertiesMatcher = Pattern.compile("^application(-\\w+)?\\.properties$").asPredicate();
 
         @Override

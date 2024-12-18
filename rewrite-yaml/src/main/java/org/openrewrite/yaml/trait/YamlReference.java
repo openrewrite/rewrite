@@ -33,7 +33,7 @@ public abstract class YamlReference implements Reference {
         return true;
     }
 
-    static abstract class YamlProvider implements Reference.Provider<YamlReference> {
+    static abstract class YamlProvider extends AbstractProvider<YamlReference> {
         @Override
         public boolean isAcceptable(SourceFile sourceFile) {
             return sourceFile instanceof Yaml.Documents;
