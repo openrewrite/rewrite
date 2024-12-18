@@ -122,27 +122,51 @@ public class Find extends Recipe {
                 if (!matcher.find()) {
                     return sourceFile;
                 }
-                matcher.reset();
+
+                String sourceFilePath = sourceFile.getSourcePath().toString();
+
                 List<PlainText.Snippet> snippets = new ArrayList<>();
                 int previousEnd = 0;
-                while (matcher.find()) {
+
+                int lastNewLineIndex = -1;
+                int nextNewLineIndex = -1;
+                boolean isFirstMatch = true;
+
+                do {
                     int matchStart = matcher.start();
                     snippets.add(snippet(rawText.substring(previousEnd, matchStart)));
                     snippets.add(SearchResult.found(snippet(rawText.substring(matchStart, matcher.end()))));
                     previousEnd = matcher.end();
 
-                    int startLine = Math.max(0, rawText.substring(0, matchStart).lastIndexOf('\n') + 1);
+                    // For the first match, search backwards
+                    if (isFirstMatch) {
+                        lastNewLineIndex = rawText.lastIndexOf('\n', matchStart);
+                        nextNewLineIndex = rawText.indexOf('\n', lastNewLineIndex + 1);
+                        isFirstMatch = false;
+                    } else if (nextNewLineIndex != -1 && nextNewLineIndex < matchStart) {
+                        // Advance lastNewLineIndex while before match start
+                        while (nextNewLineIndex != -1 && nextNewLineIndex < matchStart) {
+                            lastNewLineIndex = nextNewLineIndex;
+                            nextNewLineIndex = rawText.indexOf('\n', lastNewLineIndex + 1);
+                        }
+                    }
+
+                    int startLine = lastNewLineIndex + 1;
                     int endLine = rawText.indexOf('\n', matcher.end());
                     if (endLine == -1) {
                         endLine = rawText.length();
                     }
 
+                    //noinspection StringBufferReplaceableByString
                     textMatches.insertRow(ctx, new TextMatches.Row(
-                            sourceFile.getSourcePath().toString(),
-                            rawText.substring(startLine, matcher.start()) + "~~>" +
-                            rawText.substring(matcher.start(), endLine)
+                            sourceFilePath,
+                            new StringBuilder(endLine - startLine + 3)
+                                    .append(rawText, startLine, matchStart)
+                                    .append("~~>")
+                                    .append(rawText, matchStart, endLine)
+                                    .toString()
                     ));
-                }
+                } while (matcher.find());
                 snippets.add(snippet(rawText.substring(previousEnd)));
                 return plainText.withText("").withSnippets(snippets);
             }
@@ -160,8 +184,8 @@ public class Find extends Recipe {
         return visitor;
     }
 
-
     private static PlainText.Snippet snippet(String text) {
         return new PlainText.Snippet(Tree.randomId(), Markers.EMPTY, text);
     }
+
 }

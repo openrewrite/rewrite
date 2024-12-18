@@ -111,4 +111,121 @@ class FindTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void regexBasicMultiLine() {
+        rewriteRun(
+          spec -> spec.recipe(new Find("[T\\s]", true, true, true, null, null)),
+          text(
+            """
+              This is\ttext.
+              This is\ttext.
+              """,
+            """
+              ~~>This~~> is~~>\ttext.~~>
+              ~~>This~~> is~~>\ttext.
+              """
+          )
+        );
+    }
+
+    @Test
+    void regexWithoutMultilineAndDotall() {
+        rewriteRun(
+          spec -> spec.recipe(new Find("^This.*below\\.$", true, true, false, false, null)),
+          text(
+            """
+              This is text.
+              This is a line below.
+              This is a line above.
+              This is text.
+              This is a line below.
+              """
+          )
+        );
+    }
+
+    @Test
+    void regexMatchingWhitespaceWithoutMultilineWithDotall() {
+        rewriteRun(
+          spec -> spec.recipe(new Find("One.Two$", true, true, false, true, null)),
+          //language=csv
+          text( // the `.` above matches the space character on the same line
+            """
+              Zero
+              One Two
+              Three
+              """
+          )
+        );
+    }
+
+    @Test
+    void regexWithoutMultilineAndWithDotAll() {
+        rewriteRun(
+          spec -> spec.recipe(new Find("^This.*below\\.$", true, true, false, true, null)),
+          text(
+            """
+              This is text.
+              This is a line below.
+              This is a line above.
+              This is text.
+              This is a line below.
+              """,
+            """
+              ~~>This is text.
+              This is a line below.
+              This is a line above.
+              This is text.
+              This is a line below.
+              """
+          )
+        );
+    }
+
+    @Test
+    void regexWithMultilineAndWithoutDotall() {
+        rewriteRun(
+          spec -> spec.recipe(new Find("^This.*below\\.$", true, true, true, false, null)),
+          text(
+            """
+              This is text.
+              This is a line below.
+              This is a line above.
+              This is text.
+              This is a line below.
+              """,
+            """
+              This is text.
+              ~~>This is a line below.
+              This is a line above.
+              This is text.
+              ~~>This is a line below.
+              """
+          )
+        );
+    }
+
+    @Test
+    void regexWithBothMultilineAndDotAll() {
+        rewriteRun(
+          spec -> spec.recipe(new Find("^This.*below\\.$", true, true, true, true, null)),
+          text(
+            """
+              The first line.
+              This is a line below.
+              This is a line above.
+              This is text.
+              This is a line below.
+              """,
+            """
+              The first line.
+              ~~>This is a line below.
+              This is a line above.
+              This is text.
+              This is a line below.
+              """
+          )
+        );
+    }
 }
