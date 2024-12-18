@@ -791,7 +791,12 @@ public class GroovyParserVisitor {
                 }
                 return parenthesized;
             }
-            return parenthesizedTree.get();
+            Expression parenthesized = parenthesizedTree.get();
+            if (this.nodeCursor.getValue() != null && this.nodeCursor.getValue() instanceof BooleanExpression && node instanceof MethodCallExpression && source.charAt(cursor) == ')') {
+                parenthesized = new J.Parentheses<>(randomId(), openingParens.pop(), Markers.EMPTY,
+                        padRight(parenthesized, sourceBefore(")")));
+            }
+            return parenthesized;
         }
 
         private Statement labeled(org.codehaus.groovy.ast.stmt.Statement statement, Supplier<Statement> labeledTree) {
