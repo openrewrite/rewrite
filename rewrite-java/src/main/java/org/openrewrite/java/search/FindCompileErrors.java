@@ -42,17 +42,13 @@ public class FindCompileErrors extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.Erroneous visitErroneous(J.Erroneous erroneous, ExecutionContext ctx) {
-
                 J.CompilationUnit cu = getCursor().firstEnclosing(J.CompilationUnit.class);
                 String sourceFile = cu != null ? cu.getSourcePath().toString() : "Unknown source file";
-
-                String code = erroneous.print();
-
+                String code = erroneous.print(getCursor());
                 report.insertRow(ctx, new CompileErrors.Row(
                         sourceFile,
                         code
                 ));
-
                 return SearchResult.found(erroneous);
             }
         };
