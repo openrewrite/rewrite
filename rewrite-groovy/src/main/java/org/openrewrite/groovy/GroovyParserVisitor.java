@@ -34,6 +34,7 @@ import org.openrewrite.groovy.marker.*;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.marker.OmitParentheses;
@@ -1352,23 +1353,21 @@ public class GroovyParserVisitor {
                     jType = JavaType.Primitive.Short;
                 } else if (type == ClassHelper.STRING_TYPE) {
                     jType = JavaType.Primitive.String;
-                    // String literals value returned by getValue()/getText() has already processed sequences like "\\" -> "\"
-                    int length = sourceLengthOfString(expression);
-                    String start = source.substring(cursor);
-                    int delimiterLength = 0;
-                    if (start.startsWith("$/")) {
-                        delimiterLength = 2;
-                    } else if (start.startsWith("\"\"\"") || start.startsWith("'''")) {
-                        delimiterLength = 3;
-                    } else if (start.startsWith("/") || start.startsWith("\"") || start.startsWith("'")) {
-                        delimiterLength = 1;
-                    }
-                    boolean attributeSelector = false;
                     // this is an attribute selector
-                    if (source.startsWith("@" + value, cursor)) {
-                        attributeSelector = true;
+                    boolean attributeSelector = source.startsWith("@" + value, cursor);
+                    int length = lengthAccordingToAst(expression);
+                    Integer insideParenthesesLevel = getInsideParenthesesLevel(expression);
+                    if (insideParenthesesLevel != null) {
+                        length = length - insideParenthesesLevel * 2;
                     }
-                    text = source.substring(cursor, cursor + length + (attributeSelector ? 1 : 0));
+                    String valueAccordingToAST = source.substring(cursor, cursor + length + (attributeSelector ? 1 : 0));
+                    int delimiterLength = getDelimiterLength();
+                    if (StringUtils.containsWhitespace(valueAccordingToAST)) {
+                        length = delimiterLength + ((String) expression.getValue()).length() + delimiterLength;
+                        text = source.substring(cursor, cursor + length + (attributeSelector ? 1 : 0));
+                    } else {
+                        text = valueAccordingToAST;
+                    }
                     value = text.substring(delimiterLength, text.length() - delimiterLength);
                 } else if (expression.isNullExpression()) {
                     if (source.startsWith("null", cursor)) {
@@ -1709,6 +1708,7 @@ public class GroovyParserVisitor {
                 // closure() has implicitThis set to false
                 // So the "select" that was just parsed _may_ have actually been the method name
                 J.Identifier name;
+                Space prefix = whitespace();
 
                 String methodNameExpression = call.getMethodAsString();
                 if (source.charAt(cursor) == '"' || source.charAt(cursor) == '\'') {
@@ -1717,7 +1717,6 @@ public class GroovyParserVisitor {
                     methodNameExpression = source.charAt(cursor) + methodNameExpression + source.charAt(cursor);
                 }
 
-                Space prefix = whitespace();
                 if (methodNameExpression.equals(source.substring(cursor, cursor + methodNameExpression.length()))) {
                     cursor += methodNameExpression.length();
                     name = new J.Identifier(randomId(), prefix, Markers.EMPTY,
