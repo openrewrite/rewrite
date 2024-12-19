@@ -290,22 +290,10 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
                             }
                         } else {
                             Space originalPrefix = addDependencyInvocation.getPrefix();
-                            if (currentStatement instanceof J.VariableDeclarations) {
-                                J.VariableDeclarations variableDeclarations = (J.VariableDeclarations) currentStatement;
-                                if (variableDeclarations.getTypeExpression() != null) {
-                                    addDependencyInvocation = addDependencyInvocation.withPrefix(variableDeclarations.getTypeExpression().getPrefix());
-                                }
-                            } else {
-                                addDependencyInvocation = addDependencyInvocation.withPrefix(currentStatement.getPrefix());
-                            }
+                            addDependencyInvocation = addDependencyInvocation.withPrefix(currentStatement.getPrefix());
 
                             if (addDependencyInvocation.getSimpleName().equals(beforeDependency.getSimpleName())) {
-                                if (currentStatement instanceof J.VariableDeclarations) {
-                                    J.VariableDeclarations variableDeclarations = (J.VariableDeclarations) currentStatement;
-                                    if (variableDeclarations.getTypeExpression() != null && !variableDeclarations.getTypeExpression().getPrefix().equals(originalPrefix)) {
-                                        statements.set(i, variableDeclarations.withTypeExpression(variableDeclarations.getTypeExpression().withPrefix(originalPrefix)));
-                                    }
-                                } else if (!currentStatement.getPrefix().equals(originalPrefix)) {
+                                if (!currentStatement.getPrefix().equals(originalPrefix)) {
                                     statements.set(i, currentStatement.withPrefix(originalPrefix));
                                 }
                             }

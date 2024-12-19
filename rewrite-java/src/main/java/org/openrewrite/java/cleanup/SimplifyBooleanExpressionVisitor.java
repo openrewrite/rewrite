@@ -240,6 +240,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
     }
 
     private final MethodMatcher isEmpty = new MethodMatcher("java.lang.String isEmpty()");
+    private final MethodMatcher equals = new MethodMatcher("java.lang.String equals(java.lang.Object)");
 
     @Override
     public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
@@ -250,6 +251,15 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
             select instanceof J.Literal &&
             select.getType() == JavaType.Primitive.String) {
             return booleanLiteral(method, J.Literal.isLiteralValue(select, ""));
+        } else if (equals.matches(asMethod)) {
+            Expression arg = asMethod.getArguments().get(0);
+            if (arg instanceof J.Literal && select instanceof J.Literal) {
+                return booleanLiteral(method, ((J.Literal) select).getValue().equals(((J.Literal) arg).getValue()));
+            } else if (arg instanceof J.Identifier && select instanceof J.Identifier) {
+                return booleanLiteral(method, SemanticallyEqual.areEqual(select, arg));
+            } if (arg instanceof J.FieldAccess && select instanceof J.FieldAccess) {
+                return booleanLiteral(method, SemanticallyEqual.areEqual(select, arg));
+            }
         }
         return j;
     }

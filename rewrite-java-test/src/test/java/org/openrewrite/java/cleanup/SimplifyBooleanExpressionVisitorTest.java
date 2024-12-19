@@ -64,7 +64,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
 
     @DocumentExample
     @Test
-    void foo() {
+    void skipMissingTypeAttribution() {
         rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).build()),
           java(
@@ -732,5 +732,38 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
         } else {
             rewriteRun(java(beforeJava, template.formatted(after)));
         }
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-feature-flags/issues/40")
+    @Test
+    void simplifyStringLiteralEqualsStringLiteral() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  {
+                      String foo = "foo";
+                      if ("foo".equals("foo")) {}
+                      if (foo.equals(foo)) {}
+                      if (foo.equals("foo")) {}
+                      if ("foo".equals(foo)) {}
+                      if ("foo".equals("bar")) {}
+                  }
+              }
+              """,
+            """
+              class A {
+                  {
+                      String foo = "foo";
+                      if (true) {}
+                      if (true) {}
+                      if (foo.equals("foo")) {}
+                      if ("foo".equals(foo)) {}
+                      if (false) {}
+                  }
+              }
+              """
+          )
+        );
     }
 }
