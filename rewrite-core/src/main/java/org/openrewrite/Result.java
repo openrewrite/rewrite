@@ -185,7 +185,7 @@ public class Result {
      * @return Git-style patch diff representing the changes to this compilation unit.
      */
     public String diff(@Nullable Path relativeTo) {
-        return diff(relativeTo, null);
+        return diff(relativeTo, (PrintOutputCapture.MarkerPrinter) null);
     }
 
     public String diff(@Nullable Path relativeTo, PrintOutputCapture.@Nullable MarkerPrinter markerPrinter) {
