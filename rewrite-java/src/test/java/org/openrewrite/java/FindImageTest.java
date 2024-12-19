@@ -106,15 +106,49 @@ class FindImageTest implements RewriteTest {
     }
 
     @Test
+    void yamlFileWithMultipleImages() {
+        rewriteRun(
+          spec -> spec.recipe(new FindImage())
+            .dataTable(ImageSourceFiles.Row.class, rows ->
+              assertThat(rows)
+                .hasSize(3)
+                .extracting(ImageSourceFiles.Row::getValue)
+                .containsExactlyInAnyOrder("golang:1.7.0", "golang:1.7.0", "golang:1.7.3")),
+          yaml(
+            """
+              test:
+                image: golang:1.7.3
+              
+              accp:
+                image: golang:1.7.0
+              
+              prod:
+                image: golang:1.7.0
+              """,
+            """
+              test:
+                image: ~~(golang:1.7.3)~~>golang:1.7.3
+              
+              accp:
+                image: ~~(golang:1.7.0)~~>golang:1.7.0
+              
+              prod:
+                image: ~~(golang:1.7.0)~~>golang:1.7.0
+              """
+          )
+        );
+    }
+
+    @Test
     void dockerFile() {
         rewriteRun(
           spec -> spec.recipe(new FindImage())
-            .dataTable(ImageSourceFiles.Row.class, rows -> {
+            .dataTable(ImageSourceFiles.Row.class, rows ->
                 assertThat(rows)
                   .hasSize(2)
                   .extracting(ImageSourceFiles.Row::getValue)
-                  .containsExactlyInAnyOrder("alpine:latest", "golang:1.7.3");
-            }),
+                  .containsExactlyInAnyOrder("alpine:latest", "golang:1.7.3")
+            ),
           text(
             //language=Dockerfile
             """
