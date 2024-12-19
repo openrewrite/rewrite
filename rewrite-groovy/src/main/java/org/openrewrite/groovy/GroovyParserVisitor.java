@@ -763,10 +763,7 @@ public class GroovyParserVisitor {
         }
 
         private Expression insideParentheses(ASTNode node, Function<Space, Expression> parenthesizedTree) {
-            int saveCursor = cursor;
-            whitespace();
             Integer insideParenthesesLevel = getInsideParenthesesLevel(node);
-            cursor = saveCursor;
             if (insideParenthesesLevel != null && insideParenthesesLevel > 0) {
                 Stack<Space> openingParens = new Stack<>();
                 for (int i = 0; i < insideParenthesesLevel; i++) {
@@ -2536,6 +2533,8 @@ public class GroovyParserVisitor {
             return (Integer) rawIpl;
         } else if (node instanceof MethodCallExpression) {
             MethodCallExpression expr = (MethodCallExpression) node;
+            int saveCursor = cursor;
+            whitespace();
             int childBegin = cursor;
             if (expr.getObjectExpression().getLineNumber() != expr.getLineNumber()) {
                 for (int i = 0; i < (expr.getObjectExpression().getLineNumber() - expr.getLineNumber()) - 1; i++) {
@@ -2551,6 +2550,7 @@ public class GroovyParserVisitor {
                     count++;
                 }
             }
+            cursor = saveCursor;
             return count;
         } else {
             return null;
