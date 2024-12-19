@@ -15,30 +15,16 @@
  */
 package org.openrewrite.groovy.tree;
 
-import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
-import static org.openrewrite.groovy.Assertions.srcTestGroovy;
-import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.java.Assertions.srcTestJava;
 
-@SuppressWarnings({"GroovyUnusedAssignment", "GrUnnecessarySemicolon"})
 class AttributeTest implements RewriteTest {
-
-    @Language("groovy")
-    private static final String SOME_USER = """
-      class User {
-        public final String name
-        User(String name) { this.name = name}
-      }
-      """;
 
     @Test
     void attribute() {
         rewriteRun(
-          srcTestGroovy(groovy(SOME_USER)),
           groovy("new User('Bob').@name == 'Bob'")
         );
     }
@@ -46,7 +32,6 @@ class AttributeTest implements RewriteTest {
     @Test
     void attributeInClosure() {
         rewriteRun(
-          srcTestGroovy(groovy(SOME_USER)),
           groovy("[new User('Bob')].find { it.@name == 'Bob' }")
         );
     }
@@ -54,7 +39,6 @@ class AttributeTest implements RewriteTest {
     @Test
     void attributeWithParentheses() {
         rewriteRun(
-          srcTestGroovy(groovy(SOME_USER)),
           groovy("(new User('Bob').@name) == 'Bob'")
         );
     }
