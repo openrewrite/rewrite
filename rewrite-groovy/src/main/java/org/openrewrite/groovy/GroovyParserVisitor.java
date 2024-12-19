@@ -764,7 +764,7 @@ public class GroovyParserVisitor {
 
         private Expression insideParentheses(ASTNode node, Function<Space, Expression> parenthesizedTree) {
             Integer insideParenthesesLevel = getInsideParenthesesLevel(node);
-            if (insideParenthesesLevel != null && insideParenthesesLevel > 0) {
+            if (insideParenthesesLevel != null) {
                 Stack<Space> openingParens = new Stack<>();
                 for (int i = 0; i < insideParenthesesLevel; i++) {
                     openingParens.push(sourceBefore("("));
