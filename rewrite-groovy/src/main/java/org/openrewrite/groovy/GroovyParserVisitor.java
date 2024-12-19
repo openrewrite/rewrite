@@ -1907,23 +1907,24 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitAttributeExpression(AttributeExpression attr) {
-            Space fmt = whitespace();
-            Expression target = visit(attr.getObjectExpression());
-            Space beforeDot = attr.isSafe() ? sourceBefore("?.") :
-                    sourceBefore(attr.isSpreadSafe() ? "*." : ".");
-            J name = visit(attr.getProperty());
-            if (name instanceof J.Literal) {
-                String nameStr = ((J.Literal) name).getValueSource();
-                assert nameStr != null;
-                name = new J.Identifier(randomId(), name.getPrefix(), Markers.EMPTY, emptyList(), nameStr, null, null);
-            }
-            if (attr.isSpreadSafe()) {
-                name = name.withMarkers(name.getMarkers().add(new StarDot(randomId())));
-            }
-            if (attr.isSafe()) {
-                name = name.withMarkers(name.getMarkers().add(new NullSafe(randomId())));
-            }
-            queue.add(new J.FieldAccess(randomId(), fmt, Markers.EMPTY, target, padLeft(beforeDot, (J.Identifier) name), null));
+            queue.add(insideParentheses(attr, fmt -> {
+                Expression target = visit(attr.getObjectExpression());
+                Space beforeDot = attr.isSafe() ? sourceBefore("?.") :
+                        sourceBefore(attr.isSpreadSafe() ? "*." : ".");
+                J name = visit(attr.getProperty());
+                if (name instanceof J.Literal) {
+                    String nameStr = ((J.Literal) name).getValueSource();
+                    assert nameStr != null;
+                    name = new J.Identifier(randomId(), name.getPrefix(), Markers.EMPTY, emptyList(), nameStr, null, null);
+                }
+                if (attr.isSpreadSafe()) {
+                    name = name.withMarkers(name.getMarkers().add(new StarDot(randomId())));
+                }
+                if (attr.isSafe()) {
+                    name = name.withMarkers(name.getMarkers().add(new NullSafe(randomId())));
+                }
+                return new J.FieldAccess(randomId(), fmt, Markers.EMPTY, target, padLeft(beforeDot, (J.Identifier) name), null);
+            }));
         }
 
         @Override
@@ -2540,25 +2541,25 @@ public class GroovyParserVisitor {
             MethodCallExpression expr = (MethodCallExpression) node;
             int saveCursor = cursor;
             whitespace();
-            int count = determineParenthesisLevel(expr);
+            int count = determineParenthesisLevel(expr.getObjectExpression().getLineNumber(), expr.getLineNumber(), expr.getObjectExpression().getColumnNumber(), expr.getColumnNumber());
             cursor = saveCursor;
             return count;
         }
         return null;
     }
 
-    private int determineParenthesisLevel(MethodCallExpression expr) {
-        int objectExpressionBeginCursor = cursor;
-        if (expr.getObjectExpression().getLineNumber() > expr.getLineNumber()) {
-            for (int i = 0; i < (expr.getObjectExpression().getLineNumber() - expr.getLineNumber()); i++) {
-                objectExpressionBeginCursor = source.indexOf('\n', objectExpressionBeginCursor);
+    private int determineParenthesisLevel(int childLineNumber, int parentLineNumber, int childColumn, int parentColumn) {
+        int childBeginCursor = cursor;
+        if (childLineNumber > parentLineNumber) {
+            for (int i = 0; i < (childColumn - parentLineNumber); i++) {
+                childBeginCursor = source.indexOf('\n', childBeginCursor);
             }
-            objectExpressionBeginCursor += expr.getObjectExpression().getColumnNumber();
+            childBeginCursor += childBeginCursor;
         } else {
-            objectExpressionBeginCursor += expr.getObjectExpression().getColumnNumber() - expr.getColumnNumber();
+            childBeginCursor += childColumn - parentColumn;
         }
         int count = 0;
-        for (int i = cursor; i < objectExpressionBeginCursor; i++) {
+        for (int i = cursor; i < childBeginCursor; i++) {
             if (source.charAt(i) == '(') {
                 count++;
             }
