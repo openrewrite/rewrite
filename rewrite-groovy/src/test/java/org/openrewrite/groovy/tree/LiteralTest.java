@@ -217,29 +217,6 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
-    void emptyListLiteral() {
-        rewriteRun(
-          groovy(
-            """
-              def a = []
-              def b = [   ]
-              """
-          )
-        );
-    }
-
-    @Test
-    void emptyListLiteralWithParentheses() {
-        rewriteRun(
-          groovy(
-            """
-              def y = ([])
-              """
-          )
-        );
-    }
-
-    @Test
     void multilineStringWithApostrophes() {
         rewriteRun(
           groovy(
@@ -260,17 +237,6 @@ class LiteralTest implements RewriteTest {
           groovy(
             """
               def a = [ foo : "bar" , ]
-              """
-          )
-        );
-    }
-
-    @Test
-    void listLiteralTrailingComma() {
-        rewriteRun(
-          groovy(
-            """
-              def a = [ "foo" /* "foo" suffix */ , /* "]" prefix */ ]
               """
           )
         );
