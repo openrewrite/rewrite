@@ -15,39 +15,52 @@
  */
 package org.openrewrite.groovy.tree;
 
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
+import static org.openrewrite.groovy.Assertions.srcTestGroovy;
+import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.srcTestJava;
 
 @SuppressWarnings({"GroovyUnusedAssignment", "GrUnnecessarySemicolon"})
 class AttributeTest implements RewriteTest {
 
+    @Language("groovy")
+    private static final String SOME_USER = """
+      class User {
+        public final String name
+        User(String name) { this.name = name}
+      }
+      """;
+
+
     @Test
-    void usingGroovyNode() {
+    void attribute() {
         rewriteRun(
+          srcTestGroovy(groovy(SOME_USER)),
           groovy(
             """
-              def xml = new Node(null, "ivy")
-              def n = xml.dependencies.dependency.find { it.@name == 'test-module' }
-              n.@conf = 'runtime->default;docs->docs;sources->sources'
+              new User("Bob").@name == 'Bob'
               """
           )
         );
     }
 
     @Test
+    void attributeInClosure() {
+        rewriteRun(
+          srcTestGroovy(groovy(SOME_USER)),
+          groovy("[new User('Bob')].find { it.@name == 'Bob' }")
+        );
+    }
+
+    @Test
     void attributeWithParentheses() {
         rewriteRun(
-          groovy(
-            """
-              class User {
-                public final String name
-                User(String name) { this.name = name}
-             }
-             (new User("henk").@name) == 'henk'
-             """
-          )
+          srcTestGroovy(groovy(SOME_USER)),
+          groovy("(new User('Bob').@name) == 'Bob'")
         );
     }
 }
