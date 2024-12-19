@@ -55,10 +55,8 @@ class RemoteFileTest {
 
     @Test
     void gradleWrapperDownloadFails() throws Exception {
-        URL distributionUrl = requireNonNull(RemoteFileTest.class.getClassLoader().getResource("gradle-wrapper.properties"));
+        URL distributionUrl = new URL("http://example.com");
         ExecutionContext ctx = new InMemoryExecutionContext();
-        RemoteExecutionContextView.view(ctx).setArtifactCache(new LocalRemoteArtifactCache(
-          Paths.get(System.getProperty("user.home") + "/.rewrite/remote/gradleWrapperDownloadFails")));
         HttpSenderExecutionContextView.view(ctx)
           .setLargeFileHttpSender(new MockHttpSender(408));
 
