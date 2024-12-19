@@ -39,11 +39,7 @@ class AttributeTest implements RewriteTest {
     void attribute() {
         rewriteRun(
           srcTestGroovy(groovy(SOME_USER)),
-          groovy(
-            """
-              new User("Bob").@name == 'Bob'
-              """
-          )
+          groovy("new User('Bob').@name == 'Bob'")
         );
     }
 
