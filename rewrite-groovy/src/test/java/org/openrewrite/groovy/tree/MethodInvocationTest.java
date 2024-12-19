@@ -406,4 +406,17 @@ class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void insideFourParenthesesAndEnters() {
+        rewriteRun(
+          groovy(
+            """
+              ((((
+                something(a)
+              ))))
+              """
+          )
+        );
+    }
 }
