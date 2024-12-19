@@ -35,4 +35,19 @@ class AttributeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void attributeWithParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              class User {
+                public final String name
+                User(String name) { this.name = name}
+             }
+             (new User("henk").@name) == 'henk'
+             """
+          )
+        );
+    }
 }
