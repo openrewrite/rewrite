@@ -722,7 +722,7 @@ public class StringUtils {
     }
 
     public static boolean containsWhitespace(String s) {
-        for(int i = 0; i < s.length(); ++i) {
+        for (int i = 0; i < s.length(); ++i) {
             if (Character.isWhitespace(s.charAt(i))) {
                 return true;
             }

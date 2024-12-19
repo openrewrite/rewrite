@@ -763,7 +763,8 @@ public class GroovyParserVisitor {
         }
 
         private Expression insideParentheses(ASTNode node, Function<Space, Expression> parenthesizedTree) {
-            int saveCursor = cursor;whitespace();
+            int saveCursor = cursor;
+            whitespace();
             Integer insideParenthesesLevel = getInsideParenthesesLevel(node);
             cursor = saveCursor;
             if (insideParenthesesLevel != null && insideParenthesesLevel > 0) {
@@ -2532,23 +2533,23 @@ public class GroovyParserVisitor {
         if (rawIpl instanceof AtomicInteger) {
             // On Java 11 and newer _INSIDE_PARENTHESES_LEVEL is an AtomicInteger
             return ((AtomicInteger) rawIpl).get();
-        }  else if (rawIpl instanceof Integer) {
+        } else if (rawIpl instanceof Integer) {
             // On Java 8 _INSIDE_PARENTHESES_LEVEL is a regular Integer
             return (Integer) rawIpl;
         } else if (node instanceof MethodCallExpression) {
             MethodCallExpression expr = (MethodCallExpression) node;
             int childBegin = cursor;
             if (expr.getObjectExpression().getLineNumber() != expr.getLineNumber()) {
-                for (int i = 0; i < (expr.getObjectExpression().getLineNumber() - expr.getLineNumber()) - 1 ; i++) {
+                for (int i = 0; i < (expr.getObjectExpression().getLineNumber() - expr.getLineNumber()) - 1; i++) {
                     childBegin = source.indexOf('\n', childBegin);
                 }
                 childBegin += expr.getObjectExpression().getColumnNumber();
             } else {
-                childBegin += expr.getObjectExpression().getColumnNumber() - expr.getColumnNumber() ;
+                childBegin += expr.getObjectExpression().getColumnNumber() - expr.getColumnNumber();
             }
             int count = 0;
             for (int i = cursor; i < childBegin; i++) {
-                if (source.charAt(i) == '('){
+                if (source.charAt(i) == '(') {
                     count++;
                 }
             }
