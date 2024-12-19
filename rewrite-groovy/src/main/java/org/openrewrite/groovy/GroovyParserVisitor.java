@@ -2539,16 +2539,21 @@ public class GroovyParserVisitor {
             return (Integer) rawIpl;
         } else if (node instanceof MethodCallExpression) {
             MethodCallExpression expr = (MethodCallExpression) node;
-            int saveCursor = cursor;
-            whitespace();
-            int count = determineParenthesisLevel(expr.getObjectExpression().getLineNumber(), expr.getLineNumber(), expr.getObjectExpression().getColumnNumber(), expr.getColumnNumber());
-            cursor = saveCursor;
-            return count;
+            return determineParenthesisLevel(expr.getObjectExpression().getLineNumber(), expr.getLineNumber(), expr.getObjectExpression().getColumnNumber(), expr.getColumnNumber());
         }
         return null;
     }
 
+    /**
+     * @param childLineNumber the beginning line number of the first sub node
+     * @param parentLineNumber the beginning line number of the parent node
+     * @param childColumn the column on the {@code childLineNumber} line where the sub node starts
+     * @param parentColumn the column on the {@code parentLineNumber} line where the parent node starts
+     * @return the level of parenthesis parsed from the source
+     */
     private int determineParenthesisLevel(int childLineNumber, int parentLineNumber, int childColumn, int parentColumn) {
+        int saveCursor = cursor;
+        whitespace();
         int childBeginCursor = cursor;
         if (childLineNumber > parentLineNumber) {
             for (int i = 0; i < (childColumn - parentLineNumber); i++) {
@@ -2564,6 +2569,7 @@ public class GroovyParserVisitor {
                 count++;
             }
         }
+        cursor = saveCursor;
         return count;
     }
 
