@@ -1361,7 +1361,7 @@ public class GroovyParserVisitor {
                     String valueAccordingToAST = source.substring(cursor, cursor + length + (attributeSelector ? 1 : 0));
                     int delimiterLength = getDelimiterLength();
                     if (StringUtils.containsWhitespace(valueAccordingToAST)) {
-                        length = delimiterLength + ((String) expression.getValue()).length() + delimiterLength;
+                        length = delimiterLength + expression.getValue().toString().length() + delimiterLength;
                         text = source.substring(cursor, cursor + length + (attributeSelector ? 1 : 0));
                     } else {
                         text = valueAccordingToAST;
