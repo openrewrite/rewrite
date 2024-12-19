@@ -16,7 +16,6 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -24,6 +23,18 @@ import static org.openrewrite.groovy.Assertions.groovy;
 
 @SuppressWarnings({"UnnecessaryQualifiedReference", "GroovyUnusedAssignment", "GrUnnecessarySemicolon"})
 class CastTest implements RewriteTest {
+
+    @Test
+    void javaStyleCastNew() {
+        rewriteRun(
+          groovy(
+            """
+              String foo = ( String ) "hallo"
+              String bar = "hallo" as String
+              """
+          )
+        );
+    }
 
     @Test
     void javaStyleCast() {
@@ -74,14 +85,13 @@ class CastTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              ( "" as String ).toString()
+              ( "x" as String      ).toString()
               """
           )
         );
     }
 
     @Test
-    @ExpectedToFail("Parentheses with method invocation is not yet supported")
     void groovyCastAndInvokeMethodWithParentheses() {
         rewriteRun(
           groovy(
@@ -103,7 +113,6 @@ class CastTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("Parentheses with method invocation is not yet supported")
     @Test
     void javaCastAndInvokeMethodWithParentheses() {
         rewriteRun(

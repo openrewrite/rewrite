@@ -16,7 +16,6 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -31,11 +30,11 @@ class MethodInvocationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-
+              
               repositories {
                   mavenCentral()
               }
-
+              
               dependencies {
                   implementation 'org.hibernate:hibernate-core:3.6.7.Final'
                   api 'com.google.guava:guava:23.0'
@@ -46,7 +45,6 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("Parentheses with method invocation is not yet supported")
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4615")
     void gradleWithParentheses() {
@@ -349,7 +347,7 @@ class MethodInvocationTest implements RewriteTest {
                 static boolean isEmpty(String value) {
                   return value == null || value.isEmpty()
                 }
-
+              
                 static void main(String[] args) {
                   isEmpty("")
                 }
@@ -359,7 +357,29 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("Parentheses with method invocation is not yet supported")
+    @Issue("https://github.com/openrewrite/rewrite/issues/4703")
+    @Test
+    void insideParenthesesSimple() {
+        rewriteRun(
+          groovy(
+            """
+              ((a.invoke "b" ))
+              """
+          )
+        );
+    }
+
+    @Test
+    void lotOfSpacesAroundConstantWithParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              (  ( (    "x"         )        ).toString()       )
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4703")
     @Test
     void insideParentheses() {
@@ -375,7 +395,6 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("Parentheses with method invocation is not yet supported")
     @Issue("https://github.com/openrewrite/rewrite/issues/4703")
     @Test
     void insideParenthesesWithoutNewLineAndEscapedMethodName() {

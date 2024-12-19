@@ -34,6 +34,7 @@ import org.openrewrite.groovy.marker.*;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.marker.OmitParentheses;
@@ -762,8 +763,10 @@ public class GroovyParserVisitor {
         }
 
         private Expression insideParentheses(ASTNode node, Function<Space, Expression> parenthesizedTree) {
+            int saveCursor = cursor;whitespace();
             Integer insideParenthesesLevel = getInsideParenthesesLevel(node);
-            if (insideParenthesesLevel != null) {
+            cursor = saveCursor;
+            if (insideParenthesesLevel != null && insideParenthesesLevel > 0) {
                 Stack<Space> openingParens = new Stack<>();
                 for (int i = 0; i < insideParenthesesLevel; i++) {
                     openingParens.push(sourceBefore("("));
@@ -774,6 +777,8 @@ public class GroovyParserVisitor {
                             padRight(parenthesized, sourceBefore(")")));
                 }
                 return parenthesized;
+            } else {
+                cursor = saveCursor;
             }
             return parenthesizedTree.apply(whitespace());
         }
@@ -1350,20 +1355,20 @@ public class GroovyParserVisitor {
                     jType = JavaType.Primitive.Short;
                 } else if (type == ClassHelper.STRING_TYPE) {
                     jType = JavaType.Primitive.String;
-                    // String literals value returned by getValue()/getText() has already processed sequences like "\\" -> "\"
-                    int length = sourceLengthOfString(expression);
                     // this is an attribute selector
-                    if (source.startsWith("@" + value, cursor)) {
-                        length += 1;
+                    boolean attributeSelector = source.startsWith("@" + value, cursor);
+                    int length = lengthAccordingToAst(expression);
+                    Integer insideParenthesesLevel = getInsideParenthesesLevel(expression);
+                    if (insideParenthesesLevel != null) {
+                        length = length - insideParenthesesLevel * 2;
                     }
-                    text = source.substring(cursor, cursor + length);
-                    int delimiterLength = 0;
-                    if (text.startsWith("$/")) {
-                        delimiterLength = 2;
-                    } else if (text.startsWith("\"\"\"") || text.startsWith("'''")) {
-                        delimiterLength = 3;
-                    } else if (text.startsWith("/") || text.startsWith("\"") || text.startsWith("'")) {
-                        delimiterLength = 1;
+                    String valueAccordingToAST = source.substring(cursor, cursor + length + (attributeSelector ? 1 : 0));
+                    int delimiterLength = getDelimiterLength();
+                    if (StringUtils.containsWhitespace(valueAccordingToAST)) {
+                        length = delimiterLength + ((String) expression.getValue()).length() + delimiterLength;
+                        text = source.substring(cursor, cursor + length + (attributeSelector ? 1 : 0));
+                    } else {
+                        text = valueAccordingToAST;
                     }
                     value = text.substring(delimiterLength, text.length() - delimiterLength);
                 } else if (expression.isNullExpression()) {
@@ -2522,14 +2527,34 @@ public class GroovyParserVisitor {
         return lengthAccordingToAst;
     }
 
-    private static @Nullable Integer getInsideParenthesesLevel(ASTNode node) {
+    private @Nullable Integer getInsideParenthesesLevel(ASTNode node) {
         Object rawIpl = node.getNodeMetaData("_INSIDE_PARENTHESES_LEVEL");
         if (rawIpl instanceof AtomicInteger) {
             // On Java 11 and newer _INSIDE_PARENTHESES_LEVEL is an AtomicInteger
             return ((AtomicInteger) rawIpl).get();
-        } else {
+        }  else if (rawIpl instanceof Integer) {
             // On Java 8 _INSIDE_PARENTHESES_LEVEL is a regular Integer
             return (Integer) rawIpl;
+        } else if (node instanceof MethodCallExpression) {
+            MethodCallExpression expr = (MethodCallExpression) node;
+            int childBegin = cursor;
+            if (expr.getObjectExpression().getLineNumber() != expr.getLineNumber()) {
+                for (int i = 0; i < (expr.getObjectExpression().getLineNumber() - expr.getLineNumber()) - 1 ; i++) {
+                    childBegin = source.indexOf('\n', childBegin);
+                }
+                childBegin += expr.getObjectExpression().getColumnNumber();
+            } else {
+                childBegin += expr.getObjectExpression().getColumnNumber() - expr.getColumnNumber() ;
+            }
+            int count = 0;
+            for (int i = cursor; i < childBegin; i++) {
+                if (source.charAt(i) == '('){
+                    count++;
+                }
+            }
+            return count;
+        } else {
+            return null;
         }
     }
 

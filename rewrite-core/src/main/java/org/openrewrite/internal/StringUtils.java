@@ -720,4 +720,14 @@ public class StringUtils {
     public static boolean hasLineBreak(@Nullable String s) {
         return s != null && LINE_BREAK.matcher(s).find();
     }
+
+    public static boolean containsWhitespace(String s) {
+        for(int i = 0; i < s.length(); ++i) {
+            if (Character.isWhitespace(s.charAt(i))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }
