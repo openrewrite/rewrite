@@ -35,7 +35,6 @@ class AttributeTest implements RewriteTest {
       }
       """;
 
-
     @Test
     void attribute() {
         rewriteRun(
