@@ -19,9 +19,12 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.java.style.ImportLayoutStyle;
+import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+
+import java.util.Arrays;
 
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
@@ -705,6 +708,116 @@ class OrderImportsTest implements RewriteTest {
                   Space mySpace = null;
                   JavaType.Variable myVariable = null;
               }
+              """
+          )
+        );
+    }
+
+    /**
+     * With only an ImportLayoutStyle and no TabAndIndentsStyle the recipe indents the `extends` keyword as well.
+     * This test verifies that TabAndIndentsStyle can be configured (with continuationIndent ≤ -2) so that it leaves
+     * the code following the imports as it is.
+     */
+    @Issue("https://github.com/openrewrite/rewrite/issues/4165")
+    @Test
+    void shouldNotIndentExtends() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().styles(
+            singletonList(
+              new NamedStyles(
+                randomId(),
+                "it.will.only.OrderImports",
+                "Order imports by custom style",
+                "This style defines the order of imports and nothing else",
+                emptySet(),
+                Arrays.asList(
+                  ImportLayoutStyle.builder()
+                    .importAllOthers()
+                    .blankLine()
+                    .importStaticAllOthers()
+                    .build(),
+                  new TabsAndIndentsStyle(false, -2, -2, null, false, null)
+                )
+              )
+            ))),
+          java("class BaseClass {}"),
+          java(
+            """
+              import static org.junit.jupiter.api.Assertions.*;
+
+              import java.io.*;
+              class Test
+                  extends BaseClass {
+
+                   int foo;//nonstandard indentation
+
+              \tint ba;//tabbed indentation
+              }
+              """,
+            """
+              import java.io.*;
+
+              import static org.junit.jupiter.api.Assertions.*;
+
+              class Test
+                  extends BaseClass {
+
+                   int foo;//nonstandard indentation
+
+              \tint ba;//tabbed indentation
+              }
+              """
+          ),
+          java(
+            """
+              import com.fasterxml.jackson.core.*;
+              
+              import com.fasterxml.jackson.databind.*;
+              
+              public class CollectionDeserializer {
+    
+                  void a()
+                  {
+                  }    
+                  /**
+                   * JavaDoc without a gap.
+                   */
+                  class B {}
+              }
+              """,
+            """
+              import com.fasterxml.jackson.core.*;
+              import com.fasterxml.jackson.databind.*;
+              
+              public class CollectionDeserializer {
+    
+                  void a()
+                  {
+                  }    
+                  /**
+                   * JavaDoc without a gap.
+                   */
+                  class B {}
+              }
+              """
+          ),
+          java(
+            """
+              import java.lang.annotation.Target;
+              
+              import com.fasterxml.jackson.annotation.JsonInclude;
+              import com.fasterxml.jackson.databind.ser.VirtualBeanPropertyWriter;
+              
+              @Target({ElementType.ANNOTATION_TYPE, ElementType.TYPE })
+              public @interface JsonAppend {}
+              """,
+            """
+              import com.fasterxml.jackson.annotation.JsonInclude;
+              import com.fasterxml.jackson.databind.ser.VirtualBeanPropertyWriter;
+              import java.lang.annotation.Target;
+              
+              @Target({ElementType.ANNOTATION_TYPE, ElementType.TYPE })
+              public @interface JsonAppend {}
               """
           )
         );
