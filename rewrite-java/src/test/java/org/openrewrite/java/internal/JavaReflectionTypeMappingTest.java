@@ -22,6 +22,8 @@ import org.openrewrite.java.JavaTypeMappingTest;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 @SuppressWarnings("ConstantConditions")
 class JavaReflectionTypeMappingTest implements JavaTypeMappingTest {
     JavaReflectionTypeMapping typeMapping = new JavaReflectionTypeMapping(new JavaTypeCache());
@@ -56,4 +58,20 @@ class JavaReflectionTypeMappingTest implements JavaTypeMappingTest {
     @Override
     public void enumTypeB() {
     }
+
+    @Test
+    @Override
+    // The JavaReflectionTypeMapping cannot include source retention annotations
+    public void includeSourceRetentionAnnotations() {
+        JavaType.Parameterized goat = goatType();
+        assertThat(goat.getAnnotations()).satisfiesExactlyInAnyOrder(
+          a -> assertThat(a.getClassName()).isEqualTo("AnnotationWithRuntimeRetention")
+        );
+
+        JavaType.Method clazzMethod = methodType("clazz");
+        assertThat(clazzMethod.getAnnotations()).satisfiesExactlyInAnyOrder(
+          a -> assertThat(a.getClassName()).isEqualTo("AnnotationWithRuntimeRetention")
+        );
+    }
+
 }
