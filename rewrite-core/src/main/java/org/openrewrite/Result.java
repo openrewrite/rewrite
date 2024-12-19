@@ -192,6 +192,16 @@ public class Result {
         return diff(relativeTo, markerPrinter, false);
     }
 
+    @Incubating(since = "8.41.4")
+    public String diff(@Nullable Path relativeTo, PrintOutputCapture.MarkerPrinter.MarkerMode markerMode) {
+        return diff(relativeTo, markerMode, false);
+    }
+
+    @Incubating(since = "8.41.4")
+    public String diff(@Nullable Path relativeTo, PrintOutputCapture.MarkerPrinter.MarkerMode markerMode, boolean ignoreAllWhitespace) {
+        return diff(relativeTo, markerMode.getPrinter(), ignoreAllWhitespace);
+    }
+
     @Incubating(since = "7.34.0")
     public String diff(@Nullable Path relativeTo, PrintOutputCapture.@Nullable MarkerPrinter markerPrinter, @Nullable Boolean ignoreAllWhitespace) {
         Path beforePath = before == null ? null : before.getSourcePath();

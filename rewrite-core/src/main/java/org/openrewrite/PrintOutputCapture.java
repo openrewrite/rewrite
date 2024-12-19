@@ -15,8 +15,12 @@
  */
 package org.openrewrite;
 
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.Markup;
+import org.openrewrite.marker.SearchResult;
 
 import java.util.function.UnaryOperator;
 
@@ -67,6 +71,22 @@ public class PrintOutputCapture<P> implements Cloneable {
     }
 
     public interface MarkerPrinter {
+
+        @Incubating(since = "8.41.4")
+        @RequiredArgsConstructor
+        enum MarkerMode {
+            NONE(MarkerPrinter.NONE),
+            DEFAULT(MarkerPrinter.DEFAULT),
+            VERBOSE(MarkerPrinter.VERBOSE),
+            FENCED(MarkerPrinter.FENCED),
+            SEARCH_ONLY(MarkerPrinter.SEARCH_ONLY);
+            @Getter
+            private final MarkerPrinter printer;
+        }
+
+        MarkerPrinter NONE = new MarkerPrinter() {
+        };
+
         MarkerPrinter DEFAULT = new MarkerPrinter() {
             @Override
             public String beforeSyntax(Marker marker, Cursor cursor, UnaryOperator<String> commentWrapper) {
@@ -78,6 +98,30 @@ public class PrintOutputCapture<P> implements Cloneable {
             @Override
             public String beforeSyntax(Marker marker, Cursor cursor, UnaryOperator<String> commentWrapper) {
                 return marker.print(cursor, commentWrapper, true);
+            }
+        };
+
+        MarkerPrinter FENCED = new MarkerPrinter() {
+            @Override
+            public String beforeSyntax(Marker marker, Cursor cursor, UnaryOperator<String> commentWrapper) {
+                return marker instanceof SearchResult || marker instanceof Markup ? "{{" + marker.getId() + "}}" : "";
+            }
+
+            @Override
+            public String afterSyntax(Marker marker, Cursor cursor, UnaryOperator<String> commentWrapper) {
+                return marker instanceof SearchResult || marker instanceof Markup ? "{{" + marker.getId() + "}}" : "";
+            }
+        };
+
+        MarkerPrinter SEARCH_ONLY = new MarkerPrinter() {
+            @Override
+            public String beforeSyntax(Marker marker, Cursor cursor, UnaryOperator<String> commentWrapper) {
+                return marker instanceof SearchResult ? marker.print(cursor, commentWrapper, false) : "";
+            }
+
+            @Override
+            public String afterSyntax(Marker marker, Cursor cursor, UnaryOperator<String> commentWrapper) {
+                return marker instanceof SearchResult ? marker.print(cursor, commentWrapper, false) : "";
             }
         };
 
