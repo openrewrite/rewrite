@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
+import org.openrewrite.Tree;
 import org.openrewrite.java.marker.CompactConstructor;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.tree.*;
@@ -27,6 +28,7 @@ import org.openrewrite.marker.Markers;
 
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.UnaryOperator;
 
 public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
@@ -414,7 +416,8 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
             }
 
             if (s instanceof MethodDeclaration && ((MethodDeclaration) s).getBody() == null) {
-                p.append(';');
+                if (!hasError(s))
+                    p.append(';');
                 return;
             }
 
@@ -443,6 +446,19 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
 
             return;
         }
+    }
+
+    private static boolean hasError(Tree tree) {
+        AtomicBoolean isError = new AtomicBoolean(false);
+        new JavaIsoVisitor<AtomicBoolean>() {
+
+            @Override
+            public Erroneous visitErroneous(Erroneous erroneous, AtomicBoolean atomicBoolean) {
+                atomicBoolean.set(true);
+                return erroneous;
+            }
+        }.visit(tree, isError);
+        return isError.get();
     }
 
     @Override
@@ -1194,6 +1210,14 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         visit(yield.getValue(), p);
         afterSyntax(yield, p);
         return yield;
+    }
+
+    @Override
+    public J visitErroneous(Erroneous error, PrintOutputCapture<P> p) {
+        beforeSyntax(error, Space.Location.ERRONEOUS, p);
+        p.append(error.getText());
+        afterSyntax(error, p);
+        return error;
     }
 
     private static final UnaryOperator<String> JAVA_MARKER_WRAPPER =
