@@ -778,8 +778,6 @@ public class GroovyParserVisitor {
                             padRight(parenthesized, sourceBefore(")")));
                 }
                 return parenthesized;
-            } else {
-                cursor = saveCursor;
             }
             return parenthesizedTree.apply(whitespace());
         }
