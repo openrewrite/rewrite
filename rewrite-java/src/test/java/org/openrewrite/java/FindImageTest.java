@@ -143,6 +143,35 @@ class FindImageTest implements RewriteTest {
     void dockerFile() {
         rewriteRun(
           spec -> spec.recipe(new FindImage())
+            .dataTable(ImageSourceFiles.Row.class, rows -> {
+                assertThat(rows).hasSize(1);
+                assertThat(rows.get(0).getValue()).isEqualTo("golang:1.7.3");
+            }),
+          text(
+            //language=Dockerfile
+            """
+              FROM golang:1.7.3 as builder
+              WORKDIR /go/src/github.com/alexellis/href-counter/
+              RUN go get -d -v golang.org/x/net/html
+              COPY app.go .
+              RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o app .
+              """,
+            """
+              FROM ~~(golang:1.7.3)~~>golang:1.7.3 as builder
+              WORKDIR /go/src/github.com/alexellis/href-counter/
+              RUN go get -d -v golang.org/x/net/html
+              COPY app.go .
+              RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o app .
+              """,
+            spec -> spec.path("Dockerfile")
+          )
+        );
+    }
+
+    @Test
+    void dockerMultipleStageFileWithLowerCaseText() {
+        rewriteRun(
+          spec -> spec.recipe(new FindImage())
             .dataTable(ImageSourceFiles.Row.class, rows ->
                 assertThat(rows)
                   .hasSize(2)
@@ -165,13 +194,13 @@ class FindImageTest implements RewriteTest {
               cmd ["./app"]
               """,
             """
-              ~~(alpine:latest|golang:1.7.3)~~>FROM golang:1.7.3 as builder
+              FROM ~~(golang:1.7.3)~~>golang:1.7.3 as builder
               WORKDIR /go/src/github.com/alexellis/href-counter/
               RUN go get -d -v golang.org/x/net/html
               COPY app.go .
               RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o app .
               
-              from alpine:latest
+              from ~~(alpine:latest)~~>alpine:latest
               run apk --no-cache add ca-certificates
               workdir /root/
               copy --from=builder /go/src/github.com/alexellis/href-counter/app .

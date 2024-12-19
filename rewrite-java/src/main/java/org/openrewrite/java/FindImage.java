@@ -21,11 +21,15 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.table.ImageSourceFiles;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.text.Find;
+import org.openrewrite.text.PlainText;
 import org.openrewrite.trait.Reference;
 
 import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.joining;
 
 public class FindImage extends Recipe {
     transient ImageSourceFiles results = new ImageSourceFiles(this);
@@ -71,11 +75,13 @@ public class FindImage extends Recipe {
         public Tree postVisit(Tree tree, ExecutionContext ctx) {
             List<Reference> references = matches.get(tree);
             if (references != null) {
-                String value = references.stream()
-                        .map(Reference::getValue)
-                        .sorted()
-                        .collect(Collectors.joining("|"));
-                return SearchResult.found(tree, value);
+                if (tree instanceof PlainText) {
+                    String find = references.stream().map(Reference::getValue).sorted().collect(joining("|"));
+                    return new Find(find, true, null, null, null, null, true)
+                            .getVisitor()
+                            .visitNonNull(tree, ctx);
+                }
+                return SearchResult.found(tree, references.get(0).getValue());
             }
             return tree;
         }
