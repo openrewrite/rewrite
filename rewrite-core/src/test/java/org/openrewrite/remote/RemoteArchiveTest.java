@@ -21,10 +21,12 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.test.MockHttpSender;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Paths;
 import java.util.concurrent.*;
@@ -40,10 +42,6 @@ class RemoteArchiveTest {
     void gradleWrapper(String version) throws Exception {
         URL distributionUrl = requireNonNull(RemoteArchiveTest.class.getClassLoader().getResource("gradle-" + version + "-bin.zip"));
         ExecutionContext ctx = new InMemoryExecutionContext();
-        RemoteExecutionContextView.view(ctx).setArtifactCache(new LocalRemoteArtifactCache(
-          Paths.get(System.getProperty("user.home") + "/.rewrite/remote/gradleWrapper")));
-        HttpSenderExecutionContextView.view(ctx)
-          .setLargeFileHttpSender(new MockHttpSender(distributionUrl::openStream));
 
         RemoteArchive remoteArchive = Remote
           .builder(
@@ -58,10 +56,9 @@ class RemoteArchiveTest {
 
     @Test
     void gradleWrapperDownloadFails() throws Exception {
-        URL distributionUrl = requireNonNull(RemoteArchiveTest.class.getClassLoader().getResource("gradle-7.4.2-bin.zip"));
+        URL distributionUrl = new URL("http://example.com");
         ExecutionContext ctx = new InMemoryExecutionContext();
-        RemoteExecutionContextView.view(ctx).setArtifactCache(new LocalRemoteArtifactCache(
-          Paths.get(System.getProperty("user.home") + "/.rewrite/remote/gradleWrapperDownloadFails")));
+
         HttpSenderExecutionContextView.view(ctx)
           .setLargeFileHttpSender(new MockHttpSender(408));
 
@@ -114,6 +111,21 @@ class RemoteArchiveTest {
         }
 
         executorService.shutdown();
+    }
+
+    @Test
+    void printingRemoteArchive() throws URISyntaxException {
+        URL zipUrl = requireNonNull(RemoteArchiveTest.class.getClassLoader().getResource("zipfile.zip"));
+
+        RemoteArchive remoteArchive = Remote
+          .builder(
+            Paths.get("content.txt"),
+            zipUrl.toURI()
+          )
+          .build("content.txt");
+
+        String printed = remoteArchive.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.DEFAULT));
+        assertThat(printed).isEqualTo("this is a zipped file");
     }
 
     private Long getInputStreamSize(InputStream is) {
