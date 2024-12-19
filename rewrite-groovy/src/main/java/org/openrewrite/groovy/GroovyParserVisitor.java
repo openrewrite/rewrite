@@ -1691,15 +1691,18 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitListExpression(ListExpression list) {
-            if (list.getExpressions().isEmpty()) {
-                queue.add(new G.ListLiteral(randomId(), sourceBefore("["), Markers.EMPTY,
-                        JContainer.build(singletonList(new JRightPadded<>(new J.Empty(randomId(), EMPTY, Markers.EMPTY), sourceBefore("]"), Markers.EMPTY))),
-                        typeMapping.type(list.getType())));
-            } else {
-                queue.add(new G.ListLiteral(randomId(), sourceBefore("["), Markers.EMPTY,
-                        JContainer.build(visitRightPadded(list.getExpressions().toArray(new ASTNode[0]), "]")),
-                        typeMapping.type(list.getType())));
-            }
+            queue.add(insideParentheses(list, fmt -> {
+                skip("[");
+                if (list.getExpressions().isEmpty()) {
+                    return new G.ListLiteral(randomId(), fmt, Markers.EMPTY,
+                            JContainer.build(singletonList(new JRightPadded<>(new J.Empty(randomId(), EMPTY, Markers.EMPTY), sourceBefore("]"), Markers.EMPTY))),
+                            typeMapping.type(list.getType()));
+                } else {
+                    return new G.ListLiteral(randomId(), fmt, Markers.EMPTY,
+                            JContainer.build(visitRightPadded(list.getExpressions().toArray(new ASTNode[0]), "]")),
+                            typeMapping.type(list.getType()));
+                }
+            }));
         }
 
         @Override
@@ -1714,17 +1717,19 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitMapExpression(MapExpression map) {
-            Space prefix = sourceBefore("[");
-            JContainer<G.MapEntry> entries;
-            if (map.getMapEntryExpressions().isEmpty()) {
-                entries = JContainer.build(Collections.singletonList(JRightPadded.build(
-                        new G.MapEntry(randomId(), whitespace(), Markers.EMPTY,
-                                JRightPadded.build(new J.Empty(randomId(), sourceBefore(":"), Markers.EMPTY)),
-                                new J.Empty(randomId(), sourceBefore("]"), Markers.EMPTY), null))));
-            } else {
-                entries = JContainer.build(visitRightPadded(map.getMapEntryExpressions().toArray(new ASTNode[0]), "]"));
-            }
-            queue.add(new G.MapLiteral(randomId(), prefix, Markers.EMPTY, entries, typeMapping.type(map.getType())));
+            queue.add(insideParentheses(map, fmt -> {
+                skip("[");
+                JContainer<G.MapEntry> entries;
+                if (map.getMapEntryExpressions().isEmpty()) {
+                    entries = JContainer.build(Collections.singletonList(JRightPadded.build(
+                            new G.MapEntry(randomId(), whitespace(), Markers.EMPTY,
+                                    JRightPadded.build(new J.Empty(randomId(), sourceBefore(":"), Markers.EMPTY)),
+                                    new J.Empty(randomId(), sourceBefore("]"), Markers.EMPTY), null))));
+                } else {
+                    entries = JContainer.build(visitRightPadded(map.getMapEntryExpressions().toArray(new ASTNode[0]), "]"));
+                }
+                return new G.MapLiteral(randomId(), fmt, Markers.EMPTY, entries, typeMapping.type(map.getType()));
+            }));
         }
 
         @Override
@@ -2535,26 +2540,30 @@ public class GroovyParserVisitor {
             MethodCallExpression expr = (MethodCallExpression) node;
             int saveCursor = cursor;
             whitespace();
-            int childBegin = cursor;
-            if (expr.getObjectExpression().getLineNumber() != expr.getLineNumber()) {
-                for (int i = 0; i < (expr.getObjectExpression().getLineNumber() - expr.getLineNumber()) - 1; i++) {
-                    childBegin = source.indexOf('\n', childBegin);
-                }
-                childBegin += expr.getObjectExpression().getColumnNumber();
-            } else {
-                childBegin += expr.getObjectExpression().getColumnNumber() - expr.getColumnNumber();
-            }
-            int count = 0;
-            for (int i = cursor; i < childBegin; i++) {
-                if (source.charAt(i) == '(') {
-                    count++;
-                }
-            }
+            int count = determineParenthesisLevel(expr);
             cursor = saveCursor;
             return count;
-        } else {
-            return null;
         }
+        return null;
+    }
+
+    private int determineParenthesisLevel(MethodCallExpression expr) {
+        int objectExpressionBeginCursor = cursor;
+        if (expr.getObjectExpression().getLineNumber() > expr.getLineNumber()) {
+            for (int i = 0; i < (expr.getObjectExpression().getLineNumber() - expr.getLineNumber()); i++) {
+                objectExpressionBeginCursor = source.indexOf('\n', objectExpressionBeginCursor);
+            }
+            objectExpressionBeginCursor += expr.getObjectExpression().getColumnNumber();
+        } else {
+            objectExpressionBeginCursor += expr.getObjectExpression().getColumnNumber() - expr.getColumnNumber();
+        }
+        int count = 0;
+        for (int i = cursor; i < objectExpressionBeginCursor; i++) {
+            if (source.charAt(i) == '(') {
+                count++;
+            }
+        }
+        return count;
     }
 
     private int getDelimiterLength() {

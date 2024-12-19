@@ -25,7 +25,7 @@ import static org.openrewrite.groovy.Assertions.groovy;
 class CastTest implements RewriteTest {
 
     @Test
-    void javaStyleCastNew() {
+    void cast() {
         rewriteRun(
           groovy(
             """
