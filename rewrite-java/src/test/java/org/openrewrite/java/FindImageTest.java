@@ -25,7 +25,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.text;
 import static org.openrewrite.yaml.Assertions.yaml;
 
-// TODO: Remove this file, we will use the `FindDockerImageUses` in the rewrite-docker module
 class FindImageTest implements RewriteTest {
 
     @Override
@@ -45,9 +44,61 @@ class FindImageTest implements RewriteTest {
           yaml(
             """
               image: maven:latest
+              
+              variables:
+                MAVEN_CLI_OPTS: "-s .m2/settings.xml --batch-mode"
+                MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository"
+              
+              cache:
+                paths:
+                  - .m2/repository/
+                  - target/
+              
+              build:
+                stage: build
+                script:
+                  - mvn $MAVEN_CLI_OPTS compile
+              
+              test:
+                stage: test
+                script:
+                  - mvn $MAVEN_CLI_OPTS test
+              
+              deploy:
+                stage: deploy
+                script:
+                  - mvn $MAVEN_CLI_OPTS deploy
+                only:
+                  - master
               """,
             """
-              ~~(maven:latest)~~>image: maven:latest
+              image: ~~(maven:latest)~~>maven:latest
+              
+              variables:
+                MAVEN_CLI_OPTS: "-s .m2/settings.xml --batch-mode"
+                MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository"
+              
+              cache:
+                paths:
+                  - .m2/repository/
+                  - target/
+              
+              build:
+                stage: build
+                script:
+                  - mvn $MAVEN_CLI_OPTS compile
+              
+              test:
+                stage: test
+                script:
+                  - mvn $MAVEN_CLI_OPTS test
+              
+              deploy:
+                stage: deploy
+                script:
+                  - mvn $MAVEN_CLI_OPTS deploy
+                only:
+                  - master
               """,
             spec -> spec.path(".gitlab-ci")
           )
@@ -59,9 +110,10 @@ class FindImageTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new FindImage())
             .dataTable(ImageSourceFiles.Row.class, rows -> {
-                assertThat(rows).hasSize(2);
-                assertThat(rows.get(0).getValue()).isEqualTo("alpine:latest");
-                assertThat(rows.get(1).getValue()).isEqualTo("golang:1.7.3");
+                assertThat(rows)
+                  .hasSize(2)
+                  .extracting(ImageSourceFiles.Row::getValue)
+                  .containsExactlyInAnyOrder("alpine:latest", "golang:1.7.3");
             }),
           text(
             //language=Dockerfile

@@ -36,7 +36,7 @@ public class DockerImageReference implements Reference {
         public Set<Reference> getReferences(SourceFile sourceFile) {
             Set<Reference> references = new HashSet<>();
             java.util.regex.Matcher m = FROM.matcher(((PlainText) sourceFile).getText());
-            Cursor c = new Cursor(null, Cursor.ROOT_VALUE);
+            Cursor c = new Cursor(new Cursor(null, Cursor.ROOT_VALUE), sourceFile);
 
             while (m.find()) {
                 references.add(new DockerImageReference(c, m.group(1)));

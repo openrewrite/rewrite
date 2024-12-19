@@ -22,15 +22,11 @@ import org.openrewrite.*;
 import org.openrewrite.java.table.ImageSourceFiles;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.trait.Reference;
-import org.openrewrite.trait.SimpleTraitMatcher;
 
 import java.nio.file.Path;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
-// TODO: Remove this file, we will use the `FindDockerImageUses` in the rewrite-docker module
 public class FindImage extends Recipe {
     transient ImageSourceFiles results = new ImageSourceFiles(this);
 
@@ -50,34 +46,16 @@ public class FindImage extends Recipe {
 
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                Tree t = super.visit(tree, ctx);
-
                 if (tree instanceof SourceFileWithReferences) {
                     SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
                     Path sourcePath = sourceFile.getSourcePath();
                     Collection<Reference> references = sourceFile.getReferences().findMatches(new ImageMatcher());
-
-                    /*new JavaIsoVisitor<ExecutionContext>() {
-                      vsit
-                    };
-
-                    new SimpleTraitMatcher<Reference>() {
-
-                        @Override
-                        protected @Nullable Reference test(Cursor cursor) {
-                            return null;
-                        }
-                    }.asVisitor().visit(sourceFile, 0);*/
-
-                    // TODO improve: `if (sourceFile instanceof PlainText && references.size() > 1)` then all markers are set at beginning
-                    String value = references.stream()
-                            .map(Reference::getValue)
-                            .peek(it -> results.insertRow(ctx, new ImageSourceFiles.Row(sourcePath.toString(), tree.getClass().getSimpleName(), it)))
-                            .sorted()
-                            .collect(Collectors.joining("|"));
-                    /*System.out.println(tree);
-                    System.out.println(value);*/
-                    return SearchResult.found(tree, value);
+                    Map<Tree, List<Reference>> matches = new HashMap<>();
+                    for (Reference ref : references) {
+                        results.insertRow(ctx, new ImageSourceFiles.Row(sourcePath.toString(), tree.getClass().getSimpleName(), ref.getValue()));
+                        matches.computeIfAbsent(ref.getTree(), t -> new ArrayList<>()).add(ref);
+                    }
+                    return new ReferenceFindSearchResultVisitor(matches).visit(tree, ctx, getCursor());
                 }
                 return tree;
             }
@@ -87,13 +65,17 @@ public class FindImage extends Recipe {
     @Value
     @EqualsAndHashCode(callSuper = false)
     private static class ReferenceFindSearchResultVisitor extends TreeVisitor<Tree, ExecutionContext> {
-        Map<Tree, Reference> matches;
+        Map<Tree, List<Reference>> matches;
 
         @Override
         public Tree postVisit(Tree tree, ExecutionContext ctx) {
-            Reference reference = matches.get(tree);
-            if (reference != null && getCursor().equals(reference.getCursor())) {
-                return SearchResult.found(tree, reference.getValue());
+            List<Reference> references = matches.get(tree);
+            if (references != null) {
+                String value = references.stream()
+                        .map(Reference::getValue)
+                        .sorted()
+                        .collect(Collectors.joining("|"));
+                return SearchResult.found(tree, value);
             }
             return tree;
         }
