@@ -229,6 +229,17 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
+    void emptyListLiteralWithParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              def y = ([])
+              """
+          )
+        );
+    }
+
+    @Test
     void multilineStringWithApostrophes() {
         rewriteRun(
           groovy(
