@@ -395,7 +395,7 @@ public class KotlinTypeMappingTest {
               kotlin(
                 """
                   import java.lang.invoke.TypeDescriptor.OfField
-                  
+
                   abstract class Foo<T> : OfField<Foo<Any>>
                   """, spec -> spec.afterRecipe(cu -> {
                     AtomicBoolean found = new AtomicBoolean(false);
@@ -737,7 +737,7 @@ public class KotlinTypeMappingTest {
               kotlin(
                 """
                   import java.util.ArrayList
-                  
+
                   class Foo {
                       val l: ArrayList<String> = ArrayList<String>()
                   }
@@ -862,7 +862,7 @@ public class KotlinTypeMappingTest {
                   @file:Suppress("UNUSED_VARIABLE")
                   class A<in T>(t: T) {
                       private val t: T = t // visibility for t is PRIVATE_TO_THIS
-                  
+
                       fun test() {
                           val x: T = t // correct
                           val y: T = this.t // also correct
@@ -882,7 +882,7 @@ public class KotlinTypeMappingTest {
                   @file:Suppress("UNUSED_PARAMETER")
                   open class Object<T>
                   class Test(name: String, any: Any)
-                  
+
                   fun <T> foo(name: String) =
                       Test(name, object : Object<T>() {})
                   """
@@ -937,7 +937,7 @@ public class KotlinTypeMappingTest {
               kotlin(
                 """
                   import java.rmi.server.RemoteStub
-                  
+
                   class A : RemoteStub()
                   """
               )
@@ -976,7 +976,7 @@ public class KotlinTypeMappingTest {
                   interface B
                   interface C
                   interface D
-                  
+
                   class KotlinTypeGoat<T, S>  where   S : A, T : D, S : B, T : C
                   """, spec -> spec.afterRecipe(cu -> {
                       AtomicBoolean found = new AtomicBoolean(false);
@@ -1611,7 +1611,7 @@ public class KotlinTypeMappingTest {
                           }
                       }
                   }
-                  
+
                   val x = A.B.A.C()
                   """,
                 spec -> spec.afterRecipe(cu -> {

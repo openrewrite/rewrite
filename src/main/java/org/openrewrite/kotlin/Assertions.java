@@ -478,18 +478,15 @@ public final class Assertions {
         }
 
         private boolean isClassName() {
-            Cursor parent = getCursor().getParent();
-            return parent != null && parent.getValue() instanceof J.ClassDeclaration;
+            return getCursor().getParentTreeCursor().getValue() instanceof J.ClassDeclaration;
         }
 
         private boolean isMethodName() {
-            Cursor parent = getCursor().getParent();
-            return parent != null && parent.getValue() instanceof J.MethodDeclaration;
+            return getCursor().getParentTreeCursor().getValue() instanceof J.MethodDeclaration;
         }
 
         private boolean isMethodInvocationName() {
-            Cursor parent = getCursor().getParent();
-            return parent != null && parent.getValue() instanceof J.MethodInvocation;
+            return getCursor().getParentTreeCursor().getValue() instanceof J.MethodInvocation;
         }
 
         private boolean isFieldAccess(J.Identifier ident) {
@@ -515,8 +512,7 @@ public final class Assertions {
         }
 
         private boolean isTypeParameter() {
-            return getCursor().getParent() != null &&
-                   getCursor().getParent().getValue() instanceof J.TypeParameter;
+            return getCursor().getParentTreeCursor().getValue() instanceof J.TypeParameter;
         }
 
         private boolean isMemberReference(J.Identifier ident) {
@@ -550,8 +546,8 @@ public final class Assertions {
         }
 
         private boolean isAnnotationField(J.Identifier ident) {
-            Cursor parent = getCursor().getParent();
-            return parent != null && parent.getValue() instanceof J.Assignment &&
+            Cursor parent = getCursor().getParentTreeCursor();
+            return parent.getValue() instanceof J.Assignment &&
                    (ident == ((J.Assignment) parent.getValue()).getVariable() && getCursor().firstEnclosing(J.Annotation.class) != null);
         }
 
