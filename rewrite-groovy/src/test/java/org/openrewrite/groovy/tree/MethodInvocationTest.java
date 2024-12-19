@@ -395,6 +395,21 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void insideParenthesesWithNewline() {
+        rewriteRun(
+          groovy(
+            """              
+              static def foo(Map map) {
+                  ((
+                  map.containsKey("foo"))
+                      && ((map.get("foo")).equals("bar")))
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4703")
     @Test
     void insideParenthesesWithoutNewLineAndEscapedMethodName() {

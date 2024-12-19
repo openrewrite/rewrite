@@ -2554,7 +2554,7 @@ public class GroovyParserVisitor {
             for (int i = 0; i < (childColumn - parentLineNumber); i++) {
                 childBeginCursor = source.indexOf('\n', childBeginCursor);
             }
-            childBeginCursor += childBeginCursor;
+            childBeginCursor += childColumn;
         } else {
             childBeginCursor += childColumn - parentColumn;
         }
