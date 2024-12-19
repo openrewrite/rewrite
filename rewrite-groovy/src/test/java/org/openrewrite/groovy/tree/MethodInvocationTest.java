@@ -412,7 +412,7 @@ class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              def a = ((((
+              ((((
                 something(a)
               ))))
               """
