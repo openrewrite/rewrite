@@ -15,7 +15,10 @@
  */
 package org.openrewrite.yaml.trait;
 
+import org.openrewrite.Cursor;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
 import org.openrewrite.trait.Reference;
 import org.openrewrite.yaml.tree.Yaml;
 
@@ -31,6 +34,15 @@ public abstract class YamlReference implements Reference {
     @Override
     public boolean supportsRename() {
         return true;
+    }
+
+    @Override
+    public Tree rename(Renamer renamer, Cursor cursor, ExecutionContext ctx) {
+        Tree tree = cursor.getValue();
+        if (tree instanceof Yaml.Scalar) {
+            return ((Yaml.Scalar) tree).withValue(renamer.rename(this));
+        }
+        throw new IllegalArgumentException("cursor.getValue() must be an Yaml.Scalar but is: " + tree.getClass());
     }
 
     static abstract class YamlProvider extends AbstractProvider<YamlReference> {
