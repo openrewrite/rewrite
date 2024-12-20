@@ -18,9 +18,7 @@ package org.openrewrite.xml.trait;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
 import org.openrewrite.trait.Reference;
 import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.xml.XPathMatcher;
@@ -32,54 +30,17 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 @Value
-class SpringReference implements Reference {
+public class SpringXmlReference extends XmlReference {
+
     Cursor cursor;
     Kind kind;
-
-    @Override
-    public Tree getTree() {
-        return Reference.super.getTree();
-    }
 
     @Override
     public Kind getKind() {
         return kind;
     }
 
-    @Override
-    public String getValue() {
-        if (getTree() instanceof Xml.Attribute) {
-            Xml.Attribute attribute = (Xml.Attribute) getTree();
-            return attribute.getValueAsString();
-        } else if (getTree() instanceof Xml.Tag) {
-            Xml.Tag tag = (Xml.Tag) getTree();
-            if (tag.getValue().isPresent()) {
-                return tag.getValue().get();
-            }
-        }
-        throw new IllegalArgumentException("getTree() must be an Xml.Attribute or Xml.Tag: " + getTree().getClass());
-    }
-
-    @Override
-    public boolean supportsRename() {
-        return true;
-    }
-
-    @Override
-    public Tree rename(Renamer renamer, Cursor cursor, ExecutionContext ctx) {
-        Tree tree = cursor.getValue();
-        if (tree instanceof Xml.Attribute) {
-            Xml.Attribute attribute = (Xml.Attribute) tree;
-            String renamed = renamer.rename(this);
-            return attribute.withValue(attribute.getValue().withValue(renamed));
-        } else if (tree instanceof Xml.Tag && ((Xml.Tag) tree).getValue().isPresent()) {
-            String renamed = renamer.rename(this);
-            return ((Xml.Tag) tree).withValue(renamed);
-        }
-        return tree;
-    }
-
-    static class Matcher extends SimpleTraitMatcher<SpringReference> {
+    static class Matcher extends SimpleTraitMatcher<SpringXmlReference> {
         private final Pattern referencePattern = Pattern.compile("\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*(?:\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*)*");
         private final XPathMatcher classXPath = new XPathMatcher("//@class");
         private final XPathMatcher typeXPath = new XPathMatcher("//@type");
@@ -88,14 +49,14 @@ class SpringReference implements Reference {
         private final XPathMatcher tags = new XPathMatcher("//value");
 
         @Override
-        protected @Nullable SpringReference test(Cursor cursor) {
+        protected @Nullable SpringXmlReference test(Cursor cursor) {
             Object value = cursor.getValue();
             if (value instanceof Xml.Attribute) {
                 Xml.Attribute attrib = (Xml.Attribute) value;
                 if (classXPath.matches(cursor) || typeXPath.matches(cursor) || keyTypeXPath.matches(cursor) || valueTypeXPath.matches(cursor)) {
                     String stringVal = attrib.getValueAsString();
                     if (referencePattern.matcher(stringVal).matches()) {
-                        return new SpringReference(cursor, determineKind(stringVal));
+                        return new SpringXmlReference(cursor, determineKind(stringVal));
                     }
                 }
             } else if (value instanceof Xml.Tag) {
@@ -103,15 +64,15 @@ class SpringReference implements Reference {
                 if (tags.matches(cursor)) {
                     Optional<String> stringVal = tag.getValue();
                     if (stringVal.isPresent() && referencePattern.matcher(stringVal.get()).matches()) {
-                        return new SpringReference(cursor, determineKind(stringVal.get()));
+                        return new SpringXmlReference(cursor, determineKind(stringVal.get()));
                     }
                 }
             }
             return null;
         }
 
-        Kind determineKind(String value) {
-            return Character.isUpperCase(value.charAt(value.lastIndexOf('.') + 1)) ? Kind.TYPE : Kind.PACKAGE;
+        Reference.Kind determineKind(String value) {
+            return Character.isUpperCase(value.charAt(value.lastIndexOf('.') + 1)) ? Reference.Kind.TYPE : Reference.Kind.PACKAGE;
         }
     }
 
