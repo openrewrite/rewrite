@@ -15,26 +15,17 @@
  */
 package org.openrewrite.xml.trait;
 
-import lombok.Value;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.trait.Reference;
 import org.openrewrite.xml.tree.Xml;
 
-@Value
-class XmlReference implements Reference {
-    Cursor cursor;
-    Kind kind;
+public abstract class XmlReference implements Reference {
 
     @Override
     public Tree getTree() {
         return Reference.super.getTree();
-    }
-
-    @Override
-    public Kind getKind() {
-        return kind;
     }
 
     @Override
