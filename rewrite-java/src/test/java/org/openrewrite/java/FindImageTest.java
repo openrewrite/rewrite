@@ -21,6 +21,8 @@ import org.openrewrite.java.table.ImageSourceFiles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.function.Consumer;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.text;
 import static org.openrewrite.yaml.Assertions.yaml;
@@ -36,11 +38,7 @@ class FindImageTest implements RewriteTest {
     @Test
     void gitlabCIFile() {
         rewriteRun(
-          spec -> spec.recipe(new FindImage())
-            .dataTable(ImageSourceFiles.Row.class, rows -> {
-                assertThat(rows).hasSize(1);
-                assertThat(rows.get(0).getValue()).isEqualTo("maven:latest");
-            }),
+          assertImages("maven:latest"),
           yaml(
             """
               image: maven:latest
@@ -108,12 +106,7 @@ class FindImageTest implements RewriteTest {
     @Test
     void yamlFileWithMultipleImages() {
         rewriteRun(
-          spec -> spec.recipe(new FindImage())
-            .dataTable(ImageSourceFiles.Row.class, rows ->
-              assertThat(rows)
-                .hasSize(3)
-                .extracting(ImageSourceFiles.Row::getValue)
-                .containsExactlyInAnyOrder("golang:1.7.0", "golang:1.7.0", "golang:1.7.3")),
+          assertImages("golang:1.7.0", "golang:1.7.0", "golang:1.7.3"),
           yaml(
             """
               test:
@@ -142,11 +135,7 @@ class FindImageTest implements RewriteTest {
     @Test
     void dockerFile() {
         rewriteRun(
-          spec -> spec.recipe(new FindImage())
-            .dataTable(ImageSourceFiles.Row.class, rows -> {
-                assertThat(rows).hasSize(1);
-                assertThat(rows.get(0).getValue()).isEqualTo("golang:1.7.3");
-            }),
+          assertImages("golang:1.7.3"),
           text(
             //language=Dockerfile
             """
@@ -171,13 +160,7 @@ class FindImageTest implements RewriteTest {
     @Test
     void dockerMultipleStageFileWithLowerCaseText() {
         rewriteRun(
-          spec -> spec.recipe(new FindImage())
-            .dataTable(ImageSourceFiles.Row.class, rows ->
-                assertThat(rows)
-                  .hasSize(2)
-                  .extracting(ImageSourceFiles.Row::getValue)
-                  .containsExactlyInAnyOrder("alpine:latest", "golang:1.7.3")
-            ),
+          assertImages("alpine:latest", "golang:1.7.3"),
           text(
             //language=Dockerfile
             """
@@ -209,5 +192,134 @@ class FindImageTest implements RewriteTest {
             spec -> spec.path("Dockerfile")
           )
         );
+    }
+
+    @Test
+    void dockerMultipleStageFileWithImageInFromOption() {
+        rewriteRun(
+          assertImages("alpine:latest", "nginx:latest"),
+          text(
+            //language=Dockerfile
+            """
+              FROM alpine:latest
+              COPY --from=nginx:latest /etc/nginx/nginx.conf /etc/nginx/
+              COPY --from=nginx:latest /usr/share/nginx/html /usr/share/nginx/html
+              RUN apk add --no-cache bash
+              WORKDIR /usr/share/nginx/html
+              CMD ["ls", "-la", "/usr/share/nginx/html"]
+              """,
+            """
+              FROM ~~(alpine:latest)~~>alpine:latest
+              COPY --from=~~(nginx:latest)~~>nginx:latest /etc/nginx/nginx.conf /etc/nginx/
+              COPY --from=~~(nginx:latest)~~>nginx:latest /usr/share/nginx/html /usr/share/nginx/html
+              RUN apk add --no-cache bash
+              WORKDIR /usr/share/nginx/html
+              CMD ["ls", "-la", "/usr/share/nginx/html"]
+              """,
+            spec -> spec.path("Dockerfile")
+          )
+        );
+    }
+
+    @Test
+    void dockerMultipleStageFileWithFromOptionAsStageNumber() {
+        rewriteRun(
+          assertImages("golang:1.23", "scratch"),
+          text(
+            //language=Dockerfile
+            """
+              # syntax=docker/dockerfile:1
+              FROM golang:1.23
+              WORKDIR /src
+              COPY <<EOF ./main.go
+              package main
+              
+              import "fmt"
+
+              func main() {
+                fmt.Println("hello, world")
+              }
+              EOF
+
+              RUN go build -o /bin/hello ./main.go
+              
+              FROM scratch
+              COPY --from=0 /bin/hello /bin/hello
+              CMD ["/bin/hello"]
+              """,
+            """
+              # syntax=docker/dockerfile:1
+              FROM ~~(golang:1.23)~~>golang:1.23
+              WORKDIR /src
+              COPY <<EOF ./main.go
+              package main
+              
+              import "fmt"
+
+              func main() {
+                fmt.Println("hello, world")
+              }
+              EOF
+
+              RUN go build -o /bin/hello ./main.go
+              
+              FROM ~~(scratch)~~>scratch
+              COPY --from=0 /bin/hello /bin/hello
+              CMD ["/bin/hello"]
+              """,
+            spec -> spec.path("Dockerfile")
+          )
+        );
+    }
+
+
+    @Test
+    void platformDockerfile() {
+        rewriteRun(
+          assertImages("alpine:latest"),
+          text(
+            //language=Dockerfile
+            """
+              FROM --platform=linux/arm64 alpine:latest
+              RUN echo "Hello from ARM64!" > /message.txt
+              CMD ["cat", "/message.txt"]
+              """,
+            """
+              FROM --platform=linux/arm64 ~~(alpine:latest)~~>alpine:latest
+              RUN echo "Hello from ARM64!" > /message.txt
+              CMD ["cat", "/message.txt"]
+              """,
+            spec -> spec.path("Dockerfile")
+          )
+        );
+    }
+
+    @Test
+    void dockerFileIgnoreComment() {
+        rewriteRun(
+          assertImages("alpine:latest"),
+          text(
+            //language=Dockerfile
+            """
+              # FROM alpine
+              FROM alpine:latest
+              """,
+            """
+              # FROM alpine
+              FROM ~~(alpine:latest)~~>alpine:latest
+              """,
+            spec -> spec.path("Dockerfile")
+          )
+        );
+    }
+
+    private static Consumer<RecipeSpec> assertImages(String... expected) {
+        return spec -> spec.recipe(new FindImage())
+          .dataTable(ImageSourceFiles.Row.class, rows ->
+            assertThat(rows)
+              .hasSize(expected.length)
+              .extracting(ImageSourceFiles.Row::getValue)
+              .containsExactlyInAnyOrder(expected)
+          );
     }
 }
