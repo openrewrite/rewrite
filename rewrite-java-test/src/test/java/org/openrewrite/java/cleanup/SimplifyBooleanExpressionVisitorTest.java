@@ -733,4 +733,37 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
             rewriteRun(java(beforeJava, template.formatted(after)));
         }
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-feature-flags/issues/40")
+    @Test
+    void simplifyStringLiteralEqualsStringLiteral() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  {
+                      String foo = "foo";
+                      if ("foo".equals("foo")) {}
+                      if (foo.equals(foo)) {}
+                      if (foo.equals("foo")) {}
+                      if ("foo".equals(foo)) {}
+                      if ("foo".equals("bar")) {}
+                  }
+              }
+              """,
+            """
+              class A {
+                  {
+                      String foo = "foo";
+                      if (true) {}
+                      if (true) {}
+                      if (foo.equals("foo")) {}
+                      if ("foo".equals(foo)) {}
+                      if (false) {}
+                  }
+              }
+              """
+          )
+        );
+    }
 }
