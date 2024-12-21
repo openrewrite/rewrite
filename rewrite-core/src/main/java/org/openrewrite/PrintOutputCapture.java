@@ -15,8 +15,12 @@
  */
 package org.openrewrite;
 
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.Markup;
+import org.openrewrite.marker.SearchResult;
 
 import java.util.function.UnaryOperator;
 
@@ -67,6 +71,42 @@ public class PrintOutputCapture<P> implements Cloneable {
     }
 
     public interface MarkerPrinter {
+
+        @Incubating(since = "8.41.4")
+        @RequiredArgsConstructor
+        enum MarkerMode {
+            /**
+             * Does not print any markers.
+             */
+            NONE(MarkerPrinter.NONE),
+            /**
+             * Prints a squiggly line arrow in front of the marked element wrapped in a comment.
+             * /*~~>* /Thing thing
+             */
+            DEFAULT(MarkerPrinter.DEFAULT),
+            /**
+             * Prints a squiggly line arrow in front of the marked element wrapped in a comment.
+             * Possibly adding verbose information, depending on the marker
+             * /*~~>(this is some verbose information)* /Thing thing
+             */
+            VERBOSE(MarkerPrinter.VERBOSE),
+            /**
+             * Prints a squiggly arrow in front and after the marked element. It only includes {@link SearchResult}
+             * /*~~>* /Thing thing /**~~>* /
+             */
+            SEARCH_ONLY(MarkerPrinter.SEARCH_ONLY),
+            /**
+             * Prints a fenced marker ID in front and after the marked element. It only includes {@link Markup} and {@link SearchResult}
+             * /*{{3e2a36bb-7c16-4b03-bdde-bffda08838e7}}* /Thing thing /*{{3e2a36bb-7c16-4b03-bdde-bffda08838e7}}* /
+             */
+            FENCED_MARKUP_AND_SEARCH(MarkerPrinter.FENCED_MARKUP_AND_SEARCH);
+            @Getter
+            private final MarkerPrinter printer;
+        }
+
+        MarkerPrinter NONE = new MarkerPrinter() {
+        };
+
         MarkerPrinter DEFAULT = new MarkerPrinter() {
             @Override
             public String beforeSyntax(Marker marker, Cursor cursor, UnaryOperator<String> commentWrapper) {
@@ -78,6 +118,30 @@ public class PrintOutputCapture<P> implements Cloneable {
             @Override
             public String beforeSyntax(Marker marker, Cursor cursor, UnaryOperator<String> commentWrapper) {
                 return marker.print(cursor, commentWrapper, true);
+            }
+        };
+
+        MarkerPrinter FENCED_MARKUP_AND_SEARCH = new MarkerPrinter() {
+            @Override
+            public String beforeSyntax(Marker marker, Cursor cursor, UnaryOperator<String> commentWrapper) {
+                return marker instanceof SearchResult || marker instanceof Markup ? "{{" + marker.getId() + "}}" : "";
+            }
+
+            @Override
+            public String afterSyntax(Marker marker, Cursor cursor, UnaryOperator<String> commentWrapper) {
+                return marker instanceof SearchResult || marker instanceof Markup ? "{{" + marker.getId() + "}}" : "";
+            }
+        };
+
+        MarkerPrinter SEARCH_ONLY = new MarkerPrinter() {
+            @Override
+            public String beforeSyntax(Marker marker, Cursor cursor, UnaryOperator<String> commentWrapper) {
+                return marker instanceof SearchResult ? marker.print(cursor, commentWrapper, false) : "";
+            }
+
+            @Override
+            public String afterSyntax(Marker marker, Cursor cursor, UnaryOperator<String> commentWrapper) {
+                return marker instanceof SearchResult ? marker.print(cursor, commentWrapper, false) : "";
             }
         };
 
