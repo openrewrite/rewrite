@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 the original author or authors.
+ * Copyright 2023 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,10 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.toml;
+package org.openrewrite.toml.tree;
 
-import org.openrewrite.toml.tree.Toml;
-
-public class TomlIsoVisitor<P> extends TomlVisitor<P> {
-
+public interface TomlKey extends Toml {
 }
