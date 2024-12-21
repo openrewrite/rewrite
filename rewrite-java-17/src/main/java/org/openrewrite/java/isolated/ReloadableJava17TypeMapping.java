@@ -18,6 +18,7 @@ package org.openrewrite.java.isolated;
 import com.sun.source.tree.Tree;
 import com.sun.tools.javac.code.*;
 import com.sun.tools.javac.tree.JCTree;
+import com.sun.tools.javac.util.Pair;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
@@ -28,14 +29,12 @@ import org.openrewrite.java.tree.TypeUtils;
 
 import javax.lang.model.type.NullType;
 import javax.lang.model.type.TypeMirror;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.singletonList;
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 
 @RequiredArgsConstructor
@@ -47,7 +46,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
 
     public JavaType type(com.sun.tools.javac.code.@Nullable Type type) {
         if (type == null || type instanceof Type.ErrorType || type instanceof Type.PackageType || type instanceof Type.UnknownType ||
-            type instanceof NullType) {
+                type instanceof NullType) {
             return JavaType.Class.Unknown.getInstance();
         }
 
@@ -258,7 +257,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
             List<JavaType.FullyQualified> interfaces = null;
             if (symType.interfaces_field != null) {
                 interfaces = new ArrayList<>(symType.interfaces_field.length());
-                for (com.sun.tools.javac.code.Type iParam : symType.interfaces_field) {
+                for (Type iParam : symType.interfaces_field) {
                     JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(iParam));
                     if (javaType != null) {
                         interfaces.add(javaType);
@@ -272,8 +271,8 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
             if (sym.members_field != null) {
                 for (Symbol elem : sym.members_field.getSymbols()) {
                     if (elem instanceof Symbol.VarSymbol &&
-                        (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
-                                             Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
+                            (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
+                                    Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
                         if (fqn.equals("java.lang.String") && elem.name.toString().equals("serialPersistentFields")) {
                             // there is a "serialPersistentFields" member within the String class which is used in normal Java
                             // serialization to customize how the String field is serialized. This field is tripping up Jackson
@@ -286,7 +285,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
                         }
                         fields.add(variableType(elem, clazz));
                     } else if (elem instanceof Symbol.MethodSymbol &&
-                               (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL | Flags.ANONCONSTR)) == 0) {
+                            (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL | Flags.ANONCONSTR)) == 0) {
                         if (methods == null) {
                             methods = new ArrayList<>();
                         }
@@ -458,7 +457,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
      * @param symbol     The method symbol.
      * @return Method type attribution.
      */
-    public JavaType.@Nullable Method methodInvocationType(com.sun.tools.javac.code.@Nullable Type selectType, @Nullable Symbol symbol) {
+    public JavaType.@Nullable Method methodInvocationType(@Nullable Type selectType, @Nullable Symbol symbol) {
         if (selectType == null || selectType instanceof Type.ErrorType || symbol == null || symbol.kind == Kinds.Kind.ERR || symbol.type instanceof Type.UnknownType) {
             return null;
         }
@@ -507,7 +506,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
 
             if (!methodType.argtypes.isEmpty()) {
                 parameterTypes = new ArrayList<>(methodType.argtypes.size());
-                for (com.sun.tools.javac.code.Type argtype : methodType.argtypes) {
+                for (Type argtype : methodType.argtypes) {
                     if (argtype != null) {
                         JavaType javaType = type(argtype);
                         parameterTypes.add(javaType);
@@ -589,8 +588,8 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
                             .collect(Collectors.toList());
                 } else {
                     try {
-                        defaultValues = Collections.singletonList(methodSymbol.getDefaultValue().getValue().toString());
-                    } catch(UnsupportedOperationException e) {
+                        defaultValues = singletonList(methodSymbol.getDefaultValue().getValue().toString());
+                    } catch (UnsupportedOperationException e) {
                         // not all Attribute implementations define `getValue()`
                     }
                 }
@@ -663,7 +662,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
 
                 if (!mt.argtypes.isEmpty()) {
                     parameterTypes = new ArrayList<>(mt.argtypes.size());
-                    for (com.sun.tools.javac.code.Type argtype : mt.argtypes) {
+                    for (Type argtype : mt.argtypes) {
                         if (argtype != null) {
                             JavaType javaType = type(argtype);
                             parameterTypes.add(javaType);
@@ -692,22 +691,66 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
         }
     }
 
-    private @Nullable List<JavaType.FullyQualified> listAnnotations(Symbol symb) {
+    private @Nullable List<JavaType.FullyQualified> listAnnotations(Symbol sym) {
         List<JavaType.FullyQualified> annotations = null;
-        if (!symb.getDeclarationAttributes().isEmpty()) {
-            annotations = new ArrayList<>(symb.getDeclarationAttributes().size());
-            for (Attribute.Compound a : symb.getDeclarationAttributes()) {
-                JavaType.FullyQualified annotType = TypeUtils.asFullyQualified(type(a.type));
-                if (annotType == null) {
-                    continue;
-                }
-                Retention retention = a.getAnnotationType().asElement().getAnnotation(Retention.class);
-                if (retention != null && retention.value() == RetentionPolicy.SOURCE) {
-                    continue;
-                }
-                annotations.add(annotType);
+        if (!sym.getDeclarationAttributes().isEmpty()) {
+            annotations = new ArrayList<>(sym.getDeclarationAttributes().size());
+            for (Attribute.Compound a : sym.getDeclarationAttributes()) {
+                JavaType.Annotation annotation = annotationType(a);
+                if (annotation == null) continue;
+                annotations.add(annotation);
             }
         }
         return annotations;
+    }
+
+    private JavaType.@Nullable Annotation annotationType(Attribute.Compound compound) {
+        JavaType.FullyQualified annotType = TypeUtils.asFullyQualified(type(compound.type));
+        if (annotType == null) {
+            return null;
+        }
+        List<JavaType.Annotation.ElementValue> elementValues = new ArrayList<>();
+        for (Pair<Symbol.MethodSymbol, Attribute> attr : compound.values) {
+            Object value = annotationElementValue(attr.snd.getValue());
+            JavaType.Method element = requireNonNull(methodDeclarationType(attr.fst, annotType));
+            JavaType.Annotation.ElementValue elementValue = value instanceof Object[] ?
+                    new JavaType.Annotation.ArrayElementValue(element, ((Object[]) value)) :
+                    new JavaType.Annotation.SingleElementValue(element, value);
+            elementValues.add(elementValue);
+        }
+        return new JavaType.Annotation(annotType, elementValues);
+    }
+
+    private Object annotationElementValue(Object value) {
+        if (value instanceof Symbol.VarSymbol) {
+            JavaType.Variable mapped = variableType((Symbol.VarSymbol) value);
+            return mapped != null ? mapped : JavaType.Unknown.getInstance();
+        } else if (value instanceof Type.ClassType) {
+            return type((Type.ClassType) value);
+        } else if (value instanceof Attribute.Array) {
+            List<@Nullable Object> list = new ArrayList<>();
+            for (Attribute attribute : ((Attribute.Array) value).values) {
+                list.add(annotationElementValue(attribute));
+            }
+            return list.toArray(new Object[0]);
+        } else if (value instanceof List<?>) {
+            List<@Nullable Object> list = new ArrayList<>();
+            for (Object o : ((List<?>) value)) {
+                list.add(annotationElementValue(o));
+            }
+            return list.toArray(new Object[0]);
+        } else if (value instanceof Attribute.Class) {
+            return type(((Attribute.Class) value).classType);
+        } else if (value instanceof Attribute.Compound) {
+            JavaType.Annotation mapped = annotationType((Attribute.Compound) value);
+            return mapped != null ? mapped : JavaType.Unknown.getInstance();
+        } else if (value instanceof Attribute.Constant) {
+            return annotationElementValue(((Attribute.Constant) value).value);
+        } else if (value instanceof Attribute.Enum) {
+            return annotationElementValue(((Attribute.Enum) value).value);
+        } else if (value instanceof Attribute.Error) {
+            return JavaType.Unknown.getInstance();
+        }
+        return value;
     }
 }
