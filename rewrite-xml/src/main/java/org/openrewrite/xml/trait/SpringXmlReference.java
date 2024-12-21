@@ -15,6 +15,7 @@
  */
 package org.openrewrite.xml.trait;
 
+import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
@@ -30,6 +31,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 @Value
+@EqualsAndHashCode(callSuper = false)
 public class SpringXmlReference extends XmlReference {
 
     Cursor cursor;
@@ -76,18 +78,7 @@ public class SpringXmlReference extends XmlReference {
         }
     }
 
-    @SuppressWarnings("unused")
-    public static class Provider implements Reference.Provider {
-
-        @Override
-        public Set<Reference> getReferences(SourceFile sourceFile) {
-            Set<Reference> references = new HashSet<>();
-            new Matcher().asVisitor(reference -> {
-                references.add(reference);
-                return reference.getTree();
-            }).visit(sourceFile, 0);
-            return references;
-        }
+    public static class Provider extends AbstractProvider<SpringXmlReference> {
 
         @Override
         public boolean isAcceptable(SourceFile sourceFile) {
@@ -103,6 +94,11 @@ public class SpringXmlReference extends XmlReference {
                 }
             }
             return false;
+        }
+
+        @Override
+        public SimpleTraitMatcher<SpringXmlReference> getMatcher() {
+            return new Matcher();
         }
     }
 }

@@ -16,10 +16,12 @@
 package org.openrewrite.text;
 
 import lombok.*;
+import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.marker.Markers;
 
+import java.lang.ref.SoftReference;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -36,7 +38,7 @@ import static org.openrewrite.internal.ListUtils.nullIfEmpty;
 @Value
 @Builder
 @AllArgsConstructor
-public class PlainText implements SourceFile, Tree {
+public class PlainText implements SourceFileWithReferences, Tree {
 
     @Builder.Default
     @With
@@ -82,7 +84,7 @@ public class PlainText implements SourceFile, Tree {
     public PlainText withText(String text) {
         if (!text.equals(this.text)) {
             return new PlainText(this.id, this.sourcePath, this.markers, this.charsetName, this.charsetBomMarked,
-                    this.fileAttributes, this.checksum, text, this.snippets);
+                    this.fileAttributes, this.checksum, text, this.snippets, this.references);
         }
         return this;
     }
@@ -123,7 +125,28 @@ public class PlainText implements SourceFile, Tree {
         if (this.snippets == snippets) {
             return this;
         }
-        return new PlainText(id, sourcePath, markers, charsetName, charsetBomMarked, fileAttributes, checksum, text, snippets);
+        return new PlainText(id, sourcePath, markers, charsetName, charsetBomMarked, fileAttributes, checksum, text, snippets, references);
+    }
+
+    @Nullable
+    @NonFinal
+    @ToString.Exclude
+    transient SoftReference<References> references;
+
+    @Override
+    public References getReferences() {
+        References cache;
+        if (this.references == null) {
+            cache = References.build(this);
+            this.references = new SoftReference<>(cache);
+        } else {
+            cache = this.references.get();
+            if (cache == null || cache.getSourceFile() != this) {
+                cache = References.build(this);
+                this.references = new SoftReference<>(cache);
+            }
+        }
+        return cache;
     }
 
     @Value
