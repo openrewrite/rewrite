@@ -2422,6 +2422,8 @@ public interface J extends Tree {
         @Getter
         Markers markers;
 
+        List<J.Modifier> modifiers;
+
         List<J.Annotation> annotations;
 
         J.Parentheses<TypeTree> parenthesizedType;
