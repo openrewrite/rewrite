@@ -38,7 +38,6 @@ class RemoveDevelocityTest implements RewriteTest {
           settingsGradle(
             """
               plugins {
-                  id 'java'
                   id 'com.gradle.enterprise' version '3.16'
               }
               gradleEnterprise {
