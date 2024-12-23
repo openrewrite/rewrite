@@ -66,7 +66,7 @@ public interface Yaml extends Tree {
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     @With
-    class Documents implements Yaml, SourceFileWithReferences {
+    class Documents extends SourceFileWithReferences implements Yaml {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -129,27 +129,6 @@ public interface Yaml extends Tree {
         @Override
         public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
             return new YamlPrinter<>();
-        }
-
-        @Nullable
-        @NonFinal
-        transient SoftReference<References> references;
-
-        @Transient
-        @Override
-        public References getReferences() {
-            References cache;
-            if (this.references == null) {
-                cache = References.build(this);
-                this.references = new SoftReference<>(cache);
-            } else {
-                cache = this.references.get();
-                if (cache == null || cache.getSourceFile() != this) {
-                    cache = References.build(this);
-                    this.references = new SoftReference<>(cache);
-                }
-            }
-            return cache;
         }
     }
 

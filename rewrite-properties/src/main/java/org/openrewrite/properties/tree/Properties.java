@@ -57,7 +57,7 @@ public interface Properties extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    class File implements Properties, SourceFileWithReferences {
+    class File extends SourceFileWithReferences implements Properties {
         @With
         @EqualsAndHashCode.Include
         UUID id;
@@ -111,27 +111,6 @@ public interface Properties extends Tree {
         @Override
         public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
             return new PropertiesPrinter<>();
-        }
-
-        @Nullable
-        @NonFinal
-        transient SoftReference<References> references;
-
-        @Transient
-        @Override
-        public References getReferences() {
-            References cache;
-            if (this.references == null) {
-                cache = References.build(this);
-                this.references = new SoftReference<>(cache);
-            } else {
-                cache = this.references.get();
-                if (cache == null || cache.getSourceFile() != this) {
-                    cache = References.build(this);
-                    this.references = new SoftReference<>(cache);
-                }
-            }
-            return cache;
         }
     }
 

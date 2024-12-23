@@ -18,20 +18,42 @@ package org.openrewrite;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.ToString;
+import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.trait.Reference;
 
+import java.lang.ref.SoftReference;
 import java.util.*;
 
 @Incubating(since = "8.39.0")
-public interface SourceFileWithReferences extends SourceFile {
+public abstract class SourceFileWithReferences implements SourceFile {
 
-    References getReferences();
+    @Nullable
+    @NonFinal
+    @ToString.Exclude
+    transient SoftReference<References> references;
+
+    public References getReferences() {
+        References cache;
+        if (this.references == null) {
+            cache = References.build(this);
+            this.references = new SoftReference<>(cache);
+        } else {
+            cache = this.references.get();
+            if (cache == null || cache.getSourceFile() != this) {
+                cache = References.build(this);
+                this.references = new SoftReference<>(cache);
+            }
+        }
+        return cache;
+    }
 
     @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
-    @Getter
-    class References {
+    public static class References {
+        @Getter(AccessLevel.PRIVATE)
         private final SourceFile sourceFile;
+        @Getter
         private final Set<Reference> references;
 
         public Collection<Reference> findMatches(Reference.Matcher matcher) {
