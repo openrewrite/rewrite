@@ -56,7 +56,7 @@ class RemoteArchiveTest {
 
     @Test
     void gradleWrapperDownloadFails() throws Exception {
-        URL distributionUrl = new URL("http://example.com");
+        URL distributionUrl = new URL("http://example");
         ExecutionContext ctx = new InMemoryExecutionContext();
 
         HttpSenderExecutionContextView.view(ctx)
