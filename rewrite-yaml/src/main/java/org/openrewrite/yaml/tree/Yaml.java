@@ -63,8 +63,6 @@ public interface Yaml extends Tree {
 
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     @With
     class Documents extends SourceFileWithReferences implements Yaml {
         @EqualsAndHashCode.Include
