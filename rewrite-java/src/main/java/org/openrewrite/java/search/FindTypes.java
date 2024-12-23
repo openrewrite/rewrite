@@ -27,7 +27,6 @@ import org.openrewrite.java.TypeMatcher;
 import org.openrewrite.java.table.TypeUses;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.SearchResult;
-import org.openrewrite.trait.Reference;
 import org.openrewrite.trait.Trait;
 
 import java.util.HashSet;
@@ -80,7 +79,7 @@ public class FindTypes extends Recipe {
                     SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
                     SourceFileWithReferences.References references = sourceFile.getReferences();
                     TypeMatcher matcher = new TypeMatcher(fullyQualifiedTypeName);
-                    Set<Tree> matches = references.findMatches(matcher, Reference.Kind.TYPE).stream().map(Trait::getTree).collect(Collectors.toSet());
+                    Set<Tree> matches = references.findMatches(matcher).stream().map(Trait::getTree).collect(Collectors.toSet());
                     return new ReferenceVisitor(matches).visit(tree, ctx);
                 }
                 return tree;

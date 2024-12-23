@@ -35,17 +35,9 @@ public interface SourceFileWithReferences extends SourceFile {
         private final Set<Reference> references;
 
         public Collection<Reference> findMatches(Reference.Matcher matcher) {
-            return findMatchesInternal(matcher, null);
-        }
-
-        public Collection<Reference> findMatches(Reference.Matcher matcher, Reference.Kind kind) {
-            return findMatchesInternal(matcher, kind);
-        }
-
-        private List<Reference> findMatchesInternal(Reference.Matcher matcher, Reference.@Nullable Kind kind) {
             List<Reference> list = new ArrayList<>();
             for (Reference ref : references) {
-                if ((kind == null || ref.getKind().equals(kind)) && ref.matches(matcher) ) {
+                if (ref.matches(matcher)) {
                     list.add(ref);
                 }
             }
