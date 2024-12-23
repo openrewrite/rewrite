@@ -45,7 +45,7 @@ public abstract class YamlReference implements Reference {
         throw new IllegalArgumentException("cursor.getValue() must be an Yaml.Scalar but is: " + tree.getClass());
     }
 
-    static abstract class YamlProvider extends AbstractProvider<YamlReference> {
+    public static abstract class YamlProvider extends AbstractProvider<YamlReference> {
         @Override
         public boolean isAcceptable(SourceFile sourceFile) {
             return sourceFile instanceof Yaml.Documents;
