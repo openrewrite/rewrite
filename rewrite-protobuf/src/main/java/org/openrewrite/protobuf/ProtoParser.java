@@ -66,7 +66,6 @@ public class ProtoParser implements Parser {
                                     input.getFileAttributes(),
                                     null,
                                     sourceStr,
-                                    null,
                                     null
                             );
                         }
