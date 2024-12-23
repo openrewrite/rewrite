@@ -42,3 +42,18 @@ recipeList:
       key: org.gradle.parallel
       value: true
       filePattern: gradle.properties
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.gradle.plugins.RemoveDevelocity
+displayName: Remove Develocity
+description: Remove the Develocity plugin and configuration from the Gradle build and settings files.
+recipeList:
+  - org.openrewrite.gradle.plugins.RemoveBuildPlugin:
+      pluginId: com.gradle.develocity
+  - org.openrewrite.gradle.plugins.RemoveSettingsPlugin:
+      pluginId: com.gradle.develocity
+  - org.openrewrite.gradle.plugins.RemoveBuildPlugin:
+      pluginId: com.gradle.enterprise
+  - org.openrewrite.gradle.plugins.RemoveSettingsPlugin:
+      pluginId: com.gradle.enterprise
+  - org.openrewrite.gradle.plugins.RemoveDevelocityConfiguration
