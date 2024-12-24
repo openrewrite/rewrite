@@ -52,7 +52,7 @@ public class AttributeSpaceVisitor<P> extends HclIsoVisitor<P> {
         if (parent instanceof Hcl.Block || parent instanceof Hcl.ObjectValue) {
             List<Hcl.Attribute> siblingAttributes = getSiblingAttributes(parent);
 
-            if (attribute.getType().equals(Hcl.Attribute.Type.Assignment)) {
+            if (attribute.getType() == Hcl.Attribute.Type.Assignment) {
                 HclLeftPadded<Hcl.Attribute.Type> type = a.getPadding().getType();
 
                 if (Boolean.TRUE.equals(style.getBodyContent().getColumnarAlignment())) {
@@ -106,7 +106,7 @@ public class AttributeSpaceVisitor<P> extends HclIsoVisitor<P> {
         boolean groupFound = false;
         Hcl.Attribute perviousSibling = null;
         for (Hcl.Attribute sibling : siblings) {
-            if (sibling.getType().equals(Hcl.Attribute.Type.Assignment)) {
+            if (sibling.getType() == Hcl.Attribute.Type.Assignment) {
                 boolean siblingPrefixHasNewLines = sibling.getPrefix().getWhitespace().split("\r\n|\r|\n").length > 2;
                 boolean siblingIsMultiline = sibling.getValue().print(getCursor()).split("\r\n|\r|\n").length > 2;
                 boolean previousSiblingIsMultiline = perviousSibling != null && perviousSibling.getValue().print(getCursor()).split("\r\n|\r|\n").length > 2;

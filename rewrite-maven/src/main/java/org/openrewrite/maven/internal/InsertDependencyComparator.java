@@ -71,7 +71,7 @@ public class InsertDependencyComparator implements Comparator<Content> {
     private static final Comparator<Xml.Tag> dependencyComparator = (d1, d2) -> {
         Scope scope1 = Scope.fromName(d1.getChildValue("scope").orElse(null));
         Scope scope2 = Scope.fromName(d2.getChildValue("scope").orElse(null));
-        if (!scope1.equals(scope2)) {
+        if (scope1 != scope2) {
             return scope1.compareTo(scope2);
         }
 

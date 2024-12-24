@@ -38,7 +38,7 @@ public class PackageMatcher implements Reference.Matcher {
 
     @Override
     public boolean matchesReference(Reference reference) {
-        if (reference.getKind().equals(Reference.Kind.TYPE) || reference.getKind().equals(Reference.Kind.PACKAGE)) {
+        if (reference.getKind() == Reference.Kind.TYPE || reference.getKind() == Reference.Kind.PACKAGE) {
             String recursivePackageNamePrefix = targetPackage + ".";
             if (reference.getValue().equals(targetPackage) || recursive && reference.getValue().startsWith(recursivePackageNamePrefix)) {
                 return true;

@@ -146,7 +146,7 @@ public class Substitutions {
 
             String fqn = getTypeName(type);
             JavaType.Primitive primitive = JavaType.Primitive.fromKeyword(fqn);
-            s = primitive == null || primitive.equals(JavaType.Primitive.String) ?
+            s = primitive == null || primitive == JavaType.Primitive.String ?
                     newObjectParameter(fqn, index) :
                     newPrimitiveParameter(fqn, index);
 

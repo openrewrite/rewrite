@@ -90,7 +90,7 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
         beforeSyntax(attribute, Space.Location.ATTRIBUTE, p);
         visit(attribute.getName(), p);
         visitSpace(attribute.getPadding().getType().getBefore(), Space.Location.ATTRIBUTE_ASSIGNMENT, p);
-        p.append(attribute.getType().equals(Hcl.Attribute.Type.Assignment) ? "=" : ":");
+        p.append(attribute.getType() == Hcl.Attribute.Type.Assignment ? "=" : ":");
         visit(attribute.getValue(), p);
         if (attribute.getComma() != null) {
             visitSpace(attribute.getComma().getPrefix(), Space.Location.OBJECT_VALUE_ATTRIBUTE_COMMA, p);

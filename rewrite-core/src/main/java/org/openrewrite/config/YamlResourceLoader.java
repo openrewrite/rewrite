@@ -200,7 +200,7 @@ public class YamlResourceLoader implements ResourceLoader {
         for (Object resource : yaml.loadAll(yamlSource)) {
             if (resource instanceof Map) {
                 @SuppressWarnings("unchecked") Map<String, Object> resourceMap = (Map<String, Object>) resource;
-                if (resourceType.equals(ResourceType.fromSpec((String) resourceMap.get("type")))) {
+                if (resourceType == ResourceType.fromSpec((String) resourceMap.get("type"))) {
                     resources.add(resourceMap);
                 }
             }

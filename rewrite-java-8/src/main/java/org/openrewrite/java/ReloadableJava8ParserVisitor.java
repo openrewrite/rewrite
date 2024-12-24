@@ -761,7 +761,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                         singletonList(new J.Literal.UnicodeEscape(1,
                                 valueSource.substring(3, valueSource.length() - 1))), type);
             }
-        } else if (JavaType.Primitive.String.equals(type)) {
+        } else if (JavaType.Primitive.String == type) {
             StringBuilder valueSourceWithoutSurrogates = new StringBuilder();
             List<J.Literal.UnicodeEscape> unicodeEscapes = null;
 

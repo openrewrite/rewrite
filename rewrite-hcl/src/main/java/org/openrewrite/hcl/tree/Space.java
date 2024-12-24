@@ -156,7 +156,7 @@ public class Space {
         for (char c : charArray) {
             switch (c) {
                 case '#':
-                    if (Comment.Style.LINE_SLASH.equals(inLineSlashOrHashComment)) {
+                    if (Comment.Style.LINE_SLASH == inLineSlashOrHashComment) {
                         comment.append(c);
                     } else {
                         if (inSingleLineComment) {
@@ -169,7 +169,7 @@ public class Space {
                     }
                     break;
                 case '/':
-                    if (Comment.Style.LINE_HASH.equals(inLineSlashOrHashComment)) {
+                    if (Comment.Style.LINE_HASH == inLineSlashOrHashComment) {
                         comment.append(c);
                     } else {
                         if (inSingleLineComment) {

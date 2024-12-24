@@ -34,7 +34,7 @@ public class JavaCoordinates implements Coordinates {
     Comparator<? extends J> comparator;
 
     public boolean isReplacement() {
-        return Mode.REPLACEMENT.equals(mode);
+        return Mode.REPLACEMENT == mode;
     }
 
     /**
