@@ -15,6 +15,7 @@
  */
 package org.openrewrite.xml.trait;
 
+import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
@@ -24,12 +25,11 @@ import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.HashSet;
 import java.util.Optional;
-import java.util.Set;
 import java.util.regex.Pattern;
 
 @Value
+@EqualsAndHashCode(callSuper = false)
 public class SpringXmlReference extends XmlReference {
 
     Cursor cursor;
@@ -40,54 +40,42 @@ public class SpringXmlReference extends XmlReference {
         return kind;
     }
 
-    static class Matcher extends SimpleTraitMatcher<SpringXmlReference> {
-        private final Pattern referencePattern = Pattern.compile("\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*(?:\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*)*");
-        private final XPathMatcher classXPath = new XPathMatcher("//@class");
-        private final XPathMatcher typeXPath = new XPathMatcher("//@type");
-        private final XPathMatcher keyTypeXPath = new XPathMatcher("//@key-type");
-        private final XPathMatcher valueTypeXPath = new XPathMatcher("//@value-type");
-        private final XPathMatcher tags = new XPathMatcher("//value");
+    public static class Provider extends AbstractProvider<SpringXmlReference> {
+        private static final SimpleTraitMatcher<SpringXmlReference> matcher = new SimpleTraitMatcher<SpringXmlReference>() {
+            private final Pattern referencePattern = Pattern.compile("\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*(?:\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*)*");
+            private final XPathMatcher classXPath = new XPathMatcher("//@class");
+            private final XPathMatcher typeXPath = new XPathMatcher("//@type");
+            private final XPathMatcher keyTypeXPath = new XPathMatcher("//@key-type");
+            private final XPathMatcher valueTypeXPath = new XPathMatcher("//@value-type");
+            private final XPathMatcher tags = new XPathMatcher("//value");
 
-        @Override
-        protected @Nullable SpringXmlReference test(Cursor cursor) {
-            Object value = cursor.getValue();
-            if (value instanceof Xml.Attribute) {
-                Xml.Attribute attrib = (Xml.Attribute) value;
-                if (classXPath.matches(cursor) || typeXPath.matches(cursor) || keyTypeXPath.matches(cursor) || valueTypeXPath.matches(cursor)) {
-                    String stringVal = attrib.getValueAsString();
-                    if (referencePattern.matcher(stringVal).matches()) {
-                        return new SpringXmlReference(cursor, determineKind(stringVal));
+            @Override
+            protected @Nullable SpringXmlReference test(Cursor cursor) {
+                Object value = cursor.getValue();
+                if (value instanceof Xml.Attribute) {
+                    Xml.Attribute attrib = (Xml.Attribute) value;
+                    if (classXPath.matches(cursor) || typeXPath.matches(cursor) || keyTypeXPath.matches(cursor) || valueTypeXPath.matches(cursor)) {
+                        String stringVal = attrib.getValueAsString();
+                        if (referencePattern.matcher(stringVal).matches()) {
+                            return new SpringXmlReference(cursor, determineKind(stringVal));
+                        }
+                    }
+                } else if (value instanceof Xml.Tag) {
+                    Xml.Tag tag = (Xml.Tag) value;
+                    if (tags.matches(cursor)) {
+                        Optional<String> stringVal = tag.getValue();
+                        if (stringVal.isPresent() && referencePattern.matcher(stringVal.get()).matches()) {
+                            return new SpringXmlReference(cursor, determineKind(stringVal.get()));
+                        }
                     }
                 }
-            } else if (value instanceof Xml.Tag) {
-                Xml.Tag tag = (Xml.Tag) value;
-                if (tags.matches(cursor)) {
-                    Optional<String> stringVal = tag.getValue();
-                    if (stringVal.isPresent() && referencePattern.matcher(stringVal.get()).matches()) {
-                        return new SpringXmlReference(cursor, determineKind(stringVal.get()));
-                    }
-                }
+                return null;
             }
-            return null;
-        }
 
-        Reference.Kind determineKind(String value) {
-            return Character.isUpperCase(value.charAt(value.lastIndexOf('.') + 1)) ? Reference.Kind.TYPE : Reference.Kind.PACKAGE;
-        }
-    }
-
-    @SuppressWarnings("unused")
-    public static class Provider implements Reference.Provider {
-
-        @Override
-        public Set<Reference> getReferences(SourceFile sourceFile) {
-            Set<Reference> references = new HashSet<>();
-            new Matcher().asVisitor(reference -> {
-                references.add(reference);
-                return reference.getTree();
-            }).visit(sourceFile, 0);
-            return references;
-        }
+            Reference.Kind determineKind(String value) {
+                return Character.isUpperCase(value.charAt(value.lastIndexOf('.') + 1)) ? Reference.Kind.TYPE : Reference.Kind.PACKAGE;
+            }
+        };
 
         @Override
         public boolean isAcceptable(SourceFile sourceFile) {
@@ -103,6 +91,11 @@ public class SpringXmlReference extends XmlReference {
                 }
             }
             return false;
+        }
+
+        @Override
+        public SimpleTraitMatcher<SpringXmlReference> getMatcher() {
+            return matcher;
         }
     }
 }

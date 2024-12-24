@@ -24,12 +24,12 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.YamlVisitor;
 import org.openrewrite.yaml.internal.YamlPrinter;
 
-import java.beans.Transient;
 import java.lang.ref.SoftReference;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 import static java.util.stream.Collectors.toList;
@@ -135,21 +135,10 @@ public interface Yaml extends Tree {
         @NonFinal
         transient SoftReference<References> references;
 
-        @Transient
         @Override
         public References getReferences() {
-            References cache;
-            if (this.references == null) {
-                cache = References.build(this);
-                this.references = new SoftReference<>(cache);
-            } else {
-                cache = this.references.get();
-                if (cache == null || cache.getSourceFile() != this) {
-                    cache = References.build(this);
-                    this.references = new SoftReference<>(cache);
-                }
-            }
-            return cache;
+            this.references = build(this.references);
+            return Objects.requireNonNull(this.references.get());
         }
     }
 

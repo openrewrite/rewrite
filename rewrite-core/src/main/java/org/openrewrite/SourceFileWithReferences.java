@@ -21,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.trait.Reference;
 
+import java.lang.ref.SoftReference;
 import java.util.*;
 
 @Incubating(since = "8.39.0")
@@ -28,31 +29,29 @@ public interface SourceFileWithReferences extends SourceFile {
 
     References getReferences();
 
+    default SoftReference<References> build(@Nullable SoftReference<@Nullable References> references) {
+        if (references == null || references.get() == null) {
+            return new SoftReference<>(References.build(this));
+        }
+        return references;
+    }
+
     @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
     @Getter
     class References {
-        private final SourceFile sourceFile;
         private final Set<Reference> references;
 
         public Collection<Reference> findMatches(Reference.Matcher matcher) {
-            return findMatchesInternal(matcher, null);
-        }
-
-        public Collection<Reference> findMatches(Reference.Matcher matcher, Reference.Kind kind) {
-            return findMatchesInternal(matcher, kind);
-        }
-
-        private List<Reference> findMatchesInternal(Reference.Matcher matcher, Reference.@Nullable Kind kind) {
             List<Reference> list = new ArrayList<>();
             for (Reference ref : references) {
-                if ((kind == null || ref.getKind().equals(kind)) && ref.matches(matcher) ) {
+                if (ref.matches(matcher)) {
                     list.add(ref);
                 }
             }
             return list;
         }
 
-        public static References build(SourceFile sourceFile) {
+        private static References build(SourceFile sourceFile) {
             Set<Reference> references = new HashSet<>();
             ServiceLoader<Reference.Provider> loader = ServiceLoader.load(Reference.Provider.class);
             loader.forEach(provider -> {
@@ -60,7 +59,7 @@ public interface SourceFileWithReferences extends SourceFile {
                     references.addAll(provider.getReferences(sourceFile));
                 }
             });
-            return new References(sourceFile, references);
+            return new References(references);
         }
     }
 }

@@ -31,15 +31,11 @@ import org.openrewrite.xml.internal.WithPrefix;
 import org.openrewrite.xml.internal.XmlPrinter;
 import org.openrewrite.xml.internal.XmlWhitespaceValidationService;
 
-import java.beans.Transient;
 import java.lang.ref.SoftReference;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
@@ -171,23 +167,11 @@ public interface Xml extends Tree {
         @NonFinal
         transient SoftReference<References> references;
 
-        @Transient
         @Override
         public References getReferences() {
-            References cache;
-            if (this.references == null) {
-                cache = References.build(this);
-                this.references = new SoftReference<>(cache);
-            } else {
-                cache = this.references.get();
-                if (cache == null || cache.getSourceFile() != this) {
-                    cache = References.build(this);
-                    this.references = new SoftReference<>(cache);
-                }
-            }
-            return cache;
+            this.references = build(this.references);
+            return Objects.requireNonNull(this.references.get());
         }
-
     }
 
     @Value
