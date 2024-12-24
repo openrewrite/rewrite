@@ -472,13 +472,13 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         List<JavaType> parameterTypes = emptyList();
         if (method.getParameters().length > 0) {
             parameterTypes = new ArrayList<>(method.getParameters().length);
-            for (Parameter parameter : method.getParameters()) {
-                Type parameterizedType = parameter.getParameterizedType();
-                parameterTypes.add(type(parameterizedType == null ? parameter.getType() : parameterizedType));
+            for (Type parameter : method.getGenericParameterTypes()) {
+                parameterTypes.add(type(parameter));
             }
         }
 
-        mappedMethod.unsafeSet(declaringType, type(method.getReturnType()), parameterTypes, thrownExceptions, annotations);
+        JavaType returnType = type(method.getGenericReturnType());
+        mappedMethod.unsafeSet(declaringType, returnType, parameterTypes, thrownExceptions, annotations);
         return mappedMethod;
     }
 }
