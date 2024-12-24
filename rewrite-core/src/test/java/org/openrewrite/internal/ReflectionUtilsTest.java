@@ -29,8 +29,8 @@ class ReflectionUtilsTest {
 
     @Test
     void classNotAvailable() {
-        boolean result = ReflectionUtils.isClassAvailable("org.openrewrite.internal.ReflectionUtilsTest");
-        assertTrue(result);
+        boolean result = ReflectionUtils.isClassAvailable("org.openrewrite.internal.ReflectionUtilsTest2");
+        assertFalse(result);
     }
 
     @Test
