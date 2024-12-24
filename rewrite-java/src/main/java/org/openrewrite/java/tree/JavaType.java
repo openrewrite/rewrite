@@ -387,7 +387,6 @@ public interface JavaType {
         @NonFinal
         FullyQualified owningClass;
 
-
         @NonFinal
         FullyQualified @Nullable [] annotations;
 
@@ -1099,7 +1098,6 @@ public interface JavaType {
         @With
         @NonFinal
         JavaType returnType;
-
 
         @NonFinal
         String @Nullable [] parameterNames;
