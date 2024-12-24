@@ -38,8 +38,8 @@ import java.util.concurrent.TimeUnit;
 public class JavaTypeCacheBenchmark {
 
     @Benchmark
-    public void writeSnappy(JavaCompilationUnitState state, Blackhole bh) {
-        JavaTypeCache typeCache = new JavaTypeCache();
+    public void writeHashMap(JavaCompilationUnitState state, Blackhole bh) {
+        JavaTypeCache typeCache = new JavaCompilationUnitState.MapJavaTypeCache();
         for (Map.Entry<String, Object> entry : state.typeCache.map().entrySet()) {
             typeCache.put(entry.getKey(), entry.getValue());
         }
@@ -54,9 +54,9 @@ public class JavaTypeCacheBenchmark {
     }
 
     @Benchmark
-    public void readSnappy(JavaCompilationUnitState state, Blackhole bh) {
+    public void readHashMap(JavaCompilationUnitState state, Blackhole bh) {
         for (Map.Entry<String, Object> entry : state.typeCache.map().entrySet()) {
-            bh.consume(state.snappyTypeCache.get(entry.getKey()));
+            bh.consume(state.typeCache.get(new String(entry.getKey())));
         }
     }
 
