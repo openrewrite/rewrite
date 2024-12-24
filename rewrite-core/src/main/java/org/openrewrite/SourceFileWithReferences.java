@@ -18,8 +18,6 @@ package org.openrewrite;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import lombok.ToString;
-import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.trait.Reference;
 
@@ -27,33 +25,20 @@ import java.lang.ref.SoftReference;
 import java.util.*;
 
 @Incubating(since = "8.39.0")
-public abstract class SourceFileWithReferences implements SourceFile {
+public interface SourceFileWithReferences extends SourceFile {
 
-    @Nullable
-    @NonFinal
-    @ToString.Exclude
-    transient SoftReference<References> references;
+    References getReferences();
 
-    public References getReferences() {
-        References cache;
-        if (this.references == null) {
-            cache = References.build(this);
-            this.references = new SoftReference<>(cache);
-        } else {
-            cache = this.references.get();
-            if (cache == null || cache.getSourceFile() != this) {
-                cache = References.build(this);
-                this.references = new SoftReference<>(cache);
-            }
+    default SoftReference<References> build(@Nullable SoftReference<@Nullable References> references) {
+        if (references == null || references.get() == null) {
+            return new SoftReference<>(References.build(this));
         }
-        return cache;
+        return references;
     }
 
     @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
-    public static class References {
-        @Getter(AccessLevel.PRIVATE)
-        private final SourceFile sourceFile;
-        @Getter
+    @Getter
+    class References {
         private final Set<Reference> references;
 
         public Collection<Reference> findMatches(Reference.Matcher matcher) {
@@ -66,7 +51,7 @@ public abstract class SourceFileWithReferences implements SourceFile {
             return list;
         }
 
-        public static References build(SourceFile sourceFile) {
+        private static References build(SourceFile sourceFile) {
             Set<Reference> references = new HashSet<>();
             ServiceLoader<Reference.Provider> loader = ServiceLoader.load(Reference.Provider.class);
             loader.forEach(provider -> {
@@ -74,7 +59,7 @@ public abstract class SourceFileWithReferences implements SourceFile {
                     references.addAll(provider.getReferences(sourceFile));
                 }
             });
-            return new References(sourceFile, references);
+            return new References(references);
         }
     }
 }

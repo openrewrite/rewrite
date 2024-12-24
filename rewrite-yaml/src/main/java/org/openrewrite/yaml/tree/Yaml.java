@@ -24,12 +24,12 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.YamlVisitor;
 import org.openrewrite.yaml.internal.YamlPrinter;
 
-import java.beans.Transient;
 import java.lang.ref.SoftReference;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 import static java.util.stream.Collectors.toList;
@@ -63,8 +63,10 @@ public interface Yaml extends Tree {
 
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     @With
-    class Documents extends SourceFileWithReferences implements Yaml {
+    class Documents implements Yaml, SourceFileWithReferences {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -127,6 +129,16 @@ public interface Yaml extends Tree {
         @Override
         public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
             return new YamlPrinter<>();
+        }
+
+        @Nullable
+        @NonFinal
+        transient SoftReference<References> references;
+
+        @Override
+        public References getReferences() {
+            this.references = build(this.references);
+            return Objects.requireNonNull(this.references.get());
         }
     }
 

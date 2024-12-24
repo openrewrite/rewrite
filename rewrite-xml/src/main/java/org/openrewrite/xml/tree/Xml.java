@@ -31,15 +31,11 @@ import org.openrewrite.xml.internal.WithPrefix;
 import org.openrewrite.xml.internal.XmlPrinter;
 import org.openrewrite.xml.internal.XmlWhitespaceValidationService;
 
-import java.beans.Transient;
 import java.lang.ref.SoftReference;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
@@ -82,7 +78,8 @@ public interface Xml extends Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
-    class Document extends SourceFileWithReferences implements Xml {
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class Document implements Xml, SourceFileWithReferences {
         @With
         @EqualsAndHashCode.Include
         UUID id;
@@ -163,7 +160,17 @@ public interface Xml extends Tree {
             if (WhitespaceValidationService.class.getName().equals(service.getName())) {
                 return (T) new XmlWhitespaceValidationService();
             }
-            return super.service(service);
+            return SourceFileWithReferences.super.service(service);
+        }
+
+        @Nullable
+        @NonFinal
+        transient SoftReference<References> references;
+
+        @Override
+        public References getReferences() {
+            this.references = build(this.references);
+            return Objects.requireNonNull(this.references.get());
         }
     }
 

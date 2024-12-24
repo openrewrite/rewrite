@@ -16,14 +16,17 @@
 package org.openrewrite.text;
 
 import lombok.*;
+import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.marker.Markers;
 
+import java.lang.ref.SoftReference;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Predicate;
 
@@ -36,8 +39,7 @@ import static org.openrewrite.internal.ListUtils.nullIfEmpty;
 @Value
 @Builder
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = false)
-public class PlainText extends SourceFileWithReferences implements Tree {
+public class PlainText implements SourceFileWithReferences, Tree {
 
     @Builder.Default
     @With
@@ -80,15 +82,26 @@ public class PlainText extends SourceFileWithReferences implements Tree {
     @Builder.Default
     String text = "";
 
+    List<Snippet> snippets;
+
+    @Nullable
+    @NonFinal
+    @ToString.Exclude
+    transient SoftReference<References> references;
+
+    @Override
+    public References getReferences() {
+        this.references = build(this.references);
+        return Objects.requireNonNull(this.references.get());
+    }
+
     public PlainText withText(String text) {
         if (!text.equals(this.text)) {
             return new PlainText(this.id, this.sourcePath, this.markers, this.charsetName, this.charsetBomMarked,
-                    this.fileAttributes, this.checksum, text, this.snippets);
+                    this.fileAttributes, this.checksum, text, this.snippets, this.references);
         }
         return this;
     }
-
-    List<Snippet> snippets;
 
     @Override
     public <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
@@ -124,7 +137,7 @@ public class PlainText extends SourceFileWithReferences implements Tree {
         if (this.snippets == snippets) {
             return this;
         }
-        return new PlainText(id, sourcePath, markers, charsetName, charsetBomMarked, fileAttributes, checksum, text, snippets);
+        return new PlainText(id, sourcePath, markers, charsetName, charsetBomMarked, fileAttributes, checksum, text, snippets, null);
     }
 
     @Value
