@@ -110,6 +110,11 @@ public interface JavaTypeMappingTest {
         assertThat(generic.getName()).isEqualTo("?");
         assertThat(generic.getVariance()).isEqualTo(COVARIANT);
         assertThat(TypeUtils.asFullyQualified(generic.getBounds().get(0)).getFullyQualifiedName()).isEqualTo("org.openrewrite.java.C");
+
+        generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(methodType("generic").getReturnType()).getTypeParameters().get(0);
+        assertThat(generic.getName()).isEqualTo("?");
+        assertThat(generic.getVariance()).isEqualTo(COVARIANT);
+        assertThat(TypeUtils.asFullyQualified(generic.getBounds().get(0)).getFullyQualifiedName()).isEqualTo("org.openrewrite.java.C");
     }
 
     @Test
