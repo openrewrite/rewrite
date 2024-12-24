@@ -93,7 +93,7 @@ public class Find extends Recipe {
     String filePattern;
 
     @Option(displayName = "Description",
-            description = "Add the matched value(s) between description text.  Default `false`.",
+            description = "Add the matched value(s) as description on the search result marker.  Default `false`.",
             required = false)
     @Nullable
     Boolean description;
