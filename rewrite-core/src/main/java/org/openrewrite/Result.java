@@ -185,11 +185,21 @@ public class Result {
      * @return Git-style patch diff representing the changes to this compilation unit.
      */
     public String diff(@Nullable Path relativeTo) {
-        return diff(relativeTo, null);
+        return diff(relativeTo, (PrintOutputCapture.MarkerPrinter) null);
     }
 
     public String diff(@Nullable Path relativeTo, PrintOutputCapture.@Nullable MarkerPrinter markerPrinter) {
         return diff(relativeTo, markerPrinter, false);
+    }
+
+    @Incubating(since = "8.41.4")
+    public String diff(@Nullable Path relativeTo, PrintOutputCapture.MarkerPrinter.MarkerMode markerMode) {
+        return diff(relativeTo, markerMode, false);
+    }
+
+    @Incubating(since = "8.41.4")
+    public String diff(@Nullable Path relativeTo, PrintOutputCapture.MarkerPrinter.MarkerMode markerMode, boolean ignoreAllWhitespace) {
+        return diff(relativeTo, markerMode.getPrinter(), ignoreAllWhitespace);
     }
 
     @Incubating(since = "7.34.0")
