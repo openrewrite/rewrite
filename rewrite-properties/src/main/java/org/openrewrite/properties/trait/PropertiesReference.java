@@ -62,9 +62,26 @@ public class PropertiesReference implements Reference {
         return tree;
     }
 
-    @SuppressWarnings("unused")
     public static class Provider extends AbstractProvider<PropertiesReference> {
         private static final Predicate<String> applicationPropertiesMatcher = Pattern.compile("^application(-\\w+)?\\.properties$").asPredicate();
+        private static final SimpleTraitMatcher<PropertiesReference> matcher = new SimpleTraitMatcher<PropertiesReference>() {
+            private final Predicate<String> javaFullyQualifiedTypeMatcher = Pattern.compile(
+                    "\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*(?:\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*)*").asPredicate();
+
+            @Override
+            protected @Nullable PropertiesReference test(Cursor cursor) {
+                Object value = cursor.getValue();
+                if (value instanceof Properties.Entry &&
+                        javaFullyQualifiedTypeMatcher.test(((Properties.Entry) value).getValue().getText())) {
+                    return new PropertiesReference(cursor, determineKind(((Properties.Entry) value).getValue().getText()));
+                }
+                return null;
+            }
+
+            private Kind determineKind(String value) {
+                return Character.isUpperCase(value.charAt(value.lastIndexOf('.') + 1)) ? Kind.TYPE : Kind.PACKAGE;
+            }
+        };
 
         @Override
         public boolean isAcceptable(SourceFile sourceFile) {
@@ -73,24 +90,7 @@ public class PropertiesReference implements Reference {
 
         @Override
         public SimpleTraitMatcher<PropertiesReference> getMatcher() {
-            return new SimpleTraitMatcher<PropertiesReference>() {
-                private final Predicate<String> javaFullyQualifiedTypeMatcher = Pattern.compile(
-                        "\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*(?:\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*)*").asPredicate();
-
-                @Override
-                protected @Nullable PropertiesReference test(Cursor cursor) {
-                    Object value = cursor.getValue();
-                    if (value instanceof Properties.Entry &&
-                            javaFullyQualifiedTypeMatcher.test(((Properties.Entry) value).getValue().getText())) {
-                        return new PropertiesReference(cursor, determineKind(((Properties.Entry) value).getValue().getText()));
-                    }
-                    return null;
-                }
-
-                private Kind determineKind(String value) {
-                    return Character.isUpperCase(value.charAt(value.lastIndexOf('.') + 1)) ? Kind.TYPE : Kind.PACKAGE;
-                }
-            };
+            return matcher;
         }
     }
 }

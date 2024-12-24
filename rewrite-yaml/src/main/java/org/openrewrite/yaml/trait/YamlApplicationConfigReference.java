@@ -36,6 +36,23 @@ public class YamlApplicationConfigReference extends YamlReference {
 
     public static class Provider extends YamlProvider {
         private static final Predicate<String> applicationPropertiesMatcher = Pattern.compile("^application(-\\w+)?\\.(yaml|yml)$").asPredicate();
+        private static final SimpleTraitMatcher<YamlReference> matcher = new SimpleTraitMatcher<YamlReference>() {
+            private final Predicate<String> javaFullyQualifiedTypePattern = Pattern.compile(
+                            "\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*(?:\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*)*").asPredicate();
+
+            @Override
+            protected @Nullable YamlReference test(Cursor cursor) {
+                Object value = cursor.getValue();
+                if (value instanceof Yaml.Scalar && javaFullyQualifiedTypePattern.test(((Yaml.Scalar) value).getValue())) {
+                    return new YamlApplicationConfigReference(cursor, determineKind(((Yaml.Scalar) value).getValue()));
+                }
+                return null;
+            }
+
+            private Kind determineKind(String value) {
+                return Character.isUpperCase(value.charAt(value.lastIndexOf('.') + 1)) ? Kind.TYPE : Kind.PACKAGE;
+            }
+        };
 
         @Override
         public boolean isAcceptable(SourceFile sourceFile) {
@@ -44,24 +61,7 @@ public class YamlApplicationConfigReference extends YamlReference {
 
         @Override
         public SimpleTraitMatcher<YamlReference> getMatcher() {
-            return new SimpleTraitMatcher<YamlReference>() {
-                private final Predicate<String> javaFullyQualifiedTypePattern = Pattern.compile(
-                                "\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*(?:\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*)*")
-                        .asPredicate();
-
-                @Override
-                protected @Nullable YamlReference test(Cursor cursor) {
-                    Object value = cursor.getValue();
-                    if (value instanceof Yaml.Scalar && javaFullyQualifiedTypePattern.test(((Yaml.Scalar) value).getValue())) {
-                        return new YamlApplicationConfigReference(cursor, determineKind(((Yaml.Scalar) value).getValue()));
-                    }
-                    return null;
-                }
-
-                private Kind determineKind(String value) {
-                    return Character.isUpperCase(value.charAt(value.lastIndexOf('.') + 1)) ? Kind.TYPE : Kind.PACKAGE;
-                }
-            };
+            return matcher;
         }
     }
 }
