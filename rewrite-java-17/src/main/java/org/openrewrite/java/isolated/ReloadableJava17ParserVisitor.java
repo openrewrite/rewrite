@@ -1707,7 +1707,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             return null;
         }
         try {
-            String prefix = source.substring(cursor, Math.max(cursor, getActualStartPosition((JCTree) t)));
+            String prefix = source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
             cursor += prefix.length();
             // Java 21 and 23 have a different return type from getCommentTree; with reflection we can support both
             Method getCommentTreeMethod = DocCommentTable.class.getMethod("getCommentTree", JCTree.class);
@@ -1721,14 +1721,6 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             reportJavaParsingException(ex);
             throw ex;
         }
-    }
-
-    private static int getActualStartPosition(JCTree t) {
-        // not sure if this is a bug in Lombok, but the variable's start position is after the `val` annotation
-        if (t instanceof JCVariableDecl && isLombokVal((JCVariableDecl) t)) {
-            return ((JCVariableDecl) t).mods.annotations.get(0).getStartPosition();
-        }
-        return t.getStartPosition();
     }
 
     private void reportJavaParsingException(Throwable ex) {
