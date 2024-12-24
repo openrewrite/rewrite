@@ -75,7 +75,7 @@ public class EqualsMethodUsage extends Recipe {
                 if (unary.getExpression() instanceof J.Binary &&
                     getCursor().pollMessage("replaced") != null) {
                     J.Binary binary = (J.Binary) unary.getExpression();
-                    if (binary.getOperator().equals(J.Binary.Type.Equal)) {
+                    if (binary.getOperator() == J.Binary.Type.Equal) {
                         return binary.withOperator(J.Binary.Type.NotEqual);
                     }
                 }

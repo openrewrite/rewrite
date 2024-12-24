@@ -191,7 +191,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         visit(destructuringDeclaration.getInitializer().getLeadingAnnotations(), p);
         for (J.Modifier m : destructuringDeclaration.getInitializer().getModifiers()) {
             delegate.visitModifier(m, p);
-            if (m.getType().equals(J.Modifier.Type.Final)) {
+            if (m.getType() == J.Modifier.Type.Final) {
                 p.append("val");
             }
         }
@@ -345,7 +345,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         visit(vd.getLeadingAnnotations(), p);
         for (J.Modifier m : vd.getModifiers()) {
             delegate.visitModifier(m, p);
-            if (m.getType().equals(J.Modifier.Type.Final)) {
+            if (m.getType() == J.Modifier.Type.Final) {
                 p.append("val");
             }
         }
