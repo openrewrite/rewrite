@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 the original author or authors.
+ * Copyright 2024 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,5 +15,14 @@
  */
 package org.openrewrite.toml.tree;
 
-public interface TValue extends Toml {
+import lombok.Value;
+import lombok.With;
+import org.openrewrite.marker.Markers;
+
+@Value
+@With
+public class Comment {
+    String text;
+    String suffix;
+    Markers markers;
 }
