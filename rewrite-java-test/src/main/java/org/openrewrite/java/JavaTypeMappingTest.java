@@ -54,6 +54,16 @@ public interface JavaTypeMappingTest {
     }
 
     @Test
+    default void declaringTypeRefersToParameterizedClass() {
+        JavaType.FullyQualified declaringType = methodType("nameShadow").getDeclaringType();
+        assertThat(declaringType.getTypeParameters())
+                .describedAs("If it points to the raw class, " +
+                             "method level name shadowing of generic " +
+                             "type variables cannot be detected.")
+                .isNotEmpty();
+    }
+
+    @Test
     default void javaLangObjectHasNoSupertype() {
         assertThat(goatType().getSupertype().getSupertype()).isNull();
     }
@@ -241,5 +251,19 @@ public interface JavaTypeMappingTest {
     default void recursiveIntersection() {
         JavaType.GenericTypeVariable clazz = TypeUtils.asGeneric(firstMethodParameter("recursiveIntersection"));
         assertThat(clazz.toString()).isEqualTo("Generic{U extends org.openrewrite.java.JavaTypeGoat$Extension<Generic{U}> & org.openrewrite.java.Intersection<Generic{U}>}");
+    }
+
+    @Test
+    default void throwsGenericExceptions() {
+        JavaType.Method method = methodType("throwsGenericException");
+        JavaType ex = method.getThrownExceptions().get(0);
+
+        assertThat(ex).isInstanceOf(JavaType.GenericTypeVariable.class);
+
+        JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) ex;
+        assertThat(generic.getName()).isEqualTo("T");
+        assertThat(generic.getVariance()).isEqualTo(COVARIANT);
+        assertThat(TypeUtils.asFullyQualified(generic.getBounds().get(0))
+                .getFullyQualifiedName()).isEqualTo("java.io.FileNotFoundException");
     }
 }
