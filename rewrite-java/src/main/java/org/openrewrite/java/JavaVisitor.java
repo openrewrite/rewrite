@@ -1463,7 +1463,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             Object childScope = it.next();
             if (childScope instanceof J.ClassDeclaration) {
                 J.ClassDeclaration childClass = (J.ClassDeclaration) childScope;
-                if (!(childClass.getKind().equals(J.ClassDeclaration.Kind.Type.Class)) ||
+                if (childClass.getKind() != J.ClassDeclaration.Kind.Type.Class ||
                     childClass.hasModifier(J.Modifier.Type.Static)) {
                     //Short circuit the search if a terminating element is encountered.
                     return false;

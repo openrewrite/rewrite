@@ -1100,7 +1100,7 @@ public class GroovyParserVisitor {
                 J expr = visit(statement);
                 if (i == blockStatements.size() - 1 && (expr instanceof Expression)) {
                     if (parent instanceof ClosureExpression || (parent instanceof MethodNode &&
-                                                                !JavaType.Primitive.Void.equals(typeMapping.type(((MethodNode) parent).getReturnType())))) {
+                                                                JavaType.Primitive.Void != typeMapping.type(((MethodNode) parent).getReturnType()))) {
                         expr = new J.Return(randomId(), expr.getPrefix(), Markers.EMPTY,
                                 expr.withPrefix(EMPTY));
                         expr = expr.withMarkers(expr.getMarkers().add(new ImplicitReturn(randomId())));

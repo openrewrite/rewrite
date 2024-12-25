@@ -577,7 +577,7 @@ public class Autodetect extends NamedStyles {
                         List<Integer> countOfBlocksInStaticGroups = new ArrayList<>();
 
                         for (Block block : longestBlocks) {
-                            if (BlockType.ImportStatic.equals(block.type)) {
+                            if (BlockType.ImportStatic == block.type) {
                                 staticBlocks.add(block);
                                 countOfBlocksInStaticGroups.add(0);
                                 countOfBlocksInStaticGroups.set(staticCountPos, countOfBlocksInStaticGroups.get(staticCountPos) + 1);

@@ -60,7 +60,7 @@ public class BlockStatementTemplateGenerator {
 
                     // for CoordinateBuilder.MethodDeclaration#replaceBody()
                     if (cursor.getValue() instanceof J.MethodDeclaration &&
-                        location.equals(Space.Location.BLOCK_PREFIX)) {
+                            location == Space.Location.BLOCK_PREFIX) {
                         J.MethodDeclaration method = cursor.getValue();
                         J.MethodDeclaration m = method.withBody(null).withLeadingAnnotations(emptyList()).withPrefix(Space.EMPTY);
                         before.insert(0, m.printTrimmed(cursor.getParentOrThrow()).trim() + '{');
