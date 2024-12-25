@@ -302,7 +302,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             }
         }
 
-        mappedVariable.unsafeSet(type(field.getDeclaringClass()), type(field.getType()), annotations);
+        mappedVariable.unsafeSet(type(field.getDeclaringClass()), type(field.getGenericType()), annotations);
         return mappedVariable;
     }
 
