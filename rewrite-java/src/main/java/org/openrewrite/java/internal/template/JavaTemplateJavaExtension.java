@@ -354,11 +354,11 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             // Update method type information to reflect the new checked exceptions
                             JavaType.Method type = m.getMethodType();
                             if (type != null) {
-                                List<JavaType.FullyQualified> newThrows = new ArrayList<>();
+                                List<JavaType> newThrows = new ArrayList<>();
                                 List<NameTree> throws_ = (m.getThrows() == null) ? emptyList() : m.getThrows();
                                 for (NameTree t : throws_) {
                                     J.Identifier exceptionIdent = (J.Identifier) t;
-                                    newThrows.add((JavaType.FullyQualified) exceptionIdent.getType());
+                                    newThrows.add(exceptionIdent.getType());
                                 }
                                 type = type.withThrownExceptions(newThrows);
                             }

@@ -345,7 +345,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         );
         typeCache.put(signature, mappedMethod);
 
-        List<JavaType.FullyQualified> thrownExceptions = null;
+        List<JavaType> thrownExceptions = null;
         if (method.getExceptionTypes().length > 0) {
             thrownExceptions = new ArrayList<>(method.getExceptionTypes().length);
             for (Class<?> e : method.getExceptionTypes()) {
@@ -451,12 +451,11 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         );
         typeCache.put(signature, mappedMethod);
 
-        List<JavaType.FullyQualified> thrownExceptions = null;
+        List<JavaType> thrownExceptions = null;
         if (method.getExceptionTypes().length > 0) {
             thrownExceptions = new ArrayList<>(method.getExceptionTypes().length);
-            for (Class<?> e : method.getExceptionTypes()) {
-                JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) type(e);
-                thrownExceptions.add(fullyQualified);
+            for (Type e : method.getGenericExceptionTypes()) {
+                thrownExceptions.add(type(e));
             }
         }
 
