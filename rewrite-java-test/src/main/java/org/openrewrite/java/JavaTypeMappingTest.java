@@ -54,14 +54,13 @@ public interface JavaTypeMappingTest {
     @Test
     default void declaredFields() {
         JavaType.Parameterized goat = goatType();
-        assertThat(goat.getMembers().stream().filter(m -> m.getName().equals("parameterizedField")))
-                .anySatisfy(field ->
-                        assertThat(field).isInstanceOfSatisfying(JavaType.Variable.class, variable ->
-                                assertThat(variable.getType()).isInstanceOfSatisfying(JavaType.Parameterized.class, param ->
-                                        assertThat(param.getTypeParameters()).hasOnlyElementsOfType(JavaType.FullyQualified.class)
-                                )
+        assertThat(goat.getMembers().stream().filter(m -> m.getName().equals("parameterizedField"))).anySatisfy(field ->
+                assertThat(field).isInstanceOfSatisfying(JavaType.Variable.class, variable ->
+                        assertThat(variable.getType()).isInstanceOfSatisfying(JavaType.Parameterized.class, param ->
+                                assertThat(param.getTypeParameters()).hasOnlyElementsOfType(JavaType.FullyQualified.class)
                         )
-                );
+                )
+        );
     }
 
     @Test
