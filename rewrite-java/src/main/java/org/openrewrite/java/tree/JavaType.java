@@ -1184,7 +1184,7 @@ public interface JavaType {
         public Method unsafeSet(@Nullable FullyQualified declaringType,
                                 @Nullable JavaType returnType,
                                 JavaType @Nullable [] parameterTypes,
-                                FullyQualified @Nullable [] thrownExceptions,
+                                JavaType @Nullable [] thrownExceptions,
                                 FullyQualified @Nullable [] annotations) {
             this.declaringType = unknownIfNull(declaringType);
             this.returnType = unknownIfNull(returnType);
