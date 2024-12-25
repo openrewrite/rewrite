@@ -341,7 +341,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
                 "<constructor>",
                 null,
                 paramNames,
-                null, null, null, null
+                null, null, null, null, null
         );
         typeCache.put(signature, mappedMethod);
 
@@ -439,6 +439,17 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
                 defaultValues = Collections.singletonList(method.getDefaultValue().toString());
             }
         }
+
+        List<String> declaredFormalTypeNames = null;
+        for (TypeVariable<?> typeVariable : method.getTypeParameters()) {
+            if (typeVariable.getGenericDeclaration() == method) {
+                if (declaredFormalTypeNames == null) {
+                    declaredFormalTypeNames = new ArrayList<>();
+                }
+                declaredFormalTypeNames.add(typeVariable.getName());
+            }
+        }
+
         JavaType.Method mappedMethod = new JavaType.Method(
                 null,
                 method.getModifiers(),
@@ -447,7 +458,10 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
                 null,
                 paramNames,
                 null, null, null,
-                defaultValues
+                defaultValues,
+                declaredFormalTypeNames == null ?
+                        null :
+                        declaredFormalTypeNames.toArray(new String[0])
         );
         typeCache.put(signature, mappedMethod);
 

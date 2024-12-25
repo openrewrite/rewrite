@@ -470,12 +470,14 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
             return existing;
         }
 
-        List<String> paramNames = null;
+        String[] paramNames = null;
         if (!methodSymbol.params().isEmpty()) {
-            paramNames = new ArrayList<>(methodSymbol.params().size());
-            for (Symbol.VarSymbol p : methodSymbol.params()) {
+            paramNames = new String[methodSymbol.params().size()];
+            com.sun.tools.javac.util.List<Symbol.VarSymbol> params = methodSymbol.params();
+            for (int i = 0; i < params.size(); i++) {
+                Symbol.VarSymbol p = params.get(i);
                 String s = p.name.toString();
-                paramNames.add(s);
+                paramNames[i] = s;
             }
         }
 
@@ -486,7 +488,7 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
                 methodSymbol.isConstructor() ? "<constructor>" : methodSymbol.getSimpleName().toString(),
                 null,
                 paramNames,
-                null, null, null, null
+                null, null, null, null, null
         );
         typeCache.put(signature, method);
 
@@ -551,12 +553,14 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
                 return existing;
             }
 
-            List<String> paramNames = null;
+            String[] paramNames = null;
             if (!methodSymbol.params().isEmpty()) {
-                paramNames = new ArrayList<>(methodSymbol.params().size());
-                for (Symbol.VarSymbol p : methodSymbol.params()) {
+                paramNames = new String[methodSymbol.params().size()];
+                com.sun.tools.javac.util.List<Symbol.VarSymbol> params = methodSymbol.params();
+                for (int i = 0; i < params.size(); i++) {
+                    Symbol.VarSymbol p = params.get(i);
                     String s = p.name.toString();
-                    paramNames.add(s);
+                    paramNames[i] = s;
                 }
             }
 
@@ -574,6 +578,17 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
                     }
                 }
             }
+
+            List<String> declaredFormalTypeNames = null;
+            for (Symbol.TypeVariableSymbol typeParam : methodSymbol.getTypeParameters()) {
+                if(typeParam.owner == methodSymbol) {
+                    if (declaredFormalTypeNames == null) {
+                        declaredFormalTypeNames = new ArrayList<>();
+                    }
+                    declaredFormalTypeNames.add(typeParam.name.toString());
+                }
+            }
+
             JavaType.Method method = new JavaType.Method(
                     null,
                     methodSymbol.flags_field,
@@ -582,8 +597,8 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
                     null,
                     paramNames,
                     null, null, null,
-                    // TODO: Figure out the correct thing to put here based on methodSymbol.defaultValue.getValue()
-                    defaultValues
+                    defaultValues,
+                    declaredFormalTypeNames == null ? null : declaredFormalTypeNames.toArray(new String[0])
             );
             typeCache.put(signature, method);
 

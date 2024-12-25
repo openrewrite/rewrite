@@ -64,6 +64,21 @@ public interface JavaTypeMappingTest {
     }
 
     @Test
+    default void shadowedDeclaredFormalTypeParameters() {
+        // this method overrides the class definition of the type variable T
+        assertThat(methodType("nameShadow").getDeclaredFormalTypeNames())
+                .containsExactly("T");
+
+        // this method provides an unshadowed definition of U
+        assertThat(methodType("genericUnbounded").getDeclaredFormalTypeNames())
+                .containsExactly("U");
+
+        // this method uses the definition of T from the class level
+        assertThat(methodType("genericT").getDeclaredFormalTypeNames())
+                .isEmpty();
+    }
+
+    @Test
     default void javaLangObjectHasNoSupertype() {
         assertThat(goatType().getSupertype().getSupertype()).isNull();
     }
