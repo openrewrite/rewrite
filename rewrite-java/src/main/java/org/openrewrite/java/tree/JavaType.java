@@ -1317,7 +1317,7 @@ public interface JavaType {
         }
 
         public Method withThrownExceptions(@Nullable List<JavaType> thrownExceptions) {
-            JavaType[] thrownExceptionsArray = arrayOrNullIfEmpty(thrownExceptions, EMPTY_FULLY_QUALIFIED_ARRAY);
+            JavaType[] thrownExceptionsArray = arrayOrNullIfEmpty(thrownExceptions, EMPTY_JAVA_TYPE_ARRAY);
             if (Arrays.equals(thrownExceptionsArray, this.thrownExceptions)) {
                 return this;
             }
