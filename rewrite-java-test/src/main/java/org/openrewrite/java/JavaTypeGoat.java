@@ -26,8 +26,9 @@ public abstract class JavaTypeGoat<T, S extends PT<S> & C> {
 
     public static final PT<TypeA> parameterizedField = new PT<TypeA>() {
     };
-    public static final Double PI = 3.14;
-    public static final double PI_PRIMITIVE = 3.14;
+
+    public static Double PI;
+    public static double PI_PRIMITIVE;
 
     public static abstract class InheritedJavaTypeGoat<T, U extends PT<U> & C> extends JavaTypeGoat<T, U> {
         public InheritedJavaTypeGoat() {

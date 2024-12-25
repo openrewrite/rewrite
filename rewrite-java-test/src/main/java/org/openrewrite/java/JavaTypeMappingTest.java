@@ -25,9 +25,7 @@ import java.util.List;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.CONTRAVARIANT;
-import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.COVARIANT;
-import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.INVARIANT;
+import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 
 /**
  * Based on type attribution mappings of [JavaTypeGoat].
@@ -51,6 +49,19 @@ public interface JavaTypeMappingTest {
 
     default JavaType firstMethodParameter(String methodName) {
         return methodType(methodName).getParameterTypes().get(0);
+    }
+
+    @Test
+    default void declaredFields() {
+        JavaType.Parameterized goat = goatType();
+        assertThat(goat.getMembers().stream().filter(m -> m.getName().equals("parameterizedField")))
+                .anySatisfy(field ->
+                        assertThat(field).isInstanceOfSatisfying(JavaType.Variable.class, variable ->
+                                assertThat(variable.getType()).isInstanceOfSatisfying(JavaType.Parameterized.class, param ->
+                                        assertThat(param.getTypeParameters()).hasOnlyElementsOfType(JavaType.FullyQualified.class)
+                                )
+                        )
+                );
     }
 
     @Test
