@@ -2540,10 +2540,6 @@ public class GroovyParserVisitor {
         } else if (node instanceof MethodCallExpression) {
             MethodCallExpression expr = (MethodCallExpression) node;
             return determineParenthesisLevel(expr.getObjectExpression().getLineNumber(), expr.getLineNumber(), expr.getObjectExpression().getColumnNumber(), expr.getColumnNumber());
-        } else if (node instanceof BinaryExpression) {
-            BinaryExpression expr = (BinaryExpression) node;
-            return determineParenthesisLevel(expr.getLeftExpression().getLineNumber(), expr.getLineNumber(), expr.getLeftExpression().getColumnNumber(), expr.getColumnNumber());
-
         }
         return null;
     }
