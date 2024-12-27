@@ -42,11 +42,11 @@ public class BracketsVisitor<P> extends HclIsoVisitor<P> {
 
     @Override
     public Space visitSpace(Space space, Space.Location loc, P p) {
-        if (loc.equals(Space.Location.BLOCK_CLOSE) && !space.getLastWhitespace().contains("\n")) {
+        if (loc == Space.Location.BLOCK_CLOSE && !space.getLastWhitespace().contains("\n")) {
             return space.withLastWhitespace("\n");
         }
 
-        if (loc.equals(Space.Location.BLOCK_OPEN) && !space.getWhitespace().equals(" ")) {
+        if (loc == Space.Location.BLOCK_OPEN && !space.getWhitespace().equals(" ")) {
             return space.withWhitespace(" ");
         }
 
