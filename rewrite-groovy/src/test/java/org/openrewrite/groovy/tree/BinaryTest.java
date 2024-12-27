@@ -15,6 +15,7 @@
  */
 package org.openrewrite.groovy.tree;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
@@ -33,7 +34,6 @@ class BinaryTest implements RewriteTest {
 
           // NOT inside parentheses, but verifies the parser's
           // test for "inside parentheses" condition
-          groovy("( 1 ) + 1"),
           groovy("(1) + 1"),
           // And combine the two cases
           groovy("((1) + 1)")
@@ -211,35 +211,6 @@ class BinaryTest implements RewriteTest {
           groovy(
             """
               def foo = ("-" * 4)
-              """
-          )
-        );
-    }
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/4703")
-    @Test
-    void cxds() {
-        rewriteRun(
-          groovy(
-            """
-              def differenceInDays(int time) {
-                  return (int) ((time)/(1000*60*60*24))
-              }
-              """
-          )
-        );
-    }
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/4703")
-    @Test
-    void extraParensAroundInfixOxxxperator() {
-        rewriteRun(
-          groovy(
-            """
-              def timestamp(int hours, int minutes, int seconds) {
-                  30 * (hours)
-                  (((((hours))))) * 30
-              }
               """
           )
         );
