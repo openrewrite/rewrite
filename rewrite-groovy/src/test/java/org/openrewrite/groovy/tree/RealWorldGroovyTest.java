@@ -221,7 +221,8 @@ class RealWorldGroovyTest implements RewriteTest {
                           }
                       }
                   }
-              }"""
+              }
+              """
           )
         );
     }
