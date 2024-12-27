@@ -194,7 +194,7 @@ class RealWorldGroovyTest implements RewriteTest {
               
                       project.rootProject.subprojects.each { module ->
               
-                          module.getPlugins().withType(JavaPlugin.class).all {
+                          module.getPlugins().withType(JavaPlugin).all {
               
                               Properties schemas = new Properties();
               
