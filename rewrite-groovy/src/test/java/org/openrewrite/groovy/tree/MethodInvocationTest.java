@@ -191,6 +191,22 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void closureInObjectInObject() {
+        rewriteRun(
+          groovy(
+            """
+              class Test {
+                Test child = new Test()
+                def acceptsClosure(Closure cl) {}
+              }
+              
+              new Test().child.acceptsClosure {}
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4766")
     @Test
     void gradleFileWithMultipleClosuresWithoutParentheses() {

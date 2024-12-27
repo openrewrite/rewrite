@@ -2543,7 +2543,6 @@ public class GroovyParserVisitor {
         } else if (node instanceof BinaryExpression) {
             BinaryExpression expr = (BinaryExpression) node;
             return determineParenthesisLevel(expr.getLeftExpression().getLineNumber(), expr.getLineNumber(), expr.getLeftExpression().getColumnNumber(), expr.getColumnNumber());
-
         }
         return null;
     }
@@ -2571,6 +2570,9 @@ public class GroovyParserVisitor {
         for (int i = cursor; i < childBeginCursor; i++) {
             if (source.charAt(i) == '(') {
                 count++;
+            }
+            if (source.charAt(i) == ')') {
+                count--;
             }
         }
         cursor = saveCursor;
