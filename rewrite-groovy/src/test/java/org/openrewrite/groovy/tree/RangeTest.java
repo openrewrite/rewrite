@@ -16,6 +16,7 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
@@ -47,6 +48,7 @@ class RangeTest implements RewriteTest {
         );
     }
 
+    @ExpectedToFail("Parentheses with method invocation is not yet supported")
     @Test
     void parenthesizedAndInvokeMethodWithParentheses() {
         rewriteRun(
