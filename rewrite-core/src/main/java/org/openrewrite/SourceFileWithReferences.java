@@ -30,15 +30,18 @@ public interface SourceFileWithReferences extends SourceFile {
     References getReferences();
 
     default SoftReference<References> build(@Nullable SoftReference<@Nullable References> references) {
-        if (references == null || references.get() == null) {
+        References cache = references == null ? null : references.get();
+        if (cache == null || cache.getSourceFile() != this) {
             return new SoftReference<>(References.build(this));
         }
         return references;
     }
 
     @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
-    @Getter
     class References {
+        @Getter(AccessLevel.PRIVATE)
+        private final SourceFile sourceFile;
+        @Getter
         private final Set<Reference> references;
 
         public Collection<Reference> findMatches(Reference.Matcher matcher) {
@@ -59,7 +62,7 @@ public interface SourceFileWithReferences extends SourceFile {
                     references.addAll(provider.getReferences(sourceFile));
                 }
             });
-            return new References(references);
+            return new References(sourceFile, references);
         }
     }
 }
