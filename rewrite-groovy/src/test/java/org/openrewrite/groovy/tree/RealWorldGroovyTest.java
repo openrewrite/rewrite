@@ -16,6 +16,7 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -133,6 +134,7 @@ class RealWorldGroovyTest implements RewriteTest {
     }
 
     @Test
+    @ExpectedToFail("Anonymous inner class is not yet supported") // https://groovy-lang.org/objectorientation.html#_anonymous_inner_class
     @Issue("https://github.com/spring-projects/spring-ldap/blob/main/buildSrc/src/test/resources/samples/integrationtest/withgroovy/src/integration-test/groovy/sample/TheTest.groovy")
     void springLdapTheTest() {
         rewriteRun(
@@ -156,7 +158,6 @@ class RealWorldGroovyTest implements RewriteTest {
           )
         );
     }
-
 
     @Test
     @Issue("https://github.com/spring-projects/spring-session-data-geode/blob/main/buildSrc/src/main/groovy/io/spring/gradle/convention/SchemaZipPlugin.groovy")

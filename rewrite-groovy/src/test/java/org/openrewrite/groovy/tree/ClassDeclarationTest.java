@@ -18,6 +18,7 @@ package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -334,6 +335,24 @@ class ClassDeclarationTest implements RewriteTest {
           groovy(
             """
               class RewriteSettings extends groovy.lang.Script {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @ExpectedToFail("Anonymous inner class is not yet supported") // https://groovy-lang.org/objectorientation.html#_anonymous_inner_class
+    void anonymousInnerClass() {
+        rewriteRun(
+          groovy(
+            """
+              interface Something {}
+              
+              class Test {
+                  static def test() {
+                      new Something() {}
+                  }
               }
               """
           )
