@@ -57,7 +57,7 @@ public interface Properties extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    class File implements SourceFileWithReferences, Properties {
+    class File implements Properties, SourceFileWithReferences {
         @With
         @EqualsAndHashCode.Include
         UUID id;
