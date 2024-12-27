@@ -559,6 +559,7 @@ public class GroovyParserVisitor {
                     paramType = visitTypeTree(param.getOriginType());
                 }
 
+                // TODO: propably better implementation, the `paramType` does not handle well when varargs + index operator is used
                 Space varargs = null;
                 if (paramType instanceof J.ArrayType) {
                     // E.g. foo(String... x)

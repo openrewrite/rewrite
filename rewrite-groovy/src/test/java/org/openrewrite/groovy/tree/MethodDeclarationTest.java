@@ -116,6 +116,7 @@ class MethodDeclarationTest implements RewriteTest {
           groovy(
             """
               def foo(String... messages) {
+                  println(messages[0])
               }
               """
           )
