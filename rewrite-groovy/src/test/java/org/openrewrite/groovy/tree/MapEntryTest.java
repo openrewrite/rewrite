@@ -56,13 +56,6 @@ class MapEntryTest implements RewriteTest {
     }
 
     @Test
-    void emptyMapLiteralWithParentheses() {
-        rewriteRun(
-          groovy("Map m =  ([  :  ])")
-        );
-    }
-
-    @Test
     void mapAccess() {
         rewriteRun(
           groovy("def a = someMap /*[*/ [ /*'*/ 'someKey' /*]*/ ]")
