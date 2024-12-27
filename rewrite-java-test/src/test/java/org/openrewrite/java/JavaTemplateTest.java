@@ -1390,7 +1390,7 @@ class JavaTemplateTest implements RewriteTest {
               @Override
               public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                   J.VariableDeclarations vd = super.visitVariableDeclarations(multiVariable, ctx);
-                  if (TypeUtils.isString(vd.getType())) {
+                  if (TypeUtils.isString(vd.getType()) && "String".equals(((J.Identifier) vd.getTypeExpression()).getSimpleName())) {
                       JavaCoordinates coordinates = vd.getCoordinates().replace();
                       return JavaTemplate.builder("final var #{}")
                         .contextSensitive()

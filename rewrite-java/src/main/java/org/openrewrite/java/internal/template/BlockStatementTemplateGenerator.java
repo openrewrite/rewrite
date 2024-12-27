@@ -25,6 +25,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
@@ -409,7 +410,7 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.ForEachLoop.Control) {
             J.ForEachLoop.Control c = (J.ForEachLoop.Control) j;
             if (referToSameElement(prior, c.getVariable())) {
-                after.append(" = /*" + STOP_COMMENT + "/*").append(c.getIterable().printTrimmed(cursor));
+                after.append(" = /*" + STOP_COMMENT + "*/").append(c.getIterable().printTrimmed(cursor));
             } else if (referToSameElement(prior, c.getIterable())) {
                 before.insert(0, "Object __b" + cursor.getPathAsStream().count() + "__ =");
                 after.append(";");
@@ -817,6 +818,20 @@ public class BlockStatementTemplateGenerator {
                     }
                 }
                 return mi;
+            }
+
+            @Override
+            public J visitVariableDeclarations(J.VariableDeclarations multiVariable, Integer integer) {
+                List<J.VariableDeclarations.NamedVariable> variables = multiVariable.getVariables();
+                for (J.VariableDeclarations.NamedVariable variable : variables) {
+                    J.VariableDeclarations.NamedVariable.Padding padding = variable.getPadding();
+                    if (padding.getInitializer() != null && stopCommentExists(padding.getInitializer().getBefore().getComments())) {
+                        // Split the variable declarations at the variable with the `STOP_COMMENT` & trim off initializer
+                        List<J.VariableDeclarations.NamedVariable> vars = variables.subList(0, variables.indexOf(variable) + 1);
+                        return multiVariable.withVariables(ListUtils.mapLast(vars, v -> v.withInitializer(null)));
+                    }
+                }
+                return super.visitVariableDeclarations(multiVariable, integer);
             }
         }
     }
