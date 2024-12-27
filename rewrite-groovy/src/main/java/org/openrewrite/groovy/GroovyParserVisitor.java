@@ -558,6 +558,23 @@ public class GroovyParserVisitor {
                 } else {
                     paramType = visitTypeTree(param.getOriginType());
                 }
+
+                Space varargs = null;
+                if (paramType instanceof J.ArrayType) {
+                    // E.g. foo(String... x)
+                    if (source.startsWith("...", cursor - 3)) {
+                        varargs = format(source, cursor - 3, cursor - 3);
+                        paramType = ((J.ArrayType) paramType).withDimension(null);
+                    }
+                    // E.g. foo(String               ... x)
+                    else if (source.startsWith("...", indexOfNextNonWhitespace(cursor, source))) {
+                        int varargStart = indexOfNextNonWhitespace(cursor, source);
+                        varargs = format(source, cursor, varargStart);
+                        paramType = ((J.ArrayType) paramType).withDimension(null);
+                        cursor = varargStart + 3;
+                    }
+                }
+
                 JRightPadded<J.VariableDeclarations.NamedVariable> paramName = JRightPadded.build(
                         new J.VariableDeclarations.NamedVariable(randomId(), EMPTY, Markers.EMPTY,
                                 new J.Identifier(randomId(), whitespace(), Markers.EMPTY, emptyList(), param.getName(), null, null),
@@ -577,7 +594,7 @@ public class GroovyParserVisitor {
 
                 params.add(JRightPadded.build((Statement) new J.VariableDeclarations(randomId(), EMPTY,
                         Markers.EMPTY, paramAnnotations, emptyList(), paramType,
-                        null, emptyList(),
+                        varargs, emptyList(),
                         singletonList(paramName))).withAfter(rightPad));
             }
 
