@@ -1575,8 +1575,8 @@ public class GroovyParserVisitor {
                 } else {
                     Parameter param = forLoop.getVariable();
                     Space paramFmt = whitespace();
-                    TypeTree paramType = param.getOriginType().getColumnNumber() >= 0 ?
-                            visitTypeTree(param.getOriginType()) : null;
+                    List<J.Modifier> modifiers = getModifiers();
+                    TypeTree paramType = param.getOriginType().getColumnNumber() >= 0 ? visitTypeTree(param.getOriginType()) : null;
                     JRightPadded<J.VariableDeclarations.NamedVariable> paramName = JRightPadded.build(
                             new J.VariableDeclarations.NamedVariable(randomId(), whitespace(), Markers.EMPTY,
                                     new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), param.getName(), null, null),
@@ -1593,7 +1593,7 @@ public class GroovyParserVisitor {
                     }
 
                     JRightPadded<J.VariableDeclarations> variable = JRightPadded.build(new J.VariableDeclarations(randomId(), paramFmt,
-                            Markers.EMPTY, emptyList(), emptyList(), paramType, null, emptyList(),
+                            Markers.EMPTY, emptyList(), modifiers, paramType, null, emptyList(),
                             singletonList(paramName))
                     ).withAfter(rightPad);
 
@@ -2641,6 +2641,7 @@ public class GroovyParserVisitor {
 
         int saveCursor = cursor;
         Space fmt = whitespace();
+        // TODO: remove this? At least use `getModifiers` function
         if (cursor < source.length() && source.startsWith("def", cursor)) {
             cursor += 3;
             return new J.Identifier(randomId(), fmt, Markers.EMPTY, emptyList(), "def",
