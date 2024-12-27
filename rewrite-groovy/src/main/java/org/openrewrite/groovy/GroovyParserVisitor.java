@@ -563,7 +563,7 @@ public class GroovyParserVisitor {
                 if (paramType instanceof J.ArrayType) {
                     // E.g. foo(String... x)
                     if (source.startsWith("...", cursor - 3)) {
-                        varargs = format(source, cursor - 3, cursor - 3);
+                        varargs = Space.EMPTY;
                         paramType = ((J.ArrayType) paramType).withDimension(null);
                     }
                     // E.g. foo(String               ... x)
