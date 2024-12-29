@@ -16,8 +16,10 @@
 package org.openrewrite.yaml.trait;
 
 import org.intellij.lang.annotations.Language;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.trait.Reference;
 
@@ -50,25 +52,24 @@ class YamlReferenceTest implements RewriteTest {
         rewriteRun(
           yaml(
             YAML,
-            spec -> spec.path(filename).afterRecipe(doc -> {
-                assertThat(doc.getReferences().getReferences()).satisfiesExactlyInAnyOrder(
-                  ref -> {
-                      assertThat(ref.getKind()).isEqualTo(Reference.Kind.TYPE);
-                      assertThat(ref.getValue()).isEqualTo("java.lang.String");
-                  },
-                  ref -> {
-                      assertThat(ref.getKind()).isEqualTo(Reference.Kind.PACKAGE);
-                      assertThat(ref.getValue()).isEqualTo("java.lang");
-                  },
-                  ref -> {
-                      assertThat(ref.getKind()).isEqualTo(Reference.Kind.TYPE);
-                      assertThat(ref.getValue()).isEqualTo("org.openrewrite.java.DoSomething");
-                  },
-                  ref -> {
-                      assertThat(ref.getKind()).isEqualTo(Reference.Kind.TYPE);
-                      assertThat(ref.getValue()).isEqualTo("org.foo.Bar");
-                  });
-            }))
+            spec -> spec.path(filename).afterRecipe(doc ->
+              assertThat(doc.getReferences().getReferences()).satisfiesExactlyInAnyOrder(
+                ref -> {
+                    assertThat(ref.getKind()).isEqualTo(Reference.Kind.TYPE);
+                    assertThat(ref.getValue()).isEqualTo("java.lang.String");
+                },
+                ref -> {
+                    assertThat(ref.getKind()).isEqualTo(Reference.Kind.PACKAGE);
+                    assertThat(ref.getValue()).isEqualTo("java.lang");
+                },
+                ref -> {
+                    assertThat(ref.getKind()).isEqualTo(Reference.Kind.TYPE);
+                    assertThat(ref.getValue()).isEqualTo("org.openrewrite.java.DoSomething");
+                },
+                ref -> {
+                    assertThat(ref.getKind()).isEqualTo(Reference.Kind.TYPE);
+                    assertThat(ref.getValue()).isEqualTo("org.foo.Bar");
+                })))
         );
     }
 
@@ -90,6 +91,34 @@ class YamlReferenceTest implements RewriteTest {
           yaml(
             YAML,
             spec -> spec.path(filename).afterRecipe(doc -> assertThat(doc.getReferences().getReferences()).isEmpty())
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4817")
+    @Test
+    void endsWithDot() {
+        rewriteRun(
+          yaml(
+            """
+              root:
+                  recipelist:
+                    - org.openrewrite.java.DoSomething:
+                        option: 'org.foo.'
+              """,
+            spec -> spec
+              .path("application.yml")
+              .afterRecipe(doc -> assertThat(doc.getReferences().getReferences())
+                .satisfiesExactlyInAnyOrder(
+                  ref -> {
+                      assertThat(ref.getKind()).isEqualTo(Reference.Kind.TYPE);
+                      assertThat(ref.getValue()).isEqualTo("org.openrewrite.java.DoSomething");
+                  },
+                  ref -> {
+                      assertThat(ref.getKind()).isEqualTo(Reference.Kind.PACKAGE);
+                      assertThat(ref.getValue()).isEqualTo("org.foo.");
+                  })
+              )
           )
         );
     }
