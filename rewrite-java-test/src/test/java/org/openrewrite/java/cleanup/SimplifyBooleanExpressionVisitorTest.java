@@ -766,4 +766,20 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4821")
+    @Test
+    void stringComparisonInBinary() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  private boolean notNullAndNotEqual(String one, String other) {
+                      return one != null && !one.equals(other);
+                  }
+              }
+              """
+          )
+        );
+    }
 }

@@ -17,6 +17,7 @@ package org.openrewrite.text;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.apache.commons.lang3.BooleanUtils;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.binary.Binary;
@@ -91,6 +92,12 @@ public class Find extends Recipe {
     @Nullable
     String filePattern;
 
+    @Option(displayName = "Description",
+            description = "Add the matched value(s) as description on the search result marker.  Default `false`.",
+            required = false)
+    @Nullable
+    Boolean description;
+
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
 
@@ -135,7 +142,8 @@ public class Find extends Recipe {
                 do {
                     int matchStart = matcher.start();
                     snippets.add(snippet(rawText.substring(previousEnd, matchStart)));
-                    snippets.add(SearchResult.found(snippet(rawText.substring(matchStart, matcher.end()))));
+                    String text = rawText.substring(matchStart, matcher.end());
+                    snippets.add(SearchResult.found(snippet(text), BooleanUtils.isTrue(description) ? text : null));
                     previousEnd = matcher.end();
 
                     // For the first match, search backwards
