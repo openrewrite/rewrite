@@ -219,8 +219,8 @@ public class GroovyParserVisitor {
                 }
                 throw new GroovyParsingException(
                         "Failed to parse " + sourcePath + " at cursor position " + cursor +
-                        ". The next 10 characters in the original source are `" +
-                        source.substring(cursor, Math.min(source.length(), cursor + 10)) + "`", t);
+                                ". The next 10 characters in the original source are `" +
+                                source.substring(cursor, Math.min(source.length(), cursor + 10)) + "`", t);
             }
         }
 
@@ -559,21 +559,11 @@ public class GroovyParserVisitor {
                     paramType = visitTypeTree(param.getOriginType());
                 }
 
-                // TODO: propably better implementation, the `paramType` does not handle well when varargs + index operator is used
                 Space varargs = null;
-                if (paramType instanceof J.ArrayType) {
-                    // E.g. foo(String... x)
-                    if (source.startsWith("...", cursor - 3)) {
-                        varargs = Space.EMPTY;
-                        paramType = ((J.ArrayType) paramType).withDimension(null);
-                    }
-                    // E.g. foo(String               ... x)
-                    else if (source.startsWith("...", indexOfNextNonWhitespace(cursor, source))) {
-                        int varargStart = indexOfNextNonWhitespace(cursor, source);
-                        varargs = format(source, cursor, varargStart);
-                        paramType = ((J.ArrayType) paramType).withDimension(null);
-                        cursor = varargStart + 3;
-                    }
+                if (paramType instanceof J.ArrayType && isVarargs()) {
+                    int varargStart = indexOfNextNonWhitespace(cursor, source);
+                    varargs = format(source, cursor, varargStart);
+                    cursor = varargStart + 3;
                 }
 
                 JRightPadded<J.VariableDeclarations.NamedVariable> paramName = JRightPadded.build(
@@ -840,9 +830,9 @@ public class GroovyParserVisitor {
             //     https://docs.groovy-lang.org/latest/html/documentation/#_named_parameters_2
             // When named parameters are in use they may appear before, after, or intermixed with any positional arguments
             if (unparsedArgs.size() > 1 && unparsedArgs.get(0) instanceof MapExpression &&
-                (unparsedArgs.get(0).getLastLineNumber() > unparsedArgs.get(1).getLastLineNumber() ||
-                 (unparsedArgs.get(0).getLastLineNumber() == unparsedArgs.get(1).getLastLineNumber() &&
-                  unparsedArgs.get(0).getLastColumnNumber() > unparsedArgs.get(1).getLastColumnNumber()))) {
+                    (unparsedArgs.get(0).getLastLineNumber() > unparsedArgs.get(1).getLastLineNumber() ||
+                            (unparsedArgs.get(0).getLastLineNumber() == unparsedArgs.get(1).getLastLineNumber() &&
+                                    unparsedArgs.get(0).getLastColumnNumber() > unparsedArgs.get(1).getLastColumnNumber()))) {
 
                 // Figure out the source-code ordering of the expressions
                 MapExpression namedArgExpressions = (MapExpression) unparsedArgs.get(0);
@@ -1118,7 +1108,7 @@ public class GroovyParserVisitor {
                 J expr = visit(statement);
                 if (i == blockStatements.size() - 1 && (expr instanceof Expression)) {
                     if (parent instanceof ClosureExpression || (parent instanceof MethodNode &&
-                                                                JavaType.Primitive.Void != typeMapping.type(((MethodNode) parent).getReturnType()))) {
+                            JavaType.Primitive.Void != typeMapping.type(((MethodNode) parent).getReturnType()))) {
                         expr = new J.Return(randomId(), expr.getPrefix(), Markers.EMPTY,
                                 expr.withPrefix(EMPTY));
                         expr = expr.withMarkers(expr.getMarkers().add(new ImplicitReturn(randomId())));
@@ -1158,8 +1148,8 @@ public class GroovyParserVisitor {
             // Groovy allows catch variables to omit their type, shorthand for being of type java.lang.Exception
             // Can't use isSynthetic() here because groovy doesn't record the line number on the Parameter
             if ("java.lang.Exception".equals(param.getType().getName()) &&
-                !source.startsWith("Exception", cursor) &&
-                !source.startsWith("java.lang.Exception", cursor)) {
+                    !source.startsWith("Exception", cursor) &&
+                    !source.startsWith("java.lang.Exception", cursor)) {
                 paramType = new J.Identifier(randomId(), paramPrefix, Markers.EMPTY, emptyList(), "",
                         JavaType.ShallowClass.build("java.lang.Exception"), null);
             } else {
@@ -1977,7 +1967,7 @@ public class GroovyParserVisitor {
         public void visitReturnStatement(ReturnStatement return_) {
             Space fmt = sourceBefore("return");
             if (return_.getExpression() instanceof ConstantExpression && isSynthetic(return_.getExpression()) &&
-                (((ConstantExpression) return_.getExpression()).getValue() == null)) {
+                    (((ConstantExpression) return_.getExpression()).getValue() == null)) {
                 queue.add(new J.Return(randomId(), fmt, Markers.EMPTY, null));
             } else {
                 queue.add(new J.Return(randomId(), fmt, Markers.EMPTY, visit(return_.getExpression())));
@@ -2478,11 +2468,10 @@ public class GroovyParserVisitor {
         }
         Space prefix = whitespace();
         TypeTree elemType = typeTree(typeTree);
-        JLeftPadded<Space> dimension = padLeft(sourceBefore("["), sourceBefore("]"));
         return new J.ArrayType(randomId(), prefix, Markers.EMPTY,
                 count == 1 ? elemType : mapDimensions(elemType, classNode.getComponentType()),
                 null,
-                dimension,
+                isVarargs() ? null : padLeft(sourceBefore("["), sourceBefore("]")),
                 typeMapping.type(classNode));
     }
 
@@ -2501,6 +2490,10 @@ public class GroovyParserVisitor {
             );
         }
         return baseType;
+    }
+
+    private boolean isVarargs() {
+        return source.startsWith("...", indexOfNextNonWhitespace(cursor, source));
     }
 
     /**
@@ -2566,10 +2559,10 @@ public class GroovyParserVisitor {
     }
 
     /**
-     * @param childLineNumber the beginning line number of the first sub node
+     * @param childLineNumber  the beginning line number of the first sub node
      * @param parentLineNumber the beginning line number of the parent node
-     * @param childColumn the column on the {@code childLineNumber} line where the sub node starts
-     * @param parentColumn the column on the {@code parentLineNumber} line where the parent node starts
+     * @param childColumn      the column on the {@code childLineNumber} line where the sub node starts
+     * @param parentColumn     the column on the {@code parentLineNumber} line where the parent node starts
      * @return the level of parenthesis parsed from the source
      */
     private int determineParenthesisLevel(int childLineNumber, int parentLineNumber, int childColumn, int parentColumn) {
@@ -2753,6 +2746,11 @@ public class GroovyParserVisitor {
             }
         }
         String result = source.substring(cursor, i);
+        // remove possible varargs operator
+        if (result.endsWith("...")) {
+            result = result.substring(0, result.length() - 3);
+            i = i - 3;
+        }
         cursor += i - cursor;
         return result;
     }
