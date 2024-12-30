@@ -2468,10 +2468,11 @@ public class GroovyParserVisitor {
         }
         Space prefix = whitespace();
         TypeTree elemType = typeTree(typeTree);
+        JLeftPadded<Space> dimension = isVarargs() ? null : padLeft(sourceBefore("["), sourceBefore("]"));
         return new J.ArrayType(randomId(), prefix, Markers.EMPTY,
                 count == 1 ? elemType : mapDimensions(elemType, classNode.getComponentType()),
                 null,
-                isVarargs() ? null : padLeft(sourceBefore("["), sourceBefore("]")),
+                dimension,
                 typeMapping.type(classNode));
     }
 

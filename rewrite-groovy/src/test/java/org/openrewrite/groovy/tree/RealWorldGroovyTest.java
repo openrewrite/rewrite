@@ -88,19 +88,6 @@ class RealWorldGroovyTest implements RewriteTest {
     }
 
     @Test
-    void moveIt() {
-        rewriteRun(
-          groovy(
-            """
-              file("${rootDir}/spring-boot-tests/spring-boot-smoke-tests").eachDirMatch(~/spring-boot-smoke-test.*/) {
-                  //include "spring-boot-tests:spring-boot-smoke-tests:${it.name}"
-              }
-              """
-          )
-        );
-    }
-
-    @Test
     @Issue("https://github.com/spring-projects/spring-boot/blob/main/spring-boot-project/spring-boot-tools/spring-boot-cli/src/test/resources/classloader-test-app.groovy")
     void springBootClassloaderTestApp() {
         rewriteRun(
