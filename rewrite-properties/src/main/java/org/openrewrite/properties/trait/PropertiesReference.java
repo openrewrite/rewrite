@@ -66,7 +66,9 @@ public class PropertiesReference implements Reference {
         private static final Predicate<String> applicationPropertiesMatcher = Pattern.compile("^application(-\\w+)?\\.properties$").asPredicate();
         private static final SimpleTraitMatcher<PropertiesReference> matcher = new SimpleTraitMatcher<PropertiesReference>() {
             private final Predicate<String> javaFullyQualifiedTypeMatcher = Pattern.compile(
-                    "\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*(?:\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*)*").asPredicate();
+                    "^\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*" +
+                            "\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*" +
+                            "(?:\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*)*$").asPredicate();
 
             @Override
             protected @Nullable PropertiesReference test(Cursor cursor) {

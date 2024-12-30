@@ -38,7 +38,9 @@ public class YamlApplicationConfigReference extends YamlReference {
         private static final Predicate<String> applicationPropertiesMatcher = Pattern.compile("^application(-\\w+)?\\.(yaml|yml)$").asPredicate();
         private static final SimpleTraitMatcher<YamlReference> matcher = new SimpleTraitMatcher<YamlReference>() {
             private final Predicate<String> javaFullyQualifiedTypePattern = Pattern.compile(
-                            "\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*(?:\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*)*").asPredicate();
+                            "^\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*" +
+                                    "\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*" +
+                                    "(?:\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*)*$").asPredicate();
 
             @Override
             protected @Nullable YamlReference test(Cursor cursor) {

@@ -108,16 +108,11 @@ class YamlReferenceTest implements RewriteTest {
               """,
             spec -> spec
               .path("application.yml")
-              .afterRecipe(doc -> assertThat(doc.getReferences().getReferences())
-                .satisfiesExactlyInAnyOrder(
-                  ref -> {
-                      assertThat(ref.getKind()).isEqualTo(Reference.Kind.TYPE);
-                      assertThat(ref.getValue()).isEqualTo("org.openrewrite.java.DoSomething");
-                  },
-                  ref -> {
-                      assertThat(ref.getKind()).isEqualTo(Reference.Kind.PACKAGE);
-                      assertThat(ref.getValue()).isEqualTo("org.foo.");
-                  })
+              .afterRecipe(doc -> assertThat(doc.getReferences().getReferences()).singleElement().satisfies(
+                ref -> {
+                    assertThat(ref.getKind()).isEqualTo(Reference.Kind.TYPE);
+                    assertThat(ref.getValue()).isEqualTo("org.openrewrite.java.DoSomething");
+                })
               )
           )
         );
