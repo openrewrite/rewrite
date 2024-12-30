@@ -88,7 +88,7 @@ class RealWorldGroovyTest implements RewriteTest {
     }
 
     @Test
-    @Issue("https://github.com/spring-projects/spring-boot/blob/main/spring-boot-project/spring-boot-tools/spring-boot-cli/src/test/resources/classloader-test-app.groovy")
+    @Issue("https://github.com/spring-projects/spring-boot/blob/v3.4.1/spring-boot-project/spring-boot-tools/spring-boot-cli/src/test/resources/classloader-test-app.groovy")
     void springBootClassloaderTestApp() {
         rewriteRun(
           groovy(
@@ -111,7 +111,7 @@ class RealWorldGroovyTest implements RewriteTest {
     }
 
     @Test
-    @Issue("https://github.com/spring-projects/spring-ldap/blob/main/buildSrc/src/main/groovy/io/spring/gradle/convention/JavadocOptionsPlugin.groovy")
+    @Issue("https://github.com/spring-projects/spring-ldap/blob/v3.4.1/buildSrc/src/main/groovy/io/spring/gradle/convention/JavadocOptionsPlugin.groovy")
     void springLdapJavadocOptionsPlugin() {
         rewriteRun(
           groovy(
@@ -136,7 +136,7 @@ class RealWorldGroovyTest implements RewriteTest {
 
     @Test
     @ExpectedToFail("Anonymous inner class is not yet supported") // https://groovy-lang.org/objectorientation.html#_anonymous_inner_class
-    @Issue("https://github.com/spring-projects/spring-ldap/blob/main/buildSrc/src/test/resources/samples/integrationtest/withgroovy/src/integration-test/groovy/sample/TheTest.groovy")
+    @Issue("https://github.com/spring-projects/spring-ldap/blob/v3.4.1/buildSrc/src/test/resources/samples/integrationtest/withgroovy/src/integration-test/groovy/sample/TheTest.groovy")
     void springLdapTheTest() {
         rewriteRun(
           groovy(
@@ -161,7 +161,7 @@ class RealWorldGroovyTest implements RewriteTest {
     }
 
     @Test
-    @Issue("https://github.com/spring-projects/spring-session-data-geode/blob/main/buildSrc/src/main/groovy/io/spring/gradle/convention/SchemaZipPlugin.groovy")
+    @Issue("https://github.com/spring-projects/spring-session-data-geode/blob/v3.4.1/buildSrc/src/main/groovy/io/spring/gradle/convention/SchemaZipPlugin.groovy")
     void springTestDataGeodeSchemaZipPlugin() {
         rewriteRun(
           groovy(
@@ -230,7 +230,7 @@ class RealWorldGroovyTest implements RewriteTest {
     }
 
     @Test
-    @Issue("https://github.com/spring-projects/spring-webflow/blob/main/gradle/docs.gradle")
+    @Issue("https://github.com/spring-projects/spring-webflow/blob/v3.4.1/gradle/docs.gradle")
     void springWebflowGradleDocs() {
         rewriteRun(
           groovy(
