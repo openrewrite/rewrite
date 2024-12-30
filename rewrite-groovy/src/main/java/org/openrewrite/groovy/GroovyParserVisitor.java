@@ -560,7 +560,7 @@ public class GroovyParserVisitor {
                 }
 
                 Space varargs = null;
-                if (paramType instanceof J.ArrayType && isVarargs()) {
+                if (paramType instanceof J.ArrayType && hasVarargs()) {
                     int varargStart = indexOfNextNonWhitespace(cursor, source);
                     varargs = format(source, cursor, varargStart);
                     cursor = varargStart + 3;
@@ -2468,7 +2468,7 @@ public class GroovyParserVisitor {
         }
         Space prefix = whitespace();
         TypeTree elemType = typeTree(typeTree);
-        JLeftPadded<Space> dimension = isVarargs() ? null : padLeft(sourceBefore("["), sourceBefore("]"));
+        JLeftPadded<Space> dimension = hasVarargs() ? null : padLeft(sourceBefore("["), sourceBefore("]"));
         return new J.ArrayType(randomId(), prefix, Markers.EMPTY,
                 count == 1 ? elemType : mapDimensions(elemType, classNode.getComponentType()),
                 null,
@@ -2493,7 +2493,7 @@ public class GroovyParserVisitor {
         return baseType;
     }
 
-    private boolean isVarargs() {
+    private boolean hasVarargs() {
         return source.startsWith("...", indexOfNextNonWhitespace(cursor, source));
     }
 
