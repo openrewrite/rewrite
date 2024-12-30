@@ -28,6 +28,7 @@ import static org.openrewrite.groovy.Assertions.groovy;
 class RealWorldGroovyTest implements RewriteTest {
 
     @Test
+    @ExpectedToFail("Pattern operator is not yet supported") // https://groovy-lang.org/operators.html#_pattern_operator
     @Issue("https://github.com/spring-projects/spring-boot/blob/main/settings.gradle")
     void springBootSettingsGradle() {
         rewriteRun(
@@ -80,6 +81,19 @@ class RealWorldGroovyTest implements RewriteTest {
               
               file("${rootDir}/spring-boot-tests/spring-boot-smoke-tests").eachDirMatch(~/spring-boot-smoke-test.*/) {
                   include "spring-boot-tests:spring-boot-smoke-tests:${it.name}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void moveIt() {
+        rewriteRun(
+          groovy(
+            """
+              file("${rootDir}/spring-boot-tests/spring-boot-smoke-tests").eachDirMatch(~/spring-boot-smoke-test.*/) {
+                  //include "spring-boot-tests:spring-boot-smoke-tests:${it.name}"
               }
               """
           )
