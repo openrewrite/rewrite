@@ -2741,16 +2741,12 @@ public class GroovyParserVisitor {
         int i = cursor;
         for (; i < source.length(); i++) {
             char c = source.charAt(i);
-            if (!(Character.isJavaIdentifierPart(c) || c == '.' || c == '*')) {
+            boolean isVarargs = c == '.' && source.charAt(i + 1) == '.' && source.charAt(i + 2) == '.';
+            if (!(Character.isJavaIdentifierPart(c) || c == '.' || c == '*') || isVarargs) {
                 break;
             }
         }
         String result = source.substring(cursor, i);
-        // remove possible varargs operator
-        if (result.endsWith("...")) {
-            result = result.substring(0, result.length() - 3);
-            i = i - 3;
-        }
         cursor += i - cursor;
         return result;
     }
