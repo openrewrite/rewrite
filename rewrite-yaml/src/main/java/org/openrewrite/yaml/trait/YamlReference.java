@@ -78,7 +78,7 @@ public class YamlReference implements Reference {
         }
 
         private Kind determineKind(String value) {
-            return Character.isUpperCase(value.charAt(value.lastIndexOf('.') + 1)) ? Kind.TYPE : Kind.PACKAGE;
+            return !value.endsWith(".") && Character.isUpperCase(value.charAt(value.lastIndexOf('.') + 1)) ? Kind.TYPE : Kind.PACKAGE;
         }
     }
 
