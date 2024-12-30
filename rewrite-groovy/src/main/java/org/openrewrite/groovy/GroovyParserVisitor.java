@@ -830,9 +830,9 @@ public class GroovyParserVisitor {
             //     https://docs.groovy-lang.org/latest/html/documentation/#_named_parameters_2
             // When named parameters are in use they may appear before, after, or intermixed with any positional arguments
             if (unparsedArgs.size() > 1 && unparsedArgs.get(0) instanceof MapExpression &&
-                 (unparsedArgs.get(0).getLastLineNumber() > unparsedArgs.get(1).getLastLineNumber() ||
-                  (unparsedArgs.get(0).getLastLineNumber() == unparsedArgs.get(1).getLastLineNumber() &&
-                   unparsedArgs.get(0).getLastColumnNumber() > unparsedArgs.get(1).getLastColumnNumber()))) {
+                (unparsedArgs.get(0).getLastLineNumber() > unparsedArgs.get(1).getLastLineNumber() ||
+                 (unparsedArgs.get(0).getLastLineNumber() == unparsedArgs.get(1).getLastLineNumber() &&
+                  unparsedArgs.get(0).getLastColumnNumber() > unparsedArgs.get(1).getLastColumnNumber()))) {
 
                 // Figure out the source-code ordering of the expressions
                 MapExpression namedArgExpressions = (MapExpression) unparsedArgs.get(0);
