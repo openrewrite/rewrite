@@ -1917,8 +1917,7 @@ public class GroovyParserVisitor {
         public void visitAttributeExpression(AttributeExpression attr) {
             queue.add(insideParentheses(attr, fmt -> {
                 Expression target = visit(attr.getObjectExpression());
-                Space beforeDot = attr.isSafe() ? sourceBefore("?.") :
-                        sourceBefore(attr.isSpreadSafe() ? "*." : ".");
+                Space beforeDot = attr.isSafe() ? sourceBefore("?.") : sourceBefore(attr.isSpreadSafe() ? "*." : ".");
                 J name = visit(attr.getProperty());
                 if (name instanceof J.Literal) {
                     String nameStr = ((J.Literal) name).getValueSource();
@@ -2588,7 +2587,7 @@ public class GroovyParserVisitor {
             }
         }
         cursor = saveCursor;
-        return count;
+        return Math.max(count, 0);
     }
 
     private int getDelimiterLength() {
@@ -2653,7 +2652,6 @@ public class GroovyParserVisitor {
 
         int saveCursor = cursor;
         Space fmt = whitespace();
-        // TODO: remove this? At least use `getModifiers` function
         if (cursor < source.length() && source.startsWith("def", cursor)) {
             cursor += 3;
             return new J.Identifier(randomId(), fmt, Markers.EMPTY, emptyList(), "def",
@@ -2742,7 +2740,7 @@ public class GroovyParserVisitor {
         int i = cursor;
         for (; i < source.length(); i++) {
             char c = source.charAt(i);
-            boolean isVarargs = c == '.' && source.charAt(i + 1) == '.' && source.charAt(i + 2) == '.';
+            boolean isVarargs = c == '.' && source.length() > (i + 1) && source.charAt(i + 1) == '.' && source.charAt(i + 2) == '.';
             if (!(Character.isJavaIdentifierPart(c) || c == '.' || c == '*') || isVarargs) {
                 break;
             }
