@@ -33,7 +33,7 @@ import static org.assertj.core.api.CollectionAssert.assertThatCollection;
 import static org.openrewrite.java.Assertions.java;
 
 @SuppressWarnings({"CaughtExceptionImmediatelyRethrown", "LombokGetterMayBeUsed", "LombokSetterMayBeUsed", "DefaultAnnotationParam", "NotNullFieldNotInitialized", "ProtectedMemberInFinalClass", "WriteOnlyObject", "ConcatenationWithEmptyString"})
-@EnabledOnJre(JRE.JAVA_17)
+@EnabledOnJre({JRE.JAVA_11, JRE.JAVA_17})
 class LombokTest implements RewriteTest {
 
     @BeforeAll
@@ -426,7 +426,7 @@ class LombokTest implements RewriteTest {
                   Map<String, String> map;
                   void m() {
                       log.info("string = " + string);
-                      log.info(() -> "map = %s".formatted(map));
+                      log.info(() -> String.format("map = %s", map));
                   }
               }
               """
