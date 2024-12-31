@@ -2740,7 +2740,7 @@ public class GroovyParserVisitor {
         int i = cursor;
         for (; i < source.length(); i++) {
             char c = source.charAt(i);
-            boolean isVarargs = source.length() > (i + 1) && c == '.' && source.charAt(i + 1) == '.' && source.charAt(i + 2) == '.';
+            boolean isVarargs = source.length() > (i + 2) && c == '.' && source.charAt(i + 1) == '.' && source.charAt(i + 2) == '.';
             if (!(Character.isJavaIdentifierPart(c) || c == '.' || c == '*') || isVarargs) {
                 break;
             }
