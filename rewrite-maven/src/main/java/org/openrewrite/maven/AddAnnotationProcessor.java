@@ -85,8 +85,11 @@ public class AddAnnotationProcessor extends Recipe {
                                             artifactId.equals(child.getChildValue("artifactId").orElse(null))) {
                                             if (!version.equals(child.getChildValue("version").orElse(null))) {
                                                 String oldVersion = child.getChildValue("version").orElse("");
-                                                VersionComparator comparator = Semver.validate(oldVersion, null).getValue();
-                                                if (comparator.compare(version, oldVersion) > 0) {
+                                                String lookupVersion = oldVersion.startsWith("${") ?
+                                                    getResolutionResult().getPom().getValue(oldVersion.trim()) :
+                                                    oldVersion;
+                                                VersionComparator comparator = Semver.validate(lookupVersion, null).getValue();
+                                                if (comparator.compare(version, lookupVersion) > 0) {
                                                     List<Xml.Tag> tags = tg.getChildren();
                                                     tags.set(i, child.withChildValue("version", version));
                                                     return tg.withContent(tags);
