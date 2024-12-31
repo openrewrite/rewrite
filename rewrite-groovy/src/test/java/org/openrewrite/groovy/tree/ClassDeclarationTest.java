@@ -357,7 +357,6 @@ class ClassDeclarationTest implements RewriteTest {
     }
 
     @Test
-    @ExpectedToFail("Java style class argument is not yet supported") // https://groovy-lang.org/style-guide.html#_classes_as_first_class_citizens
     void useClassAsArgumentJavaStyle() {
         rewriteRun(
           groovy(
