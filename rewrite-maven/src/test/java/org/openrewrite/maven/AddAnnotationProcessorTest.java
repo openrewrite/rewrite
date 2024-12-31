@@ -222,7 +222,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
                   <artifactId>my-app</artifactId>
                   <version>1</version>
                   <properties>
-                      <version.lombok.mapstruct.binding>0.1.0</version.lombok.mapstruct.binding>
+                      <version.lombok.mapstruct.binding>0.2.0</version.lombok.mapstruct.binding>
                   </properties>
                   <build>
                       <plugins>
@@ -233,7 +233,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
                                       <path>
                                           <groupId>org.projectlombok</groupId>
                                           <artifactId>lombok-mapstruct-binding</artifactId>
-                                          <version>0.2.0</version>
+                                          <version>${version.lombok.mapstruct.binding}</version>
                                       </path>
                                   </annotationProcessorPaths>
                               </configuration>

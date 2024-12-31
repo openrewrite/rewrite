@@ -28,6 +28,7 @@ import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.openrewrite.maven.trait.Traits.mavenPlugin;
 
@@ -49,7 +50,7 @@ public class AddAnnotationProcessor extends Recipe {
 
     @Option(displayName = "Version",
             description = "The third part of a coordinate 'org.projectlombok:lombok-mapstruct-binding:0.2.0' of the processor to add. " +
-                          "Note that an exact version is expected",
+                    "Note that an exact version is expected",
             example = "0.2.0")
     String version;
 
@@ -61,8 +62,8 @@ public class AddAnnotationProcessor extends Recipe {
     @Override
     public String getDescription() {
         return "Add an annotation processor to the maven compiler plugin. Will not do anything if it already exists. " +
-               "Also doesn't add anything when no other annotation processors are defined yet. " +
-               "(Perhaps `ChangePluginConfiguration` can be used).";
+                "Also doesn't add anything when no other annotation processors are defined yet. " +
+                "(Perhaps `ChangePluginConfiguration` can be used).";
     }
 
     @Override
@@ -73,8 +74,9 @@ public class AddAnnotationProcessor extends Recipe {
                 Xml.Tag plugins = (Xml.Tag) super.visitTag(tag, ctx);
                 plugins = (Xml.Tag) mavenPlugin().asVisitor(plugin -> {
                     if (MAVEN_COMPILER_PLUGIN_GROUP_ID.equals(plugin.getGroupId()) &&
-                        MAVEN_COMPILER_PLUGIN_ARTIFACT_ID.equals(plugin.getArtifactId())) {
-                        return new XmlIsoVisitor<ExecutionContext>() {
+                            MAVEN_COMPILER_PLUGIN_ARTIFACT_ID.equals(plugin.getArtifactId())) {
+                        AtomicReference<TreeVisitor<?, ExecutionContext>> afterVisitor = new AtomicReference<>();
+                        Xml.Tag modifiedPlugin = new XmlIsoVisitor<ExecutionContext>() {
                             @Override
                             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                                 Xml.Tag tg = super.visitTag(tag, ctx);
@@ -82,17 +84,22 @@ public class AddAnnotationProcessor extends Recipe {
                                     for (int i = 0; i < tg.getChildren().size(); i++) {
                                         Xml.Tag child = tg.getChildren().get(i);
                                         if (groupId.equals(child.getChildValue("groupId").orElse(null)) &&
-                                            artifactId.equals(child.getChildValue("artifactId").orElse(null))) {
+                                                artifactId.equals(child.getChildValue("artifactId").orElse(null))) {
                                             if (!version.equals(child.getChildValue("version").orElse(null))) {
                                                 String oldVersion = child.getChildValue("version").orElse("");
-                                                String lookupVersion = oldVersion.startsWith("${") ?
-                                                    getResolutionResult().getPom().getValue(oldVersion.trim()) :
-                                                    oldVersion;
+                                                boolean oldVersionUsesProperty = oldVersion.startsWith("${");
+                                                String lookupVersion = oldVersionUsesProperty ?
+                                                        getResolutionResult().getPom().getValue(oldVersion.trim()) :
+                                                        oldVersion;
                                                 VersionComparator comparator = Semver.validate(lookupVersion, null).getValue();
                                                 if (comparator.compare(version, lookupVersion) > 0) {
-                                                    List<Xml.Tag> tags = tg.getChildren();
-                                                    tags.set(i, child.withChildValue("version", version));
-                                                    return tg.withContent(tags);
+                                                    if (oldVersionUsesProperty) {
+                                                        afterVisitor.set(new ChangePropertyValue(oldVersion, version, null, null).getVisitor());
+                                                    } else {
+                                                        List<Xml.Tag> tags = tg.getChildren();
+                                                        tags.set(i, child.withChildValue("version", version));
+                                                        return tg.withContent(tags);
+                                                    }
                                                 }
                                             }
                                             return tg;
@@ -105,6 +112,10 @@ public class AddAnnotationProcessor extends Recipe {
                                 return tg;
                             }
                         }.visitTag(plugin.getTree(), ctx);
+                        if (afterVisitor.get() != null) {
+                            doAfterVisit(afterVisitor.get());
+                        }
+                        return modifiedPlugin;
                     }
                     return plugin.getTree();
                 }).visitNonNull(plugins, 0);
