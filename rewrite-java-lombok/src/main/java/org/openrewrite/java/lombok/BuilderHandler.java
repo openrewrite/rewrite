@@ -103,7 +103,7 @@ public class BuilderHandler extends JavacAnnotationHandler<Builder> {
         ListBuffer<Integer> indexes = new ListBuffer<>();
         for (int i = 0; i < nodes.size(); i++) {
             JavacNode node = nodes.get(i);
-            if (node.getKind().equals(ANNOTATION) && "lombok.Builder.Default".equals(node.get().type.toString())) {
+            if (node.getKind() == ANNOTATION && "lombok.Builder.Default".equals(node.get().type.toString())) {
                 indexes.add(i);
             }
         }
