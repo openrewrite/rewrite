@@ -86,6 +86,28 @@ class AssignmentTest implements RewriteTest {
     }
 
     @Test
+    void classAssignment() {
+        rewriteRun(
+          groovy(
+            """
+              def s = String
+              """
+          )
+        );
+    }
+
+    @Test
+    void classAssignmentJavaStyle() {
+        rewriteRun(
+          groovy(
+            """
+              def s = String.class
+              """
+          )
+        );
+    }
+
+    @Test
     void unaryMinus() {
         rewriteRun(
           groovy(

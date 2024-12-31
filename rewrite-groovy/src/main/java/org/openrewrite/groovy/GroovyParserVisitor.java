@@ -915,9 +915,14 @@ public class GroovyParserVisitor {
         @Override
         public void visitClassExpression(ClassExpression clazz) {
             String unresolvedName = clazz.getType().getUnresolvedName().replace('$', '.');
+            Space space = sourceBefore(unresolvedName);
+            if (source.substring(cursor).startsWith(".class")) {
+                unresolvedName += ".class";
+                cursor += 6;
+            }
             queue.add(TypeTree.build(unresolvedName)
                     .withType(typeMapping.type(clazz.getType()))
-                    .withPrefix(sourceBefore(unresolvedName)));
+                    .withPrefix(space));
         }
 
         @Override
