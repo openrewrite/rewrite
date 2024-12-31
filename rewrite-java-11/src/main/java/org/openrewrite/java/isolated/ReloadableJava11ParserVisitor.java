@@ -992,7 +992,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                     convert(dim, t -> sourceBefore("]"))));
         }
 
-        while(true) {
+        while (true) {
             int beginBracket = indexOfNextNonWhitespace(cursor, source);
             if (source.charAt(beginBracket) == '[') {
                 int endBracket = indexOfNextNonWhitespace(beginBracket + 1, source);
@@ -1038,8 +1038,8 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                             singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
                             convertAll(node.getArguments(), commaDelim, t -> sourceBefore(")")), Markers.EMPTY);
         } else {
-            args = JContainer.empty();
-            args = args.withMarkers(args.getMarkers().add(new OmitParentheses(randomId())));
+            args = JContainer.<Expression>empty()
+                    .withMarkers(Markers.build(singletonList(new OmitParentheses(randomId()))));
         }
 
         J.Block body = null;
@@ -1137,7 +1137,8 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
     @Override
     public J visitReturn(ReturnTree node, Space fmt) {
         skip("return");
-        return new J.Return(randomId(), fmt, Markers.EMPTY, convert(node.getExpression()));
+        Expression expression = convert(node.getExpression());
+        return new J.Return(randomId(), fmt, Markers.EMPTY, expression);
     }
 
     @Override
@@ -1367,7 +1368,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                 fullName += "." + part;
 
                 int endOfPrefix = indexOfNextNonWhitespace(0, part);
-                Space identFmt = endOfPrefix > 0 ? format(part.substring(0, endOfPrefix)) : EMPTY;
+                Space identFmt = endOfPrefix > 0 ? format(part, 0, endOfPrefix) : EMPTY;
 
                 Matcher whitespaceSuffix = whitespaceSuffixPattern.matcher(part);
                 //noinspection ResultOfMethodCallIgnored
@@ -1458,7 +1459,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
             int endPos = jcVariableDecl.getEndPosition(endPosTable);
 
             if (startPos == endPos) {
-                endPos = startPos + 1;
+                endPos = startPos + 1; // For cases where the error node is a single character like "/"
             }
             String erroneousNode = source.substring(startPos, endPos);
             return new J.Erroneous(
@@ -1494,12 +1495,12 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
             } else {
                 boolean lombokVal = isLombokVal(node);
                 typeExpr = new J.Identifier(randomId(),
-                    sourceBefore(lombokVal ? "val" : "var"),
-                    Markers.build(singletonList(JavaVarKeyword.build())),
-                    emptyList(),
-                    lombokVal ? "val" : "var",
-                    typeMapping.type(vartype),
-                    null);
+                        sourceBefore(lombokVal ? "val" : "var"),
+                        Markers.build(singletonList(JavaVarKeyword.build())),
+                        emptyList(),
+                        lombokVal ? "val" : "var",
+                        typeMapping.type(vartype),
+                        null);
             }
         } else if (vartype instanceof JCArrayTypeTree) {
             JCExpression elementType = vartype;
@@ -1569,15 +1570,15 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
 
     private List<JLeftPadded<Space>> arrayDimensions() {
         List<JLeftPadded<Space>> dims = null;
-        while(true) {
+        while (true) {
             int beginBracket = indexOfNextNonWhitespace(cursor, source);
             if (source.charAt(beginBracket) == '[') {
                 int endBracket = indexOfNextNonWhitespace(beginBracket + 1, source);
-                if(dims == null) {
+                if (dims == null) {
                     dims = new ArrayList<>(2);
                 }
-                dims.add(padLeft(format(source.substring(cursor, beginBracket)),
-                        format(source.substring(beginBracket + 1, endBracket))));
+                dims.add(padLeft(format(source, cursor, beginBracket),
+                        format(source, beginBracket + 1, endBracket)));
                 cursor = endBracket + 1;
             } else {
                 break;
@@ -1776,7 +1777,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
         if (t instanceof JCExpressionStatement) {
             ExpressionTree expTree = ((ExpressionStatementTree) t).getExpression();
             if (expTree instanceof ErroneousTree) {
-                return Space.build(source.substring(((JCTree) expTree).getEndPosition(endPosTable),((JCTree) t).getEndPosition(endPosTable)), Collections.emptyList());
+                return Space.build(source.substring(((JCTree) expTree).getEndPosition(endPosTable), ((JCTree) t).getEndPosition(endPosTable)), Collections.emptyList());
             } else {
                 return sourceBefore(";");
             }
@@ -1932,9 +1933,9 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
             cursor += untilDelim.length();
             return EMPTY;
         }
-        String prefix = source.substring(cursor, delimIndex);
-        cursor += prefix.length() + untilDelim.length(); // advance past the delimiter
-        return Space.format(prefix);
+        Space space = format(source, cursor, delimIndex);
+        cursor = delimIndex + untilDelim.length(); // advance past the delimiter
+        return space;
     }
 
     private <T> JRightPadded<T> padRight(T tree, Space right) {
@@ -1961,7 +1962,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                     char c2 = source.charAt(delimIndex + 1);
                     switch (c1) {
                         case '/':
-                            switch(c2) {
+                            switch (c2) {
                                 case '/':
                                     inSingleLineComment = true;
                                     delimIndex++;
@@ -1973,7 +1974,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                             }
                             break;
                         case '*':
-                            if(c2 == '/') {
+                            if (c2 == '/') {
                                 inMultiLineComment = false;
                                 delimIndex++;
                                 continue;
@@ -2005,9 +2006,9 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
         if (nextNonWhitespace == cursor) {
             return EMPTY;
         }
-        String prefix = source.substring(cursor, nextNonWhitespace);
-        cursor += prefix.length();
-        return format(prefix);
+        Space space = format(source, cursor, nextNonWhitespace);
+        cursor = nextNonWhitespace;
+        return space;
     }
 
     private String skip(@Nullable String token) {
@@ -2088,7 +2089,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                 } else {
                     leadingAnnotations.add(annotation);
                 }
-                i = cursor -1;
+                i = cursor - 1;
                 lastAnnotationPosition = cursor;
                 continue;
             }

@@ -44,6 +44,7 @@ import org.openrewrite.style.NamedStyles;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.processing.Processor;
 import javax.tools.JavaFileManager;
@@ -87,13 +88,14 @@ public class ReloadableJava11Parser implements JavaParser {
     private final Collection<NamedStyles> styles;
     private final List<Processor> annotationProcessors;
 
-    private ReloadableJava11Parser(boolean logCompilationWarningsAndErrors,
-                                   @Nullable Collection<Path> classpath,
-                                   Collection<byte[]> classBytesClasspath,
-                                   @Nullable Collection<Input> dependsOn,
-                                   Charset charset,
-                                   Collection<NamedStyles> styles,
-                                   JavaTypeCache typeCache) {
+    private ReloadableJava11Parser(
+            boolean logCompilationWarningsAndErrors,
+            @Nullable Collection<Path> classpath,
+            Collection<byte[]> classBytesClasspath,
+            @Nullable Collection<Input> dependsOn,
+            Charset charset,
+            Collection<NamedStyles> styles,
+            JavaTypeCache typeCache) {
         this.classpath = classpath;
         this.dependsOn = dependsOn;
         this.styles = styles;
@@ -117,7 +119,7 @@ public class ReloadableJava11Parser implements JavaParser {
 
         LOMBOK:
         if (System.getenv().getOrDefault("REWRITE_LOMBOK", System.getProperty("rewrite.lombok")) != null &&
-            classpath != null && classpath.stream().anyMatch(it -> it.toString().contains("lombok"))) {
+                classpath != null && classpath.stream().anyMatch(it -> it.toString().contains("lombok"))) {
             Processor lombokProcessor = null;
             try {
                 // https://projectlombok.org/contributing/lombok-execution-path
@@ -149,19 +151,19 @@ public class ReloadableJava11Parser implements JavaParser {
 
                 Class<?> shadowLoaderClass = Class.forName("lombok.launch.ShadowClassLoader", true, getClass().getClassLoader());
                 Constructor<?> shadowLoaderConstructor = shadowLoaderClass.getDeclaredConstructor(
-                    Class.forName("java.lang.ClassLoader"),
-                    Class.forName("java.lang.String"),
-                    Class.forName("java.lang.String"),
-                    Class.forName("java.util.List"),
-                    Class.forName("java.util.List"));
+                        Class.forName("java.lang.ClassLoader"),
+                        Class.forName("java.lang.String"),
+                        Class.forName("java.lang.String"),
+                        Class.forName("java.util.List"),
+                        Class.forName("java.util.List"));
                 shadowLoaderConstructor.setAccessible(true);
 
                 ClassLoader lombokShadowLoader = (ClassLoader) shadowLoaderConstructor.newInstance(
-                    getClass().getClassLoader(),
-                    "lombok",
-                    null,
-                    emptyList(),
-                    singletonList("lombok.patcher.Symbols")
+                        getClass().getClassLoader(),
+                        "lombok",
+                        null,
+                        emptyList(),
+                        singletonList("lombok.patcher.Symbols")
                 );
                 lombokProcessor = (Processor) lombokShadowLoader.loadClass("lombok.core.AnnotationProcessor").getDeclaredConstructor().newInstance();
                 Options.instance(context).put(Option.PROCESSOR, "lombok.launch.AnnotationProcessorHider$AnnotationProcessor");
@@ -195,7 +197,7 @@ public class ReloadableJava11Parser implements JavaParser {
                 if (logCompilationWarningsAndErrors) {
                     String log = new String(Arrays.copyOfRange(cbuf, off, len));
                     if (!log.isBlank()) {
-                        org.slf4j.LoggerFactory.getLogger(ReloadableJava11Parser.class).warn(log);
+                        LoggerFactory.getLogger(ReloadableJava11Parser.class).warn(log);
                     }
                 }
             }
@@ -260,8 +262,8 @@ public class ReloadableJava11Parser implements JavaParser {
 
         LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = new LinkedHashMap<>();
         List<ReloadableJava11ParserInputFileObject> inputFileObjects = acceptedInputs(sourceFiles)
-            .map(input -> new ReloadableJava11ParserInputFileObject(input, ctx))
-            .collect(Collectors.toList());
+                .map(input -> new ReloadableJava11ParserInputFileObject(input, ctx))
+                .collect(Collectors.toList());
         if (!annotationProcessors.isEmpty()) {
             compiler.initProcessAnnotations(annotationProcessors, inputFileObjects, emptyList());
         }
@@ -287,14 +289,14 @@ public class ReloadableJava11Parser implements JavaParser {
                 compiler.attribute(compiler.todo);
             } catch (Throwable t) {
                 // when symbol entering fails on problems like missing types, attribution can often times proceed
-                // unhindered, but it sometimes cannot (so attribution is always a BEST EFFORT in the presence of errors)
+                // unhindered, but it sometimes cannot (so attribution is always best-effort in the presence of errors)
                 ctx.getOnError().accept(new JavaParsingException("Failed symbol entering or attribution", t));
             }
         } catch (IllegalStateException e) {
             if ("endPosTable already set".equals(e.getMessage())) {
                 throw new IllegalStateException(
-                    "Call reset() on JavaParser before parsing another set of source files that " +
-                        "have some of the same fully qualified names.", e);
+                        "Call reset() on JavaParser before parsing another set of source files that " +
+                                "have some of the same fully qualified names.", e);
             }
             throw e;
         }
@@ -436,8 +438,7 @@ public class ReloadableJava11Parser implements JavaParser {
         public Iterable<JavaFileObject> list(Location location, String packageName, Set<JavaFileObject.Kind> kinds, boolean recurse) throws IOException {
             if (StandardLocation.CLASS_PATH.equals(location)) {
                 Iterable<JavaFileObject> listed = super.list(location, packageName, kinds, recurse);
-                return Stream.concat(
-                        classByteClasspath.stream()
+                return Stream.concat(classByteClasspath.stream()
                                 .filter(jfo -> jfo.getPackage().equals(packageName)),
                         StreamSupport.stream(listed.spliterator(), false)
                 ).collect(toList());
@@ -448,6 +449,7 @@ public class ReloadableJava11Parser implements JavaParser {
 
     private static class PackageAwareJavaFileObject extends SimpleJavaFileObject {
         private final String pkg;
+        @Getter
         private final String className;
         private final byte[] classBytes;
 
@@ -479,10 +481,6 @@ public class ReloadableJava11Parser implements JavaParser {
 
         public String getPackage() {
             return pkg;
-        }
-
-        public String getClassName() {
-            return className;
         }
 
         @Override
