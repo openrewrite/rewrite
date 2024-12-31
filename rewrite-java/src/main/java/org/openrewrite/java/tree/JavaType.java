@@ -323,16 +323,16 @@ public interface JavaType {
 
         public boolean isAssignableTo(String fullyQualifiedName) {
             return TypeUtils.fullyQualifiedNamesAreEqual(getFullyQualifiedName(), fullyQualifiedName) ||
-                    getInterfaces().stream().anyMatch(anInterface -> anInterface.isAssignableTo(fullyQualifiedName)) ||
-                    (getSupertype() != null && getSupertype().isAssignableTo(fullyQualifiedName));
+                   getInterfaces().stream().anyMatch(anInterface -> anInterface.isAssignableTo(fullyQualifiedName)) ||
+                   (getSupertype() != null && getSupertype().isAssignableTo(fullyQualifiedName));
         }
 
         public boolean isAssignableFrom(@Nullable JavaType type) {
             if (type instanceof FullyQualified) {
                 FullyQualified clazz = (FullyQualified) type;
                 return TypeUtils.fullyQualifiedNamesAreEqual(getFullyQualifiedName(), clazz.getFullyQualifiedName()) ||
-                        isAssignableFrom(clazz.getSupertype()) ||
-                        clazz.getInterfaces().stream().anyMatch(this::isAssignableFrom);
+                       isAssignableFrom(clazz.getSupertype()) ||
+                       clazz.getInterfaces().stream().anyMatch(this::isAssignableFrom);
             } else if (type instanceof GenericTypeVariable) {
                 GenericTypeVariable generic = (GenericTypeVariable) type;
                 for (JavaType bound : generic.getBounds()) {
@@ -386,7 +386,6 @@ public interface JavaType {
         @Nullable
         @NonFinal
         FullyQualified owningClass;
-
 
         @NonFinal
         FullyQualified @Nullable [] annotations;
@@ -577,7 +576,7 @@ public interface JavaType {
             if (o == null || getClass() != o.getClass()) return false;
             Class aClass = (Class) o;
             return TypeUtils.fullyQualifiedNamesAreEqual(fullyQualifiedName, aClass.fullyQualifiedName) &&
-                    (typeParameters == null && aClass.typeParameters == null || typeParameters != null && Arrays.equals(typeParameters, aClass.typeParameters));
+                   (typeParameters == null && aClass.typeParameters == null || typeParameters != null && Arrays.equals(typeParameters, aClass.typeParameters));
         }
 
         @Override
@@ -854,7 +853,7 @@ public interface JavaType {
             if (o == null || getClass() != o.getClass()) return false;
             GenericTypeVariable that = (GenericTypeVariable) o;
             return name.equals(that.name) && variance == that.variance &&
-                    (variance == Variance.INVARIANT && bounds == null && that.bounds == null || bounds != null && Arrays.equals(bounds, that.bounds));
+                   (variance == Variance.INVARIANT && bounds == null && that.bounds == null || bounds != null && Arrays.equals(bounds, that.bounds));
         }
 
         @Override
@@ -1100,7 +1099,6 @@ public interface JavaType {
         @NonFinal
         JavaType returnType;
 
-
         @NonFinal
         String @Nullable [] parameterNames;
 
@@ -1108,7 +1106,7 @@ public interface JavaType {
         JavaType @Nullable [] parameterTypes;
 
         @NonFinal
-        FullyQualified @Nullable [] thrownExceptions;
+        JavaType @Nullable [] thrownExceptions;
 
         @NonFinal
         FullyQualified @Nullable [] annotations;
@@ -1118,18 +1116,55 @@ public interface JavaType {
         @NonFinal
         List<String> defaultValue;
 
+        /**
+         * The names of the generic type variables declared by this method. These names
+         * will occur as the name in a {@link GenericTypeVariable} parameter,
+         * return type, or thrown exception declaration elsewhere in the method definition. We
+         * keep track of the names of those variables that were defined by this method in order
+         * to be able to distinguish them from generic type variables, potentially of the same
+         * name, defined on a containing class. Some examples:
+         * <br><br>
+         * <pre>
+         * {@code
+         * interface Test<T> {
+         *   <U> U m1();   // [U] used as return type
+         *   <U> void m2(U); // [U] used as parameter
+         *   <U extends FileNotFoundException> void m3() throws U; // [U]
+         *
+         *   T m4(T);      // ∅ since T refers to the class definition of T
+         *   <T> T m3(T);  // [T] since it shadows the class definition of T
+         *   <U> U m4(T);  // [U] but not T because T refers to the class
+         * }
+         * }
+         * </pre>
+         */
+        @With
+        @NonFinal
+        String @Nullable [] declaredFormalTypeNames;
+
+        @Deprecated
         public Method(@Nullable Integer managedReference, long flagsBitMap, @Nullable FullyQualified declaringType, String name,
                       @Nullable JavaType returnType, @Nullable List<String> parameterNames,
-                      @Nullable List<JavaType> parameterTypes, @Nullable List<FullyQualified> thrownExceptions,
+                      @Nullable List<JavaType> parameterTypes, @Nullable List<JavaType> thrownExceptions,
                       @Nullable List<FullyQualified> annotations) {
             this(managedReference, flagsBitMap, declaringType, name, returnType, parameterNames, parameterTypes,
                     thrownExceptions, annotations, null);
         }
 
+        @Deprecated
         public Method(@Nullable Integer managedReference, long flagsBitMap, @Nullable FullyQualified declaringType, String name,
                       @Nullable JavaType returnType, @Nullable List<String> parameterNames,
-                      @Nullable List<JavaType> parameterTypes, @Nullable List<FullyQualified> thrownExceptions,
+                      @Nullable List<JavaType> parameterTypes, @Nullable List<JavaType> thrownExceptions,
                       @Nullable List<FullyQualified> annotations, @Nullable List<String> defaultValue) {
+            this(managedReference, flagsBitMap, declaringType, name, returnType, parameterNames, parameterTypes,
+                    thrownExceptions, annotations, defaultValue, null);
+        }
+
+        public Method(@Nullable Integer managedReference, long flagsBitMap, @Nullable FullyQualified declaringType, String name,
+                      @Nullable JavaType returnType, @Nullable List<String> parameterNames,
+                      @Nullable List<JavaType> parameterTypes, @Nullable List<JavaType> thrownExceptions,
+                      @Nullable List<FullyQualified> annotations, @Nullable List<String> defaultValue,
+                      @Nullable List<String> declaredFormalTypeNames) {
             this(
                     managedReference,
                     flagsBitMap,
@@ -1140,14 +1175,16 @@ public interface JavaType {
                     arrayOrNullIfEmpty(parameterTypes, EMPTY_JAVA_TYPE_ARRAY),
                     arrayOrNullIfEmpty(thrownExceptions, EMPTY_FULLY_QUALIFIED_ARRAY),
                     arrayOrNullIfEmpty(annotations, EMPTY_FULLY_QUALIFIED_ARRAY),
-                    defaultValue
+                    defaultValue,
+                    arrayOrNullIfEmpty(declaredFormalTypeNames, EMPTY_STRING_ARRAY)
             );
         }
 
         public Method(@Nullable Integer managedReference, long flagsBitMap, @Nullable FullyQualified declaringType, String name,
                       @Nullable JavaType returnType, String @Nullable [] parameterNames,
-                      JavaType @Nullable [] parameterTypes, FullyQualified @Nullable [] thrownExceptions,
-                      FullyQualified @Nullable [] annotations, @Nullable List<String> defaultValue) {
+                      JavaType @Nullable [] parameterTypes, JavaType @Nullable [] thrownExceptions,
+                      FullyQualified @Nullable [] annotations, @Nullable List<String> defaultValue,
+                      String @Nullable [] declaredFormalTypeNames) {
             this.managedReference = managedReference;
             this.flagsBitMap = flagsBitMap & Flag.VALID_FLAGS;
             this.declaringType = unknownIfNull(declaringType);
@@ -1158,6 +1195,7 @@ public interface JavaType {
             this.thrownExceptions = nullIfEmpty(thrownExceptions);
             this.annotations = nullIfEmpty(annotations);
             this.defaultValue = nullIfEmpty(defaultValue);
+            this.declaredFormalTypeNames = nullIfEmpty(declaredFormalTypeNames);
         }
 
         @JsonCreator
@@ -1173,12 +1211,12 @@ public interface JavaType {
         public Method unsafeSet(@Nullable FullyQualified declaringType,
                                 @Nullable JavaType returnType,
                                 @Nullable List<JavaType> parameterTypes,
-                                @Nullable List<FullyQualified> thrownExceptions,
+                                @Nullable List<JavaType> thrownExceptions,
                                 @Nullable List<FullyQualified> annotations) {
             this.declaringType = unknownIfNull(declaringType);
             this.returnType = unknownIfNull(returnType);
             this.parameterTypes = arrayOrNullIfEmpty(parameterTypes, EMPTY_JAVA_TYPE_ARRAY);
-            this.thrownExceptions = arrayOrNullIfEmpty(thrownExceptions, EMPTY_FULLY_QUALIFIED_ARRAY);
+            this.thrownExceptions = arrayOrNullIfEmpty(thrownExceptions, EMPTY_JAVA_TYPE_ARRAY);
             this.annotations = arrayOrNullIfEmpty(annotations, EMPTY_FULLY_QUALIFIED_ARRAY);
             return this;
         }
@@ -1186,13 +1224,14 @@ public interface JavaType {
         public Method unsafeSet(@Nullable FullyQualified declaringType,
                                 @Nullable JavaType returnType,
                                 JavaType @Nullable [] parameterTypes,
-                                FullyQualified @Nullable [] thrownExceptions,
+                                JavaType @Nullable [] thrownExceptions,
                                 FullyQualified @Nullable [] annotations) {
             this.declaringType = unknownIfNull(declaringType);
             this.returnType = unknownIfNull(returnType);
             this.parameterTypes = ListUtils.nullIfEmpty(parameterTypes);
             this.thrownExceptions = ListUtils.nullIfEmpty(thrownExceptions);
             this.annotations = ListUtils.nullIfEmpty(annotations);
+            this.declaredFormalTypeNames = ListUtils.nullIfEmpty(declaredFormalTypeNames);
             return this;
         }
 
@@ -1292,13 +1331,18 @@ public interface JavaType {
             return parameterNames == null ? emptyList() : Arrays.asList(parameterNames);
         }
 
+        public List<String> getDeclaredFormalTypeNames() {
+            return declaredFormalTypeNames == null ? emptyList() : Arrays.asList(declaredFormalTypeNames);
+        }
+
         public Method withParameterNames(@Nullable List<String> parameterNames) {
             String[] parameterNamesArray = arrayOrNullIfEmpty(parameterNames, EMPTY_STRING_ARRAY);
             if (Arrays.equals(parameterNamesArray, this.parameterNames)) {
                 return this;
             }
             return new Method(this.managedReference, this.flagsBitMap, this.declaringType, this.name, this.returnType,
-                    parameterNamesArray, this.parameterTypes, this.thrownExceptions, this.annotations, this.defaultValue);
+                    parameterNamesArray, this.parameterTypes, this.thrownExceptions, this.annotations, this.defaultValue,
+                    this.declaredFormalTypeNames);
         }
 
         public List<JavaType> getParameterTypes() {
@@ -1311,20 +1355,22 @@ public interface JavaType {
                 return this;
             }
             return new Method(this.managedReference, this.flagsBitMap, this.declaringType, this.name, this.returnType,
-                    this.parameterNames, parameterTypesArray, this.thrownExceptions, this.annotations, this.defaultValue);
+                    this.parameterNames, parameterTypesArray, this.thrownExceptions, this.annotations, this.defaultValue,
+                    this.declaredFormalTypeNames);
         }
 
-        public List<FullyQualified> getThrownExceptions() {
+        public List<JavaType> getThrownExceptions() {
             return thrownExceptions == null ? emptyList() : Arrays.asList(thrownExceptions);
         }
 
-        public Method withThrownExceptions(@Nullable List<FullyQualified> thrownExceptions) {
-            FullyQualified[] thrownExceptionsArray = arrayOrNullIfEmpty(thrownExceptions, EMPTY_FULLY_QUALIFIED_ARRAY);
+        public Method withThrownExceptions(@Nullable List<JavaType> thrownExceptions) {
+            JavaType[] thrownExceptionsArray = arrayOrNullIfEmpty(thrownExceptions, EMPTY_JAVA_TYPE_ARRAY);
             if (Arrays.equals(thrownExceptionsArray, this.thrownExceptions)) {
                 return this;
             }
             return new Method(this.managedReference, this.flagsBitMap, this.declaringType, this.name, this.returnType,
-                    this.parameterNames, this.parameterTypes, thrownExceptionsArray, this.annotations, this.defaultValue);
+                    this.parameterNames, this.parameterTypes, thrownExceptionsArray, this.annotations, this.defaultValue,
+                    this.declaredFormalTypeNames);
         }
 
         public List<FullyQualified> getAnnotations() {
@@ -1337,7 +1383,8 @@ public interface JavaType {
                 return this;
             }
             return new Method(this.managedReference, this.flagsBitMap, this.declaringType, this.name, this.returnType,
-                    this.parameterNames, this.parameterTypes, this.thrownExceptions, annotationsArray, this.defaultValue);
+                    this.parameterNames, this.parameterTypes, this.thrownExceptions, annotationsArray, this.defaultValue,
+                    this.declaredFormalTypeNames);
         }
 
         public boolean hasFlags(Flag... test) {
@@ -1358,9 +1405,9 @@ public interface JavaType {
             if (o == null || getClass() != o.getClass()) return false;
             Method method = (Method) o;
             return Objects.equals(declaringType, method.declaringType) &&
-                    name.equals(method.name) &&
-                    Objects.equals(returnType, method.returnType) &&
-                    Arrays.equals(parameterTypes, method.parameterTypes);
+                   name.equals(method.name) &&
+                   Objects.equals(returnType, method.returnType) &&
+                   Arrays.equals(parameterTypes, method.parameterTypes);
         }
 
         @Override

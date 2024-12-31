@@ -33,7 +33,7 @@ import static org.assertj.core.api.CollectionAssert.assertThatCollection;
 import static org.openrewrite.java.Assertions.java;
 
 @SuppressWarnings({"CaughtExceptionImmediatelyRethrown", "LombokGetterMayBeUsed", "LombokSetterMayBeUsed", "DefaultAnnotationParam", "NotNullFieldNotInitialized", "ProtectedMemberInFinalClass", "WriteOnlyObject", "ConcatenationWithEmptyString"})
-@EnabledOnJre(JRE.JAVA_17)
+@EnabledOnJre({JRE.JAVA_11, JRE.JAVA_17})
 class LombokTest implements RewriteTest {
 
     @BeforeAll
@@ -111,6 +111,30 @@ class LombokTest implements RewriteTest {
               
                   void test() {
                       A a = A.builder().n(1).b(true).s("foo").build();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void builderWithDefault() {
+        rewriteRun(
+          java(
+            """
+              import lombok.Builder;
+              
+              @Builder
+              class A {
+                  @Builder.Default boolean b = false;
+                  @Builder.Default int n = 0;
+                  @Builder.Default String s = "Hello, Anshuman!";
+              
+                  void test() {
+                      A x = A.builder().n(1).b(true).s("foo").build();
+                      A y = A.builder().n(1).b(true).build();
+                      A z = A.builder().n(1).build();
                   }
               }
               """
@@ -402,7 +426,7 @@ class LombokTest implements RewriteTest {
                   Map<String, String> map;
                   void m() {
                       log.info("string = " + string);
-                      log.info(() -> "map = %s".formatted(map));
+                      log.info(() -> String.format("map = %s", map));
                   }
               }
               """

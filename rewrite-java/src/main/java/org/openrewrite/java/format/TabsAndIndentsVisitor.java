@@ -143,18 +143,18 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
 
         // block spaces are always aligned to their parent
         Object value = getCursor().getValue();
-        boolean alignBlockPrefixToParent = loc.equals(Space.Location.BLOCK_PREFIX) && space.getWhitespace().contains("\n") &&
+        boolean alignBlockPrefixToParent = loc == Space.Location.BLOCK_PREFIX && space.getWhitespace().contains("\n") &&
                 // ignore init blocks.
                 (value instanceof J.Block && !(getCursor().getParentTreeCursor().getValue() instanceof J.Block));
 
-        boolean alignBlockToParent = loc.equals(Space.Location.BLOCK_END) ||
-                loc.equals(Space.Location.NEW_ARRAY_INITIALIZER_SUFFIX) ||
-                loc.equals(Space.Location.CATCH_PREFIX) ||
-                loc.equals(Space.Location.TRY_FINALLY) ||
-                loc.equals(Space.Location.ELSE_PREFIX);
+        boolean alignBlockToParent = loc == Space.Location.BLOCK_END ||
+                loc == Space.Location.NEW_ARRAY_INITIALIZER_SUFFIX ||
+                loc == Space.Location.CATCH_PREFIX ||
+                loc == Space.Location.TRY_FINALLY ||
+                loc == Space.Location.ELSE_PREFIX;
 
-        if ((loc.equals(Space.Location.EXTENDS) && space.getWhitespace().contains("\n")) ||
-                Space.Location.EXTENDS.equals(getCursor().getParent().getMessage("lastLocation"))) {
+        if ((loc == Space.Location.EXTENDS && space.getWhitespace().contains("\n")) ||
+                Space.Location.EXTENDS == getCursor().getParent().getMessage("lastLocation")) {
             indentType = IndentType.CONTINUATION_INDENT;
         }
 
