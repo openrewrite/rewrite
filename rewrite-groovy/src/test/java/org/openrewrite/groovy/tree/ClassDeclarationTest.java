@@ -358,4 +358,44 @@ class ClassDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4063")
+    void nestedClass() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  class B {
+                      String a;String b
+                      B(String a, String b) {
+                          this.a = a
+                          this.b = b
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4063")
+    void nestedStaticClass() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  static class B {
+                      String a;String b
+                      B(String a, String b) {
+                          this.a = a
+                          this.b = b
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
 }

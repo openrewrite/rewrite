@@ -45,6 +45,7 @@ import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
+import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
@@ -395,8 +396,6 @@ public class GroovyParserVisitor {
                                     .map(ast -> {
                                         if (ast instanceof FieldNode) {
                                             visitField((FieldNode) ast);
-                                        } else if (ast instanceof ConstructorNode) {
-                                            visitConstructor((ConstructorNode) ast);
                                         } else if (ast instanceof MethodNode) {
                                             visitMethod((MethodNode) ast);
                                         } else if (ast instanceof ClassNode) {
@@ -521,15 +520,20 @@ public class GroovyParserVisitor {
 
             List<J.Annotation> annotations = visitAndGetAnnotations(method);
             List<J.Modifier> modifiers = visitModifiers(method.getModifiers());
-            Optional<RedundantDef> redundantDef = maybeRedundantDef(method.getReturnType(), method.getName());
-            TypeTree returnType = visitTypeTree(method.getReturnType());
+            boolean isConstructor = method instanceof ConstructorNode;
+            boolean isConstructorOfInnerNonStaticClass = false;
+            Optional<RedundantDef> redundantDef = isConstructor ? Optional.empty() : maybeRedundantDef(method.getReturnType(), method.getName());
+            TypeTree returnType = isConstructor ? null : visitTypeTree(method.getReturnType());
 
-            // Method name might be in quotes
             Space namePrefix = whitespace();
             String methodName;
-            if (source.startsWith(method.getName(), cursor)) {
+            if (isConstructor) {
+                isConstructorOfInnerNonStaticClass = method.getDeclaringClass().getName().contains("$") && (method.getDeclaringClass().getModifiers() & Modifier.STATIC) == 0;
+                methodName = method.getDeclaringClass().getName().replaceFirst(".*\\$", "");
+            } else if (source.startsWith(method.getName(), cursor)) {
                 methodName = method.getName();
             } else {
+                // Method name might be in quotes
                 char openingQuote = source.charAt(cursor);
                 methodName = openingQuote + method.getName() + openingQuote;
             }
@@ -549,6 +553,24 @@ public class GroovyParserVisitor {
             Parameter[] unparsedParams = method.getParameters();
             for (int i = 0; i < unparsedParams.length; i++) {
                 Parameter param = unparsedParams[i];
+
+                /*
+                To support Java syntax for non-static inner classes, the groovy compiler uses an extra parameter to its parent class under the hood
+                class A {                               class A {
+                  class B {                               class B {
+                    String a                                String a
+                    B(String a) {           =>              B(A $p$, String a) {
+                                            =>                new Object().this$0 = $p$
+                      this.a = a            =>                this.a = a
+                    }                                       }
+                  }                                       }
+                }
+                For our LST, we should skip that placeholder param + first two statements (ConstructorCallExpression and BlockStatement)}
+                See also: https://groovy-lang.org/differences.html#_creating_instances_of_non_static_inner_classes
+                */
+                if (isConstructorOfInnerNonStaticClass && param.getName().startsWith("$")) {
+                    continue;
+                }
 
                 List<J.Annotation> paramAnnotations = visitAndGetAnnotations(param);
 
@@ -599,6 +621,11 @@ public class GroovyParserVisitor {
                     Markers.EMPTY
             );
 
+            if (isConstructorOfInnerNonStaticClass) {
+                ((BlockStatement) method.getCode()).getStatements().remove(0);
+                ((BlockStatement) method.getCode()).getStatements().remove(0);
+            }
+
             J.Block body = method.getCode() == null ? null :
                     bodyVisitor.visit(method.getCode());
 
@@ -615,98 +642,6 @@ public class GroovyParserVisitor {
                     body,
                     null,
                     typeMapping.methodType(method)
-            ));
-        }
-
-        @Override
-        public void visitConstructor(ConstructorNode constructor) {
-            Space fmt = whitespace();
-
-            List<J.Annotation> annotations = visitAndGetAnnotations(constructor);
-            List<J.Modifier> modifiers = visitModifiers(constructor.getModifiers());
-
-            // Constructor name might be in quotes
-            Space namePrefix = whitespace();
-            String constructorName;
-            if (source.startsWith(constructor.getDeclaringClass().getName(), cursor)) {
-                constructorName = constructor.getDeclaringClass().getName();
-            } else {
-                char openingQuote = source.charAt(cursor);
-                constructorName = openingQuote + constructor.getName() + openingQuote;
-            }
-            cursor += constructorName.length();
-            J.Identifier name = new J.Identifier(randomId(),
-                    namePrefix,
-                    Markers.EMPTY,
-                    emptyList(),
-                    constructorName,
-                    null, null);
-
-            RewriteGroovyVisitor bodyVisitor = new RewriteGroovyVisitor(constructor, this);
-
-            // Parameter has no visit implementation, so we've got to do this by hand
-            Space beforeParen = sourceBefore("(");
-            List<JRightPadded<Statement>> params = new ArrayList<>(constructor.getParameters().length);
-            Parameter[] unparsedParams = constructor.getParameters();
-            for (int i = 0; i < unparsedParams.length; i++) {
-                Parameter param = unparsedParams[i];
-
-                List<J.Annotation> paramAnnotations = visitAndGetAnnotations(param);
-
-                TypeTree paramType;
-                if (param.isDynamicTyped()) {
-                    paramType = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), "", JavaType.ShallowClass.build("java.lang.Object"), null);
-                } else {
-                    paramType = visitTypeTree(param.getOriginType());
-                }
-                JRightPadded<J.VariableDeclarations.NamedVariable> paramName = JRightPadded.build(
-                        new J.VariableDeclarations.NamedVariable(randomId(), EMPTY, Markers.EMPTY,
-                                new J.Identifier(randomId(), whitespace(), Markers.EMPTY, emptyList(), param.getName(), null, null),
-                                emptyList(), null, null)
-                );
-                cursor += param.getName().length();
-
-                org.codehaus.groovy.ast.expr.Expression defaultValue = param.getInitialExpression();
-                if (defaultValue != null) {
-                    paramName = paramName.withElement(paramName.getElement().getPadding()
-                            .withInitializer(new JLeftPadded<>(
-                                    sourceBefore("="),
-                                    new RewriteGroovyVisitor(defaultValue, this).visit(defaultValue),
-                                    Markers.EMPTY)));
-                }
-                Space rightPad = sourceBefore(i == unparsedParams.length - 1 ? ")" : ",");
-
-                params.add(JRightPadded.build((Statement) new J.VariableDeclarations(randomId(), EMPTY,
-                        Markers.EMPTY, paramAnnotations, emptyList(), paramType,
-                        null, emptyList(),
-                        singletonList(paramName))).withAfter(rightPad));
-            }
-
-            if (unparsedParams.length == 0) {
-                params.add(JRightPadded.build(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY)));
-            }
-
-            JContainer<NameTree> throws_ = constructor.getExceptions().length == 0 ? null : JContainer.build(
-                    sourceBefore("throws"),
-                    bodyVisitor.visitRightPadded(constructor.getExceptions(), null),
-                    Markers.EMPTY
-            );
-
-            J.Block body = constructor.getCode() == null ? null :
-                    bodyVisitor.visit(constructor.getCode());
-
-            queue.add(new J.MethodDeclaration(
-                    randomId(), fmt, Markers.EMPTY,
-                    annotations,
-                    modifiers,
-                    null,
-                    null,
-                    new J.MethodDeclaration.IdentifierWithAnnotations(name, emptyList()),
-                    JContainer.build(beforeParen, params, Markers.EMPTY),
-                    throws_,
-                    body,
-                    null,
-                    typeMapping.methodType(constructor)
             ));
         }
 
