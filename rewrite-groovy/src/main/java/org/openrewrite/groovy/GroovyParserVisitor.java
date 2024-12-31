@@ -565,7 +565,7 @@ public class GroovyParserVisitor {
                     }                                       }
                   }                                       }
                 }
-                For our LST, we should skip that placeholder param + first two statements (ConstructorCallExpression and BlockStatement)}
+                In our LST, we don't need this internal logic, so we'll skip the placeholder param + first two statements (ConstructorCallExpression and BlockStatement)}
                 See also: https://groovy-lang.org/differences.html#_creating_instances_of_non_static_inner_classes
                 */
                 if (isConstructorOfInnerNonStaticClass && param.getName().startsWith("$")) {
