@@ -177,6 +177,28 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
+    void useClassAsArgument() {
+        rewriteRun(
+          groovy(
+            """
+              foo(String)
+              """
+          )
+        );
+    }
+
+    @Test
+    void useClassAsArgumentJavaStyle() {
+        rewriteRun(
+          groovy(
+            """
+              foo(String.class)
+              """
+          )
+        );
+    }
+
+    @Test
     @SuppressWarnings("GroovyAssignabilityCheck")
     void closureWithImplicitParameter() {
         rewriteRun(

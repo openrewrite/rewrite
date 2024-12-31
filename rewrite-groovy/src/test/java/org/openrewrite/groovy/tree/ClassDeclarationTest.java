@@ -342,36 +342,6 @@ class ClassDeclarationTest implements RewriteTest {
     }
 
     @Test
-    void useClassAsArgument() {
-        rewriteRun(
-          groovy(
-            """
-              class A {}
-              
-              def test(Class clazz) {}
-              
-              test(A)
-              """
-          )
-        );
-    }
-
-    @Test
-    void useClassAsArgumentJavaStyle() {
-        rewriteRun(
-          groovy(
-            """
-              class A {}
-              
-              def test(Class clazz) {}
-              
-              test(A.class)
-              """
-          )
-        );
-    }
-
-    @Test
     @ExpectedToFail("Anonymous inner class is not yet supported") // https://groovy-lang.org/objectorientation.html#_anonymous_inner_class
     void anonymousInnerClass() {
         rewriteRun(
