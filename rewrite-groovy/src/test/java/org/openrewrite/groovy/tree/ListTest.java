@@ -24,11 +24,45 @@ import static org.openrewrite.groovy.Assertions.groovy;
 class ListTest implements RewriteTest {
 
     @Test
+    void emptyListLiteral() {
+        rewriteRun(
+          groovy(
+            """
+              def a = []
+              def b = [   ]
+              """
+          )
+        );
+    }
+
+    @Test
+    void emptyListLiteralWithParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              def y = ([])
+              """
+          )
+        );
+    }
+
+    @Test
     void listLiteral() {
         rewriteRun(
           groovy(
             """
               def numbers = [1, 2, 3]
+              """
+          )
+        );
+    }
+
+    @Test
+    void listLiteralTrailingComma() {
+        rewriteRun(
+          groovy(
+            """
+              def a = [ "foo" /* "foo" suffix */ , /* "]" prefix */ ]
               """
           )
         );

@@ -111,6 +111,19 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void varargsArguments() {
+        rewriteRun(
+          groovy(
+            """
+              def foo(String... messages) {
+                  println(messages[0])
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void defaultArgumentValues() {
         rewriteRun(
           groovy(
