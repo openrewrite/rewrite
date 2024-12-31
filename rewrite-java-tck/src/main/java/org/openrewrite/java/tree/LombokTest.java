@@ -119,6 +119,30 @@ class LombokTest implements RewriteTest {
     }
 
     @Test
+    void builderWithDefault() {
+        rewriteRun(
+          java(
+            """
+              import lombok.Builder;
+              
+              @Builder
+              class A {
+                  @Builder.Default boolean b = false;
+                  @Builder.Default int n = 0;
+                  @Builder.Default String s = "Hello, Anshuman!";
+              
+                  void test() {
+                      A x = A.builder().n(1).b(true).s("foo").build();
+                      A y = A.builder().n(1).b(true).build();
+                      A z = A.builder().n(1).build();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void tostring() {
         rewriteRun(
           java(
