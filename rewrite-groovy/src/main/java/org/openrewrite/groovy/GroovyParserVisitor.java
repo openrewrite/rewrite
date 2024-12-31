@@ -2516,30 +2516,6 @@ public class GroovyParserVisitor {
         return space;
     }
 
-    /**
-     * Gets the length in characters of a String literal.
-     * Attempts to account for a number of different strange compiler behaviors, old bugs, and edge cases.
-     * cursor is presumed to point at the beginning of the node.
-     */
-    private int sourceLengthOfString(ConstantExpression expr) {
-        // ConstantExpression.getValue() already has resolved escaped characters. So "\t" and a literal tab will look the same.
-        // Since we cannot differentiate between the two, use this alternate method only when an old version of groovy indicates risk
-        // and the literal doesn't contain any characters which might be from an escape sequence. e.g.: tabs, newlines, carriage returns
-        String value = (String) expr.getValue();
-        if (isOlderThanGroovy3() && value.matches("[^\\t\\r\\n\\\\]*")) {
-            int delimiterLength = getDelimiterLength();
-            return delimiterLength + value.length() + delimiterLength;
-        }
-        int lengthAccordingToAst = lengthAccordingToAst(expr);
-        // subtract any parentheses that were included with lengthAccordingToAst
-        Integer insideParenthesesLevel = getInsideParenthesesLevel(expr);
-        if (insideParenthesesLevel != null) {
-            return lengthAccordingToAst - insideParenthesesLevel * 2;
-        }
-
-        return lengthAccordingToAst;
-    }
-
     private @Nullable Integer getInsideParenthesesLevel(ASTNode node) {
         Object rawIpl = node.getNodeMetaData("_INSIDE_PARENTHESES_LEVEL");
         if (rawIpl instanceof AtomicInteger) {
