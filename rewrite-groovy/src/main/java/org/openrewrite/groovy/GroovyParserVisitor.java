@@ -2484,17 +2484,17 @@ public class GroovyParserVisitor {
     private int determineParenthesisLevel(int childLineNumber, int parentLineNumber, int childColumn, int parentColumn) {
         int saveCursor = cursor;
         whitespace();
-        int childBeginCursor = cursor;
+        int untilCursor = cursor;
         if (childLineNumber > parentLineNumber) {
-            for (int i = 0; i < (childColumn - parentLineNumber); i++) {
-                childBeginCursor = source.indexOf('\n', childBeginCursor);
+            for (int i = 0; i < (childLineNumber - parentLineNumber); i++) {
+                untilCursor = source.indexOf('\n', untilCursor) + 1; // +1; set cursor past `\n`
             }
-            childBeginCursor += childColumn;
+            untilCursor += childColumn - 1; // -1; skip previous `\n`
         } else {
-            childBeginCursor += childColumn - parentColumn;
+            untilCursor += childColumn - parentColumn;
         }
         int count = 0;
-        for (int i = cursor; i < childBeginCursor; i++) {
+        for (int i = cursor; i < untilCursor; i++) {
             if (source.charAt(i) == '(') {
                 count++;
             }

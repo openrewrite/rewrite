@@ -362,6 +362,25 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/4055")
+    @Test
+    void chainOfMethodInvocations() {
+        rewriteRun(
+          groovy(
+            """
+              Micronaut.build(args)
+                      .banner(false)
+                      .propertySources(PropertySource.of("my-config", [name: "MyApp"]))
+                      .environments("prod") // Only prod
+                      .overrideConfig("custom-config.yml") // Load custom config
+                      .packages("com.company")
+                      .mainClass(Application)
+                      .start()
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2552")
     @Test
     void closureInvocation() {
