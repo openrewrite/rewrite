@@ -60,6 +60,7 @@ import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
 import static org.openrewrite.java.tree.Space.EMPTY;
@@ -408,7 +409,7 @@ public class GroovyParserVisitor {
                                         Statement stat = pollQueue();
                                         return maybeSemicolon(stat);
                                     }))
-                            .collect(Collectors.toList()),
+                            .collect(toList()),
                     sourceBefore("}"));
         }
 
@@ -483,36 +484,36 @@ public class GroovyParserVisitor {
             NameTree annotationType = visitTypeTree(annotation.getClassNode());
             JContainer<Expression> arguments = null;
             if (!annotation.getMembers().isEmpty()) {
-                // This doesn't handle the case where an annotation has empty arguments like @Foo(), but that is rare
                 arguments = JContainer.build(
                         sourceBefore("("),
                         annotation.getMembers().entrySet().stream()
                                 .map(arg -> {
-                                    Space argPrefix;
-                                    if ("value".equals(arg.getKey())) {
-                                        // Determine whether the value is implicit or explicit
-                                        int saveCursor = cursor;
-                                        argPrefix = whitespace();
-                                        if (!source.startsWith("value", cursor)) {
-                                            return new JRightPadded<Expression>(
-                                                    ((Expression) bodyVisitor.visit(arg.getValue())).withPrefix(argPrefix),
-                                                    arg.getKey().equals(lastArgKey) ? sourceBefore(")") : sourceBefore(","),
-                                                    Markers.EMPTY);
-                                        }
-                                        cursor = saveCursor;
+                                    boolean isImplicitValue = "value".equals(arg.getKey()) && !source.startsWith("value", indexOfNextNonWhitespace(cursor, source));
+                                    Space argPrefix = isImplicitValue ? whitespace() : sourceBefore(arg.getKey());
+                                    Space isSign = isImplicitValue ? null : sourceBefore("=");
+                                    Expression expression;
+                                    if (arg.getValue() instanceof AnnotationConstantExpression) {
+                                        visitAnnotation((AnnotationNode) ((AnnotationConstantExpression) arg.getValue()).getValue());
+                                        expression = (Expression) queue.poll();
+                                    } else {
+                                        expression = bodyVisitor.visit(arg.getValue());
                                     }
-                                    argPrefix = sourceBefore(arg.getKey());
-                                    J.Identifier argName = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), arg.getKey(), null, null);
-                                    J.Assignment assign = new J.Assignment(randomId(), argPrefix, Markers.EMPTY,
-                                            argName, padLeft(sourceBefore("="), bodyVisitor.visit(arg.getValue())),
-                                            null);
-                                    return JRightPadded.build((Expression) assign)
+                                    Expression element = isImplicitValue ? expression
+                                            : (new J.Assignment(randomId(), argPrefix, Markers.EMPTY,
+                                            new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), arg.getKey(), null, null),
+                                            padLeft(isSign, expression), null));
+                                    return JRightPadded.build(element)
                                             .withAfter(arg.getKey().equals(lastArgKey) ? sourceBefore(")") : sourceBefore(","));
                                 })
-                                .collect(Collectors.toList()),
+                                .collect(toList()),
                         Markers.EMPTY
                 );
+            } else if (source.startsWith("(", indexOfNextNonWhitespace(cursor, source))) {
+                // An annotation with empty arguments like @Foo()
+                arguments = JContainer.build(sourceBefore("("), emptyList(), Markers.EMPTY);
+                sourceBefore(")");
             }
+
             queue.add(new J.Annotation(randomId(), prefix, Markers.EMPTY, annotationType, arguments));
         }
 
@@ -761,7 +762,7 @@ public class GroovyParserVisitor {
 
             List<org.codehaus.groovy.ast.expr.Expression> unparsedArgs = expression.getExpressions().stream()
                     .filter(GroovyParserVisitor::appearsInSource)
-                    .collect(Collectors.toList());
+                    .collect(toList());
             // If the first parameter to a function is a Map, then groovy allows "named parameters" style invocations, see:
             //     https://docs.groovy-lang.org/latest/html/documentation/#_named_parameters_2
             // When named parameters are in use they may appear before, after, or intermixed with any positional arguments
@@ -778,7 +779,7 @@ public class GroovyParserVisitor {
                                         unparsedArgs.subList(1, unparsedArgs.size()).stream())
                                 .sorted(Comparator.comparing(ASTNode::getLastLineNumber)
                                         .thenComparing(ASTNode::getLastColumnNumber))
-                                .collect(Collectors.toList());
+                                .collect(toList());
             } else if (!unparsedArgs.isEmpty() && unparsedArgs.get(0) instanceof MapExpression) {
                 // The map literal may or may not be wrapped in "[]"
                 // If it is wrapped in "[]" then this isn't a named arguments situation, and we should not lift the parameters out of the enclosing MapExpression
@@ -792,7 +793,7 @@ public class GroovyParserVisitor {
                             Stream.concat(
                                             namedArgExpressions.getMapEntryExpressions().stream(),
                                             unparsedArgs.subList(1, unparsedArgs.size()).stream())
-                                    .collect(Collectors.toList());
+                                    .collect(toList());
                 }
             }
 
@@ -1323,9 +1324,6 @@ public class GroovyParserVisitor {
                         text = "";
                     }
                     jType = JavaType.Primitive.Null;
-                } else if (expression instanceof AnnotationConstantExpression) {
-                    classVisitor.visitAnnotation((AnnotationNode) value);
-                    return ((Expression) classVisitor.pollQueue()).withPrefix(fmt);
                 } else {
                     throw new IllegalStateException("Unexpected constant type " + type);
                 }
