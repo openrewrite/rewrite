@@ -30,8 +30,43 @@ class AnnotationTest implements RewriteTest {
           groovy(
             """
               @Foo
-              class Test {
-              }
+              class Test {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void withParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              @Foo()
+              class Test {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void withProperties() {
+        rewriteRun(
+          groovy(
+            """
+              @Foo(value = "A", version = "1.0")
+              class Test {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void withImplicitValueProperty() {
+        rewriteRun(
+          groovy(
+            """
+              @Foo("A")
+              class Test {}
               """
           )
         );
@@ -43,9 +78,8 @@ class AnnotationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              @Foo(bar = @Bar)
-              class Test {
-              }
+              @Foo(bar = @Bar(@Baz(baz = @Qux("1.0"))))
+              class Test {}
               """
           )
         );
