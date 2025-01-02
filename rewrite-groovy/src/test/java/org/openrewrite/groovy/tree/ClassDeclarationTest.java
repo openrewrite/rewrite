@@ -368,8 +368,8 @@ class ClassDeclarationTest implements RewriteTest {
               class A {
                   class B {
                       String a;String b
-                      B(String a, String b) {
-                          this.a = a
+                      B(String $a, String b) {
+                          this.a = $a
                           this.b = b
                       }
                   }

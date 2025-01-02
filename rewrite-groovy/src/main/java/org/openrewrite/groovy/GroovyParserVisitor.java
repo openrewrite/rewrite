@@ -528,6 +528,20 @@ public class GroovyParserVisitor {
             Space namePrefix = whitespace();
             String methodName;
             if (isConstructor) {
+                /*
+                To support Java syntax for non-static inner classes, the groovy compiler uses an extra parameter with a reference to its parent class under the hood:
+                class A {                               class A {
+                  class B {                               class B {
+                    String s                                String s
+                    B(String s) {           =>              B(A $p$, String s) {
+                                            =>                new Object().this$0 = $p$
+                      this.s = s            =>                this.s = s
+                    }                                       }
+                  }                                       }
+                }
+                In our LST, we don't need this internal logic, so we'll skip the first param + first two statements (ConstructorCallExpression and BlockStatement)}
+                See also: https://groovy-lang.org/differences.html#_creating_instances_of_non_static_inner_classes
+                */
                 isConstructorOfInnerNonStaticClass = method.getDeclaringClass().getName().contains("$") && (method.getDeclaringClass().getModifiers() & Modifier.STATIC) == 0;
                 methodName = method.getDeclaringClass().getName().replaceFirst(".*\\$", "");
             } else if (source.startsWith(method.getName(), cursor)) {
@@ -551,26 +565,8 @@ public class GroovyParserVisitor {
             Space beforeParen = sourceBefore("(");
             List<JRightPadded<Statement>> params = new ArrayList<>(method.getParameters().length);
             Parameter[] unparsedParams = method.getParameters();
-            for (int i = 0; i < unparsedParams.length; i++) {
+            for (int i = (isConstructorOfInnerNonStaticClass ? 1 : 0); i < unparsedParams.length; i++) {
                 Parameter param = unparsedParams[i];
-
-                /*
-                To support Java syntax for non-static inner classes, the groovy compiler uses an extra parameter to its parent class under the hood
-                class A {                               class A {
-                  class B {                               class B {
-                    String a                                String a
-                    B(String a) {           =>              B(A $p$, String a) {
-                                            =>                new Object().this$0 = $p$
-                      this.a = a            =>                this.a = a
-                    }                                       }
-                  }                                       }
-                }
-                In our LST, we don't need this internal logic, so we'll skip the placeholder param + first two statements (ConstructorCallExpression and BlockStatement)}
-                See also: https://groovy-lang.org/differences.html#_creating_instances_of_non_static_inner_classes
-                */
-                if (isConstructorOfInnerNonStaticClass && param.getName().startsWith("$")) {
-                    continue;
-                }
 
                 List<J.Annotation> paramAnnotations = visitAndGetAnnotations(param);
 
@@ -621,13 +617,16 @@ public class GroovyParserVisitor {
                     Markers.EMPTY
             );
 
-            if (isConstructorOfInnerNonStaticClass) {
-                ((BlockStatement) method.getCode()).getStatements().remove(0);
-                ((BlockStatement) method.getCode()).getStatements().remove(0);
+            J.Block body = null;
+            if (method.getCode() != null) {
+                ASTNode block = isConstructorOfInnerNonStaticClass ?
+                        new BlockStatement(
+                                ((BlockStatement) method.getCode()).getStatements().subList(2, ((BlockStatement) method.getCode()).getStatements().size()),
+                                ((BlockStatement) method.getCode()).getVariableScope()
+                        )
+                        : method.getCode();
+                body = bodyVisitor.visit(block);
             }
-
-            J.Block body = method.getCode() == null ? null :
-                    bodyVisitor.visit(method.getCode());
 
             queue.add(new J.MethodDeclaration(
                     randomId(), fmt,
