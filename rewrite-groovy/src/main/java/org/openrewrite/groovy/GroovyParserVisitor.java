@@ -393,6 +393,8 @@ public class GroovyParserVisitor {
                     JRightPadded.build(false),
                     sortedByPosition.values().stream()
                             .flatMap(asts -> asts.stream()
+                                    // anonymous classes will be visited as part of visiting the ConstructorCallExpression
+                                    .filter(ast -> !(ast instanceof InnerClassNode && ((InnerClassNode) ast).isAnonymous()))
                                     .map(ast -> {
                                         if (ast instanceof FieldNode) {
                                             visitField((FieldNode) ast);

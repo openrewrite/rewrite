@@ -342,7 +342,6 @@ class ClassDeclarationTest implements RewriteTest {
     }
 
     @Test
-    @ExpectedToFail("Anonymous inner class is not yet supported") // https://groovy-lang.org/objectorientation.html#_anonymous_inner_class
     void anonymousInnerClass() {
         rewriteRun(
           groovy(
@@ -350,6 +349,7 @@ class ClassDeclarationTest implements RewriteTest {
               interface Something {}
               
               class Test {
+                  Something something = new Something() {}
                   static def test() {
                       new Something() {}
                   }
