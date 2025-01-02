@@ -97,4 +97,22 @@ class HclBlockTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void providersInModule() {
+        rewriteRun(
+          hcl(
+            """
+              module "something" {
+                source = "./some/other/directory"
+
+                providers = {
+                  aws = aws
+                  aws.dns = aws
+                }
+              }
+              """
+          )
+        );
+    }
 }
