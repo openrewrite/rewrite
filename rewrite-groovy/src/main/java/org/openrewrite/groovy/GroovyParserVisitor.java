@@ -542,7 +542,7 @@ public class GroovyParserVisitor {
                 In our LST, we don't need this internal logic, so we'll skip the first param + first two statements (ConstructorCallExpression and BlockStatement)}
                 See also: https://groovy-lang.org/differences.html#_creating_instances_of_non_static_inner_classes
                 */
-                isConstructorOfInnerNonStaticClass = method.getDeclaringClass().getName().contains("$") && (method.getDeclaringClass().getModifiers() & Modifier.STATIC) == 0;
+                isConstructorOfInnerNonStaticClass = method.getDeclaringClass() instanceof InnerClassNode && (method.getDeclaringClass().getModifiers() & Modifier.STATIC) == 0;
                 methodName = method.getDeclaringClass().getName().replaceFirst(".*\\$", "");
             } else if (source.startsWith(method.getName(), cursor)) {
                 methodName = method.getName();
