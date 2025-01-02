@@ -309,7 +309,12 @@ public class BlockStatementTemplateGenerator {
             Optional<Expression> arg = annotation.getArguments().stream().filter(a -> a == prior).findFirst();
             if (arg.isPresent()) {
                 StringBuilder beforeBuffer = new StringBuilder();
-                beforeBuffer.append('@').append(((JavaType.Class) annotation.getType()).getFullyQualifiedName()).append('(');
+                String name = annotation.getType() instanceof JavaType.Class ?
+                        ((JavaType.Class) annotation.getType()).getFullyQualifiedName() :
+                        annotation.getType() instanceof JavaType.FullyQualified ?
+                                ((JavaType.FullyQualified) annotation.getType()).getFullyQualifiedName() :
+                                annotation.getSimpleName();
+                beforeBuffer.append('@').append(name).append('(');
                 before.insert(0, beforeBuffer);
                 after.append(')').append('\n');
 
