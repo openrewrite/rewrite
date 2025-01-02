@@ -494,7 +494,7 @@ public class GroovyParserVisitor {
                                     Expression expression;
                                     if (arg.getValue() instanceof AnnotationConstantExpression) {
                                         visitAnnotation((AnnotationNode) ((AnnotationConstantExpression) arg.getValue()).getValue());
-                                        expression = (Expression) queue.poll();
+                                        expression = (J.Annotation) queue.poll();
                                     } else {
                                         expression = bodyVisitor.visit(arg.getValue());
                                     }
@@ -510,8 +510,9 @@ public class GroovyParserVisitor {
                 );
             } else if (source.startsWith("(", indexOfNextNonWhitespace(cursor, source))) {
                 // An annotation with empty arguments like @Foo()
-                arguments = JContainer.build(sourceBefore("("), emptyList(), Markers.EMPTY);
-                sourceBefore(")");
+                arguments = JContainer.build(sourceBefore("("),
+                        singletonList(JRightPadded.build(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY))),
+                        Markers.EMPTY);
             }
 
             queue.add(new J.Annotation(randomId(), prefix, Markers.EMPTY, annotationType, arguments));
