@@ -619,13 +619,13 @@ public class GroovyParserVisitor {
 
             J.Block body = null;
             if (method.getCode() != null) {
-                ASTNode block = isConstructorOfInnerNonStaticClass ?
+                ASTNode code = isConstructorOfInnerNonStaticClass ?
                         new BlockStatement(
                                 ((BlockStatement) method.getCode()).getStatements().subList(2, ((BlockStatement) method.getCode()).getStatements().size()),
                                 ((BlockStatement) method.getCode()).getVariableScope()
                         )
                         : method.getCode();
-                body = bodyVisitor.visit(block);
+                body = bodyVisitor.visit(code);
             }
 
             queue.add(new J.MethodDeclaration(
