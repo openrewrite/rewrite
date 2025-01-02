@@ -607,7 +607,7 @@ public class GroovyParserVisitor {
                         singletonList(paramName))).withAfter(rightPad));
             }
 
-            if (unparsedParams.length == 0) {
+            if (unparsedParams.length == 0 || (isConstructorOfInnerNonStaticClass && unparsedParams.length == 1)) {
                 params.add(JRightPadded.build(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY)));
             }
 
