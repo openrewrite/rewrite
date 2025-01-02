@@ -43,7 +43,7 @@ public class BuilderHandler extends JavacAnnotationHandler<Builder> {
             new HandleBuilder().handle(annotationValues, jcAnnotation, javacNode);
             return;
         }
-        Map<JCTree.JCModifiers, List<JCTree.JCAnnotation>> modifiersAndOriginalAnnotationMap = new HashMap<>();
+        Map<JCTree.JCModifiers, FlagAndAnnotations> modifiersRestoreMap = new HashMap<>();
         Map<JavacNode, LombokImmutableList<JavacNode>> nodeToChildrenMap = new HashMap<>();
         Field childrenField = null;
         try {
@@ -66,9 +66,10 @@ public class BuilderHandler extends JavacAnnotationHandler<Builder> {
                 childrenField.set(fieldNode, filtered);
                 JCTree.JCVariableDecl fd = (JCTree.JCVariableDecl) fieldNode.get();
                 JCTree.JCModifiers modifiers = fd.getModifiers();
-                List<JCTree.JCAnnotation> originalAnnotations = modifiers.getAnnotations();
-                modifiersAndOriginalAnnotationMap.put(modifiers, originalAnnotations);
-                modifiers.annotations = removeBuilderDefault(originalAnnotations);
+
+                modifiersRestoreMap.put(modifiers, new FlagAndAnnotations(modifiers.flags, modifiers.annotations));
+                modifiers.annotations = removeBuilderDefault(modifiers.annotations);
+                modifiers.flags = modifiers.flags & (~(1 << 4) /*final mask*/);
             }
         } catch (NoSuchFieldException | IllegalAccessException e) {
             // On exception just continue with the original handler
@@ -76,8 +77,9 @@ public class BuilderHandler extends JavacAnnotationHandler<Builder> {
         new HandleBuilder().handle(annotationValues, jcAnnotation, javacNode);
 
         // restore values
-        for (Map.Entry<JCTree.JCModifiers, List<JCTree.JCAnnotation>> entry : modifiersAndOriginalAnnotationMap.entrySet()) {
-            entry.getKey().annotations = entry.getValue();
+        for (Map.Entry<JCTree.JCModifiers, FlagAndAnnotations> entry : modifiersRestoreMap.entrySet()) {
+            entry.getKey().flags = entry.getValue().flags;
+            entry.getKey().annotations = entry.getValue().annotations;
         }
         for (Map.Entry<JavacNode, LombokImmutableList<JavacNode>> entry : nodeToChildrenMap.entrySet()) {
             try {
@@ -108,5 +110,15 @@ public class BuilderHandler extends JavacAnnotationHandler<Builder> {
             }
         }
         return indexes.toList();
+    }
+
+    private static class FlagAndAnnotations {
+        long flags;
+        List<JCTree.JCAnnotation> annotations;
+
+        FlagAndAnnotations(long flags, List<JCTree.JCAnnotation> annotations) {
+            this.flags = flags;
+            this.annotations = annotations;
+        }
     }
 }
