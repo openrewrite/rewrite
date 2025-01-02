@@ -342,7 +342,6 @@ class ClassDeclarationTest implements RewriteTest {
     }
 
     @Test
-    @ExpectedToFail("Anonymous inner class is not yet supported") // https://groovy-lang.org/objectorientation.html#_anonymous_inner_class
     void anonymousInnerClass() {
         rewriteRun(
           groovy(
@@ -350,8 +349,81 @@ class ClassDeclarationTest implements RewriteTest {
               interface Something {}
               
               class Test {
+                  Something something = new Something() {}
                   static def test() {
                       new Something() {}
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4063")
+    void nestedClassWithoutParameters() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  class B {
+                      B() {}
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4063")
+    void nestedClass() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  class B {
+                      String a;String[] b
+                      B(String $a, String... b) {
+                          this.a = $a
+                          this.b = b
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4063")
+    void nestedStaticClassWithoutParameters() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  static class B {
+                      B() {}
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4063")
+    void nestedStaticClass() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  static class B {
+                      String a;String[] b
+                      B(String a, String... b) {
+                          this.a = a
+                          this.b = b
+                      }
                   }
               }
               """
