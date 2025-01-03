@@ -444,10 +444,15 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
             Space tuplePrefix = sourceBefore("{");
             List<HclRightPadded<Expression>> mappedValues = new ArrayList<>();
             List<HCLParser.ObjectelemContext> values = ctx.objectelem();
-            for (int i = 0; i < values.size(); i++) {
-                HCLParser.ObjectelemContext value = values.get(i);
-                mappedValues.add(HclRightPadded.build((Expression) visit(value))
-                        .withAfter(i == values.size() - 1 ? sourceBefore("}") : Space.EMPTY));
+            if (values.isEmpty()) {
+                mappedValues.add(
+                        HclRightPadded.build(new Hcl.Empty(randomId(), sourceBefore("}"), Markers.EMPTY)));
+            } else {
+                for (int i = 0; i < values.size(); i++) {
+                    HCLParser.ObjectelemContext value = values.get(i);
+                    mappedValues.add(HclRightPadded.build((Expression) visit(value))
+                            .withAfter(i == values.size() - 1 ? sourceBefore("}") : Space.EMPTY));
+                }
             }
 
             return new Hcl.ObjectValue(randomId(), Space.format(prefix), Markers.EMPTY,
