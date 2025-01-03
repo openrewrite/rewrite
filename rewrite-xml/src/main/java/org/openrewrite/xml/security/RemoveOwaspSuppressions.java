@@ -39,7 +39,7 @@ public class RemoveOwaspSuppressions extends Recipe {
 
     @Option(displayName = "Until date",
             required = false,
-            description = "Optional. Suppressions will be removed if they expired before the provided date. Default will be yesterday.",
+            description = "Suppressions will be removed if they expired before the provided date. Default will be yesterday.",
             example = "2023-01-01")
     @Nullable
     String cutOffDate;
