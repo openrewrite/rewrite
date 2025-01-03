@@ -85,7 +85,7 @@ class TomlParserTest implements RewriteTest {
 
             # not a number
             sf4 = nan  # actual sNaN/qNaN encoding is implementation-specific
-            sf5 = +nan # sa
+            sf5 = +nan # same as `nan`
             sf6 = -nan # valid, actual encoding is implementation-specific
             """
           )
@@ -271,9 +271,9 @@ class TomlParserTest implements RewriteTest {
         rewriteRun(
           toml(
             """
-            fruit.name = "banana"     # this is best practice
+            fruit.name = "banana"      # this is best practice
             fruit. color = "yellow"    # same as fruit.color
-            fruit . flavor = "banana"   # same as fruit.flavor
+            fruit . flavor = "banana"  # same as fruit.flavor
             """
           )
         );

@@ -27,7 +27,7 @@ import java.util.*;
 import static java.util.Collections.emptyList;
 
 /**
- * Wherever whitespace can occur in JSON, so can comments (at least block style comments).
+ * Wherever whitespace can occur in TOML, so can comments (at least block style comments).
  * So whitespace and comments are like peanut butter and jelly.
  */
 @EqualsAndHashCode
