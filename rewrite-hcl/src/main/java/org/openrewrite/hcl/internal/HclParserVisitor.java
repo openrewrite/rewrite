@@ -445,8 +445,8 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
             List<HclRightPadded<Expression>> mappedValues = new ArrayList<>();
             List<HCLParser.ObjectelemContext> values = ctx.objectelem();
             if (values.isEmpty()) {
-             mappedValues.add(
-                     HclRightPadded.build(new Hcl.Empty(randomId(), sourceBefore("}"), Markers.EMPTY)));
+                mappedValues.add(
+                        HclRightPadded.build(new Hcl.Empty(randomId(), sourceBefore("}"), Markers.EMPTY)));
             } else {
                 for (int i = 0; i < values.size(); i++) {
                     HCLParser.ObjectelemContext value = values.get(i);
