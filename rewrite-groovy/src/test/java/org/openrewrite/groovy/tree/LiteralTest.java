@@ -298,7 +298,7 @@ class LiteralTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              def a = (       "-")
+              def a = (       "-"  )
               """
           ),
           groovy(
