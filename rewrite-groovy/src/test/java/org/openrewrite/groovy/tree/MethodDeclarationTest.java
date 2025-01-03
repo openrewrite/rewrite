@@ -201,7 +201,7 @@ class MethodDeclarationTest implements RewriteTest {
             """
               class A {
                   def /*int*/ int one() { 1 }
-                  def /*Object*/ Object two() { 2 }
+                  @Foo def /*Object*/ Object two() { 2 }
               }
               """
           )
