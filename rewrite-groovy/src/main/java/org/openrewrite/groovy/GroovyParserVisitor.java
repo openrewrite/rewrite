@@ -1544,16 +1544,7 @@ public class GroovyParserVisitor {
         @Override
         public void visitGStringExpression(GStringExpression gstring) {
             Space fmt = whitespace();
-            String delimiter;
-            if (source.startsWith("\"\"\"", cursor)) {
-                delimiter = "\"\"\"";
-            } else if (source.startsWith("/", cursor)) {
-                delimiter = "/";
-            } else if (source.startsWith("$/", cursor)) {
-                delimiter = "$/";
-            } else {
-                delimiter = "\"";
-            }
+            String delimiter = getDelimiter();
             skip(delimiter); // Opening delim for GString
 
             NavigableMap<LineColumn, org.codehaus.groovy.ast.expr.Expression> sortedByPosition = new TreeMap<>();
