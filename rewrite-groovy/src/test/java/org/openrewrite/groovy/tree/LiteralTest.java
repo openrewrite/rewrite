@@ -267,20 +267,6 @@ class LiteralTest implements RewriteTest {
         );
     }
 
-
-
-    @Test
-    void moreParenthesesStuff() {
-        rewriteRun(
-          groovy(
-            """
-              "  xyz\\n  "
-              """
-          )
-        );
-    }
-    // + '  \n'
-
     @Test
     void differentiateEscapeFromLiteral() {
         rewriteRun(
