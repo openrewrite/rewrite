@@ -2415,7 +2415,7 @@ public class GroovyParserVisitor {
     }
 
     /**
-     * Returns a string that is a part of this soure. The substring begins at the specified beginIndex and extends until delimiter.
+     * Returns a string that is a part of this source. The substring begins at the specified beginIndex and extends until delimiter.
      * The cursor will not be moved.
      */
     private String sourceSubstring(int beginIndex, String untilDelim) {
