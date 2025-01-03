@@ -259,13 +259,27 @@ class LiteralTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-            "\\\\n\\t"
+            "\\n\\t"
             '\\\\n\\t'
             ///\\\\n\\t///
             """
           )
         );
     }
+
+
+
+    @Test
+    void moreParenthesesStuff() {
+        rewriteRun(
+          groovy(
+            """
+              "  xyz\\n  "
+              """
+          )
+        );
+    }
+    // + '  \n'
 
     @Test
     void differentiateEscapeFromLiteral() {
@@ -284,7 +298,7 @@ class LiteralTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              def a = ("-")
+              def a = (       "-")
               """
           ),
           groovy(

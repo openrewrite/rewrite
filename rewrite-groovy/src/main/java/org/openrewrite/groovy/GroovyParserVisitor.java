@@ -1284,22 +1284,18 @@ public class GroovyParserVisitor {
                     jType = JavaType.Primitive.Short;
                 } else if (type == ClassHelper.STRING_TYPE) {
                     jType = JavaType.Primitive.String;
-                    // this is an attribute selector
-                    boolean attributeSelector = source.startsWith("@" + value, cursor);
-                    int length = lengthAccordingToAst(expression);
-                    Integer insideParenthesesLevel = getInsideParenthesesLevel(expression);
-                    if (insideParenthesesLevel != null) {
-                        length = length - insideParenthesesLevel * 2;
-                    }
-                    String valueAccordingToAST = source.substring(cursor, cursor + length + (attributeSelector ? 1 : 0));
-                    int delimiterLength = getDelimiterLength();
-                    if (StringUtils.containsWhitespace(valueAccordingToAST)) {
-                        length = delimiterLength + expression.getValue().toString().length() + delimiterLength;
-                        text = source.substring(cursor, cursor + length + (attributeSelector ? 1 : 0));
+                    // an attribute selector is modeled as a String ConstantExpression
+                    if (source.startsWith("@" + value, cursor)) {
+                        value = "@" + value;
+                        text = "@" + text;
                     } else {
-                        text = valueAccordingToAST;
+                        String delimiter = getDelimiter();
+                        if (delimiter != null) {
+                            // get the string literal from the source, so escaping of newlines and the like works out of the box
+                            value = source.substring(cursor + delimiter.length(), source.indexOf(delimiter, cursor + delimiter.length()));
+                            text = delimiter + value + delimiter;
+                        }
                     }
-                    value = text.substring(delimiterLength, text.length() - delimiterLength);
                 } else if (expression.isNullExpression()) {
                     if (source.startsWith("null", cursor)) {
                         text = "null";
@@ -2485,21 +2481,26 @@ public class GroovyParserVisitor {
         return Math.max(count, 0);
     }
 
-    private int getDelimiterLength() {
+    private @Nullable String getDelimiter() {
         String maybeDelimiter = source.substring(cursor, Math.min(cursor + 3, source.length()));
-        int delimiterLength = 0;
         if (maybeDelimiter.startsWith("$/")) {
-            delimiterLength = 2;
-        } else if (maybeDelimiter.startsWith("\"\"\"") || maybeDelimiter.startsWith("'''")) {
-            delimiterLength = 3;
-        } else if (maybeDelimiter.startsWith("/") || maybeDelimiter.startsWith("\"") || maybeDelimiter.startsWith("'")) {
-            delimiterLength = 1;
+            return "$/";
+        } else if (maybeDelimiter.startsWith("\"\"\"")) {
+            return "\"\"\"";
+        } else if (maybeDelimiter.startsWith("'''")) {
+            return "'''";
+        } else if (maybeDelimiter.startsWith("/")) {
+            return "/";
+        } else if (maybeDelimiter.startsWith("\"")) {
+            return "\"";
+        } else if (maybeDelimiter.startsWith("'")) {
+            return "'";
         }
-        return delimiterLength;
+        return null;
     }
 
     /**
-     * Gets the length according to the Groovy compiler's attestation of starting/ending line and column numbers.
+     * Gets the length according to the Groovy compiler's attestation of starting/ending line and column numbers, including whitespace and parentheses.
      * On older versions of the JDK/Groovy compiler string literals with following whitespace sometimes erroneously include
      * the length of the whitespace in the length of the AST node.
      * So in this method invocation:
