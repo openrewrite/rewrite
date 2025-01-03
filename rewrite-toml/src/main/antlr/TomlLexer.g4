@@ -23,13 +23,9 @@ with the License.  You may obtain a copy of the License at
 
 lexer grammar TomlLexer;
 
-channels {
-    COMMENTS_CHANNEL
-}
-
 WS               : [ \t]+ -> skip;
 NL               : ('\r'? '\n')+;
-COMMENT          : '#' (~[\r\n])* -> channel(COMMENTS_CHANNEL);
+COMMENT          : '#' (~[\r\n])*;
 L_BRACKET        : '[';
 DOUBLE_L_BRACKET : '[[';
 R_BRACKET        : ']';

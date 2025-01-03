@@ -97,8 +97,7 @@ public class TomlRightPadded<T> {
         return new TomlRightPadded<>(element, Space.EMPTY, Markers.EMPTY);
     }
 
-    @Nullable
-    public static <T> TomlRightPadded<T> withElement(@Nullable TomlRightPadded<T> before, @Nullable T elements) {
+    public static <T> @Nullable TomlRightPadded<T> withElement(@Nullable TomlRightPadded<T> before, @Nullable T elements) {
         if (before == null) {
             if (elements == null) {
                 return null;

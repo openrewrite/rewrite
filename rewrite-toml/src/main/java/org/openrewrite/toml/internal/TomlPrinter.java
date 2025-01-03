@@ -32,6 +32,7 @@ import java.util.function.UnaryOperator;
 
 public class TomlPrinter<P> extends TomlVisitor<PrintOutputCapture<P>> {
 
+    @Override
     public Toml visitArray(Toml.Array array, PrintOutputCapture<P> p) {
         beforeSyntax(array, p);
         p.append("[");
@@ -41,6 +42,7 @@ public class TomlPrinter<P> extends TomlVisitor<PrintOutputCapture<P>> {
         return array;
     }
 
+    @Override
     public Toml visitDocument(Toml.Document document, PrintOutputCapture<P> p) {
         beforeSyntax(document, p);
         visit(document.getValues(), p);
@@ -49,12 +51,14 @@ public class TomlPrinter<P> extends TomlVisitor<PrintOutputCapture<P>> {
         return document;
     }
 
+    @Override
     public Toml visitEmpty(Toml.Empty empty, PrintOutputCapture<P> p) {
         beforeSyntax(empty, p);
         afterSyntax(empty, p);
         return empty;
     }
 
+    @Override
     public Toml visitIdentifier(Toml.Identifier identifier, PrintOutputCapture<P> p) {
         beforeSyntax(identifier, p);
         p.append(identifier.getSource());
@@ -62,6 +66,7 @@ public class TomlPrinter<P> extends TomlVisitor<PrintOutputCapture<P>> {
         return identifier;
     }
 
+    @Override
     public Toml visitKeyValue(Toml.KeyValue keyValue, PrintOutputCapture<P> p) {
         beforeSyntax(keyValue, p);
         visitRightPadded(keyValue.getPadding().getKey(), p);
@@ -71,6 +76,7 @@ public class TomlPrinter<P> extends TomlVisitor<PrintOutputCapture<P>> {
         return keyValue;
     }
 
+    @Override
     public Toml visitLiteral(Toml.Literal literal, PrintOutputCapture<P> p) {
         beforeSyntax(literal, p);
         p.append(literal.getSource());

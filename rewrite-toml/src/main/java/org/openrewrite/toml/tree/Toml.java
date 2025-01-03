@@ -17,8 +17,8 @@ package org.openrewrite.toml.tree;
 
 import lombok.*;
 import lombok.experimental.NonFinal;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.toml.TomlVisitor;
 import org.openrewrite.toml.internal.TomlPrinter;
@@ -37,8 +37,7 @@ public interface Toml extends Tree {
         return (R) acceptToml(v.adapt(TomlVisitor.class), p);
     }
 
-    @Nullable
-    default <P> Toml acceptToml(TomlVisitor<P> v, P p) {
+    default <P> @Nullable Toml acceptToml(TomlVisitor<P> v, P p) {
         return v.defaultValue(this, p);
     }
 
@@ -224,6 +223,7 @@ public interface Toml extends Tree {
 
         Toml value;
 
+        @Override
         public <P> Toml acceptToml(TomlVisitor<P> v, P p) {
             return v.visitKeyValue(this, p);
         }
