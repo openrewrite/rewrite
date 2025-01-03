@@ -1400,21 +1400,17 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         if (typeIdent instanceof JCArrayTypeTree) {
             List<J.Annotation> annotations = leadingAnnotations(annotationPosTable);
             int saveCursor = cursor;
-            whitespace();
-            if (source.startsWith("[", cursor)) {
-                cursor = saveCursor;
-                JLeftPadded<Space> dimension = padLeft(sourceBefore("["), sourceBefore("]"));
-                return new J.ArrayType(
-                        randomId(),
-                        EMPTY,
-                        Markers.EMPTY,
-                        mapDimensions(baseType, ((JCArrayTypeTree) typeIdent).elemtype, annotationPosTable),
-                        annotations,
-                        dimension,
-                        typeMapping.type(tree)
-                );
-            }
+            Space space = whitespace();
             cursor = saveCursor;
+            return new J.ArrayType(
+                    randomId(),
+                    EMPTY,
+                    Markers.EMPTY,
+                    mapDimensions(baseType, ((JCArrayTypeTree) typeIdent).elemtype, annotationPosTable),
+                    annotations,
+                    source.startsWith("...", cursor) ? JLeftPadded.build(space) : padLeft(sourceBefore("["), sourceBefore("]")),
+                    typeMapping.type(tree)
+            );
         }
         return baseType;
     }
