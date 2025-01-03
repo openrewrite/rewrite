@@ -156,7 +156,7 @@ class AssignmentTest implements RewriteTest {
             """
               def startItem = '|  ', endItem = '  |'
               def repeatLength = startItem.length() + output.length() + endItem.length()
-              println("\\n" + ("-" * repeatLength) + "\\n" + startItem + output + endItem + "\\n" + ("-" * repeatLength))
+              println("\\n" + ("-" * repeatLength) + "\\n|  " + startItem + output + endItem + "  |\\n" + ("-" * repeatLength))
               """
           )
         );

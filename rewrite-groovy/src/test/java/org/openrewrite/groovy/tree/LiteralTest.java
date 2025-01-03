@@ -85,6 +85,17 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
+    void escapedString() {
+        rewriteRun(
+          groovy(
+            """
+              "f\\"o\\\\\\"o"
+              """
+          )
+        );
+    }
+
+    @Test
     void gString() {
         rewriteRun(
           groovy(
@@ -164,6 +175,17 @@ class LiteralTest implements RewriteTest {
           groovy(
             """
               String s = "${ ARTIFACTORY_URL }"
+              """
+          )
+        );
+    }
+
+    @Test
+    void gStringWithEscapedDelimiter() {
+        rewriteRun(
+          groovy(
+            """
+              String s = "<a href=\\"$url\\">${displayName}</a>"
               """
           )
         );
@@ -259,7 +281,7 @@ class LiteralTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-            "\\\\n\\t"
+            "\\\\\\\\n\\\\t"
             '\\\\n\\t'
             ///\\\\n\\t///
             """
@@ -284,7 +306,7 @@ class LiteralTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              def a = ("-")
+              def a = (       "-"  )
               """
           ),
           groovy(

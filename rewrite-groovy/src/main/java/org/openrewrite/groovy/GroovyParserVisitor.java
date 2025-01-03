@@ -34,7 +34,6 @@ import org.openrewrite.groovy.marker.*;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.marker.OmitParentheses;
@@ -1284,22 +1283,18 @@ public class GroovyParserVisitor {
                     jType = JavaType.Primitive.Short;
                 } else if (type == ClassHelper.STRING_TYPE) {
                     jType = JavaType.Primitive.String;
-                    // this is an attribute selector
-                    boolean attributeSelector = source.startsWith("@" + value, cursor);
-                    int length = lengthAccordingToAst(expression);
-                    Integer insideParenthesesLevel = getInsideParenthesesLevel(expression);
-                    if (insideParenthesesLevel != null) {
-                        length = length - insideParenthesesLevel * 2;
-                    }
-                    String valueAccordingToAST = source.substring(cursor, cursor + length + (attributeSelector ? 1 : 0));
-                    int delimiterLength = getDelimiterLength();
-                    if (StringUtils.containsWhitespace(valueAccordingToAST)) {
-                        length = delimiterLength + expression.getValue().toString().length() + delimiterLength;
-                        text = source.substring(cursor, cursor + length + (attributeSelector ? 1 : 0));
+                    // an attribute selector is modeled as a String ConstantExpression
+                    if (source.startsWith("@" + value, cursor)) {
+                        value = "@" + value;
+                        text = "@" + text;
                     } else {
-                        text = valueAccordingToAST;
+                        String delimiter = getDelimiter();
+                        if (delimiter != null) {
+                            // Get the string literal from the source, so escaping of newlines and the like works out of the box
+                            value = sourceSubstring(cursor + delimiter.length(), delimiter);
+                            text = delimiter + value + delimiter;
+                        }
                     }
-                    value = text.substring(delimiterLength, text.length() - delimiterLength);
                 } else if (expression.isNullExpression()) {
                     if (source.startsWith("null", cursor)) {
                         text = "null";
@@ -1548,16 +1543,7 @@ public class GroovyParserVisitor {
         @Override
         public void visitGStringExpression(GStringExpression gstring) {
             Space fmt = whitespace();
-            String delimiter;
-            if (source.startsWith("\"\"\"", cursor)) {
-                delimiter = "\"\"\"";
-            } else if (source.startsWith("/", cursor)) {
-                delimiter = "/";
-            } else if (source.startsWith("$/", cursor)) {
-                delimiter = "$/";
-            } else {
-                delimiter = "\"";
-            }
+            String delimiter = getDelimiter();
             skip(delimiter); // Opening delim for GString
 
             NavigableMap<LineColumn, org.codehaus.groovy.ast.expr.Expression> sortedByPosition = new TreeMap<>();
@@ -1588,20 +1574,13 @@ public class GroovyParserVisitor {
                         columnOffset++;
                     }
                 } else if (e instanceof ConstantExpression) {
-                    ConstantExpression cs = (ConstantExpression) e;
-                    // The sub-strings within a GString have no delimiters of their own, confusing visitConstantExpression()
-                    // ConstantExpression.getValue() cannot be trusted for strings as its values don't match source code because sequences like "\\" have already been replaced with a single "\"
-                    // Use the AST element's line/column positions to figure out its extent, but those numbers need tweaks to be correct
-                    int length = lengthAccordingToAst(cs);
-                    if (i == 0 || i == rawExprs.size() - 1) {
-                        // The first and last constants within a GString have line/column position which incorrectly include the GString's delimiters
-                        length -= delimiter.length();
+                    // Get the string literal from the source, so escaping of newlines and the like works out of the box
+                    String value = sourceSubstring(cursor, delimiter);
+                    // There could be a closer GString before the end of the closing delimiter, so shorten the string if needs be
+                    int indexNextSign = source.indexOf("$", cursor);
+                    if (indexNextSign != -1 && indexNextSign < (cursor + value.length())) {
+                        value = source.substring(cursor, indexNextSign);
                     }
-                    // The line/column numbers incorrectly indicate that the following expression's opening "$" is part of this expression
-                    if (i < rawExprs.size() - 1) {
-                        length--;
-                    }
-                    String value = source.substring(cursor, cursor + length);
                     strings.add(new J.Literal(randomId(), EMPTY, Markers.EMPTY, value, value, null, JavaType.Primitive.String));
                     skip(value);
                 } else {
@@ -2435,6 +2414,19 @@ public class GroovyParserVisitor {
         return space;
     }
 
+    /**
+     * Returns a string that is a part of this source. The substring begins at the specified beginIndex and extends until delimiter.
+     * The cursor will not be moved.
+     */
+    private String sourceSubstring(int beginIndex, String untilDelim) {
+        int endIndex = source.indexOf(untilDelim, cursor + untilDelim.length());
+        // don't stop if last char is escaped.
+        while (source.charAt(endIndex - 1) == '\\') {
+            endIndex = source.indexOf(untilDelim, endIndex + 1);
+        }
+        return source.substring(beginIndex, endIndex);
+    }
+
     private @Nullable Integer getInsideParenthesesLevel(ASTNode node) {
         Object rawIpl = node.getNodeMetaData("_INSIDE_PARENTHESES_LEVEL");
         if (rawIpl instanceof AtomicInteger) {
@@ -2485,54 +2477,22 @@ public class GroovyParserVisitor {
         return Math.max(count, 0);
     }
 
-    private int getDelimiterLength() {
+    private @Nullable String getDelimiter() {
         String maybeDelimiter = source.substring(cursor, Math.min(cursor + 3, source.length()));
-        int delimiterLength = 0;
         if (maybeDelimiter.startsWith("$/")) {
-            delimiterLength = 2;
-        } else if (maybeDelimiter.startsWith("\"\"\"") || maybeDelimiter.startsWith("'''")) {
-            delimiterLength = 3;
-        } else if (maybeDelimiter.startsWith("/") || maybeDelimiter.startsWith("\"") || maybeDelimiter.startsWith("'")) {
-            delimiterLength = 1;
+            return "$/";
+        } else if (maybeDelimiter.startsWith("\"\"\"")) {
+            return "\"\"\"";
+        } else if (maybeDelimiter.startsWith("'''")) {
+            return "'''";
+        } else if (maybeDelimiter.startsWith("/")) {
+            return "/";
+        } else if (maybeDelimiter.startsWith("\"")) {
+            return "\"";
+        } else if (maybeDelimiter.startsWith("'")) {
+            return "'";
         }
-        return delimiterLength;
-    }
-
-    /**
-     * Gets the length according to the Groovy compiler's attestation of starting/ending line and column numbers.
-     * On older versions of the JDK/Groovy compiler string literals with following whitespace sometimes erroneously include
-     * the length of the whitespace in the length of the AST node.
-     * So in this method invocation:
-     * foo( 'a' )
-     * the correct source length for the AST node representing 'a' is 3, but in affected groovy versions the length
-     * on the node is '4' because it is also counting the trailing whitespace.
-     */
-    private int lengthAccordingToAst(ConstantExpression node) {
-        if (!appearsInSource(node)) {
-            return 0;
-        }
-        int lineCount = node.getLastLineNumber() - node.getLineNumber();
-        if (lineCount == 0) {
-            return node.getLastColumnNumber() - node.getColumnNumber() + columnOffset;
-        }
-        int linesSoFar = 0;
-        int length = 0;
-        int finalLineChars = 0;
-        while (true) {
-            char c = source.charAt(cursor + length);
-            if (c == '\n') {
-                linesSoFar++;
-            }
-            if (linesSoFar == lineCount) {
-                finalLineChars++;
-            }
-
-            length++;
-
-            if (finalLineChars == node.getLastColumnNumber() + columnOffset) {
-                return length;
-            }
-        }
+        return null;
     }
 
     private TypeTree visitTypeTree(ClassNode classNode) {
