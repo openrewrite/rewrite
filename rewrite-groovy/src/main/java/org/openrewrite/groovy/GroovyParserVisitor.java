@@ -1078,8 +1078,8 @@ public class GroovyParserVisitor {
             // Groovy allows catch variables to omit their type, shorthand for being of type java.lang.Exception
             // Can't use isSynthetic() here because groovy doesn't record the line number on the Parameter
             if (Exception.class.getName().equals(param.getType().getName()) &&
-               !source.startsWith("Exception", cursor) &&
-               !source.startsWith("java.lang.Exception", cursor)) {
+                !source.startsWith("Exception", cursor) &&
+                !source.startsWith("java.lang.Exception", cursor)) {
                 paramType = new J.Identifier(randomId(), paramPrefix, Markers.EMPTY, emptyList(), "",
                         JavaType.ShallowClass.build(Exception.class.getName()), null);
             } else {
