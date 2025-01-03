@@ -169,6 +169,21 @@ class YamlParserTest implements RewriteTest {
         );
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {
+      // pass
+      "a: b@@c",
+      "a: b@c@d",
+      "a: :@b",
+      "a: :@@b",
+      // fail
+      "a: :@b@",
+      "a: ':@b@'",
+    })
+    void projectBasedir(String yaml) {
+        rewriteRun(yaml(yaml));
+    }
+
     @Test
     void troublesomeYaml() {
         rewriteRun(
