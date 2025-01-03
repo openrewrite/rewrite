@@ -619,16 +619,12 @@ public class GroovyParserVisitor {
         }
 
         /**
-         * Methods can be declared with "def" AND a return type.
+         * Methods can be declared with "def" AND a return type (or constructors with "def").
          * In these cases the "def" is semantically meaningless but needs to be preserved for source code accuracy.
          * If there is both a def and a return type, this method returns a RedundantDef object and advances the cursor
          * position past the "def" keyword, leaving the return type to be parsed as normal.
          */
         private @Nullable RedundantDef getRedundantDefMarker(MethodNode method) {
-            if (method instanceof ConstructorNode) {
-                return null;
-            }
-
             int saveCursor = cursor;
             Space defPrefix = whitespace();
             if (source.startsWith("def", cursor) && (method.getReturnType().isRedirectNode() || !method.getReturnType().getName().equals("java.lang.Object"))) {
