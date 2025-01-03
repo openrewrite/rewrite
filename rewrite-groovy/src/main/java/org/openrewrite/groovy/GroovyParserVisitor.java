@@ -627,7 +627,7 @@ public class GroovyParserVisitor {
         private @Nullable RedundantDef getRedundantDefMarker(MethodNode method) {
             int saveCursor = cursor;
             Space defPrefix = whitespace();
-            if (source.startsWith("def", cursor) && (method.getReturnType().isRedirectNode() || !method.getReturnType().getName().equals("java.lang.Object"))) {
+            if (source.startsWith("def", cursor) && (method.getReturnType().isRedirectNode() || !Object.class.getName().equals(method.getReturnType().getName()))) {
                 skip("def");
                 return new RedundantDef(randomId(), defPrefix);
             }
