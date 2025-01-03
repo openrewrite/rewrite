@@ -259,7 +259,7 @@ class LiteralTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-            "\\n\\t"
+            "\\\\\\\\n\\\\t"
             '\\\\n\\t'
             ///\\\\n\\t///
             """
