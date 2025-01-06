@@ -84,4 +84,21 @@ class AnnotationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4254")
+    @Test
+    void groovyTransformAnnotation() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.transform.ToString
+              import groovy.transform.EqualsAndHashCode
+              
+              @ToString
+              @EqualsAndHashCode
+              class Test {}
+              """
+          )
+        );
+    }
 }

@@ -16,6 +16,7 @@
 package org.openrewrite.groovy;
 
 import groovy.lang.GroovySystem;
+import groovy.transform.Generated;
 import groovyjarjarasm.asm.Opcodes;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -305,7 +306,7 @@ public class GroovyParserVisitor {
                         org.codehaus.groovy.ast.stmt.Statement statement = ((BlockStatement) method.getCode()).getStatements().get(0);
                         sortedByPosition.computeIfAbsent(pos(statement), i -> new ArrayList<>()).add(statement);
                     }
-                } else {
+                } else if (method.getAnnotations(new ClassNode(Generated.class)).isEmpty()) {
                     sortedByPosition.computeIfAbsent(pos(method), i -> new ArrayList<>()).add(method);
                 }
             }
