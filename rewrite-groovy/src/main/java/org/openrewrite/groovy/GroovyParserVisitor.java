@@ -646,7 +646,7 @@ public class GroovyParserVisitor {
                 // The groovy compiler can add or remove annotations for AST transformations.
                 // Because @groovy.transform.Immutable is discarded in favour of other transform annotations, the removed @Immutable annotation must be parsed by hand.
                 String nextParsableElem = source.substring(indexOfNextNonWhitespace(cursor, source));
-                if (nextParsableElem.startsWith("@Immutable") || nextParsableElem.startsWith("@groovy.transform.Immutable") ) {
+                if (nextParsableElem.startsWith("@" + Immutable.class.getSimpleName()) || nextParsableElem.startsWith("@" + Immutable.class.getCanonicalName()) ) {
                     visitAnnotation(new AnnotationNode(new ClassNode(Immutable.class)));
                     paramAnnotations.add(pollQueue());
                 }
