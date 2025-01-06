@@ -30,6 +30,21 @@ class AnnotationTest implements RewriteTest {
           groovy(
             """
               @Foo
+              class Test implements Runnable {
+                  @java.lang.Override
+                  void run() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void simpleFQN() {
+        rewriteRun(
+          groovy(
+            """
+              @org.springframework.stereotype.Service
               class Test {}
               """
           )
@@ -91,11 +106,45 @@ class AnnotationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              import groovy.transform.ToString
               import groovy.transform.EqualsAndHashCode
+              import groovy.transform.ToString
               
+              @Foo
               @ToString
               @EqualsAndHashCode
+              @Bar
+              class Test {}
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4254")
+    @Test
+    void groovyTransformImmutableAnnotation() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.transform.Immutable
+              //import groovy.transform.TupleConstructor
+              
+              @Foo
+              //@TupleConstructor
+              @Immutable
+              @Bar
+              class Test {}
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4254")
+    @Test
+    void groovyTransformImmutableFQNAnnotation() {
+        rewriteRun(
+          groovy(
+            """
+              @groovy.transform.Immutable
               class Test {}
               """
           )

@@ -17,6 +17,7 @@ package org.openrewrite.groovy;
 
 import groovy.lang.GroovySystem;
 import groovy.transform.Generated;
+import groovy.transform.Immutable;
 import groovyjarjarasm.asm.Opcodes;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -449,7 +450,6 @@ public class GroovyParserVisitor {
         @Override
         protected void visitAnnotation(AnnotationNode annotation) {
             RewriteGroovyVisitor bodyVisitor = new RewriteGroovyVisitor(annotation, this);
-
             String lastArgKey = annotation.getMembers().keySet().stream().reduce("", (k1, k2) -> k2);
             Space prefix = sourceBefore("@");
             NameTree annotationType = visitTypeTree(annotation.getClassNode());
@@ -643,8 +643,21 @@ public class GroovyParserVisitor {
 
             List<J.Annotation> paramAnnotations = new ArrayList<>(node.getAnnotations().size());
             for (AnnotationNode annotationNode : node.getAnnotations()) {
-                visitAnnotation(annotationNode);
-                paramAnnotations.add(pollQueue());
+                // The groovy compiler can add or remove additional annotations for AST transforms.
+                // The @groovy.transform.Immutable is removed and other transform annotations are added (unless you have specified those annotations yourself).
+                // To make the parser work, parse the removed @Immutable annotation by hand.
+                String nextParsableElem = source.substring(indexOfNextNonWhitespace(cursor, source));
+                if (nextParsableElem.startsWith("@Immutable") || nextParsableElem.startsWith("@groovy.transform.Immutable") ) {
+                    visitAnnotation(new AnnotationNode(new ClassNode(Immutable.class)));
+                    paramAnnotations.add(pollQueue());
+                    nextParsableElem = source.substring(indexOfNextNonWhitespace(cursor, source));
+                }
+
+                // Parse only annotations available in the source code
+                if (nextParsableElem.startsWith("@" + annotationNode.getClassNode().getUnresolvedName())) {
+                    visitAnnotation(annotationNode);
+                    paramAnnotations.add(pollQueue());
+                }
             }
             return paramAnnotations;
         }
