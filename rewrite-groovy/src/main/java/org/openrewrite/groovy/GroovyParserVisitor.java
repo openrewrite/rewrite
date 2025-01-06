@@ -1290,9 +1290,11 @@ public class GroovyParserVisitor {
                     } else {
                         String delimiter = getDelimiter();
                         if (delimiter != null) {
+                            // handle the `pattern` operator
+                            String endDelimiter = "~/".equals(delimiter) ? "/" : delimiter;
                             // Get the string literal from the source, so escaping of newlines and the like works out of the box
-                            value = sourceSubstring(cursor + delimiter.length(), delimiter);
-                            text = delimiter + value + delimiter;
+                            value = sourceSubstring(cursor + delimiter.length(), endDelimiter);
+                            text = delimiter + value + endDelimiter;
                         }
                     }
                 } else if (expression.isNullExpression()) {
@@ -1575,7 +1577,7 @@ public class GroovyParserVisitor {
                     }
                 } else if (e instanceof ConstantExpression) {
                     // Get the string literal from the source, so escaping of newlines and the like works out of the box
-                    String value = sourceSubstring(cursor, delimiter);
+                    String value = sourceSubstring(cursor, ("~/".equals(delimiter) ? "/" : delimiter));
                     // There could be a closer GString before the end of the closing delimiter, so shorten the string if needs be
                     int indexNextSign = source.indexOf("$", cursor);
                     if (indexNextSign != -1 && indexNextSign < (cursor + value.length())) {
@@ -2419,7 +2421,7 @@ public class GroovyParserVisitor {
      * The cursor will not be moved.
      */
     private String sourceSubstring(int beginIndex, String untilDelim) {
-        int endIndex = source.indexOf(untilDelim, cursor + untilDelim.length());
+        int endIndex = source.indexOf(untilDelim, Math.max(beginIndex, cursor + untilDelim.length()));
         // don't stop if last char is escaped.
         while (source.charAt(endIndex - 1) == '\\') {
             endIndex = source.indexOf(untilDelim, endIndex + 1);
@@ -2485,6 +2487,8 @@ public class GroovyParserVisitor {
             return "\"\"\"";
         } else if (maybeDelimiter.startsWith("'''")) {
             return "'''";
+        } else if (maybeDelimiter.startsWith("~/")) {
+            return "~/";
         } else if (maybeDelimiter.startsWith("/")) {
             return "/";
         } else if (maybeDelimiter.startsWith("\"")) {
