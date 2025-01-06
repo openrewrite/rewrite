@@ -36,6 +36,7 @@ import java.net.URI;
 import java.nio.file.*;
 import java.time.Duration;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -43,14 +44,9 @@ import java.util.regex.Pattern;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
-import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_BATCH_LOCATION;
-import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_JAR_LOCATION;
-import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_PROPERTIES_LOCATION;
-import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_SCRIPT_LOCATION;
+import static org.openrewrite.gradle.util.GradleWrapper.*;
 import static org.openrewrite.properties.Assertions.properties;
-import static org.openrewrite.test.SourceSpecs.dir;
-import static org.openrewrite.test.SourceSpecs.other;
-import static org.openrewrite.test.SourceSpecs.text;
+import static org.openrewrite.test.SourceSpecs.*;
 
 @SuppressWarnings("UnusedProperty")
 class UpdateGradleWrapperTest implements RewriteTest {
@@ -133,6 +129,47 @@ class UpdateGradleWrapperTest implements RewriteTest {
                 assertThat(gradleWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
                 assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create("https://services.gradle.org/distributions/gradle-7.4.2-bin.zip"));
                 assertThat(isValidWrapperJar(gradleWrapperJar)).as("Wrapper jar is not valid").isTrue();
+            }),
+          properties(
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4.2-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              distributionSha256Sum=29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda
+              """,
+            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+              .afterRecipe(gradleWrapperProperties ->
+                assertThat(gradleWrapperProperties.getMarkers().findFirst(BuildTool.class)).hasValueSatisfying(buildTool -> {
+                    assertThat(buildTool.getType()).isEqualTo(BuildTool.Type.Gradle);
+                    assertThat(buildTool.getVersion()).isEqualTo("7.4.2");
+                }))
+          ),
+          gradlew,
+          gradlewBat,
+          gradleWrapperJarQuark
+        );
+    }
+
+    @Test
+    @DocumentExample("Update existing Gradle wrapper")
+    void timeSaved() {
+        rewriteRun(
+          spec -> spec.allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
+            .afterRecipe(run -> {
+                AtomicReference<Duration> timeSaved = new AtomicReference<>(Duration.ofMinutes(0));
+                run.getChangeset().getAllResults().stream().forEach(
+                  c -> timeSaved.set(timeSaved.get().plus(c.getTimeSavings())));
+
+                assertThat(timeSaved.get()).isEqualTo(Duration.ofMinutes(20));
             }),
           properties(
             """
