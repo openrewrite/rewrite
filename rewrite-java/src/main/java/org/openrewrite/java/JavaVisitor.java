@@ -1423,6 +1423,13 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
                 JContainer.build(before, js, container.getMarkers());
     }
 
+    public J visitErroneous(J.Erroneous erroneous, P p) {
+        J.Erroneous u = erroneous;
+        u = u.withPrefix(visitSpace(u.getPrefix(), Space.Location.ERRONEOUS, p));
+        u = u.withMarkers(visitMarkers(u.getMarkers(), p));
+        return u;
+    }
+
     /**
      * Check if a child AST element is in the same lexical scope as that of the AST element associated with the base
      * cursor. (i.e.: Are the variables and declarations visible in the base scope also visible to the child AST
@@ -1456,7 +1463,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             Object childScope = it.next();
             if (childScope instanceof J.ClassDeclaration) {
                 J.ClassDeclaration childClass = (J.ClassDeclaration) childScope;
-                if (!(childClass.getKind().equals(J.ClassDeclaration.Kind.Type.Class)) ||
+                if (childClass.getKind() != J.ClassDeclaration.Kind.Type.Class ||
                     childClass.hasModifier(J.Modifier.Type.Static)) {
                     //Short circuit the search if a terminating element is encountered.
                     return false;

@@ -214,11 +214,7 @@ public class ChangeDependencyClassifier extends Recipe {
                     G.MapEntry mapEntry = null;
                     String classifierStringDelimiter = null;
                     int index = 0;
-                    for (Expression e : depArgs) {
-                        if (!(e instanceof G.MapEntry)) {
-                            continue;
-                        }
-                        G.MapEntry arg = (G.MapEntry) e;
+                    for (G.MapEntry arg : map.getElements()) {
                         if (!(arg.getKey() instanceof J.Literal) || !(arg.getValue() instanceof J.Literal)) {
                             continue;
                         }

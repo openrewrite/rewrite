@@ -444,10 +444,15 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
             Space tuplePrefix = sourceBefore("{");
             List<HclRightPadded<Expression>> mappedValues = new ArrayList<>();
             List<HCLParser.ObjectelemContext> values = ctx.objectelem();
-            for (int i = 0; i < values.size(); i++) {
-                HCLParser.ObjectelemContext value = values.get(i);
-                mappedValues.add(HclRightPadded.build((Expression) visit(value))
-                        .withAfter(i == values.size() - 1 ? sourceBefore("}") : Space.EMPTY));
+            if (values.isEmpty()) {
+                mappedValues.add(
+                        HclRightPadded.build(new Hcl.Empty(randomId(), sourceBefore("}"), Markers.EMPTY)));
+            } else {
+                for (int i = 0; i < values.size(); i++) {
+                    HCLParser.ObjectelemContext value = values.get(i);
+                    mappedValues.add(HclRightPadded.build((Expression) visit(value))
+                            .withAfter(i == values.size() - 1 ? sourceBefore("}") : Space.EMPTY));
+                }
             }
 
             return new Hcl.ObjectValue(randomId(), Space.format(prefix), Markers.EMPTY,
@@ -469,7 +474,13 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
                 if (ctx.LPAREN() != null) {
                     parenthesesPrefix = sourceBefore("(");
                 }
-                name = visitIdentifier(ctx.Identifier());
+                if (ctx.Identifier() != null) {
+                    name = visitIdentifier(ctx.Identifier());
+                } else if (ctx.expression(0) != null) {
+                    name = (Expression) visit(ctx.expression(0));
+                } else {
+                    throw new IllegalStateException("Unsupported LHS in object element");
+                }
                 if (ctx.RPAREN() != null) {
                     name = new Hcl.Parentheses(randomId(), parenthesesPrefix, Markers.EMPTY,
                             HclRightPadded.build(name).withAfter(sourceBefore(")")));
@@ -486,7 +497,7 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
                             c.ASSIGN() != null ? Hcl.Attribute.Type.Assignment : Hcl.Attribute.Type.ObjectElement,
                             Markers.EMPTY
                     ),
-                    (Expression) visit(c.expression()),
+                    (Expression) visit(c.expression().get(c.expression().size() - 1)),
                     ctx.COMMA() == null ?
                             null :
                             new Hcl.Empty(randomId(), sourceBefore(","), Markers.EMPTY)

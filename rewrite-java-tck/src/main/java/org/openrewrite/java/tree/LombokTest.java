@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledOnJre;
 import org.junit.jupiter.api.condition.JRE;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
@@ -33,7 +34,7 @@ import static org.assertj.core.api.CollectionAssert.assertThatCollection;
 import static org.openrewrite.java.Assertions.java;
 
 @SuppressWarnings({"CaughtExceptionImmediatelyRethrown", "LombokGetterMayBeUsed", "LombokSetterMayBeUsed", "DefaultAnnotationParam", "NotNullFieldNotInitialized", "ProtectedMemberInFinalClass", "WriteOnlyObject", "ConcatenationWithEmptyString"})
-@EnabledOnJre(JRE.JAVA_17)
+@EnabledOnJre({JRE.JAVA_11, JRE.JAVA_17})
 class LombokTest implements RewriteTest {
 
     @BeforeAll
@@ -111,6 +112,54 @@ class LombokTest implements RewriteTest {
               
                   void test() {
                       A a = A.builder().n(1).b(true).s("foo").build();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void builderWithDefault() {
+        rewriteRun(
+          java(
+            """
+              import lombok.Builder;
+              
+              @Builder
+              class A {
+                  @Builder.Default boolean b = false;
+                  @Builder.Default int n = 0;
+                  @Builder.Default String s = "Hello, Anshuman!";
+              
+                  void test() {
+                      A x = A.builder().n(1).b(true).s("foo").build();
+                      A y = A.builder().n(1).b(true).build();
+                      A z = A.builder().n(1).build();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void builderWithDefaultAndFinal() {
+        rewriteRun(
+          java(
+            """
+              import lombok.Builder;
+              
+              @Builder
+              class A {
+                  @Builder.Default private final boolean b = false;
+                  @Builder.Default public final int n = 0;
+                  @Builder.Default protected final String s = "Hello, Anshuman!";
+              
+                  void test() {
+                      A x = A.builder().n(1).b(true).s("foo").build();
+                      A y = A.builder().n(1).b(true).build();
+                      A z = A.builder().n(1).build();
                   }
               }
               """
@@ -402,7 +451,7 @@ class LombokTest implements RewriteTest {
                   Map<String, String> map;
                   void m() {
                       log.info("string = " + string);
-                      log.info(() -> "map = %s".formatted(map));
+                      log.info(() -> String.format("map = %s", map));
                   }
               }
               """
@@ -682,6 +731,78 @@ class LombokTest implements RewriteTest {
         );
     }
 
+    @Test
+    void onConstructor() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.builder().allowMissingType(o -> {
+              assert o instanceof FindMissingTypes.MissingTypeResult;
+              FindMissingTypes.MissingTypeResult result = (FindMissingTypes.MissingTypeResult) o;
+              // type attribution is missing for annotation args, as it was intentionally removed for processing.
+              return result.getPath().startsWith("Identifier->Annotation->");
+          }).build()),
+          java(
+            """
+              import lombok.AllArgsConstructor;
+              import lombok.Getter;
+              import lombok.Setter;
+              
+              import javax.inject.Inject;
+              import javax.persistence.Id;
+              import javax.persistence.Column;
+              import javax.validation.constraints.Max;
+              
+              @AllArgsConstructor(onConstructor=@__(@Inject))
+              public class OnXExample {
+                  @Getter(onMethod_={@Id, @Column(name="unique-id")}) //JDK8
+                  @Setter(onParam_=@Max(10000)) //JDK8
+                  private long unid;
+              
+                  public void test() {
+                      OnXExample x = new OnXExample(1L);
+                      x.setUnid(2L);
+                      System.out.println(x.getUnid());
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void onConstructorNoArgs() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.builder().allowMissingType(o -> {
+              assert o instanceof FindMissingTypes.MissingTypeResult;
+              FindMissingTypes.MissingTypeResult result = (FindMissingTypes.MissingTypeResult) o;
+              if (result.getJ() instanceof J.Identifier identifier) {
+                  // type attribution is missing for annotation args, as it was intentionally removed for processing.
+                  return identifier.getSimpleName().equals("__") || identifier.getSimpleName().equals("Inject");
+              }
+              return false;
+          }).build()),
+          java(
+            """
+              import lombok.NoArgsConstructor;
+              import lombok.NonNull;
+              import lombok.RequiredArgsConstructor;
+              
+              import javax.inject.Inject;
+              
+              @NoArgsConstructor(onConstructor = @__(@Inject))
+              @RequiredArgsConstructor(onConstructor = @__(@Inject))
+              public class OnXExample {
+                  @NonNull private Long unid;
+              
+                  public void test() {
+                      new OnXExample();
+                      new OnXExample(1L);
+                  }
+              }
+              """
+          )
+        );
+    }
+
     /**
      * These test lombok features that we do not fully support.
      * Code should still parse and print back to its original source code but type information may be missing.
@@ -715,55 +836,6 @@ class LombokTest implements RewriteTest {
                           if (in.isEmpty()) return in;
                           return "" + Character.toTitleCase(in.charAt(0)) + in.substring(1).toLowerCase();
                       }
-                  }
-                  """
-              )
-            );
-        }
-
-        @Test
-        void onConstructor() {
-            rewriteRun(
-              spec -> spec.typeValidationOptions(TypeValidation.none()),
-              java(
-                """
-                  import lombok.AllArgsConstructor;
-                  import lombok.Getter;
-                  import lombok.Setter;
-                  
-                  import javax.inject.Inject;
-                  import javax.persistence.Id;
-                  import javax.persistence.Column;
-                  import javax.validation.constraints.Max;
-                  
-                  // @__ missing attribution
-                  @AllArgsConstructor(onConstructor=@__(@Inject))
-                  public class OnXExample {
-                      @Getter(onMethod_={@Id, @Column(name="unique-id")}) //JDK8
-                      @Setter(onParam_=@Max(10000)) //JDK8
-                      private long unid;
-                  }
-                  """
-              )
-            );
-        }
-
-        @Test
-        void onConstructorNoArgs() {
-            rewriteRun(
-              spec -> spec.typeValidationOptions(TypeValidation.none()),
-              java(
-                """
-                  import lombok.NoArgsConstructor;
-                  import lombok.Getter;
-                  import lombok.RequiredArgsConstructor;import lombok.Setter;
-                  
-                  import javax.inject.Inject;
-                  // @__ missing attribution
-                  @NoArgsConstructor(onConstructor = @__(@Inject))
-                  @RequiredArgsConstructor(onConstructor_ = @__(@Inject))
-                  public class OnXExample {
-                      private long unid;
                   }
                   """
               )

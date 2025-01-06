@@ -86,7 +86,7 @@ object
     ;
 
 objectelem
-    : (Identifier | LPAREN Identifier RPAREN | QUOTE quotedTemplatePart* QUOTE) (ASSIGN | COLON) expression COMMA?
+    : (Identifier | LPAREN Identifier RPAREN | QUOTE quotedTemplatePart* QUOTE | expression) (ASSIGN | COLON) expression COMMA?
     ;
 
 // For Expressions

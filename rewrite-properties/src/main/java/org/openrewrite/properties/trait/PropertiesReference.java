@@ -25,8 +25,6 @@ import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.trait.Reference;
 import org.openrewrite.trait.SimpleTraitMatcher;
 
-import java.util.HashSet;
-import java.util.Set;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
@@ -64,29 +62,28 @@ public class PropertiesReference implements Reference {
         return tree;
     }
 
-    private static class Matcher extends SimpleTraitMatcher<PropertiesReference> {
-        private static final Predicate<String> javaFullyQualifiedTypeMatcher = Pattern.compile(
-                "\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*(?:\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*)*").asPredicate();
-
-        @Override
-        protected @Nullable PropertiesReference test(Cursor cursor) {
-            Object value = cursor.getValue();
-            if (value instanceof Properties.Entry &&
-                    javaFullyQualifiedTypeMatcher.test(((Properties.Entry) value).getValue().getText())) {
-                return new PropertiesReference(cursor, determineKind(((Properties.Entry) value).getValue().getText()));
-            }
-            return null;
-        }
-
-        private Kind determineKind(String value) {
-            return Character.isUpperCase(value.charAt(value.lastIndexOf('.') + 1)) ? Kind.TYPE : Kind.PACKAGE;
-        }
-    }
-
-    @SuppressWarnings("unused")
-    public static class Provider implements Reference.Provider {
-
+    public static class Provider extends AbstractProvider<PropertiesReference> {
         private static final Predicate<String> applicationPropertiesMatcher = Pattern.compile("^application(-\\w+)?\\.properties$").asPredicate();
+        private static final SimpleTraitMatcher<PropertiesReference> matcher = new SimpleTraitMatcher<PropertiesReference>() {
+            private final Predicate<String> javaFullyQualifiedTypeMatcher = Pattern.compile(
+                    "^\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*" +
+                            "\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*" +
+                            "(?:\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*)*$").asPredicate();
+
+            @Override
+            protected @Nullable PropertiesReference test(Cursor cursor) {
+                Object value = cursor.getValue();
+                if (value instanceof Properties.Entry &&
+                        javaFullyQualifiedTypeMatcher.test(((Properties.Entry) value).getValue().getText())) {
+                    return new PropertiesReference(cursor, determineKind(((Properties.Entry) value).getValue().getText()));
+                }
+                return null;
+            }
+
+            private Kind determineKind(String value) {
+                return Character.isUpperCase(value.charAt(value.lastIndexOf('.') + 1)) ? Kind.TYPE : Kind.PACKAGE;
+            }
+        };
 
         @Override
         public boolean isAcceptable(SourceFile sourceFile) {
@@ -94,13 +91,8 @@ public class PropertiesReference implements Reference {
         }
 
         @Override
-        public Set<Reference> getReferences(SourceFile sourceFile) {
-            Set<Reference> references = new HashSet<>();
-            new Matcher().asVisitor(reference -> {
-                references.add(reference);
-                return reference.getTree();
-            }).visit(sourceFile, 0);
-            return references;
+        public SimpleTraitMatcher<PropertiesReference> getMatcher() {
+            return matcher;
         }
     }
 }

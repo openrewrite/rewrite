@@ -30,8 +30,71 @@ class AnnotationTest implements RewriteTest {
           groovy(
             """
               @Foo
-              class Test {
+              class Test implements Runnable {
+                  @java.lang.Override
+                  void run() {}
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void simpleFQN() {
+        rewriteRun(
+          groovy(
+            """
+              @org.springframework.stereotype.Service
+              class Test {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void withParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              @Foo()
+              class Test {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void inline() {
+        rewriteRun(
+          groovy(
+            """
+              @Foo class Test implements Runnable {
+                  @Override void run() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void withProperties() {
+        rewriteRun(
+          groovy(
+            """
+              @Foo(value = "A", version = "1.0")
+              class Test {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void withImplicitValueProperty() {
+        rewriteRun(
+          groovy(
+            """
+              @Foo("A")
+              class Test {}
               """
           )
         );
@@ -43,9 +106,59 @@ class AnnotationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              @Foo(bar = @Bar)
-              class Test {
-              }
+              @Foo(bar = @Bar(@Baz(baz = @Qux("1.0"))))
+              class Test {}
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4254")
+    @Test
+    void groovyTransformAnnotation() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.transform.EqualsAndHashCode
+              import groovy.transform.ToString
+              
+              @Foo
+              @ToString
+              @EqualsAndHashCode
+              @Bar
+              class Test {}
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4254")
+    @Test
+    void groovyTransformImmutableAnnotation() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.transform.Immutable
+              import groovy.transform.TupleConstructor
+              
+              @Foo
+              @TupleConstructor
+              @Immutable
+              @Bar
+              class Test {}
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4254")
+    @Test
+    void groovyTransformImmutableFQNAnnotation() {
+        rewriteRun(
+          groovy(
+            """
+              @groovy.transform.Immutable
+              class Test {}
               """
           )
         );

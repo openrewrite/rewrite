@@ -97,4 +97,37 @@ class HclBlockTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void providersInModule() {
+        rewriteRun(
+          hcl(
+            """
+              module "something" {
+                source = "./some/other/directory"
+
+                providers = {
+                  aws = aws
+                  aws.dns = aws
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void expressionOnLeftHandSideOfAMapLiteral() {
+        rewriteRun(
+          hcl(
+            """
+              locals {
+                security_groups_to_create = {
+                  (data.aws_security_group.default.id) : "the_default_one"
+                }
+              }
+              """
+          )
+        );
+    }
 }

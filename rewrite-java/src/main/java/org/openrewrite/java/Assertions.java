@@ -84,6 +84,7 @@ public class Assertions {
                             return true;
                         }
                     })
+                    .filter(missingType -> !typeValidation.allowMissingType().apply(missingType))
                     .collect(Collectors.toList());
             if (!missingTypeResults.isEmpty()) {
                 String missingTypes = missingTypeResults.stream()

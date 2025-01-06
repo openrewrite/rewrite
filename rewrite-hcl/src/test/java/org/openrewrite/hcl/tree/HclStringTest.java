@@ -66,4 +66,17 @@ class HclStringTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void slashesInStrings() {
+        rewriteRun(
+          hcl(
+            """
+              locals {
+                cidr = "192.168.0.0/24"
+              }
+              """
+          )
+        );
+    }
 }

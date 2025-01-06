@@ -14,6 +14,8 @@
 # limitations under the License.
 #
 org.openrewrite.java.lombok.AllArgsConstructorHandler
+org.openrewrite.java.lombok.BuilderHandler
+org.openrewrite.java.lombok.BuilderDefaultNoOpHandler
 org.openrewrite.java.lombok.CleanupNoOpHandler
 org.openrewrite.java.lombok.ExtensionMethodHandler
 org.openrewrite.java.lombok.GetterHandler

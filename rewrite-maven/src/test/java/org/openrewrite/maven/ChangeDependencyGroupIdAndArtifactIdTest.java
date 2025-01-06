@@ -1557,4 +1557,71 @@ class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4779")
+    void changePluginDependencyGroupIdAndArtifactId() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            null,
+            null
+          )),
+          pomXml(
+            """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+            
+                <build>
+                    <plugins>
+                        <plugin>
+                            <groupId>com.mycompany.myplugin</groupId>
+                            <artifactId>my-plugin</artifactId>
+                            <version>1.0.0</version>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>javax.activation</groupId>
+                                    <artifactId>javax.activation-api</artifactId>
+                                    <version>1.2.0</version>
+                                </dependency>
+                            </dependencies>
+                        </plugin>
+                    </plugins>
+                </build>
+            </project>
+            """,
+            """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+            
+                <build>
+                    <plugins>
+                        <plugin>
+                            <groupId>com.mycompany.myplugin</groupId>
+                            <artifactId>my-plugin</artifactId>
+                            <version>1.0.0</version>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>jakarta.activation</groupId>
+                                    <artifactId>jakarta.activation-api</artifactId>
+                                    <version>1.2.0</version>
+                                </dependency>
+                            </dependencies>
+                        </plugin>
+                    </plugins>
+                </build>
+            </project>
+            """
+          )
+        );
+    }
 }
