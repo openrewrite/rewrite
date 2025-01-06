@@ -643,18 +643,15 @@ public class GroovyParserVisitor {
 
             List<J.Annotation> paramAnnotations = new ArrayList<>(node.getAnnotations().size());
             for (AnnotationNode annotationNode : node.getAnnotations()) {
-                // The groovy compiler can add or remove additional annotations for AST transforms.
-                // The @groovy.transform.Immutable is removed and other transform annotations are added (unless you have specified those annotations yourself).
-                // To make the parser work, parse the removed @Immutable annotation by hand.
+                // The groovy compiler can add or remove annotations for AST transformations.
+                // Because @groovy.transform.Immutable is discarded in favour of other transform annotations, the removed @Immutable annotation must be parsed by hand.
                 String nextParsableElem = source.substring(indexOfNextNonWhitespace(cursor, source));
                 if (nextParsableElem.startsWith("@Immutable") || nextParsableElem.startsWith("@groovy.transform.Immutable") ) {
                     visitAnnotation(new AnnotationNode(new ClassNode(Immutable.class)));
                     paramAnnotations.add(pollQueue());
-                    nextParsableElem = source.substring(indexOfNextNonWhitespace(cursor, source));
                 }
 
-                // Parse only annotations available in the source code
-                if (nextParsableElem.startsWith("@" + annotationNode.getClassNode().getUnresolvedName())) {
+                if (appearsInSource(annotationNode)) {
                     visitAnnotation(annotationNode);
                     paramAnnotations.add(pollQueue());
                 }
@@ -761,7 +758,7 @@ public class GroovyParserVisitor {
             }
 
             List<org.codehaus.groovy.ast.expr.Expression> unparsedArgs = expression.getExpressions().stream()
-                    .filter(GroovyParserVisitor::appearsInSource)
+                    .filter(GroovyParserVisitor.this::appearsInSource)
                     .collect(toList());
             // If the first parameter to a function is a Map, then groovy allows "named parameters" style invocations, see:
             //     https://docs.groovy-lang.org/latest/html/documentation/#_named_parameters_2
@@ -2718,13 +2715,17 @@ public class GroovyParserVisitor {
 
     /**
      * Sometimes the groovy compiler inserts phantom elements into argument lists and class bodies,
-     * presumably to pass type information around. These elements do not appear in source code and should not
-     * be represented in our AST.
+     * presumably to pass type information around. Other timers the groovy compiler add extra transform annotations.
+     * These elements do not appear in source code and should not be represented in our LST.
      *
      * @param node possible phantom node
      * @return true if the node reports that it does have a position within the source code
      */
-    private static boolean appearsInSource(ASTNode node) {
+    private boolean appearsInSource(ASTNode node) {
+        if (node instanceof AnnotationNode) {
+            return source.substring(indexOfNextNonWhitespace(cursor, source)).startsWith("@" + ((AnnotationNode) node).getClassNode().getUnresolvedName());
+        }
+
         return node.getColumnNumber() >= 0 && node.getLineNumber() >= 0 && node.getLastColumnNumber() >= 0 && node.getLastLineNumber() >= 0;
     }
 
