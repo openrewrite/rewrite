@@ -117,7 +117,7 @@ public class UpdateGradleWrapperMarkers extends Recipe {
      */
     @Override
     public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(0);
+        return Duration.ofMinutes(10);
     }
 
     @Override
@@ -132,11 +132,11 @@ public class UpdateGradleWrapperMarkers extends Recipe {
                         return tree;
                     }
                     String gradleWrapperVersion = getGradleWrapper(ctx).getVersion();
-                    BuildTool buildTool1 = currentMarker.withVersion(gradleWrapperVersion);
+                    BuildTool currentBuildTool = currentMarker.withVersion(gradleWrapperVersion);
                     VersionComparator versionComparator = requireNonNull(Semver.validate(isBlank(version) ? "latest.release" : version, null).getValue());
-                    int compare = versionComparator.compare(null, currentMarker.getVersion(), buildTool1.getVersion());
+                    int compare = versionComparator.compare(null, currentMarker.getVersion(), currentBuildTool.getVersion());
                     if (compare < 0) {
-                        return tree.withMarkers(tree.getMarkers().setByType(buildTool1));
+                        return tree.withMarkers(tree.getMarkers().setByType(currentBuildTool));
                     } else {
                         return tree;
                     }

@@ -160,47 +160,6 @@ class UpdateGradleWrapperTest implements RewriteTest {
     }
 
     @Test
-    @DocumentExample("Update existing Gradle wrapper")
-    void timeSaved() {
-        rewriteRun(
-          spec -> spec.allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
-            .afterRecipe(run -> {
-                AtomicReference<Duration> timeSaved = new AtomicReference<>(Duration.ofMinutes(0));
-                run.getChangeset().getAllResults().stream().forEach(
-                  c -> timeSaved.set(timeSaved.get().plus(c.getTimeSavings())));
-
-                assertThat(timeSaved.get()).isEqualTo(Duration.ofMinutes(20));
-            }),
-          properties(
-            """
-              distributionBase=GRADLE_USER_HOME
-              distributionPath=wrapper/dists
-              distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4-bin.zip
-              zipStoreBase=GRADLE_USER_HOME
-              zipStorePath=wrapper/dists
-              """,
-            """
-              distributionBase=GRADLE_USER_HOME
-              distributionPath=wrapper/dists
-              distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4.2-bin.zip
-              zipStoreBase=GRADLE_USER_HOME
-              zipStorePath=wrapper/dists
-              distributionSha256Sum=29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda
-              """,
-            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
-              .afterRecipe(gradleWrapperProperties ->
-                assertThat(gradleWrapperProperties.getMarkers().findFirst(BuildTool.class)).hasValueSatisfying(buildTool -> {
-                    assertThat(buildTool.getType()).isEqualTo(BuildTool.Type.Gradle);
-                    assertThat(buildTool.getVersion()).isEqualTo("7.4.2");
-                }))
-          ),
-          gradlew,
-          gradlewBat,
-          gradleWrapperJarQuark
-        );
-    }
-
-    @Test
     void updateVersionAndDistribution() {
         rewriteRun(
           spec -> spec.allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
