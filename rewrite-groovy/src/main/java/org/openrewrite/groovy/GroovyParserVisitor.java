@@ -2728,7 +2728,7 @@ public class GroovyParserVisitor {
 
     /**
      * Sometimes the groovy compiler inserts phantom elements into argument lists and class bodies,
-     * presumably to pass type information around. Other timers the groovy compiler add extra transform annotations.
+     * presumably to pass type information around. Other times the groovy compiler adds extra transform annotations.
      * These elements do not appear in source code and should not be represented in our LST.
      *
      * @param node possible phantom node
