@@ -64,6 +64,19 @@ class AnnotationTest implements RewriteTest {
     }
 
     @Test
+    void inline() {
+        rewriteRun(
+          groovy(
+            """
+              @Foo class Test implements Runnable {
+                  @Override void run() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void withProperties() {
         rewriteRun(
           groovy(
@@ -126,10 +139,10 @@ class AnnotationTest implements RewriteTest {
           groovy(
             """
               import groovy.transform.Immutable
-              //import groovy.transform.TupleConstructor
+              import groovy.transform.TupleConstructor
               
               @Foo
-              //@TupleConstructor
+              @TupleConstructor
               @Immutable
               @Bar
               class Test {}

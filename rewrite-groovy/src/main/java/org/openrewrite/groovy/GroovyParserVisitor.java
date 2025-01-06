@@ -458,8 +458,10 @@ public class GroovyParserVisitor {
                 arguments = JContainer.build(
                         sourceBefore("("),
                         annotation.getMembers().entrySet().stream()
+                                // Non-value implicit properties should not be represented in our LST.
+                                .filter(it -> sourceStartsWith(it.getKey()) || "value".equals(it.getKey()))
                                 .map(arg -> {
-                                    boolean isImplicitValue = "value".equals(arg.getKey()) && !source.startsWith("value", indexOfNextNonWhitespace(cursor, source));
+                                    boolean isImplicitValue = "value".equals(arg.getKey()) && !sourceStartsWith("value");
                                     Space argPrefix = isImplicitValue ? whitespace() : sourceBefore(arg.getKey());
                                     Space isSign = isImplicitValue ? null : sourceBefore("=");
                                     Expression expression;
@@ -479,8 +481,12 @@ public class GroovyParserVisitor {
                                 .collect(toList()),
                         Markers.EMPTY
                 );
-            } else if (source.startsWith("(", indexOfNextNonWhitespace(cursor, source))) {
-                // An annotation with empty arguments like @Foo()
+                // rare scenario where annotation does only have non-value implicit properties
+                if (arguments.getElements().isEmpty()) {
+                    arguments = null;
+                }
+            } else if (sourceStartsWith("(")) {
+                // Annotation with empty arguments like @Foo()
                 arguments = JContainer.build(sourceBefore("("),
                         singletonList(JRightPadded.build(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY))),
                         Markers.EMPTY);
@@ -552,7 +558,7 @@ public class GroovyParserVisitor {
                 }
 
                 Space varargs = null;
-                if (paramType instanceof J.ArrayType && hasVarargs()) {
+                if (paramType instanceof J.ArrayType && sourceStartsWith("...")) {
                     int varargStart = indexOfNextNonWhitespace(cursor, source);
                     varargs = format(source, cursor, varargStart);
                     cursor = varargStart + 3;
@@ -645,8 +651,7 @@ public class GroovyParserVisitor {
             for (AnnotationNode annotationNode : node.getAnnotations()) {
                 // The groovy compiler can add or remove annotations for AST transformations.
                 // Because @groovy.transform.Immutable is discarded in favour of other transform annotations, the removed @Immutable annotation must be parsed by hand.
-                String nextParsableElem = source.substring(indexOfNextNonWhitespace(cursor, source));
-                if (nextParsableElem.startsWith("@" + Immutable.class.getSimpleName()) || nextParsableElem.startsWith("@" + Immutable.class.getCanonicalName()) ) {
+                if (sourceStartsWith("@" + Immutable.class.getSimpleName()) || sourceStartsWith("@" + Immutable.class.getCanonicalName()) ) {
                     visitAnnotation(new AnnotationNode(new ClassNode(Immutable.class)));
                     paramAnnotations.add(pollQueue());
                 }
@@ -1028,7 +1033,7 @@ public class GroovyParserVisitor {
         public void visitBlockStatement(BlockStatement block) {
             Space fmt = EMPTY;
             Space staticInitPadding = EMPTY;
-            boolean isStaticInit = source.substring(indexOfNextNonWhitespace(cursor, source)).startsWith("static");
+            boolean isStaticInit = sourceStartsWith("static");
             Object parent = nodeCursor.getParentOrThrow().getValue();
             if (isStaticInit) {
                 fmt = sourceBefore("static");
@@ -2378,7 +2383,7 @@ public class GroovyParserVisitor {
         }
         Space prefix = whitespace();
         TypeTree elemType = typeTree(typeTree);
-        JLeftPadded<Space> dimension = hasVarargs() ? null : padLeft(sourceBefore("["), sourceBefore("]"));
+        JLeftPadded<Space> dimension = sourceStartsWith("...") ? null : padLeft(sourceBefore("["), sourceBefore("]"));
         return new J.ArrayType(randomId(), prefix, Markers.EMPTY,
                 count == 1 ? elemType : mapDimensions(elemType, classNode.getComponentType()),
                 null,
@@ -2403,10 +2408,6 @@ public class GroovyParserVisitor {
         return baseType;
     }
 
-    private boolean hasVarargs() {
-        return source.startsWith("...", indexOfNextNonWhitespace(cursor, source));
-    }
-
     /**
      * Get all characters of the source file between the cursor and the given delimiter.
      * The cursor will be moved past the delimiter.
@@ -2425,6 +2426,14 @@ public class GroovyParserVisitor {
         Space space = format(source, cursor, delimIndex);
         cursor = delimIndex + untilDelim.length(); // advance past the delimiter
         return space;
+    }
+
+    /**
+     * Tests if the source beginning at the current cursor starts with the specified delimiter.
+     * Whitespace characters are excluded, the cursor will not be moved.
+     */
+    private boolean sourceStartsWith(String delimiter) {
+        return source.startsWith(delimiter, indexOfNextNonWhitespace(cursor, source));
     }
 
     /**
@@ -2727,7 +2736,7 @@ public class GroovyParserVisitor {
      */
     private boolean appearsInSource(ASTNode node) {
         if (node instanceof AnnotationNode) {
-            return source.substring(indexOfNextNonWhitespace(cursor, source)).startsWith("@" + ((AnnotationNode) node).getClassNode().getUnresolvedName());
+            return sourceStartsWith("@" + ((AnnotationNode) node).getClassNode().getUnresolvedName());
         }
 
         return node.getColumnNumber() >= 0 && node.getLineNumber() >= 0 && node.getLastColumnNumber() >= 0 && node.getLastLineNumber() >= 0;
