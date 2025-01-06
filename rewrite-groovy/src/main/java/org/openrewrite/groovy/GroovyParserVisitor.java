@@ -481,7 +481,7 @@ public class GroovyParserVisitor {
                                 .collect(toList()),
                         Markers.EMPTY
                 );
-                // rare scenario where annotation does only have non-value implicit properties
+                // Rare scenario where annotation does only have non-value implicit properties
                 if (arguments.getElements().isEmpty()) {
                     arguments = null;
                 }
