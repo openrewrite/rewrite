@@ -28,7 +28,6 @@ import static org.openrewrite.groovy.Assertions.groovy;
 class RealWorldGroovyTest implements RewriteTest {
 
     @Test
-    @ExpectedToFail("Pattern operator is not yet supported") // https://groovy-lang.org/operators.html#_pattern_operator
     @Issue("https://github.com/spring-projects/spring-boot/blob/v3.4.1/settings.gradle")
     void springBootSettingsGradle() {
         rewriteRun(

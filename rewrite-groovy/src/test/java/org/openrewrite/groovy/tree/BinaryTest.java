@@ -79,7 +79,6 @@ class BinaryTest implements RewriteTest {
     }
 
     @Test
-    @ExpectedToFail("Pattern operator is not yet supported") // https://groovy-lang.org/operators.html#_pattern_operator
     void regexPatternOperator() {
         rewriteRun(
           groovy(
