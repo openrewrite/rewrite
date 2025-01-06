@@ -17,8 +17,8 @@ package org.openrewrite;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.apache.commons.lang3.StringUtils;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.table.SourcesFiles;
 
@@ -52,7 +52,7 @@ public class FindSourceFiles extends Recipe {
                 .map(Arrays::stream)
                 .orElseGet(Stream::empty)
                 .map(String::trim)
-                .filter(StringUtils::isNotBlank)
+                .filter(StringUtils::isNotEmpty)
                 .map(FindSourceFiles::normalize)
                 .toArray(String[]::new);
     }
