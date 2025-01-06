@@ -17,12 +17,15 @@ package org.openrewrite;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.apache.commons.lang3.StringUtils;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.table.SourcesFiles;
 
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Optional;
+import java.util.stream.Stream;
 
 
 @Value
@@ -31,11 +34,28 @@ public class FindSourceFiles extends Recipe {
     transient SourcesFiles results = new SourcesFiles(this);
 
     @Option(displayName = "File pattern",
-            description = "A glob expression representing a file path to search for (relative to the project root). Blank/null matches all.",
+            description = "A glob expression representing a file path to search for (relative to the project root). Blank/null matches all." +
+                          "Multiple patterns may be specified, separated by a semicolon `;`. " +
+                          "If multiple patterns are supplied any of the patterns matching will be interpreted as a match.",
             required = false,
             example = ".github/workflows/*.yml")
     @Nullable
     String filePattern;
+
+    @EqualsAndHashCode.Exclude
+    transient String[] filePatterns;
+
+    public FindSourceFiles(@Nullable String filePattern) {
+        this.filePattern = filePattern;
+        this.filePatterns = Optional.ofNullable(filePattern)
+                .map(it -> it.split(";"))
+                .map(Arrays::stream)
+                .orElseGet(Stream::empty)
+                .map(String::trim)
+                .filter(StringUtils::isNotBlank)
+                .map(FindSourceFiles::normalize)
+                .toArray(String[]::new);
+    }
 
     @Override
     public String getDisplayName() {
@@ -44,7 +64,7 @@ public class FindSourceFiles extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Find files by source path.";
+        return "Find files by source path. Paths are always interpreted as relative to the repository root.";
     }
 
     @Override
@@ -56,7 +76,7 @@ public class FindSourceFiles extends Recipe {
                 if (tree instanceof SourceFile) {
                     SourceFile sourceFile = (SourceFile) tree;
                     Path sourcePath = sourceFile.getSourcePath();
-                    if (StringUtils.isBlank(filePattern) || PathUtils.matchesGlob(sourcePath, normalize(filePattern))) {
+                    if (matches(sourcePath)) {
                         results.insertRow(ctx, new SourcesFiles.Row(sourcePath.toString(),
                                 tree.getClass().getSimpleName()));
                         return SearchResult.found(sourceFile);
@@ -74,5 +94,9 @@ public class FindSourceFiles extends Recipe {
             return filePattern.substring(1);
         }
         return filePattern;
+    }
+
+    private boolean matches(Path sourcePath) {
+        return filePatterns.length == 0 || Arrays.stream(filePatterns).anyMatch(pattern -> PathUtils.matchesGlob(sourcePath, pattern));
     }
 }
