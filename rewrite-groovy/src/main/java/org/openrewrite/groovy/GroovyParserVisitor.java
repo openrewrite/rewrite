@@ -136,9 +136,8 @@ public class GroovyParserVisitor {
         JRightPadded<J.Package> pkg = null;
         if (ast.getPackage() != null) {
             prefix = whitespace();
-            cursor += "package".length();
-            pkg = JRightPadded.build(new J.Package(randomId(), EMPTY, Markers.EMPTY,
-                    typeTree(null), emptyList()));
+            skip("package");
+            pkg = maybeSemicolon(new J.Package(randomId(), EMPTY, Markers.EMPTY, typeTree(null), emptyList()));
         }
 
         for (ImportNode anImport : ast.getImports()) {

@@ -138,6 +138,19 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void hasPackageWithTrailingComma() {
+        rewriteRun(
+          groovy(
+            """ 
+              package org.openrewrite;
+
+              class A{}
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1736")
     @Test
     void parameterizedFieldDoesNotAffectClassType() {
