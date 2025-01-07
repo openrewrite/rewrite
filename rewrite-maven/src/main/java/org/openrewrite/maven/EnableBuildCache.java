@@ -23,41 +23,48 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class EnableBuildCache extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Enable devolocity build cache";
+        return "Enable Develocity build cache";
     }
 
     @Override
     public String getDescription() {
-        return "Enable devolocity build cache.";
+        return "Add Develocity build cache configuration to any `.mvn/` Develocity configuration files that lack existing configuration.";
     }
 
     @Option(displayName = "Value for buildCache->local->localEnabled",
-            description = "Optional value for buildCache->local->localEnabled. Can also be SpEL, e.g. `#{true}`.",
+            description = "Value for buildCache->local->localEnabled.",
             example = "true",
             required = false)
     @Nullable
     String buildCacheLocalEnabled;
 
     @Option(displayName = "Value for buildCache->remote->enabled",
-            description = "Optional value for buildCache->remote->enabled; can also be SpEL, e.g. `#{true}`.",
+            description = "Value for buildCache->remote->enabled.",
             example = "true",
             required = false)
     @Nullable
     String buildCacheRemoteEnabled;
 
     @Option(displayName = "Value for buildCache->remote->storeEnabled",
-            description = "Optional value for buildCache->remote->storeEnabled; can also be SpEL, e.g. `#{true}`.",
-            example = "true",
+            description = "Value for buildCache->remote->storeEnabled.",
+            example = "#{isTrue(env['CI'])}",
             required = false)
     @Nullable
     String buildCacheRemoteStoreEnabled;
+
+    @Override
+    public Validated<Object> validate(ExecutionContext ctx) {
+        return super.validate(ctx)
+                .and(Validated.notBlank("buildCacheLocalEnabled", buildCacheLocalEnabled)
+                        .or(Validated.notBlank("buildCacheRemoteEnabled", buildCacheRemoteEnabled))
+                        .or(Validated.notBlank("buildCacheRemoteStoreEnabled", buildCacheRemoteStoreEnabled)));
+    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -75,7 +82,7 @@ public class EnableBuildCache extends Recipe {
             }
         };
 
-        return Preconditions.check(new FindSourceFiles("*.xml"), visitor);
+        return Preconditions.check(new FindSourceFiles(".mvn/*.xml"), visitor);
     }
 
     private String getBuildCacheConfig() {

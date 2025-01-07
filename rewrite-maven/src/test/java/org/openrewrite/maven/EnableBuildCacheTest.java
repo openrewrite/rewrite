@@ -17,74 +17,17 @@ package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Validated;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.openrewrite.xml.Assertions.xml;
 
 class EnableBuildCacheTest implements RewriteTest {
 
     @DocumentExample
-    @Test
-    void addBuildCacheConfig() {
-        rewriteRun(
-          spec -> spec.recipe(new EnableBuildCache(null, null, null)),
-          xml(
-            """
-              <develocity>
-              </develocity>
-              """,
-            """
-              <develocity>
-                <buildCache>
-                </buildCache>
-              </develocity>
-              """, s -> s.path("develocity.xml"))
-        );
-    }
-
-    @Test
-    void addBuildCacheConfigWithLocalOnly() {
-        rewriteRun(
-          spec -> spec.recipe(new EnableBuildCache("true", null, null)),
-          xml(
-            """
-              <develocity>
-              </develocity>
-              """,
-            """
-              <develocity>
-                <buildCache>
-                  <local>
-                    <storeEnabled>true</storeEnabled>
-                  </local>
-                </buildCache>
-              </develocity>
-              """)
-        );
-    }
-
-    @Test
-    void addBuildCacheAllConfigWithRemoteOnly() {
-        rewriteRun(
-          spec -> spec.recipe(new EnableBuildCache(null, "true", "#{isTrue(env['CI'])}")),
-          xml(
-            """
-              <develocity>
-              </develocity>
-              """,
-            """
-              <develocity>
-                <buildCache>
-                  <remote>
-                    <enabled>true</enabled>
-                    <storeEnabled>#{isTrue(env['CI'])}</storeEnabled>
-                  </remote>
-                </buildCache>
-              </develocity>
-              """)
-        );
-    }
-
     @Test
     void addBuildCacheAllConfigWithOptions() {
         rewriteRun(
@@ -106,7 +49,62 @@ class EnableBuildCacheTest implements RewriteTest {
                   </remote>
                 </buildCache>
               </develocity>
-              """)
+              """,
+            spec -> spec.path(".mvn/develocity.xml")
+          )
+        );
+    }
+
+    @Test
+    void requireAtLeastOneOption() {
+        Validated<Object> validate = new EnableBuildCache(null, null, null).validate(new InMemoryExecutionContext());
+        assertThat(validate.isValid()).isFalse();
+    }
+
+    @Test
+    void addBuildCacheConfigWithLocalOnly() {
+        rewriteRun(
+          spec -> spec.recipe(new EnableBuildCache("true", null, null)),
+          xml(
+            """
+              <develocity>
+              </develocity>
+              """,
+            """
+              <develocity>
+                <buildCache>
+                  <local>
+                    <storeEnabled>true</storeEnabled>
+                  </local>
+                </buildCache>
+              </develocity>
+              """,
+            spec -> spec.path(".mvn/develocity.xml")
+          )
+        );
+    }
+
+    @Test
+    void addBuildCacheAllConfigWithRemoteOnly() {
+        rewriteRun(
+          spec -> spec.recipe(new EnableBuildCache(null, "true", "#{isTrue(env['CI'])}")),
+          xml(
+            """
+              <develocity>
+              </develocity>
+              """,
+            """
+              <develocity>
+                <buildCache>
+                  <remote>
+                    <enabled>true</enabled>
+                    <storeEnabled>#{isTrue(env['CI'])}</storeEnabled>
+                  </remote>
+                </buildCache>
+              </develocity>
+              """,
+            spec -> spec.path(".mvn/develocity.xml")
+          )
         );
     }
 
@@ -127,7 +125,23 @@ class EnableBuildCacheTest implements RewriteTest {
                   </remote>
                 </buildCache>
               </develocity>
-              """)
+              """,
+            spec -> spec.path(".mvn/develocity.xml")
+          )
+        );
+    }
+
+    @Test
+    void shouldNotModifyOtherLocations() {
+        rewriteRun(
+          spec -> spec.recipe(new EnableBuildCache("true", "true", "true")),
+          xml(
+            """
+              <develocity>
+              </develocity>
+              """,
+            spec -> spec.path("src/test/resources/develocity.xml")
+          )
         );
     }
 }
