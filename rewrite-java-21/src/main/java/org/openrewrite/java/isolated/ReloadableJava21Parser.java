@@ -87,13 +87,14 @@ public class ReloadableJava21Parser implements JavaParser {
     private final Collection<NamedStyles> styles;
     private final List<Processor> annotationProcessors;
 
-    private ReloadableJava21Parser(boolean logCompilationWarningsAndErrors,
-                                   @Nullable Collection<Path> classpath,
-                                   Collection<byte[]> classBytesClasspath,
-                                   @Nullable Collection<Input> dependsOn,
-                                   Charset charset,
-                                   Collection<NamedStyles> styles,
-                                   JavaTypeCache typeCache) {
+    private ReloadableJava21Parser(
+            boolean logCompilationWarningsAndErrors,
+            @Nullable Collection<Path> classpath,
+            Collection<byte[]> classBytesClasspath,
+            @Nullable Collection<Input> dependsOn,
+            Charset charset,
+            Collection<NamedStyles> styles,
+            JavaTypeCache typeCache) {
         this.classpath = classpath;
         this.dependsOn = dependsOn;
         this.styles = styles;
@@ -116,13 +117,13 @@ public class ReloadableJava21Parser implements JavaParser {
         Options.instance(context).put("-proc", "none");
 
         // Ensure type attribution continues despite errors in individual files or nodes.
-                // If an error occurs in a single file or node, type attribution should still proceed
-                // for all other source files and unaffected nodes within the same file.
-                        Options.instance(context).put("should-stop.ifError", "GENERATE");
+        // If an error occurs in a single file or node, type attribution should still proceed
+        // for all other source files and unaffected nodes within the same file.
+        Options.instance(context).put("should-stop.ifError", "GENERATE");
 
         LOMBOK:
         if (System.getenv().getOrDefault("REWRITE_LOMBOK", System.getProperty("rewrite.lombok")) != null &&
-                classpath != null && classpath.stream().anyMatch(it -> it.toString().contains("lombok"))) {
+            classpath != null && classpath.stream().anyMatch(it -> it.toString().contains("lombok"))) {
             Processor lombokProcessor = null;
             try {
                 // https://projectlombok.org/contributing/lombok-execution-path
@@ -297,7 +298,7 @@ public class ReloadableJava21Parser implements JavaParser {
             if ("endPosTable already set".equals(e.getMessage())) {
                 throw new IllegalStateException(
                         "Call reset() on JavaParser before parsing another set of source files that " +
-                                "have some of the same fully qualified names.", e);
+                        "have some of the same fully qualified names.", e);
             }
             throw e;
         }
@@ -414,9 +415,9 @@ public class ReloadableJava21Parser implements JavaParser {
                 Iterable<JavaFileObject> listed = super.list(location, packageName, kinds, recurse);
                 return classByteClasspath.isEmpty() ? listed :
                         Stream.concat(classByteClasspath.stream()
-                                .filter(jfo -> jfo.getPackage().equals(packageName)),
-                        StreamSupport.stream(listed.spliterator(), false)
-                ).collect(toList());
+                                        .filter(jfo -> jfo.getPackage().equals(packageName)),
+                                StreamSupport.stream(listed.spliterator(), false)
+                        ).collect(toList());
             }
             return super.list(location, packageName, kinds, recurse);
         }
