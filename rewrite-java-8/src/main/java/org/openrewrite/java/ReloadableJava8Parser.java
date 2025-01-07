@@ -18,12 +18,15 @@ package org.openrewrite.java;
 import com.sun.tools.javac.comp.*;
 import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javac.main.JavaCompiler;
+import com.sun.tools.javac.main.Option;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.Log;
 import com.sun.tools.javac.util.Options;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
+import lombok.Getter;
+import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.Nullable;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
@@ -40,12 +43,17 @@ import org.openrewrite.style.NamedStyles;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
+import org.slf4j.LoggerFactory;
 
+import javax.annotation.processing.Processor;
 import javax.tools.*;
 import java.io.*;
+import java.lang.reflect.Constructor;
 import java.net.URI;
+import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
@@ -53,6 +61,9 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+import static com.sun.tools.javac.util.List.nil;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 
 class ReloadableJava8Parser implements JavaParser {
@@ -70,6 +81,7 @@ class ReloadableJava8Parser implements JavaParser {
     private final JavaCompiler compiler;
     private final ResettableLog compilerLog;
     private final Collection<NamedStyles> styles;
+    private final List<Processor> annotationProcessors;
 
     ReloadableJava8Parser(@Nullable Collection<Path> classpath,
                           Collection<byte[]> classBytesClasspath,
@@ -100,6 +112,70 @@ class ReloadableJava8Parser implements JavaParser {
         Options.instance(context).put("-g", "-g");
         Options.instance(context).put("-proc", "none");
 
+        // Ensure type attribution continues despite errors in individual files or nodes.
+        // If an error occurs in a single file or node, type attribution should still proceed
+        // for all other source files and unaffected nodes within the same file.
+        Options.instance(context).put("should-stop.ifError", "GENERATE");
+
+        LOMBOK:
+        if (System.getenv().getOrDefault("REWRITE_LOMBOK", System.getProperty("rewrite.lombok")) != null &&
+            classpath != null && classpath.stream().anyMatch(it -> it.toString().contains("lombok"))) {
+            Processor lombokProcessor = null;
+            try {
+                // https://projectlombok.org/contributing/lombok-execution-path
+                List<String> overrideClasspath = new ArrayList<>();
+                for (Path part : classpath) {
+                    if (part.toString().contains("lombok")) {
+                        overrideClasspath.add(part.toString());
+                    }
+                }
+                // make sure the rewrite-java-lombok dependency comes first
+                boolean found = false;
+                for (int i = 0; i < overrideClasspath.size(); i++) {
+                    if (overrideClasspath.get(i).contains("rewrite-java-lombok")) {
+                        overrideClasspath.add(0, overrideClasspath.remove(i));
+                        found = true;
+                    }
+                }
+                if (!found) {
+                    // try to find `rewrite-java-lombok` using class loader
+                    URL resource = getClass().getClassLoader().getResource("org/openrewrite/java/lombok/OpenRewriteConfigurationKeysLoader.class");
+                    if (resource != null && resource.getProtocol().equals("jar") && resource.getPath().startsWith("file:")) {
+                        String path = Paths.get(URI.create(resource.getPath().substring(0, resource.getPath().indexOf("!")))).toString();
+                        overrideClasspath.add(0, path);
+                    } else {
+                        break LOMBOK;
+                    }
+                }
+                System.setProperty("shadow.override.lombok", String.join(File.pathSeparator, overrideClasspath));
+
+                Class<?> shadowLoaderClass = Class.forName("lombok.launch.ShadowClassLoader", true, getClass().getClassLoader());
+                Constructor<?> shadowLoaderConstructor = shadowLoaderClass.getDeclaredConstructor(
+                        Class.forName("java.lang.ClassLoader"),
+                        Class.forName("java.lang.String"),
+                        Class.forName("java.lang.String"),
+                        Class.forName("java.util.List"),
+                        Class.forName("java.util.List"));
+                shadowLoaderConstructor.setAccessible(true);
+
+                ClassLoader lombokShadowLoader = (ClassLoader) shadowLoaderConstructor.newInstance(
+                        getClass().getClassLoader(),
+                        "lombok",
+                        null,
+                        emptyList(),
+                        singletonList("lombok.patcher.Symbols")
+                );
+                lombokProcessor = (Processor) lombokShadowLoader.loadClass("lombok.core.AnnotationProcessor").getDeclaredConstructor().newInstance();
+                Options.instance(context).put(Option.PROCESSOR, "lombok.launch.AnnotationProcessorHider$AnnotationProcessor");
+            } catch (ReflectiveOperationException ignore) {
+                // Lombok was not found or could not be initialized
+            } finally {
+                annotationProcessors = lombokProcessor != null ? singletonList(lombokProcessor) : emptyList();
+            }
+        } else {
+            annotationProcessors = emptyList();
+        }
+
         // MUST be created (registered with the context) after pfm and compilerLog
         compiler = new JavaCompiler(context);
 
@@ -118,7 +194,7 @@ class ReloadableJava8Parser implements JavaParser {
                 if (logCompilationWarningsAndErrors) {
                     String log = new String(Arrays.copyOfRange(cbuf, off, len));
                     if (!StringUtils.isBlank(log)) {
-                        org.slf4j.LoggerFactory.getLogger(ReloadableJava8Parser.class).warn(log);
+                        LoggerFactory.getLogger(ReloadableJava8Parser.class).warn(log);
                     }
                 }
             }
@@ -138,45 +214,7 @@ class ReloadableJava8Parser implements JavaParser {
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
-        if (classpath != null) { // override classpath
-            if (context.get(JavaFileManager.class) != pfm) {
-                throw new IllegalStateException("JavaFileManager has been forked unexpectedly");
-            }
-
-            try {
-                pfm.setLocation(StandardLocation.CLASS_PATH, classpath.stream().map(Path::toFile).collect(toList()));
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        }
-
-        @SuppressWarnings("ConstantConditions") LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = acceptedInputs(sourceFiles)
-                .collect(Collectors.toMap(
-                        Function.identity(),
-                        input -> {
-                            try {
-                                return compiler.parse(new Java8ParserInputFileObject(input, ctx));
-                            } catch (IllegalStateException e) {
-                                if ("endPosTable already set".equals(e.getMessage())) {
-                                    throw new IllegalStateException(
-                                            "Call reset() on JavaParser before parsing another set of source files that " +
-                                            "have some of the same fully qualified names. Source file [" +
-                                            input.getPath() + "]\n[\n" + StringUtils.readFully(input.getSource(ctx), getCharset(ctx)) + "\n]", e);
-                                }
-                                throw e;
-                            }
-                        },
-                        (e2, e1) -> e1, LinkedHashMap::new));
-
-        try {
-            enterAll(cus.values());
-            compiler.attribute(new TimedTodo(compiler.todo));
-        } catch (Throwable t) {
-            // when symbol entering fails on problems like missing types, attribution can often times proceed
-            // unhindered, but it sometimes cannot (so attribution is always a BEST EFFORT in the presence of errors)
-            ctx.getOnError().accept(new JavaParsingException("Failed symbol entering or attribution", t));
-        }
-
+        LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = parseInputsToCompilerAst(sourceFiles, ctx);
         return cus.entrySet().stream().map(cuByPath -> {
             Input input = cuByPath.getKey();
             parsingListener.startedParsing(input);
@@ -190,6 +228,7 @@ class ReloadableJava8Parser implements JavaParser {
                         ctx,
                         context);
                 J.CompilationUnit cu = (J.CompilationUnit) parser.scan(cuByPath.getValue(), Space.EMPTY);
+                //noinspection DataFlowIssue
                 cuByPath.setValue(null); // allow memory used by this JCCompilationUnit to be released
                 parsingListener.parsed(input, cu);
                 return requirePrintEqualsInput(cu, input, relativeTo, ctx);
@@ -198,6 +237,56 @@ class ReloadableJava8Parser implements JavaParser {
                 return ParseError.build(this, input, relativeTo, ctx, t);
             }
         });
+    }
+
+    private @NotNull LinkedHashMap<Input, JCTree.JCCompilationUnit> parseInputsToCompilerAst(Iterable<Input> sourceFiles, ExecutionContext ctx) {
+        if (classpath != null) { // override classpath
+            if (context.get(JavaFileManager.class) != pfm) {
+                throw new IllegalStateException("JavaFileManager has been forked unexpectedly");
+            }
+
+            try {
+                pfm.setLocation(StandardLocation.CLASS_PATH, classpath.stream().map(Path::toFile).collect(toList()));
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+
+        LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = new LinkedHashMap<>();
+        List<Java8ParserInputFileObject> inputFileObjects = acceptedInputs(sourceFiles)
+                .map(input -> new Java8ParserInputFileObject(input, ctx))
+                .collect(toList());
+        if (!annotationProcessors.isEmpty()) {
+            // TODO there is no `initialFiles` argument in Java 8; first let's see if it works without it before trying to figure out if we really need a workaround.
+            compiler.initProcessAnnotations(annotationProcessors/*, inputFileObjects, emptyList()*/);
+        }
+        try {
+            //noinspection unchecked
+            com.sun.tools.javac.util.List<JCTree.JCCompilationUnit> jcCompilationUnits = compiler.parseFiles((List<JavaFileObject>) (List<?>) inputFileObjects);
+            for (int i = 0; i < inputFileObjects.size(); i++) {
+                cus.put(inputFileObjects.get(i).getInput(), jcCompilationUnits.get(i));
+            }
+            try {
+                enterAll(cus.values());
+                if (!annotationProcessors.isEmpty()) {
+                    compiler.processAnnotations(jcCompilationUnits, nil());
+                }
+                compiler.attribute(new TimedTodo(compiler.todo));
+            } catch (Throwable t) {
+                // when symbol entering fails on problems like missing types, attribution can often times proceed
+                // unhindered, but it sometimes cannot (so attribution is always best-effort in the presence of errors)
+                ctx.getOnError().accept(new JavaParsingException("Failed symbol entering or attribution", t));
+            }
+        } catch (IllegalStateException e) {
+            if ("endPosTable already set".equals(e.getMessage())) {
+                throw new IllegalStateException(
+                        "Call reset() on JavaParser before parsing another set of source files that " +
+                                "have some of the same fully qualified names.", e);
+            }
+            throw e;
+        }
+
+        return cus;
     }
 
     @Override
@@ -332,6 +421,7 @@ class ReloadableJava8Parser implements JavaParser {
 
     private static class PackageAwareJavaFileObject extends SimpleJavaFileObject {
         private final String pkg;
+        @Getter
         private final String className;
         private final byte[] classBytes;
 
@@ -363,10 +453,6 @@ class ReloadableJava8Parser implements JavaParser {
 
         public String getPackage() {
             return pkg;
-        }
-
-        public String getClassName() {
-            return className;
         }
 
         @Override
