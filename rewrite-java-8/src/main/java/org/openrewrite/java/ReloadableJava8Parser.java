@@ -23,8 +23,6 @@ import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.Log;
 import com.sun.tools.javac.util.Options;
-import io.micrometer.core.instrument.Metrics;
-import io.micrometer.core.instrument.Timer;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.objectweb.asm.ClassReader;
@@ -33,7 +31,6 @@ import org.objectweb.asm.Opcodes;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
-import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.J;
@@ -268,7 +265,7 @@ class ReloadableJava8Parser implements JavaParser {
                 if (!annotationProcessors.isEmpty()) {
                     compiler.processAnnotations(jcCompilationUnits, nil());
                 }
-                compiler.attribute(new TimedTodo(compiler.todo));
+                compiler.attribute(compiler.todo);
             } catch (Throwable t) {
                 // when symbol entering fails on problems like missing types, attribution can often times proceed
                 // unhindered, but it sometimes cannot (so attribution is always best-effort in the presence of errors)
@@ -344,35 +341,6 @@ class ReloadableJava8Parser implements JavaParser {
                     itr.remove();
                 }
             }
-        }
-    }
-
-    private static class TimedTodo extends Todo {
-        private final Todo todo;
-        private Timer.@Nullable Sample sample;
-
-        private TimedTodo(Todo todo) {
-            super(new Context());
-            this.todo = todo;
-        }
-
-        @Override
-        public boolean isEmpty() {
-            if (sample != null) {
-                sample.stop(MetricsHelper.successTags(
-                                Timer.builder("rewrite.parse")
-                                        .description("The time spent by the JDK in type attributing the source file")
-                                        .tag("file.type", "Java")
-                                        .tag("step", "(2) Type attribution"))
-                        .register(Metrics.globalRegistry));
-            }
-            return todo.isEmpty();
-        }
-
-        @Override
-        public Env<AttrContext> remove() {
-            this.sample = Timer.start();
-            return todo.remove();
         }
     }
 
