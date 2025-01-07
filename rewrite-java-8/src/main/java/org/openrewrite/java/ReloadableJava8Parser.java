@@ -261,10 +261,8 @@ class ReloadableJava8Parser implements JavaParser {
             }
             try {
                 enterAll(cus.values());
-                if (!annotationProcessors.isEmpty()) {
-                    compiler.processAnnotations(jcCompilationUnits, nil());
-                }
-                compiler.attribute(compiler.todo);
+                JavaCompiler delegate = annotationProcessors.isEmpty() ? compiler : compiler.processAnnotations(jcCompilationUnits, nil());
+                delegate.attribute(delegate.todo);
             } catch (Throwable t) {
                 // when symbol entering fails on problems like missing types, attribution can often times proceed
                 // unhindered, but it sometimes cannot (so attribution is always best-effort in the presence of errors)
