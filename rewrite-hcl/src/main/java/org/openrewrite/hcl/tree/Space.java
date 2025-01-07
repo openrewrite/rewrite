@@ -225,6 +225,11 @@ public class Space {
             last = c;
         }
 
+        if ((comment.length() > 0)) {
+            comments.add(new Comment(inLineSlashOrHashComment, comment.toString(), prefix.toString(), Markers.EMPTY));
+            prefix = new StringBuilder();
+        }
+
         // Shift the whitespace on each comment forward to be a suffix of the comment before it, and the
         // whitespace on the first comment to be the whitespace of the tree element. The remaining prefix is the suffix
         // of the last comment.
