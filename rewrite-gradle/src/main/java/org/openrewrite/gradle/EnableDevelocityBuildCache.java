@@ -31,7 +31,7 @@ public class EnableDevelocityBuildCache extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Add Develocity build cache configuration to any `.mvn/` Develocity configuration file that lack existing configuration.";
+        return "Add Develocity build cache configuration Develocity configuration given it lacks an existing configuration.";
     }
 
     @Option(displayName = "Enable local build cache",
