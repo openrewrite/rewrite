@@ -251,8 +251,7 @@ class ReloadableJava8Parser implements JavaParser {
                 .map(input -> new Java8ParserInputFileObject(input, ctx))
                 .collect(toList());
         if (!annotationProcessors.isEmpty()) {
-            // TODO there is neither a `initialFiles` nor `initialClassNames` argument in Java 8, so we need some workaround to make this work
-            compiler.initProcessAnnotations(annotationProcessors/*, inputFileObjects, emptyList()*/);
+            compiler.initProcessAnnotations(annotationProcessors);
         }
         try {
             //noinspection unchecked
