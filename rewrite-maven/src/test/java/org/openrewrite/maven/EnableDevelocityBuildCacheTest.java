@@ -19,19 +19,18 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Validated;
-import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.openrewrite.xml.Assertions.xml;
 
-class EnableBuildCacheTest implements RewriteTest {
+class EnableDevelocityBuildCacheTest implements RewriteTest {
 
     @DocumentExample
     @Test
     void addBuildCacheAllConfigWithOptions() {
         rewriteRun(
-          spec -> spec.recipe(new EnableBuildCache("true", "true", "#{isTrue(env['CI'])}")),
+          spec -> spec.recipe(new EnableDevelocityBuildCache("true", "true", "#{isTrue(env['CI'])}")),
           xml(
             """
               <develocity>
@@ -57,14 +56,14 @@ class EnableBuildCacheTest implements RewriteTest {
 
     @Test
     void requireAtLeastOneOption() {
-        Validated<Object> validate = new EnableBuildCache(null, null, null).validate(new InMemoryExecutionContext());
+        Validated<Object> validate = new EnableDevelocityBuildCache(null, null, null).validate(new InMemoryExecutionContext());
         assertThat(validate.isValid()).isFalse();
     }
 
     @Test
     void addBuildCacheConfigWithLocalOnly() {
         rewriteRun(
-          spec -> spec.recipe(new EnableBuildCache("true", null, null)),
+          spec -> spec.recipe(new EnableDevelocityBuildCache("true", null, null)),
           xml(
             """
               <develocity>
@@ -87,7 +86,7 @@ class EnableBuildCacheTest implements RewriteTest {
     @Test
     void addBuildCacheAllConfigWithRemoteOnly() {
         rewriteRun(
-          spec -> spec.recipe(new EnableBuildCache(null, "true", "#{isTrue(env['CI'])}")),
+          spec -> spec.recipe(new EnableDevelocityBuildCache(null, "true", "#{isTrue(env['CI'])}")),
           xml(
             """
               <develocity>
@@ -111,7 +110,7 @@ class EnableBuildCacheTest implements RewriteTest {
     @Test
     void shouldNotModifyExistingConfiguration() {
         rewriteRun(
-          spec -> spec.recipe(new EnableBuildCache("true", "true", "true")),
+          spec -> spec.recipe(new EnableDevelocityBuildCache("true", "true", "true")),
           xml(
             """
               <develocity>
@@ -134,7 +133,7 @@ class EnableBuildCacheTest implements RewriteTest {
     @Test
     void shouldNotModifyOtherLocations() {
         rewriteRun(
-          spec -> spec.recipe(new EnableBuildCache("true", "true", "true")),
+          spec -> spec.recipe(new EnableDevelocityBuildCache("true", "true", "true")),
           xml(
             """
               <develocity>
