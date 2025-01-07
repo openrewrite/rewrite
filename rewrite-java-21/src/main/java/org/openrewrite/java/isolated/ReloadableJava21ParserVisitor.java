@@ -392,6 +392,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
     public J visitClass(ClassTree node, Space fmt) {
         Map<Integer, JCAnnotation> annotationPosTable = mapAnnotations(node.getModifiers().getAnnotations(),
                 new HashMap<>(node.getModifiers().getAnnotations().size()));
+
         ReloadableJava21ModifierResults modifierResults = sortedModifiersAndAnnotations(node.getModifiers(), annotationPosTable);
 
         List<J.Annotation> kindAnnotations = collectAnnotations(annotationPosTable);
@@ -956,6 +957,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
 
         Map<Integer, JCAnnotation> annotationPosTable = mapAnnotations(node.getModifiers().getAnnotations(),
                 new HashMap<>(node.getModifiers().getAnnotations().size()));
+
         ReloadableJava21ModifierResults modifierResults = sortedModifiersAndAnnotations(node.getModifiers(), annotationPosTable);
 
         J.TypeParameters typeParams;
@@ -1597,6 +1599,10 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
             typeExpr = convert(vartype);
         }
 
+        if (typeExpr == null && node.declaredUsingVar()) {
+            typeExpr = new J.Identifier(randomId(), sourceBefore("var"), Markers.build(singletonList(JavaVarKeyword.build())), emptyList(), "var", typeMapping.type(vartype), null);
+        }
+
         if (typeExpr != null && !typeExprAnnotations.isEmpty()) {
             Space prefix = typeExprAnnotations.get(0).getPrefix();
             typeExpr = new J.AnnotatedType(randomId(), prefix, Markers.EMPTY, ListUtils.mapFirst(typeExprAnnotations, a -> a.withPrefix(EMPTY)), typeExpr);
@@ -1695,7 +1701,6 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
      * Conversion utilities
      * --------------
      */
-
     private <J2 extends J> @Nullable J2 convert(@Nullable Tree t) {
         if (t == null) {
             return null;
