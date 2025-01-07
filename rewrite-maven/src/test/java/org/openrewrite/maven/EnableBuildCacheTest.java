@@ -41,7 +41,7 @@ class EnableBuildCacheTest implements RewriteTest {
               <develocity>
                 <buildCache>
                   <local>
-                    <storeEnabled>true</storeEnabled>
+                    <enabled>true</enabled>
                   </local>
                   <remote>
                     <enabled>true</enabled>
@@ -74,7 +74,7 @@ class EnableBuildCacheTest implements RewriteTest {
               <develocity>
                 <buildCache>
                   <local>
-                    <storeEnabled>true</storeEnabled>
+                    <enabled>true</enabled>
                   </local>
                 </buildCache>
               </develocity>
@@ -117,7 +117,7 @@ class EnableBuildCacheTest implements RewriteTest {
               <develocity>
                 <buildCache>
                   <local>
-                    <storeEnabled>false</storeEnabled>
+                    <enabled>false</enabled>
                   </local>
                   <remote>
                     <enabled>false</enabled>

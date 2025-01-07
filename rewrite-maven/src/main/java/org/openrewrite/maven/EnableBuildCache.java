@@ -20,6 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -37,22 +38,22 @@ public class EnableBuildCache extends Recipe {
         return "Add Develocity build cache configuration to any `.mvn/` Develocity configuration files that lack existing configuration.";
     }
 
-    @Option(displayName = "Value for buildCache->local->localEnabled",
-            description = "Value for buildCache->local->localEnabled.",
+    @Option(displayName = "Enable local build cache",
+            description = "Value for `//develocity/buildCache/local/enabled`.",
             example = "true",
             required = false)
     @Nullable
     String buildCacheLocalEnabled;
 
-    @Option(displayName = "Value for buildCache->remote->enabled",
-            description = "Value for buildCache->remote->enabled.",
+    @Option(displayName = "Enable remote build cache",
+            description = "Value for `//develocity/buildCache/remote/enabled`.",
             example = "true",
             required = false)
     @Nullable
     String buildCacheRemoteEnabled;
 
-    @Option(displayName = "Value for buildCache->remote->storeEnabled",
-            description = "Value for buildCache->remote->storeEnabled.",
+    @Option(displayName = "Enable remote build cache store",
+            description = "Value for `//develocity/buildCache/remote/storeEnabled`.",
             example = "#{isTrue(env['CI'])}",
             required = false)
     @Nullable
@@ -74,7 +75,7 @@ public class EnableBuildCache extends Recipe {
                 Xml.Tag rootTag = document.getRoot();
 
                 if ("develocity".equals(rootTag.getName()) && !rootTag.getChild("buildCache").isPresent()) {
-                    Xml.Tag tag = Xml.Tag.build(getBuildCacheConfig());
+                    Xml.Tag tag = Xml.Tag.build(buildCacheConfig());
                     rootTag = maybeAutoFormat(rootTag, rootTag.withContent(ListUtils.concat(rootTag.getChildren(), tag)), ctx);
                     return document.withRoot(rootTag);
                 }
@@ -85,24 +86,22 @@ public class EnableBuildCache extends Recipe {
         return Preconditions.check(new FindSourceFiles(".mvn/*.xml"), visitor);
     }
 
-    private String getBuildCacheConfig() {
-        StringBuilder sb = new StringBuilder("<buildCache>\n");
-
-        if (buildCacheLocalEnabled != null) {
-            sb.append("  <local>\n");
-            sb.append("    <storeEnabled>").append(buildCacheLocalEnabled).append("</storeEnabled>\n");
-            sb.append("  </local>\n");
+    private String buildCacheConfig() {
+        StringBuilder sb = new StringBuilder("<buildCache>");
+        if (!StringUtils.isBlank(buildCacheLocalEnabled)) {
+            sb.append("<local>");
+            sb.append("<enabled>").append(buildCacheLocalEnabled).append("</enabled>");
+            sb.append("</local>");
         }
-
-        if (buildCacheRemoteEnabled != null || buildCacheRemoteStoreEnabled != null) {
-            sb.append("  <remote>\n");
-            if (buildCacheRemoteEnabled != null) {
-                sb.append("    <enabled>").append(buildCacheRemoteEnabled).append("</enabled>\n");
+        if (!StringUtils.isBlank(buildCacheRemoteEnabled) || !StringUtils.isBlank(buildCacheRemoteStoreEnabled)) {
+            sb.append("<remote>");
+            if (!StringUtils.isBlank(buildCacheRemoteEnabled)) {
+                sb.append("<enabled>").append(buildCacheRemoteEnabled).append("</enabled>");
             }
-            if (buildCacheRemoteStoreEnabled != null) {
-                sb.append("    <storeEnabled>").append(buildCacheRemoteStoreEnabled).append("</storeEnabled>\n");
+            if (!StringUtils.isBlank(buildCacheRemoteStoreEnabled)) {
+                sb.append("<storeEnabled>").append(buildCacheRemoteStoreEnabled).append("</storeEnabled>");
             }
-            sb.append("  </remote>\n");
+            sb.append("</remote>");
         }
         sb.append("</buildCache>");
         return sb.toString();
