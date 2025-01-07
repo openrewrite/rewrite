@@ -1479,22 +1479,19 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         List<J.Annotation> typeExprAnnotations = collectAnnotations(annotationPosTable);
 
         TypeTree typeExpr;
-        if (vartype == null || vartype instanceof JCErroneous) {
-            typeExpr = null;
-        } else if (endPos(vartype) < 0) {
-            if ((node.sym.flags() & Flags.PARAMETER) > 0) {
-                // this is a lambda parameter with an inferred type expression
-                typeExpr = null;
-            } else {
-                boolean lombokVal = isLombokVal(node);
-                typeExpr = new J.Identifier(randomId(),
-                        sourceBefore(lombokVal ? "val" : "var"),
-                        Markers.build(singletonList(JavaVarKeyword.build())),
-                        emptyList(),
-                        lombokVal ? "val" : "var",
-                        typeMapping.type(vartype),
-                        null);
-            }
+        if (vartype == null || endPos(vartype) < 0 || vartype instanceof JCErroneous) {
+            typeExpr = null; // this is a lambda parameter with an inferred type expression*/
+        } else if (isLombokValOrVar(node)) {
+            Space space = whitespace();
+            boolean lombokVal = source.substring(cursor).startsWith("val");
+            cursor += 3;
+            typeExpr = new J.Identifier(randomId(),
+                    space,
+                    Markers.build(singletonList(JavaVarKeyword.build())),
+                    emptyList(),
+                    lombokVal ? "val" : "var",
+                    typeMapping.type(vartype),
+                    null);
         } else if (vartype instanceof JCArrayTypeTree) {
             JCExpression elementType = vartype;
             while (elementType instanceof JCArrayTypeTree || elementType instanceof JCAnnotatedType) {
@@ -1649,7 +1646,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
 
     private static int getActualStartPosition(JCTree t) {
         // not sure if this is a bug in Lombok, but the variable's start position is after the `val` annotation
-        if (t instanceof JCVariableDecl && isLombokVal((JCVariableDecl) t)) {
+        if (t instanceof JCVariableDecl && isLombokValOrVar((JCVariableDecl) t)) {
             return ((JCVariableDecl) t).mods.annotations.get(0).getStartPosition();
         }
         return t.getStartPosition();
@@ -1852,10 +1849,10 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         return converted;
     }
 
-    private static boolean isLombokVal(JCTree.JCVariableDecl t) {
+    private static boolean isLombokValOrVar(JCTree.JCVariableDecl t) {
         if (t.sym != null && t.sym.getMetadata() != null) {
             for (Attribute.Compound a : t.sym.getDeclarationAttributes()) {
-                if ("lombok.val".equals(a.type.toString())) {
+                if ("lombok.val".equals(a.type.toString()) || "lombok.var".equals(a.type.toString())) {
                     return true;
                 }
             }
@@ -1884,8 +1881,8 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         if (sym == null) {
             return false;
         }
-        // Lombok val is represented as a @lombok.val on a "final" modifier, neither which appear in source
-        if ("lombok.val".equals(sym.getQualifiedName().toString())) {
+        // Lombok local variables are represented as `final @lombok.val` and `@lombok.var`, which do not appear in source
+        if ("lombok.val".equals(sym.getQualifiedName().toString()) || "lombok.var".equals(sym.getQualifiedName().toString())) {
             return true;
         }
         if (sym.getMetadata() == null) {

@@ -1970,8 +1970,8 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         if (sym == null) {
             return false;
         }
-        // Lombok val is represented as a @lombok.val on a "final" modifier, neither which appear in source
-        if ("lombok.val".equals(sym.getQualifiedName().toString())) {
+        // Lombok local variables are represented as `final @lombok.val` and `@lombok.var`, which do not appear in source
+        if ("lombok.val".equals(sym.getQualifiedName().toString()) || "lombok.var".equals(sym.getQualifiedName().toString())) {
             return true;
         }
         if (sym.getMetadata() == null) {
