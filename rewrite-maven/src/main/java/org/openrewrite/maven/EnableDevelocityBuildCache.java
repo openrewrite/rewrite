@@ -43,33 +43,33 @@ public class EnableDevelocityBuildCache extends Recipe {
             example = "true",
             required = false)
     @Nullable
-    String buildCacheLocalEnabled;
+    String localEnabled;
 
     @Option(displayName = "Enable remote build cache",
             description = "Value for `//develocity/buildCache/remote/enabled`.",
             example = "true",
             required = false)
     @Nullable
-    String buildCacheRemoteEnabled;
+    String remoteEnabled;
 
     @Option(displayName = "Enable remote build cache store",
             description = "Value for `//develocity/buildCache/remote/storeEnabled`.",
             example = "#{isTrue(env['CI'])}",
             required = false)
     @Nullable
-    String buildCacheRemoteStoreEnabled;
+    String remoteStoreEnabled;
 
     @Override
     public Validated<Object> validate(ExecutionContext ctx) {
         return super.validate(ctx)
-                .and(Validated.notBlank("buildCacheLocalEnabled", buildCacheLocalEnabled)
-                        .or(Validated.notBlank("buildCacheRemoteEnabled", buildCacheRemoteEnabled))
-                        .or(Validated.notBlank("buildCacheRemoteStoreEnabled", buildCacheRemoteStoreEnabled)));
+                .and(Validated.notBlank("localEnabled", localEnabled)
+                        .or(Validated.notBlank("remoteEnabled", remoteEnabled))
+                        .or(Validated.notBlank("remoteStoreEnabled", remoteStoreEnabled)));
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        XmlVisitor<ExecutionContext> visitor = new XmlVisitor<ExecutionContext>() {
+        return Preconditions.check(new FindSourceFiles(".mvn/*.xml"), new XmlVisitor<ExecutionContext>() {
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
                 Xml.Tag rootTag = document.getRoot();
@@ -81,29 +81,27 @@ public class EnableDevelocityBuildCache extends Recipe {
                 }
                 return document;
             }
-        };
 
-        return Preconditions.check(new FindSourceFiles(".mvn/*.xml"), visitor);
-    }
-
-    private String buildCacheConfig() {
-        StringBuilder sb = new StringBuilder("<buildCache>");
-        if (!StringUtils.isBlank(buildCacheLocalEnabled)) {
-            sb.append("<local>");
-            sb.append("<enabled>").append(buildCacheLocalEnabled).append("</enabled>");
-            sb.append("</local>");
-        }
-        if (!StringUtils.isBlank(buildCacheRemoteEnabled) || !StringUtils.isBlank(buildCacheRemoteStoreEnabled)) {
-            sb.append("<remote>");
-            if (!StringUtils.isBlank(buildCacheRemoteEnabled)) {
-                sb.append("<enabled>").append(buildCacheRemoteEnabled).append("</enabled>");
+            private String buildCacheConfig() {
+                StringBuilder sb = new StringBuilder("<buildCache>");
+                if (!StringUtils.isBlank(localEnabled)) {
+                    sb.append("<local>");
+                    sb.append("<enabled>").append(localEnabled).append("</enabled>");
+                    sb.append("</local>");
+                }
+                if (!StringUtils.isBlank(remoteEnabled) || !StringUtils.isBlank(remoteStoreEnabled)) {
+                    sb.append("<remote>");
+                    if (!StringUtils.isBlank(remoteEnabled)) {
+                        sb.append("<enabled>").append(remoteEnabled).append("</enabled>");
+                    }
+                    if (!StringUtils.isBlank(remoteStoreEnabled)) {
+                        sb.append("<storeEnabled>").append(remoteStoreEnabled).append("</storeEnabled>");
+                    }
+                    sb.append("</remote>");
+                }
+                sb.append("</buildCache>");
+                return sb.toString();
             }
-            if (!StringUtils.isBlank(buildCacheRemoteStoreEnabled)) {
-                sb.append("<storeEnabled>").append(buildCacheRemoteStoreEnabled).append("</storeEnabled>");
-            }
-            sb.append("</remote>");
-        }
-        sb.append("</buildCache>");
-        return sb.toString();
+        });
     }
 }
