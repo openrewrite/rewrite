@@ -1480,11 +1480,11 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
 
         TypeTree typeExpr;
         if (vartype == null || endPos(vartype) < 0 || vartype instanceof JCErroneous) {
-            typeExpr = null; // this is a lambda parameter with an inferred type expression*/
+            typeExpr = null; // this is a lambda parameter with an inferred type expression
         } else if (isLombokValOrVar(node)) {
             Space space = whitespace();
             boolean lombokVal = source.substring(cursor).startsWith("val");
-            cursor += 3;
+            cursor += 3; // skip `val` or `var`
             typeExpr = new J.Identifier(randomId(),
                     space,
                     Markers.build(singletonList(JavaVarKeyword.build())),
@@ -2071,7 +2071,6 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         for (int i = cursor; i < source.length(); i++) {
             if (annotationPosTable.containsKey(i)) {
                 JCAnnotation jcAnnotation = annotationPosTable.get(i);
-                // Skip over lombok's "@val" annotation which does not actually appear in source
                 if (isLombokGenerated(jcAnnotation.getAnnotationType())) {
                     continue;
                 }

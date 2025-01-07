@@ -2079,7 +2079,6 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
         for (int i = cursor; i < source.length(); i++) {
             if (annotationPosTable.containsKey(i)) {
                 JCAnnotation jcAnnotation = annotationPosTable.get(i);
-                // Skip over lombok's "@val" annotation which does not actually appear in source
                 if (isLombokGenerated(jcAnnotation.getAnnotationType())) {
                     continue;
                 }
