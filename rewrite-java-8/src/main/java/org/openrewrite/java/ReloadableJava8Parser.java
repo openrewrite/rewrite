@@ -26,7 +26,6 @@ import com.sun.tools.javac.util.Options;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import lombok.Getter;
-import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.Nullable;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
@@ -56,8 +55,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -239,7 +236,7 @@ class ReloadableJava8Parser implements JavaParser {
         });
     }
 
-    private @NotNull LinkedHashMap<Input, JCTree.JCCompilationUnit> parseInputsToCompilerAst(Iterable<Input> sourceFiles, ExecutionContext ctx) {
+    LinkedHashMap<Input, JCTree.JCCompilationUnit> parseInputsToCompilerAst(Iterable<Input> sourceFiles, ExecutionContext ctx) {
         if (classpath != null) { // override classpath
             if (context.get(JavaFileManager.class) != pfm) {
                 throw new IllegalStateException("JavaFileManager has been forked unexpectedly");
