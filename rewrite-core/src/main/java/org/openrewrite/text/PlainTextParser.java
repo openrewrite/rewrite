@@ -82,6 +82,7 @@ public class PlainTextParser implements Parser {
                         input.getFileAttributes(),
                         null,
                         sourceStr,
+                        null,
                         null
                 );
                 parsingListener.parsed(input, plainText);

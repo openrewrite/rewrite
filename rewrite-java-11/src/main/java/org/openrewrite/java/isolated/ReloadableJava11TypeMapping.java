@@ -232,8 +232,9 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
     private JavaType.FullyQualified classType(Type.ClassType classType, String signature) {
         Symbol.ClassSymbol sym = (Symbol.ClassSymbol) classType.tsym;
         Type.ClassType symType = (Type.ClassType) sym.type;
+        String fqn = sym.flatName().toString();
 
-        JavaType.FullyQualified fq = typeCache.get(sym.flatName().toString());
+        JavaType.FullyQualified fq = typeCache.get(fqn);
         JavaType.Class clazz = (JavaType.Class) (fq instanceof JavaType.Parameterized ? ((JavaType.Parameterized) fq).getType() : fq);
         if (clazz == null) {
             if (!sym.completer.isTerminal()) {
@@ -243,12 +244,12 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
             clazz = new JavaType.Class(
                     null,
                     sym.flags_field,
-                    sym.flatName().toString(),
+                    fqn,
                     getKind(sym),
                     null, null, null, null, null, null, null
             );
 
-            typeCache.put(sym.flatName().toString(), clazz);
+            typeCache.put(fqn, clazz);
 
             JavaType.FullyQualified supertype = TypeUtils.asFullyQualified(type(symType.supertype_field));
 
@@ -276,7 +277,7 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
                     if (elem instanceof Symbol.VarSymbol &&
                             (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
                                     Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
-                        if (sym.flatName().toString().equals("java.lang.String") && elem.name.toString().equals("serialPersistentFields")) {
+                        if (fqn.equals("java.lang.String") && elem.name.toString().equals("serialPersistentFields")) {
                             // there is a "serialPersistentFields" member within the String class which is used in normal Java
                             // serialization to customize how the String field is serialized. This field is tripping up Jackson
                             // serialization and is intentionally filtered to prevent errors.
@@ -358,12 +359,19 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
             return variableType(((JCTree.JCVariableDecl) tree).sym);
         } else if (tree instanceof JCTree.JCAnnotatedType && ((JCTree.JCAnnotatedType) tree).getUnderlyingType() instanceof JCTree.JCArrayTypeTree) {
             return annotatedArray((JCTree.JCAnnotatedType) tree);
+        } else if (tree instanceof JCTree.JCClassDecl) {
+            symbol = ((JCTree.JCClassDecl) tree).sym;
+        } else if (tree instanceof JCTree.JCFieldAccess) {
+            symbol = ((JCTree.JCFieldAccess) tree).sym;
         }
 
         return type(((JCTree) tree).type, symbol);
     }
 
-    private @Nullable JavaType type(Type type, Symbol symbol) {
+    private @Nullable JavaType type(@Nullable Type type, @Nullable Symbol symbol) {
+        if (type == null && symbol != null) {
+            type = symbol.type;
+        }
         if (type instanceof Type.MethodType || type instanceof Type.ForAll) {
             return methodInvocationType(type, symbol);
         }
@@ -470,12 +478,14 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
             return existing;
         }
 
-        List<String> paramNames = null;
+        String[] paramNames = null;
         if (!methodSymbol.params().isEmpty()) {
-            paramNames = new ArrayList<>(methodSymbol.params().size());
-            for (Symbol.VarSymbol p : methodSymbol.params()) {
+            paramNames = new String[methodSymbol.params().size()];
+            com.sun.tools.javac.util.List<Symbol.VarSymbol> params = methodSymbol.params();
+            for (int i = 0; i < params.size(); i++) {
+                Symbol.VarSymbol p = params.get(i);
                 String s = p.name.toString();
-                paramNames.add(s);
+                paramNames[i] = s;
             }
         }
 
@@ -486,13 +496,13 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
                 methodSymbol.isConstructor() ? "<constructor>" : methodSymbol.getSimpleName().toString(),
                 null,
                 paramNames,
-                null, null, null, null
+                null, null, null, null, null
         );
         typeCache.put(signature, method);
 
         JavaType returnType = null;
         List<JavaType> parameterTypes = null;
-        List<JavaType.FullyQualified> exceptionTypes = null;
+        List<JavaType> exceptionTypes = null;
 
         if (selectType instanceof Type.MethodType) {
             Type.MethodType methodType = (Type.MethodType) selectType;
@@ -512,20 +522,8 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
             if (!methodType.thrown.isEmpty()) {
                 exceptionTypes = new ArrayList<>(methodType.thrown.size());
                 for (Type exceptionType : methodType.thrown) {
-                    JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(exceptionType));
-                    if (javaType == null) {
-                        // if the type cannot be resolved to a class (it might not be on the classpath, or it might have
-                        // been mapped to cyclic)
-                        if (exceptionType instanceof Type.ClassType) {
-                            Symbol.ClassSymbol sym = (Symbol.ClassSymbol) exceptionType.tsym;
-                            javaType = new JavaType.Class(null, Flag.Public.getBitMask(), sym.flatName().toString(), JavaType.Class.Kind.Class,
-                                    null, null, null, null, null, null, null);
-                        }
-                    }
-                    if (javaType != null) {
-                        // if the exception type is not resolved, it is not added to the list of exceptions
-                        exceptionTypes.add(javaType);
-                    }
+                    JavaType javaType = type(exceptionType);
+                    exceptionTypes.add(javaType);
                 }
             }
         } else if (selectType instanceof Type.UnknownType) {
@@ -563,12 +561,14 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
                 return existing;
             }
 
-            List<String> paramNames = null;
+            String[] paramNames = null;
             if (!methodSymbol.params().isEmpty()) {
-                paramNames = new ArrayList<>(methodSymbol.params().size());
-                for (Symbol.VarSymbol p : methodSymbol.params()) {
+                paramNames = new String[methodSymbol.params().size()];
+                com.sun.tools.javac.util.List<Symbol.VarSymbol> params = methodSymbol.params();
+                for (int i = 0; i < params.size(); i++) {
+                    Symbol.VarSymbol p = params.get(i);
                     String s = p.name.toString();
-                    paramNames.add(s);
+                    paramNames[i] = s;
                 }
             }
 
@@ -586,6 +586,17 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
                     }
                 }
             }
+
+            List<String> declaredFormalTypeNames = null;
+            for (Symbol.TypeVariableSymbol typeParam : methodSymbol.getTypeParameters()) {
+                if(typeParam.owner == methodSymbol) {
+                    if (declaredFormalTypeNames == null) {
+                        declaredFormalTypeNames = new ArrayList<>();
+                    }
+                    declaredFormalTypeNames.add(typeParam.name.toString());
+                }
+            }
+
             JavaType.Method method = new JavaType.Method(
                     null,
                     methodSymbol.flags_field,
@@ -594,8 +605,8 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
                     null,
                     paramNames,
                     null, null, null,
-                    // TODO: Figure out the correct thing to put here based on methodSymbol.defaultValue.getValue()
-                    defaultValues
+                    defaultValues,
+                    declaredFormalTypeNames == null ? null : declaredFormalTypeNames.toArray(new String[0])
             );
             typeCache.put(signature, method);
 
@@ -603,7 +614,7 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
                     ((Type.ForAll) methodSymbol.type).qtype :
                     methodSymbol.type;
 
-            List<JavaType.FullyQualified> exceptionTypes = null;
+            List<JavaType> exceptionTypes = null;
 
             Type selectType = methodSymbol.type;
             if (selectType instanceof Type.ForAll) {
@@ -615,20 +626,8 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
                 if (!methodType.thrown.isEmpty()) {
                     exceptionTypes = new ArrayList<>(methodType.thrown.size());
                     for (Type exceptionType : methodType.thrown) {
-                        JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(exceptionType));
-                        if (javaType == null) {
-                            // if the type cannot be resolved to a class (it might not be on the classpath, or it might have
-                            // been mapped to cyclic)
-                            if (exceptionType instanceof Type.ClassType) {
-                                Symbol.ClassSymbol sym = (Symbol.ClassSymbol) exceptionType.tsym;
-                                javaType = new JavaType.Class(null, Flag.Public.getBitMask(), sym.flatName().toString(), JavaType.Class.Kind.Class,
-                                        null, null, null, null, null, null, null);
-                            }
-                        }
-                        if (javaType != null) {
-                            // if the exception type is not resolved, it is not added to the list of exceptions
-                            exceptionTypes.add(javaType);
-                        }
+                        JavaType javaType = type(exceptionType);
+                        exceptionTypes.add(javaType);
                     }
                 }
             }

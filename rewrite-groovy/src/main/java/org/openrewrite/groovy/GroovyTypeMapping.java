@@ -244,7 +244,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
             }
         }
 
-        List<JavaType.FullyQualified> thrownExceptions = null;
+        List<JavaType> thrownExceptions = null;
         if(node.getExceptions() != null) {
             for (ClassNode e : node.getExceptions()) {
                 thrownExceptions = new ArrayList<>(node.getExceptions().length);

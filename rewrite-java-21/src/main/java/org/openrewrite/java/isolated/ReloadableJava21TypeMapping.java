@@ -505,13 +505,13 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
                 methodSymbol.isConstructor() ? "<constructor>" : methodSymbol.getSimpleName().toString(),
                 null,
                 paramNames,
-                null, null, null, null
+                null, null, null, null, null
         );
         typeCache.put(signature, method);
 
         JavaType returnType = null;
         List<JavaType> parameterTypes = null;
-        List<JavaType.FullyQualified> exceptionTypes = null;
+        List<JavaType> exceptionTypes = null;
 
         if (selectType instanceof Type.MethodType) {
             Type.MethodType methodType = (Type.MethodType) selectType;
@@ -531,20 +531,8 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
             if (!methodType.thrown.isEmpty()) {
                 exceptionTypes = new ArrayList<>(methodType.thrown.size());
                 for (Type exceptionType : methodType.thrown) {
-                    JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(exceptionType));
-                    if (javaType == null) {
-                        // if the type cannot be resolved to a class (it might not be on the classpath, or it might have
-                        // been mapped to cyclic)
-                        if (exceptionType instanceof Type.ClassType) {
-                            Symbol.ClassSymbol sym = (Symbol.ClassSymbol) exceptionType.tsym;
-                            javaType = new JavaType.Class(null, Flag.Public.getBitMask(), sym.flatName().toString(), JavaType.Class.Kind.Class,
-                                    null, null, null, null, null, null, null);
-                        }
-                    }
-                    if (javaType != null) {
-                        // if the exception type is not resolved, it is not added to the list of exceptions
-                        exceptionTypes.add(javaType);
-                    }
+                    JavaType javaType = type(exceptionType);
+                    exceptionTypes.add(javaType);
                 }
             }
         } else if (selectType instanceof Type.UnknownType) {
@@ -606,6 +594,17 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
                     }
                 }
             }
+
+            List<String> declaredFormalTypeNames = null;
+            for (Symbol.TypeVariableSymbol typeParam : methodSymbol.getTypeParameters()) {
+                if(typeParam.owner == methodSymbol) {
+                    if (declaredFormalTypeNames == null) {
+                        declaredFormalTypeNames = new ArrayList<>();
+                    }
+                    declaredFormalTypeNames.add(typeParam.name.toString());
+                }
+            }
+
             JavaType.Method method = new JavaType.Method(
                     null,
                     methodSymbol.flags_field,
@@ -614,7 +613,8 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
                     null,
                     paramNames,
                     null, null, null,
-                    defaultValues
+                    defaultValues,
+                    declaredFormalTypeNames == null ? null : declaredFormalTypeNames.toArray(new String[0])
             );
             typeCache.put(signature, method);
 
@@ -622,7 +622,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
                     ((Type.ForAll) methodSymbol.type).qtype :
                     methodSymbol.type;
 
-            List<JavaType.FullyQualified> exceptionTypes = null;
+            List<JavaType> exceptionTypes = null;
 
             Type selectType = methodSymbol.type;
             if (selectType instanceof Type.ForAll) {
@@ -634,20 +634,8 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
                 if (!methodType.thrown.isEmpty()) {
                     exceptionTypes = new ArrayList<>(methodType.thrown.size());
                     for (Type exceptionType : methodType.thrown) {
-                        JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(exceptionType));
-                        if (javaType == null) {
-                            // if the type cannot be resolved to a class (it might not be on the classpath, or it might have
-                            // been mapped to cyclic)
-                            if (exceptionType instanceof Type.ClassType) {
-                                Symbol.ClassSymbol sym = (Symbol.ClassSymbol) exceptionType.tsym;
-                                javaType = new JavaType.Class(null, Flag.Public.getBitMask(), sym.flatName().toString(), JavaType.Class.Kind.Class,
-                                        null, null, null, null, null, null, null);
-                            }
-                        }
-                        if (javaType != null) {
-                            // if the exception type is not resolved, it is not added to the list of exceptions
-                            exceptionTypes.add(javaType);
-                        }
+                        JavaType javaType = type(exceptionType);
+                        exceptionTypes.add(javaType);
                     }
                 }
             }

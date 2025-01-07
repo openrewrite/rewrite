@@ -57,6 +57,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         JRightPadded<J.Package> pkg = cu.getPadding().getPackageDeclaration();
         if (pkg != null) {
             visit(pkg.getElement(), p);
+            visitMarkers(pkg.getMarkers(), p);
             visitSpace(pkg.getAfter(), Space.Location.PACKAGE_SUFFIX, p);
         }
 
@@ -265,12 +266,16 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             beforeSyntax(multiVariable, Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
             visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
             visit(multiVariable.getLeadingAnnotations(), p);
-            for (J.Modifier m : multiVariable.getModifiers()) {
-                visitModifier(m, p);
-            }
             multiVariable.getMarkers().findFirst(RedundantDef.class).ifPresent(def -> {
                 visitSpace(def.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p);
                 p.append("def");
+            });
+            for (J.Modifier m : multiVariable.getModifiers()) {
+                visitModifier(m, p);
+            }
+            multiVariable.getMarkers().findFirst(MultiVariable.class).ifPresent(multiVar -> {
+                visitSpace(multiVar.getPrefix(), Space.Location.NAMED_VARIABLE_SUFFIX, p);
+                p.append(",");
             });
             visit(multiVariable.getTypeExpression(), p);
             // For backwards compatibility.

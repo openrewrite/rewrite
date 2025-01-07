@@ -292,7 +292,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
         if (managedVersion == null) {
             return false;
         }
-        if (comparator.equals(Comparator.ANY)) {
+        if (comparator == Comparator.ANY) {
             return true;
         }
         if (!isExact(managedVersion)) {
@@ -301,11 +301,11 @@ public class RemoveRedundantDependencyVersions extends Recipe {
         int comparison = new LatestIntegration(null)
                 .compare(null, managedVersion, requestedVersion);
         if (comparison < 0) {
-            return comparator.equals(Comparator.LT) || comparator.equals(Comparator.LTE);
+            return comparator == Comparator.LT || comparator == Comparator.LTE;
         } else if (comparison > 0) {
-            return comparator.equals(Comparator.GT) || comparator.equals(Comparator.GTE);
+            return comparator == Comparator.GT || comparator == Comparator.GTE;
         } else {
-            return comparator.equals(Comparator.EQ) || comparator.equals(Comparator.LTE) || comparator.equals(Comparator.GTE);
+            return comparator == Comparator.EQ || comparator == Comparator.LTE || comparator == Comparator.GTE;
         }
     }
 

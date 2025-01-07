@@ -165,6 +165,17 @@ class ForLoopTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
+              for(def i : [1, 2, 3]) {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void forEachTypedWithColon() {
+        rewriteRun(
+          groovy(
+            """
               for(int i : [1, 2, 3]) {}
               """
           )
@@ -176,9 +187,7 @@ class ForLoopTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              def dependenciesType = ['implementation', 'testImplementation']
-              for (type in dependenciesType) {
-              }
+              for (type in ['implementation', 'testImplementation']) {}
               """
           )
         );
