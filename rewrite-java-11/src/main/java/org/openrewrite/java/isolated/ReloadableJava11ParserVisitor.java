@@ -1874,14 +1874,11 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
             sym = ((JCClassDecl) t).sym;
         } else if (t instanceof JCTree.JCVariableDecl) {
             sym = ((JCVariableDecl) t).sym;
+            return sym != null && sym.getDeclarationAttributes().stream().anyMatch(a -> "lombok.val".equals(a.type.toString()));
         }
 
         //noinspection ConstantConditions
-        return sym != null && (
-                "lombok.val".equals(sym.getQualifiedName().toString()) ||
-                sym.getDeclarationAttributes().stream().anyMatch(a -> "lombok.val".equals(a.type.toString())) ||
-                sym.getAnnotation(Generated.class) != null
-        );
+        return sym != null && ("lombok.val".equals(sym.getQualifiedName().toString()) || sym.getAnnotation(Generated.class) != null);
     }
 
     /**
