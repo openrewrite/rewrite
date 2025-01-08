@@ -354,7 +354,11 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container, JContainer.Location loc, P p) {
+    public <J2 extends J> @Nullable JContainer<J2> visitContainer(@Nullable JContainer<J2> container, JContainer.Location loc, P p) {
+        if (container == null) {
+            return null;
+        }
+
         setCursor(new Cursor(getCursor(), container));
 
         Space before;
