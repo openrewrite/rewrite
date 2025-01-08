@@ -1067,10 +1067,11 @@ public interface J extends Tree {
             return getPadding().withBody(JRightPadded.withElement(this.body, body));
         }
 
+        @Nullable
         JContainer<CaseLabel> labels;
 
         public List<CaseLabel> getLabels() {
-            return labels.getElements();
+            return labels != null ? labels.getElements() : emptyList();
         }
 
         public Case withLabels(List<CaseLabel> labels) {
