@@ -68,36 +68,34 @@ public class EnableDevelocityBuildCache extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new IsSettingsGradle<>(), new GroovyIsoVisitor<ExecutionContext>() {
-                    @Override
-                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                        J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
-                        if ("buildCache".equals(method.getSimpleName())) {
-                            try {
-                                Cursor parent = getCursor().dropParentUntil(v -> v instanceof J.MethodInvocation && "develocity".equals(((J.MethodInvocation) v).getSimpleName()));
-                                parent.putMessage("hasBuildCacheConfig", true);
-                            } catch (IllegalStateException e) {
-                                // ignore, this means we're not in a develocity block
-                            }
-                            return m;
-                        }
-
-                        if ("develocity".equals(method.getSimpleName()) && getCursor().pollMessage("hasBuildCacheConfig") != null) {
-                            J.MethodInvocation buildCache = develocityBuildCacheTemplate("    ", ctx);
-
-                            return maybeAutoFormat(m, m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
-                                if (arg instanceof J.Lambda) {
-                                    J.Lambda lambda = (J.Lambda) arg;
-                                    J.Block block = (J.Block) lambda.getBody();
-                                    return lambda.withBody(block.withStatements(ListUtils.concat(block.getStatements(), buildCache)));
-                                }
-                                return arg;
-                            })), ctx);
-                        }
-                        return m;
+                if ("buildCache".equals(method.getSimpleName())) {
+                    try {
+                        Cursor parent = getCursor().dropParentUntil(v -> v instanceof J.MethodInvocation && "develocity".equals(((J.MethodInvocation) v).getSimpleName()));
+                        parent.putMessage("hasBuildCacheConfig", true);
+                    } catch (IllegalStateException e) {
+                        // ignore, this means we're not in a develocity block
                     }
+                    return m;
                 }
-        );
+
+                if ("develocity".equals(method.getSimpleName()) && getCursor().pollMessage("hasBuildCacheConfig") == null) {
+                    J.MethodInvocation buildCache = develocityBuildCacheTemplate("    ", ctx);
+                    return maybeAutoFormat(m, m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
+                        if (arg instanceof J.Lambda) {
+                            J.Lambda lambda = (J.Lambda) arg;
+                            J.Block block = (J.Block) lambda.getBody();
+                            return lambda.withBody(block.withStatements(ListUtils.concat(block.getStatements(), buildCache)));
+                        }
+                        return arg;
+                    })), ctx);
+                }
+                return m;
+            }
+        });
     }
 
     private J.@Nullable MethodInvocation develocityBuildCacheTemplate(String indent, ExecutionContext ctx) {
