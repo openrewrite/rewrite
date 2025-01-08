@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import com.sun.org.apache.xalan.internal.xsltc.compiler.sym;
 import com.sun.source.tree.*;
 import com.sun.source.util.TreePathScanner;
 import com.sun.tools.javac.code.Attribute;
@@ -1858,12 +1859,8 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         } else if (tree instanceof JCTree.JCMethodDecl) {
             sym = ((JCMethodDecl) tree).sym;
             if (sym == null) {
-                // In java 8 code, a JCMethodDecl does not always have a symbol, so retrieve the possible @Generated annotation differently
-                for (JCAnnotation ann : ((JCMethodDecl) tree).getModifiers().getAnnotations()) {
-                    if ("@lombok.Generated()".equals(ann.toString())) {
-                        return true;
-                    }
-                }
+                // In java 8 code, a JCMethodDecl does not always have a symbol, so check the possible @Generated annotation directly
+                return ((JCMethodDecl) tree).getModifiers().getAnnotations().stream().anyMatch(a -> "@lombok.Generated()".equals(a.toString()));
             }
         } else if (tree instanceof JCTree.JCClassDecl) {
             sym = ((JCClassDecl) tree).sym;
