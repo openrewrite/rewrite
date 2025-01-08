@@ -748,24 +748,25 @@ class LombokTest implements RewriteTest {
     @Test
     void onConstructor() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.builder().allowMissingType(o -> {
-              assert o instanceof FindMissingTypes.MissingTypeResult;
-              FindMissingTypes.MissingTypeResult result = (FindMissingTypes.MissingTypeResult) o;
-              // type attribution is missing for annotation args, as it was intentionally removed for processing.
-              return result.getPath().startsWith("Identifier->Annotation->");
-          }).build()),
+          java(
+            """
+              public @interface Inject {}
+              public @interface Id {}
+              public @interface Column {
+                  String name();
+              }
+              public @interface Max {
+                  long value();
+              }
+              """
+          ),
           java(
             """
               import lombok.AllArgsConstructor;
               import lombok.Getter;
               import lombok.Setter;
               
-              import javax.inject.Inject;
-              import javax.persistence.Id;
-              import javax.persistence.Column;
-              import javax.validation.constraints.Max;
-              
-              @AllArgsConstructor(onConstructor=@__(@Inject))
+              @AllArgsConstructor(onConstructor_=@Inject) //JDK8
               public class OnXExample {
                   @Getter(onMethod_={@Id, @Column(name="unique-id")}) //JDK8
                   @Setter(onParam_=@Max(10000)) //JDK8
@@ -785,15 +786,11 @@ class LombokTest implements RewriteTest {
     @Test
     void onConstructorNoArgs() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.builder().allowMissingType(o -> {
-              assert o instanceof FindMissingTypes.MissingTypeResult;
-              FindMissingTypes.MissingTypeResult result = (FindMissingTypes.MissingTypeResult) o;
-              if (result.getJ() instanceof J.Identifier identifier) {
-                  // type attribution is missing for annotation args, as it was intentionally removed for processing.
-                  return identifier.getSimpleName().equals("__") || identifier.getSimpleName().equals("Inject");
-              }
-              return false;
-          }).build()),
+          java(
+            """
+              public @interface Inject {}
+              """
+          ),
           java(
             """
               import lombok.NoArgsConstructor;
@@ -802,8 +799,8 @@ class LombokTest implements RewriteTest {
               
               import javax.inject.Inject;
               
-              @NoArgsConstructor(onConstructor = @__(@Inject))
-              @RequiredArgsConstructor(onConstructor = @__(@Inject))
+              @NoArgsConstructor(onConstructor_ = @Inject)
+              @RequiredArgsConstructor(onConstructor_ = @Inject)
               public class OnXExample {
                   @NonNull private Long unid;
               
