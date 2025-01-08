@@ -341,19 +341,22 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
     @Override
     public J visitCase(CaseTree node, Space fmt) {
         J.Case.Type type = node.getCaseKind() == CaseTree.CaseKind.RULE ? J.Case.Type.Rule : J.Case.Type.Statement;
+
+        JContainer<CaseLabel> labels = JContainer.build(
+                node.getLabels().isEmpty() ? EMPTY : sourceBefore("case"),
+                node.getLabels().isEmpty() || node.getLabels().stream().allMatch(clt -> clt instanceof DefaultCaseLabelTree) ?
+                        List.of(JRightPadded.build(new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), skip("default"), null, null))) :
+                        convertAll(node.getLabels(), commaDelim, t -> EMPTY),
+                Markers.EMPTY
+        );
+
         return new J.Case(
                 randomId(),
                 fmt,
                 Markers.EMPTY,
                 type,
                 null,
-                JContainer.build(
-                        node.getLabels().isEmpty() ? EMPTY : sourceBefore("case"),
-                        node.getLabels().isEmpty() || node.getLabels().stream().allMatch(clt -> clt instanceof DefaultCaseLabelTree) ?
-                                List.of(JRightPadded.build(new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), skip("default"), null, null))) :
-                                convertAll(node.getLabels(), commaDelim, t -> EMPTY),
-                        Markers.EMPTY
-                ),
+                JContainer.empty(),
                 JContainer.build(
                         sourceBefore(type == J.Case.Type.Rule ? "->" : ":"),
                         convertStatements(node.getStatements()),
@@ -361,7 +364,8 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 ),
                 type == J.Case.Type.Rule ?
                         padRight(convert(node.getBody()), statementDelim(node.getBody())) :
-                        null
+                        null,
+                labels
         );
     }
 

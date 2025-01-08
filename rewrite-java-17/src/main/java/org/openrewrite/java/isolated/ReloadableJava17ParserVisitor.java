@@ -362,7 +362,8 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 ),
                 type == J.Case.Type.Rule ?
                         padRight(convert(node.getBody()), statementDelim(node.getBody())) :
-                        null
+                        null,
+                null
         );
     }
 

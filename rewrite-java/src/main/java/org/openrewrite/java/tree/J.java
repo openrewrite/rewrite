@@ -1067,8 +1067,18 @@ public interface J extends Tree {
             return getPadding().withBody(JRightPadded.withElement(this.body, body));
         }
 
+        JContainer<CaseLabel> labels;
+
+        public List<CaseLabel> getLabels() {
+            return labels.getElements();
+        }
+
+        public Case withLabels(List<CaseLabel> labels) {
+            return getPadding().withLabels(requireNonNull(JContainer.withElementsNullable(this.labels, labels)));
+        }
+
         @JsonCreator
-        public Case(UUID id, Space prefix, Markers markers, Type type, @Deprecated @Nullable Expression pattern, JContainer<Expression> expressions, JContainer<Statement> statements, @Nullable JRightPadded<J> body) {
+        public Case(UUID id, Space prefix, Markers markers, Type type, @Deprecated @Nullable Expression pattern, JContainer<Expression> expressions, JContainer<Statement> statements, @Nullable JRightPadded<J> body, JContainer<CaseLabel> labels) {
             this.id = id;
             this.prefix = prefix;
             this.markers = markers;
@@ -1080,6 +1090,7 @@ public interface J extends Tree {
             }
             this.statements = statements;
             this.body = body;
+            this.labels = labels;
         }
 
         @Override
@@ -1127,7 +1138,7 @@ public interface J extends Tree {
             }
 
             public Case withBody(@Nullable JRightPadded<J> body) {
-                return t.body == body ? t : new Case(t.id, t.prefix, t.markers, t.type, null, t.expressions, t.statements, body);
+                return t.body == body ? t : new Case(t.id, t.prefix, t.markers, t.type, null, t.expressions, t.statements, body, t.labels);
             }
 
             public JContainer<Statement> getStatements() {
@@ -1135,7 +1146,7 @@ public interface J extends Tree {
             }
 
             public Case withStatements(JContainer<Statement> statements) {
-                return t.statements == statements ? t : new Case(t.id, t.prefix, t.markers, t.type, null, t.expressions, statements, t.body);
+                return t.statements == statements ? t : new Case(t.id, t.prefix, t.markers, t.type, null, t.expressions, statements, t.body, t.labels);
             }
 
             public JContainer<Expression> getExpressions() {
@@ -1143,7 +1154,15 @@ public interface J extends Tree {
             }
 
             public Case withExpressions(JContainer<Expression> expressions) {
-                return t.expressions == expressions ? t : new Case(t.id, t.prefix, t.markers, t.type, null, expressions, t.statements, t.body);
+                return t.expressions == expressions ? t : new Case(t.id, t.prefix, t.markers, t.type, null, expressions, t.statements, t.body, t.labels);
+            }
+
+            public JContainer<CaseLabel> getLabels() {
+                return t.labels;
+            }
+
+            public Case withLabels(JContainer<CaseLabel> labels) {
+                return t.labels == labels ? t : new Case(t.id, t.prefix, t.markers, t.type, null, t.expressions, t.statements, t.body, labels);
             }
         }
     }
@@ -2452,7 +2471,7 @@ public interface J extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)})
     @With
-    class Identifier implements J, TypeTree, Expression {
+    class Identifier implements J, TypeTree, Expression, CaseLabel {
         @Getter
         @EqualsAndHashCode.Include
         UUID id;

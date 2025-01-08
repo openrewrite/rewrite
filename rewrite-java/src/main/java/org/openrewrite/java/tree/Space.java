@@ -326,6 +326,7 @@ public class Space {
         CASE_PREFIX,
         CASE_BODY,
         CASE_EXPRESSION,
+        CASE_LABEL,
         CASE_SUFFIX,
         CATCH_ALTERNATIVE_SUFFIX,
         CATCH_PREFIX,
