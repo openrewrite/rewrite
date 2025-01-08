@@ -25,10 +25,6 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.tree.J;
 
-import java.nio.file.Paths;
-
-import static java.util.Collections.singletonList;
-
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class EnableDevelocityBuildCache extends Recipe {
@@ -83,7 +79,7 @@ public class EnableDevelocityBuildCache extends Recipe {
                 }
 
                 if ("develocity".equals(method.getSimpleName()) && getCursor().pollMessage("hasBuildCacheConfig") == null) {
-                    J.MethodInvocation buildCache = develocityBuildCacheTemplate("    ", ctx);
+                    J.MethodInvocation buildCache = develocityBuildCacheTemplate();
                     return maybeAutoFormat(m, m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
                         if (arg instanceof J.Lambda) {
                             J.Lambda lambda = (J.Lambda) arg;
@@ -98,25 +94,22 @@ public class EnableDevelocityBuildCache extends Recipe {
         });
     }
 
-    private J.@Nullable MethodInvocation develocityBuildCacheTemplate(String indent, ExecutionContext ctx) {
-        StringBuilder ge = new StringBuilder("\ndevelocity {\n");
-        ge.append(indent).append("buildCache {\n");
+    private J.@Nullable MethodInvocation develocityBuildCacheTemplate() {
+        String ge = "\ndevelocity {\n" +
+                    "    buildCache {\n" +
+                    "        remote(develocity.buildCache) {\n";
 
-        ge.append(indent).append(indent).append("remote(develocity.buildCache) {\n");
         if (!StringUtils.isBlank(remoteEnabled)) {
-            ge.append(indent).append(indent).append(indent).append("enabled = ").append(remoteEnabled).append("\n");
+            ge += "            enabled = " + remoteEnabled + "\n";
         }
 
         if (!StringUtils.isBlank(remotePushEnabled)) {
-            ge.append(indent).append(indent).append(indent).append("push = ").append(remotePushEnabled).append("\n");
+            ge += "            push = " + remotePushEnabled + "\n";
         }
-        ge.append(indent).append(indent).append("}\n");
-        ge.append(indent).append("}\n");
-        ge.append("}\n");
+        ge += "        }\n    }\n}\n";
 
         G.CompilationUnit cu = GradleParser.builder().build()
-                .parseInputs(singletonList(
-                        Parser.Input.fromString(Paths.get("settings.gradle"), ge.toString())), null, ctx)
+                .parse(ge)
                 .map(G.CompilationUnit.class::cast)
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"));
