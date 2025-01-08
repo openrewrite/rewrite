@@ -54,8 +54,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static java.lang.Math.max;
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
+import static java.util.Collections.*;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.StreamSupport.stream;
 import static org.openrewrite.Tree.randomId;
@@ -1851,15 +1850,17 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     private static boolean isLombokGenerated(Tree t) {
-        Symbol sym = null;
         if (t instanceof JCAnnotation) {
             t = ((JCAnnotation) t).getAnnotationType();
         }
+
+        Symbol sym = null;
         if (t instanceof JCIdent) {
             sym = ((JCIdent) t).sym;
         } else if (t instanceof JCTree.JCMethodDecl) {
             sym = ((JCMethodDecl) t).sym;
-            if (sym == null && "<init>".equals(((JCMethodDecl) t).getName().toString())) {
+            if (sym == null) {
+                // In java 8 code, a JCMethodDecl does not always have a symbol, so retrieve the possible @Generated annotation differently
                 for (JCAnnotation ann : ((JCMethodDecl) t).getModifiers().getAnnotations()) {
                     if ("@lombok.Generated()".equals(ann.toString())) {
                         return true;
@@ -1872,22 +1873,12 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
             sym = ((JCVariableDecl) t).sym;
         }
 
-        if (sym == null) {
-            return false;
-        }
-
-        // Matches the added `@val` / `@var` JCIdent and JCAnnotation elements
-        if ("lombok.val".equals(sym.getQualifiedName().toString()) || "lombok.var".equals(sym.getQualifiedName().toString())) {
-            return true;
-        }
-
-        for (Attribute.Compound a : sym.getDeclarationAttributes()) {
-            if ("lombok.val".equals(a.type.toString()) || "lombok.var".equals(a.type.toString())) {
-                return true;
-            }
-        }
-
-        return sym.getAnnotation(Generated.class) != null;
+        //noinspection ConstantConditions
+        return sym != null && (
+                "lombok.val".equals(sym.getQualifiedName().toString()) || "lombok.var".equals(sym.getQualifiedName().toString()) ||
+                sym.getDeclarationAttributes().stream().anyMatch(a -> "lombok.val".equals(a.type.toString()) || "lombok.var".equals(a.type.toString())) ||
+                sym.getAnnotation(Generated.class) != null
+        );
     }
 
     /**

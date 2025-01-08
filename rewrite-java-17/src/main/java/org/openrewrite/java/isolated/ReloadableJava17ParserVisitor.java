@@ -1942,10 +1942,11 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     private static boolean isLombokGenerated(Tree t) {
-        Symbol sym = null;
         if (t instanceof JCAnnotation) {
             t = ((JCAnnotation) t).getAnnotationType();
         }
+
+        Symbol sym = null;
         if (t instanceof JCIdent) {
             sym = ((JCIdent) t).sym;
         } else if (t instanceof JCTree.JCMethodDecl) {
@@ -1956,22 +1957,12 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             sym = ((JCVariableDecl) t).sym;
         }
 
-        if (sym == null) {
-            return false;
-        }
-
-        // Matches the added `@val` / `@var` JCIdent and JCAnnotation elements
-        if ("lombok.val".equals(sym.getQualifiedName().toString()) || "lombok.var".equals(sym.getQualifiedName().toString())) {
-            return true;
-        }
-
-        for (Attribute.Compound a : sym.getDeclarationAttributes()) {
-            if ("lombok.val".equals(a.type.toString())) {
-                return true;
-            }
-        }
-
-        return sym.getAnnotation(Generated.class) != null;
+        //noinspection ConstantConditions
+        return sym != null && (
+                "lombok.val".equals(sym.getQualifiedName().toString()) ||
+                sym.getDeclarationAttributes().stream().anyMatch(a -> "lombok.val".equals(a.type.toString())) ||
+                sym.getAnnotation(Generated.class) != null
+        );
     }
 
     /**

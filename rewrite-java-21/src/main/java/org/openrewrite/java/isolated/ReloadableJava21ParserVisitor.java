@@ -27,6 +27,7 @@ import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
 import com.sun.tools.javac.util.Context;
+import lombok.Generated;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
@@ -1572,9 +1573,11 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 // this is a lambda parameter with an inferred type expression
                 typeExpr = null;
             } else {
-                boolean lombokVal = isLombokVal(node);
+                Space space = whitespace();
+                boolean lombokVal = source.substring(cursor).startsWith("val");
+                cursor += 3; // skip `val` or `var`
                 typeExpr = new J.Identifier(randomId(),
-                        sourceBefore(lombokVal ? "val" : "var"),
+                        space,
                         Markers.build(singletonList(JavaVarKeyword.build())),
                         emptyList(),
                         lombokVal ? "val" : "var",
@@ -1723,8 +1726,8 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     private static int getActualStartPosition(JCTree t) {
-        // not sure if this is a bug in Lombok, but the variable's start position is after the `val` annotation
-        if (t instanceof JCVariableDecl && isLombokVal((JCVariableDecl) t)) {
+        // The variable's start position in the source is wrongly after lombok's `@val` annotation
+        if (t instanceof JCVariableDecl && isLombokGenerated(t)) {
             return ((JCVariableDecl) t).mods.annotations.get(0).getStartPosition();
         }
         return t.getStartPosition();
@@ -1906,7 +1909,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
 
         Map<Integer, List<Tree>> treesGroupedByStartPosition = new LinkedHashMap<>();
         for (Tree t : trees) {
-            if (isLombokGenerated(t)) {
+            if (!(t instanceof JCVariableDecl) && isLombokGenerated(t)) {
                 continue;
             }
             treesGroupedByStartPosition.computeIfAbsent(((JCTree) t).getStartPosition(), k -> new ArrayList<>(1)).add(t);
@@ -1938,22 +1941,12 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         return converted;
     }
 
-    private static boolean isLombokVal(JCTree.JCVariableDecl t) {
-        if (t.sym != null && t.sym.getMetadata() != null) {
-            for (Attribute.Compound a : t.sym.getDeclarationAttributes()) {
-                if ("lombok.val".equals(a.type.toString())) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
     private static boolean isLombokGenerated(Tree t) {
-        Symbol sym = null;
         if (t instanceof JCAnnotation) {
             t = ((JCAnnotation) t).getAnnotationType();
         }
+
+        Symbol sym = null;
         if (t instanceof JCIdent) {
             sym = ((JCIdent) t).sym;
         } else if (t instanceof JCTree.JCMethodDecl) {
@@ -1963,26 +1956,13 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         } else if (t instanceof JCTree.JCVariableDecl) {
             sym = ((JCVariableDecl) t).sym;
         }
-        return isLombokGenerated(sym);
-    }
 
-    private static boolean isLombokGenerated(@Nullable Symbol sym) {
-        if (sym == null) {
-            return false;
-        }
-        // Lombok local variables are represented as `final @lombok.val` and `@lombok.var`, which do not appear in source
-        if ("lombok.val".equals(sym.getQualifiedName().toString()) || "lombok.var".equals(sym.getQualifiedName().toString())) {
-            return true;
-        }
-        if (sym.getMetadata() == null) {
-            return false;
-        }
-        for (Attribute.Compound a : sym.getDeclarationAttributes()) {
-            if ("lombok.Generated".equals(a.type.toString())) {
-                return true;
-            }
-        }
-        return false;
+        //noinspection ConstantConditions
+        return sym != null && (
+                "lombok.val".equals(sym.getQualifiedName().toString()) ||
+                sym.getDeclarationAttributes().stream().anyMatch(a -> "lombok.val".equals(a.type.toString())) ||
+                sym.getAnnotation(Generated.class) != null
+        );
     }
 
     /**
