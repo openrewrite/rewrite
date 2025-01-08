@@ -16,7 +16,6 @@
 package org.openrewrite.hcl.tree;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -101,7 +100,6 @@ class HclCommentTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Issue("https://github.com/openrewrite/rewrite/issues/4611")
     @Test
     void commentAsTheLastLine() {
@@ -112,6 +110,83 @@ class HclCommentTest implements RewriteTest {
                 a = 3
               }
               # Nice code, right?
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4611")
+    @Test
+    void commentsAsTheFinalLines() {
+        rewriteRun(
+          hcl(
+            """
+              locals {
+                a = 3
+              }
+              # Nice code, right?
+              # Isn't it?
+              """
+          )
+        );
+    }
+
+    @Test
+    void singeLineWithinMultiLineHash() {
+        rewriteRun(
+          hcl(
+            """
+              /*
+              # It's important
+              */
+              locals {
+               Anwil = "Wloclawek"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void singeLineWithinMultiLineSlash() {
+        rewriteRun(
+          hcl(
+            """
+              /*
+              // It's important
+              */
+              locals {
+               Anwil = "Wloclawek"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineNotStartingInTheFirstCharacter() {
+        rewriteRun(
+          hcl(
+            """
+                  /* An indented comment
+              */
+              """
+          )
+        );
+    }
+
+    @Test
+    void commentedOutLinesInListLiteral() {
+        rewriteRun(
+          hcl(
+            """
+              locals {
+                resources = [
+                   "arn:aws:s3:::${var.my_precious_bucket}",
+                   "arn:aws:s3:::${var.waste_bucket}",
+                   #      "arn:aws:s3:::just-some-bucket/*",
+                ]
+              }
               """
           )
         );
