@@ -650,7 +650,7 @@ public class GroovyParserVisitor {
             for (AnnotationNode annotationNode : node.getAnnotations()) {
                 // The groovy compiler can add or remove annotations for AST transformations.
                 // Because @groovy.transform.Immutable is discarded in favour of other transform annotations, the removed annotation must be parsed by hand.
-                if (sourceStartsWith("@" + Immutable.class.getSimpleName()) || sourceStartsWith("@" + Immutable.class.getCanonicalName()) ) {
+                if (sourceStartsWith("@" + Immutable.class.getSimpleName()) || sourceStartsWith("@" + Immutable.class.getCanonicalName())) {
                     visitAnnotation(new AnnotationNode(new ClassNode(Immutable.class)));
                     paramAnnotations.add(pollQueue());
                 }
@@ -1137,9 +1137,9 @@ public class GroovyParserVisitor {
                     JContainer.build(singletonList(JRightPadded.build(visit(statement.getExpression())))),
                     statement.getCode() instanceof EmptyStatement ?
                             JContainer.build(sourceBefore(":"), convertStatements(emptyList()), Markers.EMPTY) :
-                            JContainer.build(sourceBefore(":"), convertStatements(((BlockStatement) statement.getCode()).getStatements()), Markers.EMPTY)
-                    , null,
-                    null)
+                            JContainer.build(sourceBefore(":"), convertStatements(((BlockStatement) statement.getCode()).getStatements()), Markers.EMPTY),
+                    null,
+                    JContainer.empty())
             );
         }
 
@@ -1152,7 +1152,7 @@ public class GroovyParserVisitor {
                     JContainer.build(singletonList(JRightPadded.build(new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), skip("default"), null, null)))),
                     JContainer.build(sourceBefore(":"), convertStatements(statement.getStatements()), Markers.EMPTY),
                     null,
-                    null
+                    JContainer.empty()
             );
         }
 
@@ -1608,7 +1608,7 @@ public class GroovyParserVisitor {
                 }
             }
 
-            queue.add(new G.GString(randomId(), fmt, Markers.EMPTY, delimiter, strings,typeMapping.type(gstring.getType())));
+            queue.add(new G.GString(randomId(), fmt, Markers.EMPTY, delimiter, strings, typeMapping.type(gstring.getType())));
             skip(delimiter); // Closing delim for GString
         }
 

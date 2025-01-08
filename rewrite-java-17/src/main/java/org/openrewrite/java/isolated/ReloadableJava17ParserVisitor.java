@@ -363,7 +363,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 type == J.Case.Type.Rule ?
                         padRight(convert(node.getBody()), statementDelim(node.getBody())) :
                         null,
-                null
+                JContainer.empty()
         );
     }
 
@@ -1860,7 +1860,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             case EXPRESSION_STATEMENT:
                 ExpressionTree expTree = ((ExpressionStatementTree) t).getExpression();
                 if (expTree instanceof ErroneousTree) {
-                    return Space.build(source.substring(((JCTree) expTree).getEndPosition(endPosTable),((JCTree) t).getEndPosition(endPosTable)), Collections.emptyList());
+                    return Space.build(source.substring(((JCTree) expTree).getEndPosition(endPosTable), ((JCTree) t).getEndPosition(endPosTable)), Collections.emptyList());
                 } else {
                     return sourceBefore(";");
                 }

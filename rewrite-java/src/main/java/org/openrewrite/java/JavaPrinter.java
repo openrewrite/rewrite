@@ -431,8 +431,8 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
                         getCursor()
                                 .dropParentUntil(
                                         c -> c instanceof Switch ||
-                                                c instanceof SwitchExpression ||
-                                                c == Cursor.ROOT_VALUE
+                                             c instanceof SwitchExpression ||
+                                             c == Cursor.ROOT_VALUE
                                 )
                                 .getValue();
                 if (aSwitch instanceof SwitchExpression) {
@@ -479,7 +479,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         }
         if (!case_.getExpressions().isEmpty()) {
             visitContainer("", case_.getPadding().getExpressions(), JContainer.Location.CASE_EXPRESSION, ",", "", p);
-        } else if (!case_.getLabels().isEmpty()){
+        } else if (!case_.getLabels().isEmpty()) {
             visitContainer("", case_.getPadding().getLabels(), JContainer.Location.CASE_LABEL, ",", "", p);
         }
         visitSpace(case_.getPadding().getStatements().getBefore(), Space.Location.CASE, p);
