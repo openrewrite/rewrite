@@ -35,7 +35,7 @@ class EnumTest implements RewriteTest {
               public enum Test {
                   @Deprecated(since = "now")
                   One,
-                  
+
                   @Deprecated(since = "now")
                   Two;
               }
@@ -56,7 +56,7 @@ class EnumTest implements RewriteTest {
                   };
 
                   A(int n) {}
-                  
+
                   abstract void foo();
               }
               """
@@ -74,7 +74,7 @@ class EnumTest implements RewriteTest {
                       @Override
                       void foo() {}
                   };
-                  
+
                   abstract void foo();
               }
               """
@@ -90,10 +90,10 @@ class EnumTest implements RewriteTest {
               public class Outer {
                   public enum A {
                       A1(1);
-                            
+
                       A(int n) {}
                   }
-                  
+
                   private static final class ContextFailedToStart {
                       private static Object[] combineArguments(String context, Throwable ex, Object[] arguments) {
                           return new Object[arguments.length + 2];
@@ -126,7 +126,7 @@ class EnumTest implements RewriteTest {
               public enum A {
                   ONE(1),
                   TWO(2);
-                            
+              
                   A(int n) {}
               }
               """
@@ -161,6 +161,23 @@ class EnumTest implements RewriteTest {
     void enumWithEmptyParameters() {
         rewriteRun(
           java("public enum A { ONE ( ), TWO ( ) }")
+        );
+    }
+
+    @Test
+    void enumWithParametersAndTrailingComma() {
+        rewriteRun(
+          java(
+            """
+              public enum A {
+                  ONE(1),
+                  TWO(2),
+                  ;
+
+                  A(int n) {}
+              }
+              """
+          )
         );
     }
 }
