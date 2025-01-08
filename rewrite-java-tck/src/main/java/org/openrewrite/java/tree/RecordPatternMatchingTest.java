@@ -22,7 +22,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.java.Assertions.java;
 
 @MinimumJava21
-public class RecordPatternMatchingTest implements RewriteTest {
+class RecordPatternMatchingTest implements RewriteTest {
 
     @Test
     void shouldParseJava21PatternMatchForRecords() {

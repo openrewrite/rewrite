@@ -22,7 +22,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.java.Assertions.java;
 
 @MinimumJava21
-public class SwitchPatternMatchingTest implements RewriteTest {
+class SwitchPatternMatchingTest implements RewriteTest {
 
     @Test
     void shouldParseJava21PatternSwitch() {
