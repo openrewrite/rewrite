@@ -1861,19 +1861,17 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     private static boolean isLombokGenerated(Tree t) {
-        if (t instanceof JCAnnotation) {
-            t = ((JCAnnotation) t).getAnnotationType();
-        }
+        Tree tree = (t instanceof JCAnnotation) ? ((JCAnnotation) t).getAnnotationType() : t;
 
         Symbol sym = null;
-        if (t instanceof JCIdent) {
-            sym = ((JCIdent) t).sym;
-        } else if (t instanceof JCTree.JCMethodDecl) {
-            sym = ((JCMethodDecl) t).sym;
-        } else if (t instanceof JCTree.JCClassDecl) {
-            sym = ((JCClassDecl) t).sym;
-        } else if (t instanceof JCTree.JCVariableDecl) {
-            sym = ((JCVariableDecl) t).sym;
+        if (tree instanceof JCIdent) {
+            sym = ((JCIdent) tree).sym;
+        } else if (tree instanceof JCTree.JCMethodDecl) {
+            sym = ((JCMethodDecl) tree).sym;
+        } else if (tree instanceof JCTree.JCClassDecl) {
+            sym = ((JCClassDecl) tree).sym;
+        } else if (tree instanceof JCTree.JCVariableDecl) {
+            sym = ((JCVariableDecl) tree).sym;
             return sym != null && sym.getDeclarationAttributes().stream().anyMatch(a -> "lombok.val".equals(a.type.toString()));
         }
 

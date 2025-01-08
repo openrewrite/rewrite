@@ -1850,27 +1850,25 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     private static boolean isLombokGenerated(Tree t) {
-        if (t instanceof JCAnnotation) {
-            t = ((JCAnnotation) t).getAnnotationType();
-        }
+        Tree tree = (t instanceof JCAnnotation) ? ((JCAnnotation) t).getAnnotationType() : t;
 
         Symbol sym = null;
-        if (t instanceof JCIdent) {
-            sym = ((JCIdent) t).sym;
-        } else if (t instanceof JCTree.JCMethodDecl) {
-            sym = ((JCMethodDecl) t).sym;
+        if (tree instanceof JCIdent) {
+            sym = ((JCIdent) tree).sym;
+        } else if (tree instanceof JCTree.JCMethodDecl) {
+            sym = ((JCMethodDecl) tree).sym;
             if (sym == null) {
                 // In java 8 code, a JCMethodDecl does not always have a symbol, so retrieve the possible @Generated annotation differently
-                for (JCAnnotation ann : ((JCMethodDecl) t).getModifiers().getAnnotations()) {
+                for (JCAnnotation ann : ((JCMethodDecl) tree).getModifiers().getAnnotations()) {
                     if ("@lombok.Generated()".equals(ann.toString())) {
                         return true;
                     }
                 }
             }
-        } else if (t instanceof JCTree.JCClassDecl) {
-            sym = ((JCClassDecl) t).sym;
-        } else if (t instanceof JCTree.JCVariableDecl) {
-            sym = ((JCVariableDecl) t).sym;
+        } else if (tree instanceof JCTree.JCClassDecl) {
+            sym = ((JCClassDecl) tree).sym;
+        } else if (tree instanceof JCTree.JCVariableDecl) {
+            sym = ((JCVariableDecl) tree).sym;
             return sym != null && sym.getDeclarationAttributes().stream().anyMatch(a -> "lombok.val".equals(a.type.toString()) || "lombok.var".equals(a.type.toString()));
         }
 
