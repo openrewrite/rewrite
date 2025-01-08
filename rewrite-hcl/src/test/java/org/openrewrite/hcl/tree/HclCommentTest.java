@@ -175,4 +175,20 @@ class HclCommentTest implements RewriteTest {
         );
     }
 
+    @Test
+    void commentedOutLinesInListLiteral() {
+        rewriteRun(
+          hcl(
+            """
+              locals {
+                resources = [
+                   "arn:aws:s3:::${var.my_precious_bucket}",
+                   "arn:aws:s3:::${var.waste_bucket}",
+                   #      "arn:aws:s3:::just-some-bucket/*",
+                ]
+              }
+              """
+          )
+        );
+    }
 }

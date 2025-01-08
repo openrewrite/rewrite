@@ -742,8 +742,10 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
 
         int delimIndex = cursor;
         for (; delimIndex < source.length() - untilDelim.length() + 1; delimIndex++) {
-            if (inSingleLineComment && source.charAt(delimIndex) == '\n') {
-                inSingleLineComment = false;
+            if (inSingleLineComment) {
+                if (source.charAt(delimIndex) == '\n') {
+                    inSingleLineComment = false;
+                }
             } else {
                 if (source.length() - untilDelim.length() > delimIndex + 1) {
                     if ('#' == source.charAt(delimIndex)) {
