@@ -130,4 +130,49 @@ class HclCommentTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void singeLineWithinMultiLineHash() {
+        rewriteRun(
+          hcl(
+            """
+              /*
+              # It's important
+              */
+              locals {
+               Anwil = "Wloclawek"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void singeLineWithinMultiLineSlash() {
+        rewriteRun(
+          hcl(
+            """
+              /*
+              // It's important
+              */
+              locals {
+               Anwil = "Wloclawek"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineNotStartingInTheFirstCharacter() {
+        rewriteRun(
+          hcl(
+            """
+                  /* An indented comment
+              */
+              """
+          )
+        );
+    }
+
 }

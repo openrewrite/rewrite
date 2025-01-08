@@ -158,14 +158,14 @@ public class Space {
                 case '#':
                     if (Comment.Style.LINE_SLASH == inLineSlashOrHashComment) {
                         comment.append(c);
+                    } else if (inSingleLineComment) {
+                        comment.append(c);
+                    } else if (inMultiLineComment) {
+                        comment.append(c);
                     } else {
-                        if (inSingleLineComment) {
-                            comment.append(c);
-                        } else {
-                            inSingleLineComment = true;
-                            inLineSlashOrHashComment = Comment.Style.LINE_HASH;
-                            comment = new StringBuilder();
-                        }
+                        inSingleLineComment = true;
+                        inLineSlashOrHashComment = Comment.Style.LINE_HASH;
+                        comment = new StringBuilder();
                     }
                     break;
                 case '/':
