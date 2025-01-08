@@ -31,15 +31,9 @@ public class EnableDevelocityBuildCache extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Add Develocity build cache configuration Develocity configuration given it lacks an existing configuration.";
+        return "Add configuration to enable Develocity build cache, the recipe requires `develocity` " +
+               "configuration without `buildCache` configuration to be present. Only work for Groovy DSL.";
     }
-
-    @Option(displayName = "Enable local build cache",
-            description = "Value for `//develocity/buildCache/local/enabled`.",
-            example = "true",
-            required = false)
-    @Nullable
-    String localEnabled;
 
     @Option(displayName = "Enable remote build cache",
             description = "Value for `//develocity/buildCache/remote/enabled`.",
@@ -48,21 +42,19 @@ public class EnableDevelocityBuildCache extends Recipe {
     @Nullable
     String remoteEnabled;
 
-    @Option(displayName = "Enable remote build cache store",
+    @Option(displayName = "Enable remote build cache push",
             description = "Value for `//develocity/buildCache/remote/storeEnabled`.",
             example = "true",
             required = false)
     @Nullable
-    String remoteStoreEnabled;
+    String remotePushEnabled;
 
     @Override
     public Validated<Object> validate(ExecutionContext ctx) {
         return super.validate(ctx)
-                .and(Validated.notBlank("localEnabled", localEnabled)
-                        .or(Validated.notBlank("remoteEnabled", remoteEnabled))
-                        .or(Validated.notBlank("remoteStoreEnabled", remoteStoreEnabled)));
+                .or(Validated.notBlank("remoteEnabled", remoteEnabled)
+                        .or(Validated.notBlank("remotePushEnabled", remotePushEnabled)));
     }
-
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

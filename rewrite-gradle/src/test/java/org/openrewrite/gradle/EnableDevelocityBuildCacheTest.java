@@ -26,7 +26,7 @@ class EnableDevelocityBuildCacheTest implements RewriteTest {
     @Test
     @DocumentExample
     void addBuildCacheRemoteConfig() {
-        rewriteRun(spec -> spec.recipe(new EnableDevelocityBuildCache("true", "true", "System.getenv(\"CI\") != null")),
+        rewriteRun(spec -> spec.recipe(new EnableDevelocityBuildCache("true", "System.getenv(\"CI\") != null")),
           settingsGradle(
             """
               plugins {
@@ -55,38 +55,9 @@ class EnableDevelocityBuildCacheTest implements RewriteTest {
     }
 
     @Test
-    void addBuildCacheLocalConfig() {
-        rewriteRun(spec -> spec.recipe(new EnableDevelocityBuildCache("true", null, null)),
-          settingsGradle(
-            """
-              plugins {
-                  id 'com.gradle.develocity' version '3.17.6'
-              }
-              develocity {
-                  server = 'https://dev.example.com/'
-              }
-              """,
-            """
-              plugins {
-                  id 'com.gradle.develocity' version '3.17.6'
-              }
-              develocity {
-                  server = 'https://dev.example.com/'
-                  buildCache {
-                      local(develocity.buildCache) {
-                          enabled = true
-                      }
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
     @DocumentExample
     void shouldNotModifyBuildCacheConfig() {
-        rewriteRun(spec -> spec.recipe(new EnableDevelocityBuildCache("true", "true", "#{isTrue(env['CI'])}")),
+        rewriteRun(spec -> spec.recipe(new EnableDevelocityBuildCache(null, "#{isTrue(env['CI'])}")),
           settingsGradle(
             """
               plugins {
@@ -96,7 +67,6 @@ class EnableDevelocityBuildCacheTest implements RewriteTest {
                   server = 'https://dev.example.com/'
                   buildCache {
                       remote(develocity.buildCache) {
-                          enabled = false
                           push = false
                       }
                   }
