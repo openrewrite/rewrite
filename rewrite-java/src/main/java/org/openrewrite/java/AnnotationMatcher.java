@@ -158,6 +158,7 @@ public class AnnotationMatcher {
                     return false;
                 }
 
+                //todo the problem is, that varType is null for inner Enums even fa.getType() is null
                 JavaType.Variable varType = fa.getName().getFieldType();
                 if (varType != null) {
                     JavaType.FullyQualified owner = TypeUtils.asFullyQualified(varType.getOwner());
