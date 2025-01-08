@@ -19,8 +19,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledOnJre;
-import org.junit.jupiter.api.condition.JRE;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.test.RecipeSpec;
@@ -436,7 +434,7 @@ class LombokTest implements RewriteTest {
     }
 
     @Test
-    void jul() {
+    void log() {
         rewriteRun(
           java(
             """
