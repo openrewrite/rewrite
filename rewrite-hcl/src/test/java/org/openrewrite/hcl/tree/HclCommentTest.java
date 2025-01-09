@@ -132,7 +132,7 @@ class HclCommentTest implements RewriteTest {
     }
 
     @Test
-    void singeLineWithinMultiLineHash() {
+    void singleLineWithinMultiLineHash() {
         rewriteRun(
           hcl(
             """
@@ -148,7 +148,7 @@ class HclCommentTest implements RewriteTest {
     }
 
     @Test
-    void singeLineWithinMultiLineSlash() {
+    void singleLineWithinMultiLineSlash() {
         rewriteRun(
           hcl(
             """
@@ -186,6 +186,37 @@ class HclCommentTest implements RewriteTest {
                    "arn:aws:s3:::${var.waste_bucket}",
                    #      "arn:aws:s3:::just-some-bucket/*",
                 ]
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void emptyHashCommentJustBeforeCurlyBraceEnd() {
+        rewriteRun(
+          hcl(
+            """
+              locals {
+                #
+              }
+              module "something" {
+                source = "../else/"
+              }
+              """
+          )
+        );
+    }
+    @Test
+    void emptyDoubleSlashCommentJustBeforeCurlyBraceEnd() {
+        rewriteRun(
+          hcl(
+            """
+              locals {
+                //
+              }
+              module "something" {
+                source = "../else/"
               }
               """
           )
