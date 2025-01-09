@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.test.RewriteTest;
@@ -23,8 +22,6 @@ import org.openrewrite.test.RewriteTest;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-
-import static org.openrewrite.java.Assertions.java;
 
 class Java21ParserTest implements RewriteTest {
 
