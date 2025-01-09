@@ -20,7 +20,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.JavaParser;
-import org.openrewrite.java.search.FindMissingTypes;
+import org.openrewrite.java.MinimumJava11;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
@@ -244,6 +244,12 @@ class LombokTest implements RewriteTest {
                 @NoArgsConstructor
                 public static class NoArgsExample {
                   @NonNull private String field;
+                }
+              
+                public void test() {
+                  ConstructorExample<?> x = ConstructorExample.of("desc");
+                  ConstructorExample<?> y = new ConstructorExample<>("1L");
+                  ConstructorExample.NoArgsExample z = new ConstructorExample.NoArgsExample();
                 }
               }
               """
@@ -710,6 +716,7 @@ class LombokTest implements RewriteTest {
     }
 
     @Test
+    @MinimumJava11
     void jacksonized() {
         rewriteRun(
           spec -> spec.parser(JavaParser.fromJavaVersion().classpath("jackson-annotations", "lombok")),
@@ -746,18 +753,15 @@ class LombokTest implements RewriteTest {
     }
 
     @Test
+    @MinimumJava11
     void onConstructor() {
         rewriteRun(
           java(
             """
               public @interface Inject {}
               public @interface Id {}
-              public @interface Column {
-                  String name();
-              }
-              public @interface Max {
-                  long value();
-              }
+              public @interface Column { String name(); }
+              public @interface Max { long value(); }
               """
           ),
           java(
@@ -766,10 +770,10 @@ class LombokTest implements RewriteTest {
               import lombok.Getter;
               import lombok.Setter;
               
-              @AllArgsConstructor(onConstructor_=@Inject) //JDK8
+              @AllArgsConstructor(onConstructor_=@Inject)
               public class OnXExample {
-                  @Getter(onMethod_={@Id, @Column(name="unique-id")}) //JDK8
-                  @Setter(onParam_=@Max(10000)) //JDK8
+                  @Getter(onMethod_={@Id, @Column(name="unique-id")})
+                  @Setter(onParam_=@Max(10000))
                   private long unid;
               
                   public void test() {
@@ -784,6 +788,7 @@ class LombokTest implements RewriteTest {
     }
 
     @Test
+    @MinimumJava11
     void onConstructorNoArgs() {
         rewriteRun(
           java(
@@ -821,6 +826,107 @@ class LombokTest implements RewriteTest {
     @SuppressWarnings("MismatchedReadAndWriteOfArray")
     @Nested
     class LessSupported {
+        /*
+         java 8 cannot figure out all type checking:
+         - When the @AllArgsConstructorHandler, @NoArgsConstructorHandler and @NoArgsConstructorHandler annotations are
+           used with the `onConstructor_` param, Lombok does not call the JavacAnnotationHandlers.
+         - The @Jacksonized annotation does somehow turns into `ClassDeclaration->CompilationUni` error
+         */
+
+        @Test
+        // TODO: Find solution and remove this test
+        void jacksonizedForJava8() {
+            rewriteRun(
+              spec -> spec
+                .parser(JavaParser.fromJavaVersion().classpath("jackson-annotations", "lombok"))
+                .typeValidationOptions(TypeValidation.none()),
+              java(
+                """
+                  import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+                  import lombok.Builder;
+                  import lombok.extern.jackson.Jacksonized;
+                  
+                  @Jacksonized
+                  @Builder
+                  @JsonIgnoreProperties(ignoreUnknown = true)
+                  public class JacksonExample {
+                      private List<String> strings;
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        // TODO: Find solution and remove this test
+        void onConstructorForJava8() {
+            rewriteRun(
+              spec -> spec.typeValidationOptions(TypeValidation.none()),
+              java(
+                """
+                  public @interface Inject {}
+                  public @interface Id {}
+                  public @interface Column { String name(); }
+                  public @interface Max { long value(); }
+                  """
+              ),
+              java(
+                """
+                  import lombok.AllArgsConstructor;
+                  import lombok.Getter;
+                  import lombok.Setter;
+                  
+                  @AllArgsConstructor(onConstructor_=@Inject)
+                  public class OnXExample {
+                      @Getter(onMethod_={@Id, @Column(name="unique-id")})
+                      @Setter(onParam_=@Max(10000))
+                      private long unid;
+                  
+                      public void test() {
+                          OnXExample x = new OnXExample(1L);
+                          x.setUnid(2L);
+                          System.out.println(x.getUnid());
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        // TODO: Find solution and remove this test
+        void onConstructorNoArgsForJava8() {
+            rewriteRun(
+              spec -> spec.typeValidationOptions(TypeValidation.none()),
+              java(
+                """
+                  public @interface Inject {}
+                  """
+              ),
+              java(
+                """
+                  import lombok.NoArgsConstructor;
+                  import lombok.NonNull;
+                  import lombok.RequiredArgsConstructor;
+                  
+                  import javax.inject.Inject;
+                  
+                  @NoArgsConstructor(onConstructor_ = @Inject)
+                  @RequiredArgsConstructor(onConstructor_ = @Inject)
+                  public class OnXExample {
+                      @NonNull private Long unid;
+                  
+                      public void test() {
+                          new OnXExample();
+                          new OnXExample(1L);
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+
         @Test
         void extensionMethod() {
             rewriteRun(
