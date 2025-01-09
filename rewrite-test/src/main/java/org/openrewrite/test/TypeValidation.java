@@ -98,7 +98,7 @@ public class TypeValidation {
 
 
     /**
-     * Controls whether `J.Erroneous` nodes are allowed to be present in the LST.
+     * Controls whether the LST is validated not to contain any `J.Erroneous` elements.
      */
     @Builder.Default
     private boolean erroneous = true;
