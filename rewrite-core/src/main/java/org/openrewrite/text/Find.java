@@ -102,7 +102,7 @@ public class Find extends Recipe {
 
         TreeVisitor<?, ExecutionContext> visitor = new TreeVisitor<Tree, ExecutionContext>() {
 
-            public static final int CONTEXT_SIZE = 50;
+            static final int CONTEXT_SIZE = 50;
 
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
