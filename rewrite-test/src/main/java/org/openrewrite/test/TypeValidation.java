@@ -96,6 +96,13 @@ public class TypeValidation {
     @Builder.Default
     private Function<Object, Boolean> allowMissingType = o -> false;
 
+
+    /**
+     * Controls whether the LST is validated not to contain any `J.Erroneous` elements.
+     */
+    @Builder.Default
+    private boolean erroneous = true;
+
     /**
      * Enable all invariant validation checks.
      */
@@ -107,7 +114,7 @@ public class TypeValidation {
      * Skip all invariant validation checks.
      */
     public static TypeValidation none() {
-        return new TypeValidation(false, false, false, false, false, false, false, false, o -> false);
+        return new TypeValidation(false, false, false, false, false, false, false, false, o -> false, false);
     }
 
     static TypeValidation before(RecipeSpec testMethodSpec, RecipeSpec testClassSpec) {
