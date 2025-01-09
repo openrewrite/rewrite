@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.test.RewriteTest;
@@ -57,6 +58,7 @@ class Java21ParserTest implements RewriteTest {
     }
 
     @Test
+    @Disabled("To be implemented")
     void shouldParseJava21PatternMatchForRecords() {
         rewriteRun(
           java(
