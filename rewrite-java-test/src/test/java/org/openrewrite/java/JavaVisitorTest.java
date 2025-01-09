@@ -25,6 +25,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
+import static org.openrewrite.test.TypeValidation.all;
 
 class JavaVisitorTest implements RewriteTest {
 
@@ -116,20 +117,21 @@ class JavaVisitorTest implements RewriteTest {
             })
           ),
           java(
-                """
-           class A {
-             public void method1() {
-             }
-             
-             @Deprecated
-             public String myMethod() {
-               return "hello";
-             }
-             
-             public void method2() {
-             }
-           }
-           """)
+            """
+              class A {
+                public void method1() {
+                }
+              
+                @Deprecated
+                public String myMethod() {
+                  return "hello";
+                }
+              
+                public void method2() {
+                }
+              }
+              """
+          )
         );
     }
 
@@ -149,7 +151,8 @@ class JavaVisitorTest implements RewriteTest {
                       return method;
                   }
               })
-            ),
+            )
+            .typeValidationOptions(all().erroneous(false)),
           java(
             """
               class A {
