@@ -16,7 +16,6 @@
 
 package org.openrewrite.java.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
@@ -150,7 +149,6 @@ class EnumTest implements RewriteTest {
     }
 
     @Test
-    @Disabled("enum A { ONE~~(non-whitespace)~~>, <~~}")
     void enumValuesTerminatedWithComma() {
         rewriteRun(
           java("enum A { ONE, }")

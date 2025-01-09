@@ -476,10 +476,29 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
         JRightPadded<Statement> enumSet = null;
         if (!jcEnums.isEmpty()) {
-            List<JRightPadded<J.EnumValue>> enumValues = convertAll(jcEnums, commaDelim, t -> whitespace(), t -> {
-                if (t == jcEnums.get(jcEnums.size() - 1) && source.charAt(cursor) == ',') {
-                    cursor++;
-                    return Markers.build(singletonList(new TrailingComma(randomId(), whitespace())));
+            Tree lastConstant = jcEnums.get(jcEnums.size() - 1);
+            List<JRightPadded<J.EnumValue>> enumValues = convertAll(jcEnums, commaDelim, t -> {
+                if (t != lastConstant) {
+                    return whitespace();
+                }
+                int savedCursor = cursor;
+                Space suffix = whitespace();
+                if (source.charAt(cursor) == ',' || source.charAt(cursor) == ';') {
+                    return suffix;
+                }
+                // Whitespace should be assigned to prefix of next statement or `J.Block#end`
+                cursor = savedCursor;
+                return EMPTY;
+            }, t -> {
+                if (t == lastConstant && skip(",") != null) {
+                    int savedCursor = cursor;
+                    Space suffix = whitespace();
+                    if (source.charAt(cursor) == ';') {
+                        return Markers.build(singletonList(new TrailingComma(randomId(), suffix)));
+                    }
+                    // Whitespace should be assigned to prefix of next statement or `J.Block#end`
+                    cursor = savedCursor;
+                    return Markers.build(singletonList(new TrailingComma(randomId(), EMPTY)));
                 }
                 return Markers.EMPTY;
             });
