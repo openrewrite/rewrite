@@ -42,21 +42,6 @@ public class FindSourceFiles extends Recipe {
     @Nullable
     String filePattern;
 
-    @EqualsAndHashCode.Exclude
-    transient String[] filePatterns;
-
-    public FindSourceFiles(@Nullable String filePattern) {
-        this.filePattern = filePattern;
-        this.filePatterns = Optional.ofNullable(filePattern)
-                .map(it -> it.split(";"))
-                .map(Arrays::stream)
-                .orElseGet(Stream::empty)
-                .map(String::trim)
-                .filter(StringUtils::isNotEmpty)
-                .map(FindSourceFiles::normalize)
-                .toArray(String[]::new);
-    }
-
     @Override
     public String getDisplayName() {
         return "Find files";
@@ -84,6 +69,22 @@ public class FindSourceFiles extends Recipe {
                 }
                 return tree;
             }
+
+            String @Nullable[] filePatterns;
+
+            private boolean matches(Path sourcePath) {
+                if (filePatterns == null) {
+                    filePatterns = Optional.ofNullable(filePattern)
+                            .map(it -> it.split(";"))
+                            .map(Arrays::stream)
+                            .orElseGet(Stream::empty)
+                            .map(String::trim)
+                            .filter(StringUtils::isNotEmpty)
+                            .map(FindSourceFiles::normalize)
+                            .toArray(String[]::new);
+                }
+                return filePatterns.length == 0 || Arrays.stream(filePatterns).anyMatch(pattern -> PathUtils.matchesGlob(sourcePath, pattern));
+            }
         };
     }
 
@@ -96,7 +97,4 @@ public class FindSourceFiles extends Recipe {
         return filePattern;
     }
 
-    private boolean matches(Path sourcePath) {
-        return filePatterns.length == 0 || Arrays.stream(filePatterns).anyMatch(pattern -> PathUtils.matchesGlob(sourcePath, pattern));
-    }
 }
