@@ -52,10 +52,11 @@ public class PlainTextParser implements Parser {
                 .orElseThrow(() -> new IllegalStateException("Failed to parse as plain text"))
                 .withSourcePath(sourceFile.getSourcePath())
                 .withFileAttributes(sourceFile.getFileAttributes())
-                .withCharsetBomMarked(sourceFile.isCharsetBomMarked())
                 .withId(sourceFile.getId());
         if (sourceFile.getCharset() != null) {
-            text = (PlainText) text.withCharset(sourceFile.getCharset());
+            text = (PlainText) text
+                    .withCharset(sourceFile.getCharset())
+                    .withCharsetBomMarked(sourceFile.isCharsetBomMarked());
         }
         return text;
     }
