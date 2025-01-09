@@ -34,45 +34,4 @@ class Java21ParserTest implements RewriteTest {
         rewriteRun(spec -> spec.parser(JavaParser.fromJavaVersion().classpathFromResources(new InMemoryExecutionContext(), "jackson-annotations")));
     }
 
-    // TODO below test cases are to be removed
-
-    @Test
-    void shouldParseJava21PatternSwitch() {
-        rewriteRun(
-          java(
-            //language=java
-            """
-              class Test {
-                  String formatterPatternSwitch(Object obj) {
-                      return switch (obj) {
-                          case Integer i -> String.format("int %d", i);
-                          case Long l    -> String.format("long %d", l);
-                          case Double d  -> String.format("double %f", d);
-                          case String s  -> String.format("String %s", s);
-                          default        -> obj.toString();
-                      };
-                  }
-              }
-              """
-          ));
-    }
-
-    @Test
-    @Disabled("To be implemented")
-    void shouldParseJava21PatternMatchForRecords() {
-        rewriteRun(
-          java(
-            //language=java
-            """
-              record Point(int x, int y) {}
-              class Test {
-                  void printSum(Object obj) {
-                      if (obj instanceof Point(int x, int y)) {
-                          System.out.println(x+y);
-                      }
-                  }
-              }
-              """
-          ));
-    }
 }
