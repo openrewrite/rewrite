@@ -52,7 +52,6 @@ import java.lang.reflect.Method;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.regex.Matcher;
@@ -1895,7 +1894,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
             case EXPRESSION_STATEMENT:
                 ExpressionTree expTree = ((ExpressionStatementTree) t).getExpression();
                 if (expTree instanceof ErroneousTree) {
-                    return Space.build(source.substring(((JCTree) expTree).getEndPosition(endPosTable),((JCTree) t).getEndPosition(endPosTable)), Collections.emptyList());
+                    return Space.build(source.substring(((JCTree) expTree).getEndPosition(endPosTable), ((JCTree) t).getEndPosition(endPosTable)), Collections.emptyList());
                 } else {
                     return sourceBefore(";");
                 }
