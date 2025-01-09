@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.MinimumJava11;
+import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
@@ -839,7 +840,14 @@ class LombokTest implements RewriteTest {
             rewriteRun(
               spec -> spec
                 .parser(JavaParser.fromJavaVersion().classpath("jackson-annotations", "lombok"))
-                .typeValidationOptions(TypeValidation.none()),
+                .typeValidationOptions(TypeValidation.builder().allowMissingType(o -> {
+                    assert o instanceof FindMissingTypes.MissingTypeResult;
+                    FindMissingTypes.MissingTypeResult result = (FindMissingTypes.MissingTypeResult) o;
+                    // Using the @Jacksonized annotation in java 8 just breaks it all
+                    return result.getPath().startsWith("ClassDeclaration->CompilationUnit") ||
+                      result.getPath().startsWith("Identifier->Annotation")||
+                      result.getPath().startsWith("Identifier->ParameterizedType");
+                }).build()),
               java(
                 """
                   import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -861,7 +869,13 @@ class LombokTest implements RewriteTest {
         // TODO: Find solution and remove this test
         void onConstructorForJava8() {
             rewriteRun(
-              spec -> spec.typeValidationOptions(TypeValidation.none()),
+              spec -> spec.typeValidationOptions(TypeValidation.builder().allowMissingType(o -> {
+                  assert o instanceof FindMissingTypes.MissingTypeResult;
+                  FindMissingTypes.MissingTypeResult result = (FindMissingTypes.MissingTypeResult) o;
+                  // The AllArgsConstructorHandler, GetterHandler and SetterHandler do not run at all for java 8,
+                  // so no generated constructors and methods, thus no types.
+                  return result.getPath().startsWith("NewClass->") || result.getPath().startsWith("MethodInvocation->");
+              }).build()),
               java(
                 """
                   public @interface Inject {}
@@ -897,10 +911,17 @@ class LombokTest implements RewriteTest {
         // TODO: Find solution and remove this test
         void onConstructorNoArgsForJava8() {
             rewriteRun(
-              spec -> spec.typeValidationOptions(TypeValidation.none()),
+              spec -> spec.typeValidationOptions(TypeValidation.builder().allowMissingType(o -> {
+                  assert o instanceof FindMissingTypes.MissingTypeResult;
+                  FindMissingTypes.MissingTypeResult result = (FindMissingTypes.MissingTypeResult) o;
+                  // The NoArgsConstructor and RequiredArgsConstructor do not run at all for java 8,
+                  // so no generated constructors, thus no types.
+                  return result.getPath().startsWith("NewClass->");
+              }).build()),
               java(
                 """
                   public @interface Inject {}
+                  public @interface Ignore {} // somehow we need this, to prevent `ClassDeclaration->CompilationUnit` errors
                   """
               ),
               java(
@@ -911,8 +932,8 @@ class LombokTest implements RewriteTest {
                   
                   import javax.inject.Inject;
                   
-                  @NoArgsConstructor(onConstructor_ = @Inject)
-                  @RequiredArgsConstructor(onConstructor_ = @Inject)
+                  @NoArgsConstructor(onConstructor_=@Inject)
+                  @RequiredArgsConstructor(onConstructor_=@Inject)
                   public class OnXExample {
                       @NonNull private Long unid;
                   
