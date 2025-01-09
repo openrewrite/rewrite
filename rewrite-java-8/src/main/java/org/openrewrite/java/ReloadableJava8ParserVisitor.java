@@ -35,6 +35,7 @@ import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.OmitParentheses;
+import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
@@ -324,7 +325,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
 
         J.Identifier label = node.getLabel() == null ? null : new J.Identifier(randomId(),
                 sourceBefore(node.getLabel().toString()), Markers.EMPTY,
-                emptyList(), skip(node.getLabel().toString()), null, null);
+                emptyList(), node.getLabel().toString(), null, null);
 
         return new J.Break(randomId(), fmt, Markers.EMPTY, label);
     }
@@ -418,13 +419,31 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
 
         JRightPadded<Statement> enumSet = null;
         if (!jcEnums.isEmpty()) {
-            AtomicBoolean semicolonPresent = new AtomicBoolean(false);
-
+            Tree lastConstant = jcEnums.get(jcEnums.size() - 1);
             List<JRightPadded<J.EnumValue>> enumValues = convertAll(jcEnums, commaDelim, t -> {
-                // this semicolon is required when there are non-value members, but can still
-                // be present when there are not
-                semicolonPresent.set(positionOfNext(";", '}') > 0);
-                return semicolonPresent.get() ? sourceBefore(";", '}') : EMPTY;
+                if (t != lastConstant) {
+                    return whitespace();
+                }
+                int savedCursor = cursor;
+                Space suffix = whitespace();
+                if (source.charAt(cursor) == ',' || source.charAt(cursor) == ';') {
+                    return suffix;
+                }
+                // Whitespace should be assigned to prefix of next statement or `J.Block#end`
+                cursor = savedCursor;
+                return EMPTY;
+            }, t -> {
+                if (t == lastConstant && skip(",") != null) {
+                    int savedCursor = cursor;
+                    Space suffix = whitespace();
+                    if (source.charAt(cursor) == ';') {
+                        return Markers.build(singletonList(new TrailingComma(randomId(), suffix)));
+                    }
+                    // Whitespace should be assigned to prefix of next statement or `J.Block#end`
+                    cursor = savedCursor;
+                    return Markers.build(singletonList(new TrailingComma(randomId(), EMPTY)));
+                }
+                return Markers.EMPTY;
             });
 
             enumSet = padRight(
@@ -433,7 +452,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                             EMPTY,
                             Markers.EMPTY,
                             enumValues,
-                            semicolonPresent.get()
+                            skip(";") != null
                     ),
                     EMPTY
             );
@@ -990,7 +1009,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                     convert(dim, t -> sourceBefore("]"))));
         }
 
-        while(true) {
+        while (true) {
             int beginBracket = indexOfNextNonWhitespace(cursor, source);
             if (source.charAt(beginBracket) == '[') {
                 int endBracket = indexOfNextNonWhitespace(beginBracket + 1, source);
@@ -1008,7 +1027,14 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         JContainer<Expression> initializer = node.getInitializers() == null ? null :
                 JContainer.build(sourceBefore("{"), node.getInitializers().isEmpty() ?
                         singletonList(padRight(new J.Empty(randomId(), sourceBefore("}"), Markers.EMPTY), EMPTY)) :
-                        convertAll(node.getInitializers(), commaDelim, t -> sourceBefore("}")), Markers.EMPTY);
+                        convertAll(node.getInitializers(), commaDelim, t -> whitespace(), t -> {
+                            if (t == node.getInitializers().get(node.getInitializers().size() - 1) && source.charAt(cursor) == ',') {
+                                cursor++;
+                                return Markers.build(singletonList(new TrailingComma(randomId(), whitespace())));
+                            }
+                            return Markers.EMPTY;
+                        }), Markers.EMPTY);
+        skip("}");
 
         return new J.NewArray(randomId(), fmt, Markers.EMPTY, typeExpr, dimensions,
                 initializer, typeMapping.type(node));
@@ -1608,7 +1634,6 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
      * Conversion utilities
      * --------------
      */
-
     private <J2 extends J> @Nullable J2 convert(@Nullable Tree t) {
         if (t == null) {
             return null;
@@ -1656,17 +1681,24 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         if (t == null) {
             return null;
         }
+        return convert(t, suffix, j -> Markers.EMPTY);
+    }
+
+    private <<J2 extends @Nullable J> @Nullable JRightPadded<J2> convert(@Nullable Tree t, Function<Tree, Space> suffix, Function<Tree, Markers> markers) {
+        if (t == null) {
+            return null;
+        }
         J2 j = convert(t);
         @SuppressWarnings("ConstantConditions") JRightPadded<J2> rightPadded = j == null ? null :
-                new JRightPadded<>(j, suffix.apply(t), Markers.EMPTY);
+                new JRightPadded<>(j, suffix.apply(t), markers.apply(t));
         int idx = findFirstNonWhitespaceChar(rightPadded.getAfter().getWhitespace());
         if (idx >= 0) {
-            rightPadded = (JRightPadded<J2>) JRightPadded.build(getErroneous(singletonList(rightPadded)));
+            rightPadded = (JRightPadded<J2>) JRightPadded.build(getErroneous(Collections.singletonList(rightPadded)));
         }
         // Cursor hasn't been updated but points at the end of erroneous node already
         // This means that error node start position == end position
-        // Therefore ensure that cursor has moved to the end of erroneous node bu adding its length to the cursor
-        // Example `/pet` results in 2 erroeneous nodes: `/` and `pet`. The `/` node would have start and end position the
+        // Therefore ensure that cursor has moved to the end of erroneous node but adding its length to the cursor
+        // Example `/pet` results in 2 erroneous nodes: `/` and `pet`. The `/` node would have start and end position the
         // same from the JC compiler.
         if (endPos(t) == cursor && rightPadded.getElement() instanceof J.Erroneous) {
             cursor += ((J.Erroneous) rightPadded.getElement()).getText().length();
@@ -1677,8 +1709,8 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     private <J2 extends J> J.Erroneous getErroneous(List<JRightPadded<J2>> converted) {
-        PrintOutputCapture p = new PrintOutputCapture<>(0);
-        new JavaPrinter<>().visitContainer(JContainer.build(EMPTY, converted, Markers.EMPTY), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, p);
+        PrintOutputCapture<Integer> p = new PrintOutputCapture<>(0);
+        new JavaPrinter<Integer>().visitContainer(JContainer.build(EMPTY, converted, Markers.EMPTY), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, p);
         return new J.Erroneous(
                 org.openrewrite.Tree.randomId(),
                 EMPTY,
@@ -1717,13 +1749,20 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
     private <J2 extends J> List<JRightPadded<J2>> convertAll(List<? extends Tree> trees,
                                                              Function<Tree, Space> innerSuffix,
                                                              Function<Tree, Space> suffix) {
+        return convertAll(trees, innerSuffix, suffix, t -> Markers.EMPTY);
+    }
+
+    private <J2 extends J> List<JRightPadded<J2>> convertAll(List<? extends Tree> trees,
+                                                             Function<Tree, Space> innerSuffix,
+                                                             Function<Tree, Space> suffix,
+                                                             Function<Tree, Markers> markers) {
         int size = trees.size();
         if (size == 0) {
             return emptyList();
         }
         List<JRightPadded<J2>> converted = new ArrayList<>(size);
         for (int i = 0; i < size; i++) {
-            converted.add(convert(trees.get(i), i == size - 1 ? suffix : innerSuffix));
+            converted.add(convert(trees.get(i), i == size - 1 ? suffix : innerSuffix, markers));
         }
         return converted;
     }
@@ -1982,15 +2021,16 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         return format(prefix);
     }
 
-    private String skip(@Nullable String token) {
+    private @Nullable String skip(@Nullable String token) {
         if (token == null) {
             //noinspection ConstantConditions
             return null;
         }
         if (source.startsWith(token, cursor)) {
             cursor += token.length();
+            return token;
         }
-        return token;
+        return null;
     }
 
     // Only exists as a function to make it easier to debug unexpected cursor shifts
