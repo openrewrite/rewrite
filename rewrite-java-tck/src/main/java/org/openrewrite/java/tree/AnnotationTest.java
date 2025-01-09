@@ -82,6 +82,21 @@ class AnnotationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void newArrayArgumentTrailingComma() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.Target;
+              import static java.lang.annotation.ElementType.*;
+
+              @Target({ FIELD, PARAMETER , })
+              public @interface Annotation {}
+              """
+          )
+        );
+    }
+
     @SuppressWarnings("FinalMethodInFinalClass")
     @Test
     void annotationsInManyLocations() {
