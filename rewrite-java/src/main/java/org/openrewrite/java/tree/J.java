@@ -1068,18 +1068,12 @@ public interface J extends Tree {
         }
 
         @Nullable
-        JContainer<CaseLabel> labels;
-
-        public List<CaseLabel> getLabels() {
-            return labels != null ? labels.getElements() : emptyList();
-        }
-
-        public Case withLabels(List<CaseLabel> labels) {
-            return getPadding().withLabels(requireNonNull(JContainer.withElementsNullable(this.labels, labels)));
-        }
+        @Getter
+        @With
+        Expression guard;
 
         @JsonCreator
-        public Case(UUID id, Space prefix, Markers markers, Type type, @Deprecated @Nullable Expression pattern, JContainer<Expression> expressions, JContainer<Statement> statements, @Nullable JRightPadded<J> body, JContainer<CaseLabel> labels) {
+        public Case(UUID id, Space prefix, Markers markers, Type type, @Deprecated @Nullable Expression pattern, JContainer<Expression> expressions, @Nullable Expression guard, JContainer<Statement> statements, @Nullable JRightPadded<J> body) {
             this.id = id;
             this.prefix = prefix;
             this.markers = markers;
@@ -1089,9 +1083,9 @@ public interface J extends Tree {
             } else {
                 this.expressions = expressions;
             }
+            this.guard = guard;
             this.statements = statements;
             this.body = body;
-            this.labels = labels;
         }
 
         @Override
@@ -1139,7 +1133,7 @@ public interface J extends Tree {
             }
 
             public Case withBody(@Nullable JRightPadded<J> body) {
-                return t.body == body ? t : new Case(t.id, t.prefix, t.markers, t.type, null, t.expressions, t.statements, body, t.labels);
+                return t.body == body ? t : new Case(t.id, t.prefix, t.markers, t.type, null, t.expressions, t.guard, t.statements, body);
             }
 
             public JContainer<Statement> getStatements() {
@@ -1147,7 +1141,7 @@ public interface J extends Tree {
             }
 
             public Case withStatements(JContainer<Statement> statements) {
-                return t.statements == statements ? t : new Case(t.id, t.prefix, t.markers, t.type, null, t.expressions, statements, t.body, t.labels);
+                return t.statements == statements ? t : new Case(t.id, t.prefix, t.markers, t.type, null, t.expressions, t.guard, statements, t.body);
             }
 
             public JContainer<Expression> getExpressions() {
@@ -1155,16 +1149,17 @@ public interface J extends Tree {
             }
 
             public Case withExpressions(JContainer<Expression> expressions) {
-                return t.expressions == expressions ? t : new Case(t.id, t.prefix, t.markers, t.type, null, expressions, t.statements, t.body, t.labels);
+                return t.expressions == expressions ? t : new Case(t.id, t.prefix, t.markers, t.type, null, expressions, t.guard, t.statements, t.body);
             }
 
-            public JContainer<CaseLabel> getLabels() {
-                return t.labels;
+            public Expression getGuard() {
+                return t.guard;
             }
 
-            public Case withLabels(JContainer<CaseLabel> labels) {
-                return t.labels == labels ? t : new Case(t.id, t.prefix, t.markers, t.type, null, t.expressions, t.statements, t.body, labels);
+            public Case withGuard(Expression guard) {
+                return t.guard == guard ? t : new Case(t.id, t.prefix, t.markers, t.type, null, t.expressions, guard, t.statements, t.body);
             }
+
         }
     }
 
@@ -2472,7 +2467,7 @@ public interface J extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)})
     @With
-    class Identifier implements J, TypeTree, Expression, CaseLabel {
+    class Identifier implements J, TypeTree, Expression {
         @Getter
         @EqualsAndHashCode.Include
         UUID id;
@@ -5771,7 +5766,7 @@ public interface J extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class VariableDeclarations implements J, Statement, TypedTree {
+    final class VariableDeclarations implements J, Statement, Expression, TypedTree {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;

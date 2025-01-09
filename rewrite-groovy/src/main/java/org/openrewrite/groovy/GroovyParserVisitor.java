@@ -1135,11 +1135,11 @@ public class GroovyParserVisitor {
                     J.Case.Type.Statement,
                     null,
                     JContainer.build(singletonList(JRightPadded.build(visit(statement.getExpression())))),
+                    null,
                     statement.getCode() instanceof EmptyStatement ?
                             JContainer.build(sourceBefore(":"), convertStatements(emptyList()), Markers.EMPTY) :
                             JContainer.build(sourceBefore(":"), convertStatements(((BlockStatement) statement.getCode()).getStatements()), Markers.EMPTY),
-                    null,
-                    JContainer.empty())
+                    null)
             );
         }
 
@@ -1150,9 +1150,9 @@ public class GroovyParserVisitor {
                     J.Case.Type.Statement,
                     null,
                     JContainer.build(singletonList(JRightPadded.build(new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), skip("default"), null, null)))),
-                    JContainer.build(sourceBefore(":"), convertStatements(statement.getStatements()), Markers.EMPTY),
                     null,
-                    JContainer.empty()
+                    JContainer.build(sourceBefore(":"), convertStatements(statement.getStatements()), Markers.EMPTY),
+                    null
             );
         }
 

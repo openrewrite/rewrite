@@ -342,9 +342,9 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                         ),
                         Markers.EMPTY
                 ),
-                JContainer.build(sourceBefore(":"), convertStatements(node.getStatements()), Markers.EMPTY),
                 null,
-                JContainer.empty()
+                JContainer.build(sourceBefore(":"), convertStatements(node.getStatements()), Markers.EMPTY),
+                null
         );
     }
 

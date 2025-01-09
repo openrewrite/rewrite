@@ -78,25 +78,6 @@ public abstract class CoordinateBuilder {
         }
     }
 
-    public static class CaseLabel extends Expression {
-        public CaseLabel(org.openrewrite.java.tree.CaseLabel tree) {
-            super(tree);
-        }
-
-        public JavaCoordinates after() {
-            return after(Space.Location.CASE_LABEL);
-        }
-
-        public JavaCoordinates before() {
-            return before(Space.Location.CASE_LABEL);
-        }
-
-        @Override
-        public JavaCoordinates replace() {
-            return replace(Space.Location.CASE_LABEL);
-        }
-    }
-
     public static class Annotation extends Expression {
         Annotation(J.Annotation tree) {
             super(tree);
