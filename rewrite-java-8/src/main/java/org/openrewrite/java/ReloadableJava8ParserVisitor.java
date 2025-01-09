@@ -1684,7 +1684,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         return convert(t, suffix, j -> Markers.EMPTY);
     }
 
-    private <<J2 extends @Nullable J> @Nullable JRightPadded<J2> convert(@Nullable Tree t, Function<Tree, Space> suffix, Function<Tree, Markers> markers) {
+    private <J2 extends @Nullable J> @Nullable JRightPadded<J2> convert(@Nullable Tree t, Function<Tree, Space> suffix, Function<Tree, Markers> markers) {
         if (t == null) {
             return null;
         }
