@@ -1257,13 +1257,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         public <M extends Marker> M visitMarker(Marker marker, PrintOutputCapture<P> p) {
             if (marker instanceof Semicolon) {
                 p.append(';');
-            } else if (marker instanceof TrailingComma) {
-                // TODO consider adding cursor message to only print for last element in list
-                // TODO the space should then probably be printed anyway (could contain a comment)
-                p.append(',');
-                visitSpace(((TrailingComma) marker).getSuffix(), Space.Location.LANGUAGE_EXTENSION, p);
             }
-
             return super.visitMarker(marker, p);
         }
 
