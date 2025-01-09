@@ -243,4 +243,42 @@ class FindTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void longLine() {
+        rewriteRun(
+          spec -> spec.recipe(new Find("very", null, null, null, null, null, null))
+            .dataTable(TextMatches.Row.class, rows -> {
+                assertThat(rows).hasSize(18);
+                assertThat(rows).satisfiesExactly(
+                  r -> assertThat(r.getMatch()).isEqualTo("This is a ~~>very, very, very, very, very, very, very, very, very, ..."),
+                  r -> assertThat(r.getMatch()).isEqualTo("This is a very, ~~>very, very, very, very, very, very, very, very, very, ..."),
+                  r -> assertThat(r.getMatch()).isEqualTo("This is a very, very, ~~>very, very, very, very, very, very, very, very, very, ..."),
+                  r -> assertThat(r.getMatch()).isEqualTo("This is a very, very, very, ~~>very, very, very, very, very, very, very, very, very, ..."),
+                  r -> assertThat(r.getMatch()).isEqualTo("This is a very, very, very, very, ~~>very, very, very, very, very, very, very, very, very, ..."),
+                  r -> assertThat(r.getMatch()).isEqualTo("This is a very, very, very, very, very, ~~>very, very, very, very, very, very, very, very, very, ..."),
+                  r -> assertThat(r.getMatch()).isEqualTo("This is a very, very, very, very, very, very, ~~>very, very, very, very, very, very, very, very, very, ..."),
+                  r -> assertThat(r.getMatch()).isEqualTo("...is a very, very, very, very, very, very, very, ~~>very, very, very, very, very, very, very, very, very, ..."),
+                  r -> assertThat(r.getMatch()).isEqualTo("...ery, very, very, very, very, very, very, very, ~~>very, very, very, very, very, very, very, very, very, ..."),
+                  r -> assertThat(r.getMatch()).isEqualTo("...ery, very, very, very, very, very, very, very, ~~>very, very, very, very, very, very, very, very, very l..."),
+                  r -> assertThat(r.getMatch()).isEqualTo("...ery, very, very, very, very, very, very, very, ~~>very, very, very, very, very, very, very, very long line."),
+                  r -> assertThat(r.getMatch()).isEqualTo("...ery, very, very, very, very, very, very, very, ~~>very, very, very, very, very, very, very long line."),
+                  r -> assertThat(r.getMatch()).isEqualTo("...ery, very, very, very, very, very, very, very, ~~>very, very, very, very, very, very long line."),
+                  r -> assertThat(r.getMatch()).isEqualTo("...ery, very, very, very, very, very, very, very, ~~>very, very, very, very, very long line."),
+                  r -> assertThat(r.getMatch()).isEqualTo("...ery, very, very, very, very, very, very, very, ~~>very, very, very, very long line."),
+                  r -> assertThat(r.getMatch()).isEqualTo("...ery, very, very, very, very, very, very, very, ~~>very, very, very long line."),
+                  r -> assertThat(r.getMatch()).isEqualTo("...ery, very, very, very, very, very, very, very, ~~>very, very long line."),
+                  r -> assertThat(r.getMatch()).isEqualTo("...ery, very, very, very, very, very, very, very, ~~>very long line.")
+                );
+            }),
+          text(
+            """
+              This is a very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very, very long line.
+              """,
+            """
+              This is a ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very, ~~>very long line.
+              """
+          )
+        );
+    }
 }

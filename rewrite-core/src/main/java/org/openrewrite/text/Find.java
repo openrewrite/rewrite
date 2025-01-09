@@ -101,6 +101,9 @@ public class Find extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
 
         TreeVisitor<?, ExecutionContext> visitor = new TreeVisitor<Tree, ExecutionContext>() {
+
+            public static final int CONTEXT_SIZE = 50;
+
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 SourceFile sourceFile = (SourceFile) requireNonNull(tree);
@@ -159,20 +162,28 @@ public class Find extends Recipe {
                     }
 
                     int startLine = lastNewLineIndex + 1;
-                    int endLine = rawText.indexOf('\n', matcher.end());
+                    int endLine = nextNewLineIndex > matcher.end() ? nextNewLineIndex : rawText.indexOf('\n', matcher.end());
                     if (endLine == -1) {
                         endLine = rawText.length();
                     }
 
-                    //noinspection StringBufferReplaceableByString
-                    textMatches.insertRow(ctx, new TextMatches.Row(
-                            sourceFilePath,
-                            new StringBuilder(endLine - startLine + 3)
-                                    .append(rawText, startLine, matchStart)
-                                    .append("~~>")
-                                    .append(rawText, matchStart, endLine)
-                                    .toString()
-                    ));
+                    StringBuilder context = new StringBuilder(Math.min(endLine - startLine + 3, CONTEXT_SIZE * 2 + matcher.group().length() + 3));
+                    if (matchStart - startLine > CONTEXT_SIZE) {
+                        context.append("...");
+                        context.append(rawText, matchStart - (CONTEXT_SIZE - 3), matchStart);
+                    } else {
+                        context.append(rawText, startLine, matchStart);
+                    }
+                    context.append("~~>");
+                    int matchLength = matcher.group().length();
+                    if (endLine - (matchStart + 3 + matchLength) > CONTEXT_SIZE) {
+                        context.append(rawText, matchStart, matchStart + 3 + matchLength + (CONTEXT_SIZE - 3));
+                        context.append("...");
+                    } else {
+                        context.append(rawText, matchStart, endLine);
+                    }
+
+                    textMatches.insertRow(ctx, new TextMatches.Row(sourceFilePath, context.toString()));
                 } while (matcher.find());
                 snippets.add(snippet(rawText.substring(previousEnd)));
                 return plainText.withText("").withSnippets(snippets);
