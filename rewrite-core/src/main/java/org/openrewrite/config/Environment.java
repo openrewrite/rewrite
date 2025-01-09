@@ -251,8 +251,7 @@ public class Environment {
         public Builder scanJar(Path jar, Collection<Path> dependencies, ClassLoader classLoader) {
             List<ClasspathScanningLoader> firstPassLoaderList = new ArrayList<>();
             for (Path dep : dependencies) {
-                ClasspathScanningLoader classpathScanningLoader = new ClasspathScanningLoader(dep, properties, emptyList(), classLoader);
-                firstPassLoaderList.add(classpathScanningLoader);
+                firstPassLoaderList.add(new ClasspathScanningLoader(dep, properties, emptyList(), classLoader));
             }
 
             /*
@@ -264,8 +263,7 @@ public class Environment {
              */
             List<ClasspathScanningLoader> secondPassLoaderList = new ArrayList<>();
             for (Path dep : dependencies) {
-                ClasspathScanningLoader classpathScanningLoader = new ClasspathScanningLoader(dep, properties, firstPassLoaderList, classLoader);
-                secondPassLoaderList.add(classpathScanningLoader);
+                secondPassLoaderList.add(new ClasspathScanningLoader(dep, properties, firstPassLoaderList, classLoader));
             }
             return load(new ClasspathScanningLoader(jar, properties, secondPassLoaderList, classLoader), secondPassLoaderList);
         }
