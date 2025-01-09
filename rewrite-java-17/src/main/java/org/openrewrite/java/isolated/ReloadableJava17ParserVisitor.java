@@ -1747,14 +1747,6 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         }
     }
 
-    private static int getActualStartPosition(JCTree t) {
-        // not sure if this is a bug in Lombok, but the variable's start position is after the `val` annotation
-        if (t instanceof JCVariableDecl && isLombokVal((JCVariableDecl) t)) {
-            return ((JCVariableDecl) t).mods.annotations.get(0).getStartPosition();
-        }
-        return t.getStartPosition();
-    }
-
     private void reportJavaParsingException(Throwable ex) {
         // this SHOULD never happen, but is here simply as a diagnostic measure in the event of unexpected exceptions
         StringBuilder message = new StringBuilder("Failed to convert for the following cursor stack:");
@@ -1777,6 +1769,14 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         message.append("--- END PATH ---\n");
 
         ctx.getOnError().accept(new JavaParsingException(message.toString(), ex));
+    }
+
+    private static int getActualStartPosition(JCTree t) {
+        // not sure if this is a bug in Lombok, but the variable's start position is after the `val` annotation
+        if (t instanceof JCVariableDecl && isLombokVal((JCVariableDecl) t)) {
+            return ((JCVariableDecl) t).mods.annotations.get(0).getStartPosition();
+        }
+        return t.getStartPosition();
     }
 
     private <J2 extends @Nullable J> @Nullable JRightPadded<J2> convert(@Nullable Tree t, Function<Tree, Space> suffix) {
