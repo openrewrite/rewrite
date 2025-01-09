@@ -1483,7 +1483,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
             typeExpr = null; // this is a lambda parameter with an inferred type expression
         } else if (isLombokGenerated(node)) {
             Space space = whitespace();
-            boolean lombokVal = source.substring(cursor).startsWith("val");
+            boolean lombokVal = source.startsWith("val", cursor);
             cursor += 3; // skip `val` or `var`
             typeExpr = new J.Identifier(randomId(),
                     space,

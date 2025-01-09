@@ -1573,7 +1573,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 typeExpr = null;
             } else {
                 Space space = whitespace();
-                boolean lombokVal = source.substring(cursor).startsWith("val");
+                boolean lombokVal = source.startsWith("val", cursor);
                 cursor += 3; // skip `val` or `var`
                 typeExpr = new J.Identifier(randomId(),
                         space,
