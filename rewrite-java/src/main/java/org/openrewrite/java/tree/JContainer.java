@@ -102,7 +102,6 @@ public class JContainer<T> {
         ANNOTATION_ARGUMENTS(Space.Location.ANNOTATION_ARGUMENTS, JRightPadded.Location.ANNOTATION_ARGUMENT),
         CASE(Space.Location.CASE, JRightPadded.Location.CASE),
         CASE_EXPRESSION(Space.Location.CASE_EXPRESSION, JRightPadded.Location.CASE_EXPRESSION),
-        CASE_LABEL(Space.Location.CASE_LABEL, JRightPadded.Location.CASE_LABEL),
         IMPLEMENTS(Space.Location.IMPLEMENTS, JRightPadded.Location.IMPLEMENTS),
         PERMITS(Space.Location.PERMITS, JRightPadded.Location.PERMITS),
         LANGUAGE_EXTENSION(Space.Location.LANGUAGE_EXTENSION, JRightPadded.Location.LANGUAGE_EXTENSION),
