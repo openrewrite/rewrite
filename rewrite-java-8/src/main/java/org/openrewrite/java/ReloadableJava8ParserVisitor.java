@@ -1972,15 +1972,16 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         return format(prefix);
     }
 
-    private String skip(@Nullable String token) {
+    private @Nullable String skip(@Nullable String token) {
         if (token == null) {
             //noinspection ConstantConditions
             return null;
         }
         if (source.startsWith(token, cursor)) {
             cursor += token.length();
+            return token;
         }
-        return token;
+        return null;
     }
 
     // Only exists as a function to make it easier to debug unexpected cursor shifts
