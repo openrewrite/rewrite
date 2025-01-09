@@ -14,8 +14,8 @@ lexer grammar HCLLexer;
     private Stack<String> heredocIdentifier = new Stack<String>();
 }
 
-FOR_BRACE             : '{' (WS|NEWLINE)* 'for' WS;
-FOR_BRACK             : '[' (WS|NEWLINE)* 'for' WS;
+FOR_BRACE             : '{' (WS|NEWLINE|COMMENT|LINE_COMMENT)* 'for' WS;
+FOR_BRACK             : '[' (WS|NEWLINE|COMMENT|LINE_COMMENT)* 'for' WS;
 
 IF              : 'if';
 IN              : 'in';
@@ -49,10 +49,10 @@ Identifier
 
 // Lexical Elements - Comments and Whitespace
 // https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md#comments-and-whitespace
-WS              : [ \t\r\u000C]+                   -> channel(HIDDEN);
-COMMENT         : '/*' .*? '*/'                    -> channel(HIDDEN);
-LINE_COMMENT    : ('//' | '#') ~[\r\n]* '\r'?'\n'  -> channel(HIDDEN);
-NEWLINE         : '\n'                             -> channel(HIDDEN);
+WS              : [ \t\r\u000C]+                           -> channel(HIDDEN);
+COMMENT         : '/*' .*? '*/'                            -> channel(HIDDEN);
+LINE_COMMENT    : ('//' | '#') ~[\r\n]* '\r'? ('\n' | EOF) -> channel(HIDDEN);
+NEWLINE         : '\n'                                     -> channel(HIDDEN);
 
 fragment LetterOrDigit
     : Letter
