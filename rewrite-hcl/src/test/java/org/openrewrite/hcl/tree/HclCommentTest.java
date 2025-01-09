@@ -207,6 +207,7 @@ class HclCommentTest implements RewriteTest {
           )
         );
     }
+
     @Test
     void emptyDoubleSlashCommentJustBeforeCurlyBraceEnd() {
         rewriteRun(
