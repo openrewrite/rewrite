@@ -747,6 +747,11 @@ class LombokTest implements RewriteTest {
               
               @StandardException
               public class ExampleException extends Exception {
+                  public void test() {
+                      new ExampleException("message");
+                      new ExampleException(new RuntimeException("message"));
+                      new ExampleException("message", new RuntimeException("message"));
+                  }
               }
               """
           )
