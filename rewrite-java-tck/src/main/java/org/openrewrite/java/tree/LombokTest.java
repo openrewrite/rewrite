@@ -389,6 +389,61 @@ class LombokTest implements RewriteTest {
                   this.name = name;
                   this.age = age;
                 }
+              
+                static void test() {
+                    WithExample x = new WithExample("old name", 22);
+                    x.withName("name", 23);
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void withOnClass() {
+        rewriteRun(
+          java(
+            """
+              import lombok.AccessLevel;
+              import lombok.NonNull;
+              import lombok.With;
+              
+              @With
+              public class WithExample {
+                private final String name;
+                private final int age;
+              
+                public WithExample(String name, int age) {
+                  this.name = name;
+                  this.age = age;
+                }
+              
+                static void test() {
+                    WithExample x = new WithExample("old name", 22);
+                    x.withName("name", 23);
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    // TODO: Remove this method, it's just for researching the parser
+    void constructor2() {
+        rewriteRun(
+          java(
+            """
+              import lombok.*;
+              
+              @AllArgsConstructor
+              public class ConstructorExample {
+                private int x, y;
+              
+                public void test() {
+                  ConstructorExample<?> x = new ConstructorExample(1,2);
+                }
               }
               """
           )
