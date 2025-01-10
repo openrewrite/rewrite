@@ -50,7 +50,7 @@ public class EnableDevelocityBuildCache extends Recipe {
 
     @Option(displayName = "Enable remote build cache push",
             description = "Value for `//develocity/buildCache/remote/storeEnabled`.",
-            example = "true",
+            example = "System.getenv(\"CI\") != null",
             required = false)
     @Nullable
     String remotePushEnabled;
