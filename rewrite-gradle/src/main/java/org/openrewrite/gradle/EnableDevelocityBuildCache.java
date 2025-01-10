@@ -36,8 +36,7 @@ public class EnableDevelocityBuildCache extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Add configuration to enable Develocity build cache, the recipe requires `develocity` " +
-               "configuration without `buildCache` configuration to be present. Only work for Groovy DSL.";
+        return "Adds `buildCache` configuration to `develocity` where not yet present.";
     }
 
     @Option(displayName = "Enable remote build cache",
@@ -79,7 +78,7 @@ public class EnableDevelocityBuildCache extends Recipe {
                 }
 
                 if ("develocity".equals(method.getSimpleName()) && getCursor().pollMessage("hasBuildCacheConfig") == null) {
-                    J.MethodInvocation buildCache = develocityBuildCacheTemplate();
+                    J.MethodInvocation buildCache = createBuildCache();
                     return maybeAutoFormat(m, m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
                         if (arg instanceof J.Lambda) {
                             J.Lambda lambda = (J.Lambda) arg;
@@ -89,34 +88,29 @@ public class EnableDevelocityBuildCache extends Recipe {
                         return arg;
                     })), ctx);
                 }
+
                 return m;
             }
         });
     }
 
-    private J.@Nullable MethodInvocation develocityBuildCacheTemplate() {
-        String ge = "develocity {\n" +
-                    "    buildCache {\n" +
-                    "        remote(develocity.buildCache) {\n";
-
+    private J.MethodInvocation createBuildCache() {
+        String conf = "buildCache {\n" +
+                "    remote(develocity.buildCache) {\n";
         if (!StringUtils.isBlank(remoteEnabled)) {
-            ge += "            enabled = " + remoteEnabled + "\n";
+            conf += "        enabled = " + remoteEnabled + "\n";
         }
-
         if (!StringUtils.isBlank(remotePushEnabled)) {
-            ge += "            push = " + remotePushEnabled + "\n";
+            conf += "        push = " + remotePushEnabled + "\n";
         }
-        ge += "        }" +
-              "    }" +
-              "}";
-
-        G.CompilationUnit cu = GradleParser.builder().build()
-                .parse(ge)
+        conf += "    }" +
+                "}";
+        return (J.MethodInvocation) GradleParser.builder().build()
+                .parse(conf)
                 .map(G.CompilationUnit.class::cast)
                 .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"));
-
-        J.MethodInvocation develocity = (J.MethodInvocation) cu.getStatements().get(0);
-        return (J.MethodInvocation) ((J.Return) ((J.Block) ((J.Lambda) develocity.getArguments().get(0)).getBody()).getStatements().get(0)).getExpression();
+                .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
+                .getStatements()
+                .get(0);
     }
 }
