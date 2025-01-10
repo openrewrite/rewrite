@@ -2790,6 +2790,7 @@ public class GroovyParserVisitor {
         modifierNameToType.put("final", J.Modifier.Type.Final);
         modifierNameToType.put("volatile", J.Modifier.Type.Volatile);
         modifierNameToType.put("synchronized", J.Modifier.Type.Synchronized);
+        modifierNameToType.put("transient", J.Modifier.Type.Transient);
         modifierNameToType.put("native", J.Modifier.Type.Native);
         modifierNameToType.put("default", J.Modifier.Type.Default);
         modifierNameToType.put("strictfp", J.Modifier.Type.Strictfp);
