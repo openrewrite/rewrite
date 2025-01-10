@@ -22,7 +22,6 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
 import org.openrewrite.java.internal.JavaTypeCache;
-import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
@@ -461,6 +460,31 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
      * @return Method type attribution.
      */
     public JavaType.@Nullable Method methodInvocationType(com.sun.tools.javac.code.@Nullable Type selectType, @Nullable Symbol symbol) {
+        if (selectType instanceof Type.ErrorType) {
+            try {
+                /* TODO: AttrRecover class does not exist for java 8; there is a
+                   public static final JCNoType recoveryType = new JCNoType(){
+                        @Override @DefinedBy(Api.LANGUAGE_MODEL)
+                        public String toString() {
+                            return "recovery";
+                        }
+                    };
+                  in the Type.class, so maybe it is possible to retrieve this information...
+                 */
+                // Ugly reflection solution, because AttrRecover$RecoveryErrorType is private inner class
+                /*for (Class<?> targetClass : Class.forName(AttrRecover.class.getCanonicalName()).getDeclaredClasses()) {
+                    if (targetClass.getSimpleName().equals("RecoveryErrorType")) {
+                        Field field = targetClass.getDeclaredField("candidateSymbol");
+                        field.setAccessible(true);
+                        Symbol originalSymbol = (Symbol) field.get(selectType);
+                        return methodInvocationType(selectType.getOriginalType(), originalSymbol);
+                    }
+                }*/
+            } catch (Exception e) {
+                // ignore
+            }
+        }
+
         if (selectType == null || selectType instanceof Type.ErrorType || symbol == null || symbol.kind == Kinds.Kind.ERR || symbol.type instanceof Type.UnknownType) {
             return null;
         }

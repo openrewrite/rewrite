@@ -962,11 +962,15 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
                 convertAll(node.getArguments(), commaDelim, t -> sourceBefore(")")), Markers.EMPTY);
 
-        Symbol methodSymbol = (jcSelect instanceof JCFieldAccess) ? ((JCFieldAccess) jcSelect).sym :
-                ((JCIdent) jcSelect).sym;
+        JavaType.Method methodType;
+        if (name.getType() instanceof JavaType.Method) {
+            methodType = (JavaType.Method) name.getType();
+        } else {
+            Symbol methodSymbol = (jcSelect instanceof JCFieldAccess) ? ((JCFieldAccess) jcSelect).sym : ((JCIdent) jcSelect).sym;
+            methodType = typeMapping.methodInvocationType(jcSelect.type, methodSymbol);
+        }
 
-        return new J.MethodInvocation(randomId(), fmt, Markers.EMPTY, select, typeParams, name, args,
-                typeMapping.methodInvocationType(jcSelect.type, methodSymbol));
+        return new J.MethodInvocation(randomId(), fmt, Markers.EMPTY, select, typeParams, name, args, methodType);
     }
 
     @Override

@@ -962,11 +962,15 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
                 convertAll(node.getArguments(), commaDelim, t -> sourceBefore(")")), Markers.EMPTY);
 
-        Symbol methodSymbol = (jcSelect instanceof JCFieldAccess) ? ((JCFieldAccess) jcSelect).sym :
-                ((JCIdent) jcSelect).sym;
+        JavaType.Method methodType;
+        if (name.getType() instanceof JavaType.Method) {
+            methodType = (JavaType.Method) name.getType();
+        } else {
+            Symbol methodSymbol = (jcSelect instanceof JCFieldAccess) ? ((JCFieldAccess) jcSelect).sym : ((JCIdent) jcSelect).sym;
+            methodType = typeMapping.methodInvocationType(jcSelect.type, methodSymbol);
+        }
 
-        return new J.MethodInvocation(randomId(), fmt, Markers.EMPTY, select, typeParams, name, args,
-                typeMapping.methodInvocationType(jcSelect.type, methodSymbol));
+        return new J.MethodInvocation(randomId(), fmt, Markers.EMPTY, select, typeParams, name, args, methodType);
     }
 
     @Override
@@ -1733,12 +1737,16 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             return null;
         }
         try {
-            String prefix = source.substring(cursor, Math.max(cursor, getActualStartPosition((JCTree) t)));
-            cursor += prefix.length();
-            // Java 21 and 23 have a different return type from getCommentTree; with reflection we can support both
-            Method getCommentTreeMethod = DocCommentTable.class.getMethod("getCommentTree", JCTree.class);
-            DocCommentTree commentTree = (DocCommentTree) getCommentTreeMethod.invoke(docCommentTable, t);
-            @SuppressWarnings("unchecked") J2 j = (J2) scan(t, formatWithCommentTree(prefix, (JCTree) t, commentTree));
+            Space prefix = EMPTY;
+            //if (!isLombokGenerated(t)) {
+                String pre = source.substring(cursor, Math.max(cursor, getActualStartPosition((JCTree) t)));
+                cursor += pre.length();
+                // Java 21 and 23 have a different return type from getCommentTree; with reflection we can support both
+                Method getCommentTreeMethod = DocCommentTable.class.getMethod("getCommentTree", JCTree.class);
+                DocCommentTree commentTree = (DocCommentTree) getCommentTreeMethod.invoke(docCommentTable, t);
+                prefix = formatWithCommentTree(pre, (JCTree) t, commentTree);
+            //}
+            @SuppressWarnings("unchecked") J2 j = (J2) scan(t, prefix);
             return j;
         } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException ex) {
             reportJavaParsingException(ex);
@@ -1804,7 +1812,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         if (endPos(t) == cursor && rightPadded.getElement() instanceof J.Erroneous) {
             cursor += ((J.Erroneous) rightPadded.getElement()).getText().length();
         } else {
-            cursor(max(endPos(t), cursor)); // if there is a non-empty suffix, the cursor may have already moved past it
+            cursor(max(endPos(t), cursor)); // if there is a non-empty suffix or a lombok generated method, the cursor can be already moved past it
         }
         return rightPadded;
     }
@@ -1945,6 +1953,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         Map<Integer, List<Tree>> treesGroupedByStartPosition = new LinkedHashMap<>();
         for (Tree t : trees) {
             if (!(t instanceof JCVariableDecl) && isLombokGenerated(t)) {
+                //System.out.println(t);
                 continue;
             }
             treesGroupedByStartPosition.computeIfAbsent(((JCTree) t).getStartPosition(), k -> new ArrayList<>(1)).add(t);
@@ -1955,8 +1964,13 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             if (treeGroup.size() == 1) {
                 Tree t = treeGroup.get(0);
                 int startPosition = ((JCTree) t).getStartPosition();
-                if (cursor > startPosition)
+                if (cursor > startPosition && !isLombokGenerated(t))
                     continue;
+
+                if (isLombokGenerated(t)) {
+                    System.out.println();
+                }
+
                 converted.add(convert(treeGroup.get(0), suffix));
             } else {
                 // multi-variable declarations are split into independent overlapping JCVariableDecl's by the OpenJDK AST
