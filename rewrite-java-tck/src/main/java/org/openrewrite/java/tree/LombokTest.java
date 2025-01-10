@@ -373,6 +373,29 @@ class LombokTest implements RewriteTest {
     }
 
     @Test
+    void gett() {
+        rewriteRun(
+          java(
+            """
+              import lombok.Getter;
+              
+              public class WithExample {
+                @Getter int age;
+              
+                public WithExample(int age) {
+                  this.age = age;
+                }
+              
+                void test() {
+                    int x = getAge();
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void with() {
         rewriteRun(
           java(
@@ -387,7 +410,7 @@ class LombokTest implements RewriteTest {
                 }
               
                 void test() {
-                    WithExample x = withName("name", 23);
+                    WithExample x = withAge("name", 23);
                 }
               }
               """
