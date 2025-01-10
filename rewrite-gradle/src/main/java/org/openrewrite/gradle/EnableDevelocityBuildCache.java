@@ -25,6 +25,8 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.tree.J;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class EnableDevelocityBuildCache extends Recipe {
@@ -65,21 +67,9 @@ public class EnableDevelocityBuildCache extends Recipe {
         return Preconditions.check(new IsSettingsGradle<>(), new GroovyIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-
-                if ("buildCache".equals(method.getSimpleName())) {
-                    try {
-                        Cursor parent = getCursor().dropParentUntil(v -> v instanceof J.MethodInvocation && "develocity".equals(((J.MethodInvocation) v).getSimpleName()));
-                        parent.putMessage("hasBuildCacheConfig", true);
-                    } catch (IllegalStateException e) {
-                        // ignore, this means we're not in a develocity block
-                    }
-                    return m;
-                }
-
-                if ("develocity".equals(method.getSimpleName()) && getCursor().pollMessage("hasBuildCacheConfig") == null) {
+                if ("develocity".equals(method.getSimpleName()) && !hasBuildCache(method)) {
                     J.MethodInvocation buildCache = createBuildCache();
-                    return maybeAutoFormat(m, m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
+                    return maybeAutoFormat(method, method.withArguments(ListUtils.mapFirst(method.getArguments(), arg -> {
                         if (arg instanceof J.Lambda) {
                             J.Lambda lambda = (J.Lambda) arg;
                             J.Block block = (J.Block) lambda.getBody();
@@ -88,8 +78,20 @@ public class EnableDevelocityBuildCache extends Recipe {
                         return arg;
                     })), ctx);
                 }
+                return method;
+            }
 
-                return m;
+            private boolean hasBuildCache(J.MethodInvocation m) {
+                return new GroovyIsoVisitor<AtomicBoolean>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean atomicBoolean) {
+                        if ("buildCache".equals(method.getSimpleName())) {
+                            atomicBoolean.set(true);
+                            return method;
+                        }
+                        return super.visitMethodInvocation(method, atomicBoolean);
+                    }
+                }.reduce(m, new AtomicBoolean(false), getCursor().getParentTreeCursor()).get();
             }
         });
     }
