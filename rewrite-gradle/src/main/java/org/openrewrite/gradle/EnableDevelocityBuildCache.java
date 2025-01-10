@@ -57,7 +57,7 @@ public class EnableDevelocityBuildCache extends Recipe {
     @Override
     public Validated<Object> validate(ExecutionContext ctx) {
         return super.validate(ctx)
-                .or(Validated.notBlank("remoteEnabled", remoteEnabled)
+                .and(Validated.notBlank("remoteEnabled", remoteEnabled)
                         .or(Validated.notBlank("remotePushEnabled", remotePushEnabled)));
     }
 
