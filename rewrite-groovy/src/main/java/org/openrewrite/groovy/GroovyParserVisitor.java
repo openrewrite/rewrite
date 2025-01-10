@@ -1385,7 +1385,7 @@ public class GroovyParserVisitor {
         public void visitDeclarationExpression(DeclarationExpression expression) {
             Space prefix = whitespace();
             Optional<MultiVariable> multiVariable = maybeMultiVariable();
-            List<J.Modifier> modifiers = getModifiers();
+            List<J.Modifier> modifiers = getModifiers(expression.getVariableExpression());
             TypeTree typeExpr = visitVariableExpressionType(expression.getVariableExpression());
 
             J.VariableDeclarations.NamedVariable namedVariable;
@@ -1440,25 +1440,28 @@ public class GroovyParserVisitor {
             return Optional.empty();
         }
 
-        private List<J.Modifier> getModifiers() {
+        private List<J.Modifier> getModifiers(Variable variable) {
+            String varName = variable.getName();
             List<J.Modifier> modifiers = new ArrayList<>();
             int saveCursor = cursor;
             Space prefix = whitespace();
-            while (source.startsWith("def", cursor) || source.startsWith("var", cursor) || source.startsWith("final", cursor)) {
-                if (source.startsWith("var", cursor)) {
-                    modifiers.add(new J.Modifier(randomId(), prefix, Markers.EMPTY, "var", J.Modifier.Type.LanguageExtension, emptyList()));
-                    skip("var");
-                } else if (source.startsWith("def", cursor)) {
-                    modifiers.add(new J.Modifier(randomId(), prefix, Markers.EMPTY, "def", J.Modifier.Type.LanguageExtension, emptyList()));
-                    skip("def");
-                } else if (source.startsWith("final", cursor)) {
-                    modifiers.add(new J.Modifier(randomId(), prefix, Markers.EMPTY, "final", J.Modifier.Type.LanguageExtension, emptyList()));
-                    skip("final");
-                } else {
-                    break;
-                }
+            Set<String> possibleModifiers = new LinkedHashSet<>(modifierNameToType.keySet());
+            String currentModifier = possibleModifiers.stream().filter(modifierName -> source.startsWith(modifierName, cursor))
+                    .findFirst()
+                    .orElse(null);
+            while (currentModifier != null) {
+                possibleModifiers.remove(currentModifier);
+                modifiers.add(new J.Modifier(randomId(), prefix, Markers.EMPTY, currentModifier, modifierNameToType.get(currentModifier), emptyList()));
+                skip(currentModifier);
                 saveCursor = cursor;
                 prefix = whitespace();
+                currentModifier = possibleModifiers.stream()
+                        .filter(modifierName ->
+                                // Try to avoid confusing a variable name with an incidentally similar modifier keyword
+                                (varName.length() < modifierName.length() || !source.startsWith(varName, cursor)) &&
+                                source.startsWith(modifierName, cursor))
+                        .findFirst()
+                        .orElse(null);
             }
             cursor = saveCursor;
             return modifiers;
@@ -1515,7 +1518,7 @@ public class GroovyParserVisitor {
                 } else {
                     Parameter param = forLoop.getVariable();
                     Space paramFmt = whitespace();
-                    List<J.Modifier> modifiers = getModifiers();
+                    List<J.Modifier> modifiers = getModifiers(param);
                     TypeTree paramType = param.getOriginType().getColumnNumber() >= 0 ? visitTypeTree(param.getOriginType()) : null;
                     JRightPadded<J.VariableDeclarations.NamedVariable> paramName = JRightPadded.build(
                             new J.VariableDeclarations.NamedVariable(randomId(), whitespace(), Markers.EMPTY,
@@ -2774,5 +2777,24 @@ public class GroovyParserVisitor {
         } else {
             return inferred;
         }
+    }
+
+    private static final Map<String, J.Modifier.Type> modifierNameToType;
+    static {
+        modifierNameToType = new LinkedHashMap<>();
+        modifierNameToType.put("def", J.Modifier.Type.LanguageExtension);
+        modifierNameToType.put("var", J.Modifier.Type.LanguageExtension);
+        modifierNameToType.put("public", J.Modifier.Type.Public);
+        modifierNameToType.put("protected", J.Modifier.Type.Protected);
+        modifierNameToType.put("private", J.Modifier.Type.Private);
+        modifierNameToType.put("abstract", J.Modifier.Type.Abstract);
+        modifierNameToType.put("static", J.Modifier.Type.Static);
+        modifierNameToType.put("final", J.Modifier.Type.Final);
+        modifierNameToType.put("volatile", J.Modifier.Type.Volatile);
+        modifierNameToType.put("synchronized", J.Modifier.Type.Synchronized);
+        modifierNameToType.put("transient", J.Modifier.Type.Transient);
+        modifierNameToType.put("native", J.Modifier.Type.Native);
+        modifierNameToType.put("default", J.Modifier.Type.Default);
+        modifierNameToType.put("strictfp", J.Modifier.Type.Strictfp);
     }
 }

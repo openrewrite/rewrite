@@ -17,12 +17,12 @@ package org.openrewrite.java.lombok;
 
 import com.sun.tools.javac.tree.JCTree;
 import lombok.core.AnnotationValues;
-import lombok.experimental.ExtensionMethod;
+import lombok.experimental.Helper;
 import lombok.javac.JavacAnnotationHandler;
 import lombok.javac.JavacNode;
 
-public class ExtensionMethodHandler extends JavacAnnotationHandler<ExtensionMethod> {
+public class HelperNoOpHandler extends JavacAnnotationHandler<Helper> {
     @Override
-    public void handle(AnnotationValues<ExtensionMethod> annotationValues, JCTree.JCAnnotation jcAnnotation, JavacNode javacNode) {
+    public void handle(AnnotationValues<Helper> annotation, JCTree.JCAnnotation ast, JavacNode annotationNode) {
     }
 }

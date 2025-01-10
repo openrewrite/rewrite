@@ -21,6 +21,7 @@ import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
 import org.openrewrite.java.marker.CompactConstructor;
 import org.openrewrite.java.marker.OmitParentheses;
+import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.J.*;
 import org.openrewrite.marker.Marker;
@@ -92,6 +93,16 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
                 p.append(suffix);
             }
         }
+    }
+
+    @Override
+    public <M extends Marker> M visitMarker(Marker marker, PrintOutputCapture<P> p) {
+        if (marker instanceof TrailingComma) {
+            p.append(',');
+            visitSpace(((TrailingComma) marker).getSuffix(), Space.Location.TRAILING_COMMA_SUFFIX, p);
+        }
+        //noinspection unchecked
+        return (M) marker;
     }
 
     @Override
