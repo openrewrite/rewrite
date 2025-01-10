@@ -1731,7 +1731,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             return null;
         }
         try {
-            String prefix = source.substring(cursor, Math.max(cursor, getActualStartPosition((JCTree) t)));
+            String prefix = source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
             cursor += prefix.length();
             // Java 21 and 23 have a different return type from getCommentTree; with reflection we can support both
             Method getCommentTreeMethod = DocCommentTable.class.getMethod("getCommentTree", JCTree.class);
