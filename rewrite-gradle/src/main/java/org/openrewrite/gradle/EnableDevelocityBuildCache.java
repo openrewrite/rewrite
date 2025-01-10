@@ -95,7 +95,7 @@ public class EnableDevelocityBuildCache extends Recipe {
     }
 
     private J.@Nullable MethodInvocation develocityBuildCacheTemplate() {
-        String ge = "\ndevelocity {\n" +
+        String ge = "develocity {\n" +
                     "    buildCache {\n" +
                     "        remote(develocity.buildCache) {\n";
 
@@ -106,7 +106,9 @@ public class EnableDevelocityBuildCache extends Recipe {
         if (!StringUtils.isBlank(remotePushEnabled)) {
             ge += "            push = " + remotePushEnabled + "\n";
         }
-        ge += "        }\n    }\n}\n";
+        ge += "        }" +
+              "    }" +
+              "}";
 
         G.CompilationUnit cu = GradleParser.builder().build()
                 .parse(ge)
