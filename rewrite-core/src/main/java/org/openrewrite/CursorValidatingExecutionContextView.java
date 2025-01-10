@@ -15,8 +15,11 @@
  */
 package org.openrewrite;
 
+import org.jspecify.annotations.Nullable;
+
 public class CursorValidatingExecutionContextView extends DelegatingExecutionContext {
     private static final String VALIDATE_CURSOR_ACYCLIC = "org.openrewrite.CursorValidatingExecutionContextView.ValidateCursorAcyclic";
+    private static final String VALIDATE_CTX_MUTATION = "org.openrewrite.CursorValidatingExecutionContextView.AllowExecutionContextMutation";
 
     public CursorValidatingExecutionContextView(ExecutionContext delegate) {
         super(delegate);
@@ -37,5 +40,22 @@ public class CursorValidatingExecutionContextView extends DelegatingExecutionCon
     public CursorValidatingExecutionContextView setValidateCursorAcyclic(boolean validateCursorAcyclic) {
         putMessage(VALIDATE_CURSOR_ACYCLIC, validateCursorAcyclic);
         return this;
+    }
+
+    public CursorValidatingExecutionContextView setValidateImmutableExecutionContext(boolean allowExecutionContextMutation) {
+        putMessage(VALIDATE_CTX_MUTATION, allowExecutionContextMutation);
+        return this;
+    }
+
+    @Override
+    public void putMessage(String key, @Nullable Object value) {
+        assert !getMessage(VALIDATE_CTX_MUTATION, false) || key.equals(VALIDATE_CURSOR_ACYCLIC) || key.equals(VALIDATE_CTX_MUTATION)
+                || key.equals(ExecutionContext.CURRENT_CYCLE) || key.equals(ExecutionContext.CURRENT_RECIPE) || key.equals(ExecutionContext.DATA_TABLES)
+                : "Recipe mutated execution context key \"" + key + "\". " +
+                  "Recipes should not mutate the contents of the ExecutionContext as it allows mutable state to leak between " +
+                  "recipes, opening the door for difficult to debug recipe composition errors. " +
+                  "If you need to store state within the execution of a single recipe use Cursor messaging. " +
+                  "If you want to pass state between recipes, use a ScanningRecipe instead.";
+        super.putMessage(key, value);
     }
 }
