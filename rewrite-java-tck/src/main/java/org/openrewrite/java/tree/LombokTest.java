@@ -377,6 +377,29 @@ class LombokTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              import lombok.With;
+              
+              public class WithExample {
+                @With int age;
+              
+                public WithExample(int age) {
+                  this.age = age;
+                }
+              
+                void test() {
+                    WithExample x = withName("name", 23);
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void withWithParams() {
+        rewriteRun(
+          java(
+            """
               import lombok.AccessLevel;
               import lombok.NonNull;
               import lombok.With;
@@ -419,7 +442,7 @@ class LombokTest implements RewriteTest {
                   this.age = age;
                 }
               
-                static void test() {
+                void test() {
                     WithExample x = new WithExample("old name", 22);
                     x.withName("name", 23);
                 }
