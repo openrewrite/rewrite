@@ -87,7 +87,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
             public J.Annotation visitAnnotation(J.Annotation a, ExecutionContext ctx) {
                 J.Annotation original = super.visitAnnotation(a, ctx);
                 if (!TypeUtils.isOfClassType(a.getType(), annotationType)) {
-                    return a;
+                    return original;
                 }
 
                 String newAttributeValue = maybeQuoteStringArgument(attributeName, attributeValue, a);
