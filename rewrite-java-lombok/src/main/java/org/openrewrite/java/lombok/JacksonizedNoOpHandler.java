@@ -24,7 +24,7 @@ import lombok.javac.JavacNode;
 
 @SuppressWarnings("SpellCheckingInspection")
 @HandlerPriority(-512)
-public class JacksonizedHandler extends JavacAnnotationHandler<Jacksonized> {
+public class JacksonizedNoOpHandler extends JavacAnnotationHandler<Jacksonized> {
     @Override
     public void handle(AnnotationValues<Jacksonized> annotation, JCTree.JCAnnotation ast, JavacNode annotationNode) {
     }

@@ -19,7 +19,6 @@ package org.openrewrite.java.isolated;
 import com.sun.source.doctree.DocCommentTree;
 import com.sun.source.tree.*;
 import com.sun.source.util.TreePathScanner;
-import com.sun.tools.javac.code.Attribute;
 import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.tree.DocCommentTable;
@@ -27,6 +26,7 @@ import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
 import com.sun.tools.javac.util.Context;
+import lombok.Generated;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
@@ -1597,9 +1597,11 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 // this is a lambda parameter with an inferred type expression
                 typeExpr = null;
             } else {
-                boolean lombokVal = isLombokVal(node);
+                Space space = whitespace();
+                boolean lombokVal = source.startsWith("val", cursor);
+                cursor += 3; // skip `val` or `var`
                 typeExpr = new J.Identifier(randomId(),
-                        sourceBefore(lombokVal ? "val" : "var"),
+                        space,
                         Markers.build(singletonList(JavaVarKeyword.build())),
                         emptyList(),
                         lombokVal ? "val" : "var",
@@ -1747,6 +1749,14 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         }
     }
 
+    private static int getActualStartPosition(JCTree t) {
+        // The variable's start position in the source is wrongly after lombok's `@val` annotation
+        if (t instanceof JCVariableDecl && isLombokGenerated(t)) {
+            return ((JCVariableDecl) t).mods.annotations.get(0).getStartPosition();
+        }
+        return t.getStartPosition();
+    }
+
     private void reportJavaParsingException(Throwable ex) {
         // this SHOULD never happen, but is here simply as a diagnostic measure in the event of unexpected exceptions
         StringBuilder message = new StringBuilder("Failed to convert for the following cursor stack:");
@@ -1769,14 +1779,6 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         message.append("--- END PATH ---\n");
 
         ctx.getOnError().accept(new JavaParsingException(message.toString(), ex));
-    }
-
-    private static int getActualStartPosition(JCTree t) {
-        // not sure if this is a bug in Lombok, but the variable's start position is after the `val` annotation
-        if (t instanceof JCVariableDecl && isLombokVal((JCVariableDecl) t)) {
-            return ((JCVariableDecl) t).mods.annotations.get(0).getStartPosition();
-        }
-        return t.getStartPosition();
     }
 
     private <J2 extends @Nullable J> @Nullable JRightPadded<J2> convert(@Nullable Tree t, Function<Tree, Space> suffix) {
@@ -1942,7 +1944,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
 
         Map<Integer, List<Tree>> treesGroupedByStartPosition = new LinkedHashMap<>();
         for (Tree t : trees) {
-            if (isLombokGenerated(t)) {
+            if (!(t instanceof JCVariableDecl) && isLombokGenerated(t)) {
                 continue;
             }
             treesGroupedByStartPosition.computeIfAbsent(((JCTree) t).getStartPosition(), k -> new ArrayList<>(1)).add(t);
@@ -1974,51 +1976,23 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         return converted;
     }
 
-    private static boolean isLombokVal(JCTree.JCVariableDecl t) {
-        if (t.sym != null && t.sym.getMetadata() != null) {
-            for (Attribute.Compound a : t.sym.getDeclarationAttributes()) {
-                if ("lombok.val".equals(a.type.toString())) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
     private static boolean isLombokGenerated(Tree t) {
-        Symbol sym = null;
-        if (t instanceof JCAnnotation) {
-            t = ((JCAnnotation) t).getAnnotationType();
-        }
-        if (t instanceof JCIdent) {
-            sym = ((JCIdent) t).sym;
-        } else if (t instanceof JCTree.JCMethodDecl) {
-            sym = ((JCMethodDecl) t).sym;
-        } else if (t instanceof JCTree.JCClassDecl) {
-            sym = ((JCClassDecl) t).sym;
-        } else if (t instanceof JCTree.JCVariableDecl) {
-            sym = ((JCVariableDecl) t).sym;
-        }
-        return isLombokGenerated(sym);
-    }
+        Tree tree = (t instanceof JCAnnotation) ? ((JCAnnotation) t).getAnnotationType() : t;
 
-    private static boolean isLombokGenerated(@Nullable Symbol sym) {
-        if (sym == null) {
-            return false;
+        Symbol sym = null;
+        if (tree instanceof JCIdent) {
+            sym = ((JCIdent) tree).sym;
+        } else if (tree instanceof JCTree.JCMethodDecl) {
+            sym = ((JCMethodDecl) tree).sym;
+        } else if (tree instanceof JCTree.JCClassDecl) {
+            sym = ((JCClassDecl) tree).sym;
+        } else if (tree instanceof JCTree.JCVariableDecl) {
+            sym = ((JCVariableDecl) tree).sym;
+            return sym != null && sym.getDeclarationAttributes().stream().anyMatch(a -> "lombok.val".equals(a.type.toString()));
         }
-        // Lombok val is represented as a @lombok.val on a "final" modifier, neither which appear in source
-        if ("lombok.val".equals(sym.getQualifiedName().toString())) {
-            return true;
-        }
-        if (sym.getMetadata() == null) {
-            return false;
-        }
-        for (Attribute.Compound a : sym.getDeclarationAttributes()) {
-            if ("lombok.Generated".equals(a.type.toString())) {
-                return true;
-            }
-        }
-        return false;
+
+        //noinspection ConstantConditions
+        return sym != null && ("lombok.val".equals(sym.getQualifiedName().toString()) || sym.getAnnotation(Generated.class) != null);
     }
 
     /**
@@ -2199,7 +2173,6 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         for (int i = cursor; i < source.length(); i++) {
             if (annotationPosTable.containsKey(i)) {
                 JCAnnotation jcAnnotation = annotationPosTable.get(i);
-                // Skip over lombok's "@val" annotation which does not actually appear in source
                 if (isLombokGenerated(jcAnnotation.getAnnotationType())) {
                     continue;
                 }
