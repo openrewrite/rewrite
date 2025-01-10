@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
@@ -50,7 +49,6 @@ class NewArrayTest implements RewriteTest {
     }
 
     @Test
-    @Disabled("int[] n = new int[] { 0, 1, 2~~(non-whitespace)~~>, <~~};")
     void initializersWithTrailingComma() {
         rewriteRun(
           java(

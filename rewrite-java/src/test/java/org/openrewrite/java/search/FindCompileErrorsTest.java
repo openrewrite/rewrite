@@ -23,6 +23,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.test.TypeValidation.all;
 
 class FindCompileErrorsTest implements RewriteTest {
 
@@ -39,7 +40,7 @@ class FindCompileErrorsTest implements RewriteTest {
             rows -> assertThat(rows).singleElement().satisfies(row -> {
                 assertThat(row.getSourceFile()).isEqualTo("A.java");
                 assertThat(row.getCode()).isEqualTo("\n        owner");
-            })),
+            })).typeValidationOptions(all().erroneous(false)),
           java(
             """
               class A {

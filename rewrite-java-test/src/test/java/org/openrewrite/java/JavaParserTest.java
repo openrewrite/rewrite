@@ -40,6 +40,7 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.test.TypeValidation.all;
 
 /**
  * @author Alex Boyko
@@ -49,6 +50,7 @@ class JavaParserTest implements RewriteTest {
     @Test
     void incompleteAssignment() {
         rewriteRun(
+          spec -> spec.typeValidationOptions(all().erroneous(false)),
           java(
             """
               @Deprecated(since=)
@@ -238,6 +240,7 @@ class JavaParserTest implements RewriteTest {
     })
     void erroneousExpressionStatements(@Language("java") String source) {
         rewriteRun(
+          spec -> spec.typeValidationOptions(all().erroneous(false)),
           java(source)
         );
     }
@@ -245,7 +248,8 @@ class JavaParserTest implements RewriteTest {
     @Test
     void erroneousVariableDeclarations() {
         rewriteRun(
-          spec -> spec.recipe(new FindCompileErrors()),
+          spec -> spec.recipe(new FindCompileErrors())
+            .typeValidationOptions(all().erroneous(false)),
           java(
             """
               package com.example.demo;
