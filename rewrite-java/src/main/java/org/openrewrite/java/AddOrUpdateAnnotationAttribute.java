@@ -67,6 +67,12 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     @Nullable
     String attributeValue;
 
+    @Option(displayName = "Old Attribute value",
+            description = "The current value of the attribute, this can be used to filter where the change is applied. Set to `null` for wildcard behavior.",
+            example = "400")
+    @Nullable
+    String oldAttributeValue;
+
     @Option(displayName = "Add only",
             description = "When set to `true` will not change existing annotation attribute values.")
     @Nullable
