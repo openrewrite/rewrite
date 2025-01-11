@@ -16,6 +16,7 @@
 package org.openrewrite.groovy;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
@@ -120,25 +121,18 @@ class JenkinsFileTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/pull/4887")
     @Test
     void jenkinsfileWithComment() {
-        // the Jenkinsfile from https://github.com/jenkinsci/ssh-plugin/blob/158.ve2a_e90fb_7319/Jenkinsfile
+        // the Jenkinsfile adapted from https://github.com/jenkinsci/ssh-plugin/blob/158.ve2a_e90fb_7319/Jenkinsfile
         rewriteRun(
           groovy(
             """
-                #!/usr/bin/env groovy
-
-                /* `buildPlugin` step provided by: https://github.com/jenkins-infra/pipeline-library */
-                buildPlugin(
-                        useContainerAgent: true,
-                        configurations: [
-                                [platform: 'linux', jdk: 21],
-                                [platform: 'windows', jdk: 17],
-                        ])
+                /* https://github.com */
+                foo()
               """,
             spec -> spec.path("Jenkinsfile")
           )
         );
     }
-
 }
