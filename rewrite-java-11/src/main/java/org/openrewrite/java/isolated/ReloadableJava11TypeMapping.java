@@ -371,7 +371,7 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
         if (type == null && symbol != null) {
             type = symbol.type;
         }
-        if (type instanceof Type.MethodType || type instanceof Type.ForAll) {
+        if (type instanceof Type.MethodType || type instanceof Type.ForAll || (type instanceof Type.ErrorType && type.getOriginalType() instanceof Type.MethodType)) {
             return methodInvocationType(type, symbol);
         }
         return type(type);
