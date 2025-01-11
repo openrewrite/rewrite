@@ -128,8 +128,8 @@ class JenkinsFileTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-                /* https://github.com */
-                foo()
+              /* https://github.com */
+              foo()
               """,
             spec -> spec.path("Jenkinsfile")
           )
