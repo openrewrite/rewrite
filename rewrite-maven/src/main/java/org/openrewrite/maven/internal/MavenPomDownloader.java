@@ -702,6 +702,23 @@ public class MavenPomDownloader {
                 //This can happen if the artifact only exists in the local maven cache. In this case, just return the original
                 return gav.getVersion();
             }
+
+            // Find the newest <snapshotVersion> with a matching classifier - the latest snapshot may not have artifacts for all classifiers.
+            List<MavenMetadata.SnapshotVersion> snapshotVersions = mavenMetadata.getVersioning().getSnapshotVersions();
+            if (snapshotVersions != null) {
+                // Try to get requested classifier (this is unfortunately not present in 'gav' structure)
+                String classifier = getClassifierFromContainingPom(gav, containingPom);
+                MavenMetadata.SnapshotVersion snapshotVersion = snapshotVersions.stream()
+                      .sorted(Comparator.comparing(MavenMetadata.SnapshotVersion::getUpdated).reversed())
+                      .filter(s -> Objects.equals(s.getClassifier(), classifier))
+                      .findFirst().orElse(null);
+
+                if (snapshotVersion != null) {
+                    return snapshotVersion.getValue();
+                }
+            }
+
+            // Old behaviour
             MavenMetadata.Snapshot snapshot = mavenMetadata.getVersioning().getSnapshot();
             if (snapshot != null && snapshot.getTimestamp() != null) {
                 return gav.getVersion().replaceFirst("SNAPSHOT$", snapshot.getTimestamp() + "-" + snapshot.getBuildNumber());
@@ -1054,4 +1071,26 @@ public class MavenPomDownloader {
         String artifactPomFile = gav.getArtifactId() + "-" + versionPath.getFileName() + ".pom";
         return Files.exists(dir.resolve(versionPath.resolve(artifactPomFile)));
     }
+
+    /**
+     * Retrieves the classifier of a dependency from a provided resolved POM, if it exists.
+     *
+     * @param gav The group, artifact, and version information of the dependency to locate.
+     * @param containingPom The resolved POM that potentially contains the dependency information.
+     *                      If null, the method will return null.
+     * @return The classifier of the dependency within the provided POM, or null if no matching
+     *         dependency or classifier is found.
+     */
+    private static @Nullable String getClassifierFromContainingPom(GroupArtifactVersion gav, @Nullable ResolvedPom containingPom) {
+        if (containingPom == null) {
+            return null;
+        }
+        Optional<Dependency> dependency = containingPom.getRequestedDependencies().stream()
+            .filter(dep -> Objects.equals(dep.getArtifactId(), gav.getArtifactId()))
+            .filter(dep -> Objects.equals(dep.getGroupId(), gav.getGroupId()))
+            .findFirst();
+
+        return dependency.map(Dependency::getClassifier).orElse(null);
+    }
+
 }
