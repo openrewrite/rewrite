@@ -221,9 +221,11 @@ class VariableDeclarationsTest implements RewriteTest {
     @Test
     void defVariableStartsWithDef() {
         rewriteRun(
-          groovy("""
-          def defaultPublicStaticFinal = 0
-          """)
+          groovy(
+            """
+              def defaultPublicStaticFinal = 0
+              """
+          )
         );
     }
 }

@@ -892,4 +892,50 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void addAttributeToNestedAnnotationArray() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+            "org.example.Bar",
+            "attribute",
+            "",
+            null,
+            false)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  Bar[] array() default {};
+              }
+              """
+          ),
+          java(
+            """
+              package org.example;
+              public @interface Bar {
+                  String attribute() default "";
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              import org.example.Bar;
+              
+              @Foo(array = { @Bar() })
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              import org.example.Bar;
+              
+              @Foo(array = { @Bar(attribute = "") })
+              public class A {
+              }
+              """
+          )
+        );
+    }
 }
