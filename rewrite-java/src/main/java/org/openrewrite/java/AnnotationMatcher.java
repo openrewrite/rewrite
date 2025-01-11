@@ -76,8 +76,8 @@ public class AnnotationMatcher {
 
     public boolean matches(J.Annotation annotation) {
         return matchesAnnotationName(annotation) &&
-               matchesSingleParameter(annotation) &&
-               matchesNamedParameters(annotation);
+                matchesSingleParameter(annotation) &&
+                matchesNamedParameters(annotation);
     }
 
     private boolean matchesAnnotationName(J.Annotation annotation) {
@@ -99,7 +99,7 @@ public class AnnotationMatcher {
                         seenAnnotations = new HashSet<>();
                     }
                     if (seenAnnotations.add(annotation.getFullyQualifiedName()) &&
-                        matchesAnnotationOrMetaAnnotation(annotation, seenAnnotations)) {
+                            matchesAnnotationOrMetaAnnotation(annotation, seenAnnotations)) {
                         return true;
                     }
                 }
@@ -168,10 +168,16 @@ public class AnnotationMatcher {
             }
             if (arg instanceof J.NewArray) {
                 J.NewArray na = (J.NewArray) arg;
-                if (na.getInitializer() == null || na.getInitializer().size() != 1) {
+                if (na.getInitializer() == null) {
                     return false;
                 }
-                return argumentValueMatches("value", na.getInitializer().get(0), matchText);
+                // recursively check each initializer of the array initializer
+                for (Expression expression : na.getInitializer()) {
+                    if (argumentValueMatches(matchOnArgumentName, expression, matchText)) {
+                        return true;
+                    }
+                }
+                return false;
             }
         }
 
