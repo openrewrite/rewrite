@@ -15,3 +15,5 @@ concurrency:
 jobs:
   upload-patch:
     uses: openrewrite/gh-automation/.github/workflows/receive-pr.yml@main
+    with:
+      recipe: 'org.openrewrite.recipes.OpenRewriteBestPracticesSubset'
