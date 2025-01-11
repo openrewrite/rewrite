@@ -2096,9 +2096,13 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     @Override
     public J visitConstantExpression(KtConstantExpression expression, ExecutionContext data) {
         IElementType elementType = expression.getElementType();
+        JavaType.Primitive type = primitiveType(expression);
         Object value;
         if (elementType == KtNodeTypes.INTEGER_CONSTANT || elementType == KtNodeTypes.FLOAT_CONSTANT) {
             value = ParseUtilsKt.parseNumericLiteral(expression.getText(), elementType);
+            if (type == JavaType.Primitive.Int && value instanceof Long) {
+                value = ((Long) value).intValue();
+            }
         } else if (elementType == KtNodeTypes.BOOLEAN_CONSTANT) {
             value = ParseUtilsKt.parseBoolean(expression.getText());
         } else if (elementType == KtNodeTypes.CHARACTER_CONSTANT) {
@@ -2115,7 +2119,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 value,
                 expression.getText(),
                 null,
-                primitiveType(expression)
+                type
         );
     }
 
