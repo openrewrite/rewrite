@@ -119,4 +119,26 @@ class JenkinsFileTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void jenkinsfileWithComment() {
+        // the Jenkinsfile from https://github.com/jenkinsci/ssh-plugin/blob/158.ve2a_e90fb_7319/Jenkinsfile
+        rewriteRun(
+          groovy(
+            """
+                #!/usr/bin/env groovy
+
+                /* `buildPlugin` step provided by: https://github.com/jenkins-infra/pipeline-library */
+                buildPlugin(
+                        useContainerAgent: true,
+                        configurations: [
+                                [platform: 'linux', jdk: 21],
+                                [platform: 'windows', jdk: 17],
+                        ])
+              """,
+            spec -> spec.path("Jenkinsfile")
+          )
+        );
+    }
+
 }
