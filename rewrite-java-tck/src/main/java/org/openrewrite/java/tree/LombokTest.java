@@ -483,27 +483,6 @@ class LombokTest implements RewriteTest {
     }
 
     @Test
-    // TODO: Remove this method, it's just for researching the parser
-    void constructor2() {
-        rewriteRun(
-          java(
-            """
-              import lombok.*;
-              
-              @AllArgsConstructor
-              public class ConstructorExample {
-                private int x, y;
-              
-                public void test() {
-                  ConstructorExample<?> x = new ConstructorExample(1,2);
-                }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
     void lazyGetter() {
         rewriteRun(
           java(

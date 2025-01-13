@@ -1737,16 +1737,12 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             return null;
         }
         try {
-            Space prefix = EMPTY;
-            //if (!isLombokGenerated(t)) {
-                String pre = source.substring(cursor, Math.max(cursor, getActualStartPosition((JCTree) t)));
-                cursor += pre.length();
-                // Java 21 and 23 have a different return type from getCommentTree; with reflection we can support both
-                Method getCommentTreeMethod = DocCommentTable.class.getMethod("getCommentTree", JCTree.class);
-                DocCommentTree commentTree = (DocCommentTree) getCommentTreeMethod.invoke(docCommentTable, t);
-                prefix = formatWithCommentTree(pre, (JCTree) t, commentTree);
-            //}
-            @SuppressWarnings("unchecked") J2 j = (J2) scan(t, prefix);
+            String prefix = source.substring(cursor, Math.max(cursor, getActualStartPosition((JCTree) t)));
+            cursor += prefix.length();
+            // Java 21 and 23 have a different return type from getCommentTree; with reflection we can support both
+            Method getCommentTreeMethod = DocCommentTable.class.getMethod("getCommentTree", JCTree.class);
+            DocCommentTree commentTree = (DocCommentTree) getCommentTreeMethod.invoke(docCommentTable, t);
+            @SuppressWarnings("unchecked") J2 j = (J2) scan(t, formatWithCommentTree(prefix, (JCTree) t, commentTree));
             return j;
         } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException ex) {
             reportJavaParsingException(ex);
@@ -1904,7 +1900,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             case EXPRESSION_STATEMENT:
                 ExpressionTree expTree = ((ExpressionStatementTree) t).getExpression();
                 if (expTree instanceof ErroneousTree) {
-                    return Space.build(source.substring(((JCTree) expTree).getEndPosition(endPosTable),((JCTree) t).getEndPosition(endPosTable)), Collections.emptyList());
+                    return Space.build(source.substring(((JCTree) expTree).getEndPosition(endPosTable), ((JCTree) t).getEndPosition(endPosTable)), Collections.emptyList());
                 } else {
                     return sourceBefore(";");
                 }
@@ -1953,7 +1949,6 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         Map<Integer, List<Tree>> treesGroupedByStartPosition = new LinkedHashMap<>();
         for (Tree t : trees) {
             if (!(t instanceof JCVariableDecl) && isLombokGenerated(t)) {
-                //System.out.println(t);
                 continue;
             }
             treesGroupedByStartPosition.computeIfAbsent(((JCTree) t).getStartPosition(), k -> new ArrayList<>(1)).add(t);
@@ -1964,13 +1959,8 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             if (treeGroup.size() == 1) {
                 Tree t = treeGroup.get(0);
                 int startPosition = ((JCTree) t).getStartPosition();
-                if (cursor > startPosition && !isLombokGenerated(t))
+                if (cursor > startPosition)
                     continue;
-
-                if (isLombokGenerated(t)) {
-                    System.out.println();
-                }
-
                 converted.add(convert(treeGroup.get(0), suffix));
             } else {
                 // multi-variable declarations are split into independent overlapping JCVariableDecl's by the OpenJDK AST

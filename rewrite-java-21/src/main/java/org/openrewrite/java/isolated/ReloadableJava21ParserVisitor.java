@@ -1808,7 +1808,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         if (endPos(t) == cursor && rightPadded.getElement() instanceof J.Erroneous) {
             cursor += ((J.Erroneous) rightPadded.getElement()).getText().length();
         } else {
-            cursor(max(endPos(t), cursor)); // if there is a non-empty suffix, the cursor may have already moved past it
+            cursor(max(endPos(t), cursor)); // if there is a non-empty suffix or a lombok generated method, the cursor can be already moved past it
         }
         return rightPadded;
     }
