@@ -219,7 +219,7 @@ public class BlockStatementTemplateGenerator {
                 before.append("Object o = ");
             }
             after.append(";\n}}");
-        } else if (j instanceof Expression && !(j instanceof J.Assignment)) {
+        } else if (j instanceof Expression && !(j instanceof J.Assignment) && !(j instanceof J.VariableDeclarations)) {
             before.insert(0, "class Template {\n");
             before.append("Object o = ");
             after.append(";\n}");
