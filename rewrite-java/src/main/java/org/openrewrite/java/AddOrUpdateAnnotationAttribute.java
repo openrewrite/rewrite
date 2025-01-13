@@ -99,7 +99,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 String newAttributeValue = maybeQuoteStringArgument(attributeName, attributeValue, a);
                 List<Expression> currentArgs = a.getArguments();
                 if (currentArgs == null || currentArgs.isEmpty() || currentArgs.get(0) instanceof J.Empty) {
-                    if (newAttributeValue == null) {
+                    if (newAttributeValue == null || oldAttributeValue != null) {
                         return a;
                     }
 
@@ -125,6 +125,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 } else {
                     // First assume the value exists amongst the arguments and attempt to update it
                     AtomicBoolean foundOrSetAttributeWithDesiredValue = new AtomicBoolean(false);
+                    //String oldAttributeValue = maybeQuoteStringArgument(attributeName, AddOrUpdateAnnotationAttribute.this.oldAttributeValue, a);
                     final J.Annotation finalA = a;
                     List<Expression> newArgs = ListUtils.map(currentArgs, it -> {
                         if (it instanceof J.Assignment) {
@@ -155,6 +156,9 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                         if (Boolean.FALSE.equals(addOnly) && attributeValIsAlreadyPresent(jLiteralList, newAttributeListValue)) {
                                             continue;
                                         }
+                                        if (oldAttributeValue != null && !oldAttributeValue.equals(attrListValues)) {
+                                            continue;
+                                        }
                                         changed = true;
                                         jLiteralList.add(new J.Literal(randomId(), Space.EMPTY, Markers.EMPTY, newAttributeListValue, newAttributeListValue, null, JavaType.Primitive.String));
                                     }
@@ -177,6 +181,9 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                     if (newAttributeListValue != null && newAttributeListValue.equals(((J.Literal) jLiteralList.get(i)).getValueSource()) || Boolean.TRUE.equals(addOnly)) {
                                         continue;
                                     }
+                                    if (oldAttributeValue != null && !oldAttributeValue.equals(newAttributeListValue)) {
+                                        continue;
+                                    }
 
                                     jLiteralList.set(i, ((J.Literal) jLiteralList.get(i)).withValue(newAttributeListValue).withValueSource(newAttributeListValue).withPrefix(jLiteralList.get(i).getPrefix()));
                                 }
@@ -196,6 +203,9 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                 if (newAttributeValue.equals(value.getValueSource()) || Boolean.TRUE.equals(addOnly)) {
                                     return it;
                                 }
+                                if (!valueMatches(value, oldAttributeValue)) {
+                                    return it;
+                                }
                                 return as.withAssignment(value.withValue(newAttributeValue).withValueSource(newAttributeValue));
                             }
                         } else if (it instanceof J.Literal) {
@@ -207,6 +217,9 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                 }
                                 J.Literal value = (J.Literal) it;
                                 if (newAttributeValue.equals(value.getValueSource()) || Boolean.TRUE.equals(addOnly)) {
+                                    return it;
+                                }
+                                if (!valueMatches(value, oldAttributeValue)) {
                                     return it;
                                 }
                                 return ((J.Literal) it).withValue(newAttributeValue).withValueSource(newAttributeValue);
@@ -223,6 +236,9 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                             // The only way anything except an assignment can appear is if there's an implicit assignment to "value"
                             if (attributeName == null || "value".equals(attributeName)) {
                                 foundOrSetAttributeWithDesiredValue.set(true);
+                                if (!valueMatches(it, oldAttributeValue)) {
+                                    return it;
+                                }
                                 if (newAttributeValue == null) {
                                     return null;
                                 }
@@ -267,6 +283,27 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 return a;
             }
         });
+    }
+
+    private static boolean valueMatches(Expression expression, @Nullable String oldAttributeValue) {
+        if (oldAttributeValue == null) { // null means wildcard
+            return true;
+        } else if (expression instanceof J.Literal) { // 219 & 203
+            return oldAttributeValue.equals(((J.Literal) expression).getValue());
+        } else if (expression instanceof J.FieldAccess) { // 236
+            J.FieldAccess fa = (J.FieldAccess) expression;
+            String currentValue = ((J.Identifier) fa.getTarget()).getSimpleName() + "." + fa.getSimpleName();
+            return oldAttributeValue.equals(currentValue);
+        } else if (expression instanceof J.Identifier) { // class names, static variables ..
+            if (oldAttributeValue.endsWith(".class")) {
+                String className = TypeUtils.toString(expression.getType()) + ".class";
+                return className.endsWith(oldAttributeValue);
+            } else {
+                return oldAttributeValue.equals(((J.Identifier) expression).getSimpleName());
+            }
+        } else {
+            throw new IllegalArgumentException("Unexpected expression type: " + expression.getClass());
+        }
     }
 
     private static @Nullable String maybeQuoteStringArgument(@Nullable String attributeName, @Nullable String attributeValue, J.Annotation annotation) {
