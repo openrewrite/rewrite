@@ -70,8 +70,7 @@ class SwitchPatternMatchingTest implements RewriteTest {
           java(
             //language=java
             """
-              sealed interface Currency permits Coin {}
-              enum Coin implements Currency { HEADS, TAILS }
+              enum Coin  { HEADS, TAILS }
               
               class Test {
                   void switchEnum(Coin c) {
