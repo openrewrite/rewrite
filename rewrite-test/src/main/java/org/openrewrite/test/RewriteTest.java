@@ -632,8 +632,7 @@ public interface RewriteTest extends SourceSpecs {
     default ExecutionContext defaultExecutionContext(SourceSpec<?>[] sourceSpecs) {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext(t -> {
             if (t instanceof RecipeRunException){
-                RecipeRunException e = (RecipeRunException) t;
-                fail("Failed to run recipe at %s", e.getCursor(), e);
+                fail("Failed to run recipe at " + ((RecipeRunException) t).getCursor(), t);
             }
             fail("Failed to parse sources or run recipe", t);
         });
