@@ -125,7 +125,6 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 } else {
                     // First assume the value exists amongst the arguments and attempt to update it
                     AtomicBoolean foundOrSetAttributeWithDesiredValue = new AtomicBoolean(false);
-                    //String oldAttributeValue = maybeQuoteStringArgument(attributeName, AddOrUpdateAnnotationAttribute.this.oldAttributeValue, a);
                     final J.Annotation finalA = a;
                     List<Expression> newArgs = ListUtils.map(currentArgs, it -> {
                         if (it instanceof J.Assignment) {

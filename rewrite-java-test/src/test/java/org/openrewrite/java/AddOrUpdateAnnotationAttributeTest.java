@@ -1022,7 +1022,13 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
         @Test
         void matchValueInArray() {
             rewriteRun(
-              spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, "hello", "goodbye", null, null)),
+              spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+                "org.example.Foo",
+                null,
+                "hello",
+                "goodbye",
+                null,
+                null)),
               java(
                 """
                   package org.example;
@@ -1132,6 +1138,156 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               )
             );
         }
+    }
 
+    @Nested
+    class AsValueAttribute {
+        @Test
+        void implicitWithNullAttributeName() {
+            rewriteRun(
+              spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+                "org.example.Foo",
+                null,
+                "b",
+                null,
+                false,
+                true)),
+              java(
+                """
+                  package org.example;
+                  public @interface Foo {
+                      String[] value() default {};
+                  }
+                  """
+              ),
+              java(
+                """
+                  import org.example.Foo;
+                  
+                  @Foo({"a"})
+                  public class A {
+                  }
+                  """,
+                """
+                  import org.example.Foo;
+                  
+                  @Foo({"a", "b"})
+                  public class A {
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void implicitWithAttributeNameValue() {
+            rewriteRun(
+              spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+                "org.example.Foo",
+                null,
+                "b",
+                null,
+                false,
+                true)),
+              java(
+                """
+                  package org.example;
+                  public @interface Foo {
+                      String[] value() default {};
+                  }
+                  """
+              ),
+              java(
+                """
+                  import org.example.Foo;
+                  
+                  @Foo(value = {"a"})
+                  public class A {
+                  }
+                  """,
+                """
+                  import org.example.Foo;
+                  
+                  @Foo(value = {"a", "b"})
+                  public class A {
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void explicitWithNullAttributeName() {
+            rewriteRun(
+              spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+                "org.example.Foo",
+                null,
+                "b",
+                null,
+                false,
+                true)),
+              java(
+                """
+                  package org.example;
+                  public @interface Foo {
+                      String[] value() default {};
+                  }
+                  """
+              ),
+              java(
+                """
+                  import org.example.Foo;
+                  
+                  @Foo(value = {"a"})
+                  public class A {
+                  }
+                  """,
+                """
+                  import org.example.Foo;
+                  
+                  @Foo(value = {"a", "b"})
+                  public class A {
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void explicitWithAttributeNameValue() {
+            rewriteRun(
+              spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
+                "org.example.Foo",
+                "value",
+                "b",
+                null,
+                false,
+                true)),
+              java(
+                """
+                  package org.example;
+                  public @interface Foo {
+                      String[] value() default {};
+                  }
+                  """
+              ),
+              java(
+                """
+                  import org.example.Foo;
+                  
+                  @Foo(value = {"a"})
+                  public class A {
+                  }
+                  """,
+                """
+                  import org.example.Foo;
+                  
+                  @Foo(value = {"a", "b"})
+                  public class A {
+                  }
+                  """
+              )
+            );
+        }
     }
 }
