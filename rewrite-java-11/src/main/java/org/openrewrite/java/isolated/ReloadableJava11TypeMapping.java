@@ -22,7 +22,6 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
 import org.openrewrite.java.internal.JavaTypeCache;
-import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
@@ -461,6 +460,10 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
      * @return Method type attribution.
      */
     public JavaType.@Nullable Method methodInvocationType(com.sun.tools.javac.code.@Nullable Type selectType, @Nullable Symbol symbol) {
+        /*
+         TODO: AttrRecover class does not exist for java 11; there is JCNoType
+          in the Type.class, so maybe it is possible to retrieve this information...
+         */
         if (selectType == null || selectType instanceof Type.ErrorType || symbol == null || symbol.kind == Kinds.Kind.ERR || symbol.type instanceof Type.UnknownType) {
             return null;
         }
