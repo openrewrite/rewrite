@@ -963,11 +963,15 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
                 convertAll(node.getArguments(), commaDelim, t -> sourceBefore(")")), Markers.EMPTY);
 
-        Symbol methodSymbol = (jcSelect instanceof JCFieldAccess) ? ((JCFieldAccess) jcSelect).sym :
-                ((JCIdent) jcSelect).sym;
+        JavaType.Method methodType;
+        if (name.getType() instanceof JavaType.Method) {
+            methodType = (JavaType.Method) name.getType();
+        } else {
+            Symbol methodSymbol = (jcSelect instanceof JCFieldAccess) ? ((JCFieldAccess) jcSelect).sym : ((JCIdent) jcSelect).sym;
+            methodType = typeMapping.methodInvocationType(jcSelect.type, methodSymbol);
+        }
 
-        return new J.MethodInvocation(randomId(), fmt, Markers.EMPTY, select, typeParams, name, args,
-                typeMapping.methodInvocationType(jcSelect.type, methodSymbol));
+        return new J.MethodInvocation(randomId(), fmt, Markers.EMPTY, select, typeParams, name, args, methodType);
     }
 
     @Override
@@ -1805,7 +1809,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         if (endPos(t) == cursor && rightPadded.getElement() instanceof J.Erroneous) {
             cursor += ((J.Erroneous) rightPadded.getElement()).getText().length();
         } else {
-            cursor(max(endPos(t), cursor)); // if there is a non-empty suffix, the cursor may have already moved past it
+            cursor(max(endPos(t), cursor)); // if there is a non-empty suffix or a lombok generated method, the cursor can be already moved past it
         }
         return rightPadded;
     }
