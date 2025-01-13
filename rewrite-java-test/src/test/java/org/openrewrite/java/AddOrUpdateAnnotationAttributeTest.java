@@ -987,6 +987,71 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
         }
 
         @Test
+        void matchEnumValue() {
+            rewriteRun(
+              spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, "Values.TWO", "Values.ONE", null, null)),
+              java(
+                """
+                  package org.example;
+                  public @interface Foo {
+                      Values value() default "";
+                  }
+                  public enum Values {ONE, TWO}
+                  """
+              ),
+
+              java(
+                """
+                  import org.example.Foo;
+                  
+                  @Foo(Values.ONE)
+                  public class A {
+                  }
+                  """,
+                """
+                  import org.example.Foo;
+                  
+                  @Foo(Values.TWO)
+                  public class A {
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void matchValueInArray() {
+            rewriteRun(
+              spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, "hello", "goodbye", null, null)),
+              java(
+                """
+                  package org.example;
+                  public @interface Foo {
+                      String[] value() default "";
+                  }
+                  """
+              ),
+
+              java(
+                """
+                  import org.example.Foo;
+                  
+                  @Foo({"goodbye", "hi"})
+                  public class A {
+                  }
+                  """,
+                """
+                  import org.example.Foo;
+                  
+                  @Foo({"hello", "hi"})
+                  public class A {
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
         void noMatchValue() {
             rewriteRun(
               spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, "hello", "hi", null, null)),
@@ -1051,7 +1116,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                 """
                   package org.example;
                   public @interface Foo {
-                      Class<? extends Number> value();
+                      Class<?> value();
                   }
                   """
               ),
