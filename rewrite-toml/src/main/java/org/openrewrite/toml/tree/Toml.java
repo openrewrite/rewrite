@@ -265,7 +265,7 @@ public interface Toml extends Tree {
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
-    class Literal implements TomlValue {
+    class Literal implements Toml {
         @EqualsAndHashCode.Include
         UUID id;
 

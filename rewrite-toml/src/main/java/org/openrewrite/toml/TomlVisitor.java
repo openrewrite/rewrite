@@ -38,7 +38,7 @@ public class TomlVisitor<P> extends TreeVisitor<Toml, P> {
         Toml.Array a = array;
         a = a.withPrefix(visitSpace(a.getPrefix(), p));
         a = a.withMarkers(visitMarkers(a.getMarkers(), p));
-        a = a.withValues(ListUtils.map(a.getValues(), v -> (TomlValue) visit(v, p)));
+        a = a.withValues(ListUtils.map(a.getValues(), v -> visit(v, p)));
         return a;
     }
 
