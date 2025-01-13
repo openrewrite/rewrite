@@ -57,6 +57,7 @@ dependencies {
     testImplementation(project(":rewrite-test")) {
         // because gradle-api fatjars this implementation already
         exclude("ch.qos.logback", "logback-classic")
+        exclude("org.slf4j", "slf4j-nop")
     }
 
     testImplementation("org.openrewrite.gradle.tooling:model:$latest")
