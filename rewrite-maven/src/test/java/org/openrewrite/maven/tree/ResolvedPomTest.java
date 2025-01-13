@@ -371,6 +371,7 @@ class ResolvedPomTest implements RewriteTest {
     }
 
     @Nested
+    @Issue("https://github.com/openrewrite/rewrite-maven-plugin/issues/862")
     class DependencyManagement {
 
         @TempDir
