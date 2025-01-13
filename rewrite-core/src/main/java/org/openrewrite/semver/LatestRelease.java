@@ -140,9 +140,8 @@ public class LatestRelease implements VersionComparator {
         // parts are the same:
         //
         // HyphenRange [25-28] should include "28-jre" and "28-android" as possible candidates.
-        String normalized1 = metadataPattern == null ? nv1 : nv1.replace(metadataPattern, "");
-        String normalized2 = metadataPattern == null ? nv2 : nv2.replace(metadataPattern, "");
-
+        String normalized1 = metadataPattern == null ? nv1 : nv1.replaceAll(metadataPattern, "");
+        String normalized2 = metadataPattern == null ? nv2 : nv2.replaceAll(metadataPattern, "");
         try {
             for (int i = 1; i <= Math.max(vp1, vp2); i++) {
                 String v1Part = v1Gav.group(i);
