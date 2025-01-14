@@ -16,9 +16,8 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.test.RewriteTest;
-
 import static org.openrewrite.java.Assertions.java;
+import org.openrewrite.test.RewriteTest;
 
 class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
 
@@ -886,6 +885,47 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               import org.example.Foo;
               
               @Foo(array = {"a", "b", "b", "c"})
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void updateFieldAccessAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", "value", "hello", false, null)),
+          java(
+            """
+              package org.example;
+              
+              public class Const {
+                    public static final String HI = "hi";
+              }
+              """),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String value() default "";
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              import org.example.Const;
+              
+              @Foo(value = Const.HI)
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              import org.example.Const;
+              
+              @Foo(value = "hello")
               public class A {
               }
               """
