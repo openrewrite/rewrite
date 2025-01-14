@@ -293,7 +293,7 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
         beforeSyntax(laccess, Space.Location.LEGACY_INDEX_ATTRIBUTE_ACCESS, p);
         visit(laccess.getBase(), p);
         p.append(".");
-        p.append(laccess.getIndex());
+        p.append(String.valueOf(laccess.getIndex()));
         afterSyntax(laccess, p);
         return laccess;
     }

@@ -265,7 +265,7 @@ public interface Hcl extends Tree {
 
         @With
         @Getter
-        String index;
+        int index;
 
         @Override
         public <P> Hcl acceptHcl(HclVisitor<P> v, P p) {

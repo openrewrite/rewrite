@@ -416,7 +416,7 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
                 Space.format(prefix),
                 Markers.EMPTY,
                 (Expression) visit(c.exprTerm()),
-                c.legacyIndexAttr().NumericLiteral().getText()
+                Integer.parseInt(c.legacyIndexAttr().NumericLiteral().getText())
         ));
     }
 
