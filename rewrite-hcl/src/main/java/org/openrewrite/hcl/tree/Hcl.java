@@ -261,11 +261,11 @@ public interface Hcl extends Tree {
 
         @With
         @Getter
-        Expression base;
+        HclRightPadded<Expression> base;
 
         @With
         @Getter
-        int index;
+        Literal index;
 
         @Override
         public <P> Hcl acceptHcl(HclVisitor<P> v, P p) {
@@ -295,6 +295,14 @@ public interface Hcl extends Tree {
         @RequiredArgsConstructor
         public static class Padding {
             private final LegacyIndexAttributeAccess t;
+
+            public HclRightPadded<Expression> getBase() {
+                return t.base;
+            }
+
+            public LegacyIndexAttributeAccess withBase(HclRightPadded<Expression> base) {
+                return t.base == base ? t : new LegacyIndexAttributeAccess(t.id, t.prefix, t.markers, base, t.index);
+            }
         }
     }
 

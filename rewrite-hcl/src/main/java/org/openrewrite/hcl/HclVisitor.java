@@ -87,8 +87,9 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         } else {
             li = (Hcl.LegacyIndexAttributeAccess) temp;
         }
-        li = li.withBase((Expression) visit(li.getBase(), p));
-        li = li.withIndex(li.getIndex());
+        li = li.getPadding().withBase(
+                visitRightPadded(li.getPadding().getBase(), HclRightPadded.Location.LEGACY_INDEX_ATTRIBUTE_ACCESS_BASE, p));
+        li = li.withIndex((Hcl.Literal) visitLiteral(li.getIndex(), p));
         return li;
     }
 

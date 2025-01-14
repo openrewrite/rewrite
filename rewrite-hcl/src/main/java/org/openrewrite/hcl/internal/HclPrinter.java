@@ -23,6 +23,7 @@ import org.openrewrite.hcl.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.function.UnaryOperator;
 
@@ -291,9 +292,11 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
     @Override
     public Hcl visitLegacyIndexAttribute(Hcl.LegacyIndexAttributeAccess laccess, PrintOutputCapture<P> p) {
         beforeSyntax(laccess, Space.Location.LEGACY_INDEX_ATTRIBUTE_ACCESS, p);
-        visit(laccess.getBase(), p);
+        visitRightPadded(
+                Collections.singletonList(laccess.getPadding().getBase()),
+                HclRightPadded.Location.LEGACY_INDEX_ATTRIBUTE_ACCESS_BASE, "", p);
         p.append(".");
-        p.append(String.valueOf(laccess.getIndex()));
+        visitLiteral(laccess.getIndex(), p);
         afterSyntax(laccess, p);
         return laccess;
     }
