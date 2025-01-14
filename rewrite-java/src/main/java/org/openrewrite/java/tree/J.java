@@ -1151,15 +1151,6 @@ public interface J extends Tree {
             public Case withExpressions(JContainer<Expression> expressions) {
                 return t.expressions == expressions ? t : new Case(t.id, t.prefix, t.markers, t.type, null, expressions, t.guard, t.statements, t.body);
             }
-
-            public Expression getGuard() {
-                return t.guard;
-            }
-
-            public Case withGuard(Expression guard) {
-                return t.guard == guard ? t : new Case(t.id, t.prefix, t.markers, t.type, null, t.expressions, guard, t.statements, t.body);
-            }
-
         }
     }
 
