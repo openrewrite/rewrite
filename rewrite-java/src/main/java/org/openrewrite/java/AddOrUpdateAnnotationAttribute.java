@@ -46,7 +46,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     @Override
     public String getDescription() {
         return "Some annotations accept arguments. This recipe sets an existing argument to the specified value, " +
-               "or adds the argument if it is not already set.";
+                "or adds the argument if it is not already set.";
     }
 
     @Option(displayName = "Annotation type",
@@ -80,9 +80,9 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
 
     @Option(displayName = "Append array",
             description = "If the attribute is an array, setting this option to `true` will append the value(s). " +
-                          "In conjunction with `addOnly`, it is possible to control duplicates: " +
-                          "`addOnly=true`, always append. " +
-                          "`addOnly=false`, only append if the value is not already present.")
+                    "In conjunction with `addOnly`, it is possible to control duplicates: " +
+                    "`addOnly=true`, always append. " +
+                    "`addOnly=false`, only append if the value is not already present.")
     @Nullable
     Boolean appendArray;
 
@@ -111,7 +111,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     } else {
                         String newAttributeValueResult = newAttributeValue;
                         if (((JavaType.FullyQualified) Objects.requireNonNull(a.getAnnotationType().getType())).getMethods().stream().anyMatch(method -> method.getReturnType().toString().equals("java.lang.String[]"))) {
-                            String attributeValueCleanedUp = attributeValue.replaceAll("\\s+","").replaceAll("[\\s+{}\"]","");
+                            String attributeValueCleanedUp = attributeValue.replaceAll("\\s+", "").replaceAll("[\\s+{}\"]", "");
                             List<String> attributeList = Arrays.asList(attributeValueCleanedUp.contains(",") ? attributeValueCleanedUp.split(",") : new String[]{attributeValueCleanedUp});
                             newAttributeValueResult = attributeList.stream()
                                     .map(String::valueOf)
@@ -130,9 +130,13 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                         if (it instanceof J.Assignment) {
                             J.Assignment as = (J.Assignment) it;
                             J.Identifier var = (J.Identifier) as.getVariable();
-                            if (attributeName == null || !attributeName.equals(var.getSimpleName())) {
+                            if (attributeName == null && !"value".equals(var.getSimpleName())) {
                                 return it;
                             }
+                            if (attributeName != null && !attributeName.equals(var.getSimpleName())) {
+                                return it;
+                            }
+
                             foundOrSetAttributeWithDesiredValue.set(true);
 
                             if (newAttributeValue == null) {
@@ -141,7 +145,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
 
                             if (as.getAssignment() instanceof J.NewArray) {
                                 List<Expression> jLiteralList = ((J.NewArray) as.getAssignment()).getInitializer();
-                                String attributeValueCleanedUp = attributeValue.replaceAll("\\s+","").replaceAll("[\\s+{}\"]","");
+                                String attributeValueCleanedUp = attributeValue.replaceAll("\\s+", "").replaceAll("[\\s+{}\"]", "");
                                 List<String> attributeList = Arrays.asList(attributeValueCleanedUp.contains(",") ? attributeValueCleanedUp.split(",") : new String[]{attributeValueCleanedUp});
 
                                 if (as.getMarkers().findFirst(AlreadyAppended.class).filter(ap -> ap.getValues().equals(newAttributeValue)).isPresent()) {
@@ -165,16 +169,16 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                             .withMarkers(as.getMarkers().add(new AlreadyAppended(randomId(), newAttributeValue))) : as;
                                 }
                                 int m = 0;
-                                for (int i = 0; i< Objects.requireNonNull(jLiteralList).size(); i++){
-                                    if (i >= attributeList.size()){
+                                for (int i = 0; i < Objects.requireNonNull(jLiteralList).size(); i++) {
+                                    if (i >= attributeList.size()) {
                                         jLiteralList.remove(i);
                                         i--;
                                         continue;
                                     }
 
                                     String newAttributeListValue = maybeQuoteStringArgument(attributeName, attributeList.get(i), finalA);
-                                    if (jLiteralList.size() == i+1){
-                                        m = i+1;
+                                    if (jLiteralList.size() == i + 1) {
+                                        m = i + 1;
                                     }
 
                                     if (newAttributeListValue != null && newAttributeListValue.equals(((J.Literal) jLiteralList.get(i)).getValueSource()) || Boolean.TRUE.equals(addOnly)) {
@@ -186,11 +190,11 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
 
                                     jLiteralList.set(i, ((J.Literal) jLiteralList.get(i)).withValue(newAttributeListValue).withValueSource(newAttributeListValue).withPrefix(jLiteralList.get(i).getPrefix()));
                                 }
-                                if (jLiteralList.size() < attributeList.size() || Boolean.TRUE.equals(addOnly)){
-                                    if (Boolean.TRUE.equals(addOnly)){
+                                if (jLiteralList.size() < attributeList.size() || Boolean.TRUE.equals(addOnly)) {
+                                    if (Boolean.TRUE.equals(addOnly)) {
                                         m = 0;
                                     }
-                                    for (int j = m; j < attributeList.size(); j++){
+                                    for (int j = m; j < attributeList.size(); j++) {
                                         String newAttributeListValue = maybeQuoteStringArgument(attributeName, attributeList.get(j), finalA);
                                         jLiteralList.add(j, new J.Literal(randomId(), jLiteralList.get(j - 1).getPrefix(), Markers.EMPTY, newAttributeListValue, newAttributeListValue, null, JavaType.Primitive.String));
                                     }
