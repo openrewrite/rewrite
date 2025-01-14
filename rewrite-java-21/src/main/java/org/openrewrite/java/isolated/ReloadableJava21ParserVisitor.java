@@ -783,8 +783,17 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 convert(node.getType()),
                 node.getPattern() instanceof JCBindingPattern b ?
                         new J.Identifier(randomId(), sourceBefore(b.getVariable().getName().toString()), Markers.EMPTY, emptyList(), b.getVariable().getName().toString(),
-                                type, typeMapping.variableType(b.var.sym)) : null,
+                                type, typeMapping.variableType(b.var.sym)) :
+                        new J.Identifier(randomId(), mapInstanceOfPatternAsWhitespace(node.getPattern()), Markers.EMPTY, emptyList(), "",
+                        type, null),
                 type);
+    }
+
+    private Space mapInstanceOfPatternAsWhitespace(PatternTree pattern){
+        int saveCursor = cursor;
+        int endCursor = max(endPos(pattern), cursor);
+        cursor = endCursor;
+        return Space.build(source.substring(saveCursor, endCursor), emptyList());
     }
 
     @Override
