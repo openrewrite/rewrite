@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
+import org.antlr.v4.runtime.tree.TerminalNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.hcl.HclParser;
@@ -233,6 +234,67 @@ public interface Hcl extends Tree {
             public AttributeAccess withName(HclLeftPadded<Identifier> name) {
                 return t.name == name ? t : new AttributeAccess(t.id, t.prefix, t.markers, t.attribute, name);
             }
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class LegacyIndexAttributeAccess implements Expression, Label {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        Expression base;
+
+        @With
+        @Getter
+        String index;
+
+        @Override
+        public <P> Hcl acceptHcl(HclVisitor<P> v, P p) {
+            return v.visitLegacyIndexAttribute(this, p);
+        }
+
+        @Override
+        public String toString() {
+            return "LegacyIndexAttributeAccess{" + base + "." + index + "}";
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final LegacyIndexAttributeAccess t;
         }
     }
 

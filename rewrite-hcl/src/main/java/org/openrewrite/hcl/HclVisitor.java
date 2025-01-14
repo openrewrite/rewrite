@@ -77,6 +77,22 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         return a;
     }
 
+    public Hcl visitLegacyIndexAttribute(Hcl.LegacyIndexAttributeAccess legacyIndexAttributeAccess, P p) {
+        Hcl.LegacyIndexAttributeAccess li = legacyIndexAttributeAccess;
+        li = li.withPrefix(visitSpace(li.getPrefix(), Space.Location.ATTRIBUTE_ACCESS, p));
+        li = li.withMarkers(visitMarkers(li.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(li, p);
+        if (!(temp instanceof Hcl.LegacyIndexAttributeAccess)) {
+            return temp;
+        } else {
+            li = (Hcl.LegacyIndexAttributeAccess) temp;
+        }
+        li = li.withBase((Expression) visit(li.getBase(), p));
+        li = li.withIndex(li.getIndex());
+        return li;
+    }
+
+
     public Hcl visitBinary(Hcl.Binary binary, P p) {
         Hcl.Binary b = binary;
         b = b.withPrefix(visitSpace(b.getPrefix(), Space.Location.BINARY, p));

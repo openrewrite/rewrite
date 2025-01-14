@@ -289,6 +289,16 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public Hcl visitLegacyIndexAttribute(Hcl.LegacyIndexAttributeAccess laccess, PrintOutputCapture<P> p) {
+        beforeSyntax(laccess, Space.Location.ATTRIBUTE_ACCESS, p);
+        visit(laccess.getBase(), p);
+        p.append(".");
+        p.append(laccess.getIndex());
+        afterSyntax(laccess, p);
+        return laccess;
+    }
+
+    @Override
     public Hcl visitLiteral(Hcl.Literal literal, PrintOutputCapture<P> p) {
         beforeSyntax(literal, Space.Location.LITERAL, p);
         p.append(literal.getValueSource());
