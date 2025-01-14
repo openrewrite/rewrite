@@ -410,6 +410,17 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
     }
 
     @Override
+    public Hcl visitLegacyIndexAttributeExpression(HCLParser.LegacyIndexAttributeExpressionContext ctx) {
+        return convert(ctx, (c, prefix) -> new Hcl.LegacyIndexAttributeAccess(
+                randomId(),
+                Space.format(prefix),
+                Markers.EMPTY,
+                (Expression) visit(c.exprTerm()),
+                c.legacyIndexAttr().NumericLiteral().getText()
+        ));
+    }
+
+    @Override
     public Hcl visitLiteralValue(HCLParser.LiteralValueContext ctx) {
         return convert(ctx, (c, prefix) -> {
             Object value;
