@@ -343,19 +343,23 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
     public J visitCase(CaseTree node, Space fmt) {
         J.Case.Type type = node.getCaseKind() == CaseTree.CaseKind.RULE ? J.Case.Type.Rule : J.Case.Type.Statement;
 
+        JContainer<J> caselabels = JContainer.build(
+                node.getLabels().isEmpty() ? EMPTY : sourceBefore("case"),
+                node.getLabels().isEmpty() || node.getLabels().getFirst() instanceof DefaultCaseLabelTree ?
+                        List.of(JRightPadded.build(new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), skip("default"), null, null))) :
+                        convertAll(node.getLabels(), commaDelim, t -> EMPTY),
+                Markers.EMPTY
+        );
+        JContainer<Expression> expressions = JContainer.build(caselabels.getBefore(), caselabels.getElements().stream().filter(Expression.class::isInstance).map(Expression.class::cast).map(JRightPadded::build).toList(), caselabels.getMarkers());
+
         return new J.Case(
                 randomId(),
                 fmt,
                 Markers.EMPTY,
                 type,
                 null,
-                JContainer.build(
-                        node.getLabels().isEmpty() ? EMPTY : sourceBefore("case"),
-                        node.getLabels().isEmpty() || node.getLabels().stream().allMatch(clt -> clt instanceof DefaultCaseLabelTree) ?
-                                List.of(JRightPadded.build(new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), skip("default"), null, null))) :
-                                convertAll(node.getLabels(), commaDelim, t -> EMPTY),
-                        Markers.EMPTY
-                ),
+                expressions,
+                caselabels,
                 convert(node.getGuard()),
                 JContainer.build(
                         sourceBefore(type == J.Case.Type.Rule ? "->" : ":"),

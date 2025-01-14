@@ -1037,6 +1037,17 @@ public interface J extends Tree {
             return getPadding().withExpressions(requireNonNull(JContainer.withElementsNullable(this.expressions, expressions)));
         }
 
+        @Nullable
+        JContainer<J> caseLabels;
+
+        public List<J> getCaseLabels() {
+            return caseLabels != null ? caseLabels.getElements() : emptyList();
+        }
+
+        public Case withCaseLabels(List<J> caseLabels) {
+            return getPadding().withCaseLabels(requireNonNull(JContainer.withElementsNullable(this.caseLabels, caseLabels)));
+        }
+
         /**
          * For case with kind {@link Type#Statement}, returns the statements labeled by the case.
          * This container will be empty for case with kind {@link Type#Rule}, but possess the prefix
@@ -1073,7 +1084,7 @@ public interface J extends Tree {
         Expression guard;
 
         @JsonCreator
-        public Case(UUID id, Space prefix, Markers markers, Type type, @Deprecated @Nullable Expression pattern, JContainer<Expression> expressions, @Nullable Expression guard, JContainer<Statement> statements, @Nullable JRightPadded<J> body) {
+        public Case(UUID id, Space prefix, Markers markers, Type type, @Deprecated @Nullable Expression pattern, JContainer<Expression> expressions, @Nullable JContainer<J> caseLabels, @Nullable Expression guard, JContainer<Statement> statements, @Nullable JRightPadded<J> body) {
             this.id = id;
             this.prefix = prefix;
             this.markers = markers;
@@ -1083,6 +1094,7 @@ public interface J extends Tree {
             } else {
                 this.expressions = expressions;
             }
+            this.caseLabels = caseLabels;
             this.guard = guard;
             this.statements = statements;
             this.body = body;
@@ -1133,7 +1145,7 @@ public interface J extends Tree {
             }
 
             public Case withBody(@Nullable JRightPadded<J> body) {
-                return t.body == body ? t : new Case(t.id, t.prefix, t.markers, t.type, null, t.expressions, t.guard, t.statements, body);
+                return t.body == body ? t : new Case(t.id, t.prefix, t.markers, t.type, null, t.expressions, t.caseLabels, t.guard, t.statements, body);
             }
 
             public JContainer<Statement> getStatements() {
@@ -1141,7 +1153,7 @@ public interface J extends Tree {
             }
 
             public Case withStatements(JContainer<Statement> statements) {
-                return t.statements == statements ? t : new Case(t.id, t.prefix, t.markers, t.type, null, t.expressions, t.guard, statements, t.body);
+                return t.statements == statements ? t : new Case(t.id, t.prefix, t.markers, t.type, null, t.expressions, t.caseLabels, t.guard, statements, t.body);
             }
 
             public JContainer<Expression> getExpressions() {
@@ -1149,7 +1161,15 @@ public interface J extends Tree {
             }
 
             public Case withExpressions(JContainer<Expression> expressions) {
-                return t.expressions == expressions ? t : new Case(t.id, t.prefix, t.markers, t.type, null, expressions, t.guard, t.statements, t.body);
+                return t.expressions == expressions ? t : new Case(t.id, t.prefix, t.markers, t.type, null, expressions, t.caseLabels, t.guard, t.statements, t.body);
+            }
+
+            public JContainer<J> getCaseLabels() {
+                return t.caseLabels;
+            }
+
+            public Case withCaseLabels(JContainer<J> caseLabels) {
+                return t.caseLabels == caseLabels ? t : new Case(t.id, t.prefix, t.markers, t.type, null, t.expressions, caseLabels, t.guard, t.statements, t.body);
             }
         }
     }
@@ -5757,7 +5777,7 @@ public interface J extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class VariableDeclarations implements J, Statement, Expression, TypedTree {
+    final class VariableDeclarations implements J, Statement, TypedTree {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
