@@ -290,7 +290,7 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
 
     @Override
     public Hcl visitLegacyIndexAttribute(Hcl.LegacyIndexAttributeAccess laccess, PrintOutputCapture<P> p) {
-        beforeSyntax(laccess, Space.Location.ATTRIBUTE_ACCESS, p);
+        beforeSyntax(laccess, Space.Location.LEGACY_INDEX_ATTRIBUTE_ACCESS, p);
         visit(laccess.getBase(), p);
         p.append(".");
         p.append(laccess.getIndex());

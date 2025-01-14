@@ -328,6 +328,7 @@ public class Space {
         INDEX_POSITION,
         INDEX_POSITION_SUFFIX,
         IDENTIFIER,
+        LEGACY_INDEX_ATTRIBUTE_ACCESS,
         LITERAL,
         OBJECT_VALUE,
         OBJECT_VALUE_ATTRIBUTES,
