@@ -785,10 +785,22 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         return new J.InstanceOf(randomId(), fmt, Markers.EMPTY,
                 convert(node.getExpression(), t -> sourceBefore("instanceof")),
                 convert(node.getType()),
-                node.getPattern() instanceof JCBindingPattern b ?
-                        new J.Identifier(randomId(), sourceBefore(b.getVariable().getName().toString()), Markers.EMPTY, emptyList(), b.getVariable().getName().toString(),
-                                type, typeMapping.variableType(b.var.sym)) : null,
+                getNodePattern(node.getPattern(), type),
                 type);
+    }
+
+    private @Nullable J getNodePattern(PatternTree pattern, JavaType type){
+        if (pattern instanceof  JCBindingPattern b) {
+            return new J.Identifier(randomId(), sourceBefore(b.getVariable().getName().toString()), Markers.EMPTY, emptyList(), b.getVariable().getName().toString(),
+                    type, typeMapping.variableType(b.var.sym));
+        } else if (pattern instanceof JCRecordPattern r) {
+            int saveCursor = cursor;
+            int endCursor = max(endPos(r), cursor);
+            cursor = endCursor;
+            return new J.Unknown(randomId(), whitespace(), Markers.EMPTY, new J.Unknown.Source(randomId(), whitespace(), Markers.EMPTY, source.substring(saveCursor, endCursor)));
+        } else {
+            return null;
+        }
     }
 
     @Override
