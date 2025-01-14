@@ -184,7 +184,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                     if (newAttributeListValue != null && newAttributeListValue.equals(((J.Literal) jLiteralList.get(i)).getValueSource()) || Boolean.TRUE.equals(addOnly)) {
                                         continue;
                                     }
-                                    if (oldAttributeValue != null && !oldAttributeValue.equals(newAttributeListValue)) {
+                                    if (oldAttributeValue != null && !oldAttributeValue.equals(attributeList.get(i))) {
                                         continue;
                                     }
 
@@ -261,28 +261,86 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                         .apply(getCursor(), finalA.getCoordinates().replaceArguments(), it))
                                         .getArguments().get(0);
                             }
+                        } else if (it instanceof J.NewArray) {
+                            if (it.getMarkers().findFirst(AlreadyAppended.class).filter(ap -> ap.getValues().equals(newAttributeValue)).isPresent()) {
+                                return it;
+                            }
+
+                            J.NewArray arrayValue = (J.NewArray) it;
+                            List<Expression> jLiteralList = arrayValue.getInitializer();
+                            String attributeValueCleanedUp = attributeValue.replaceAll("\\s+", "").replaceAll("[\\s+{}\"]", "");
+                            List<String> attributeList = Arrays.asList(attributeValueCleanedUp.contains(",") ? attributeValueCleanedUp.split(",") : new String[]{attributeValueCleanedUp});
+
+                            if (Boolean.TRUE.equals(appendArray)) {
+                                boolean changed = false;
+                                for (String attrListValues : attributeList) {
+                                    String newAttributeListValue = maybeQuoteStringArgument(attributeName, attrListValues, finalA);
+                                    if (Boolean.FALSE.equals(addOnly) && attributeValIsAlreadyPresent(jLiteralList, newAttributeListValue)) {
+                                        continue;
+                                    }
+                                    changed = true;
+                                    jLiteralList.add(new J.Literal(randomId(), Space.EMPTY, Markers.EMPTY, newAttributeListValue, newAttributeListValue, null, JavaType.Primitive.String));
+                                }
+                                if (oldAttributeValue != null) { // remove old value from array
+                                    jLiteralList = ListUtils.map(jLiteralList, val -> valueMatches(val, oldAttributeValue) ? null : val);
+                                }
+
+                                return changed ? arrayValue.withInitializer(jLiteralList)
+                                        .withMarkers(it.getMarkers().add(new AlreadyAppended(randomId(), newAttributeValue))) : it;
+                            }
+                            int m = 0;
+                            for (int i = 0; i < Objects.requireNonNull(jLiteralList).size(); i++) {
+                                if (i >= attributeList.size()) {
+                                    jLiteralList.remove(i);
+                                    i--;
+                                    continue;
+                                }
+
+                                String newAttributeListValue = maybeQuoteStringArgument(attributeName, attributeList.get(i), finalA);
+                                if (jLiteralList.size() == i + 1) {
+                                    m = i + 1;
+                                }
+
+                                if (newAttributeListValue != null && newAttributeListValue.equals(((J.Literal) jLiteralList.get(i)).getValueSource()) || Boolean.TRUE.equals(addOnly)) {
+                                    continue;
+                                }
+                                if (oldAttributeValue != null && !oldAttributeValue.equals(newAttributeListValue)) {
+                                    continue;
+                                }
+
+                                jLiteralList.set(i, ((J.Literal) jLiteralList.get(i)).withValue(newAttributeListValue).withValueSource(newAttributeListValue).withPrefix(jLiteralList.get(i).getPrefix()));
+                            }
+                            if (jLiteralList.size() < attributeList.size() || Boolean.TRUE.equals(addOnly)) {
+                                if (Boolean.TRUE.equals(addOnly)) {
+                                    m = 0;
+                                }
+                                for (int j = m; j < attributeList.size(); j++) {
+                                    String newAttributeListValue = maybeQuoteStringArgument(attributeName, attributeList.get(j), finalA);
+                                    jLiteralList.add(j, new J.Literal(randomId(), jLiteralList.get(j - 1).getPrefix(), Markers.EMPTY, newAttributeListValue, newAttributeListValue, null, JavaType.Primitive.String));
+                                }
+                            }
+
+                            return arrayValue.withInitializer(jLiteralList);
                         }
                         return it;
                     });
+
                     if (newArgs != currentArgs) {
                         a = a.withArguments(newArgs);
                     }
-                    if (foundOrSetAttributeWithDesiredValue.get()) {
-                        a = maybeAutoFormat(original, a, ctx);
-                        return a;
+                    if (!foundOrSetAttributeWithDesiredValue.get() && !attributeValIsAlreadyPresent(newArgs, newAttributeValue)) {
+                        // There was no existing value to update, so add a new value into the argument list
+                        String effectiveName = (attributeName == null) ? "value" : attributeName;
+                        //noinspection ConstantConditions
+                        J.Assignment as = (J.Assignment) ((J.Annotation) JavaTemplate.builder("#{} = #{}")
+                                .contextSensitive()
+                                .build()
+                                .apply(getCursor(), a.getCoordinates().replaceArguments(), effectiveName, newAttributeValue))
+                                .getArguments().get(0);
+                        a = a.withArguments(ListUtils.concat(as, a.getArguments()));
                     }
-                    // There was no existing value to update, so add a new value into the argument list
-                    String effectiveName = (attributeName == null) ? "value" : attributeName;
-                    //noinspection ConstantConditions
-                    J.Assignment as = (J.Assignment) ((J.Annotation) JavaTemplate.builder("#{} = #{}")
-                            .contextSensitive()
-                            .build()
-                            .apply(getCursor(), a.getCoordinates().replaceArguments(), effectiveName, newAttributeValue))
-                            .getArguments().get(0);
-                    a = a.withArguments(ListUtils.concat(as, a.getArguments()));
-                    a = maybeAutoFormat(original, a, ctx);
                 }
-
+                a = maybeAutoFormat(original, a, ctx);
                 return a;
             }
         });
@@ -337,6 +395,9 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 if (literal.getValueSource() != null && literal.getValueSource().equals(attributeValue)) {
                     return true;
                 }
+            }
+            if (e instanceof J.NewArray) {
+                return attributeValIsAlreadyPresent(((J.NewArray) e).getInitializer(), attributeValue);
             }
         }
         return false;

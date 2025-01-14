@@ -1028,7 +1028,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                 "hello",
                 "goodbye",
                 null,
-                null)),
+                true)),
               java(
                 """
                   package org.example;
@@ -1049,7 +1049,7 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                 """
                   import org.example.Foo;
                   
-                  @Foo({"hello", "hi"})
+                  @Foo({"hi", "hello"})
                   public class A {
                   }
                   """
