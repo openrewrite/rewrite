@@ -74,6 +74,21 @@ public class Assertions {
                             .collect(joining("\n\n")));
                 }
             }
+            if (typeValidation.unknown()) {
+                List<J.Unknown> allUnknown = new JavaIsoVisitor<List<J.Unknown>>() {
+                    @Override
+                    public J.Unknown visitUnknown(J.Unknown unknown, List<J.Unknown> list) {
+                        J.Unknown err = super.visitUnknown(unknown, list);
+                        list.add(err);
+                        return err;
+                    }
+                }.reduce(source, new ArrayList<>());
+                if (!allUnknown.isEmpty()) {
+                    throw new IllegalStateException("LST contains erroneous nodes\n" + allUnknown.stream()
+                            .map(unknown -> unknown.getSource().getText())
+                            .collect(joining("\n\n")));
+                }
+            }
         }
         return source;
     }

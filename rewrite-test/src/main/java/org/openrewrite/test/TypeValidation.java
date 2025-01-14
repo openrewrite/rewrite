@@ -104,6 +104,12 @@ public class TypeValidation {
     private boolean erroneous = true;
 
     /**
+     * Controls whether the LST is validated not to contain any `J.Unknown` elements.
+     */
+    @Builder.Default
+    private boolean unknown = true;
+
+    /**
      * Enable all invariant validation checks.
      */
     public static TypeValidation all() {
@@ -114,7 +120,7 @@ public class TypeValidation {
      * Skip all invariant validation checks.
      */
     public static TypeValidation none() {
-        return new TypeValidation(false, false, false, false, false, false, false, false, o -> false, false);
+        return new TypeValidation(false, false, false, false, false, false, false, false, o -> false, false, false);
     }
 
     static TypeValidation before(RecipeSpec testMethodSpec, RecipeSpec testClassSpec) {
