@@ -15,9 +15,11 @@
  */
 package org.openrewrite.java;
 
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
 import static org.openrewrite.java.Assertions.java;
 
@@ -964,9 +966,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                   public @interface Foo {
                       String value() default "";
                   }
-                  """
+                  """,
+                SourceSpec::skip
               ),
-
               java(
                 """
                   import org.example.Foo;
@@ -997,9 +999,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                       Values value() default "";
                   }
                   public enum Values {ONE, TWO}
-                  """
+                  """,
+                SourceSpec::skip
               ),
-
               java(
                 """
                   import org.example.Foo;
@@ -1035,9 +1037,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                   public @interface Foo {
                       String[] value() default "";
                   }
-                  """
+                  """,
+                SourceSpec::skip
               ),
-
               java(
                 """
                   import org.example.Foo;
@@ -1067,9 +1069,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                   public @interface Foo {
                       String value() default "";
                   }
-                  """
+                  """,
+                SourceSpec::skip
               ),
-
               java(
                 """
                   import org.example.Foo;
@@ -1092,9 +1094,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                   public @interface Foo {
                       Class<? extends Number> value();
                   }
-                  """
+                  """,
+                SourceSpec::skip
               ),
-
               java(
                 """
                   import org.example.Foo;
@@ -1124,9 +1126,9 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                   public @interface Foo {
                       Class<?> value();
                   }
-                  """
+                  """,
+                SourceSpec::skip
               ),
-
               java(
                 """
                   import org.example.Foo;
@@ -1142,6 +1144,15 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
 
     @Nested
     class AsValueAttribute {
+
+        @Language("java")
+        private static final String FOO_ANNOTATION_WITH_STRING_ARRAY_VALUE = """
+          package org.example;
+          public @interface Foo {
+              String[] value() default {};
+          }
+          """;
+
         @Test
         void implicitWithNullAttributeName() {
             rewriteRun(
@@ -1153,12 +1164,8 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                 false,
                 true)),
               java(
-                """
-                  package org.example;
-                  public @interface Foo {
-                      String[] value() default {};
-                  }
-                  """
+                FOO_ANNOTATION_WITH_STRING_ARRAY_VALUE,
+                SourceSpec::skip
               ),
               java(
                 """
@@ -1190,12 +1197,8 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                 false,
                 true)),
               java(
-                """
-                  package org.example;
-                  public @interface Foo {
-                      String[] value() default {};
-                  }
-                  """
+                FOO_ANNOTATION_WITH_STRING_ARRAY_VALUE,
+                SourceSpec::skip
               ),
               java(
                 """
@@ -1227,12 +1230,8 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                 false,
                 true)),
               java(
-                """
-                  package org.example;
-                  public @interface Foo {
-                      String[] value() default {};
-                  }
-                  """
+                FOO_ANNOTATION_WITH_STRING_ARRAY_VALUE,
+                SourceSpec::skip
               ),
               java(
                 """
@@ -1264,12 +1263,8 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
                 false,
                 true)),
               java(
-                """
-                  package org.example;
-                  public @interface Foo {
-                      String[] value() default {};
-                  }
-                  """
+                FOO_ANNOTATION_WITH_STRING_ARRAY_VALUE,
+                SourceSpec::skip
               ),
               java(
                 """
