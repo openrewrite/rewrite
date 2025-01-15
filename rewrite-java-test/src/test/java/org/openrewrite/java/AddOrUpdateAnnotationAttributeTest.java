@@ -16,8 +16,9 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
-import static org.openrewrite.java.Assertions.java;
 import org.openrewrite.test.RewriteTest;
+
+import static org.openrewrite.java.Assertions.java;
 
 class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
 
