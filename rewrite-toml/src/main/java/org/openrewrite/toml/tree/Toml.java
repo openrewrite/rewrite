@@ -128,7 +128,11 @@ public interface Toml extends Tree {
         String charsetName;
 
         boolean charsetBomMarked;
+
+        @Nullable
         Checksum checksum;
+
+        @Nullable
         FileAttributes fileAttributes;
 
         @Override
@@ -137,7 +141,8 @@ public interface Toml extends Tree {
         }
 
         @Override
-        public SourceFile withCharset(Charset charset) {
+        @SuppressWarnings("unchecked")
+        public Document withCharset(Charset charset) {
             return withCharsetName(charset.name());
         }
 
@@ -309,8 +314,16 @@ public interface Toml extends Tree {
         @With
         Markers markers;
 
-        @With
+        @Nullable
         TomlRightPadded<Toml.Identifier> name;
+
+        public Toml.@Nullable Identifier getName() {
+            return name != null ? name.getElement() : null;
+        }
+
+        public Table withName(Toml.@Nullable Identifier name) {
+            return getPadding().withName(TomlRightPadded.withElement(this.name, name));
+        }
 
         List<TomlRightPadded<Toml>> values;
 
@@ -352,6 +365,14 @@ public interface Toml extends Tree {
 
             public Table withValues(List<TomlRightPadded<Toml>> values) {
                 return t.values == values ? t : new Table(t.id, t.prefix, t.markers, t.name, values);
+            }
+
+            public @Nullable TomlRightPadded<Toml.Identifier> getName() {
+                return t.name;
+            }
+
+            public Table withName(@Nullable TomlRightPadded<Identifier> name) {
+                return t.name == name ? t : new Table(t.id, t.prefix, t.markers, name, t.values);
             }
         }
     }
