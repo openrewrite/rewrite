@@ -58,6 +58,13 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
     @Nullable
     String newArtifactId;
 
+    @Option(displayName = "New version",
+            description = "An exact version number or node-style semver selector used to select the version number.",
+            example = "29.X",
+            required = false)
+    @Nullable
+    String newVersion;
+
     @Override
     public String getDisplayName() {
         return "Change Maven plugin group and artifact ID";
@@ -70,7 +77,7 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Change the groupId and/or the artifactId of a specified Maven plugin.";
+        return "Change the groupId and/or the artifactId of a specified Maven plugin.  Optionally update the plugin version.";
     }
 
     @Override
@@ -86,6 +93,9 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
                     }
                     if (newArtifactId != null) {
                         t = changeChildTagValue(t, "artifactId", newArtifactId, ctx);
+                    }
+                    if (newVersion != null) {
+                        t = changeChildTagValue(t, "version", newVersion, ctx);
                     }
                     if (t != tag) {
                         maybeUpdateModel();
