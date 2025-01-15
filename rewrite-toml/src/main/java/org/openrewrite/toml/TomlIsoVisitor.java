@@ -30,6 +30,11 @@ public class TomlIsoVisitor<P> extends TomlVisitor<P> {
     }
 
     @Override
+    public Toml.Empty visitEmpty(Toml.Empty empty, P p) {
+        return (Toml.Empty) super.visitEmpty(empty, p);
+    }
+
+    @Override
     public Toml.Identifier visitIdentifier(Toml.Identifier identifier, P p) {
         return (Toml.Identifier) super.visitIdentifier(identifier, p);
     }
@@ -42,5 +47,10 @@ public class TomlIsoVisitor<P> extends TomlVisitor<P> {
     @Override
     public Toml.Literal visitLiteral(Toml.Literal literal, P p) {
         return (Toml.Literal) super.visitLiteral(literal, p);
+    }
+
+    @Override
+    public Toml.Table visitTable(Toml.Table table, P p) {
+        return (Toml.Table) super.visitTable(table, p);
     }
 }
