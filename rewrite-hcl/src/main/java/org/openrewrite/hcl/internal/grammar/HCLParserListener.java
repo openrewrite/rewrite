@@ -203,6 +203,18 @@ public interface HCLParserListener extends ParseTreeListener {
 	 */
 	void exitIndexAccessExpression(HCLParser.IndexAccessExpressionContext ctx);
 	/**
+	 * Enter a parse tree produced by the {@code LegacyIndexAttributeExpression}
+	 * labeled alternative in {@link HCLParser#exprTerm}.
+	 * @param ctx the parse tree
+	 */
+	void enterLegacyIndexAttributeExpression(HCLParser.LegacyIndexAttributeExpressionContext ctx);
+	/**
+	 * Exit a parse tree produced by the {@code LegacyIndexAttributeExpression}
+	 * labeled alternative in {@link HCLParser#exprTerm}.
+	 * @param ctx the parse tree
+	 */
+	void exitLegacyIndexAttributeExpression(HCLParser.LegacyIndexAttributeExpressionContext ctx);
+	/**
 	 * Enter a parse tree produced by the {@code ForExpression}
 	 * labeled alternative in {@link HCLParser#exprTerm}.
 	 * @param ctx the parse tree
@@ -398,6 +410,16 @@ public interface HCLParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitGetAttr(HCLParser.GetAttrContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link HCLParser#legacyIndexAttr}.
+	 * @param ctx the parse tree
+	 */
+	void enterLegacyIndexAttr(HCLParser.LegacyIndexAttrContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link HCLParser#legacyIndexAttr}.
+	 * @param ctx the parse tree
+	 */
+	void exitLegacyIndexAttr(HCLParser.LegacyIndexAttrContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link HCLParser#splat}.
 	 * @param ctx the parse tree
