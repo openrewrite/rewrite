@@ -19,12 +19,12 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.gradle.util.Dependency;
 import org.openrewrite.gradle.util.DependencyStringNotationConverter;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -51,12 +51,14 @@ public class DependencyUseMapNotation extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
         return Preconditions.check(new IsBuildGradle<>(), new GroovyVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                if (!dependencyDsl.matches(m)) {
+
+                GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
+
+                if (!gradleDependencyMatcher.get(getCursor()).isPresent()) {
                     return m;
                 }
                 m = forBasicString(m);
@@ -119,8 +121,8 @@ public class DependencyUseMapNotation extends Recipe {
                 // Supporting all possible GString interpolations is impossible
                 // Supporting all probable GString interpolations is difficult
                 // This focuses on the most common case: When only the version number is interpolated
-                if (g.getStrings().size() != 2 || !(g.getStrings().get(0) instanceof J.Literal)
-                        || !(g.getStrings().get(1) instanceof G.GString.Value)) {
+                if (g.getStrings().size() != 2 || !(g.getStrings().get(0) instanceof J.Literal) ||
+                        !(g.getStrings().get(1) instanceof G.GString.Value)) {
                     return m;
                 }
                 J.Literal arg1 = (J.Literal)g.getStrings().get(0);

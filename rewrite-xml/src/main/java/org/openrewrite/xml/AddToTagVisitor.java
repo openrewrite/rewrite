@@ -15,9 +15,9 @@
  */
 package org.openrewrite.xml;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
@@ -111,7 +111,7 @@ public class AddToTagVisitor<P> extends XmlVisitor<P> {
      */
     public static Xml.Tag addToTag(Xml.Tag parentScope, Xml.Tag parent, Xml.Tag newChild, Cursor parentCursor) {
         //noinspection ConstantConditions
-        return (Xml.Tag) new AddToTagVisitor<Void>(parent, newChild)
-                .visitNonNull(parentScope, null, parentCursor);
+        return (Xml.Tag) new AddToTagVisitor<Integer>(parent, newChild)
+                .visitNonNull(parentScope, 0, parentCursor);
     }
 }

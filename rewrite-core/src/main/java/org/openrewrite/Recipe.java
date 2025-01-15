@@ -23,6 +23,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.config.DataTableDescriptor;
 import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
@@ -30,7 +31,6 @@ import org.openrewrite.config.RecipeExample;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NullUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.table.RecipeRunStats;
 import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.table.SourcesFileResults;
@@ -211,10 +211,11 @@ public abstract class Recipe implements Cloneable {
 
     protected RecipeDescriptor createRecipeDescriptor() {
         List<OptionDescriptor> options = getOptionDescriptors();
-        List<RecipeDescriptor> recipeList1 = new ArrayList<>();
+        ArrayList<RecipeDescriptor> recipeList1 = new ArrayList<>();
         for (Recipe next : getRecipeList()) {
             recipeList1.add(next.getDescriptor());
         }
+        recipeList1.trimToSize();
         URI recipeSource;
         try {
             recipeSource = getClass().getProtectionDomain().getCodeSource().getLocation().toURI();
@@ -233,7 +234,7 @@ public abstract class Recipe implements Cloneable {
             recipe = ((DelegatingRecipe) this).getDelegate();
         }
 
-        List<OptionDescriptor> options = new ArrayList<>();
+        ArrayList<OptionDescriptor> options = new ArrayList<>();
 
         for (Field field : recipe.getClass().getDeclaredFields()) {
             Object value;
@@ -255,6 +256,7 @@ public abstract class Recipe implements Cloneable {
                         value));
             }
         }
+        options.trimToSize();
         return options;
     }
 

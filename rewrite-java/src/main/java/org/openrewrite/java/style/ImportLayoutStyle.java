@@ -28,9 +28,9 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaStyle;
 import org.openrewrite.java.tree.*;
@@ -106,7 +106,7 @@ public class ImportLayoutStyle implements JavaStyle {
      * @return The import list with a new import added.
      */
     public List<JRightPadded<J.Import>> addImport(List<JRightPadded<J.Import>> originalImports,
-                                                  J.Import toAdd, @Nullable J.Package pkg,
+                                                  J.Import toAdd, J.@Nullable Package pkg,
                                                   Collection<JavaType.FullyQualified> classpath) {
         JRightPadded<J.Import> paddedToAdd = new JRightPadded<>(toAdd, Space.EMPTY, Markers.EMPTY);
 
@@ -788,11 +788,8 @@ public class ImportLayoutStyle implements JavaStyle {
         if (anImport.getElement().isStatic()) {
             return typeName;
         } else {
-            String className = anImport.getElement().getClassName();
-            if (className.contains("$")) {
-                return anImport.getElement().getPackageName() + "." +
-                        className.substring(0, className.lastIndexOf('$'))
-                                .replace('$', '.');
+            if (typeName.contains("$")) {
+                return typeName.substring(0, typeName.lastIndexOf('$')).replace('$', '.');
             }
             return anImport.getElement().getPackageName();
         }

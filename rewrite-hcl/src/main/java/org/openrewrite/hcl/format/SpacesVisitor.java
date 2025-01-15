@@ -15,12 +15,12 @@
  */
 package org.openrewrite.hcl.format;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.hcl.HclIsoVisitor;
 import org.openrewrite.hcl.style.SpacesStyle;
 import org.openrewrite.hcl.tree.Expression;
 import org.openrewrite.hcl.tree.Hcl;
-import org.openrewrite.internal.lang.Nullable;
 
 public class SpacesVisitor<P> extends HclIsoVisitor<P> {
     @Nullable

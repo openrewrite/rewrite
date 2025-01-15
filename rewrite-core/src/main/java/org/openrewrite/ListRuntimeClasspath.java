@@ -19,6 +19,7 @@ import io.github.classgraph.ClassGraph;
 import io.github.classgraph.Resource;
 import io.github.classgraph.ResourceList;
 import io.github.classgraph.ScanResult;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.table.ClasspathReport;
 
 import java.net.URI;
@@ -42,7 +43,7 @@ public class ListRuntimeClasspath extends ScanningRecipe<Void> {
     }
 
     @Override
-    public Void getInitialValue(ExecutionContext ctx) {
+    public @Nullable Void getInitialValue(ExecutionContext ctx) {
         return null;
     }
 

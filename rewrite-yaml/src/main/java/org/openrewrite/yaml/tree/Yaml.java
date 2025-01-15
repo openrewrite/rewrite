@@ -17,16 +17,19 @@ package org.openrewrite.yaml.tree;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.NonFinal;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.YamlVisitor;
 import org.openrewrite.yaml.internal.YamlPrinter;
 
+import java.lang.ref.SoftReference;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 import static java.util.stream.Collectors.toList;
@@ -60,8 +63,10 @@ public interface Yaml extends Tree {
 
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     @With
-    class Documents implements Yaml, SourceFile {
+    class Documents implements Yaml, SourceFileWithReferences {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -90,7 +95,7 @@ public interface Yaml extends Tree {
             return withCharsetName(charset.name());
         }
 
-        List<? extends Document> documents;
+        List<Document> documents;
 
         @Override
         public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
@@ -125,6 +130,16 @@ public interface Yaml extends Tree {
         public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
             return new YamlPrinter<>();
         }
+
+        @Nullable
+        @NonFinal
+        transient SoftReference<References> references;
+
+        @Override
+        public References getReferences() {
+            this.references = build(this.references);
+            return Objects.requireNonNull(this.references.get());
+        }
     }
 
     @Value
@@ -153,7 +168,7 @@ public interface Yaml extends Tree {
                     Markers.EMPTY,
                     explicit,
                     block.copyPaste(),
-                    end == null ? null : end.copyPaste()
+                    end.copyPaste()
             );
         }
 
@@ -188,6 +203,17 @@ public interface Yaml extends Tree {
                 return new End(randomId(), prefix, Markers.EMPTY, explicit);
             }
         }
+    }
+
+    interface Block extends Yaml {
+        /**
+         * @return A new deep copy of this block with different IDs.
+         */
+        @Override
+        Block copyPaste();
+
+        @Override
+        Block withPrefix(String prefix);
     }
 
     @Value
@@ -479,16 +505,5 @@ public interface Yaml extends Tree {
         public String toString() {
             return "Yaml.Anchor(" + key + ")";
         }
-    }
-
-    interface Block extends Yaml {
-        /**
-         * @return A new deep copy of this block with different IDs.
-         */
-        @Override
-        Block copyPaste();
-
-        @Override
-        Block withPrefix(String prefix);
     }
 }

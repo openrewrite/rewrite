@@ -15,12 +15,12 @@
  */
 package org.openrewrite.internal;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.config.ColumnDescriptor;
 import org.openrewrite.config.DataTableDescriptor;
 import org.openrewrite.config.RecipeIntrospectionException;
 import org.openrewrite.internal.lang.NonNull;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;

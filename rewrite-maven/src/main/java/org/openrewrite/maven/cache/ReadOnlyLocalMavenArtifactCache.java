@@ -15,7 +15,7 @@
  */
 package org.openrewrite.maven.cache;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.tree.ResolvedDependency;
 
 import java.io.InputStream;

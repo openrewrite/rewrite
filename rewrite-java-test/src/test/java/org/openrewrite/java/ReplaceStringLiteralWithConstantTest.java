@@ -15,11 +15,11 @@
  */
 package org.openrewrite.java;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;

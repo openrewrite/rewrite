@@ -17,6 +17,7 @@ package org.openrewrite.gradle;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
@@ -25,7 +26,6 @@ import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.format.BlankLinesVisitor;
 import org.openrewrite.java.search.FindMethods;
@@ -517,7 +517,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
     private static class RemoveVersionVisitor extends GroovyIsoVisitor<ExecutionContext> {
 
         @Override
-        public J.Return visitReturn(J.Return _return, ExecutionContext ctx) {
+        public  J.@Nullable Return visitReturn(J.Return _return, ExecutionContext ctx) {
             J.Return r = super.visitReturn(_return, ctx);
             if(r.getExpression() == null) {
                 //noinspection DataFlowIssue
@@ -527,7 +527,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
         }
 
         @Override
-        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+        public  J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
             if("version".equals(m.getSimpleName()) && m.getArguments().size() == 1 && m.getArguments().get(0) instanceof J.Lambda) {
                 //noinspection DataFlowIssue

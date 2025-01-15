@@ -15,7 +15,7 @@
  */
 package org.openrewrite.java.tree;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A tree with type attribution information. Unlike {@link TypeTree},

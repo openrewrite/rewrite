@@ -15,7 +15,7 @@
  */
 package org.openrewrite.gradle.util;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public class DependencyStringNotationConverter {
 

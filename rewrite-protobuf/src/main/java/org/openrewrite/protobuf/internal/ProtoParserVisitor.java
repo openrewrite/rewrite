@@ -19,8 +19,8 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.FileAttributes;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.protobuf.internal.grammar.Protobuf2Parser;
 import org.openrewrite.protobuf.internal.grammar.Protobuf2ParserBaseVisitor;
@@ -283,7 +283,7 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
         return name;
     }
 
-    private @Nullable ProtoContainer<Proto.Option> mapOptionList(@Nullable Protobuf2Parser.OptionListContext ctx) {
+    private @Nullable ProtoContainer<Proto.Option> mapOptionList(Protobuf2Parser.@Nullable OptionListContext ctx) {
         if (ctx == null) {
             return null;
         }

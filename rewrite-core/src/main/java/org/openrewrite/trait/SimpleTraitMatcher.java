@@ -15,11 +15,11 @@
  */
 package org.openrewrite.trait;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.util.Iterator;
 import java.util.Optional;

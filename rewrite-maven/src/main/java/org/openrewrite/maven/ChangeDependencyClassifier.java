@@ -17,11 +17,11 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.RemoveContentVisitor;
@@ -86,7 +86,7 @@ public class ChangeDependencyClassifier extends Recipe {
                     Optional<Xml.Tag> classifier = tag.getChild("classifier");
                     if (classifier.isPresent()) {
                         if (newClassifier == null) {
-                            doAfterVisit(new RemoveContentVisitor<>(classifier.get(), false));
+                            doAfterVisit(new RemoveContentVisitor<>(classifier.get(), false, true));
                         } else if (!newClassifier.equals(classifier.get().getValue().orElse(null))) {
                             doAfterVisit(new ChangeTagValueVisitor<>(classifier.get(), newClassifier));
                         }

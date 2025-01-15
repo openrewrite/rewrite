@@ -16,7 +16,7 @@
 package org.openrewrite.java.internal;
 
 import lombok.Value;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.xerial.snappy.Snappy;
 
 import java.io.IOException;

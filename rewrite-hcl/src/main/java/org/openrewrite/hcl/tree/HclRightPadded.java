@@ -18,7 +18,7 @@ package org.openrewrite.hcl.tree;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
@@ -50,6 +50,7 @@ public class HclRightPadded<T> {
         FOR_VARIABLE_ARGUMENT(Space.Location.FOR_VARIABLE_SUFFIX),
         FUNCTION_CALL_ARGUMENT(Space.Location.FUNCTION_CALL_ARGUMENT_SUFFIX),
         INDEX_POSITION(Space.Location.INDEX_POSITION_SUFFIX),
+        LEGACY_INDEX_ATTRIBUTE_ACCESS_BASE(Space.Location.LEGACY_INDEX_ATTRIBUTE_ACCESS_BASE),
         OBJECT_VALUE_ARGUMENT(Space.Location.OBJECT_VALUE_ATTRIBUTE_SUFFIX),
         PARENTHESES(Space.Location.PARENTHESES_SUFFIX),
         SPLAT_OPERATOR(Space.Location.SPLAT_OPERATOR_SUFFIX),

@@ -17,6 +17,7 @@ package org.openrewrite.java.search;
 
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.SearchResult;
 
 public class DeclaresType<P> extends JavaIsoVisitor<P> {
@@ -28,10 +29,9 @@ public class DeclaresType<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
-        J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, p);
-        if (cd.getType() != null && cd.getType().toString().equals(type)) {
-            return SearchResult.found(cd);
+        if (classDecl.getType() != null && TypeUtils.isOfClassType(classDecl.getType(), type)) {
+            return SearchResult.found(classDecl);
         }
-        return cd;
+        return super.visitClassDeclaration(classDecl, p);
     }
 }

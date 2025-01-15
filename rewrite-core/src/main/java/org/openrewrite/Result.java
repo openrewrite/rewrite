@@ -16,9 +16,9 @@
 package org.openrewrite;
 
 import lombok.Getter;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.InMemoryDiffEntry;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.jgit.lib.FileMode;
 import org.openrewrite.marker.RecipesThatMadeChanges;
 import org.openrewrite.marker.SearchResult;
@@ -188,12 +188,12 @@ public class Result {
         return diff(relativeTo, null);
     }
 
-    public String diff(@Nullable Path relativeTo, @Nullable PrintOutputCapture.MarkerPrinter markerPrinter) {
+    public String diff(@Nullable Path relativeTo, PrintOutputCapture.@Nullable MarkerPrinter markerPrinter) {
         return diff(relativeTo, markerPrinter, false);
     }
 
     @Incubating(since = "7.34.0")
-    public String diff(@Nullable Path relativeTo, @Nullable PrintOutputCapture.MarkerPrinter markerPrinter, @Nullable Boolean ignoreAllWhitespace) {
+    public String diff(@Nullable Path relativeTo, PrintOutputCapture.@Nullable MarkerPrinter markerPrinter, @Nullable Boolean ignoreAllWhitespace) {
         Path beforePath = before == null ? null : before.getSourcePath();
         Path afterPath = null;
         if (before == null && after == null) {

@@ -15,9 +15,9 @@
  */
 package org.openrewrite.groovy.format;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;

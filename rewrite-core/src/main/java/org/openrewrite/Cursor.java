@@ -16,7 +16,7 @@
 package org.openrewrite;
 
 import lombok.EqualsAndHashCode;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.util.*;
 import java.util.function.Function;
@@ -57,7 +57,7 @@ public class Cursor {
     /**
      * @return true if this cursor is the root of the tree, false otherwise
      */
-    final boolean isRoot() {
+    final public boolean isRoot() {
         return ROOT_VALUE.equals(value);
     }
 
@@ -187,8 +187,8 @@ public class Cursor {
                        .map(t -> t instanceof Tree ?
                                t.getClass().getSimpleName() :
                                t.toString())
-                       .collect(Collectors.joining("->"))
-               + "}";
+                       .collect(Collectors.joining("->")) +
+               "}";
     }
 
     public Cursor dropParentUntil(Predicate<Object> valuePredicate) {

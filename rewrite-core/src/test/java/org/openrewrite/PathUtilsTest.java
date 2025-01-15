@@ -15,7 +15,6 @@
  */
 package org.openrewrite;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;

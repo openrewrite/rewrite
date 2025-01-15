@@ -19,8 +19,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Value;
 import lombok.With;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 
@@ -86,6 +86,9 @@ public class Pom {
     String name;
 
     @Nullable
+    Prerequisites prerequisites;
+
+    @Nullable
     String packaging;
 
     @Builder.Default
@@ -111,6 +114,10 @@ public class Pom {
 
     @Builder.Default
     List<Plugin> pluginManagement = emptyList();
+
+    @Builder.Default
+    @Nullable
+    List<String> subprojects = emptyList();
 
     public String getGroupId() {
         return gav.getGroupId();
@@ -181,7 +188,8 @@ public class Pom {
                 repositories,
                 dependencies,
                 plugins,
-                pluginManagement)
+                pluginManagement,
+                subprojects)
                 .resolve(ctx, downloader);
     }
 

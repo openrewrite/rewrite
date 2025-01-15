@@ -16,9 +16,9 @@
 
 package org.openrewrite.yaml;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.AlreadyReplaced;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.tree.Yaml;

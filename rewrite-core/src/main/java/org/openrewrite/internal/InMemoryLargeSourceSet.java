@@ -16,8 +16,8 @@
 package org.openrewrite.internal;
 
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Generated;
 import org.openrewrite.marker.RecipesThatMadeChanges;
 

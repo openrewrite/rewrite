@@ -15,14 +15,15 @@
  */
 package org.openrewrite.hcl.internal;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.hcl.HclVisitor;
 import org.openrewrite.hcl.tree.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.function.UnaryOperator;
 
@@ -90,7 +91,7 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
         beforeSyntax(attribute, Space.Location.ATTRIBUTE, p);
         visit(attribute.getName(), p);
         visitSpace(attribute.getPadding().getType().getBefore(), Space.Location.ATTRIBUTE_ASSIGNMENT, p);
-        p.append(attribute.getType().equals(Hcl.Attribute.Type.Assignment) ? "=" : ":");
+        p.append(attribute.getType() == Hcl.Attribute.Type.Assignment ? "=" : ":");
         visit(attribute.getValue(), p);
         if (attribute.getComma() != null) {
             visitSpace(attribute.getComma().getPrefix(), Space.Location.OBJECT_VALUE_ATTRIBUTE_COMMA, p);
@@ -289,6 +290,18 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public Hcl visitLegacyIndexAttribute(Hcl.LegacyIndexAttributeAccess laccess, PrintOutputCapture<P> p) {
+        beforeSyntax(laccess, Space.Location.LEGACY_INDEX_ATTRIBUTE_ACCESS, p);
+        visitRightPadded(
+                Collections.singletonList(laccess.getPadding().getBase()),
+                HclRightPadded.Location.LEGACY_INDEX_ATTRIBUTE_ACCESS_BASE, "", p);
+        p.append(".");
+        visitLiteral(laccess.getIndex(), p);
+        afterSyntax(laccess, p);
+        return laccess;
+    }
+
+    @Override
     public Hcl visitLiteral(Hcl.Literal literal, PrintOutputCapture<P> p) {
         beforeSyntax(literal, Space.Location.LITERAL, p);
         p.append(literal.getValueSource());
@@ -402,7 +415,7 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
         beforeSyntax(h.getPrefix(), h.getMarkers(), loc, p);
     }
 
-    private void beforeSyntax(Space prefix, Markers markers, @Nullable Space.Location loc, PrintOutputCapture<P> p) {
+    private void beforeSyntax(Space prefix, Markers markers, Space.@Nullable Location loc, PrintOutputCapture<P> p) {
         for (Marker marker : markers.getMarkers()) {
             p.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), HCL_MARKER_WRAPPER));
         }

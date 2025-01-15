@@ -16,11 +16,11 @@
 package org.openrewrite.java;
 
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;

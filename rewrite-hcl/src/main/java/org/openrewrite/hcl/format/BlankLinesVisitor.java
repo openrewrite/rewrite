@@ -15,13 +15,13 @@
  */
 package org.openrewrite.hcl.format;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.hcl.HclIsoVisitor;
 import org.openrewrite.hcl.tree.Hcl;
 import org.openrewrite.hcl.tree.HclRightPadded;
 import org.openrewrite.hcl.tree.Space;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 
 public class BlankLinesVisitor<P> extends HclIsoVisitor<P> {
     @Nullable

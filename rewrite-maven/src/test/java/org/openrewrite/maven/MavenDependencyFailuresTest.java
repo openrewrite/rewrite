@@ -25,6 +25,7 @@ import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 import org.openrewrite.xml.tree.Xml;
 
 import java.io.IOException;
@@ -85,7 +86,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
     void unresolvableParent() { // Dad said he was heading to the corner store for cigarettes, and hasn't been resolvable for the past 20 years :'(
         rewriteRun(
           spec -> spec
-            .recipe(new UpgradeParentVersion("*", "*", "latest.patch", null))
+            .recipe(new UpgradeParentVersion("*", "*", "latest.patch", null, null))
             .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
               .setRepositories(List.of(MavenRepository.builder().id("jenkins").uri("https://repo.jenkins-ci.org/public").knownToExist(true).build())))
             .recipeExecutionContext(new InMemoryExecutionContext())
@@ -222,7 +223,11 @@ class MavenDependencyFailuresTest implements RewriteTest {
     @Test
     void unresolvableDependency() {
         rewriteRun(
-          spec -> spec.executionContext(new InMemoryExecutionContext()),
+          spec -> spec.executionContext(new InMemoryExecutionContext())
+            .typeValidationOptions(TypeValidation.builder()
+              // Skip test framework validation that a MavenResolutionResult is present since this tests exercises error handling
+              .dependencyModel(false)
+              .build()),
           pomXml(
             """
               <project>
@@ -247,7 +252,8 @@ class MavenDependencyFailuresTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            spec -> spec.afterRecipe(after -> {
+            spec -> spec
+              .afterRecipe(after -> {
                 Optional<ParseExceptionResult> maybeParseException = after.getMarkers().findFirst(ParseExceptionResult.class);
                 assertThat(maybeParseException).hasValueSatisfying(per -> assertThat(per.getMessage()).contains("Unable to download POM: com.google.guava:guava:doesnotexist. Tried repositories"));
             })
@@ -326,17 +332,15 @@ class MavenDependencyFailuresTest implements RewriteTest {
               </project>
               """,
             spec -> spec.afterRecipe(pom ->
-              {
-                  assertThat(pom.getMarkers().findFirst(MavenResolutionResult.class))
-                    .isPresent()
-                    .get()
-                    .extracting(mrr -> mrr.getDependencies().get(Scope.Compile))
-                    .matches(deps -> deps.size() == 1)
-                    .extracting(deps -> deps.get(0))
-                    .matches(dep -> dep.getGroupId().equals("org.jvnet.staxex") &&
-                      dep.getArtifactId().equals("stax-ex") &&
-                      dep.getVersion().equals("1.0"));
-              }))
+              assertThat(pom.getMarkers().findFirst(MavenResolutionResult.class))
+                .isPresent()
+                .get()
+                .extracting(mrr -> mrr.getDependencies().get(Scope.Compile))
+                .matches(deps -> deps.size() == 1)
+                .extracting(deps -> deps.get(0))
+                .matches(dep -> dep.getGroupId().equals("org.jvnet.staxex") &&
+                  dep.getArtifactId().equals("stax-ex") &&
+                  dep.getVersion().equals("1.0"))))
         );
     }
 

@@ -16,9 +16,9 @@
 package org.openrewrite.xml.trait;
 
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.trait.Trait;
 import org.openrewrite.xml.XPathMatcher;
@@ -234,8 +234,8 @@ public class Namespaced implements Trait<Xml> {
             Namespaced namespaced = new Namespaced(cursor);
             if (uri != null || prefix != null) {
                 Map<String, String> namespaces = namespaced.getNamespaces();
-                if ((uri != null && !namespaces.containsValue(uri))
-                    || (prefix != null && !namespaces.containsKey(prefix))) {
+                if ((uri != null && !namespaces.containsValue(uri)) ||
+                    (prefix != null && !namespaces.containsKey(prefix))) {
                     return null;
                 }
             }

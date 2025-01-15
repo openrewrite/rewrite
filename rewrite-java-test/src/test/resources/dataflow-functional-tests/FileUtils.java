@@ -18,6 +18,7 @@ package org.apache.commons.io;
 
 import org.apache.commons.io.filefilter.*;
 import org.apache.commons.io.output.NullOutputStream;
+import org.jspecify.annotations.Nullable;
 
 import java.io.*;
 import java.net.URL;
@@ -515,7 +516,7 @@ public class FileUtils {
      * @return the equivalent <code>File</code> object, or <code>null</code>
      *  if the URL's protocol is not <code>file</code>
      */
-    public static File toFile(URL url) {
+    public static @Nullable File toFile(URL url) {
         if (url == null || !"file".equalsIgnoreCase(url.getProtocol())) {
             return null;
         } else {
@@ -1719,10 +1720,10 @@ public class FileUtils {
         if (directory.exists()) {
             if (!directory.isDirectory()) {
                 String message =
-                        "File "
-                        + directory
-                        + " exists and is "
-                        + "not a directory. Unable to create directory.";
+                        "File " +
+                        directory +
+                        " exists and is " +
+                        "not a directory. Unable to create directory.";
                 throw new IOException(message);
             }
         } else {
@@ -1823,8 +1824,8 @@ public class FileUtils {
             throw new IllegalArgumentException("No specified reference file");
         }
         if (!reference.exists()) {
-            throw new IllegalArgumentException("The reference file '"
-                                               + reference + "' doesn't exist");
+            throw new IllegalArgumentException("The reference file '" +
+                                               reference + "' doesn't exist");
         }
         return isFileNewer(file, reference.lastModified());
     }
@@ -1890,8 +1891,8 @@ public class FileUtils {
             throw new IllegalArgumentException("No specified reference file");
         }
         if (!reference.exists()) {
-            throw new IllegalArgumentException("The reference file '"
-                                               + reference + "' doesn't exist");
+            throw new IllegalArgumentException("The reference file '" +
+                                               reference + "' doesn't exist");
         }
         return isFileOlder(file, reference.lastModified());
     }

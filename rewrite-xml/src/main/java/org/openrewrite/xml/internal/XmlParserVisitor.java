@@ -19,8 +19,8 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.FileAttributes;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.internal.grammar.XMLParser;
 import org.openrewrite.xml.internal.grammar.XMLParserBaseVisitor;
@@ -359,6 +359,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     prefix,
                     Markers.EMPTY,
                     name,
+                    ctx.DOCTYPE().getText(),
                     externalId,
                     internalSubset == null ? emptyList() : internalSubset,
                     externalSubsets,

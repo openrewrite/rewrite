@@ -22,7 +22,6 @@ import org.openrewrite.maven.marker.AlreadyIncremented;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.xml.ChangeTagValue;
-import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
@@ -81,7 +80,6 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, S
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Map<GroupArtifact, String> acc) {
-        final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
         final Pattern SEMVER_PATTERN = Pattern.compile("(\\d+)\\.(\\d+)\\.(\\d+)\\.?(\\d+)?(-.+)?$");
 
         return new MavenIsoVisitor<ExecutionContext>() {
@@ -89,7 +87,7 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, S
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
 
-                if (!PROJECT_MATCHER.matches(getCursor())) {
+                if (!isProjectTag()) {
                     return t;
                 }
                 ResolvedPom resolvedPom = getResolutionResult().getPom();
@@ -158,25 +156,24 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, S
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Map<GroupArtifact, String> acc) {
         return new MavenIsoVisitor<ExecutionContext>() {
-            final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent");
-            final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
-
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
 
-                if ((!(PROJECT_MATCHER.matches(getCursor()) || PARENT_MATCHER.matches(getCursor())))
-                    || t.getMarkers().findFirst(AlreadyIncremented.class).isPresent()) {
+                if (!(isProjectTag() || isParentTag()) ||
+                    t.getMarkers().findFirst(AlreadyIncremented.class).isPresent()) {
                     return t;
                 }
                 String newVersion = acc.get(new GroupArtifact(
-                        t.getChildValue("groupId").orElse(null), t.getChildValue("artifactId").orElse(null)));
-                if (newVersion == null || newVersion.equals(t.getChildValue("version").orElse(null))) {
+                        t.getChildValue("groupId").orElse(null),
+                        t.getChildValue("artifactId").orElse(null)));
+                String oldVersion = t.getChildValue("version").orElse(null);
+                if (newVersion == null || newVersion.equals(oldVersion)) {
                     return t;
                 }
                 t = t.withMarkers(t.getMarkers().add(new AlreadyIncremented(randomId())));
-                return (Xml.Tag) new ChangeTagValue("version", null, newVersion).getVisitor()
-                        .visitNonNull(t, ctx);
+                return (Xml.Tag) new ChangeTagValue("version", oldVersion, newVersion, null)
+                        .getVisitor().visitNonNull(t, ctx);
             }
         };
     }

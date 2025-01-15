@@ -65,7 +65,7 @@ public class MapTagChildrenVisitor<T> extends XmlVisitor<T> {
      */
     public static Xml.Tag mapChildren(Xml.Tag parentScope, Xml.Tag parent, UnaryOperator<Content> map) {
         //noinspection ConstantConditions
-        return (Xml.Tag) new MapTagChildrenVisitor<Void>(parent, map).visitNonNull(parentScope, null);
+        return (Xml.Tag) new MapTagChildrenVisitor<Integer>(parent, map).visitNonNull(parentScope, 0);
     }
 
     public static Xml.Tag mapTagChildren(Xml.Tag parent, UnaryOperator<Xml.Tag> map) {

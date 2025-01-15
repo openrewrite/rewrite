@@ -17,9 +17,10 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.java.tree.*;
 
 import java.util.ArrayList;
@@ -107,7 +108,7 @@ public class RemoveAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
     }
 
     @Override
-    public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+    public  J.@Nullable Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
         if (annotationMatcher.matches(annotation)) {
             getCursor().getParentOrThrow().putMessage("annotationRemoved", annotation);
             maybeRemoveImport(TypeUtils.asFullyQualified(annotation.getType()));
@@ -141,7 +142,7 @@ public class RemoveAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
      *
      * @param annotation the annotation to check
      */
-    private void maybeRemoveAnnotationParameterImports(@NonNull J.Annotation annotation) {
+    private void maybeRemoveAnnotationParameterImports(J.@NonNull Annotation annotation) {
         if (ListUtils.nullIfEmpty(annotation.getArguments()) == null) {
             return;
         }
@@ -174,14 +175,14 @@ public class RemoveAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
         }
     }
 
-    private void maybeRemoveAnnotationFromArray(@NonNull J.NewArray newArray) {
+    private void maybeRemoveAnnotationFromArray(J.@NonNull NewArray newArray) {
         List<Expression> initializer = newArray.getInitializer();
         if (ListUtils.nullIfEmpty(initializer) != null) {
             initializer.forEach(this::maybeRemoveImportFromExpression);
         }
     }
 
-    private void maybeRemoveAnnotationFromFieldAccess(@NonNull J.FieldAccess fa) {
+    private void maybeRemoveAnnotationFromFieldAccess(J.@NonNull FieldAccess fa) {
         JavaType.Variable fieldType = fa.getName().getFieldType();
         if (fieldType != null && fieldType.getOwner() != null) {
             maybeRemoveImport(TypeUtils.asFullyQualified(fieldType.getOwner()));

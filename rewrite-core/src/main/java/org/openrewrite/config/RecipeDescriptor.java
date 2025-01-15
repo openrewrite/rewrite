@@ -18,10 +18,10 @@ package org.openrewrite.config;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Contributor;
 import org.openrewrite.Maintainer;
 import org.openrewrite.NlsRewrite;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.net.URI;
 import java.time.Duration;

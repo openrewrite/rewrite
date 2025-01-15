@@ -170,11 +170,12 @@ class GradleParserTest implements RewriteTest {
         rewriteRun(
           buildGradle(
             """
-              import org.gradle.api.Project
-              
               plugins {
                   id 'java-library'
               }
+              
+              // Deliberately not first, as per test
+              import org.gradle.api.Project
               
               repositories {
                   mavenCentral()

@@ -15,9 +15,9 @@
  */
 package org.openrewrite.java;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.*;
@@ -57,7 +57,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
      *
      * @param clazz The class that will be imported into the compilation unit.
      */
-    public void maybeAddImport(@Nullable JavaType.FullyQualified clazz) {
+    public void maybeAddImport(JavaType.@Nullable FullyQualified clazz) {
         if (clazz != null) {
             maybeAddImport(clazz.getFullyQualifiedName());
         }
@@ -155,7 +155,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         throw new IllegalArgumentException("No JavaSourceFile parent found");
     }
 
-    public void maybeRemoveImport(@Nullable JavaType.FullyQualified clazz) {
+    public void maybeRemoveImport(JavaType.@Nullable FullyQualified clazz) {
         if (clazz != null) {
             maybeRemoveImport(clazz.getFullyQualifiedName());
         }
@@ -449,8 +449,6 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             c = (J.ClassDeclaration) temp;
         }
         c = c.withLeadingAnnotations(ListUtils.map(c.getLeadingAnnotations(), a -> visitAndCast(a, p)));
-        c = c.withModifiers(ListUtils.map(c.getModifiers(),
-                mod -> mod.withPrefix(visitSpace(mod.getPrefix(), Space.Location.MODIFIER_PREFIX, p))));
         c = c.withModifiers(ListUtils.map(c.getModifiers(), m -> visitAndCast(m, p)));
         //Kind can have annotations associated with it, need to visit those.
         c = c.getPadding().withKind(
@@ -846,8 +844,6 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         m = m.withLeadingAnnotations(ListUtils.map(m.getLeadingAnnotations(), a -> visitAndCast(a, p)));
         m = m.withModifiers(ListUtils.map(m.getModifiers(), e -> visitAndCast(e, p)));
-        m = m.withModifiers(ListUtils.map(m.getModifiers(),
-                mod -> mod.withPrefix(visitSpace(mod.getPrefix(), Space.Location.MODIFIER_PREFIX, p))));
         J.TypeParameters typeParameters = m.getAnnotations().getTypeParameters();
         if (typeParameters != null) {
             m = m.getAnnotations().withTypeParameters(typeParameters.withAnnotations(
@@ -920,6 +916,14 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return m;
     }
 
+    public J visitModifier(J.Modifier modifer, P p) {
+        J.Modifier m = modifer;
+        m = m.withPrefix(visitSpace(m.getPrefix(), Space.Location.MODIFIER_PREFIX, p));
+        m = m.withMarkers(visitMarkers(m.getMarkers(), p));
+        m = m.withAnnotations(ListUtils.map(m.getAnnotations(), a -> visitAndCast(a, p)));
+        return m;
+    }
+
     public J visitMultiCatch(J.MultiCatch multiCatch, P p) {
         J.MultiCatch m = multiCatch;
         m = m.withPrefix(visitSpace(m.getPrefix(), Space.Location.MULTI_CATCH_PREFIX, p));
@@ -941,8 +945,6 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         m = m.withLeadingAnnotations(ListUtils.map(m.getLeadingAnnotations(), a -> visitAndCast(a, p)));
         m = m.withModifiers(Objects.requireNonNull(ListUtils.map(m.getModifiers(), e -> visitAndCast(e, p))));
-        m = m.withModifiers(ListUtils.map(m.getModifiers(),
-                mod -> mod.withPrefix(visitSpace(mod.getPrefix(), Space.Location.MODIFIER_PREFIX, p))));
         m = m.withTypeExpression(visitAndCast(m.getTypeExpression(), p));
         m = m.withTypeExpression(m.getTypeExpression() == null ?
                 null :
@@ -1351,7 +1353,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return y;
     }
 
-    public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, P p) {
+    public <T> @Nullable JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, P p) {
         if (right == null) {
             //noinspection ConstantConditions
             return null;
@@ -1377,7 +1379,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
                 right : new JRightPadded<>(t, after, markers);
     }
 
-    public <T> JLeftPadded<T> visitLeftPadded(@Nullable JLeftPadded<T> left, JLeftPadded.Location loc, P p) {
+    public <T> @Nullable JLeftPadded<T> visitLeftPadded(@Nullable JLeftPadded<T> left, JLeftPadded.Location loc, P p) {
         if (left == null) {
             //noinspection ConstantConditions
             return null;
@@ -1403,7 +1405,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return t == null ? null : new JLeftPadded<>(before, t, left.getMarkers());
     }
 
-    public <J2 extends J> JContainer<J2> visitContainer(@Nullable JContainer<J2> container,
+    public <J2 extends J> @Nullable JContainer<J2> visitContainer(@Nullable JContainer<J2> container,
                                                         JContainer.Location loc, P p) {
         if (container == null) {
             //noinspection ConstantConditions
@@ -1419,6 +1421,13 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return js == container.getPadding().getElements() && before == container.getBefore() ?
                 container :
                 JContainer.build(before, js, container.getMarkers());
+    }
+
+    public J visitErroneous(J.Erroneous erroneous, P p) {
+        J.Erroneous u = erroneous;
+        u = u.withPrefix(visitSpace(u.getPrefix(), Space.Location.ERRONEOUS, p));
+        u = u.withMarkers(visitMarkers(u.getMarkers(), p));
+        return u;
     }
 
     /**
@@ -1454,7 +1463,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             Object childScope = it.next();
             if (childScope instanceof J.ClassDeclaration) {
                 J.ClassDeclaration childClass = (J.ClassDeclaration) childScope;
-                if (!(childClass.getKind().equals(J.ClassDeclaration.Kind.Type.Class)) ||
+                if (childClass.getKind() != J.ClassDeclaration.Kind.Type.Class ||
                     childClass.hasModifier(J.Modifier.Type.Static)) {
                     //Short circuit the search if a terminating element is encountered.
                     return false;

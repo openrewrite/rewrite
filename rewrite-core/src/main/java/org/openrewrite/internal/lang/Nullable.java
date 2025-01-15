@@ -15,9 +15,9 @@
  */
 package org.openrewrite.internal.lang;
 
-import javax.annotation.Nonnull;
+import org.jspecify.annotations.NullMarked;
+
 import javax.annotation.meta.TypeQualifierNickname;
-import javax.annotation.meta.When;
 import java.lang.annotation.*;
 
 /**
@@ -29,14 +29,16 @@ import java.lang.annotation.*;
  * <p>Can be used in association with {@code NonNullApi} or {@code @NonNullFields} to
  * override the default non-nullable semantic to nullable.
  *
- * @see NonNullApi
+ * @see NullMarked
  * @see NonNullFields
  * @see NonNull
+ * @deprecated Use {@link org.jspecify.annotations.Nullable} instead.
  */
 @Target({ElementType.METHOD, ElementType.PARAMETER, ElementType.FIELD, ElementType.TYPE_USE})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
-@Nonnull(when = When.MAYBE)
+@org.jspecify.annotations.Nullable
 @TypeQualifierNickname
+@Deprecated
 public @interface Nullable {
 }

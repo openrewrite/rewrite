@@ -25,6 +25,7 @@ import org.openrewrite.yaml.style.YamlDefaultStyles;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.yaml.Assertions.yaml;
 
+@SuppressWarnings("KubernetesUnknownResourcesInspection")
 class IndentsTest implements RewriteTest {
 
     @Override
@@ -112,6 +113,83 @@ class IndentsTest implements RewriteTest {
                       name: Run tests
                       command: npm run test:ci
             """
+          )
+        );
+    }
+
+    @Test
+    void indentSequenceComments() {
+        rewriteRun(
+          yaml("""
+              key:
+              # a under-indented
+                  # a over-indented
+                - a :
+                # b under-indented
+                      # b over-indented
+                     - b
+              """,
+            """
+              key:
+                # a under-indented
+                # a over-indented
+                - a :
+                    # b under-indented
+                    # b over-indented
+                    - b
+              """
+          )
+        );
+    }
+
+    @Test
+    void indentMappingComments() {
+        rewriteRun(
+          yaml("""
+              key: # no change
+              # under-indented
+                  # over-indented
+                a : # no change
+              
+              
+                # under-indented
+                    # over-indented
+                  b : c
+              """,
+            """
+              key: # no change
+                # under-indented
+                # over-indented
+                a : # no change
+              
+              
+                  # under-indented
+                  # over-indented
+                  b : c
+              """
+          )
+        );
+    }
+
+    @Test
+    void indentRootComments() {
+        rewriteRun(
+          yaml("""
+                # over-indented 1
+              ---
+                # over-indented 2
+              key: value # no change
+                # over-indented 2
+              key2: value2
+              """,
+            """
+              # over-indented 1
+              ---
+              # over-indented 2
+              key: value # no change
+              # over-indented 2
+              key2: value2
+              """
           )
         );
     }

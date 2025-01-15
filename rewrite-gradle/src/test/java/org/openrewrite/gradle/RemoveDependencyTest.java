@@ -455,4 +455,95 @@ class RemoveDependencyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void removeDependencyDefinedInJvmTestSuite() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+                  id 'jvm-test-suite'
+              }
+                  
+              repositories {
+                  mavenCentral()
+              }
+                  
+              testing {
+                  suites {
+                      test {
+                          dependencies {
+                              implementation "org.springframework.boot:spring-boot-starter-web:2.7.0"
+                              implementation "org.junit.vintage:junit-vintage-engine:5.6.2"
+                          }
+                      }
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+                  id 'jvm-test-suite'
+              }
+                  
+              repositories {
+                  mavenCentral()
+              }
+                  
+              testing {
+                  suites {
+                      test {
+                          dependencies {
+                              implementation "org.junit.vintage:junit-vintage-engine:5.6.2"
+                          }
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dependenciesBlockInFreestandingScript() {
+        rewriteRun(
+          buildGradle(
+            """
+              repositories {
+                  mavenLocal()
+                  mavenCentral()
+                  maven {
+                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                  }
+              }
+              dependencies {
+                  implementation("org.springframework.boot:spring-boot-starter-web:2.7.0")
+                  implementation "org.junit.vintage:junit-vintage-engine:5.6.2"
+              }
+              """,
+            """
+              repositories {
+                  mavenLocal()
+                  mavenCentral()
+                  maven {
+                     url = uri("https://oss.sonatype.org/content/repositories/snapshots")
+                  }
+              }
+              dependencies {
+                  implementation "org.junit.vintage:junit-vintage-engine:5.6.2"
+              }
+              """,
+            spec -> spec.path("dependencies.gradle")
+          ),
+          buildGradle(
+            """
+              plugins {
+                  id("java")
+              }
+              apply from: 'dependencies.gradle'
+              """
+          )
+        );
+    }
 }

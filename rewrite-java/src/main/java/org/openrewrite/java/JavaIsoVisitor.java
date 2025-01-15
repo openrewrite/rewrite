@@ -230,6 +230,11 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     }
 
     @Override
+    public J.Modifier visitModifier(J.Modifier modifier, P p) {
+        return (J.Modifier) super.visitModifier(modifier, p);
+    }
+
+    @Override
     public J.MultiCatch visitMultiCatch(J.MultiCatch multiCatch, P p) {
         return (J.MultiCatch) super.visitMultiCatch(multiCatch, p);
     }
@@ -359,4 +364,10 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     public J.Yield visitYield(J.Yield yield, P p) {
         return (J.Yield) super.visitYield(yield, p);
     }
+
+    @Override
+    public J.Erroneous visitErroneous(J.Erroneous erroneous, P p) {
+        return (J.Erroneous) super.visitErroneous(erroneous, p);
+    }
+
 }

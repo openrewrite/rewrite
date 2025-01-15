@@ -17,8 +17,8 @@ package org.openrewrite.java;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Flag;
@@ -146,7 +146,7 @@ public class UseStaticImport extends Recipe {
         return methodNameConflicts(methodName, cdCursor);
     }
 
-    private static boolean methodNameConflicts(String methodName, @Nullable JavaType.FullyQualified ct) {
+    private static boolean methodNameConflicts(String methodName, JavaType.@Nullable FullyQualified ct) {
         if(ct == null) {
             return false;
         }

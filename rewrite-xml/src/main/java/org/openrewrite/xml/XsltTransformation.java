@@ -18,9 +18,9 @@ package org.openrewrite.xml;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;

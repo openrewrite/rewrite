@@ -18,9 +18,9 @@ package org.openrewrite.java.internal.template;
 import lombok.RequiredArgsConstructor;
 import lombok.ToString;
 import org.antlr.v4.runtime.*;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.internal.grammar.TemplateParameterLexer;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser;
@@ -133,8 +133,8 @@ public class Substitutions {
             if (param != null) {
                 type = TypeParameter.toFullyQualifiedName(param);
             } else {
-                if (parameter instanceof J.NewClass && ((J.NewClass) parameter).getBody() != null
-                    && ((J.NewClass) parameter).getClazz() != null) {
+                if (parameter instanceof J.NewClass && ((J.NewClass) parameter).getBody() != null &&
+                    ((J.NewClass) parameter).getClazz() != null) {
                     // for anonymous classes get the type from the supertype
                     type = ((J.NewClass) parameter).getClazz().getType();
                 } else if (parameter instanceof TypedTree) {
@@ -146,7 +146,7 @@ public class Substitutions {
 
             String fqn = getTypeName(type);
             JavaType.Primitive primitive = JavaType.Primitive.fromKeyword(fqn);
-            s = primitive == null || primitive.equals(JavaType.Primitive.String) ?
+            s = primitive == null || primitive == JavaType.Primitive.String ?
                     newObjectParameter(fqn, index) :
                     newPrimitiveParameter(fqn, index);
 
@@ -187,7 +187,7 @@ public class Substitutions {
                 // wildcards cannot be used as type parameters on method invocations
                 return "java.lang.Object";
             }
-            return TypeUtils.toString(type);
+            return genericTypeVariable.getName();
         }
         return TypeUtils.toString(type).replace("$", ".");
     }
@@ -235,13 +235,13 @@ public class Substitutions {
     }
 
     @SuppressWarnings("SpellCheckingInspection")
-    public <J2 extends J> J2 unsubstitute(J2 j) {
+    public <J2 extends J> @Nullable J2 unsubstitute(J2 j) {
         if (parameters.length == 0) {
             return j;
         }
 
         //noinspection unchecked
-        J2 unsub = (J2) new JavaVisitor<Integer>() {
+        return (J2) new JavaVisitor<Integer>() {
             @SuppressWarnings("ConstantConditions")
             @Override
             public J visitAnnotation(J.Annotation annotation, Integer integer) {
@@ -289,11 +289,11 @@ public class Substitutions {
                 return super.visitLiteral(literal, integer);
             }
 
-            private @Nullable J maybeParameter(J j) {
-                Integer param = parameterIndex(j.getPrefix());
+            private @Nullable J maybeParameter(J j1) {
+                Integer param = parameterIndex(j1.getPrefix());
                 if (param != null) {
                     J j2 = (J) parameters[param];
-                    return j2.withPrefix(j2.getPrefix().withWhitespace(j.getPrefix().getWhitespace()));
+                    return j2.withPrefix(j2.getPrefix().withWhitespace(j1.getPrefix().getWhitespace()));
                 }
                 return null;
             }
@@ -309,10 +309,7 @@ public class Substitutions {
                 }
                 return null;
             }
-        }.visit(j, 0);
-
-        assert unsub != null;
-        return unsub;
+        }.visitNonNull(j, 0);
     }
 
     private static class ThrowingErrorListener extends BaseErrorListener {

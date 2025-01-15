@@ -19,10 +19,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Javadoc;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.SearchResult;
 
@@ -146,6 +143,18 @@ public class FindMissingTypes extends Recipe {
                     // A different object in one implies a type has changed, either in the method signature or deeper in the type tree.
                     mi = SearchResult.found(mi, "MethodInvocation#name#type is not the same instance as the MethodType of MethodInvocation.");
                 }
+                if (type != null) {
+                    int argCount = 0;
+                    for (Expression argument : mi.getArguments()) {
+                        if (!(argument instanceof J.Empty)) {
+                            argCount++;
+                        }
+                    }
+                    int minCount = type.hasFlags(Flag.Varargs) ? type.getParameterTypes().size() - 1 : type.getParameterTypes().size();
+                    if (argCount < minCount) {
+                        mi = SearchResult.found(mi, "argument count mismatch: " + argCount + " != " + type.getParameterTypes().size());
+                    }
+                }
             }
             return mi;
         }
@@ -173,7 +182,7 @@ public class FindMissingTypes extends Recipe {
 
         @Override
         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-            J.MethodDeclaration md = super.visitMethodDeclaration(method, ctx);
+            J.MethodDeclaration md = method;
             JavaType.Method type = md.getMethodType();
             if (!isWellFormedType(type, seenTypes)) {
                 md = SearchResult.found(md, "MethodDeclaration type is missing or malformed");
@@ -185,7 +194,7 @@ public class FindMissingTypes extends Recipe {
                 // A different object in one implies a type has changed, either in the method signature or deeper in the type tree.
                 md = SearchResult.found(md, "MethodDeclaration#name#type is not the same instance as the MethodType of MethodDeclaration.");
             }
-            return md;
+            return super.visitMethodDeclaration(md, ctx);
         }
 
         @Override
@@ -234,10 +243,10 @@ public class FindMissingTypes extends Recipe {
         }
 
         private boolean isAllowedToHaveNullType(J.Identifier ident) {
-            return inPackageDeclaration() || inImport() || isClassName()
-                    || isMethodName() || isMethodInvocationName() || isFieldAccess(ident) || isBeingDeclared(ident) || isParameterizedType(ident)
-                    || isNewClass(ident) || isTypeParameter() || isMemberReference(ident) || isCaseLabel() || isLabel() || isAnnotationField(ident)
-                    || isInJavaDoc(ident);
+            return inPackageDeclaration() || inImport() || isClassName() ||
+                    isMethodName() || isMethodInvocationName() || isFieldAccess(ident) || isBeingDeclared(ident) || isParameterizedType(ident) ||
+                    isNewClass(ident) || isTypeParameter() || isMemberReference(ident) || isCaseLabel() || isLabel() || isAnnotationField(ident) ||
+                    isInJavaDoc(ident);
         }
 
         private boolean inPackageDeclaration() {
@@ -265,8 +274,8 @@ public class FindMissingTypes extends Recipe {
 
         private boolean isFieldAccess(J.Identifier ident) {
             Tree value = getCursor().getParentTreeCursor().getValue();
-            return value instanceof J.FieldAccess
-                    && (ident == ((J.FieldAccess) value).getName() ||
+            return value instanceof J.FieldAccess &&
+                    (ident == ((J.FieldAccess) value).getName() ||
                         ident == ((J.FieldAccess) value).getTarget() && !((J.FieldAccess) value).getSimpleName().equals("class"));
         }
 
@@ -286,8 +295,8 @@ public class FindMissingTypes extends Recipe {
         }
 
         private boolean isTypeParameter() {
-            return getCursor().getParent() != null
-                    && getCursor().getParent().getValue() instanceof J.TypeParameter;
+            return getCursor().getParent() != null &&
+                    getCursor().getParent().getValue() instanceof J.TypeParameter;
         }
 
         private boolean isMemberReference(J.Identifier ident) {
@@ -312,8 +321,8 @@ public class FindMissingTypes extends Recipe {
 
         private boolean isAnnotationField(J.Identifier ident) {
             Cursor parent = getCursor().getParent();
-            return parent != null && parent.getValue() instanceof J.Assignment
-                    && (ident == ((J.Assignment) parent.getValue()).getVariable() && getCursor().firstEnclosing(J.Annotation.class) != null);
+            return parent != null && parent.getValue() instanceof J.Assignment &&
+                    (ident == ((J.Assignment) parent.getValue()).getVariable() && getCursor().firstEnclosing(J.Annotation.class) != null);
         }
 
     }

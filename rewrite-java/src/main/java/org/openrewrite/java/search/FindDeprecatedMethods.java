@@ -17,8 +17,8 @@ package org.openrewrite.java.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.AnnotationMatcher;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
@@ -73,9 +73,11 @@ public class FindDeprecatedMethods extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher methodMatcher = methodPattern == null || methodPattern.isEmpty() ? null : new MethodMatcher(methodPattern, true);
+
         return Preconditions.check(new JavaIsoVisitor<ExecutionContext>() {
+            @SuppressWarnings("NullableProblems")
             @Override
-            public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+            public J visit(Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
                     for (JavaType.Method method : cu.getTypesInUse().getUsedMethods()) {
@@ -114,7 +116,7 @@ public class FindDeprecatedMethods extends Recipe {
                             if (javaSourceFile != null) {
                                 deprecatedMethodCalls.insertRow(ctx, new MethodCalls.Row(
                                         javaSourceFile.getSourcePath().toString(),
-                                        method.printTrimmed(getCursor()),
+                                        method.printTrimmed(getCursor().getParentTreeCursor()),
                                         method.getMethodType().getDeclaringType().getFullyQualifiedName(),
                                         method.getSimpleName(),
                                         method.getArguments().stream()

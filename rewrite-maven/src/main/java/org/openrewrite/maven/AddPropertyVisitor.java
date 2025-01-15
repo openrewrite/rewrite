@@ -17,8 +17,8 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.TagNameComparator;
@@ -54,9 +54,9 @@ public class AddPropertyVisitor extends MavenIsoVisitor<ExecutionContext> {
 
     @Override
     public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-        if (!Boolean.TRUE.equals(preserveExistingValue)
-            && isPropertyTag() && key.equals(tag.getName())
-            && !value.equals(tag.getValue().orElse(null))) {
+        if (!Boolean.TRUE.equals(preserveExistingValue) &&
+            isPropertyTag() && key.equals(tag.getName()) &&
+            !value.equals(tag.getValue().orElse(null))) {
             doAfterVisit(new ChangeTagValueVisitor<>(tag, value));
         }
         return super.visitTag(tag, ctx);

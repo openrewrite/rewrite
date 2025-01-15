@@ -17,8 +17,8 @@ package org.openrewrite.java.trait;
 
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.AnnotationMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;

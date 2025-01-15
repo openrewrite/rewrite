@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
@@ -37,7 +36,7 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                
+              
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
@@ -55,11 +54,11 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                
+              
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-                
+              
                 <dependencies>
                   <dependency>
                     <groupId>com.google.guava</groupId>
@@ -83,11 +82,11 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                
+              
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-                
+              
                 <dependencies>
                   <dependency>
                     <groupId>com.google.guava</groupId>
@@ -114,11 +113,11 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                
+              
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-                
+              
                 <dependencies>
                   <!-- comment 1 -->
                   <dependency>
@@ -145,11 +144,11 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                
+              
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-                
+              
                 <dependencies>
                   <!-- comment 1 -->
                   <dependency>
@@ -179,11 +178,11 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                
+              
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-                
+              
                 <dependencies>
                   <dependency>
                     <groupId>com.google.guava</groupId>
@@ -212,11 +211,11 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                
+              
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-                
+              
                 <dependencies>
                   <dependency>
                     <groupId>com.google.guava</groupId>
@@ -243,11 +242,11 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                
+              
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-                
+              
                 <dependencies>
                   <dependency>
                     <groupId>com.google.inject</groupId>
@@ -264,11 +263,11 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
               """, """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                
+              
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-                
+              
                 <dependencies>
                   <dependency>
                     <groupId>com.google.inject</groupId>
@@ -289,11 +288,11 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                
+              
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-                
+              
                 <dependencies>
                   <dependency>
                     <groupId>com.google.inject</groupId>
@@ -313,7 +312,6 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
         );
     }
 
-    @Disabled("Unsure if this is a valid use case or not")
     @Test
     void keepDependencyWithType() {
         rewriteRun(
@@ -321,11 +319,11 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                
+              
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-                
+              
                 <dependencies>
                   <dependency>
                     <groupId>com.google.guava</groupId>
@@ -345,38 +343,38 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
         );
     }
 
-	@Test
-	void keepDependencyManagementWithType() {
-		rewriteRun(
-		  pomXml(
-			"""
- 			  <project>
-				<modelVersion>4.0.0</modelVersion>
-				
-				<groupId>com.mycompany.app</groupId>
-				<artifactId>my-app</artifactId>
-				<version>1</version>
-				
-				<dependencyManagement>
-				  <dependencies>
-					<dependency>
-					  <groupId>com.acme</groupId>
-					  <artifactId>example-dependency</artifactId>
-				      <version>1.0.0</version>
-					</dependency>
-					<dependency>
-				      <groupId>com.acme</groupId>
-				      <artifactId>example-dependency</artifactId>
-				      <version>1.0.0</version>
-				      <type>test-jar</type>
-					</dependency>
-				  </dependencies>
-				</dependencyManagement>
-			  </project>
-			  """
-		  )
-		);
-	}
+    @Test
+    void keepDependencyManagementWithType() {
+        rewriteRun(
+          pomXml(
+            """
+                <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              
+              <dependencyManagement>
+                <dependencies>
+              	<dependency>
+              	  <groupId>com.acme</groupId>
+              	  <artifactId>example-dependency</artifactId>
+                    <version>1.0.0</version>
+              	</dependency>
+              	<dependency>
+                    <groupId>com.acme</groupId>
+                    <artifactId>example-dependency</artifactId>
+                    <version>1.0.0</version>
+                    <type>test-jar</type>
+              	</dependency>
+                </dependencies>
+              </dependencyManagement>
+               </project>
+              """
+          )
+        );
+    }
 
     @Test
     void keepDependencyWithDifferentScope() {
@@ -385,11 +383,11 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                
+              
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-                
+              
                 <dependencies>
                   <dependency>
                     <groupId>com.google.guava</groupId>
@@ -411,17 +409,74 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
     }
 
     @Test
+    void removeDuplicatedDependencyWithImportScope() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+              
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+              
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.apache.logging.log4j</groupId>
+                              <artifactId>log4j-bom</artifactId>
+                              <version>2.24.0</version>
+                              <scope>import</scope>
+                              <type>pom</type>
+                          </dependency>
+                          <dependency>
+                              <groupId>org.apache.logging.log4j</groupId>
+                              <artifactId>log4j-bom</artifactId>
+                              <version>2.24.0</version>
+                              <scope>import</scope>
+                              <type>pom</type>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+              
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+              
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.apache.logging.log4j</groupId>
+                              <artifactId>log4j-bom</artifactId>
+                              <version>2.24.0</version>
+                              <scope>import</scope>
+                              <type>pom</type>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void removeDependencyWithDefaultType() {
         rewriteRun(
           pomXml(
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                
+              
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-                
+              
                 <dependencies>
                   <dependency>
                     <groupId>com.google.guava</groupId>
@@ -440,11 +495,11 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                
+              
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-                
+              
                 <dependencies>
                   <dependency>
                     <groupId>com.google.guava</groupId>
@@ -466,15 +521,15 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>
-                
+              
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
-                
+              
                 <properties>
                   <version.chromedriver>94.0.4606.61</version.chromedriver>
                 </properties>
-                
+              
                 <dependencyManagement>
                   <dependencies>
                     <dependency>

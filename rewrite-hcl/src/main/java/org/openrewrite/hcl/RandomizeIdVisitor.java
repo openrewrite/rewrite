@@ -15,8 +15,8 @@
  */
 package org.openrewrite.hcl;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.hcl.tree.Hcl;
-import org.openrewrite.internal.lang.Nullable;
 
 import static org.openrewrite.Tree.randomId;
 

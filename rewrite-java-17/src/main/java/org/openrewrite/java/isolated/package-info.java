@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@NonNullApi
+@NullMarked
 @NonNullFields
 package org.openrewrite.java.isolated;
 
-import org.openrewrite.internal.lang.NonNullApi;
+import org.jspecify.annotations.NullMarked;
 import org.openrewrite.internal.lang.NonNullFields;

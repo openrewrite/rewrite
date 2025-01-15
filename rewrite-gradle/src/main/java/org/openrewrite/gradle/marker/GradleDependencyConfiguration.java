@@ -18,8 +18,8 @@ package org.openrewrite.gradle.marker;
 import lombok.Value;
 import lombok.With;
 import lombok.experimental.NonFinal;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.ResolvedDependency;
 

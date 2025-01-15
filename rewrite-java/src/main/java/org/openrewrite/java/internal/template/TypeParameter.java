@@ -15,7 +15,7 @@
  */
 package org.openrewrite.java.internal.template;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser;
 import org.openrewrite.java.internal.grammar.TemplateParameterParserBaseVisitor;
 import org.openrewrite.java.tree.JavaType;
@@ -30,7 +30,7 @@ public class TypeParameter {
 
     private static final JavaType.Class TYPE_OBJECT = JavaType.ShallowClass.build("java.lang.Object");
 
-    public static JavaType toFullyQualifiedName(@Nullable TemplateParameterParser.TypeContext type) {
+    public static JavaType toFullyQualifiedName(TemplateParameterParser.@Nullable TypeContext type) {
         if (type == null) {
             return TYPE_OBJECT;
         }

@@ -19,13 +19,13 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.LoathingOfOthers;
 import org.openrewrite.internal.SelfLoathing;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.NonNull;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.JavaVisitor;
@@ -134,7 +134,7 @@ public interface J extends Tree {
         }
 
         /**
-         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(J)} instead.
+         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(Cursor)} instead.
          */
         @Deprecated
         public List<Annotation> getAllAnnotations() {
@@ -218,7 +218,7 @@ public interface J extends Tree {
         }
 
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             return annotationType.getType();
         }
 
@@ -961,8 +961,7 @@ public interface J extends Tree {
         Markers markers;
 
         @With
-        @Nullable
-        J.Identifier label;
+        J.@Nullable Identifier label;
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -1223,6 +1222,12 @@ public interface J extends Tree {
         @Nullable
         JLeftPadded<TypeTree> extendings;
 
+        /**
+         * This is used to access the parent class.
+         *
+         * @return The parent class of the ClassDeclaration. If the ClassDeclaration is a class, this will return the
+         * class specified by the 'extends' keyword. If the ClassDeclaration is an interface, this will return null.
+         */
         public @Nullable TypeTree getExtends() {
             return extendings == null ? null : extendings.getElement();
         }
@@ -1234,6 +1239,13 @@ public interface J extends Tree {
         @Nullable
         JContainer<TypeTree> implementings;
 
+        /**
+         * This is used to access the parent interfaces.
+         *
+         * @return A list of the parent interfaces of the ClassDeclaration. If the ClassDeclaration is a class, this
+         * will return the interfaces specified by the 'implements' keyword. If the ClassDeclaration is an interface,
+         * this will return the interfaces specified by the 'extends' keyword.
+         */
         public @Nullable List<TypeTree> getImplements() {
             return implementings == null ? null : implementings.getElements();
         }
@@ -1258,8 +1270,7 @@ public interface J extends Tree {
         Block body;
 
         @Getter
-        @Nullable
-        JavaType.FullyQualified type;
+        JavaType.@Nullable FullyQualified type;
 
         @SuppressWarnings("unchecked")
         @Override
@@ -1281,7 +1292,7 @@ public interface J extends Tree {
         }
 
         /**
-         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(J)} instead.
+         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(Cursor)} instead.
          */
         @Deprecated
         // gather annotations from everywhere they may occur
@@ -1634,8 +1645,7 @@ public interface J extends Tree {
         Markers markers;
 
         @With
-        @Nullable
-        J.Identifier label;
+        J.@Nullable Identifier label;
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -1763,7 +1773,7 @@ public interface J extends Tree {
         Markers markers;
 
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             return null;
         }
 
@@ -1969,21 +1979,30 @@ public interface J extends Tree {
         }
 
         public boolean isFullyQualifiedClassReference(String className) {
-            return isFullyQualifiedClassReference(this, className);
-        }
-
-        private boolean isFullyQualifiedClassReference(J.FieldAccess fieldAccess, String className) {
-            if (!className.contains(".")) {
+            if (getName().getFieldType() == null && getName().getType() instanceof JavaType.FullyQualified &&
+                !(getName().getType() instanceof JavaType.Unknown) &&
+                TypeUtils.fullyQualifiedNamesAreEqual(((JavaType.FullyQualified) getName().getType()).getFullyQualifiedName(), className)) {
+                return true;
+            } else if (!className.contains(".")) {
                 return false;
             }
-            if (!fieldAccess.getName().getSimpleName().equals(className.substring(className.lastIndexOf('.') + 1))) {
+            return isFullyQualifiedClassReference(this, TypeUtils.toFullyQualifiedName(className), className.length());
+        }
+
+        private boolean isFullyQualifiedClassReference(J.FieldAccess fieldAccess, String className, int prevDotIndex) {
+            int dotIndex = className.lastIndexOf('.', prevDotIndex - 1);
+            if (dotIndex < 0) {
+                return false;
+            }
+            String simpleName = fieldAccess.getName().getSimpleName();
+            if (!simpleName.regionMatches(0, className, dotIndex + 1, Math.max(simpleName.length(), prevDotIndex - dotIndex - 1))) {
                 return false;
             }
             if (fieldAccess.getTarget() instanceof J.FieldAccess) {
-                return isFullyQualifiedClassReference((J.FieldAccess) fieldAccess.getTarget(), className.substring(0, className.lastIndexOf('.')));
+                return isFullyQualifiedClassReference((J.FieldAccess) fieldAccess.getTarget(), className, dotIndex);
             }
             if (fieldAccess.getTarget() instanceof Identifier) {
-                return ((Identifier) fieldAccess.getTarget()).getSimpleName().equals(className.substring(0, className.lastIndexOf('.')));
+                return ((Identifier) fieldAccess.getTarget()).getSimpleName().equals(className.substring(0, dotIndex));
             }
             return false;
         }
@@ -2451,14 +2470,13 @@ public interface J extends Tree {
         @Nullable
         JavaType type;
 
-        @Nullable
-        JavaType.Variable fieldType;
+        JavaType.@Nullable Variable fieldType;
 
         /**
          * @deprecated Use {@link #Identifier(UUID, Space, Markers, List, String, JavaType, JavaType.Variable)} instead.
          */
         @Deprecated
-        public Identifier(UUID id, Space prefix, Markers markers, String simpleName, @Nullable JavaType type, @Nullable JavaType.Variable fieldType) {
+        public Identifier(UUID id, Space prefix, Markers markers, String simpleName, @Nullable JavaType type, JavaType.@Nullable Variable fieldType) {
             this.id = id;
             this.prefix = prefix;
             this.markers = markers;
@@ -2673,14 +2691,14 @@ public interface J extends Tree {
             return getPadding().withStatic(this.statik.withElement(statik));
         }
 
-        public @Nullable J.Identifier getAlias() {
+        public J.@Nullable Identifier getAlias() {
             if (alias == null) {
                 return null;
             }
             return alias.getElement();
         }
 
-        public J.Import withAlias(@Nullable J.Identifier alias) {
+        public J.Import withAlias(J.@Nullable Identifier alias) {
             if (this.alias == null) {
                 if (alias == null) {
                     return this;
@@ -3364,7 +3382,7 @@ public interface J extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class MemberReference implements J, Expression, TypedTree, MethodCall {
+    final class MemberReference implements J, TypedTree, MethodCall {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -3443,17 +3461,15 @@ public interface J extends Tree {
          * In the case of a method reference, this is the method type pointed to by {@link #reference}.
          */
         @With
-        @Nullable
         @Getter
-        JavaType.Method methodType;
+        JavaType.@Nullable Method methodType;
 
         /**
          * In the case of a field reference, this is the field pointed to by {@link #reference}.
          */
         @With
-        @Nullable
         @Getter
-        JavaType.Variable variableType;
+        JavaType.@Nullable Variable variableType;
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -3632,10 +3648,9 @@ public interface J extends Tree {
         }
 
         @Getter
-        @Nullable
-        JavaType.Method methodType;
+        JavaType.@Nullable Method methodType;
 
-        public MethodDeclaration withMethodType(@Nullable JavaType.Method type) {
+        public MethodDeclaration withMethodType(JavaType.@Nullable Method type) {
             if (type == this.methodType) {
                 return this;
             }
@@ -3681,7 +3696,7 @@ public interface J extends Tree {
         }
 
         /**
-         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(J)} instead.
+         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(Cursor)} instead.
          */
         @Deprecated
         // gather annotations from everywhere they may occur
@@ -3811,7 +3826,7 @@ public interface J extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class MethodInvocation implements J, Statement, Expression, TypedTree, MethodCall {
+    final class MethodInvocation implements J, Statement, TypedTree, MethodCall {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -3881,12 +3896,12 @@ public interface J extends Tree {
             return getPadding().withArguments(JContainer.withElements(this.arguments, arguments));
         }
 
-        @Nullable
+
         @Getter
-        JavaType.Method methodType;
+        JavaType.@Nullable Method methodType;
 
         @Override
-        public MethodInvocation withMethodType(@Nullable JavaType.Method type) {
+        public MethodInvocation withMethodType(JavaType.@Nullable Method type) {
             if (type == this.methodType) {
                 return this;
             }
@@ -4022,6 +4037,11 @@ public interface J extends Tree {
         @Getter
         List<Annotation> annotations;
 
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitModifier(this, p);
+        }
+
         /**
          * @deprecated Use {@link #Modifier(UUID, Space, Markers, String, Type, List)} instead.
          */
@@ -4042,7 +4062,7 @@ public interface J extends Tree {
 
         /**
          * These types are sorted in order of their recommended appearance in a list of modifiers, as defined in the
-         * <a href="https://rules.sonarsource.com/java/tag/convention/RSPEC-S1124">JLS</a>.
+         * <a href="https://rules.sonarsource.com/java/tag/convention/RSPEC-1124">JLS</a>.
          */
         public enum Type {
             Default,
@@ -4318,7 +4338,7 @@ public interface J extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class NewClass implements J, Statement, Expression, TypedTree, MethodCall {
+    final class NewClass implements J, Statement, TypedTree, MethodCall {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -4387,9 +4407,8 @@ public interface J extends Tree {
         Block body;
 
         @With
-        @Nullable
         @Getter
-        JavaType.Method constructorType;
+        JavaType.@Nullable Method constructorType;
 
         @Override
         public @Nullable JavaType getType() {
@@ -4402,7 +4421,7 @@ public interface J extends Tree {
          * @return The constructor type.
          */
         @Override
-        public @Nullable JavaType.Method getMethodType() {
+        public JavaType.@Nullable Method getMethodType() {
             return getConstructorType();
         }
 
@@ -4413,7 +4432,7 @@ public interface J extends Tree {
          * @return An instance with the new constructor type.
          */
         @Override
-        public NewClass withMethodType(@Nullable JavaType.Method methodType) {
+        public NewClass withMethodType(JavaType.@Nullable Method methodType) {
             return withConstructorType(methodType);
         }
 
@@ -4838,7 +4857,7 @@ public interface J extends Tree {
         }
 
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             J2 element = tree.getElement();
             if (element instanceof Expression) {
                 return ((Expression) element).getType();
@@ -4932,8 +4951,7 @@ public interface J extends Tree {
         }
 
         @Override
-        @NonNull
-        public JavaType.Primitive getType() {
+        public JavaType.@NonNull Primitive getType() {
             return type;
         }
 
@@ -5801,7 +5819,7 @@ public interface J extends Tree {
         }
 
         /**
-         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(J)} instead.
+         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(Cursor)} instead.
          */
         @Deprecated
         // gather annotations from everywhere they may occur
@@ -5816,7 +5834,7 @@ public interface J extends Tree {
             return allAnnotations;
         }
 
-        public @Nullable JavaType.FullyQualified getTypeAsFullyQualified() {
+        public JavaType.@Nullable FullyQualified getTypeAsFullyQualified() {
             return typeExpression == null ? null : TypeUtils.asFullyQualified(typeExpression.getType());
         }
 
@@ -5882,9 +5900,8 @@ public interface J extends Tree {
             }
 
             @With
-            @Nullable
             @Getter
-            JavaType.Variable variableType;
+            JavaType.@Nullable Variable variableType;
 
             @Override
             public JavaType getType() {
@@ -5908,16 +5925,16 @@ public interface J extends Tree {
 
             public Cursor getDeclaringScope(Cursor cursor) {
                 return cursor.dropParentUntil(it ->
-                        it instanceof J.Block
-                        || it instanceof J.Lambda
-                        || it instanceof J.MethodDeclaration
-                        || it == Cursor.ROOT_VALUE);
+                        it instanceof J.Block ||
+                        it instanceof J.Lambda ||
+                        it instanceof J.MethodDeclaration ||
+                        it == Cursor.ROOT_VALUE);
             }
 
             public boolean isField(Cursor cursor) {
                 Cursor declaringScope = getDeclaringScope(cursor);
-                return declaringScope.getValue() instanceof J.Block
-                       && declaringScope.getParentTreeCursor().getValue() instanceof J.ClassDeclaration;
+                return declaringScope.getValue() instanceof J.Block &&
+                       declaringScope.getParentTreeCursor().getValue() instanceof J.ClassDeclaration;
             }
 
             public Padding getPadding() {
@@ -6106,7 +6123,7 @@ public interface J extends Tree {
         NameTree boundedType;
 
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             return null;
         }
 
@@ -6197,7 +6214,7 @@ public interface J extends Tree {
     @AllArgsConstructor
     @Data
     @With
-    final class Unknown implements J, Statement, Expression, TypeTree, TypedTree, NameTree {
+    final class Unknown implements J, Statement, Expression, TypeTree {
 
         @EqualsAndHashCode.Include
         UUID id;
@@ -6249,6 +6266,54 @@ public interface J extends Tree {
             public <P> J acceptJava(JavaVisitor<P> v, P p) {
                 return v.visitUnknownSource(this, p);
             }
+        }
+    }
+
+    /**
+     * A node that represents an erroneous element.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    @With
+    final class Erroneous implements Statement, Expression {
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
+        String text;
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitErroneous(this, p);
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return JavaType.Unknown.getInstance();
+        }
+
+        @Override
+        public <T extends J> T withType(@Nullable JavaType type) {
+            return (T) this;
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
         }
     }
 }

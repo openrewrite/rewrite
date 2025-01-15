@@ -20,9 +20,9 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.remote.Remote;
 import org.openrewrite.semver.LatestRelease;
@@ -102,7 +102,7 @@ public class GradleWrapper {
     public static GradleWrapper create(URI fullDistributionUri, @SuppressWarnings("unused") ExecutionContext ctx) {
         String version = "";
         Matcher matcher = GRADLE_VERSION_PATTERN.matcher(fullDistributionUri.toString());
-        if(matcher.find()) {
+        if (matcher.find()) {
             version = matcher.group(1);
         }
         return new GradleWrapper(version, new DistributionInfos(fullDistributionUri.toString(), null, null));

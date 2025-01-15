@@ -15,11 +15,11 @@
  */
 package org.openrewrite.xml;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.format.AutoFormatVisitor;
 import org.openrewrite.xml.tree.Xml;
 

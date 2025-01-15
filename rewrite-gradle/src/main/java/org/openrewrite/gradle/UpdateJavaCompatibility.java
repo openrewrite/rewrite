@@ -17,12 +17,12 @@ package org.openrewrite.gradle;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.util.ChangeStringLiteral;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -186,8 +186,8 @@ public class UpdateJavaCompatibility extends Recipe {
                         }
                     }
 
-                    return SearchResult.found(m, "Attempted to update to Java version to " + version
-                            + "  but was unsuccessful, please update manually");
+                    return SearchResult.found(m, "Attempted to update to Java version to " + version +
+                            "  but was unsuccessful, please update manually");
                 }
 
                 if (sourceCompatibilityDsl.matches(m) || targetCompatibilityDsl.matches(m)) {
@@ -208,8 +208,8 @@ public class UpdateJavaCompatibility extends Recipe {
                         }
                     }
 
-                    return SearchResult.found(m, "Attempted to update to Java version to " + version
-                            + "  but was unsuccessful, please update manually");
+                    return SearchResult.found(m, "Attempted to update to Java version to " + version +
+                            "  but was unsuccessful, please update manually");
                 }
 
                 return m;

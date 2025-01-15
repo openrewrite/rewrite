@@ -15,8 +15,8 @@
  */
 package org.openrewrite.java.format;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.EmptyForInitializerPadStyle;
 import org.openrewrite.java.style.EmptyForIteratorPadStyle;
@@ -24,8 +24,6 @@ import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
-
-import static java.util.Objects.requireNonNull;
 
 public class Spaces extends Recipe {
 
@@ -41,28 +39,26 @@ public class Spaces extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new SpacesFromCompilationUnitStyle();
-    }
-
-    private static class SpacesFromCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
-        @Override
-        public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-            return sourceFile instanceof J.CompilationUnit;
-        }
-
-        @Override
-        public J visit(@Nullable Tree tree, ExecutionContext ctx) {
-            if (tree instanceof JavaSourceFile) {
-                JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
-                SpacesStyle style = ((SourceFile) cu).getStyle(SpacesStyle.class);
-                if (style == null) {
-                    style = IntelliJ.spaces();
-                }
-                doAfterVisit(new SpacesVisitor<>(style, ((SourceFile) cu).getStyle(EmptyForInitializerPadStyle.class),
-                        ((SourceFile) cu).getStyle(EmptyForIteratorPadStyle.class)));
+        return new JavaIsoVisitor<ExecutionContext>() {
+            @Override
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return sourceFile instanceof J.CompilationUnit;
             }
-            return super.visit(tree, ctx);
-        }
+
+            @Override
+            public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    JavaSourceFile cu = (JavaSourceFile) tree;
+                    SpacesStyle style = cu.getStyle(SpacesStyle.class);
+                    if (style == null) {
+                        style = IntelliJ.spaces();
+                    }
+                    return new SpacesVisitor<>(style, cu.getStyle(EmptyForInitializerPadStyle.class),
+                            cu.getStyle(EmptyForIteratorPadStyle.class)).visit(cu, ctx);
+                }
+                return super.visit(tree, ctx);
+            }
+        };
     }
 
     public static <J2 extends J> J2 formatSpaces(J j, Cursor cursor) {

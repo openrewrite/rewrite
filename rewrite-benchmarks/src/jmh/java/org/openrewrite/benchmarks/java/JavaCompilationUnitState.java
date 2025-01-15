@@ -15,38 +15,53 @@
  */
 package org.openrewrite.benchmarks.java;
 
+import org.jspecify.annotations.Nullable;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
+import org.openjdk.jol.info.GraphLayout;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.LargeSourceSet;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.internal.AdaptiveRadixJavaTypeCache;
+import org.openrewrite.java.internal.JavaTypeCache;
 
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @State(Scope.Benchmark)
 public class JavaCompilationUnitState {
+    JavaParser.Builder<? extends JavaParser, ?> javaParser;
     List<SourceFile> sourceFiles;
+    List<Path> inputs;
+    JavaTypeCache snappyTypeCache;
+    AdaptiveRadixJavaTypeCache radixMapTypeCache;
+    MapJavaTypeCache typeCache;
+
+    public static void main(String[] args) throws URISyntaxException {
+        new JavaCompilationUnitState().setup();
+    }
 
     @Setup(Level.Trial)
     public void setup() throws URISyntaxException {
         Path rewriteRoot = Paths.get(ChangeTypeBenchmark.class.getResource("./")
                 .toURI()).resolve("../../../../../../../../").normalize();
 
-        List<Path> inputs = Arrays.asList(
+        inputs = Arrays.asList(
                 rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/internal/lang/Nullable.java"),
                 rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/internal/lang/NullUtils.java"),
                 rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/internal/MetricsHelper.java"),
                 rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/internal/ListUtils.java"),
-                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/internal/StringUtils.java"),
                 rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/internal/PropertyPlaceholderHelper.java"),
                 rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/internal/RecipeIntrospectionUtils.java"),
+                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/internal/StringUtils.java"),
                 rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/Tree.java"),
                 rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/ExecutionContext.java"),
                 rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/InMemoryExecutionContext.java"),
@@ -61,7 +76,11 @@ public class JavaCompilationUnitState {
                 rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/Result.java"),
                 rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/SourceFile.java"),
                 rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/Recipe.java"),
+                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/ScanningRecipe.java"),
                 rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/Validated.java"),
+                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/ValidationException.java"),
+                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/TreeVisitor.java"),
+                rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/TreeObserver.java"),
                 rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/config/DeclarativeRecipe.java"),
                 rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/config/ResourceLoader.java"),
                 rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/config/YamlResourceLoader.java"),
@@ -69,13 +88,33 @@ public class JavaCompilationUnitState {
                 rewriteRoot.resolve("rewrite-core/src/main/java/org/openrewrite/config/RecipeIntrospectionException.java")
         );
 
-        sourceFiles = JavaParser.fromJavaVersion()
-                .classpath("jsr305", "classgraph", "jackson-annotations", "micrometer-core", "slf4j-api",
-                        "org.openrewrite.jgit")
+        javaParser = JavaParser.fromJavaVersion()
+                .classpath("jsr305", "classgraph", "jackson-annotations", "micrometer-core",
+                        "jgit", "jspecify", "lombok", "annotations");
 //                .logCompilationWarningsAndErrors(true)
-                .build()
-                .parse(inputs, null, new InMemoryExecutionContext(Throwable::printStackTrace))
+
+        typeCache = new MapJavaTypeCache();
+        JavaParser parser = javaParser.typeCache(typeCache).build();
+        sourceFiles = parser
+                .parse(inputs, null, new InMemoryExecutionContext())
                 .collect(Collectors.toList());
+
+        radixMapTypeCache = new AdaptiveRadixJavaTypeCache();
+        for (Map.Entry<String, Object> entry : typeCache.map().entrySet()) {
+            radixMapTypeCache.put(entry.getKey(), entry.getValue());
+        }
+
+        snappyTypeCache = new JavaTypeCache();
+        for (Map.Entry<String, Object> entry : typeCache.map().entrySet()) {
+            snappyTypeCache.put(entry.getKey(), entry.getValue());
+        }
+    }
+
+    void printMemory() {
+        long retainedSize = GraphLayout.parseInstance(radixMapTypeCache).totalSize();
+        System.out.printf("Retained AdaptiveRadixTree size: %10d bytes\n", retainedSize);
+        retainedSize = GraphLayout.parseInstance(snappyTypeCache).totalSize();
+        System.out.printf("Retained Snappy size:            %10d bytes\n", retainedSize);
     }
 
     @TearDown(Level.Trial)
@@ -89,5 +128,42 @@ public class JavaCompilationUnitState {
 
     public List<SourceFile> getSourceFiles() {
         return sourceFiles;
+    }
+
+    static class MapJavaTypeCache extends JavaTypeCache {
+
+        Map<String, Object> typeCache = new HashMap<>();
+
+        @Override
+        public <T> @Nullable T get(String signature) {
+            //noinspection unchecked
+            return (T) typeCache.get(signature);
+        }
+
+        @Override
+        public void put(String signature, Object o) {
+            typeCache.put(signature, o);
+        }
+
+        public Map<String, Object> map() {
+            return typeCache;
+        }
+
+        @Override
+        public void clear() {
+            typeCache.clear();
+        }
+
+        @Override
+        public int size() {
+            return typeCache.size();
+        }
+
+        @Override
+        public MapJavaTypeCache clone() {
+            MapJavaTypeCache clone = (MapJavaTypeCache) super.clone();
+            clone.typeCache = new HashMap<>(this.typeCache);
+            return clone;
+        }
     }
 }

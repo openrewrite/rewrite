@@ -249,12 +249,23 @@ public class Environment {
          */
         @SuppressWarnings("unused")
         public Builder scanJar(Path jar, Collection<Path> dependencies, ClassLoader classLoader) {
-            List<ClasspathScanningLoader> list = new ArrayList<>();
+            List<ClasspathScanningLoader> firstPassLoaderList = new ArrayList<>();
             for (Path dep : dependencies) {
-                ClasspathScanningLoader classpathScanningLoader = new ClasspathScanningLoader(dep, properties, emptyList(), classLoader);
-                list.add(classpathScanningLoader);
+                firstPassLoaderList.add(new ClasspathScanningLoader(dep, properties, emptyList(), classLoader));
             }
-            return load(new ClasspathScanningLoader(jar, properties, list, classLoader), list);
+
+            /*
+             * Second loader creation pass where the firstPassLoaderList is passed as the
+             * dependencyResourceLoaders list to ensure that we can resolve transitive
+             * dependencies using the loaders we just created. This is necessary because
+             * the first pass may have missing recipes since the full list of loaders was
+             * not provided.
+             */
+            List<ClasspathScanningLoader> secondPassLoaderList = new ArrayList<>();
+            for (Path dep : dependencies) {
+                secondPassLoaderList.add(new ClasspathScanningLoader(dep, properties, firstPassLoaderList, classLoader));
+            }
+            return load(new ClasspathScanningLoader(jar, properties, secondPassLoaderList, classLoader), secondPassLoaderList);
         }
 
         @SuppressWarnings("unused")

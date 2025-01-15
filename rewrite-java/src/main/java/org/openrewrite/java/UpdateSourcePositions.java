@@ -15,8 +15,8 @@
  */
 package org.openrewrite.java;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Range;
@@ -39,7 +39,7 @@ public class UpdateSourcePositions extends Recipe {
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
+    public @Nullable TreeVisitor<?, ExecutionContext> getVisitor() {
         Map<Tree, Range> positionMap = new IdentityHashMap<>();
         PositionPrintOutputCapture ppoc = new PositionPrintOutputCapture();
 
@@ -64,18 +64,6 @@ public class UpdateSourcePositions extends Recipe {
 
                 return t;
             }
-
-            @Override
-            protected void visitModifier(J.Modifier modifier, PrintOutputCapture<ExecutionContext> p) {
-                PositionPrintOutputCapture prefix = new PositionPrintOutputCapture(ppoc.pos, ppoc.line, ppoc.column);
-                spacePrinter.visitSpace(modifier.getPrefix(), Space.Location.ANY, prefix);
-
-                Range.Position startPosition = new Range.Position(prefix.pos, prefix.line, prefix.column);
-                super.visitModifier(modifier, p);
-                Range.Position endPosition = new Range.Position(ppoc.pos, ppoc.line, ppoc.column);
-                positionMap.put(modifier, new Range(randomId(), startPosition, endPosition));
-            }
-
         };
 
         return new JavaVisitor<ExecutionContext>() {

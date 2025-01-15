@@ -16,8 +16,8 @@
 package org.openrewrite.java.trait;
 
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.trait.internal.MaybeParenthesesPair;
 import org.openrewrite.java.tree.J;

@@ -1010,6 +1010,205 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2218")
+    @Test
+    void existingEntryBlockWithCommentAtFirstLine() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              A:
+                B:
+                  C:
+                    D:
+                      4: new desc
+                    D2:
+                      2: new description
+                    D3:
+                      2: new text
+                      3: more new text
+                  E: description
+              """,
+            false,
+            null,
+            null
+          )),
+          yaml(
+            """
+              A: # Comment untouched
+                B:
+                  C:
+                    D:
+                      1: something else
+                      2: something else
+                      3: old desc
+                    D2:
+                      1: old description
+                    D3:
+                      1: old text
+              """,
+            """
+              A: # Comment untouched
+                B:
+                  C:
+                    D:
+                      1: something else
+                      2: something else
+                      3: old desc
+                      4: new desc
+                    D2:
+                      1: old description
+                      2: new description
+                    D3:
+                      1: old text
+                      2: new text
+                      3: more new text
+                  E: description
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2218")
+    @Test
+    void existingEntryBlockWithCommentAtLastLine() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              spring:
+                application:
+                  description: a description
+              """,
+            false,
+            null,
+            null
+          )),
+          yaml(
+            """
+              spring:
+                application:
+                  name: main # Comment moved from root to previous element
+              """,
+            """
+              spring:
+                application:
+                  name: main # Comment moved from root to previous element
+                  description: a description
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2218")
+    @Test
+    void existingEntryBlockWithCommentsAllOverThePlace() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              A:
+                B:
+                  C:
+                    D:
+                      3: new desc
+                    D2:
+                      4: d
+                    D3:
+                      2: new description
+                    D4:
+                      2: new text
+              """,
+            false,
+            null,
+            null
+          )),
+          yaml(
+            """
+              A: # Comment untouched 1
+                B: # Comment untouched 2
+                  C: # Comment untouched 3
+                    D: # Comment untouched 4
+                      1: something else
+                      2: old desc # Comment moved from prefix D2 to prefix D->3
+                                  # This is also part of prefix D2, but should NOT be moved to D->3
+                    D2:
+                      1: a
+                      # Comment above tag untouched 1
+                      2: b                             # Comment with a lot of spaces untouched 5
+                      3: c
+                    # Comment above tag untouched 2
+              # with multilines
+                    D3: # Comment untouched 6
+                      1: old description                           # Comment with a lot of spaces moved from prefix D4 to prefix D3->2
+                    D4: # Comment untouched 7
+                      1: old text # Comment moved from end document to prefix D4->2
+              """,
+            """
+              A: # Comment untouched 1
+                B: # Comment untouched 2
+                  C: # Comment untouched 3
+                    D: # Comment untouched 4
+                      1: something else
+                      2: old desc # Comment moved from prefix D2 to prefix D->3
+                      3: new desc
+                                  # This is also part of prefix D2, but should NOT be moved to D->3
+                    D2:
+                      1: a
+                      # Comment above tag untouched 1
+                      2: b                             # Comment with a lot of spaces untouched 5
+                      3: c
+                      4: d
+                    # Comment above tag untouched 2
+              # with multilines
+                    D3: # Comment untouched 6
+                      1: old description                           # Comment with a lot of spaces moved from prefix D4 to prefix D3->2
+                      2: new description
+                    D4: # Comment untouched 7
+                      1: old text # Comment moved from end document to prefix D4->2
+                      2: new text
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2218")
+    @Test
+    void existingEntryBlockWithCommentNotAtLastLine() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              spring:
+                application:
+                  description: a description
+              """,
+            false,
+            null,
+            null
+          )),
+          yaml(
+            """
+              spring:
+                application:
+                  name: main # Some comment
+                  name2: main
+              """,
+            """
+              spring:
+                application:
+                  name: main # Some comment
+                  name2: main
+                  description: a description
+              """
+          )
+        );
+    }
+
     @Test
     void mergeScalar() {
         rewriteRun(
@@ -1102,18 +1301,18 @@ class MergeYamlTest implements RewriteTest {
     void mergeEmptyStructureFollowedByCopyValue() {
         rewriteRun(
           spec -> spec.recipes(
-            new MergeYaml(
-              "$.spec",
-              //language=yaml
-              """
-                empty:
-                  initially:
-                """,
-              false,
-              null,
-              null
-            ),
-            new CopyValue("$.spec.level1.level2", null, "$.spec.empty.initially", null))
+              new MergeYaml(
+                "$.spec",
+                //language=yaml
+                """
+                  empty:
+                    initially:
+                  """,
+                false,
+                null,
+                null
+              ),
+              new CopyValue("$.spec.level1.level2", null, "$.spec.empty.initially", null))
             .expectedCyclesThatMakeChanges(2),
           yaml(
             """
@@ -1133,6 +1332,360 @@ class MergeYamlTest implements RewriteTest {
                   initially: true
               """
           )
+        );
+    }
+
+    @Test
+    void comment() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new MergeYaml(
+              "$",
+              //language=yaml
+              """
+                
+                  # new stuff
+                new-property: value
+                """,
+              false,
+              null,
+              null
+            )),
+          yaml(
+            """
+              # config
+              activate-auto: true
+              activate-mep: true
+              """,
+            """
+              # config
+              activate-auto: true
+              activate-mep: true
+              # new stuff
+              new-property: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void commentInList() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new MergeYaml(
+              "$.groups",
+              //language=yaml
+              """
+                
+                # comment
+                - id: 3
+                
+                  # foo bar
+                  foo: bar
+                """,
+              false,
+              "id",
+              null
+            )),
+          yaml(
+            """
+              groups:
+                - id: 1
+                - id: 2
+              """,
+            """
+              groups:
+                - id: 1
+                - id: 2
+                # comment
+                - id: 3
+              
+                  # foo bar
+                  foo: bar
+              """
+          )
+        );
+    }
+
+    @Test
+    // Mimics `org.openrewrite.quarkus.AddQuarkusProperty`
+    void addPropertyWitCommentAboveLastLine() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new MergeYaml(
+              "$",
+              //language=yaml
+              """
+                quarkus:
+                  http:
+                    # This property was added
+                    root-path: /api
+                """,
+              true,
+              null,
+              null
+            )),
+          yaml(
+            """
+              quarkus:
+                http:
+                  port: 9090
+              """,
+            """
+              quarkus:
+                http:
+                  port: 9090
+                  # This property was added
+                  root-path: /api
+              """
+          )
+        );
+    }
+
+    @Test
+    void addLiteralStyleBlockAtRoot() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.",
+              // language=yaml
+              """
+                script: |
+                  #!/bin/bash
+                  echo "hello"
+                """,
+              false, "name",
+              null)),
+          yaml(
+            """
+              some:
+                object:
+                  with: An existing value
+              """,
+            """
+              some:
+                object:
+                  with: An existing value
+              script: |
+                #!/bin/bash
+                echo "hello"
+              """)
+        );
+    }
+
+    @Test
+    void addLiteralStyleBlockWhichDoesAlreadyExist() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.some.object",
+              // language=yaml
+              """
+                script: |
+                  #!/bin/bash
+                  echo "hellow"
+                something: else
+                """,
+              false, null,
+              null)),
+          yaml(
+            """
+              some:
+                object:
+                  with: An existing value
+                  script: |
+                    #!/bin/bash
+                    echo "hello"
+              """,
+            """
+              some:
+                object:
+                  with: An existing value
+                  script: |
+                    #!/bin/bash
+                    echo "hellow"
+                  something: else
+              """)
+        );
+    }
+
+    @Test
+    void addLiteralStyleBlock() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.some.very",
+              // language=yaml
+              """
+                deep:
+                  object:
+                
+                    script: | # yaml comment
+                       #!/bin/bash
+                        echo "hello"
+                           echo "hello"
+                """,
+              false, "name",
+              null)),
+          yaml(
+            """
+              some:
+                very:
+                  deep:
+                    object:
+                      with: An existing value
+              """,
+            """
+              some:
+                very:
+                  deep:
+                    object:
+                      with: An existing value
+              
+                      script: | # yaml comment
+                         #!/bin/bash
+                          echo "hello"
+                             echo "hello"
+              """)
+        );
+    }
+
+    @Test
+    // Mimics `org.openrewrite.github.UpgradeSlackNotificationVersion2Test`
+    void upgradeSlackNotificationVersion2() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$..steps[?(@.uses =~ 'slackapi/slack-github-action@v1.*')]",
+              // language=yaml
+              """
+                with:
+                  method: chat.postMessage
+                  token: ${{ secrets.SLACK_MORTY_BOT_TOKEN }}
+                  payload: |
+                    channel: "##foo-alerts"
+                    text: ":boom: Unable run dependency check on: <${{ steps.get_failed_check_link.outputs.failed-check-link }}|${{ inputs.organization }}/${{ inputs.repository }}>"
+                """,
+              false, "name",
+              null)),
+          yaml(
+            """
+              jobs:
+                build:
+                  steps:
+                    - name: Send notification on error
+                      if: failure() && inputs.send-notification
+                      uses: slackapi/slack-github-action@v1.27.0
+                      with:
+                        channel-id: "##foo-alerts"
+                        slack-message: ":boom: Unable run dependency check on: <${{ steps.get_failed_check_link.outputs.failed-check-link }}|${{ inputs.organization }}/${{ inputs.repository }}>"
+                      env:
+                        SLACK_BOT_TOKEN: ${{ secrets.SLACK_MORTY_BOT_TOKEN }}
+              """,
+            """
+              jobs:
+                build:
+                  steps:
+                    - name: Send notification on error
+                      if: failure() && inputs.send-notification
+                      uses: slackapi/slack-github-action@v1.27.0
+                      with:
+                        channel-id: "##foo-alerts"
+                        slack-message: ":boom: Unable run dependency check on: <${{ steps.get_failed_check_link.outputs.failed-check-link }}|${{ inputs.organization }}/${{ inputs.repository }}>"
+                        method: chat.postMessage
+                        token: ${{ secrets.SLACK_MORTY_BOT_TOKEN }}
+                        payload: |
+                          channel: "##foo-alerts"
+                          text: ":boom: Unable run dependency check on: <${{ steps.get_failed_check_link.outputs.failed-check-link }}|${{ inputs.organization }}/${{ inputs.repository }}>"
+                      env:
+                        SLACK_BOT_TOKEN: ${{ secrets.SLACK_MORTY_BOT_TOKEN }}
+              """)
+        );
+    }
+
+    @Test
+    void addLiteralStyleMinusBlock() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.some.object",
+              // language=yaml
+              """
+                script: |-
+                  #!/bin/bash
+                  echo "hello"
+                """,
+              false, "name",
+              null)),
+          yaml(
+            """
+              some:
+                object:
+                  with: An existing value
+              """,
+            """
+              some:
+                object:
+                  with: An existing value
+                  script: |-
+                    #!/bin/bash
+                    echo "hello"
+              """)
+        );
+    }
+
+    @Test
+    void addFoldedStyleBlock() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.some.object",
+              // language=yaml
+              """
+                script: >
+                  #!/bin/bash
+                  echo "hello"
+                """,
+              false, "name",
+              null)),
+          yaml(
+            """
+              some:
+                object:
+                  with: An existing value
+              """,
+            """
+              some:
+                object:
+                  with: An existing value
+                  script: >
+                    #!/bin/bash
+                    echo "hello"
+              """)
+        );
+    }
+
+    @Test
+    void addFoldedStyleMinusBlock() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml("$.some.object",
+              // language=yaml
+              """
+                script: >-
+                  #!/bin/bash
+                  echo "hello"
+                """,
+              false, "name",
+              null)),
+          yaml(
+            """
+              some:
+                object:
+                  with: An existing value
+              """,
+            """
+              some:
+                object:
+                  with: An existing value
+                  script: >-
+                    #!/bin/bash
+                    echo "hello"
+              """)
         );
     }
 }

@@ -17,9 +17,9 @@ package org.openrewrite.yaml;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.concurrent.atomic.AtomicReference;
@@ -28,7 +28,7 @@ import java.util.concurrent.atomic.AtomicReference;
 @EqualsAndHashCode(callSuper = false)
 public class DeleteKey extends Recipe {
     @Option(displayName = "Key path",
-            description = "A [JsonPath](https://github.com/json-path/JsonPath) expression to locate a YAML entry.",
+            description = "A [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expression to locate a YAML entry.",
             example = "$.source.kind")
     String keyPath;
 
@@ -54,8 +54,9 @@ public class DeleteKey extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         JsonPathMatcher matcher = new JsonPathMatcher(keyPath);
         return Preconditions.check(new FindSourceFiles(filePattern), new YamlIsoVisitor<ExecutionContext>() {
+
             @Override
-            public Yaml.Sequence.Entry visitSequenceEntry(Yaml.Sequence.Entry entry, ExecutionContext ctx) {
+            public  Yaml.Sequence.@Nullable Entry visitSequenceEntry(Yaml.Sequence.Entry entry, ExecutionContext ctx) {
                 if (matcher.matches(getCursor()) || matcher.matches(new Cursor(getCursor(), entry.getBlock()))) {
                     //noinspection ConstantConditions
                     return null;

@@ -17,6 +17,7 @@ package org.openrewrite.gradle.plugins;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.DependencyVersionSelector;
 import org.openrewrite.gradle.GradleParser;
@@ -27,7 +28,6 @@ import org.openrewrite.gradle.marker.GradleSettings;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.J;
@@ -245,7 +245,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
         return found.get();
     }
 
-    private @Nullable J.MethodInvocation gradleEnterpriseDsl(String newVersion, VersionComparator versionComparator, String indent, ExecutionContext ctx) {
+    private J.@Nullable MethodInvocation gradleEnterpriseDsl(String newVersion, VersionComparator versionComparator, String indent, ExecutionContext ctx) {
         if (server == null && allowUntrustedServer == null && captureTaskInputFiles == null && uploadInBackground == null && publishCriteria == null) {
             return null;
         }

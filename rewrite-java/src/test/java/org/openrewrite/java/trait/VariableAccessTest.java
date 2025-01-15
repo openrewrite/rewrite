@@ -62,9 +62,8 @@ class VariableAccessTest implements RewriteTest {
                  }
               }
               """,
-            spec -> spec.afterRecipe(cu -> {
-                assertThat(new VariableAccess.Matcher().lower(cu)).hasSize(6);
-            })
+            spec -> spec.afterRecipe(cu ->
+                assertThat(new VariableAccess.Matcher().lower(cu)).hasSize(6))
           )
         );
     }

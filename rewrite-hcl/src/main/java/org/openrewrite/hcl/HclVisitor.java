@@ -15,13 +15,13 @@
  */
 package org.openrewrite.hcl;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.hcl.format.AutoFormatVisitor;
 import org.openrewrite.hcl.tree.*;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.util.List;
 
@@ -76,6 +76,23 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         a = a.getPadding().withName(visitLeftPadded(a.getPadding().getName(), HclLeftPadded.Location.ATTRIBUTE_ACCESS_NAME, p));
         return a;
     }
+
+    public Hcl visitLegacyIndexAttribute(Hcl.LegacyIndexAttributeAccess legacyIndexAttributeAccess, P p) {
+        Hcl.LegacyIndexAttributeAccess li = legacyIndexAttributeAccess;
+        li = li.withPrefix(visitSpace(li.getPrefix(), Space.Location.LEGACY_INDEX_ATTRIBUTE_ACCESS, p));
+        li = li.withMarkers(visitMarkers(li.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(li, p);
+        if (!(temp instanceof Hcl.LegacyIndexAttributeAccess)) {
+            return temp;
+        } else {
+            li = (Hcl.LegacyIndexAttributeAccess) temp;
+        }
+        li = li.getPadding().withBase(
+                visitRightPadded(li.getPadding().getBase(), HclRightPadded.Location.LEGACY_INDEX_ATTRIBUTE_ACCESS_BASE, p));
+        li = li.withIndex((Hcl.Literal) visitLiteral(li.getIndex(), p));
+        return li;
+    }
+
 
     public Hcl visitBinary(Hcl.Binary binary, P p) {
         Hcl.Binary b = binary;
@@ -388,7 +405,7 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         return expression;
     }
 
-    public <T> HclLeftPadded<T> visitLeftPadded(HclLeftPadded<T> left, HclLeftPadded.Location loc, P p) {
+    public <T> @Nullable HclLeftPadded<T> visitLeftPadded(HclLeftPadded<T> left, HclLeftPadded.Location loc, P p) {
         setCursor(new Cursor(getCursor(), left));
 
         Space before = visitSpace(left.getBefore(), loc.getBeforeLocation(), p);
@@ -408,7 +425,7 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         return (before == left.getBefore() && t == left.getElement()) ? left : new HclLeftPadded<>(before, t, left.getMarkers());
     }
 
-    public <T> HclRightPadded<T> visitRightPadded(@Nullable HclRightPadded<T> right, HclRightPadded.Location loc, P p) {
+    public <T> @Nullable HclRightPadded<T> visitRightPadded(@Nullable HclRightPadded<T> right, HclRightPadded.Location loc, P p) {
         if (right == null) {
             //noinspection ConstantConditions
             return null;

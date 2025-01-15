@@ -16,19 +16,27 @@
 package org.openrewrite.maven;
 
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.ParseExceptionResult;
+import org.openrewrite.SourceFile;
+import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
+import org.openrewrite.test.TypeValidation;
 import org.openrewrite.xml.tree.Xml;
+import org.opentest4j.AssertionFailedError;
 
 import java.util.function.Consumer;
+
+import static org.junit.jupiter.api.Assertions.fail;
 
 public class Assertions {
     private Assertions() {
     }
+
     static void customizeExecutionContext(ExecutionContext ctx) {
-        if(MavenSettings.readFromDiskEnabled()) {
+        if (MavenSettings.readFromDiskEnabled()) {
             MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
             mctx.setMavenSettings(MavenSettings.readMavenSettingsFromDisk(mctx));
         }
@@ -41,7 +49,7 @@ public class Assertions {
 
     public static SourceSpecs pomXml(@Language("xml") @Nullable String before, Consumer<SourceSpec<Xml.Document>> spec) {
         SourceSpec<Xml.Document> maven = new SourceSpec<>(Xml.Document.class, "maven", MavenParser.builder(), before,
-                SourceSpec.ValidateSource.noop, Assertions::customizeExecutionContext);
+                Assertions::pomResolvedSuccessfully, Assertions::customizeExecutionContext);
         maven.path("pom.xml");
         spec.accept(maven);
         return maven;
@@ -53,12 +61,23 @@ public class Assertions {
     }
 
     public static SourceSpecs pomXml(@Language("xml") @Nullable String before, @Language("xml") @Nullable String after,
-                               Consumer<SourceSpec<Xml.Document>> spec) {
+                                     Consumer<SourceSpec<Xml.Document>> spec) {
         SourceSpec<Xml.Document> maven = new SourceSpec<>(Xml.Document.class, "maven", MavenParser.builder(), before,
-                SourceSpec.ValidateSource.noop, Assertions::customizeExecutionContext).after(s -> after);
+                Assertions::pomResolvedSuccessfully, Assertions::customizeExecutionContext).after(s -> after);
         maven.path("pom.xml");
         spec.accept(maven);
         return maven;
     }
 
+    private static SourceFile pomResolvedSuccessfully(SourceFile sourceFile, TypeValidation typeValidation) {
+        if (typeValidation.dependencyModel()) {
+            sourceFile.getMarkers()
+                    .findFirst(ParseExceptionResult.class)
+                    .ifPresent(parseExceptionResult -> fail("Problem parsing " + sourceFile.getSourcePath() + ":\n" + parseExceptionResult.getMessage()));
+            sourceFile.getMarkers()
+                    .findFirst(MavenResolutionResult.class)
+                    .orElseThrow(() -> new AssertionFailedError("No MavenResolutionResult found on " + sourceFile.getSourcePath()));
+        }
+        return sourceFile;
+    }
 }

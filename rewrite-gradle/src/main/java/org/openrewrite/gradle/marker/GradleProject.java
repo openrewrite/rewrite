@@ -15,14 +15,21 @@
  */
 package org.openrewrite.gradle.marker;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.maven.tree.MavenRepository;
 
 import java.io.Serializable;
 import java.util.*;
+
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
+import static org.openrewrite.Tree.randomId;
 
 
 /**
@@ -32,29 +39,71 @@ import java.util.*;
  */
 @SuppressWarnings("unused")
 @Value
+@AllArgsConstructor(onConstructor_ = { @JsonCreator })
+@Builder
 public class GradleProject implements Marker, Serializable {
-    @With
-    UUID id;
 
     @With
-    String name;
+    @Builder.Default
+    UUID id = randomId();
 
     @With
-    String path;
+    @Nullable
+    String group;
 
     @With
-    List<GradlePluginDescriptor> plugins;
+    @Builder.Default
+    String name = "";
 
     @With
-    List<MavenRepository> mavenRepositories;
+    @Nullable
+    String version;
 
     @With
+    @Builder.Default
+    String path = "";
+
+    @With
+    @Builder.Default
+    List<GradlePluginDescriptor> plugins = emptyList();
+
+    @With
+    @Builder.Default
+    List<MavenRepository> mavenRepositories = emptyList();
+
+    @With
+    @Deprecated
+    @Nullable
     List<MavenRepository> mavenPluginRepositories;
 
-    Map<String, GradleDependencyConfiguration> nameToConfiguration;
+    @Builder.Default
+    Map<String, GradleDependencyConfiguration> nameToConfiguration = emptyMap();
 
+    @Builder.Default
+    GradleBuildscript buildscript = new GradleBuildscript(randomId(), emptyList(), emptyMap());
+
+    public GradleBuildscript getBuildscript() {
+        // Temporary workaround for better compatibility with old LSTs that don't have a buildscript field yet.
+        //noinspection ConstantValue
+        if (buildscript == null) {
+            return new GradleBuildscript(randomId(), emptyList(), emptyMap());
+        }
+        return buildscript;
+    }
+
+    /**
+     * Get a list of Maven plugin repositories.
+     *
+     * @return list of Maven plugin repositories
+     * @deprecated Use {@link GradleBuildscript#getMavenRepositories()} instead.
+     */
+    @Deprecated
     public List<MavenRepository> getMavenPluginRepositories() {
-        return mavenPluginRepositories == null ? Collections.emptyList() : mavenPluginRepositories;
+        //noinspection ConstantValue
+        if (buildscript != null) {
+            return buildscript.getMavenRepositories();
+        }
+        return mavenPluginRepositories == null ? emptyList() : mavenPluginRepositories;
     }
 
     public @Nullable GradleDependencyConfiguration getConfiguration(String name) {
@@ -120,12 +169,15 @@ public class GradleProject implements Marker, Serializable {
 
         return new GradleProject(
                 id,
+                group,
                 name,
+                version,
                 path,
                 plugins,
                 mavenRepositories,
                 mavenPluginRepositories,
-                configurations
+                configurations,
+                buildscript
         );
     }
 }

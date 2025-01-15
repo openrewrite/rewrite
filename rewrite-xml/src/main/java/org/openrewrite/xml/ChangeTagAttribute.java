@@ -17,12 +17,12 @@ package org.openrewrite.xml;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.regex.Pattern;
@@ -82,7 +82,7 @@ public class ChangeTagAttribute extends Recipe {
                 return t;
             }
 
-            public Xml.Attribute visitChosenElementAttribute(Xml.Attribute attribute) {
+            public  Xml.@Nullable Attribute visitChosenElementAttribute(Xml.Attribute attribute) {
                 if (!attribute.getKeyAsString().equals(attributeName)) {
                     return attribute;
                 }
@@ -102,9 +102,9 @@ public class ChangeTagAttribute extends Recipe {
                     return null;
                 }
 
-                String changedValue = oldValue != null
-                        ? (Boolean.TRUE.equals(regex) ? stringValue.replaceAll(oldValue, newValue) : stringValue.replace(oldValue, newValue))
-                        : newValue;
+                String changedValue = oldValue != null ?
+                        (Boolean.TRUE.equals(regex) ? stringValue.replaceAll(oldValue, newValue) : stringValue.replace(oldValue, newValue)) :
+                        newValue;
 
                 return attribute.withValue(
                         new Xml.Attribute.Value(attribute.getId(),

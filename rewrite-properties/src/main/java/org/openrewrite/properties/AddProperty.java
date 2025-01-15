@@ -17,10 +17,10 @@ package org.openrewrite.properties;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.search.FindProperties;
 import org.openrewrite.properties.tree.Properties;

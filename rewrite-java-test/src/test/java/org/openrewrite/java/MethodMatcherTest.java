@@ -48,6 +48,12 @@ class MethodMatcherTest implements RewriteTest {
     }
 
     @Test
+    void anyTypeMatchesNullTargetType() {
+        assertTrue(new MethodMatcher("*..* equals(Object)", true).matchesTargetType(null));
+        assertTrue(new MethodMatcher("*..* equals(Object)", true).matchesTargetType(JavaType.Unknown.getInstance()));
+    }
+
+    @Test
     @SuppressWarnings("rawtypes")
     void matchesSuperclassTypeOfInterfaces() {
         rewriteRun(

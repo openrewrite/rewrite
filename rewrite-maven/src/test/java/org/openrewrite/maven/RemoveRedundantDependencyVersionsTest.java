@@ -22,6 +22,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
 import java.util.Collections;
 
@@ -501,7 +502,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                             <artifactId>myApiApp</artifactId>
                             <version>1.0.0</version>
                         </parent>
-                        
+
                         <dependencies>
                             <dependency>
                                 <groupId>com.google.guava</groupId>
@@ -550,7 +551,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                             <artifactId>myApiApp</artifactId>
                             <version>1.0.0</version>
                         </parent>
-                        
+
                         <dependencies>
                             <dependency>
                                 <groupId>com.google.guava</groupId>
@@ -1063,7 +1064,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                       </dependency>
                   </dependencies>
               </project>
-                """
+              """
           )
         );
     }
@@ -1109,6 +1110,126 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                           <version>30.0-jre</version>
                       </dependency>
                   </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeRedundantVersionsFromManagedPlugins() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <groupId>pl.project13.maven</groupId>
+                                  <artifactId>git-commit-id-plugin</artifactId>
+                                  <version>4.9.10</version>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                      <plugins>
+                          <plugin>
+                              <groupId>pl.project13.maven</groupId>
+                              <artifactId>git-commit-id-plugin</artifactId>
+                              <version>4.9.10</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <groupId>pl.project13.maven</groupId>
+                                  <artifactId>git-commit-id-plugin</artifactId>
+                                  <version>4.9.10</version>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                      <plugins>
+                          <plugin>
+                              <groupId>pl.project13.maven</groupId>
+                              <artifactId>git-commit-id-plugin</artifactId>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeRedundantVersionsFromManagedButNonInheritedPlugins() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <groupId>pl.project13.maven</groupId>
+                                  <artifactId>git-commit-id-plugin</artifactId>
+                                  <version>4.9.10</version>
+                                  <inherited>false</inherited>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                      <plugins>
+                          <plugin>
+                              <groupId>pl.project13.maven</groupId>
+                              <artifactId>git-commit-id-plugin</artifactId>
+                              <version>4.9.10</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <groupId>pl.project13.maven</groupId>
+                                  <artifactId>git-commit-id-plugin</artifactId>
+                                  <version>4.9.10</version>
+                                  <inherited>false</inherited>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                      <plugins>
+                          <plugin>
+                              <groupId>pl.project13.maven</groupId>
+                              <artifactId>git-commit-id-plugin</artifactId>
+                          </plugin>
+                      </plugins>
+                  </build>
               </project>
               """
           )
@@ -1163,6 +1284,359 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                               <artifactId>git-commit-id-plugin</artifactId>
                           </plugin>
                       </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeRedundantVersionsFromPluginsManagedByParentNotSpecifyingGroupId() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0</version>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.7.18</version>
+                      <relativePath/>
+                  </parent>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <artifactId>maven-resources-plugin</artifactId>
+                                  <configuration><whatever/></configuration>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                  </build>
+              </project>
+              """, SourceSpec::skip),
+          mavenProject("child", pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>org.sample</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0</version>
+                        <relativePath/>
+                    </parent>
+                    <artifactId>sample</artifactId>
+                    <build>
+                        <plugins>
+                            <plugin>
+                                <artifactId>maven-resources-plugin</artifactId>
+                                <version>3.0.0</version>
+                                <configuration>
+                                    <something-else/>
+                                </configuration>
+                            </plugin>
+                        </plugins>
+                    </build>
+                </project>
+                """,
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>org.sample</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0</version>
+                        <relativePath/>
+                    </parent>
+                    <artifactId>sample</artifactId>
+                    <build>
+                        <plugins>
+                            <plugin>
+                                <artifactId>maven-resources-plugin</artifactId>
+                                <configuration>
+                                    <something-else/>
+                                </configuration>
+                            </plugin>
+                        </plugins>
+                    </build>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void removeRedundantDmVersionsFromPluginsManagedByParentNotSpecifyingGroupId() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0</version>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.7.18</version>
+                      <relativePath/>
+                  </parent>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <artifactId>maven-resources-plugin</artifactId>
+                                  <configuration><whatever/></configuration>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                  </build>
+              </project>
+              """, SourceSpec::skip),
+          mavenProject("child", pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>org.sample</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0</version>
+                        <relativePath/>
+                    </parent>
+                    <artifactId>sample</artifactId>
+                    <build>
+                        <pluginManagement>
+                            <plugins>
+                                <plugin>
+                                    <artifactId>maven-resources-plugin</artifactId>
+                                    <version>3.0.0</version>
+                                    <configuration>
+                                        <something-else/>
+                                    </configuration>
+                                </plugin>
+                            </plugins>
+                        </pluginManagement>
+                    </build>
+                </project>
+                """,
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>org.sample</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0.0</version>
+                        <relativePath/>
+                    </parent>
+                    <artifactId>sample</artifactId>
+                    <build>
+                        <pluginManagement>
+                            <plugins>
+                                <plugin>
+                                    <artifactId>maven-resources-plugin</artifactId>
+                                    <configuration>
+                                        <something-else/>
+                                    </configuration>
+                                </plugin>
+                            </plugins>
+                        </pluginManagement>
+                    </build>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void keepPluginIfParentInheritanceDisabled() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0-SNAPSHOT</version>
+                  <modules>
+                      <module>child-with-pluginManagement</module>
+                      <module>child-with-plugin-execution</module>
+                  </modules>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <groupId>pl.project13.maven</groupId>
+                                  <artifactId>git-commit-id-plugin</artifactId>
+                                  <version>4.9.10</version>
+                                  <inherited>false</inherited>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                  </build>
+              </project>
+              """
+          ),
+          mavenProject("child-with-pluginManagement",
+            pomXml(
+              """
+                <project>
+                    <parent>
+                        <groupId>org.example</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0-SNAPSHOT</version>
+                    </parent>
+                    <artifactId>child-with-pluginManagement</artifactId>
+                    <build>
+                        <pluginManagement>
+                            <plugins>
+                                <plugin>
+                                    <groupId>pl.project13.maven</groupId>
+                                    <artifactId>git-commit-id-plugin</artifactId>
+                                    <version>4.9.10</version>
+                                </plugin>
+                            </plugins>
+                        </pluginManagement>
+                    </build>
+                </project>
+                """
+            )
+          ),
+          mavenProject("child-with-plugin-execution",
+            pomXml(
+              """
+                <project>
+                    <parent>
+                        <groupId>org.example</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>1.0-SNAPSHOT</version>
+                    </parent>
+                    <artifactId>child-with-plugin-execution</artifactId>
+                    <build>
+                        <plugins>
+                            <plugin>
+                                <groupId>pl.project13.maven</groupId>
+                                <artifactId>git-commit-id-plugin</artifactId>
+                                <version>4.9.10</version>
+                            </plugin>
+                        </plugins>
+                    </build>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void removeRedundantManagedVersionFromPluginsManagedByParentAndKeepOtherElements() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.7.18</version>
+                      <relativePath/>
+                  </parent>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <groupId>pl.project13.maven</groupId>
+                                  <artifactId>git-commit-id-plugin</artifactId>
+                                  <version>4.9.10</version>
+                                  <configuration><whatever /></configuration>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.7.18</version>
+                      <relativePath/>
+                  </parent>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <groupId>pl.project13.maven</groupId>
+                                  <artifactId>git-commit-id-plugin</artifactId>
+                                  <configuration><whatever /></configuration>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeRedundantManagedPluginWhenPluginManagedByParentAndNoOtherElement() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.7.18</version>
+                      <relativePath/>
+                  </parent>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <groupId>pl.project13.maven</groupId>
+                                  <artifactId>git-commit-id-plugin</artifactId>
+                                  <version>4.9.10</version>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                  <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.7.18</version>
+                      <relativePath/>
+                  </parent>
+                  <build>
                   </build>
               </project>
               """
@@ -1305,11 +1779,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                     <version>2.3.0.RELEASE</version>
                     <relativePath/>
                 </parent>
-            
+
                 <groupId>com.example</groupId>
                 <artifactId>test</artifactId>
                 <version>1.0.0-SNAPSHOT</version>
-            
+
                 <modelVersion>4.0.0</modelVersion>
                 <build>
                     <plugins>
@@ -1329,11 +1803,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                     <version>2.3.0.RELEASE</version>
                     <relativePath/>
                 </parent>
-            
+
                 <groupId>com.example</groupId>
                 <artifactId>test</artifactId>
                 <version>1.0.0-SNAPSHOT</version>
-            
+
                 <modelVersion>4.0.0</modelVersion>
                 <build>
                     <plugins>
@@ -1362,13 +1836,13 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                     <version>2.5.4</version>
                     <relativePath/>
                 </parent>
-            
+
                 <groupId>com.example</groupId>
                 <artifactId>test</artifactId>
                 <version>1.0.0-SNAPSHOT</version>
-            
+
                 <modelVersion>4.0.0</modelVersion>
-                
+
                 <dependencies>
                     <dependency>
                         <groupId>org.springframework</groupId>
@@ -1385,13 +1859,13 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                     <version>2.5.4</version>
                     <relativePath/>
                 </parent>
-            
+
                 <groupId>com.example</groupId>
                 <artifactId>test</artifactId>
                 <version>1.0.0-SNAPSHOT</version>
-            
+
                 <modelVersion>4.0.0</modelVersion>
-                
+
                 <dependencies>
                     <dependency>
                         <groupId>org.springframework</groupId>
@@ -1527,6 +2001,51 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                     </project>
                 """
             )
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/discussions/4386")
+    void dontOverrideDependencyConfigurations() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
+          pomXml(
+            """
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-parent</artifactId>
+                        <version>2.3.12.RELEASE</version>
+                    </parent>
+                    <groupId>com.example</groupId>
+                    <artifactId>acme</artifactId>
+                    <version>0.0.1-SNAPSHOT</version>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.springframework.boot</groupId>
+                                <artifactId>spring-boot-starter-web</artifactId>
+                                <version>2.2.13.RELEASE</version>
+                                <!-- This exclusion should be kept -->
+                                <exclusions>
+                                    <exclusion>
+                                        <groupId>org.slf4j</groupId>
+                                        <artifactId>slf4j-api</artifactId>
+                                    </exclusion>
+                                </exclusions>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-starter-web</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
           )
         );
     }

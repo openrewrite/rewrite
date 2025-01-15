@@ -15,7 +15,7 @@
  */
 package org.openrewrite.internal;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.util.*;
 import java.util.function.Function;
@@ -68,11 +68,11 @@ public class PropertyPlaceholderHelper {
         return replacePlaceholders(value, properties::getProperty);
     }
 
-    public String replacePlaceholders(String value, Function<String, String> placeholderResolver) {
+    public String replacePlaceholders(String value, Function<String, @Nullable String> placeholderResolver) {
         return parseStringValue(value, placeholderResolver, null);
     }
 
-    protected String parseStringValue(String value, Function<String, String> placeholderResolver,
+    protected String parseStringValue(String value, Function<String, @Nullable String> placeholderResolver,
                                       @Nullable Set<String> visitedPlaceholders) {
         int startIndex = value.indexOf(placeholderPrefix);
         if (startIndex == -1) {

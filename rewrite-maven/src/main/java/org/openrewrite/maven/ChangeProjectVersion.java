@@ -17,15 +17,14 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
-import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Arrays;
@@ -83,13 +82,11 @@ public class ChangeProjectVersion extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
 
         return new MavenIsoVisitor<ExecutionContext>() {
-            private final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
-
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
 
-                if (PROJECT_MATCHER.matches(getCursor())) {
+                if (isProjectTag()) {
                     ResolvedPom resolvedPom = getResolutionResult().getPom();
 
                     if (matchesGlob(resolvedPom.getValue(t.getChildValue("groupId").orElse(null)), groupId) &&

@@ -15,9 +15,9 @@
  */
 package org.openrewrite.semver;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.util.Scanner;
 import java.util.regex.Pattern;
@@ -26,10 +26,22 @@ public class Semver {
     private Semver() {
     }
 
-    public static boolean isVersion(String version) {
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
+    public static boolean isVersion(@Nullable String version) {
+        if (version == null) {
+            return false;
+        }
         return LatestRelease.RELEASE_PATTERN.matcher(version).matches();
     }
 
+    /**
+     * Validates the given version against an optional pattern
+     *
+     * @param toVersion       the version to validate. Node-style [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors) may be used.
+     * @param metadataPattern optional metadata appended to the version. Allows version selection to be extended beyond the original Node Semver semantics. So for example,
+     *                        Setting 'version' to "25-29" can be paired with a metadata pattern of "-jre" to select Guava 29.0-jre
+     * @return the validation result
+     */
     public static Validated<VersionComparator> validate(String toVersion, @Nullable String metadataPattern) {
         return Validated.<VersionComparator, String>testNone(
                 "metadataPattern",
@@ -47,6 +59,7 @@ public class Semver {
         ).and(Validated.<VersionComparator>none()
                 .or(LatestRelease.buildLatestRelease(toVersion, metadataPattern))
                 .or(LatestIntegration.build(toVersion, metadataPattern))
+                .or(LatestMinor.build(toVersion, metadataPattern))
                 .or(LatestPatch.build(toVersion, metadataPattern))
                 .or(HyphenRange.build(toVersion, metadataPattern))
                 .or(XRange.build(toVersion, metadataPattern))

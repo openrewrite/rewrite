@@ -15,11 +15,11 @@
  */
 package org.openrewrite.json;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonRightPadded;
 import org.openrewrite.json.tree.JsonValue;
@@ -97,7 +97,7 @@ public class JsonVisitor<P> extends TreeVisitor<Json, P> {
     }
 
     @SuppressWarnings("ConstantConditions")
-    public <T extends Json> JsonRightPadded<T> visitRightPadded(@Nullable JsonRightPadded<T> right, P p) {
+    public <T extends Json> @Nullable JsonRightPadded<T> visitRightPadded(@Nullable JsonRightPadded<T> right, P p) {
         if (right == null) {
             //noinspection ConstantConditions
             return null;

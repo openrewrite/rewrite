@@ -17,7 +17,7 @@ package org.openrewrite.maven.cache;
 
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.tree.ResolvedDependency;
 
 import java.io.IOException;

@@ -15,7 +15,7 @@
  */
 package org.openrewrite.internal;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -36,7 +36,18 @@ public class ReflectionUtils {
      * Cache for {@link Class#getDeclaredMethods()} plus equivalent default methods
      * from Java 8 based interfaces, allowing for fast iteration.
      */
-    private static final Map<Class<?>, Method[]> declaredMethodsCache = new ConcurrentHashMap<>(256);
+    private static final Map<Class<?>, Method[]> DECLARED_METHODS_CACHE = new ConcurrentHashMap<>(256);
+
+    public static boolean isClassAvailable(String fullyQualifiedClassName) {
+        try {
+            ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+            ClassLoader classLoader = contextClassLoader == null ? ReflectionUtils.class.getClassLoader() : contextClassLoader;
+            Class.forName(fullyQualifiedClassName, false, classLoader);
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
+    }
 
     public static @Nullable Method findMethod(Class<?> clazz, String name, Class<?>... paramTypes) {
         Class<?> searchType = clazz;
@@ -54,7 +65,7 @@ public class ReflectionUtils {
     }
 
     private static Method[] getDeclaredMethods(Class<?> clazz) {
-        Method[] result = declaredMethodsCache.get(clazz);
+        Method[] result = DECLARED_METHODS_CACHE.get(clazz);
         if (result == null) {
             try {
                 Method[] declaredMethods = clazz.getDeclaredMethods();
@@ -70,7 +81,7 @@ public class ReflectionUtils {
                 } else {
                     result = declaredMethods;
                 }
-                declaredMethodsCache.put(clazz, (result.length == 0 ? EMPTY_METHOD_ARRAY : result));
+                DECLARED_METHODS_CACHE.put(clazz, (result.length == 0 ? EMPTY_METHOD_ARRAY : result));
             } catch (Throwable ex) {
                 throw new IllegalStateException("Failed to introspect Class [" + clazz.getName() +
                                                 "] from ClassLoader [" + clazz.getClassLoader() + "]", ex);

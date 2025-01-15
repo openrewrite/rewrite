@@ -16,32 +16,32 @@
 package org.openrewrite.maven.tree;
 
 import lombok.*;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.io.Serializable;
 import java.util.List;
 
+import static java.util.Collections.emptyList;
+
 @Value
 @Builder
 @AllArgsConstructor(access = AccessLevel.PUBLIC)
+@With
 public class Dependency implements Serializable {
     GroupArtifactVersion gav;
 
-    @With
     @Nullable
     String classifier;
 
-    @With
     @Nullable
     String type;
 
     @With
     String scope;
 
-    @With
-    List<GroupArtifact> exclusions;
+    @Builder.Default
+    List<GroupArtifact> exclusions = emptyList();
 
-    @With
     @Nullable
     String optional;
 
@@ -55,13 +55,6 @@ public class Dependency implements Serializable {
 
     public @Nullable String getVersion() {
         return gav.getVersion();
-    }
-
-    public Dependency withGav(GroupArtifactVersion gav) {
-        if(gav == this.gav) {
-            return this;
-        }
-        return new Dependency(gav, classifier, type, scope, exclusions, optional);
     }
 
     @Override

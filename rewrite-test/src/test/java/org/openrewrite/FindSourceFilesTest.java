@@ -15,7 +15,6 @@
  */
 package org.openrewrite;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullSource;
@@ -154,7 +153,6 @@ class FindSourceFilesTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/pull/3758")
-    @Disabled("{} syntax not supported yet")
     void eitherOr() {
         rewriteRun(
           spec -> spec.recipe(new FindSourceFiles("**/*.{md,txt}")),
@@ -168,6 +166,33 @@ class FindSourceFilesTest implements RewriteTest {
             "~~>hello world!",
             spec -> spec.path("a/c/hello.txt")
           )
+        );
+    }
+
+    @Test
+    void multiplePathsSemicolonDelimitedPaths() {
+        rewriteRun(
+          spec -> spec.recipe(new FindSourceFiles("a.txt ; b.txt")),
+          text(
+            "this one",
+            "~~>this one",
+            spec -> spec.path("a.txt")
+          ),
+          text(
+            "also this one",
+            "~~>also this one",
+            spec -> spec.path("b.txt")
+          ),
+          text("not this one", spec -> spec.path("c.txt"))
+        );
+    }
+
+    @Test
+    void negation() {
+        rewriteRun(
+          spec -> spec.recipe(new FindSourceFiles("!(**/not-this.txt)")),
+          text("not-this", spec -> spec.path("not-this.txt")),
+          text("this", "~~>this", spec -> spec.path("this.txt"))
         );
     }
 }

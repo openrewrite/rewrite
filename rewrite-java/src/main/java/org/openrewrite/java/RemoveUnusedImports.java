@@ -106,12 +106,20 @@ public class RemoveUnusedImports extends Recipe {
                     for (JavaType typeParameter : parameterized.getTypeParameters()) {
                         JavaType.FullyQualified fq = TypeUtils.asFullyQualified(typeParameter);
                         if (fq != null) {
-                            typesByPackage.computeIfAbsent(fq.getPackageName(), f -> new HashSet<>()).add(fq);
+                            typesByPackage.computeIfAbsent(
+                                    fq.getOwningClass() == null ?
+                                            fq.getPackageName() :
+                                            toFullyQualifiedName(fq.getOwningClass().getFullyQualifiedName()),
+                                    f -> new HashSet<>()).add(fq);
                         }
                     }
                 } else if (javaType instanceof JavaType.FullyQualified) {
                     JavaType.FullyQualified fq = (JavaType.FullyQualified) javaType;
-                    typesByPackage.computeIfAbsent(fq.getPackageName(), f -> new HashSet<>()).add(fq);
+                    typesByPackage.computeIfAbsent(
+                            fq.getOwningClass() == null ?
+                                    fq.getPackageName() :
+                                    toFullyQualifiedName(fq.getOwningClass().getFullyQualifiedName()),
+                            f -> new HashSet<>()).add(fq);
                 }
             }
 
@@ -152,7 +160,7 @@ public class RemoveUnusedImports extends Recipe {
                     SortedSet<String> targetMethodsAndFields = methodsAndFieldsByTypeName.get(modifiedTarget);
 
                     Set<JavaType.FullyQualified> staticClasses = null;
-                    for (JavaType.FullyQualified maybeStatic : typesByPackage.getOrDefault(elem.getPackageName(), emptySet())) {
+                    for (JavaType.FullyQualified maybeStatic : typesByPackage.getOrDefault(target, emptySet())) {
                         if (maybeStatic.getOwningClass() != null && outerType.startsWith(maybeStatic.getOwningClass().getFullyQualifiedName())) {
                             if (staticClasses == null) {
                                 staticClasses = new HashSet<>();
@@ -169,7 +177,7 @@ public class RemoveUnusedImports extends Recipe {
                             anImport.used = true;
                             usedStaticWildcardImports.add(elem.getTypeName());
                         } else if (((methodsAndFields == null ? 0 : methodsAndFields.size()) +
-                                (staticClasses == null ? 0 : staticClasses.size())) < layoutStyle.getNameCountToUseStarImport()) {
+                                    (staticClasses == null ? 0 : staticClasses.size())) < layoutStyle.getNameCountToUseStarImport()) {
                             // replacing the star with a series of unfolded imports
                             anImport.imports.clear();
 
@@ -199,16 +207,17 @@ public class RemoveUnusedImports extends Recipe {
                             usedStaticWildcardImports.add(elem.getTypeName());
                         }
                     } else if (staticClasses != null && staticClasses.stream().anyMatch(c -> elem.getTypeName().equals(c.getFullyQualifiedName())) ||
-                            (methodsAndFields != null && methodsAndFields.contains(qualid.getSimpleName())) ||
-                            (targetMethodsAndFields != null && targetMethodsAndFields.contains(qualid.getSimpleName()))) {
+                               (methodsAndFields != null && methodsAndFields.contains(qualid.getSimpleName())) ||
+                               (targetMethodsAndFields != null && targetMethodsAndFields.contains(qualid.getSimpleName()))) {
                         anImport.used = true;
                     } else {
                         anImport.used = false;
                         changed = true;
                     }
                 } else {
-                    Set<JavaType.FullyQualified> types = typesByPackage.getOrDefault(elem.getPackageName(), new HashSet<>());
-                    Set<JavaType.FullyQualified> typesByFullyQualifiedClassPath = typesByPackage.getOrDefault(toFullyQualifiedName(elem.getPackageName()), new HashSet<>());
+                    String target = qualid.getTarget().toString();
+                    Set<JavaType.FullyQualified> types = typesByPackage.getOrDefault(target, new HashSet<>());
+                    Set<JavaType.FullyQualified> typesByFullyQualifiedClassPath = typesByPackage.getOrDefault(toFullyQualifiedName(target), new HashSet<>());
                     Set<JavaType.FullyQualified> combinedTypes = Stream.concat(types.stream(), typesByFullyQualifiedClassPath.stream())
                             .collect(Collectors.toSet());
                     JavaType.FullyQualified qualidType = TypeUtils.asFullyQualified(elem.getQualid().getType());
@@ -226,7 +235,7 @@ public class RemoveUnusedImports extends Recipe {
                             // add each unfolded import
                             combinedTypes.stream().map(JavaType.FullyQualified::getClassName).sorted().distinct().forEach(type ->
                                     anImport.imports.add(new JRightPadded<>(elem
-                                            .withQualid(qualid.withName(name.withSimpleName(type)))
+                                            .withQualid(qualid.withName(name.withSimpleName(type.substring(type.lastIndexOf('.') + 1))))
                                             .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY))
                             );
 
@@ -236,7 +245,7 @@ public class RemoveUnusedImports extends Recipe {
 
                             changed = true;
                         } else {
-                            usedWildcardImports.add(elem.getPackageName());
+                            usedWildcardImports.add(target);
                         }
                     } else if (combinedTypes.stream().noneMatch(c -> {
                         if ("*".equals(elem.getQualid().getSimpleName())) {
@@ -252,11 +261,13 @@ public class RemoveUnusedImports extends Recipe {
             }
 
             // Do not use direct imports that are imported by a wildcard import
+            Set<String> ambiguousStaticImportNames = getAmbiguousStaticImportNames(cu);
             for (ImportUsage anImport : importUsage) {
                 J.Import elem = anImport.imports.get(0).getElement();
                 if (!"*".equals(elem.getQualid().getSimpleName())) {
                     if (elem.isStatic()) {
-                        if (usedStaticWildcardImports.contains(elem.getTypeName())) {
+                        if (usedStaticWildcardImports.contains(elem.getTypeName()) &&
+                            !ambiguousStaticImportNames.contains(elem.getQualid().getSimpleName())) {
                             anImport.used = false;
                             changed = true;
                         }
@@ -278,7 +289,7 @@ public class RemoveUnusedImports extends Recipe {
                         for (int i = 0; i < importGroup.size(); i++) {
                             JRightPadded<J.Import> anImport = importGroup.get(i);
                             if (i == 0 && lastUnusedImportSpace != null && anImport.getElement().getPrefix().getLastWhitespace()
-                                    .chars().filter(c -> c == '\n').count() <= 1) {
+                                                                                   .chars().filter(c -> c == '\n').count() <= 1) {
                                 anImport = anImport.withElement(anImport.getElement().withPrefix(lastUnusedImportSpace));
                             }
                             imports.add(anImport);
@@ -296,6 +307,32 @@ public class RemoveUnusedImports extends Recipe {
             }
 
             return cu;
+        }
+
+        private static Set<String> getAmbiguousStaticImportNames(J.CompilationUnit cu) {
+            Set<String> typesWithWildcardImport = new HashSet<>();
+            for (J.Import elem : cu.getImports()) {
+                if ("*".equals(elem.getQualid().getSimpleName())) {
+                    typesWithWildcardImport.add(elem.getTypeName());
+                }
+            }
+            Set<JavaType.FullyQualified> qualifiedTypes = new HashSet<>();
+            for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
+                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getOwner());
+                if (fq != null && typesWithWildcardImport.contains(fq.getFullyQualifiedName())) {
+                    qualifiedTypes.add(fq);
+                }
+            }
+            Set<String> seen = new HashSet<>();
+            Set<String> ambiguous = new HashSet<>();
+            for (JavaType.FullyQualified fq : qualifiedTypes) {
+                for (JavaType.Variable member : fq.getMembers()) {
+                    if (!seen.add(member.getName())) {
+                        ambiguous.add(member.getName());
+                    }
+                }
+            }
+            return ambiguous;
         }
 
         private static final Set<String> JAVA_LANG_CLASS_NAMES = new HashSet<>(Arrays.asList(

@@ -30,14 +30,12 @@ class SearchResultsTest implements RewriteTest {
     @DocumentExample
     @Test
     void searchResultIsOnlyAddedOnceEvenWhenRunMultipleTimesByScheduler() {
-        rewriteRun(spec -> {
-              spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-                  @Override
-                  public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                      return SearchResult.mergingFound(super.visitMethodInvocation(method, executionContext), method.getSimpleName());
-                  }
-              }));
-          },
+        rewriteRun(spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                return SearchResult.mergingFound(super.visitMethodInvocation(method, executionContext), method.getSimpleName());
+            }
+        })),
           java(
             """
               class Test {
@@ -59,23 +57,21 @@ class SearchResultsTest implements RewriteTest {
 
     @Test
     void multipleSearchResultIsOnlyAddedOnceEvenWhenRunMultipleTimesByScheduler() {
-        rewriteRun(spec -> {
-              spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-                  @Override
-                  public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                      return SearchResult.mergingFound(
-                        SearchResult.mergingFound(
-                          SearchResult.mergingFound(
-                            super.visitMethodInvocation(method, executionContext),
-                            "42"
-                          ),
-                          "Hello, world!"
-                        ),
-                        method.getSimpleName()
-                      );
-                  }
-              }));
-          },
+        rewriteRun(spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                return SearchResult.mergingFound(
+                  SearchResult.mergingFound(
+                    SearchResult.mergingFound(
+                      super.visitMethodInvocation(method, executionContext),
+                      "42"
+                    ),
+                    "Hello, world!"
+                  ),
+                  method.getSimpleName()
+                );
+            }
+        })),
           java(
             """
               class Test {
@@ -97,19 +93,17 @@ class SearchResultsTest implements RewriteTest {
 
     @Test
     void foundSearchResultsShouldNotClobberResultsWithDescription() {
-        rewriteRun(spec -> {
-              spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-                  @Override
-                  public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                      return SearchResult.found(
-                        SearchResult.found(
-                          super.visitMethodInvocation(method, executionContext),
-                          "Hello, world!"
-                        )
-                      );
-                  }
-              }));
-          },
+        rewriteRun(spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                return SearchResult.found(
+                  SearchResult.found(
+                    super.visitMethodInvocation(method, executionContext),
+                    "Hello, world!"
+                  )
+                );
+            }
+        })),
           java(
             """
               class Test {
@@ -121,7 +115,7 @@ class SearchResultsTest implements RewriteTest {
             """
               class Test {
                   void test() {
-                      /*~~(Hello, world!)~~>*/System.out.println("Hello, world!");
+                      /*~~(Hello, world!)~~>*//*~~>*/System.out.println("Hello, world!");
                   }
               }
               """

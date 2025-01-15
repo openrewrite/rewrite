@@ -15,9 +15,9 @@
  */
 package org.openrewrite.gradle;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.SearchResult;
 

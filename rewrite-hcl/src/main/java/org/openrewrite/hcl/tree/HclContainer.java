@@ -17,8 +17,8 @@ package org.openrewrite.hcl.tree;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
 import java.util.List;

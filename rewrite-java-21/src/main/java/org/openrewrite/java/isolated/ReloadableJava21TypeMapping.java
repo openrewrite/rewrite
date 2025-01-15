@@ -17,12 +17,12 @@ package org.openrewrite.java.isolated;
 
 import com.sun.source.tree.Tree;
 import com.sun.tools.javac.code.*;
+import com.sun.tools.javac.comp.AttrRecover;
 import com.sun.tools.javac.tree.JCTree;
 import lombok.RequiredArgsConstructor;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
 import org.openrewrite.java.internal.JavaTypeCache;
-import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
@@ -30,6 +30,7 @@ import javax.lang.model.type.NullType;
 import javax.lang.model.type.TypeMirror;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -45,9 +46,9 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
 
     private final JavaTypeCache typeCache;
 
-    public JavaType type(@Nullable com.sun.tools.javac.code.Type type) {
+    public JavaType type(com.sun.tools.javac.code.@Nullable Type type) {
         if (type == null || type instanceof Type.ErrorType || type instanceof Type.PackageType || type instanceof Type.UnknownType ||
-                type instanceof NullType) {
+            type instanceof NullType) {
             return JavaType.Class.Unknown.getInstance();
         }
 
@@ -149,7 +150,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
         );
     }
 
-    private @Nullable JavaType.FullyQualified[] mapAnnotations(List<JCTree.JCAnnotation> annotations) {
+    private JavaType.@Nullable FullyQualified[] mapAnnotations(List<JCTree.JCAnnotation> annotations) {
         List<JavaType.FullyQualified> types = new ArrayList<>(annotations.size());
         for (JCTree.JCAnnotation annotation : annotations) {
             JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type(annotation));
@@ -160,7 +161,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
         return types.toArray(new JavaType.FullyQualified[0]);
     }
 
-    private @Nullable JavaType.FullyQualified[] mapAnnotations(Type type) {
+    private JavaType.@Nullable FullyQualified[] mapAnnotations(Type type) {
         if (!type.isAnnotated()) {
             return null;
         }
@@ -211,7 +212,12 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
     }
 
     private JavaType generic(Type.TypeVar type, String signature) {
-        String name = type.tsym.name.toString();
+        String name;
+        if (type instanceof Type.CapturedType && ((Type.CapturedType) type).wildcard.kind == BoundKind.UNBOUND) {
+            name = "?";
+        } else {
+            name = type.tsym.name.toString();
+        }
         JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null,
                 name, INVARIANT, null);
         typeCache.put(signature, gtv);
@@ -356,7 +362,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
 
     @Override
     @SuppressWarnings("ConstantConditions")
-    public JavaType type(@Nullable Tree tree) {
+    public @Nullable JavaType type(@Nullable Tree tree) {
         if (tree == null) {
             return null;
         }
@@ -376,7 +382,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
     }
 
     private @Nullable JavaType type(Type type, Symbol symbol) {
-        if (type instanceof Type.MethodType) {
+        if (type instanceof Type.MethodType || type instanceof Type.ForAll || (type instanceof Type.ErrorType && type.getOriginalType() instanceof Type.MethodType)) {
             return methodInvocationType(type, symbol);
         }
         return type(type);
@@ -413,12 +419,12 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
         }
     }
 
-    public @Nullable JavaType.Variable variableType(@Nullable Symbol symbol) {
+    public JavaType.@Nullable Variable variableType(@Nullable Symbol symbol) {
         return variableType(symbol, null);
     }
 
-    private @Nullable JavaType.Variable variableType(@Nullable Symbol symbol,
-                                           @Nullable JavaType.FullyQualified owner) {
+    private JavaType.@Nullable Variable variableType(@Nullable Symbol symbol,
+            JavaType.@Nullable FullyQualified owner) {
         if (!(symbol instanceof Symbol.VarSymbol)) {
             return null;
         }
@@ -464,7 +470,23 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
      * @param symbol     The method symbol.
      * @return Method type attribution.
      */
-    public @Nullable JavaType.Method methodInvocationType(@Nullable com.sun.tools.javac.code.Type selectType, @Nullable Symbol symbol) {
+    public JavaType.@Nullable Method methodInvocationType(com.sun.tools.javac.code.@Nullable Type selectType, @Nullable Symbol symbol) {
+        if (selectType instanceof Type.ErrorType) {
+            try {
+                // Ugly reflection solution, because AttrRecover$RecoveryErrorType is private inner class
+                for (Class<?> targetClass : Class.forName(AttrRecover.class.getCanonicalName()).getDeclaredClasses()) {
+                    if (targetClass.getSimpleName().equals("RecoveryErrorType")) {
+                        Field field = targetClass.getDeclaredField("candidateSymbol");
+                        field.setAccessible(true);
+                        Symbol originalSymbol = (Symbol) field.get(selectType);
+                        return methodInvocationType(selectType.getOriginalType(), originalSymbol);
+                    }
+                }
+            } catch (Exception e) {
+                // ignore
+            }
+        }
+
         if (selectType == null || selectType instanceof Type.ErrorType || symbol == null || symbol.kind == Kinds.Kind.ERR || symbol.type instanceof Type.UnknownType) {
             return null;
         }
@@ -500,13 +522,13 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
                 methodSymbol.isConstructor() ? "<constructor>" : methodSymbol.getSimpleName().toString(),
                 null,
                 paramNames,
-                null, null, null, null
+                null, null, null, null, null
         );
         typeCache.put(signature, method);
 
         JavaType returnType = null;
         List<JavaType> parameterTypes = null;
-        List<JavaType.FullyQualified> exceptionTypes = null;
+        List<JavaType> exceptionTypes = null;
 
         if (selectType instanceof Type.MethodType) {
             Type.MethodType methodType = (Type.MethodType) selectType;
@@ -526,20 +548,8 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
             if (!methodType.thrown.isEmpty()) {
                 exceptionTypes = new ArrayList<>(methodType.thrown.size());
                 for (Type exceptionType : methodType.thrown) {
-                    JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(exceptionType));
-                    if (javaType == null) {
-                        // if the type cannot be resolved to a class (it might not be on the classpath, or it might have
-                        // been mapped to cyclic)
-                        if (exceptionType instanceof Type.ClassType) {
-                            Symbol.ClassSymbol sym = (Symbol.ClassSymbol) exceptionType.tsym;
-                            javaType = new JavaType.Class(null, Flag.Public.getBitMask(), sym.flatName().toString(), JavaType.Class.Kind.Class,
-                                    null, null, null, null, null, null, null);
-                        }
-                    }
-                    if (javaType != null) {
-                        // if the exception type is not resolved, it is not added to the list of exceptions
-                        exceptionTypes.add(javaType);
-                    }
+                    JavaType javaType = type(exceptionType);
+                    exceptionTypes.add(javaType);
                 }
             }
         } else if (selectType instanceof Type.UnknownType) {
@@ -566,7 +576,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
      * @param declaringType The method's declaring type.
      * @return Method type attribution.
      */
-    public @Nullable JavaType.Method methodDeclarationType(@Nullable Symbol symbol, @Nullable JavaType.FullyQualified declaringType) {
+    public JavaType.@Nullable Method methodDeclarationType(@Nullable Symbol symbol, JavaType.@Nullable FullyQualified declaringType) {
         // if the symbol is not a method symbol, there is a parser error in play
         Symbol.MethodSymbol methodSymbol = symbol instanceof Symbol.MethodSymbol ? (Symbol.MethodSymbol) symbol : null;
 
@@ -594,9 +604,24 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
                             .map(attr -> attr.getValue().toString())
                             .collect(Collectors.toList());
                 } else {
-                    defaultValues = Collections.singletonList(methodSymbol.getDefaultValue().getValue().toString());
+                    try {
+                        defaultValues = Collections.singletonList(methodSymbol.getDefaultValue().getValue().toString());
+                    } catch(UnsupportedOperationException e) {
+                        // not all Attribute implementations define `getValue()`
+                    }
                 }
             }
+
+            List<String> declaredFormalTypeNames = null;
+            for (Symbol.TypeVariableSymbol typeParam : methodSymbol.getTypeParameters()) {
+                if(typeParam.owner == methodSymbol) {
+                    if (declaredFormalTypeNames == null) {
+                        declaredFormalTypeNames = new ArrayList<>();
+                    }
+                    declaredFormalTypeNames.add(typeParam.name.toString());
+                }
+            }
+
             JavaType.Method method = new JavaType.Method(
                     null,
                     methodSymbol.flags_field,
@@ -605,7 +630,8 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
                     null,
                     paramNames,
                     null, null, null,
-                    defaultValues
+                    defaultValues,
+                    declaredFormalTypeNames == null ? null : declaredFormalTypeNames.toArray(new String[0])
             );
             typeCache.put(signature, method);
 
@@ -613,7 +639,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
                     ((Type.ForAll) methodSymbol.type).qtype :
                     methodSymbol.type;
 
-            List<JavaType.FullyQualified> exceptionTypes = null;
+            List<JavaType> exceptionTypes = null;
 
             Type selectType = methodSymbol.type;
             if (selectType instanceof Type.ForAll) {
@@ -625,20 +651,8 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
                 if (!methodType.thrown.isEmpty()) {
                     exceptionTypes = new ArrayList<>(methodType.thrown.size());
                     for (Type exceptionType : methodType.thrown) {
-                        JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(exceptionType));
-                        if (javaType == null) {
-                            // if the type cannot be resolved to a class (it might not be on the classpath, or it might have
-                            // been mapped to cyclic)
-                            if (exceptionType instanceof Type.ClassType) {
-                                Symbol.ClassSymbol sym = (Symbol.ClassSymbol) exceptionType.tsym;
-                                javaType = new JavaType.Class(null, Flag.Public.getBitMask(), sym.flatName().toString(), JavaType.Class.Kind.Class,
-                                        null, null, null, null, null, null, null);
-                            }
-                        }
-                        if (javaType != null) {
-                            // if the exception type is not resolved, it is not added to the list of exceptions
-                            exceptionTypes.add(javaType);
-                        }
+                        JavaType javaType = type(exceptionType);
+                        exceptionTypes.add(javaType);
                     }
                 }
             }
