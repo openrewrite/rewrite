@@ -81,7 +81,7 @@ fragment HexDigit
 // https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md#numeric-literals
 
 NumericLiteral
-    : [0-9]+ '.' [0-9]* ExponentPart?
+    : [0-9]+ '.' [0-9]+ ExponentPart?
     | [0-9]+ ExponentPart
     | [0-9]+
     ;
@@ -128,6 +128,7 @@ COMMA                           : ',';
 MOD                             : '%';
 ELLIPSIS                        : '...';
 TILDE                           : '~';
+
 
 // ----------------------------------------------------------------------------------------------
 mode TEMPLATE;
