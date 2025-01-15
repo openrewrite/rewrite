@@ -374,9 +374,9 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
         }
         if (oldAttributeValue == null) { // null means wildcard
             return true;
-        } else if (expression instanceof J.Literal) { // 219 & 203
+        } else if (expression instanceof J.Literal) {
             return oldAttributeValue.equals(((J.Literal) expression).getValue());
-        } else if (expression instanceof J.FieldAccess) { // 236
+        } else if (expression instanceof J.FieldAccess) {
             J.FieldAccess fa = (J.FieldAccess) expression;
             String currentValue = ((J.Identifier) fa.getTarget()).getSimpleName() + "." + fa.getSimpleName();
             return oldAttributeValue.equals(currentValue);
