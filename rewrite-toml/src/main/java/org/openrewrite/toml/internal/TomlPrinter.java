@@ -103,12 +103,12 @@ public class TomlPrinter<P> extends TomlVisitor<PrintOutputCapture<P>> {
             p.append("}");
         } else if (table.getMarkers().findFirst(ArrayTable.class).isPresent()) {
             p.append("[[");
-            visitRightPadded(table.getName(), p);
+            visitRightPadded(table.getPadding().getName(), p);
             p.append("]]");
             visitRightPadded(table.getPadding().getValues(), "", p);
         } else {
             p.append("[");
-            visitRightPadded(table.getName(), p);
+            visitRightPadded(table.getPadding().getName(), p);
             p.append("]");
             visitRightPadded(table.getPadding().getValues(), "", p);
         }
