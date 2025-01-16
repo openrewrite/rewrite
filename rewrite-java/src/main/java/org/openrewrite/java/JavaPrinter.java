@@ -484,19 +484,11 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     @Override
     public J visitCase(Case case_, PrintOutputCapture<P> p) {
         beforeSyntax(case_, Space.Location.CASE_PREFIX, p);
-        if (!case_.getCaseLabels().isEmpty()) {
-            J elem = case_.getCaseLabels().get(0);
-            if (!(elem instanceof Identifier) || !((Identifier) elem).getSimpleName().equals("default")) {
-                p.append("case");
-            }
-            visitContainer("", case_.getPadding().getCaseLabels(), JContainer.Location.CASE_LABEL, ",", "", p);
-        } else {
-            Expression elem = case_.getExpressions().get(0);
-            if (!(elem instanceof Identifier) || !((Identifier) elem).getSimpleName().equals("default")) {
-                p.append("case");
-            }
-            visitContainer("", case_.getPadding().getExpressions(), JContainer.Location.CASE_EXPRESSION, ",", "", p);
+        J elem = case_.getCaseLabels().get(0);
+        if (!(elem instanceof Identifier) || !((Identifier) elem).getSimpleName().equals("default")) {
+            p.append("case");
         }
+        visitContainer("", case_.getPadding().getCaseLabels(), JContainer.Location.CASE_LABEL, ",", "", p);
         if (case_.getGuard() != null) {
             visit(case_.getGuard(), p);
         }
