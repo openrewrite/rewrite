@@ -320,11 +320,13 @@ public class ResolvedPom {
 
     public @Nullable String getManagedVersion(@Nullable String groupId, String artifactId, @Nullable String type, @Nullable String classifier) {
         for (ResolvedManagedDependency dm : dependencyManagement) {
+            if (dm.getVersion() == null) {
+                continue; // Unclear why this happens; just ignore those entries, because a valid version is requested
+            }
             if (dm.matches(groupId, artifactId, type, classifier)) {
                 return getValue(dm.getVersion());
             }
         }
-
         return null;
     }
 
