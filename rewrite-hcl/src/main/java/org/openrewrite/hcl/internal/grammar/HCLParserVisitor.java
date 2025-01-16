@@ -132,6 +132,13 @@ public interface HCLParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitIndexAccessExpression(HCLParser.IndexAccessExpressionContext ctx);
 	/**
+	 * Visit a parse tree produced by the {@code LegacyIndexAttributeExpression}
+	 * labeled alternative in {@link HCLParser#exprTerm}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitLegacyIndexAttributeExpression(HCLParser.LegacyIndexAttributeExpressionContext ctx);
+	/**
 	 * Visit a parse tree produced by the {@code ForExpression}
 	 * labeled alternative in {@link HCLParser#exprTerm}.
 	 * @param ctx the parse tree
@@ -248,6 +255,12 @@ public interface HCLParserVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitGetAttr(HCLParser.GetAttrContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link HCLParser#legacyIndexAttr}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitLegacyIndexAttr(HCLParser.LegacyIndexAttrContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link HCLParser#splat}.
 	 * @param ctx the parse tree

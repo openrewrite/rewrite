@@ -58,17 +58,12 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
     @Nullable
     String newArtifactId;
 
-    /**
-     * Mistakenly introduced, we restored newArtifactId but let's not break recipes abruptly.
-     */
-    @Option(displayName = "New artifact ID",
-        description = "The new artifact ID to use. Defaults to the existing artifact ID. This property is deprecated, use newArtifactId instead.",
-        example = "my-new-maven-plugin",
-        required = false)
+    @Option(displayName = "New version",
+            description = "An exact version number or node-style semver selector used to select the version number.",
+            example = "29.X",
+            required = false)
     @Nullable
-    @Deprecated
-    @SuppressWarnings("DeprecatedIsStillUsed")
-    String newArtifact;
+    String newVersion;
 
     @Override
     public String getDisplayName() {
@@ -82,7 +77,7 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Change the groupId and/or the artifactId of a specified Maven plugin.";
+        return "Change the groupId and/or the artifactId of a specified Maven plugin. Optionally update the plugin version.";
     }
 
     @Override
@@ -98,8 +93,9 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
                     }
                     if (newArtifactId != null) {
                         t = changeChildTagValue(t, "artifactId", newArtifactId, ctx);
-                    } else if (newArtifact != null) {
-                        t = changeChildTagValue(t, "artifactId", newArtifact, ctx);
+                    }
+                    if (newVersion != null) {
+                        t = changeChildTagValue(t, "version", newVersion, ctx);
                     }
                     if (t != tag) {
                         maybeUpdateModel();
