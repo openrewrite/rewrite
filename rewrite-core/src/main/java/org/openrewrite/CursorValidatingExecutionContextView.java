@@ -19,7 +19,7 @@ import org.jspecify.annotations.Nullable;
 
 public class CursorValidatingExecutionContextView extends DelegatingExecutionContext {
     private static final String VALIDATE_CURSOR_ACYCLIC = "org.openrewrite.CursorValidatingExecutionContextView.ValidateCursorAcyclic";
-    private static final String VALIDATE_CTX_MUTATION = "org.openrewrite.CursorValidatingExecutionContextView.AllowExecutionContextMutation";
+    private static final String VALIDATE_CTX_MUTATION = "org.openrewrite.CursorValidatingExecutionContextView.ValidateExecutionContextImmutability";
 
     public CursorValidatingExecutionContextView(ExecutionContext delegate) {
         super(delegate);
@@ -49,8 +49,10 @@ public class CursorValidatingExecutionContextView extends DelegatingExecutionCon
 
     @Override
     public void putMessage(String key, @Nullable Object value) {
-        assert !getMessage(VALIDATE_CTX_MUTATION, false) || key.equals(VALIDATE_CURSOR_ACYCLIC) || key.equals(VALIDATE_CTX_MUTATION)
-                || key.equals(ExecutionContext.CURRENT_CYCLE) || key.equals(ExecutionContext.CURRENT_RECIPE) || key.equals(ExecutionContext.DATA_TABLES)
+        boolean mutationAllowed = !getMessage(VALIDATE_CTX_MUTATION, false) || key.equals(VALIDATE_CURSOR_ACYCLIC) || key.equals(VALIDATE_CTX_MUTATION)
+                                  || key.equals(ExecutionContext.CURRENT_CYCLE) || key.equals(ExecutionContext.CURRENT_RECIPE) || key.equals(ExecutionContext.DATA_TABLES)
+                                  || key.startsWith("org.openrewrite.maven"); // MavenExecutionContextView stores metrics
+        assert mutationAllowed
                 : "Recipe mutated execution context key \"" + key + "\". " +
                   "Recipes should not mutate the contents of the ExecutionContext as it allows mutable state to leak between " +
                   "recipes, opening the door for difficult to debug recipe composition errors. " +
