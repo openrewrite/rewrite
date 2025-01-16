@@ -33,11 +33,11 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
-import org.openrewrite.maven.http.OkHttpSender;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenParser;
 import org.openrewrite.maven.MavenSettings;
+import org.openrewrite.maven.http.OkHttpSender;
 import org.openrewrite.maven.tree.*;
 
 import javax.net.ssl.SSLSocketFactory;
@@ -314,7 +314,7 @@ class MavenPomDownloaderTest {
 
         @Test
         @Disabled
-        void dontFetchSnapshotsFromReleaseRepos() {
+        void dontFetchSnapshotsFromReleaseRepos() throws Exception {
             try (MockWebServer snapshotRepo = new MockWebServer();
                  MockWebServer releaseRepo = new MockWebServer()) {
                 snapshotRepo.setDispatcher(new Dispatcher() {
@@ -322,39 +322,39 @@ class MavenPomDownloaderTest {
                     public MockResponse dispatch(RecordedRequest request) {
                         MockResponse response = new MockResponse().setResponseCode(200);
                         if (request.getPath() != null && request.getPath().contains("maven-metadata")) {
+                            //language=xml
                             response.setBody(
-                              //language=xml
                               """
-                                    <metadata modelVersion="1.1.0">
-                                      <groupId>org.springframework.cloud</groupId>
-                                      <artifactId>spring-cloud-dataflow-build</artifactId>
-                                      <version>2.10.0-SNAPSHOT</version>
-                                      <versioning>
-                                        <snapshot>
-                                          <timestamp>20220201.001946</timestamp>
-                                          <buildNumber>85</buildNumber>
-                                        </snapshot>
-                                        <lastUpdated>20220201001950</lastUpdated>
-                                        <snapshotVersions>
-                                          <snapshotVersion>
-                                            <extension>pom</extension>
-                                            <value>2.10.0-20220201.001946-85</value>
-                                            <updated>20220201001946</updated>
-                                          </snapshotVersion>
-                                        </snapshotVersions>
-                                      </versioning>
-                                    </metadata>
+                                <metadata modelVersion="1.1.0">
+                                  <groupId>org.springframework.cloud</groupId>
+                                  <artifactId>spring-cloud-dataflow-build</artifactId>
+                                  <version>2.10.0-SNAPSHOT</version>
+                                  <versioning>
+                                    <snapshot>
+                                      <timestamp>20220201.001946</timestamp>
+                                      <buildNumber>85</buildNumber>
+                                    </snapshot>
+                                    <lastUpdated>20220201001950</lastUpdated>
+                                    <snapshotVersions>
+                                      <snapshotVersion>
+                                        <extension>pom</extension>
+                                        <value>2.10.0-20220201.001946-85</value>
+                                        <updated>20220201001946</updated>
+                                      </snapshotVersion>
+                                    </snapshotVersions>
+                                  </versioning>
+                                </metadata>
                                 """
                             );
                         } else if (request.getPath() != null && request.getPath().endsWith(".pom")) {
+                            //language=xml
                             response.setBody(
-                              //language=xml
                               """
-                                    <project>
-                                        <groupId>org.springframework.cloud</groupId>
-                                        <artifactId>spring-cloud-dataflow-build</artifactId>
-                                        <version>2.10.0-SNAPSHOT</version>
-                                    </project>
+                                <project>
+                                    <groupId>org.springframework.cloud</groupId>
+                                    <artifactId>spring-cloud-dataflow-build</artifactId>
+                                    <version>2.10.0-SNAPSHOT</version>
+                                </project>
                                 """
                             );
                         }
@@ -380,117 +380,111 @@ class MavenPomDownloaderTest {
                 MavenParser.builder().build().parse(ctx,
                   //language=xml
                   """
-                        <project>
-                            <modelVersion>4.0.0</modelVersion>
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
                     
-                            <groupId>org.openrewrite.test</groupId>
-                            <artifactId>foo</artifactId>
-                            <version>0.1.0-SNAPSHOT</version>
+                        <groupId>org.openrewrite.test</groupId>
+                        <artifactId>foo</artifactId>
+                        <version>0.1.0-SNAPSHOT</version>
                     
-                            <repositories>
-                              <repository>
-                                <id>snapshot</id>
-                                <snapshots>
-                                  <enabled>true</enabled>
-                                </snapshots>
-                                <url>http://%s:%d</url>
-                              </repository>
-                              <repository>
-                                <id>release</id>
-                                <snapshots>
-                                  <enabled>false</enabled>
-                                </snapshots>
-                                <url>http://%s:%d</url>
-                              </repository>
-                            </repositories>
+                        <repositories>
+                          <repository>
+                            <id>snapshot</id>
+                            <snapshots>
+                              <enabled>true</enabled>
+                            </snapshots>
+                            <url>http://%s:%d</url>
+                          </repository>
+                          <repository>
+                            <id>release</id>
+                            <snapshots>
+                              <enabled>false</enabled>
+                            </snapshots>
+                            <url>http://%s:%d</url>
+                          </repository>
+                        </repositories>
                     
-                            <dependencies>
-                                <dependency>
-                                    <groupId>org.springframework.cloud</groupId>
-                                    <artifactId>spring-cloud-dataflow-build</artifactId>
-                                    <version>2.10.0-SNAPSHOT</version>
-                                </dependency>
-                            </dependencies>
-                        </project>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.springframework.cloud</groupId>
+                                <artifactId>spring-cloud-dataflow-build</artifactId>
+                                <version>2.10.0-SNAPSHOT</version>
+                            </dependency>
+                        </dependencies>
+                    </project>
                     """.formatted(snapshotRepo.getHostName(), snapshotRepo.getPort(), releaseRepo.getHostName(), releaseRepo.getPort())
                 );
 
                 assertThat(snapshotRepo.getRequestCount()).isGreaterThan(1);
                 assertThat(metadataPaths.get()).isEqualTo(0);
-
-
-
-            } catch (IOException e) {
-                throw new RuntimeException(e);
             }
         }
 
         @Issue("https://github.com/openrewrite/rewrite-maven-plugin/issues/862")
         @Test
-        void fetchSnapshotWithCorrectClassifier() throws MavenDownloadingException {
+        void fetchSnapshotWithCorrectClassifier() throws Exception {
             try (MockWebServer snapshotServer = new MockWebServer()) {
                 snapshotServer.setDispatcher(new Dispatcher() {
                     @Override
                     public MockResponse dispatch(RecordedRequest request) {
                         MockResponse response = new MockResponse().setResponseCode(200);
                         if (request.getPath() != null && request.getPath().contains("maven-metadata")) {
+                            //language=xml
                             response.setBody(
-                              //language=xml
                               """
-                                
-                                    <metadata modelVersion="1.1.0">
-                                         <groupId>com.some</groupId>
-                                         <artifactId>an-artifact</artifactId>
-                                         <version>10.5.0-SNAPSHOT</version>
-                                         <versioning>
-                                           <snapshot>
-                                             <timestamp>20250113.114247</timestamp>
-                                             <buildNumber>36</buildNumber>
-                                           </snapshot>
-                                           <lastUpdated>20250113114247</lastUpdated>
-                                           <snapshotVersions>
-                                             <snapshotVersion>
-                                               <classifier>javadoc</classifier>
-                                               <extension>jar</extension>
-                                               <value>10.5.0-20250113.114247-36</value>
-                                               <updated>20250113114247</updated>
-                                             </snapshotVersion>
-                                             <snapshotVersion>
-                                               <classifier>tests</classifier>
-                                               <extension>jar</extension>
-                                               <value>10.5.0-20250113.114244-35</value>
-                                               <updated>20250113114244</updated>
-                                             </snapshotVersion>
-                                             <snapshotVersion>
-                                               <classifier>sources</classifier>
-                                               <extension>jar</extension>
-                                               <value>10.5.0-20250113.114242-34</value>
-                                               <updated>20250113114242</updated>
-                                             </snapshotVersion>
-                                             <snapshotVersion>
-                                               <extension>jar</extension>
-                                               <value>10.5.0-20250113.114227-33</value>
-                                               <updated>20250113114227</updated>
-                                             </snapshotVersion>
-                                             <snapshotVersion>
-                                               <extension>pom</extension>
-                                               <value>10.5.0-20250113.114227-33</value>
-                                               <updated>20250113114227</updated>
-                                             </snapshotVersion>
-                                           </snapshotVersions>
-                                         </versioning>
-                                       </metadata>
+                                <metadata modelVersion="1.1.0">
+                                  <groupId>com.some</groupId>
+                                  <artifactId>an-artifact</artifactId>
+                                  <version>10.5.0-SNAPSHOT</version>
+                                  <versioning>
+                                    <snapshot>
+                                      <timestamp>20250113.114247</timestamp>
+                                      <buildNumber>36</buildNumber>
+                                    </snapshot>
+                                    <lastUpdated>20250113114247</lastUpdated>
+                                    <snapshotVersions>
+                                      <snapshotVersion>
+                                        <classifier>javadoc</classifier>
+                                        <extension>jar</extension>
+                                        <value>10.5.0-20250113.114247-36</value>
+                                        <updated>20250113114247</updated>
+                                      </snapshotVersion>
+                                      <snapshotVersion>
+                                        <classifier>tests</classifier>
+                                        <extension>jar</extension>
+                                        <value>10.5.0-20250113.114244-35</value>
+                                        <updated>20250113114244</updated>
+                                      </snapshotVersion>
+                                      <snapshotVersion>
+                                        <classifier>sources</classifier>
+                                        <extension>jar</extension>
+                                        <value>10.5.0-20250113.114242-34</value>
+                                        <updated>20250113114242</updated>
+                                      </snapshotVersion>
+                                      <snapshotVersion>
+                                        <extension>jar</extension>
+                                        <value>10.5.0-20250113.114227-33</value>
+                                        <updated>20250113114227</updated>
+                                      </snapshotVersion>
+                                      <snapshotVersion>
+                                        <extension>pom</extension>
+                                        <value>10.5.0-20250113.114227-33</value>
+                                        <updated>20250113114227</updated>
+                                      </snapshotVersion>
+                                    </snapshotVersions>
+                                  </versioning>
+                                </metadata>
                                 """
                             );
                         } else if (request.getPath() != null && request.getPath().endsWith(".pom")) {
+                            //language=xml
                             response.setBody(
-                              //language=xml
                               """
-                                    <project>
-                                         <groupId>com.some</groupId>
-                                         <artifactId>an-artifact</artifactId>
-                                         <version>10.5.0-SNAPSHOT</version>
-                                    </project>
+                                <project>
+                                     <groupId>com.some</groupId>
+                                     <artifactId>an-artifact</artifactId>
+                                     <version>10.5.0-SNAPSHOT</version>
+                                </project>
                                 """
                             );
                         }
@@ -500,69 +494,59 @@ class MavenPomDownloaderTest {
 
                 snapshotServer.start();
 
+                //language=xml
                 MavenParser.builder().build().parse(ctx,
-                  //language=xml
                   """
-                        <project>
-                            <modelVersion>4.0.0</modelVersion>
-                    
-                            <groupId>org.openrewrite.test</groupId>
-                            <artifactId>foo</artifactId>
-                            <version>0.1.0-SNAPSHOT</version>
-                    
-                            <repositories>
-                              <repository>
-                                <id>snapshot</id>
-                                <snapshots>
-                                  <enabled>true</enabled>
-                                </snapshots>
-                                <url>http://%s:%d</url>
-                              </repository>
-                            </repositories>
-                    
-                            <dependencies>
-                                <dependency>
-                                     <groupId>com.some</groupId>
-                                     <artifactId>an-artifact</artifactId>
-                                     <version>10.5.0-SNAPSHOT</version>
-                                </dependency>
-                            </dependencies>
-                        </project>
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <groupId>org.openrewrite.test</groupId>
+                        <artifactId>foo</artifactId>
+                        <version>0.1.0-SNAPSHOT</version>
+                        <repositories>
+                          <repository>
+                            <id>snapshot</id>
+                            <snapshots>
+                              <enabled>true</enabled>
+                            </snapshots>
+                            <url>http://%s:%d</url>
+                          </repository>
+                        </repositories>
+                        <dependencies>
+                            <dependency>
+                                 <groupId>com.some</groupId>
+                                 <artifactId>an-artifact</artifactId>
+                                 <version>10.5.0-SNAPSHOT</version>
+                            </dependency>
+                        </dependencies>
+                    </project>
                     """.formatted(snapshotServer.getHostName(), snapshotServer.getPort())
                 );
 
                 MavenRepository snapshotRepo = MavenRepository.builder()
-                    .id("id")
-                    .uri("http://%s:%d/maven/".formatted(snapshotServer.getHostName(), snapshotServer.getPort()))
-                    .build();
+                  .id("id")
+                  .uri("http://%s:%d/maven/".formatted(snapshotServer.getHostName(), snapshotServer.getPort()))
+                  .build();
 
                 var gav = new GroupArtifactVersion("com.some", "an-artifact", "10.5.0-SNAPSHOT");
                 var mavenPomDownloader = new MavenPomDownloader(emptyMap(), ctx);
 
                 var pomPath = Paths.get("pom.xml");
                 var pom = Pom.builder()
-                    .sourcePath(pomPath)
-                    .repository(snapshotRepo)
-                    .properties(singletonMap("REPO_URL", snapshotRepo.getUri()))
-                    .gav(new ResolvedGroupArtifactVersion(
-                      "${REPO_URL}", gav.getGroupId(), gav.getArtifactId(), gav.getVersion(), null))
-                    .build();
+                  .sourcePath(pomPath)
+                  .repository(snapshotRepo)
+                  .properties(singletonMap("REPO_URL", snapshotRepo.getUri()))
+                  .gav(new ResolvedGroupArtifactVersion(
+                    "${REPO_URL}", gav.getGroupId(), gav.getArtifactId(), gav.getVersion(), null))
+                  .build();
                 var resolvedPom = ResolvedPom.builder()
-                    .requested(pom)
-                    .properties(singletonMap("REPO_URL", snapshotRepo.getUri()))
-                    .repositories(singletonList(snapshotRepo))
-                    .build();
-
-
-                var downloadedPom = mavenPomDownloader.download(gav, null, resolvedPom, List.of(snapshotRepo));
+                  .requested(pom)
+                  .properties(singletonMap("REPO_URL", snapshotRepo.getUri()))
+                  .repositories(singletonList(snapshotRepo))
+                  .build();
 
                 // Ensure that classifier 'javadoc', 'tests' and 'sources' are not used
-                assertThat(downloadedPom)
-                    .isNotNull()
-                    .returns("10.5.0-20250113.114227-33", Pom::getDatedSnapshotVersion);
-
-            } catch (IOException e) {
-                throw new RuntimeException(e);
+                var downloadedPom = mavenPomDownloader.download(gav, null, resolvedPom, List.of(snapshotRepo));
+                assertThat(downloadedPom).returns("10.5.0-20250113.114227-33", Pom::getDatedSnapshotVersion);
             }
         }
 
