@@ -196,7 +196,8 @@ class ChangePluginGroupIdAndArtifactIdTest implements RewriteTest {
           )
         );
     }
-@Test
+
+    @Test
     void changePluginGroupIdAndArtifactIdNoChangeWithVersion() {
         rewriteRun(
           spec -> spec.recipe(new ChangePluginGroupIdAndArtifactId(

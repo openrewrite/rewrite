@@ -77,7 +77,7 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Change the groupId and/or the artifactId of a specified Maven plugin.  Optionally update the plugin version.";
+        return "Change the groupId and/or the artifactId of a specified Maven plugin. Optionally update the plugin version.";
     }
 
     @Override
