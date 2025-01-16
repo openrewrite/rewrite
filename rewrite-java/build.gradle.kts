@@ -60,6 +60,7 @@ dependencies {
 
     implementation("org.ow2.asm:asm:latest.release")
     implementation("org.ow2.asm:asm-util:latest.release")
+    implementation("com.puppycrawl.tools:checkstyle:10.21.1")
 
     testImplementation("org.yaml:snakeyaml:latest.release")
     testImplementation(project(":rewrite-test"))

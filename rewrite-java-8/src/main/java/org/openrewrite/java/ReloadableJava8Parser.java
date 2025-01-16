@@ -113,7 +113,7 @@ class ReloadableJava8Parser implements JavaParser {
 
         LOMBOK:
         if (System.getenv().getOrDefault("REWRITE_LOMBOK", System.getProperty("rewrite.lombok")) != null &&
-            classpath != null && classpath.stream().anyMatch(it -> it.toString().contains("lombok"))) {
+                classpath != null && classpath.stream().anyMatch(it -> it.toString().contains("lombok"))) {
             Processor lombokProcessor = null;
             try {
                 // https://projectlombok.org/contributing/lombok-execution-path
@@ -255,7 +255,7 @@ class ReloadableJava8Parser implements JavaParser {
         }
         try {
             //noinspection unchecked
-            com.sun.tools.javac.util.List<JCTree.JCCompilationUnit> jcCompilationUnits = compiler.parseFiles((List<JavaFileObject>) (List<?>) inputFileObjects);
+            com.sun.tools.javac.util.List<JCTree.JCCompilationUnit> jcCompilationUnits = com.sun.tools.javac.util.List.from(inputFileObjects.stream().map(input -> compiler.parse(input)).toArray(JCTree.JCCompilationUnit[]::new));
             for (int i = 0; i < inputFileObjects.size(); i++) {
                 cus.put(inputFileObjects.get(i).getInput(), jcCompilationUnits.get(i));
             }

@@ -21,6 +21,8 @@ dependencies {
     implementation("org.ow2.asm:asm:latest.release")
 
     implementation("io.micrometer:micrometer-core:1.9.+")
+    implementation("com.puppycrawl.tools:checkstyle:10.21.1")
+
 
     testImplementation("org.junit.jupiter:junit-jupiter-api")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
@@ -84,4 +86,8 @@ testing {
 
 tasks.named("check") {
     dependsOn(testing.suites.named("compatibilityTest"))
+}
+
+tasks.named<JavaCompile>("compileJava") {
+    options.compilerArgs.addAll(arrayOf("-parameters", "-Xlint:deprecation", "-Xlint:unchecked"))
 }
