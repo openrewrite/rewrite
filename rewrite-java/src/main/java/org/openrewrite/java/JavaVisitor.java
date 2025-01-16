@@ -423,7 +423,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         } else {
             c = (J.Case) temp;
         }
-        c = c.getPadding().withExpressions(visitContainer(c.getPadding().getExpressions(), JContainer.Location.CASE_EXPRESSION, p));
+        c = c.getPadding().withCaseLabels(visitContainer(c.getPadding().getCaseLabels(), JContainer.Location.CASE_LABEL, p));
         c = c.getPadding().withBody(visitRightPadded(c.getPadding().getBody(), JRightPadded.Location.CASE_BODY, p));
         c = c.getPadding().withStatements(visitContainer(c.getPadding().getStatements(), JContainer.Location.CASE, p));
         return c;
