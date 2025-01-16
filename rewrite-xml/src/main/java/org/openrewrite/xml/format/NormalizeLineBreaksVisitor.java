@@ -21,6 +21,8 @@ import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
+import static org.openrewrite.format.LineBreaks.normalizeNewLines;
+
 public class NormalizeLineBreaksVisitor<P> extends XmlIsoVisitor<P> {
     @Nullable
     private final Tree stopAfter;
@@ -49,23 +51,6 @@ public class NormalizeLineBreaksVisitor<P> extends XmlIsoVisitor<P> {
         }
 
         return super.visit(tree, p);
-    }
-
-    private static String normalizeNewLines(String text, boolean useCrlf) {
-        if (!text.contains("\n")) {
-            return text;
-        }
-        StringBuilder normalized = new StringBuilder();
-        char[] charArray = text.toCharArray();
-        for (int i = 0; i < charArray.length; i++) {
-            char c = charArray[i];
-            if (useCrlf && c == '\n' && (i == 0 || text.charAt(i - 1) != '\r')) {
-                normalized.append('\r').append('\n');
-            } else if (useCrlf || c != '\r') {
-                normalized.append(c);
-            }
-        }
-        return normalized.toString();
     }
 
     @Override
