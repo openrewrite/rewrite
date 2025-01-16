@@ -255,7 +255,10 @@ class ReloadableJava8Parser implements JavaParser {
         }
         try {
             //noinspection unchecked
-            com.sun.tools.javac.util.List<JCTree.JCCompilationUnit> jcCompilationUnits = com.sun.tools.javac.util.List.from(inputFileObjects.stream().map(input -> compiler.parse(input)).toArray(JCTree.JCCompilationUnit[]::new));
+            com.sun.tools.javac.util.List<JCTree.JCCompilationUnit> jcCompilationUnits = com.sun.tools.javac.util.List.from(
+                    inputFileObjects.stream()
+                            .map(input -> compiler.parse(input))
+                            .toArray(JCTree.JCCompilationUnit[]::new));
             for (int i = 0; i < inputFileObjects.size(); i++) {
                 cus.put(inputFileObjects.get(i).getInput(), jcCompilationUnits.get(i));
             }
