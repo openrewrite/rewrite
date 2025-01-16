@@ -82,20 +82,20 @@ public class AddKeyValue extends Recipe {
                 if (pathMatcher.matches(getCursor()) && objectDoesNotContainKey(obj, key)) {
                     List<Json> originalMembers = obj.getMembers();
                     boolean jsonIsEmpty = originalMembers.isEmpty() || originalMembers.get(0) instanceof Json.Empty;
-                    Space space = jsonIsEmpty || prepend ? originalMembers.get(0).getPrefix() : Space.SINGLE_SPACE;
+                    Space space = jsonIsEmpty || prepend ? originalMembers.get(0).getPrefix() : Space.build("\n", emptyList());
 
                     JsonRightPadded<JsonKey> newKey = rightPaddedKey();
                     Json.Literal newValue = valueLiteral();
                     Json newMember = new Json.Member(randomId(), space, Markers.EMPTY, newKey, newValue);
 
                     if (jsonIsEmpty) {
-                        return obj.withMembers(Collections.singletonList(newMember));
+                        return autoFormat(obj.withMembers(Collections.singletonList(newMember)), ctx, getCursor().getParent());
                     }
 
                     List<Json> newMembers = prepend ?
                             ListUtils.concat(newMember, originalMembers) :
                             ListUtils.concat(originalMembers, newMember);
-                    return obj.withMembers(newMembers);
+                    return autoFormat(obj.withMembers(newMembers), ctx, getCursor().getParent());
                 }
                 return obj;
             }
