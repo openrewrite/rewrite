@@ -31,7 +31,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.maven.Assertions.pomXml;
@@ -371,16 +370,11 @@ class ResolvedPomTest implements RewriteTest {
     }
 
     @Nested
-    @Issue("https://github.com/openrewrite/rewrite-maven-plugin/issues/862")
     class DependencyManagement {
 
-        @TempDir
-        Path localRepository;
-
+        @Issue("https://github.com/openrewrite/rewrite-maven-plugin/issues/862")
         @Test
-        void resolveVersionFromParentDependencyManagement() throws IOException {
-
-
+        void resolveVersionFromParentDependencyManagement(@TempDir Path localRepository) throws IOException {
             MavenRepository mavenLocal = createMavenRepository(localRepository, "local");
             createJarFile(localRepository);
             createJarFile(localRepository, "org.openrewrite.test", "lib", "1.0");
@@ -398,7 +392,6 @@ class ResolvedPomTest implements RewriteTest {
                     downloadErrorArgs.add(list);
                 }
             });
-
 
             String father = """
               <project>
@@ -491,16 +484,8 @@ class ResolvedPomTest implements RewriteTest {
     }
 
     private static void createJarFile(Path localRepository, String groupId, String artifactId, String version) throws IOException {
-
-        Objects.requireNonNull(groupId);
-        Objects.requireNonNull(artifactId);
-        Objects.requireNonNull(version);
-
-        // Build the path based on groupId, artifactId, and version
-        String artifactPath = String.format("%s/%s/%s/%s-%s.jar", groupId.replace('.', '/'), artifactId, version, artifactId, version);
-        Path localJar = localRepository.resolve(artifactPath);
-
-        // Create directories and the JAR file with sample content
+        Path localJar = localRepository.resolve("%s/%s/%s/%s-%s.jar".formatted(
+          groupId.replace('.', '/'), artifactId, version, artifactId, version));
         assertThat(localJar.getParent().toFile().mkdirs()).isTrue();
         Files.writeString(localJar, "some content not to be empty");
     }
@@ -513,6 +498,4 @@ class ResolvedPomTest implements RewriteTest {
           .knownToExist(true)
           .build();
     }
-
-
 }
