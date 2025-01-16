@@ -417,6 +417,150 @@ class MavenPomDownloaderTest {
 
                 assertThat(snapshotRepo.getRequestCount()).isGreaterThan(1);
                 assertThat(metadataPaths.get()).isEqualTo(0);
+
+
+
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite-maven-plugin/issues/862")
+        @Test
+        void fetchSnapshotWithCorrectClassifier() throws MavenDownloadingException {
+            try (MockWebServer snapshotServer = new MockWebServer()) {
+                snapshotServer.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest request) {
+                        MockResponse response = new MockResponse().setResponseCode(200);
+                        if (request.getPath() != null && request.getPath().contains("maven-metadata")) {
+                            response.setBody(
+                              //language=xml
+                              """
+                                
+                                    <metadata modelVersion="1.1.0">
+                                         <groupId>com.some</groupId>
+                                         <artifactId>an-artifact</artifactId>
+                                         <version>10.5.0-SNAPSHOT</version>
+                                         <versioning>
+                                           <snapshot>
+                                             <timestamp>20250113.114247</timestamp>
+                                             <buildNumber>36</buildNumber>
+                                           </snapshot>
+                                           <lastUpdated>20250113114247</lastUpdated>
+                                           <snapshotVersions>
+                                             <snapshotVersion>
+                                               <classifier>javadoc</classifier>
+                                               <extension>jar</extension>
+                                               <value>10.5.0-20250113.114247-36</value>
+                                               <updated>20250113114247</updated>
+                                             </snapshotVersion>
+                                             <snapshotVersion>
+                                               <classifier>tests</classifier>
+                                               <extension>jar</extension>
+                                               <value>10.5.0-20250113.114244-35</value>
+                                               <updated>20250113114244</updated>
+                                             </snapshotVersion>
+                                             <snapshotVersion>
+                                               <classifier>sources</classifier>
+                                               <extension>jar</extension>
+                                               <value>10.5.0-20250113.114242-34</value>
+                                               <updated>20250113114242</updated>
+                                             </snapshotVersion>
+                                             <snapshotVersion>
+                                               <extension>jar</extension>
+                                               <value>10.5.0-20250113.114227-33</value>
+                                               <updated>20250113114227</updated>
+                                             </snapshotVersion>
+                                             <snapshotVersion>
+                                               <extension>pom</extension>
+                                               <value>10.5.0-20250113.114227-33</value>
+                                               <updated>20250113114227</updated>
+                                             </snapshotVersion>
+                                           </snapshotVersions>
+                                         </versioning>
+                                       </metadata>
+                                """
+                            );
+                        } else if (request.getPath() != null && request.getPath().endsWith(".pom")) {
+                            response.setBody(
+                              //language=xml
+                              """
+                                    <project>
+                                         <groupId>com.some</groupId>
+                                         <artifactId>an-artifact</artifactId>
+                                         <version>10.5.0-SNAPSHOT</version>
+                                    </project>
+                                """
+                            );
+                        }
+                        return response;
+                    }
+                });
+
+                snapshotServer.start();
+
+                MavenParser.builder().build().parse(ctx,
+                  //language=xml
+                  """
+                        <project>
+                            <modelVersion>4.0.0</modelVersion>
+                    
+                            <groupId>org.openrewrite.test</groupId>
+                            <artifactId>foo</artifactId>
+                            <version>0.1.0-SNAPSHOT</version>
+                    
+                            <repositories>
+                              <repository>
+                                <id>snapshot</id>
+                                <snapshots>
+                                  <enabled>true</enabled>
+                                </snapshots>
+                                <url>http://%s:%d</url>
+                              </repository>
+                            </repositories>
+                    
+                            <dependencies>
+                                <dependency>
+                                     <groupId>com.some</groupId>
+                                     <artifactId>an-artifact</artifactId>
+                                     <version>10.5.0-SNAPSHOT</version>
+                                </dependency>
+                            </dependencies>
+                        </project>
+                    """.formatted(snapshotServer.getHostName(), snapshotServer.getPort())
+                );
+
+                MavenRepository snapshotRepo = MavenRepository.builder()
+                    .id("id")
+                    .uri("http://%s:%d/maven/".formatted(snapshotServer.getHostName(), snapshotServer.getPort()))
+                    .build();
+
+                var gav = new GroupArtifactVersion("com.some", "an-artifact", "10.5.0-SNAPSHOT");
+                var mavenPomDownloader = new MavenPomDownloader(emptyMap(), ctx);
+
+                var pomPath = Paths.get("pom.xml");
+                var pom = Pom.builder()
+                    .sourcePath(pomPath)
+                    .repository(snapshotRepo)
+                    .properties(singletonMap("REPO_URL", snapshotRepo.getUri()))
+                    .gav(new ResolvedGroupArtifactVersion(
+                      "${REPO_URL}", gav.getGroupId(), gav.getArtifactId(), gav.getVersion(), null))
+                    .build();
+                var resolvedPom = ResolvedPom.builder()
+                    .requested(pom)
+                    .properties(singletonMap("REPO_URL", snapshotRepo.getUri()))
+                    .repositories(singletonList(snapshotRepo))
+                    .build();
+
+
+                var downloadedPom = mavenPomDownloader.download(gav, null, resolvedPom, List.of(snapshotRepo));
+
+                // Ensure that classifier 'javadoc', 'tests' and 'sources' are not used
+                assertThat(downloadedPom)
+                    .isNotNull()
+                    .returns("10.5.0-20250113.114227-33", Pom::getDatedSnapshotVersion);
+
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
