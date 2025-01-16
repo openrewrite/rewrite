@@ -15,18 +15,14 @@
  */
 // Generated from java-escape by ANTLR 4.11.1
 package org.openrewrite.toml.internal.grammar;
-
-import org.antlr.v4.runtime.*;
-import org.antlr.v4.runtime.atn.ATN;
-import org.antlr.v4.runtime.atn.ATNDeserializer;
-import org.antlr.v4.runtime.atn.ParserATNSimulator;
-import org.antlr.v4.runtime.atn.PredictionContextCache;
+import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
-import org.antlr.v4.runtime.tree.ParseTreeListener;
-import org.antlr.v4.runtime.tree.ParseTreeVisitor;
-import org.antlr.v4.runtime.tree.TerminalNode;
-
+import org.antlr.v4.runtime.*;
+import org.antlr.v4.runtime.misc.*;
+import org.antlr.v4.runtime.tree.*;
 import java.util.List;
+import java.util.Iterator;
+import java.util.ArrayList;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue"})
 public class TomlParser extends Parser {
@@ -249,6 +245,7 @@ public class TomlParser extends Parser {
 	public final ExpressionContext expression() throws RecognitionException {
 		ExpressionContext _localctx = new ExpressionContext(_ctx, getState());
 		enterRule(_localctx, 2, RULE_expression);
+		int _la;
 		try {
 			setState(65);
 			_errHandler.sync(this);
@@ -262,14 +259,14 @@ public class TomlParser extends Parser {
 				keyValue();
 				setState(58);
 				_errHandler.sync(this);
-				switch ( getInterpreter().adaptivePredict(_input,3,_ctx) ) {
-				case 1:
+				_la = _input.LA(1);
+				if (_la==COMMENT) {
 					{
 					setState(57);
 					comment();
 					}
-					break;
 				}
+
 				}
 				break;
 			case L_BRACKET:
@@ -280,14 +277,14 @@ public class TomlParser extends Parser {
 				table();
 				setState(62);
 				_errHandler.sync(this);
-				switch ( getInterpreter().adaptivePredict(_input,4,_ctx) ) {
-				case 1:
+				_la = _input.LA(1);
+				if (_la==COMMENT) {
 					{
 					setState(61);
 					comment();
 					}
-					break;
 				}
+
 				}
 				break;
 			case COMMENT:
@@ -1086,8 +1083,8 @@ public class TomlParser extends Parser {
 
 	@SuppressWarnings("CheckReturnValue")
 	public static class CommentOrNlContext extends ParserRuleContext {
-		public TerminalNode COMMENT() { return getToken(TomlParser.COMMENT, 0); }
 		public TerminalNode NL() { return getToken(TomlParser.NL, 0); }
+		public TerminalNode COMMENT() { return getToken(TomlParser.COMMENT, 0); }
 		public CommentOrNlContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -1110,28 +1107,22 @@ public class TomlParser extends Parser {
 	public final CommentOrNlContext commentOrNl() throws RecognitionException {
 		CommentOrNlContext _localctx = new CommentOrNlContext(_ctx, getState());
 		enterRule(_localctx, 30, RULE_commentOrNl);
+		int _la;
 		try {
-			setState(114);
+			enterOuterAlt(_localctx, 1);
+			{
+			setState(112);
 			_errHandler.sync(this);
-			switch (_input.LA(1)) {
-			case COMMENT:
-				enterOuterAlt(_localctx, 1);
+			_la = _input.LA(1);
+			if (_la==COMMENT) {
 				{
 				setState(111);
 				match(COMMENT);
-				setState(112);
-				match(NL);
 				}
-				break;
-			case NL:
-				enterOuterAlt(_localctx, 2);
-				{
-				setState(113);
-				match(NL);
-				}
-				break;
-			default:
-				throw new NoViableAltException(this);
+			}
+
+			setState(114);
+			match(NL);
 			}
 		}
 		catch (RecognitionException re) {
@@ -1377,11 +1368,11 @@ public class TomlParser extends Parser {
 			return getRuleContext(KeyContext.class,0);
 		}
 		public TerminalNode R_BRACKET() { return getToken(TomlParser.R_BRACKET, 0); }
-		public List<ExpressionContext> expression() {
-			return getRuleContexts(ExpressionContext.class);
+		public List<KeyValueContext> keyValue() {
+			return getRuleContexts(KeyValueContext.class);
 		}
-		public ExpressionContext expression(int i) {
-			return getRuleContext(ExpressionContext.class,i);
+		public KeyValueContext keyValue(int i) {
+			return getRuleContext(KeyValueContext.class,i);
 		}
 		public List<CommentOrNlContext> commentOrNl() {
 			return getRuleContexts(CommentOrNlContext.class);
@@ -1411,6 +1402,7 @@ public class TomlParser extends Parser {
 	public final StandardTableContext standardTable() throws RecognitionException {
 		StandardTableContext _localctx = new StandardTableContext(_ctx, getState());
 		enterRule(_localctx, 36, RULE_standardTable);
+		int _la;
 		try {
 			int _alt;
 			enterOuterAlt(_localctx, 1);
@@ -1430,22 +1422,20 @@ public class TomlParser extends Parser {
 					{
 					setState(168);
 					_errHandler.sync(this);
-					_alt = getInterpreter().adaptivePredict(_input,19,_ctx);
-					while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
-						if ( _alt==1 ) {
-							{
-							{
-							setState(165);
-							commentOrNl();
-							}
-							} 
+					_la = _input.LA(1);
+					while (_la==NL || _la==COMMENT) {
+						{
+						{
+						setState(165);
+						commentOrNl();
+						}
 						}
 						setState(170);
 						_errHandler.sync(this);
-						_alt = getInterpreter().adaptivePredict(_input,19,_ctx);
+						_la = _input.LA(1);
 					}
 					setState(171);
-					expression();
+					keyValue();
 					}
 					} 
 				}
@@ -1635,11 +1625,11 @@ public class TomlParser extends Parser {
 			return getRuleContext(KeyContext.class,0);
 		}
 		public TerminalNode DOUBLE_R_BRACKET() { return getToken(TomlParser.DOUBLE_R_BRACKET, 0); }
-		public List<ExpressionContext> expression() {
-			return getRuleContexts(ExpressionContext.class);
+		public List<KeyValueContext> keyValue() {
+			return getRuleContexts(KeyValueContext.class);
 		}
-		public ExpressionContext expression(int i) {
-			return getRuleContext(ExpressionContext.class,i);
+		public KeyValueContext keyValue(int i) {
+			return getRuleContext(KeyValueContext.class,i);
 		}
 		public List<CommentOrNlContext> commentOrNl() {
 			return getRuleContexts(CommentOrNlContext.class);
@@ -1669,6 +1659,7 @@ public class TomlParser extends Parser {
 	public final ArrayTableContext arrayTable() throws RecognitionException {
 		ArrayTableContext _localctx = new ArrayTableContext(_ctx, getState());
 		enterRule(_localctx, 40, RULE_arrayTable);
+		int _la;
 		try {
 			int _alt;
 			enterOuterAlt(_localctx, 1);
@@ -1688,22 +1679,20 @@ public class TomlParser extends Parser {
 					{
 					setState(225);
 					_errHandler.sync(this);
-					_alt = getInterpreter().adaptivePredict(_input,28,_ctx);
-					while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
-						if ( _alt==1 ) {
-							{
-							{
-							setState(222);
-							commentOrNl();
-							}
-							} 
+					_la = _input.LA(1);
+					while (_la==NL || _la==COMMENT) {
+						{
+						{
+						setState(222);
+						commentOrNl();
+						}
 						}
 						setState(227);
 						_errHandler.sync(this);
-						_alt = getInterpreter().adaptivePredict(_input,28,_ctx);
+						_la = _input.LA(1);
 					}
 					setState(228);
-					expression();
+					keyValue();
 					}
 					} 
 				}
@@ -1741,8 +1730,8 @@ public class TomlParser extends Parser {
 		"\u0006\u0001\u0007\u0001\u0007\u0001\b\u0001\b\u0001\b\u0004\bY\b\b\u000b"+
 		"\b\f\bZ\u0001\t\u0001\t\u0001\t\u0001\t\u0001\t\u0001\t\u0001\t\u0003"+
 		"\td\b\t\u0001\n\u0001\n\u0001\u000b\u0001\u000b\u0001\f\u0001\f\u0001"+
-		"\r\u0001\r\u0001\u000e\u0001\u000e\u0001\u000f\u0001\u000f\u0001\u000f"+
-		"\u0003\u000fs\b\u000f\u0001\u0010\u0001\u0010\u0005\u0010w\b\u0010\n\u0010"+
+		"\r\u0001\r\u0001\u000e\u0001\u000e\u0001\u000f\u0003\u000fq\b\u000f\u0001"+
+		"\u000f\u0001\u000f\u0001\u0010\u0001\u0010\u0005\u0010w\b\u0010\n\u0010"+
 		"\f\u0010z\t\u0010\u0001\u0010\u0001\u0010\u0001\u0010\u0005\u0010\u007f"+
 		"\b\u0010\n\u0010\f\u0010\u0082\t\u0010\u0001\u0010\u0001\u0010\u0001\u0010"+
 		"\u0005\u0010\u0087\b\u0010\n\u0010\f\u0010\u008a\t\u0010\u0001\u0010\u0001"+
@@ -1771,7 +1760,7 @@ public class TomlParser extends Parser {
 		"U\u0001\u0000\u0000\u0000\u0012c\u0001\u0000\u0000\u0000\u0014e\u0001"+
 		"\u0000\u0000\u0000\u0016g\u0001\u0000\u0000\u0000\u0018i\u0001\u0000\u0000"+
 		"\u0000\u001ak\u0001\u0000\u0000\u0000\u001cm\u0001\u0000\u0000\u0000\u001e"+
-		"r\u0001\u0000\u0000\u0000 \u009c\u0001\u0000\u0000\u0000\"\u00a0\u0001"+
+		"p\u0001\u0000\u0000\u0000 \u009c\u0001\u0000\u0000\u0000\"\u00a0\u0001"+
 		"\u0000\u0000\u0000$\u00a2\u0001\u0000\u0000\u0000&\u00d9\u0001\u0000\u0000"+
 		"\u0000(\u00db\u0001\u0000\u0000\u0000*,\u0003\u0002\u0001\u0000+*\u0001"+
 		"\u0000\u0000\u0000+,\u0001\u0000\u0000\u0000,3\u0001\u0000\u0000\u0000"+
@@ -1804,9 +1793,9 @@ public class TomlParser extends Parser {
 		"f\u0015\u0001\u0000\u0000\u0000gh\u0007\u0002\u0000\u0000h\u0017\u0001"+
 		"\u0000\u0000\u0000ij\u0007\u0003\u0000\u0000j\u0019\u0001\u0000\u0000"+
 		"\u0000kl\u0005\u0010\u0000\u0000l\u001b\u0001\u0000\u0000\u0000mn\u0007"+
-		"\u0004\u0000\u0000n\u001d\u0001\u0000\u0000\u0000op\u0005\u0003\u0000"+
-		"\u0000ps\u0005\u0002\u0000\u0000qs\u0005\u0002\u0000\u0000ro\u0001\u0000"+
-		"\u0000\u0000rq\u0001\u0000\u0000\u0000s\u001f\u0001\u0000\u0000\u0000"+
+		"\u0004\u0000\u0000n\u001d\u0001\u0000\u0000\u0000oq\u0005\u0003\u0000"+
+		"\u0000po\u0001\u0000\u0000\u0000pq\u0001\u0000\u0000\u0000qr\u0001\u0000"+
+		"\u0000\u0000rs\u0005\u0002\u0000\u0000s\u001f\u0001\u0000\u0000\u0000"+
 		"tx\u0005\u0004\u0000\u0000uw\u0003\u001e\u000f\u0000vu\u0001\u0000\u0000"+
 		"\u0000wz\u0001\u0000\u0000\u0000xv\u0001\u0000\u0000\u0000xy\u0001\u0000"+
 		"\u0000\u0000y{\u0001\u0000\u0000\u0000zx\u0001\u0000\u0000\u0000{\u009d"+
@@ -1836,7 +1825,7 @@ public class TomlParser extends Parser {
 		"\u0000\u00a5\u00a7\u0003\u001e\u000f\u0000\u00a6\u00a5\u0001\u0000\u0000"+
 		"\u0000\u00a7\u00aa\u0001\u0000\u0000\u0000\u00a8\u00a6\u0001\u0000\u0000"+
 		"\u0000\u00a8\u00a9\u0001\u0000\u0000\u0000\u00a9\u00ab\u0001\u0000\u0000"+
-		"\u0000\u00aa\u00a8\u0001\u0000\u0000\u0000\u00ab\u00ad\u0003\u0002\u0001"+
+		"\u0000\u00aa\u00a8\u0001\u0000\u0000\u0000\u00ab\u00ad\u0003\u0006\u0003"+
 		"\u0000\u00ac\u00a8\u0001\u0000\u0000\u0000\u00ad\u00b0\u0001\u0000\u0000"+
 		"\u0000\u00ae\u00ac\u0001\u0000\u0000\u0000\u00ae\u00af\u0001\u0000\u0000"+
 		"\u0000\u00af%\u0001\u0000\u0000\u0000\u00b0\u00ae\u0001\u0000\u0000\u0000"+
@@ -1869,10 +1858,10 @@ public class TomlParser extends Parser {
 		"\u000f\u0000\u00df\u00de\u0001\u0000\u0000\u0000\u00e0\u00e3\u0001\u0000"+
 		"\u0000\u0000\u00e1\u00df\u0001\u0000\u0000\u0000\u00e1\u00e2\u0001\u0000"+
 		"\u0000\u0000\u00e2\u00e4\u0001\u0000\u0000\u0000\u00e3\u00e1\u0001\u0000"+
-		"\u0000\u0000\u00e4\u00e6\u0003\u0002\u0001\u0000\u00e5\u00e1\u0001\u0000"+
+		"\u0000\u0000\u00e4\u00e6\u0003\u0006\u0003\u0000\u00e5\u00e1\u0001\u0000"+
 		"\u0000\u0000\u00e6\u00e9\u0001\u0000\u0000\u0000\u00e7\u00e5\u0001\u0000"+
 		"\u0000\u0000\u00e7\u00e8\u0001\u0000\u0000\u0000\u00e8)\u0001\u0000\u0000"+
-		"\u0000\u00e9\u00e7\u0001\u0000\u0000\u0000\u001e+/3:>AKOZcrx\u0080\u0088"+
+		"\u0000\u00e9\u00e7\u0001\u0000\u0000\u0000\u001e+/3:>AKOZcpx\u0080\u0088"+
 		"\u008d\u0091\u0097\u009c\u00a0\u00a8\u00ae\u00b5\u00bd\u00c5\u00ca\u00ce"+
 		"\u00d4\u00d9\u00e1\u00e7";
 	public static final ATN _ATN =
