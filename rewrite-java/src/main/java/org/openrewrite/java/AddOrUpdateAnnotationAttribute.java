@@ -23,7 +23,10 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.search.UsesType;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
@@ -208,14 +211,24 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
 
                                 return as.withAssignment(((J.NewArray) as.getAssignment()).withInitializer(jLiteralList));
                             } else {
-                                J.Literal value = (J.Literal) as.getAssignment();
-                                if (newAttributeValue.equals(value.getValueSource()) || Boolean.TRUE.equals(addOnly)) {
-                                    return it;
+                                Expression exp = as.getAssignment();
+                                if (exp instanceof J.Literal) {
+                                    J.Literal value = (J.Literal) exp;
+                                    if (newAttributeValue.equals(value.getValueSource()) || Boolean.TRUE.equals(addOnly)) {
+                                        return it;
+                                    }
+                                    if (!valueMatches(value, oldAttributeValue)) {
+                                        return it;
+                                    }
+                                    return as.withAssignment(value.withValue(newAttributeValue).withValueSource(newAttributeValue));
+                                } else if (exp instanceof J.FieldAccess) {
+                                    if (Boolean.TRUE.equals(addOnly)) {
+                                        return it;
+                                    }
+                                    int index = finalA.getArguments().indexOf(as);
+                                    as = (J.Assignment) ((J.Annotation) JavaTemplate.apply("#{} = #{}", getCursor(), as.getCoordinates().replace(), var.getSimpleName(), newAttributeValue)).getArguments().get(index);
+                                    return as;
                                 }
-                                if (!valueMatches(value, oldAttributeValue)) {
-                                    return it;
-                                }
-                                return as.withAssignment(value.withValue(newAttributeValue).withValueSource(newAttributeValue));
                             }
                         } else if (it instanceof J.Literal) {
                             // The only way anything except an assignment can appear is if there's an implicit assignment to "value"

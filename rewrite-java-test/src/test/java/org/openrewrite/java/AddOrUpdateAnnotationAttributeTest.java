@@ -908,6 +908,47 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
     }
 
     @Test
+    void updateFieldAccessAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", "value", "hello", null, false, null)),
+          java(
+            """
+              package org.example;
+              
+              public class Const {
+                    public static final String HI = "hi";
+              }
+              """),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String value() default "";
+              }
+              """
+          ),
+          java(
+            """
+              import org.example.Foo;
+              import org.example.Const;
+              
+              @Foo(value = Const.HI)
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+              import org.example.Const;
+              
+              @Foo(value = "hello")
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void addAttributeToNestedAnnotationArray() {
         rewriteRun(
           spec -> spec.recipe(new AddOrUpdateAnnotationAttribute(
