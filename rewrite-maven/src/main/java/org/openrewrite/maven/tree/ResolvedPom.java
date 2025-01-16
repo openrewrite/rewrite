@@ -281,7 +281,9 @@ public class ResolvedPom {
         if (property == null) {
             return null;
         }
-        String propVal = properties.get(property);
+        // Maven allows system properties to override project properties
+        // This facilitates the usage of "-D" arguments on the command line to customize builds
+        String propVal = System.getProperty(property, properties.get(property));
         if (propVal != null) {
             return propVal;
         }
