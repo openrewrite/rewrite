@@ -348,13 +348,15 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 Markers.EMPTY,
                 type,
                 null,
+                null,
                 JContainer.build(
-                        node.getExpressions().isEmpty() ? EMPTY : sourceBefore("case"),
-                        node.getExpressions().isEmpty() ?
+                        node.getLabels().isEmpty() ? EMPTY : sourceBefore("case"),
+                        node.getLabels().isEmpty() || node.getLabels().getFirst() instanceof DefaultCaseLabelTree ?
                                 List.of(JRightPadded.build(new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), skip("default"), null, null))) :
-                                convertAll(node.getExpressions(), commaDelim, t -> EMPTY),
+                                convertAll(node.getLabels(), commaDelim, ignored -> node.getGuard() != null ? sourceBefore("when", '-') : EMPTY),
                         Markers.EMPTY
                 ),
+                convert(node.getGuard()),
                 JContainer.build(
                         sourceBefore(type == J.Case.Type.Rule ? "->" : ":"),
                         convertStatements(node.getStatements()),
@@ -779,10 +781,24 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         return new J.InstanceOf(randomId(), fmt, Markers.EMPTY,
                 convert(node.getExpression(), t -> sourceBefore("instanceof")),
                 convert(node.getType()),
-                node.getPattern() instanceof JCBindingPattern b ?
-                        new J.Identifier(randomId(), sourceBefore(b.getVariable().getName().toString()), Markers.EMPTY, emptyList(), b.getVariable().getName().toString(),
-                                type, typeMapping.variableType(b.var.sym)) : null,
+                getNodePattern(node.getPattern(), type),
                 type);
+    }
+
+    private @Nullable J getNodePattern(@Nullable PatternTree pattern, JavaType type) {
+        if (pattern instanceof JCBindingPattern b) {
+            return new J.Identifier(randomId(), sourceBefore(b.getVariable().getName().toString()), Markers.EMPTY, emptyList(), b.getVariable().getName().toString(),
+                    type, typeMapping.variableType(b.var.sym));
+        } else {
+            if (pattern == null) {
+                return null;
+            }
+            int saveCursor = cursor;
+            int endCursor = max(endPos(pattern), cursor);
+            cursor = endCursor;
+            return new J.Unknown(randomId(), whitespace(), Markers.EMPTY, new J.Unknown.Source(randomId(), whitespace(), Markers.EMPTY, source.substring(saveCursor, endCursor)));
+
+        }
     }
 
     @Override

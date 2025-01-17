@@ -343,6 +343,8 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                         ),
                         Markers.EMPTY
                 ),
+                null,
+                null,
                 JContainer.build(sourceBefore(":"), convertStatements(node.getStatements()), Markers.EMPTY),
                 null
         );
@@ -1787,17 +1789,17 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
 
     private Space statementDelim(@Nullable Tree t) {
         if (t instanceof JCAssert ||
-                t instanceof JCAssign ||
-                t instanceof JCAssignOp ||
-                t instanceof JCBreak ||
-                t instanceof JCContinue ||
-                t instanceof JCDoWhileLoop ||
-                t instanceof JCImport ||
-                t instanceof JCMethodInvocation ||
-                t instanceof JCNewClass ||
-                t instanceof JCReturn ||
-                t instanceof JCThrow ||
-                t instanceof JCUnary) {
+            t instanceof JCAssign ||
+            t instanceof JCAssignOp ||
+            t instanceof JCBreak ||
+            t instanceof JCContinue ||
+            t instanceof JCDoWhileLoop ||
+            t instanceof JCImport ||
+            t instanceof JCMethodInvocation ||
+            t instanceof JCNewClass ||
+            t instanceof JCReturn ||
+            t instanceof JCThrow ||
+            t instanceof JCUnary) {
             return sourceBefore(";");
         }
 
@@ -1808,7 +1810,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         if (t instanceof JCExpressionStatement) {
             ExpressionTree expTree = ((ExpressionStatementTree) t).getExpression();
             if (expTree instanceof ErroneousTree) {
-                return Space.build(source.substring(((JCTree) expTree).getEndPosition(endPosTable),((JCTree) t).getEndPosition(endPosTable)), Collections.emptyList());
+                return Space.build(source.substring(((JCTree) expTree).getEndPosition(endPosTable), ((JCTree) t).getEndPosition(endPosTable)), Collections.emptyList());
             } else {
                 return sourceBefore(";");
             }
@@ -1972,7 +1974,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                     char c2 = source.charAt(delimIndex + 1);
                     switch (c1) {
                         case '/':
-                            switch(c2) {
+                            switch (c2) {
                                 case '/':
                                     inSingleLineComment = true;
                                     delimIndex++;
@@ -1984,7 +1986,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                             }
                             break;
                         case '*':
-                            if(c2 == '/') {
+                            if (c2 == '/') {
                                 inMultiLineComment = false;
                                 delimIndex++;
                                 continue;
@@ -2051,7 +2053,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                     try {
                         // FIXME instanceof probably not right here...
                         return field.get(null) instanceof Long &&
-                                field.getName().matches("[A-Z_]+");
+                               field.getName().matches("[A-Z_]+");
                     } catch (IllegalAccessException e) {
                         throw new RuntimeException(e);
                     }

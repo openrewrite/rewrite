@@ -295,8 +295,8 @@ public class Space {
         String whitespaces = printedWs.toString();
 
         return "Space(" +
-                "comments=<" + (comments.size() == 1 ? "1 comment" : comments.size() + " comments") + ">, " +
-                "whitespace=" + (whitespaces.isEmpty() ? "<empty>" : "'" + whitespaces + "'") + ")";
+               "comments=<" + (comments.size() == 1 ? "1 comment" : comments.size() + " comments") + ">, " +
+               "whitespace=" + (whitespaces.isEmpty() ? "<empty>" : "'" + whitespaces + "'") + ")";
     }
 
     public enum Location {
@@ -325,6 +325,7 @@ public class Space {
         CASE,
         CASE_BODY,
         CASE_EXPRESSION,
+        CASE_LABEL,
         CASE_PREFIX,
         CASE_SUFFIX,
         CATCH_ALTERNATIVE_SUFFIX,

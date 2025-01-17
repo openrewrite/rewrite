@@ -74,13 +74,28 @@ public class Assertions {
                             .collect(joining("\n\n")));
                 }
             }
+            if (typeValidation.unknown()) {
+                List<J.Unknown> allUnknown = new JavaIsoVisitor<List<J.Unknown>>() {
+                    @Override
+                    public J.Unknown visitUnknown(J.Unknown unknown, List<J.Unknown> list) {
+                        J.Unknown err = super.visitUnknown(unknown, list);
+                        list.add(err);
+                        return err;
+                    }
+                }.reduce(source, new ArrayList<>());
+                if (!allUnknown.isEmpty()) {
+                    throw new IllegalStateException("LST contains erroneous nodes\n" + allUnknown.stream()
+                            .map(unknown -> unknown.getSource().getText())
+                            .collect(joining("\n\n")));
+                }
+            }
         }
         return source;
     }
 
     private static void assertValidTypes(TypeValidation typeValidation, J sf) {
         if (typeValidation.identifiers() || typeValidation.methodInvocations() || typeValidation.methodDeclarations() || typeValidation.classDeclarations() ||
-                typeValidation.constructorInvocations()) {
+            typeValidation.constructorInvocations()) {
             List<FindMissingTypes.MissingTypeResult> missingTypeResults = FindMissingTypes.findMissingTypes(sf);
             missingTypeResults = missingTypeResults.stream()
                     .filter(missingType -> {
@@ -108,7 +123,7 @@ public class Assertions {
                         .collect(joining("\n\n"));
                 throw new IllegalStateException(
                         "LST contains missing or invalid type information\n" + missingTypes +
-                                "\nhttps://docs.openrewrite.org/reference/faq#im-seeing-lst-contains-missing-or-invalid-type-information-in-my-recipe-unit-tests-how-to-resolve");
+                        "\nhttps://docs.openrewrite.org/reference/faq#im-seeing-lst-contains-missing-or-invalid-type-information-in-my-recipe-unit-tests-how-to-resolve");
             }
         }
     }

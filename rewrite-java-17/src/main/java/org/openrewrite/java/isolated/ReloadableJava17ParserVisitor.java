@@ -355,6 +355,8 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                                 convertAll(node.getExpressions(), commaDelim, t -> EMPTY),
                         Markers.EMPTY
                 ),
+                null,
+                null,
                 JContainer.build(
                         sourceBefore(type == J.Case.Type.Rule ? "->" : ":"),
                         convertStatements(node.getStatements()),

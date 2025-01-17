@@ -104,6 +104,12 @@ public class TypeValidation {
     private boolean erroneous = true;
 
     /**
+     * Controls whether the LST is validated not to contain any `J.Unknown` elements.
+     */
+    @Builder.Default
+    private boolean unknown = true;
+
+    /**
      * Adding messages to execution context is a side effect which makes the recipe run itself stateful.
      * Potentially allows recipes to interfere with each other in surprising and hard to debug ways.
      * Problematic for all the same reasons mutable global variables or singletons are.
@@ -122,7 +128,7 @@ public class TypeValidation {
      * Skip all invariant validation checks.
      */
     public static TypeValidation none() {
-        return new TypeValidation(false, false, false, false, false, false, false, false, o -> false, false, false);
+        return new TypeValidation(false, false, false, false, false, false, false, false, o -> false, false, false, false);
     }
 
     static TypeValidation before(RecipeSpec testMethodSpec, RecipeSpec testClassSpec) {

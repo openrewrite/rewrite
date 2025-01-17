@@ -346,6 +346,8 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                         ),
                         Markers.EMPTY
                 ),
+                null,
+                null,
                 JContainer.build(sourceBefore(":"), convertStatements(node.getStatements()), Markers.EMPTY),
                 null
         );
