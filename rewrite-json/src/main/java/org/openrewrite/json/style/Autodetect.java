@@ -51,13 +51,13 @@ public class Autodetect extends NamedStyles {
 
         private final IndentStatistics indentStatistics = new IndentStatistics();
         private final GeneralFormatStatistics generalFormatStatistics = new GeneralFormatStatistics();
-        private final FindIndentJsonVisitor findIndentJsonVisitor = new FindIndentJsonVisitor();
-        private final FindLineFormatJavaVisitor findLineFormatJavaVisitor = new FindLineFormatJavaVisitor();
+        private final FindIndentJsonVisitor findIndentVisitor = new FindIndentJsonVisitor();
+        private final FindLineFormatJsonVisitor findLineFormatVisitor = new FindLineFormatJsonVisitor();
 
         public Detector sample(SourceFile json) {
             if(json instanceof Json.Document) {
-                findIndentJsonVisitor.visit(json, indentStatistics);
-                findLineFormatJavaVisitor.visit(json, generalFormatStatistics);
+                findIndentVisitor.visit(json, indentStatistics);
+                findLineFormatVisitor.visit(json, generalFormatStatistics);
             }
             return this;
         }
@@ -123,7 +123,7 @@ public class Autodetect extends NamedStyles {
         }
     }
 
-    private static class FindLineFormatJavaVisitor extends JsonVisitor<GeneralFormatStatistics> {
+    private static class FindLineFormatJsonVisitor extends JsonVisitor<GeneralFormatStatistics> {
         @Override
         public @Nullable Json visit(@Nullable Tree tree, GeneralFormatStatistics stats) {
             if (tree instanceof Json) {
