@@ -424,7 +424,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             c = (J.Case) temp;
         }
         c = c.getPadding().withCaseLabels(visitContainer(c.getPadding().getCaseLabels(), JContainer.Location.CASE_LABEL, p));
-        c = c.withGuard((Expression) visitExpression(c.getGuard(), p));
+        c = c.withGuard(visitAndCast(c.getGuard(), p));
         c = c.getPadding().withBody(visitRightPadded(c.getPadding().getBody(), JRightPadded.Location.CASE_BODY, p));
         c = c.getPadding().withStatements(visitContainer(c.getPadding().getStatements(), JContainer.Location.CASE, p));
         return c;
