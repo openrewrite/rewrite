@@ -17,15 +17,13 @@ package org.openrewrite.json;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.json.tree.Json;
-import org.openrewrite.json.tree.JsonKey;
-import org.openrewrite.json.tree.JsonRightPadded;
-import org.openrewrite.json.tree.Space;
+import org.openrewrite.json.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.util.Collections;
@@ -52,6 +50,7 @@ public class AddKeyValue extends Recipe {
             description = "The value to add to the array at the specified key. Can be of any type." +
                           " String values should be quoted to be inserted as Strings.",
             example = "`\"myValue\"` or `{\"a\": 1}` or `[ 123 ]`")
+    @Language("Json")
     String value;
 
     @Option(displayName = "Prepend",
@@ -84,9 +83,7 @@ public class AddKeyValue extends Recipe {
                     boolean jsonIsEmpty = originalMembers.isEmpty() || originalMembers.get(0) instanceof Json.Empty;
                     Space space = jsonIsEmpty || prepend ? originalMembers.get(0).getPrefix() : Space.build("\n", emptyList());
 
-                    JsonRightPadded<JsonKey> newKey = rightPaddedKey();
-                    Json.Literal newValue = valueLiteral();
-                    Json newMember = new Json.Member(randomId(), space, Markers.EMPTY, newKey, newValue);
+                    Json newMember = new Json.Member(randomId(), space, Markers.EMPTY, rightPaddedKey(), parsedValue());
 
                     if (jsonIsEmpty) {
                         return autoFormat(obj.withMembers(Collections.singletonList(newMember)), ctx, getCursor().getParent());
@@ -100,8 +97,11 @@ public class AddKeyValue extends Recipe {
                 return obj;
             }
 
-            private Json.Literal valueLiteral() {
-                return new Json.Literal(randomId(), Space.SINGLE_SPACE, Markers.EMPTY, value, unQuote(value));
+            private JsonValue parsedValue() {
+                Json.Document parsedDoc = (Json.Document) JsonParser.builder().build()
+                        .parse(value.trim()).findFirst().get();
+                JsonValue value = parsedDoc.getValue();
+                return value.withPrefix(value.getPrefix().withWhitespace(" "));
             }
 
             private JsonRightPadded<JsonKey> rightPaddedKey() {
