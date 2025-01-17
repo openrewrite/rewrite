@@ -111,13 +111,6 @@ public class AddKeyValue extends Recipe {
                 );
             }
 
-            private String unQuote(String value) {
-                if (value.startsWith("'") || value.startsWith("\"")) {
-                    return value.substring(1, value.length() - 1);
-                }
-                return value;
-            }
-
             private boolean objectDoesNotContainKey(Json.JsonObject obj, String key) {
                 for (Json member : obj.getMembers()) {
                     if (member instanceof Json.Member) {
