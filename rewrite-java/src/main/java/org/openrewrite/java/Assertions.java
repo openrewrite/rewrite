@@ -95,7 +95,7 @@ public class Assertions {
 
     private static void assertValidTypes(TypeValidation typeValidation, J sf) {
         if (typeValidation.identifiers() || typeValidation.methodInvocations() || typeValidation.methodDeclarations() || typeValidation.classDeclarations() ||
-                typeValidation.constructorInvocations()) {
+            typeValidation.constructorInvocations()) {
             List<FindMissingTypes.MissingTypeResult> missingTypeResults = FindMissingTypes.findMissingTypes(sf);
             missingTypeResults = missingTypeResults.stream()
                     .filter(missingType -> {
@@ -123,7 +123,7 @@ public class Assertions {
                         .collect(joining("\n\n"));
                 throw new IllegalStateException(
                         "LST contains missing or invalid type information\n" + missingTypes +
-                                "\nhttps://docs.openrewrite.org/reference/faq#im-seeing-lst-contains-missing-or-invalid-type-information-in-my-recipe-unit-tests-how-to-resolve");
+                        "\nhttps://docs.openrewrite.org/reference/faq#im-seeing-lst-contains-missing-or-invalid-type-information-in-my-recipe-unit-tests-how-to-resolve");
             }
         }
     }

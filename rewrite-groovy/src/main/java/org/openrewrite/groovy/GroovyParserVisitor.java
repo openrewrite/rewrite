@@ -2782,6 +2782,7 @@ public class GroovyParserVisitor {
     }
 
     private static final Map<String, J.Modifier.Type> modifierNameToType;
+
     static {
         modifierNameToType = new LinkedHashMap<>();
         modifierNameToType.put("def", J.Modifier.Type.LanguageExtension);
