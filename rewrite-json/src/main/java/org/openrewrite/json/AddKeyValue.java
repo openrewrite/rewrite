@@ -47,7 +47,7 @@ public class AddKeyValue extends Recipe {
     String key;
 
     @Option(displayName = "Value",
-            description = "The value to add to the array at the specified key. Can be of any type." +
+            description = "The value to add to the document at the specified key. Can be of any type representing JSON value." +
                           " String values should be quoted to be inserted as Strings.",
             example = "`\"myValue\"` or `{\"a\": 1}` or `[ 123 ]`")
     @Language("Json")
