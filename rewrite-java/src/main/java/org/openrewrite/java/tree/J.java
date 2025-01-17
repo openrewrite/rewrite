@@ -1095,6 +1095,11 @@ public interface J extends Tree {
         Expression guard;
 
         @JsonCreator
+        public Case(UUID id, Space prefix, Markers markers, Type type, @Deprecated @Nullable Expression pattern, @Nullable JContainer<Expression> expressions, JContainer<Statement> statements, @Nullable JRightPadded<J> body) {
+            this(id, prefix, markers, type, pattern, expressions,  null, null, statements, body);
+        }
+
+        @JsonCreator
         public Case(UUID id, Space prefix, Markers markers, Type type, @Deprecated @Nullable Expression pattern, @Nullable JContainer<Expression> expressions, @Nullable JContainer<J> caseLabels, @Nullable Expression guard, JContainer<Statement> statements, @Nullable JRightPadded<J> body) {
             this.id = id;
             this.prefix = prefix;
