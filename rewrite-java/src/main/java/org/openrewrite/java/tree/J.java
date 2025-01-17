@@ -1027,23 +1027,32 @@ public interface J extends Tree {
             return withExpressions(ListUtils.mapFirst(getExpressions(), first -> pattern));
         }
 
+        /**
+         * @deprecated As of Java 21 this is referred to as case labels and can be broader than just Expressions.
+         * Use {@link #getCaseLabels} and {@link #withCaseLabels(List)} instead.
+         */
+        @Deprecated
         public List<Expression> getExpressions() {
-            return caseLabels != null ? caseLabels.getElements().stream().filter(Expression.class::isInstance).map(Expression.class::cast).collect(toList()) : emptyList();
+            return caseLabels.getElements().stream().filter(Expression.class::isInstance).map(Expression.class::cast).collect(toList());
         }
 
+        /**
+         * @deprecated As of Java 21 this is referred to as case labels and can be broader than just Expressions.
+         * Use {@link #getCaseLabels} and {@link #withCaseLabels(List)} instead.
+         */
         public Case withExpressions(List<Expression> expressions) {
-            if (caseLabels != null && caseLabels.getElements().stream().allMatch(Expression.class::isInstance)) {
-                return getPadding().withCaseLabels(requireNonNull(JContainer.withElementsNullable(this.caseLabels, expressions.stream().map(J.class::cast).collect(toList()))));
+            if (caseLabels.getElements().stream().allMatch(Expression.class::isInstance)) {
+                //noinspection unchecked
+                return getPadding().withCaseLabels(requireNonNull(JContainer.withElementsNullable(this.caseLabels, (List<J>) (List<?>) expressions)));
             } else {
                 throw new IllegalStateException("caseLabels contains an entry that is not an Expression, use withCaseLabels instead.");
             }
         }
 
-        @Nullable
         JContainer<J> caseLabels;
 
         public List<J> getCaseLabels() {
-            return caseLabels != null ? caseLabels.getElements() : emptyList();
+            return caseLabels.getElements();
         }
 
         public Case withCaseLabels(List<J> caseLabels) {
@@ -1093,10 +1102,12 @@ public interface J extends Tree {
             this.type = type;
             if (pattern != null) {
                 this.caseLabels = requireNonNull(JContainer.withElementsNullable(null, singletonList(pattern)));
-            } else if (expressions != null && !expressions.getElements().isEmpty()) {
+            } else if (expressions != null) {
                 this.caseLabels = JContainer.build(expressions.getBefore(), expressions.getElements().stream().map(J.class::cast).map(JRightPadded::build).collect(toList()), expressions.getMarkers());
-            } else {
+            } else if (caseLabels != null) {
                 this.caseLabels = caseLabels;
+            } else {
+                this.caseLabels = JContainer.empty();
             }
             this.guard = guard;
             this.statements = statements;
@@ -1159,21 +1170,31 @@ public interface J extends Tree {
                 return t.statements == statements ? t : new Case(t.id, t.prefix, t.markers, t.type, null, null, t.caseLabels, t.guard, statements, t.body);
             }
 
+            /**
+             * @deprecated As of Java 21 this is referred to as case labels and can be broader than just Expressions.
+             * Use {@link #getCaseLabels} and {@link #withCaseLabels(JContainer)} instead.
+             */
+            @Deprecated
             public JContainer<Expression> getExpressions() {
-                return t.caseLabels != null ? JContainer.build(t.caseLabels.getBefore(), t.caseLabels.getElements().stream().filter(Expression.class::isInstance).map(Expression.class::cast).map(JRightPadded::build).collect(toList()), t.caseLabels.getMarkers()) : JContainer.empty();
+                return JContainer.build(t.caseLabels.getBefore(), t.caseLabels.getElements().stream().filter(Expression.class::isInstance).map(Expression.class::cast).map(JRightPadded::build).collect(toList()), t.caseLabels.getMarkers());
             }
 
+            /**
+             * @deprecated As of Java 21 this is referred to as case labels and can be broader than just Expressions.
+             * Use {@link #getCaseLabels} and {@link #withCaseLabels(JContainer)} instead.
+             */
+            @Deprecated
             public Case withExpressions(JContainer<Expression> expressions) {
                 if (t.getExpressions() == expressions) {
                     return t;
-                } else if (t.caseLabels != null && t.caseLabels.getElements().stream().allMatch(Expression.class::isInstance)) {
+                } else if (t.caseLabels.getElements().stream().allMatch(Expression.class::isInstance)) {
                     return new Case(t.id, t.prefix, t.markers, t.type, null, expressions, null, t.guard, t.statements, t.body);
                 }
                 throw new IllegalStateException("caseLabels contains an entry that is not an Expression, use withCaseLabels instead.");
             }
 
             public JContainer<J> getCaseLabels() {
-                return t.caseLabels != null ? t.caseLabels : JContainer.empty();
+                return t.caseLabels;
             }
 
             public Case withCaseLabels(JContainer<J> caseLabels) {

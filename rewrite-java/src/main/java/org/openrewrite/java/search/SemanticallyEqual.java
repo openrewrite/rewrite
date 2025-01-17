@@ -367,6 +367,7 @@ public class SemanticallyEqual {
                 this.visitList(_case.getStatements(), compareTo.getStatements());
                 visit(_case.getBody(), compareTo.getBody());
                 this.visitList(_case.getCaseLabels(), compareTo.getCaseLabels());
+                this.visitExpression(_case.getGuard(), compareTo.getGuard());
             }
             return _case;
         }
