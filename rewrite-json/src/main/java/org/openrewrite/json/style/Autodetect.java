@@ -16,7 +16,6 @@
 package org.openrewrite.json.style;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
@@ -126,7 +125,7 @@ public class Autodetect extends NamedStyles {
 
     private static class FindLineFormatJavaVisitor extends JsonVisitor<GeneralFormatStatistics> {
         @Override
-        public @Nullable Json visit(@Nullable Tree tree, @NotNull GeneralFormatStatistics stats) {
+        public @Nullable Json visit(@Nullable Tree tree, GeneralFormatStatistics stats) {
             if (tree instanceof Json) {
                 String prefix = ((Json) tree).getPrefix().getWhitespace();
                 char[] chars = prefix.toCharArray();
@@ -150,7 +149,7 @@ public class Autodetect extends NamedStyles {
 
     private static class FindIndentJsonVisitor extends JsonVisitor<IndentStatistics> {
         @Override
-        public @NotNull Json visitMember(Json.Member member, IndentStatistics stats) {
+        public Json visitMember(Json.Member member, IndentStatistics stats) {
             measureFrequencies(member.getPrefix().getWhitespace(), stats.indentFrequencies);
             return super.visitMember(member, stats);
         }

@@ -33,7 +33,6 @@ package org.openrewrite.json.style;
 
 import lombok.Value;
 import lombok.With;
-import org.jetbrains.annotations.NotNull;
 import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
@@ -50,7 +49,7 @@ public class TabsAndIndentsStyle implements JsonStyle {
     // Integer continuationIndentSize;
 
     @Override
-    public @NotNull Style applyDefaults() {
+    public Style applyDefaults() {
         return StyleHelper.merge(DEFAULT, this);
     }
 }

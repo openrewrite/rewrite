@@ -15,7 +15,6 @@
  */
 package org.openrewrite.json.format;
 
-import org.jetbrains.annotations.NotNull;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -45,7 +44,7 @@ public class Indents extends Recipe {
 
     private static class TabsAndIndentsFromCompilationUnitStyle extends JsonIsoVisitor<ExecutionContext> {
         @Override
-        public Json.@NotNull Document visitDocument(Json.Document docs, ExecutionContext ctx) {
+        public Json. Document visitDocument(Json.Document docs, ExecutionContext ctx) {
             TabsAndIndentsStyle style = docs.getStyle(TabsAndIndentsStyle.class);
             if (style == null) {
                 style = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(Autodetect.detector().sample(docs).build()));

@@ -15,7 +15,6 @@
  */
 package org.openrewrite.json.format;
 
-import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
@@ -42,7 +41,7 @@ public class TabsAndIndentsVisitor<P> extends JsonIsoVisitor<P> {
     }
 
     @Override
-    public @NotNull Json preVisit(Json tree, P p) {
+    public Json preVisit(Json tree, P p) {
         Json json = super.preVisit(tree, p);
         if (json != null) {
             final String ws = json.getPrefix().getWhitespace();
@@ -73,7 +72,7 @@ public class TabsAndIndentsVisitor<P> extends JsonIsoVisitor<P> {
         return super.visit(tree, p);
     }
 
-    private @NotNull String createIndent(String ws, int indentMultiple) {
+    private String createIndent(String ws, int indentMultiple) {
         StringBuilder shiftedPrefixBuilder = new StringBuilder(ws.substring(0, ws.lastIndexOf('\n') + 1));
         for (int i = 0; i < indentMultiple; i++) {
             if (style.getUseTabCharacter()) {
