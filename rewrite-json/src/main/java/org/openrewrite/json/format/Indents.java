@@ -29,7 +29,7 @@ import static java.util.Collections.singletonList;
 public class Indents extends Recipe {
     @Override
     public String getDisplayName() {
-        return "YAML indent";
+        return "JSON indent";
     }
 
     @Override
