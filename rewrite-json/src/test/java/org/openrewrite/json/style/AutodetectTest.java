@@ -25,7 +25,7 @@ import java.util.function.Function;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.json.Assertions.json;
 
-public class AutodetectTest implements RewriteTest {
+class AutodetectTest implements RewriteTest {
 
     @Test
     void autodetectSimple() {
