@@ -1096,7 +1096,7 @@ public interface J extends Tree {
 
         @JsonCreator
         public Case(UUID id, Space prefix, Markers markers, Type type, @Deprecated @Nullable Expression pattern, @Nullable JContainer<Expression> expressions, JContainer<Statement> statements, @Nullable JRightPadded<J> body) {
-            this(id, prefix, markers, type, pattern, expressions,  null, null, statements, body);
+            this(id, prefix, markers, type, pattern, expressions, null, null, statements, body);
         }
 
         @JsonCreator
