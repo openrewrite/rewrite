@@ -34,7 +34,7 @@ public class Indents extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Format tabs and indents in YAML.";
+        return "Format tabs and indents in JSON.";
     }
 
     @Override
