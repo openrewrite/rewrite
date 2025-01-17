@@ -216,4 +216,20 @@ class YamlParserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void atSymbols() {
+        rewriteRun(
+          yaml(
+            // BTW, the @ sign is forbidden as the first character of a scalar value by the YAML spec:
+            // https://github.com/yaml/yaml-spec/blob/1b1a1be43bd6e0cfec45caf0e40af3b5d2bb7f8a/spec/1.2.2/spec.md#L1877
+            """
+              root:
+                specifier: npm:@testing-library/vue@5.0.4
+                date: @build.timestamp@
+                version: @project.version@
+              """
+          )
+        );
+    }
 }
