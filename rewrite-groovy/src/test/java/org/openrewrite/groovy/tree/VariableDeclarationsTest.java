@@ -216,4 +216,16 @@ class VariableDeclarationsTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4877")
+    @Test
+    void defVariableStartsWithDef() {
+        rewriteRun(
+          groovy(
+            """
+              def defaultPublicStaticFinal = 0
+              """
+          )
+        );
+    }
 }

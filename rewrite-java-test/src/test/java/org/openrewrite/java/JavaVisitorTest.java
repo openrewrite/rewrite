@@ -25,6 +25,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
+import static org.openrewrite.test.TypeValidation.all;
 
 class JavaVisitorTest implements RewriteTest {
 
@@ -116,20 +117,58 @@ class JavaVisitorTest implements RewriteTest {
             })
           ),
           java(
-                """
-           class A {
-             public void method1() {
-             }
-             
-             @Deprecated
-             public String myMethod() {
-               return "hello";
-             }
-             
-             public void method2() {
-             }
-           }
-           """)
+            """
+              class A {
+                public void method1() {
+                }
+              
+                @Deprecated
+                public String myMethod() {
+                  return "hello";
+                }
+              
+                public void method2() {
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void javaVisitorHandlesErroneousNodes() {
+        rewriteRun(
+          spec -> spec
+            .expectedCyclesThatMakeChanges(2)
+            .recipes(
+              toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+                      if (method.getSimpleName().equals("test")) {
+                          return JavaTemplate.builder("Exception").contextSensitive().build()
+                            .apply(getCursor(), method.getCoordinates().replaceThrows());
+                      }
+                      return method;
+                  }
+              })
+            )
+            .typeValidationOptions(all().erroneous(false)),
+          java(
+            """
+              class A {
+                  void test() {
+                      owner
+                  }
+              }
+              """,
+            """
+              class A {
+                  void test() throws Exception {
+                      owner
+                  }
+              }
+              """
+          )
         );
     }
 }

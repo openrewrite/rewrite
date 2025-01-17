@@ -34,6 +34,7 @@ import org.openrewrite.semver.Semver;
 
 import java.util.*;
 
+import static java.util.Collections.*;
 import static java.util.Objects.requireNonNull;
 
 @Value
@@ -171,14 +172,14 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     return tree;
                 }
                 SourceFile sourceFile = (SourceFile) tree;
-                sourceFile.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject ->
-                        sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet -> {
-                            if (usesType(sourceFile, ctx)) {
-                                acc.usingType = true;
-                            }
-                            Set<String> configurations = acc.configurationsByProject.computeIfAbsent(javaProject, ignored -> new HashSet<>());
-                            configurations.add("main".equals(sourceSet.getName()) ? "implementation" : sourceSet.getName() + "Implementation");
-                        }));
+                sourceFile.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject -> {
+                    if (usesType(sourceFile, ctx)) {
+                        acc.usingType = true;
+                    }
+                    Set<String> configurations = acc.configurationsByProject.computeIfAbsent(javaProject, ignored -> new HashSet<>());
+                    sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet ->
+                            configurations.add("main".equals(sourceSet.getName()) ? "implementation" : sourceSet.getName() + "Implementation"));
+                });
                 return tree;
             }
         };
@@ -216,7 +217,12 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
                         GradleProject gp = maybeGp.get();
 
-                        Set<String> resolvedConfigurations = StringUtils.isBlank(configuration) ? acc.configurationsByProject.get(jp) : new HashSet<>(Collections.singletonList(configuration));
+                        Set<String> resolvedConfigurations = StringUtils.isBlank(configuration) ?
+                                acc.configurationsByProject.getOrDefault(jp, new HashSet<>()) :
+                                new HashSet<>(singletonList(configuration));
+                        if (resolvedConfigurations.isEmpty()) {
+                            resolvedConfigurations.add("implementation");
+                        }
                         Set<String> tmpConfigurations = new HashSet<>(resolvedConfigurations);
                         for (String tmpConfiguration : tmpConfigurations) {
                             GradleDependencyConfiguration gdc = gp.getConfiguration(tmpConfiguration);

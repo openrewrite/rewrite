@@ -13,19 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.lombok;
+package org.openrewrite.groovy.marker;
 
-import com.sun.tools.javac.tree.JCTree;
-import lombok.core.AnnotationValues;
-import lombok.core.HandlerPriority;
-import lombok.extern.jackson.Jacksonized;
-import lombok.javac.JavacAnnotationHandler;
-import lombok.javac.JavacNode;
+import lombok.Value;
+import lombok.With;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.marker.Marker;
 
-@SuppressWarnings("SpellCheckingInspection")
-@HandlerPriority(-512)
-public class JacksonizedHandler extends JavacAnnotationHandler<Jacksonized> {
-    @Override
-    public void handle(AnnotationValues<Jacksonized> annotation, JCTree.JCAnnotation ast, JavacNode annotationNode) {
-    }
+import java.util.UUID;
+
+@Value
+@With
+public class MultiVariable implements Marker {
+    UUID id;
+    Space prefix;
 }

@@ -38,6 +38,7 @@ import java.util.*;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import static java.util.stream.Collectors.joining;
 import static org.openrewrite.test.SourceSpecs.dir;
 
 @SuppressWarnings("unused")
@@ -58,13 +59,28 @@ public class Assertions {
     public static SourceFile validateTypes(SourceFile source, TypeValidation typeValidation) {
         if (source instanceof JavaSourceFile) {
             assertValidTypes(typeValidation, (JavaSourceFile) source);
+            if (typeValidation.erroneous()) {
+                List<J.Erroneous> allErroneous = new JavaIsoVisitor<List<J.Erroneous>>() {
+                    @Override
+                    public J.Erroneous visitErroneous(J.Erroneous erroneous, List<J.Erroneous> list) {
+                        J.Erroneous err = super.visitErroneous(erroneous, list);
+                        list.add(err);
+                        return err;
+                    }
+                }.reduce(source, new ArrayList<>());
+                if (!allErroneous.isEmpty()) {
+                    throw new IllegalStateException("LST contains erroneous nodes\n" + allErroneous.stream()
+                            .map(J.Erroneous::getText)
+                            .collect(joining("\n\n")));
+                }
+            }
         }
         return source;
     }
 
     private static void assertValidTypes(TypeValidation typeValidation, J sf) {
         if (typeValidation.identifiers() || typeValidation.methodInvocations() || typeValidation.methodDeclarations() || typeValidation.classDeclarations() ||
-            typeValidation.constructorInvocations()) {
+                typeValidation.constructorInvocations()) {
             List<FindMissingTypes.MissingTypeResult> missingTypeResults = FindMissingTypes.findMissingTypes(sf);
             missingTypeResults = missingTypeResults.stream()
                     .filter(missingType -> {
@@ -84,14 +100,15 @@ public class Assertions {
                             return true;
                         }
                     })
+                    .filter(missingType -> !typeValidation.allowMissingType().apply(missingType))
                     .collect(Collectors.toList());
             if (!missingTypeResults.isEmpty()) {
                 String missingTypes = missingTypeResults.stream()
                         .map(v -> v.getPath() + "\n" + v.getPrintedTree())
-                        .collect(Collectors.joining("\n\n"));
+                        .collect(joining("\n\n"));
                 throw new IllegalStateException(
                         "LST contains missing or invalid type information\n" + missingTypes +
-                        "\nhttps://docs.openrewrite.org/reference/faq#im-seeing-lst-contains-missing-or-invalid-type-information-in-my-recipe-unit-tests-how-to-resolve");
+                                "\nhttps://docs.openrewrite.org/reference/faq#im-seeing-lst-contains-missing-or-invalid-type-information-in-my-recipe-unit-tests-how-to-resolve");
             }
         }
     }

@@ -40,7 +40,6 @@ public class AllArgsConstructorHandler extends JavacAnnotationHandler<AllArgsCon
                     JCTree.JCIdent ident = (JCTree.JCIdent) assign.getVariable();
                     String name = ident.getName().toString();
                     if (name.equals("onConstructor") || name.equals("onConstructor_")) {
-                        // In Java 1.8+ the parameter is `onConstructor_`
                         continue;
                     }
                 }

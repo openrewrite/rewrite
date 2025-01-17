@@ -18,6 +18,7 @@ package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -137,6 +138,19 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void hasPackageWithTrailingComma() {
+        rewriteRun(
+          groovy(
+            """ 
+              package org.openrewrite;
+
+              class A{}
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1736")
     @Test
     void parameterizedFieldDoesNotAffectClassType() {
@@ -221,6 +235,20 @@ class ClassDeclarationTest implements RewriteTest {
               interface C {
                   class Inner {
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4705")
+    @Test
+    void constructorWithDef() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  def A() {}
               }
               """
           )
@@ -334,6 +362,96 @@ class ClassDeclarationTest implements RewriteTest {
           groovy(
             """
               class RewriteSettings extends groovy.lang.Script {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void anonymousInnerClass() {
+        rewriteRun(
+          groovy(
+            """
+              interface Something {}
+              
+              class Test {
+                  Something something = new Something() {}
+                  static def test() {
+                      new Something() {}
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4063")
+    void nestedClassWithoutParameters() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  class B {
+                      B() {}
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4063")
+    void nestedClass() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  class B {
+                      String a;String[] b
+                      B(String $a, String... b) {
+                          this.a = $a
+                          this.b = b
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4063")
+    void nestedStaticClassWithoutParameters() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  static class B {
+                      B() {}
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4063")
+    void nestedStaticClass() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  static class B {
+                      String a;String[] b
+                      B(String a, String... b) {
+                          this.a = a
+                          this.b = b
+                      }
+                  }
               }
               """
           )

@@ -16,6 +16,8 @@
 package org.openrewrite.groovy;
 
 import groovy.lang.GroovySystem;
+import groovy.transform.Generated;
+import groovy.transform.Immutable;
 import groovyjarjarasm.asm.Opcodes;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -39,11 +41,13 @@ import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.marker.Semicolon;
 import org.openrewrite.java.marker.TrailingComma;
-import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
+import java.lang.annotation.Annotation;
+import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
@@ -53,11 +57,11 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
 import static org.openrewrite.java.tree.Space.EMPTY;
@@ -112,35 +116,6 @@ public class GroovyParserVisitor {
         return olderThanGroovy3;
     }
 
-    /**
-     *  Groovy methods can be declared with "def" AND a return type
-     *  In these cases the "def" is semantically meaningless but needs to be preserved for source code accuracy
-     *  If there is both a def and a return type, this method returns a RedundantDef object and advances the cursor
-     *  position past the "def" keyword, leaving the return type to be parsed as normal.
-     *  In any other situation an empty Optional is returned and the cursor is not advanced.
-     */
-    private Optional<RedundantDef> maybeRedundantDef(ClassNode type, String name) {
-        int saveCursor = cursor;
-        Space defPrefix = whitespace();
-        if(source.startsWith("def", cursor)) {
-            skip("def");
-            // The def is redundant only when it is followed by the method's return type
-            // I hope no one puts an annotation between "def" and the return type
-            int cursorBeforeReturnType = cursor;
-            int lengthOfTypePrefix = indexOfNextNonWhitespace(cursorBeforeReturnType, source) - cursorBeforeReturnType;
-            // Differentiate between the next token being the method/variable name and it being the return type
-            if (!source.startsWith(name, cursorBeforeReturnType + lengthOfTypePrefix)) {
-                TypeTree returnType = visitTypeTree(type);
-                if (source.startsWith(returnType.toString(), cursorBeforeReturnType + lengthOfTypePrefix)) {
-                    cursor = cursorBeforeReturnType;
-                    return Optional.of(new RedundantDef(randomId(), defPrefix));
-                }
-            }
-        }
-        cursor = saveCursor;
-        return Optional.empty();
-    }
-
     public G.CompilationUnit visit(SourceUnit unit, ModuleNode ast) throws GroovyParsingException {
         NavigableMap<LineColumn, List<ASTNode>> sortedByPosition = new TreeMap<>();
         for (org.codehaus.groovy.ast.stmt.Statement s : ast.getStatementBlock().getStatements()) {
@@ -161,9 +136,8 @@ public class GroovyParserVisitor {
         JRightPadded<J.Package> pkg = null;
         if (ast.getPackage() != null) {
             prefix = whitespace();
-            cursor += "package".length();
-            pkg = JRightPadded.build(new J.Package(randomId(), EMPTY, Markers.EMPTY,
-                    typeTree(null), emptyList()));
+            skip("package");
+            pkg = maybeSemicolon(new J.Package(randomId(), EMPTY, Markers.EMPTY, typeTree(null), emptyList()));
         }
 
         for (ImportNode anImport : ast.getImports()) {
@@ -182,8 +156,8 @@ public class GroovyParserVisitor {
         for (ClassNode aClass : ast.getClasses()) {
             if (aClass.getSuperClass() == null ||
                 !("groovy.lang.Script".equals(aClass.getSuperClass().getName()) ||
-                     "RewriteGradleProject".equals(aClass.getSuperClass().getName()) ||
-                     "RewriteSettings".equals(aClass.getSuperClass().getName()))) {
+                  "RewriteGradleProject".equals(aClass.getSuperClass().getName()) ||
+                  "RewriteSettings".equals(aClass.getSuperClass().getName()))) {
                 sortedByPosition.computeIfAbsent(pos(aClass), i -> new ArrayList<>()).add(aClass);
             }
         }
@@ -235,7 +209,7 @@ public class GroovyParserVisitor {
                 null,
                 pkg,
                 statements,
-                format(source.substring(cursor))
+                format(source, cursor, source.length())
         );
     }
 
@@ -256,16 +230,16 @@ public class GroovyParserVisitor {
             J.ClassDeclaration.Kind.Type kindType = null;
             if (source.startsWith("class", cursor)) {
                 kindType = J.ClassDeclaration.Kind.Type.Class;
-                cursor += "class".length();
+                skip("class");
             } else if (source.startsWith("interface", cursor)) {
                 kindType = J.ClassDeclaration.Kind.Type.Interface;
-                cursor += "interface".length();
+                skip("interface");
             } else if (source.startsWith("@interface", cursor)) {
                 kindType = J.ClassDeclaration.Kind.Type.Annotation;
-                cursor += "@interface".length();
+                skip("@interface");
             } else if (source.startsWith("enum", cursor)) {
                 kindType = J.ClassDeclaration.Kind.Type.Enum;
-                cursor += "enum".length();
+                skip("enum");
             }
             assert kindType != null;
             J.ClassDeclaration.Kind kind = new J.ClassDeclaration.Kind(randomId(), kindPrefix, Markers.EMPTY, emptyList(), kindType);
@@ -295,7 +269,7 @@ public class GroovyParserVisitor {
                 for (int i = 0; i < interfaces.length; i++) {
                     ClassNode anInterface = interfaces[i];
                     // Any annotation @interface is listed as extending java.lang.annotation.Annotation, although it doesn't appear in source
-                    if (kindType == J.ClassDeclaration.Kind.Type.Annotation && "java.lang.annotation.Annotation".equals(anInterface.getName())) {
+                    if (kindType == J.ClassDeclaration.Kind.Type.Annotation && Annotation.class.getName().equals(anInterface.getName())) {
                         continue;
                     }
                     implTypes.add(JRightPadded.build(visitTypeTree(anInterface))
@@ -332,7 +306,7 @@ public class GroovyParserVisitor {
                         org.codehaus.groovy.ast.stmt.Statement statement = ((BlockStatement) method.getCode()).getStatements().get(0);
                         sortedByPosition.computeIfAbsent(pos(statement), i -> new ArrayList<>()).add(statement);
                     }
-                } else {
+                } else if (method.getAnnotations(new ClassNode(Generated.class)).isEmpty()) {
                     sortedByPosition.computeIfAbsent(pos(method), i -> new ArrayList<>()).add(method);
                 }
             }
@@ -391,11 +365,11 @@ public class GroovyParserVisitor {
                     JRightPadded.build(false),
                     sortedByPosition.values().stream()
                             .flatMap(asts -> asts.stream()
+                                    // anonymous classes will be visited as part of visiting the ConstructorCallExpression
+                                    .filter(ast -> !(ast instanceof InnerClassNode && ((InnerClassNode) ast).isAnonymous()))
                                     .map(ast -> {
                                         if (ast instanceof FieldNode) {
                                             visitField((FieldNode) ast);
-                                        } else if (ast instanceof ConstructorNode) {
-                                            visitConstructor((ConstructorNode) ast);
                                         } else if (ast instanceof MethodNode) {
                                             visitMethod((MethodNode) ast);
                                         } else if (ast instanceof ClassNode) {
@@ -406,7 +380,7 @@ public class GroovyParserVisitor {
                                         Statement stat = pollQueue();
                                         return maybeSemicolon(stat);
                                     }))
-                            .collect(Collectors.toList()),
+                            .collect(toList()),
                     sourceBefore("}"));
         }
 
@@ -475,42 +449,48 @@ public class GroovyParserVisitor {
         @Override
         protected void visitAnnotation(AnnotationNode annotation) {
             RewriteGroovyVisitor bodyVisitor = new RewriteGroovyVisitor(annotation, this);
-
             String lastArgKey = annotation.getMembers().keySet().stream().reduce("", (k1, k2) -> k2);
             Space prefix = sourceBefore("@");
             NameTree annotationType = visitTypeTree(annotation.getClassNode());
             JContainer<Expression> arguments = null;
             if (!annotation.getMembers().isEmpty()) {
-                // This doesn't handle the case where an annotation has empty arguments like @Foo(), but that is rare
                 arguments = JContainer.build(
                         sourceBefore("("),
                         annotation.getMembers().entrySet().stream()
+                                // Non-value implicit properties should not be represented in our LST.
+                                .filter(it -> sourceStartsWith(it.getKey()) || "value".equals(it.getKey()))
                                 .map(arg -> {
-                                    Space argPrefix;
-                                    if ("value".equals(arg.getKey())) {
-                                        // Determine whether the value is implicit or explicit
-                                        int saveCursor = cursor;
-                                        argPrefix = whitespace();
-                                        if (!source.startsWith("value", cursor)) {
-                                            return new JRightPadded<Expression>(
-                                                    ((Expression) bodyVisitor.visit(arg.getValue())).withPrefix(argPrefix),
-                                                    arg.getKey().equals(lastArgKey) ? sourceBefore(")") : sourceBefore(","),
-                                                    Markers.EMPTY);
-                                        }
-                                        cursor = saveCursor;
+                                    boolean isImplicitValue = "value".equals(arg.getKey()) && !sourceStartsWith("value");
+                                    Space argPrefix = isImplicitValue ? whitespace() : sourceBefore(arg.getKey());
+                                    Space isSign = isImplicitValue ? null : sourceBefore("=");
+                                    Expression expression;
+                                    if (arg.getValue() instanceof AnnotationConstantExpression) {
+                                        visitAnnotation((AnnotationNode) ((AnnotationConstantExpression) arg.getValue()).getValue());
+                                        expression = (J.Annotation) queue.poll();
+                                    } else {
+                                        expression = bodyVisitor.visit(arg.getValue());
                                     }
-                                    argPrefix = sourceBefore(arg.getKey());
-                                    J.Identifier argName = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), arg.getKey(), null, null);
-                                    J.Assignment assign = new J.Assignment(randomId(), argPrefix, Markers.EMPTY,
-                                            argName, padLeft(sourceBefore("="), bodyVisitor.visit(arg.getValue())),
-                                            null);
-                                    return JRightPadded.build((Expression) assign)
+                                    Expression element = isImplicitValue ? expression
+                                            : (new J.Assignment(randomId(), argPrefix, Markers.EMPTY,
+                                            new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), arg.getKey(), null, null),
+                                            padLeft(isSign, expression), null));
+                                    return JRightPadded.build(element)
                                             .withAfter(arg.getKey().equals(lastArgKey) ? sourceBefore(")") : sourceBefore(","));
                                 })
-                                .collect(Collectors.toList()),
+                                .collect(toList()),
                         Markers.EMPTY
                 );
+                // Rare scenario where annotation does only have non-value implicit properties
+                if (arguments.getElements().isEmpty()) {
+                    arguments = null;
+                }
+            } else if (sourceStartsWith("(")) {
+                // Annotation with empty arguments like @Foo()
+                arguments = JContainer.build(sourceBefore("("),
+                        singletonList(JRightPadded.build(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY))),
+                        Markers.EMPTY);
             }
+
             queue.add(new J.Annotation(randomId(), prefix, Markers.EMPTY, annotationType, arguments));
         }
 
@@ -520,15 +500,33 @@ public class GroovyParserVisitor {
 
             List<J.Annotation> annotations = visitAndGetAnnotations(method);
             List<J.Modifier> modifiers = visitModifiers(method.getModifiers());
-            Optional<RedundantDef> redundantDef = maybeRedundantDef(method.getReturnType(), method.getName());
-            TypeTree returnType = visitTypeTree(method.getReturnType());
+            boolean isConstructorOfInnerNonStaticClass = false;
+            RedundantDef redundantDef = getRedundantDefMarker(method);
+            TypeTree returnType = method instanceof ConstructorNode ? null : visitTypeTree(method.getReturnType());
 
-            // Method name might be in quotes
             Space namePrefix = whitespace();
             String methodName;
-            if (source.startsWith(method.getName(), cursor)) {
+            if (method instanceof ConstructorNode) {
+                /*
+                To support Java syntax for non-static inner classes, the groovy compiler uses an extra parameter with a reference to its parent class under the hood:
+                class A {                               class A {
+                  class B {                               class B {
+                    String s                                String s
+                    B(String s) {           =>              B(A $p$, String s) {
+                                            =>                new Object().this$0 = $p$
+                      this.s = s            =>                this.s = s
+                    }                                       }
+                  }                                       }
+                }
+                In our LST, we don't need this internal logic, so we'll skip the first param + first two statements (ConstructorCallExpression and BlockStatement)}
+                See also: https://groovy-lang.org/differences.html#_creating_instances_of_non_static_inner_classes
+                */
+                isConstructorOfInnerNonStaticClass = method.getDeclaringClass() instanceof InnerClassNode && (method.getDeclaringClass().getModifiers() & Modifier.STATIC) == 0;
+                methodName = method.getDeclaringClass().getName().replaceFirst(".*\\$", "");
+            } else if (source.startsWith(method.getName(), cursor)) {
                 methodName = method.getName();
             } else {
+                // Method name might be in quotes
                 char openingQuote = source.charAt(cursor);
                 methodName = openingQuote + method.getName() + openingQuote;
             }
@@ -546,7 +544,7 @@ public class GroovyParserVisitor {
             Space beforeParen = sourceBefore("(");
             List<JRightPadded<Statement>> params = new ArrayList<>(method.getParameters().length);
             Parameter[] unparsedParams = method.getParameters();
-            for (int i = 0; i < unparsedParams.length; i++) {
+            for (int i = (isConstructorOfInnerNonStaticClass ? 1 : 0); i < unparsedParams.length; i++) {
                 Parameter param = unparsedParams[i];
 
                 List<J.Annotation> paramAnnotations = visitAndGetAnnotations(param);
@@ -557,12 +555,20 @@ public class GroovyParserVisitor {
                 } else {
                     paramType = visitTypeTree(param.getOriginType());
                 }
+
+                Space varargs = null;
+                if (paramType instanceof J.ArrayType && sourceStartsWith("...")) {
+                    int varargStart = indexOfNextNonWhitespace(cursor, source);
+                    varargs = format(source, cursor, varargStart);
+                    cursor = varargStart + 3;
+                }
+
                 JRightPadded<J.VariableDeclarations.NamedVariable> paramName = JRightPadded.build(
                         new J.VariableDeclarations.NamedVariable(randomId(), EMPTY, Markers.EMPTY,
                                 new J.Identifier(randomId(), whitespace(), Markers.EMPTY, emptyList(), param.getName(), null, null),
                                 emptyList(), null, null)
                 );
-                cursor += param.getName().length();
+                skip(param.getName());
 
                 org.codehaus.groovy.ast.expr.Expression defaultValue = param.getInitialExpression();
                 if (defaultValue != null) {
@@ -576,11 +582,11 @@ public class GroovyParserVisitor {
 
                 params.add(JRightPadded.build((Statement) new J.VariableDeclarations(randomId(), EMPTY,
                         Markers.EMPTY, paramAnnotations, emptyList(), paramType,
-                        null, emptyList(),
+                        varargs, emptyList(),
                         singletonList(paramName))).withAfter(rightPad));
             }
 
-            if (unparsedParams.length == 0) {
+            if (unparsedParams.length == 0 || (isConstructorOfInnerNonStaticClass && unparsedParams.length == 1)) {
                 params.add(JRightPadded.build(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY)));
             }
 
@@ -590,12 +596,20 @@ public class GroovyParserVisitor {
                     Markers.EMPTY
             );
 
-            J.Block body = method.getCode() == null ? null :
-                    bodyVisitor.visit(method.getCode());
+            J.Block body = null;
+            if (method.getCode() != null) {
+                ASTNode code = isConstructorOfInnerNonStaticClass ?
+                        new BlockStatement(
+                                ((BlockStatement) method.getCode()).getStatements().subList(2, ((BlockStatement) method.getCode()).getStatements().size()),
+                                ((BlockStatement) method.getCode()).getVariableScope()
+                        )
+                        : method.getCode();
+                body = bodyVisitor.visit(code);
+            }
 
             queue.add(new J.MethodDeclaration(
                     randomId(), fmt,
-                    redundantDef.map(Markers.EMPTY::add).orElse(Markers.EMPTY),
+                    redundantDef == null ? Markers.EMPTY : Markers.EMPTY.add(redundantDef),
                     annotations,
                     modifiers,
                     null,
@@ -609,96 +623,22 @@ public class GroovyParserVisitor {
             ));
         }
 
-        @Override
-        public void visitConstructor(ConstructorNode constructor) {
-            Space fmt = whitespace();
-
-            List<J.Annotation> annotations = visitAndGetAnnotations(constructor);
-            List<J.Modifier> modifiers = visitModifiers(constructor.getModifiers());
-
-            // Constructor name might be in quotes
-            Space namePrefix = whitespace();
-            String constructorName;
-            if (source.startsWith(constructor.getDeclaringClass().getName(), cursor)) {
-                constructorName = constructor.getDeclaringClass().getName();
-            } else {
-                char openingQuote = source.charAt(cursor);
-                constructorName = openingQuote + constructor.getName() + openingQuote;
-            }
-            cursor += constructorName.length();
-            J.Identifier name = new J.Identifier(randomId(),
-                    namePrefix,
-                    Markers.EMPTY,
-                    emptyList(),
-                    constructorName,
-                    null, null);
-
-            RewriteGroovyVisitor bodyVisitor = new RewriteGroovyVisitor(constructor, this);
-
-            // Parameter has no visit implementation, so we've got to do this by hand
-            Space beforeParen = sourceBefore("(");
-            List<JRightPadded<Statement>> params = new ArrayList<>(constructor.getParameters().length);
-            Parameter[] unparsedParams = constructor.getParameters();
-            for (int i = 0; i < unparsedParams.length; i++) {
-                Parameter param = unparsedParams[i];
-
-                List<J.Annotation> paramAnnotations = visitAndGetAnnotations(param);
-
-                TypeTree paramType;
-                if (param.isDynamicTyped()) {
-                    paramType = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), "", JavaType.ShallowClass.build("java.lang.Object"), null);
-                } else {
-                    paramType = visitTypeTree(param.getOriginType());
-                }
-                JRightPadded<J.VariableDeclarations.NamedVariable> paramName = JRightPadded.build(
-                        new J.VariableDeclarations.NamedVariable(randomId(), EMPTY, Markers.EMPTY,
-                                new J.Identifier(randomId(), whitespace(), Markers.EMPTY, emptyList(), param.getName(), null, null),
-                                emptyList(), null, null)
-                );
-                cursor += param.getName().length();
-
-                org.codehaus.groovy.ast.expr.Expression defaultValue = param.getInitialExpression();
-                if (defaultValue != null) {
-                    paramName = paramName.withElement(paramName.getElement().getPadding()
-                            .withInitializer(new JLeftPadded<>(
-                                    sourceBefore("="),
-                                    new RewriteGroovyVisitor(defaultValue, this).visit(defaultValue),
-                                    Markers.EMPTY)));
-                }
-                Space rightPad = sourceBefore(i == unparsedParams.length - 1 ? ")" : ",");
-
-                params.add(JRightPadded.build((Statement) new J.VariableDeclarations(randomId(), EMPTY,
-                        Markers.EMPTY, paramAnnotations, emptyList(), paramType,
-                        null, emptyList(),
-                        singletonList(paramName))).withAfter(rightPad));
+        /**
+         * Methods can be declared with "def" AND a return type (or constructors with "def").
+         * In these cases the "def" is semantically meaningless but needs to be preserved for source code accuracy.
+         * If there is both a def and a return type, this method returns a RedundantDef object and advances the cursor
+         * position past the "def" keyword, leaving the return type to be parsed as normal.
+         */
+        private @Nullable RedundantDef getRedundantDefMarker(MethodNode method) {
+            int saveCursor = cursor;
+            Space defPrefix = whitespace();
+            if (source.startsWith("def", cursor) && (method.getReturnType().isRedirectNode() || !Object.class.getName().equals(method.getReturnType().getName()))) {
+                skip("def");
+                return new RedundantDef(randomId(), defPrefix);
             }
 
-            if (unparsedParams.length == 0) {
-                params.add(JRightPadded.build(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY)));
-            }
-
-            JContainer<NameTree> throws_ = constructor.getExceptions().length == 0 ? null : JContainer.build(
-                    sourceBefore("throws"),
-                    bodyVisitor.visitRightPadded(constructor.getExceptions(), null),
-                    Markers.EMPTY
-            );
-
-            J.Block body = constructor.getCode() == null ? null :
-                    bodyVisitor.visit(constructor.getCode());
-
-            queue.add(new J.MethodDeclaration(
-                    randomId(), fmt, Markers.EMPTY,
-                    annotations,
-                    modifiers,
-                    null,
-                    null,
-                    new J.MethodDeclaration.IdentifierWithAnnotations(name, emptyList()),
-                    JContainer.build(beforeParen, params, Markers.EMPTY),
-                    throws_,
-                    body,
-                    null,
-                    typeMapping.methodType(constructor)
-            ));
+            cursor = saveCursor;
+            return null;
         }
 
         public List<J.Annotation> visitAndGetAnnotations(AnnotatedNode node) {
@@ -708,8 +648,17 @@ public class GroovyParserVisitor {
 
             List<J.Annotation> paramAnnotations = new ArrayList<>(node.getAnnotations().size());
             for (AnnotationNode annotationNode : node.getAnnotations()) {
-                visitAnnotation(annotationNode);
-                paramAnnotations.add(pollQueue());
+                // The groovy compiler can add or remove annotations for AST transformations.
+                // Because @groovy.transform.Immutable is discarded in favour of other transform annotations, the removed annotation must be parsed by hand.
+                if (sourceStartsWith("@" + Immutable.class.getSimpleName()) || sourceStartsWith("@" + Immutable.class.getCanonicalName()) ) {
+                    visitAnnotation(new AnnotationNode(new ClassNode(Immutable.class)));
+                    paramAnnotations.add(pollQueue());
+                }
+
+                if (appearsInSource(annotationNode)) {
+                    visitAnnotation(annotationNode);
+                    paramAnnotations.add(pollQueue());
+                }
             }
             return paramAnnotations;
         }
@@ -747,13 +696,11 @@ public class GroovyParserVisitor {
                     converted = converted.withAfter(whitespace());
                     if (',' == source.charAt(cursor)) {
                         // In Groovy trailing "," are allowed
-                        cursor += 1;
+                        skip(",");
                         converted = converted.withMarkers(Markers.EMPTY.add(new TrailingComma(randomId(), whitespace())));
                     }
                     ts.add(converted);
-                    if (afterLast != null && source.startsWith(afterLast, cursor)) {
-                        cursor += afterLast.length();
-                    }
+                    skip(afterLast);
                 } else {
                     ts.add(converted.withAfter(sourceBefore(",")));
                 }
@@ -805,35 +752,32 @@ public class GroovyParserVisitor {
             int saveCursor = cursor;
             Space beforeOpenParen = whitespace();
 
-            OmitParentheses omitParentheses = null;
+            boolean hasParentheses = true;
             if (source.charAt(cursor) == '(') {
-                cursor++;
+                skip("(");
             } else {
-                omitParentheses = new OmitParentheses(randomId());
+                hasParentheses = false;
                 beforeOpenParen = EMPTY;
                 cursor = saveCursor;
             }
 
             List<org.codehaus.groovy.ast.expr.Expression> unparsedArgs = expression.getExpressions().stream()
-                    .filter(GroovyParserVisitor::appearsInSource)
-                    .collect(Collectors.toList());
+                    .filter(GroovyParserVisitor.this::appearsInSource)
+                    .collect(toList());
             // If the first parameter to a function is a Map, then groovy allows "named parameters" style invocations, see:
             //     https://docs.groovy-lang.org/latest/html/documentation/#_named_parameters_2
             // When named parameters are in use they may appear before, after, or intermixed with any positional arguments
             if (unparsedArgs.size() > 1 && unparsedArgs.get(0) instanceof MapExpression &&
                 (unparsedArgs.get(0).getLastLineNumber() > unparsedArgs.get(1).getLastLineNumber() ||
-                    (unparsedArgs.get(0).getLastLineNumber() == unparsedArgs.get(1).getLastLineNumber() &&
-                        unparsedArgs.get(0).getLastColumnNumber() > unparsedArgs.get(1).getLastColumnNumber()))) {
+                 (unparsedArgs.get(0).getLastLineNumber() == unparsedArgs.get(1).getLastLineNumber() &&
+                  unparsedArgs.get(0).getLastColumnNumber() > unparsedArgs.get(1).getLastColumnNumber()))) {
 
                 // Figure out the source-code ordering of the expressions
                 MapExpression namedArgExpressions = (MapExpression) unparsedArgs.get(0);
                 unparsedArgs =
-                        Stream.concat(
-                                        namedArgExpressions.getMapEntryExpressions().stream(),
-                                        unparsedArgs.subList(1, unparsedArgs.size()).stream())
-                                .sorted(Comparator.comparing(ASTNode::getLastLineNumber)
-                                        .thenComparing(ASTNode::getLastColumnNumber))
-                                .collect(Collectors.toList());
+                        ListUtils.concatAll(unparsedArgs.subList(1, unparsedArgs.size()), namedArgExpressions.getMapEntryExpressions()).stream()
+                                .sorted(Comparator.comparing(ASTNode::getLastLineNumber).thenComparing(ASTNode::getLastColumnNumber))
+                                .collect(toList());
             } else if (!unparsedArgs.isEmpty() && unparsedArgs.get(0) instanceof MapExpression) {
                 // The map literal may or may not be wrapped in "[]"
                 // If it is wrapped in "[]" then this isn't a named arguments situation, and we should not lift the parameters out of the enclosing MapExpression
@@ -847,31 +791,32 @@ public class GroovyParserVisitor {
                             Stream.concat(
                                             namedArgExpressions.getMapEntryExpressions().stream(),
                                             unparsedArgs.subList(1, unparsedArgs.size()).stream())
-                                    .collect(Collectors.toList());
+                                    .collect(toList());
                 }
             }
 
             if (unparsedArgs.isEmpty()) {
                 args.add(JRightPadded.build((Expression) new J.Empty(randomId(), whitespace(), Markers.EMPTY))
-                        .withAfter(omitParentheses == null ? sourceBefore(")") : EMPTY));
+                        .withAfter(hasParentheses ? sourceBefore(")") : EMPTY));
             } else {
+                boolean lastArgumentsAreAllClosures = endsWithClosures(expression.getExpressions());
                 for (int i = 0; i < unparsedArgs.size(); i++) {
                     org.codehaus.groovy.ast.expr.Expression rawArg = unparsedArgs.get(i);
                     Expression arg = visit(rawArg);
-                    if (omitParentheses != null) {
-                        arg = arg.withMarkers(arg.getMarkers().add(omitParentheses));
+                    if (!hasParentheses) {
+                        arg = arg.withMarkers(arg.getMarkers().add(new OmitParentheses(randomId())));
                     }
 
                     Space after = EMPTY;
                     if (i == unparsedArgs.size() - 1) {
-                        if (omitParentheses == null) {
+                        if (hasParentheses) {
                             after = sourceBefore(")");
                         }
-                    } else {
+                    } else if (!(arg instanceof J.Lambda && lastArgumentsAreAllClosures && !hasParentheses)) {
                         after = whitespace();
                         if (source.charAt(cursor) == ')') {
-                            // the next argument will have an OmitParentheses marker
-                            omitParentheses = new OmitParentheses(randomId());
+                            // next argument(s), if they exists, are trailing closures and will have an OmitParentheses marker
+                            hasParentheses = false;
                         }
                         cursor++;
                     }
@@ -883,12 +828,36 @@ public class GroovyParserVisitor {
             queue.add(JContainer.build(beforeOpenParen, args, Markers.EMPTY));
         }
 
+        public boolean endsWithClosures(List<org.codehaus.groovy.ast.expr.Expression> list) {
+            if (!(list.get(list.size() - 1) instanceof ClosureExpression)) {
+                return false;
+            }
+
+            boolean foundNonClosure = false;
+            for (int i = list.size() - 2; i >= 0; i--) {
+                if (list.get(i) instanceof ClosureExpression) {
+                    if (foundNonClosure) {
+                        return false;
+                    }
+                } else {
+                    foundNonClosure = true;
+                }
+            }
+
+            return true;
+        }
+
         @Override
         public void visitClassExpression(ClassExpression clazz) {
             String unresolvedName = clazz.getType().getUnresolvedName().replace('$', '.');
+            Space space = sourceBefore(unresolvedName);
+            if (source.substring(cursor).startsWith(".class")) {
+                unresolvedName += ".class";
+                skip(".class");
+            }
             queue.add(TypeTree.build(unresolvedName)
                     .withType(typeMapping.type(clazz.getType()))
-                    .withPrefix(sourceBefore(unresolvedName)));
+                    .withPrefix(space));
         }
 
         @Override
@@ -1063,7 +1032,7 @@ public class GroovyParserVisitor {
         public void visitBlockStatement(BlockStatement block) {
             Space fmt = EMPTY;
             Space staticInitPadding = EMPTY;
-            boolean isStaticInit = source.substring(indexOfNextNonWhitespace(cursor, source)).startsWith("static");
+            boolean isStaticInit = sourceStartsWith("static");
             Object parent = nodeCursor.getParentOrThrow().getValue();
             if (isStaticInit) {
                 fmt = sourceBefore("static");
@@ -1079,7 +1048,7 @@ public class GroovyParserVisitor {
                 J expr = visit(statement);
                 if (i == blockStatements.size() - 1 && (expr instanceof Expression)) {
                     if (parent instanceof ClosureExpression || (parent instanceof MethodNode &&
-                            !JavaType.Primitive.Void.equals(typeMapping.type(((MethodNode) parent).getReturnType())))) {
+                                                                JavaType.Primitive.Void != typeMapping.type(((MethodNode) parent).getReturnType()))) {
                         expr = new J.Return(randomId(), expr.getPrefix(), Markers.EMPTY,
                                 expr.withPrefix(EMPTY));
                         expr = expr.withMarkers(expr.getMarkers().add(new ImplicitReturn(randomId())));
@@ -1089,11 +1058,11 @@ public class GroovyParserVisitor {
                 JRightPadded<Statement> stat = JRightPadded.build((Statement) expr);
                 int saveCursor = cursor;
                 Space beforeSemicolon = whitespace();
-                if (cursor < source.length() && source.charAt(cursor) == ';') {
+                if (source.charAt(cursor) == ';') {
                     stat = stat
                             .withMarkers(stat.getMarkers().add(new Semicolon(randomId())))
                             .withAfter(beforeSemicolon);
-                    cursor++;
+                    skip(";");
                 } else {
                     cursor = saveCursor;
                 }
@@ -1118,11 +1087,11 @@ public class GroovyParserVisitor {
             Space paramPrefix = whitespace();
             // Groovy allows catch variables to omit their type, shorthand for being of type java.lang.Exception
             // Can't use isSynthetic() here because groovy doesn't record the line number on the Parameter
-            if ("java.lang.Exception".equals(param.getType().getName()) &&
+            if (Exception.class.getName().equals(param.getType().getName()) &&
                 !source.startsWith("Exception", cursor) &&
                 !source.startsWith("java.lang.Exception", cursor)) {
                 paramType = new J.Identifier(randomId(), paramPrefix, Markers.EMPTY, emptyList(), "",
-                        JavaType.ShallowClass.build("java.lang.Exception"), null);
+                        JavaType.ShallowClass.build(Exception.class.getName()), null);
             } else {
                 paramType = visitTypeTree(param.getOriginType()).withPrefix(paramPrefix);
             }
@@ -1134,7 +1103,7 @@ public class GroovyParserVisitor {
             );
             cursor += param.getName().length();
             Space rightPad = whitespace();
-            cursor += 1; // skip )
+            skip(")");
             JRightPadded<J.VariableDeclarations> variable = JRightPadded.build(new J.VariableDeclarations(randomId(), paramType.getPrefix(),
                     Markers.EMPTY, emptyList(), emptyList(), paramType.withPrefix(EMPTY),
                     null, emptyList(),
@@ -1179,9 +1148,8 @@ public class GroovyParserVisitor {
                     Markers.EMPTY,
                     J.Case.Type.Statement,
                     null,
-                    JContainer.build(singletonList(JRightPadded.build(new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), skip("default"), null, null)))),
-                    JContainer.build(sourceBefore(":"),
-                            convertStatements(statement.getStatements()), Markers.EMPTY),
+                    JContainer.build(singletonList(JRightPadded.build(new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), skip("default"), null, null)))),
+                    JContainer.build(sourceBefore(":"), convertStatements(statement.getStatements()), Markers.EMPTY),
                     null
             );
         }
@@ -1191,7 +1159,7 @@ public class GroovyParserVisitor {
             queue.add(insideParentheses(cast, prefix -> {
                 // Might be looking at a Java-style cast "(type)object" or a groovy-style cast "object as type"
                 if (source.charAt(cursor) == '(') {
-                    cursor++; // skip '('
+                    skip("(");
                     return new J.TypeCast(randomId(), prefix, Markers.EMPTY,
                             new J.ControlParentheses<>(randomId(), EMPTY, Markers.EMPTY,
                                     new JRightPadded<>(visitTypeTree(cast.getType()), sourceBefore(")"), Markers.EMPTY)
@@ -1282,7 +1250,7 @@ public class GroovyParserVisitor {
             for (int i = 0, expressionsSize = expressions.size(); i < expressionsSize; i++) {
                 results.add(JRightPadded.build(visit(expressions.get(i))).withAfter(whitespace()));
                 if (i < expressionsSize - 1) {
-                    cursor++; // ","
+                    cursor++; // "," or ";" (a for-loop uses a ClosureListExpression)
                 }
             }
             queue.add(results);
@@ -1306,46 +1274,44 @@ public class GroovyParserVisitor {
                     jType = JavaType.Primitive.Byte;
                 } else if (type == ClassHelper.char_TYPE) {
                     jType = JavaType.Primitive.Char;
-                } else if (type == ClassHelper.double_TYPE || "java.lang.Double".equals(type.getName())) {
+                } else if (type == ClassHelper.double_TYPE || Double.class.getName().equals(type.getName())) {
                     jType = JavaType.Primitive.Double;
                     if (expression.getNodeMetaData().get("_FLOATING_POINT_LITERAL_TEXT") instanceof String) {
                         text = (String) expression.getNodeMetaData().get("_FLOATING_POINT_LITERAL_TEXT");
                     }
-                } else if (type == ClassHelper.float_TYPE || "java.lang.Float".equals(type.getName())) {
+                } else if (type == ClassHelper.float_TYPE || Float.class.getName().equals(type.getName())) {
                     jType = JavaType.Primitive.Float;
                     if (expression.getNodeMetaData().get("_FLOATING_POINT_LITERAL_TEXT") instanceof String) {
                         text = (String) expression.getNodeMetaData().get("_FLOATING_POINT_LITERAL_TEXT");
                     }
-                } else if (type == ClassHelper.int_TYPE || "java.lang.Integer".equals(type.getName())) {
+                } else if (type == ClassHelper.int_TYPE || Integer.class.getName().equals(type.getName())) {
                     jType = JavaType.Primitive.Int;
                     if (expression.getNodeMetaData().get("_INTEGER_LITERAL_TEXT") instanceof String) {
                         text = (String) expression.getNodeMetaData().get("_INTEGER_LITERAL_TEXT");
                     }
-                } else if (type == ClassHelper.long_TYPE || "java.lang.Long".equals(type.getName())) {
+                } else if (type == ClassHelper.long_TYPE || Long.class.getName().equals(type.getName())) {
                     if (expression.getNodeMetaData().get("_INTEGER_LITERAL_TEXT") instanceof String) {
                         text = (String) expression.getNodeMetaData().get("_INTEGER_LITERAL_TEXT");
                     }
                     jType = JavaType.Primitive.Long;
-                } else if (type == ClassHelper.short_TYPE || "java.lang.Short".equals(type.getName())) {
+                } else if (type == ClassHelper.short_TYPE || Short.class.getName().equals(type.getName())) {
                     jType = JavaType.Primitive.Short;
                 } else if (type == ClassHelper.STRING_TYPE) {
                     jType = JavaType.Primitive.String;
-                    // String literals value returned by getValue()/getText() has already processed sequences like "\\" -> "\"
-                    int length = sourceLengthOfString(expression);
-                    // this is an attribute selector
+                    // an attribute selector is modeled as a String ConstantExpression
                     if (source.startsWith("@" + value, cursor)) {
-                        length += 1;
+                        value = "@" + value;
+                        text = "@" + text;
+                    } else {
+                        String delimiter = getDelimiter();
+                        if (delimiter != null) {
+                            // handle the `pattern` operator
+                            String endDelimiter = "~/".equals(delimiter) ? "/" : delimiter;
+                            // Get the string literal from the source, so escaping of newlines and the like works out of the box
+                            value = sourceSubstring(cursor + delimiter.length(), endDelimiter);
+                            text = delimiter + value + endDelimiter;
+                        }
                     }
-                    text = source.substring(cursor, cursor + length);
-                    int delimiterLength = 0;
-                    if (text.startsWith("$/")) {
-                        delimiterLength = 2;
-                    } else if (text.startsWith("\"\"\"") || text.startsWith("'''")) {
-                        delimiterLength = 3;
-                    } else if (text.startsWith("/") || text.startsWith("\"") || text.startsWith("'")) {
-                        delimiterLength = 1;
-                    }
-                    value = text.substring(delimiterLength, text.length() - delimiterLength);
                 } else if (expression.isNullExpression()) {
                     if (source.startsWith("null", cursor)) {
                         text = "null";
@@ -1353,9 +1319,6 @@ public class GroovyParserVisitor {
                         text = "";
                     }
                     jType = JavaType.Primitive.Null;
-                } else if (expression instanceof AnnotationConstantExpression) {
-                    classVisitor.visitAnnotation((AnnotationNode) value);
-                    return ((Expression) classVisitor.pollQueue()).withPrefix(fmt);
                 } else {
                     throw new IllegalStateException("Unexpected constant type " + type);
                 }
@@ -1380,7 +1343,7 @@ public class GroovyParserVisitor {
         @Override
         public void visitConstructorCallExpression(ConstructorCallExpression ctor) {
             queue.add(insideParentheses(ctor, fmt -> {
-                cursor += 3; // skip "new"
+                skip("new");
                 TypeTree clazz = visitTypeTree(ctor.getType(), ctor.getNodeMetaData().containsKey(StaticTypesMarker.INFERRED_TYPE));
                 JContainer<Expression> args = visit(ctor.getArguments());
                 J.Block body = null;
@@ -1418,7 +1381,9 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitDeclarationExpression(DeclarationExpression expression) {
-            Optional<RedundantDef> redundantDef = maybeRedundantDef(expression.getVariableExpression().getType(), expression.getVariableExpression().getName());
+            Space prefix = whitespace();
+            Optional<MultiVariable> multiVariable = maybeMultiVariable();
+            List<J.Modifier> modifiers = getModifiers(expression.getVariableExpression());
             TypeTree typeExpr = visitVariableExpressionType(expression.getVariableExpression());
 
             J.VariableDeclarations.NamedVariable namedVariable;
@@ -1446,17 +1411,58 @@ public class GroovyParserVisitor {
 
             J.VariableDeclarations variableDeclarations = new J.VariableDeclarations(
                     randomId(),
-                    EMPTY,
-                    redundantDef.map(Markers.EMPTY::add).orElse(Markers.EMPTY),
+                    prefix,
+                    Markers.EMPTY,
                     emptyList(),
-                    emptyList(),
+                    modifiers,
                     typeExpr,
                     null,
                     emptyList(),
                     singletonList(JRightPadded.build(namedVariable))
             );
+            if (multiVariable.isPresent()) {
+                variableDeclarations = variableDeclarations.withMarkers(variableDeclarations.getMarkers().add(multiVariable.get()));
+            }
 
             queue.add(variableDeclarations);
+        }
+
+        private Optional<MultiVariable> maybeMultiVariable() {
+            int saveCursor = cursor;
+            Space commaPrefix = whitespace();
+            if (source.startsWith(",", cursor)) {
+                skip(",");
+                return Optional.of(new MultiVariable(randomId(), commaPrefix));
+            }
+            cursor = saveCursor;
+            return Optional.empty();
+        }
+
+        private List<J.Modifier> getModifiers(Variable variable) {
+            String varName = variable.getName();
+            List<J.Modifier> modifiers = new ArrayList<>();
+            int saveCursor = cursor;
+            Space prefix = whitespace();
+            Set<String> possibleModifiers = new LinkedHashSet<>(modifierNameToType.keySet());
+            String currentModifier = possibleModifiers.stream().filter(modifierName -> source.startsWith(modifierName, cursor))
+                    .findFirst()
+                    .orElse(null);
+            while (currentModifier != null) {
+                possibleModifiers.remove(currentModifier);
+                modifiers.add(new J.Modifier(randomId(), prefix, Markers.EMPTY, currentModifier, modifierNameToType.get(currentModifier), emptyList()));
+                skip(currentModifier);
+                saveCursor = cursor;
+                prefix = whitespace();
+                currentModifier = possibleModifiers.stream()
+                        .filter(modifierName ->
+                                // Try to avoid confusing a variable name with an incidentally similar modifier keyword
+                                (varName.length() < modifierName.length() || !source.startsWith(varName, cursor)) &&
+                                source.startsWith(modifierName, cursor))
+                        .findFirst()
+                        .orElse(null);
+            }
+            cursor = saveCursor;
+            return modifiers;
         }
 
         @Override
@@ -1501,7 +1507,7 @@ public class GroovyParserVisitor {
                     List<JRightPadded<Statement>> update = controls.get(2).getElement() instanceof List ?
                             (List<JRightPadded<Statement>>) controls.get(2).getElement() :
                             singletonList((JRightPadded<Statement>) controls.get(2));
-                    cursor++; // skip ')'
+                    skip(")");
 
                     return new J.ForLoop(randomId(), prefix, Markers.EMPTY,
                             new J.ForLoop.Control(randomId(), controlFmt,
@@ -1510,8 +1516,8 @@ public class GroovyParserVisitor {
                 } else {
                     Parameter param = forLoop.getVariable();
                     Space paramFmt = whitespace();
-                    TypeTree paramType = param.getOriginType().getColumnNumber() >= 0 ?
-                            visitTypeTree(param.getOriginType()) : null;
+                    List<J.Modifier> modifiers = getModifiers(param);
+                    TypeTree paramType = param.getOriginType().getColumnNumber() >= 0 ? visitTypeTree(param.getOriginType()) : null;
                     JRightPadded<J.VariableDeclarations.NamedVariable> paramName = JRightPadded.build(
                             new J.VariableDeclarations.NamedVariable(randomId(), whitespace(), Markers.EMPTY,
                                     new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), param.getName(), null, null),
@@ -1521,14 +1527,14 @@ public class GroovyParserVisitor {
                     Space rightPad = whitespace();
                     Markers forEachMarkers = Markers.EMPTY;
                     if (source.charAt(cursor) == ':') {
-                        cursor++; // Skip ":"
+                        skip(":");
                     } else {
-                        cursor += 2; // Skip "in"
+                        skip("in");
                         forEachMarkers = forEachMarkers.add(new InStyleForEachLoop(randomId()));
                     }
 
                     JRightPadded<J.VariableDeclarations> variable = JRightPadded.build(new J.VariableDeclarations(randomId(), paramFmt,
-                            Markers.EMPTY, emptyList(), emptyList(), paramType, null, emptyList(),
+                            Markers.EMPTY, emptyList(), modifiers, paramType, null, emptyList(),
                             singletonList(paramName))
                     ).withAfter(rightPad);
 
@@ -1557,17 +1563,8 @@ public class GroovyParserVisitor {
         @Override
         public void visitGStringExpression(GStringExpression gstring) {
             Space fmt = whitespace();
-            String delimiter;
-            if (source.startsWith("\"\"\"", cursor)) {
-                delimiter = "\"\"\"";
-            } else if (source.startsWith("/", cursor)) {
-                delimiter = "/";
-            } else if (source.startsWith("$/", cursor)) {
-                delimiter = "$/";
-            } else {
-                delimiter = "\"";
-            }
-            cursor += delimiter.length();
+            String delimiter = getDelimiter();
+            skip(delimiter); // Opening delim for GString
 
             NavigableMap<LineColumn, org.codehaus.groovy.ast.expr.Expression> sortedByPosition = new TreeMap<>();
             for (org.codehaus.groovy.ast.expr.ConstantExpression e : gstring.getStrings()) {
@@ -1585,56 +1582,51 @@ public class GroovyParserVisitor {
             for (int i = 0; i < rawExprs.size(); i++) {
                 org.codehaus.groovy.ast.expr.Expression e = rawExprs.get(i);
                 if (source.charAt(cursor) == '$') {
-                    cursor++;
+                    skip("$");
                     boolean inCurlies = source.charAt(cursor) == '{';
                     if (inCurlies) {
-                        cursor++;
+                        skip("{");
                     } else {
                         columnOffset--;
                     }
-                    strings.add(new G.GString.Value(randomId(), Markers.EMPTY, visit(e), inCurlies ? sourceBefore("}") : Space.EMPTY, inCurlies));
+                    strings.add(new G.GString.Value(randomId(), Markers.EMPTY, visit(e), inCurlies ? sourceBefore("}") : EMPTY, inCurlies));
                     if (!inCurlies) {
                         columnOffset++;
                     }
                 } else if (e instanceof ConstantExpression) {
-                    ConstantExpression cs = (ConstantExpression) e;
-                    // The sub-strings within a GString have no delimiters of their own, confusing visitConstantExpression()
-                    // ConstantExpression.getValue() cannot be trusted for strings as its values don't match source code because sequences like "\\" have already been replaced with a single "\"
-                    // Use the AST element's line/column positions to figure out its extent, but those numbers need tweaks to be correct
-                    int length = lengthAccordingToAst(cs);
-                    if (i == 0 || i == rawExprs.size() - 1) {
-                        // The first and last constants within a GString have line/column position which incorrectly include the GString's delimiters
-                        length -= delimiter.length();
+                    // Get the string literal from the source, so escaping of newlines and the like works out of the box
+                    String value = sourceSubstring(cursor, ("~/".equals(delimiter) ? "/" : delimiter));
+                    // There could be a closer GString before the end of the closing delimiter, so shorten the string if needs be
+                    int indexNextSign = source.indexOf("$", cursor);
+                    if (indexNextSign != -1 && indexNextSign < (cursor + value.length())) {
+                        value = source.substring(cursor, indexNextSign);
                     }
-                    // The line/column numbers incorrectly indicate that the following expression's opening "$" is part of this expression
-                    if (i < rawExprs.size() - 1) {
-                        length--;
-                    }
-                    String value = source.substring(cursor, cursor + length);
                     strings.add(new J.Literal(randomId(), EMPTY, Markers.EMPTY, value, value, null, JavaType.Primitive.String));
-                    cursor += value.length();
+                    skip(value);
                 } else {
                     // Everything should be handled already by the other two code paths, but just in case
                     strings.add(visit(e));
                 }
             }
 
-            queue.add(new G.GString(randomId(), fmt, Markers.EMPTY, delimiter, strings,
-                    typeMapping.type(gstring.getType())));
-            cursor += delimiter.length();
+            queue.add(new G.GString(randomId(), fmt, Markers.EMPTY, delimiter, strings,typeMapping.type(gstring.getType())));
+            skip(delimiter); // Closing delim for GString
         }
 
         @Override
         public void visitListExpression(ListExpression list) {
-            if (list.getExpressions().isEmpty()) {
-                queue.add(new G.ListLiteral(randomId(), sourceBefore("["), Markers.EMPTY,
-                        JContainer.build(singletonList(new JRightPadded<>(new J.Empty(randomId(), EMPTY, Markers.EMPTY), sourceBefore("]"), Markers.EMPTY))),
-                        typeMapping.type(list.getType())));
-            } else {
-                queue.add(new G.ListLiteral(randomId(), sourceBefore("["), Markers.EMPTY,
-                        JContainer.build(visitRightPadded(list.getExpressions().toArray(new ASTNode[0]), "]")),
-                        typeMapping.type(list.getType())));
-            }
+            queue.add(insideParentheses(list, fmt -> {
+                skip("[");
+                if (list.getExpressions().isEmpty()) {
+                    return new G.ListLiteral(randomId(), fmt, Markers.EMPTY,
+                            JContainer.build(singletonList(new JRightPadded<>(new J.Empty(randomId(), EMPTY, Markers.EMPTY), sourceBefore("]"), Markers.EMPTY))),
+                            typeMapping.type(list.getType()));
+                } else {
+                    return new G.ListLiteral(randomId(), fmt, Markers.EMPTY,
+                            JContainer.build(visitRightPadded(list.getExpressions().toArray(new ASTNode[0]), "]")),
+                            typeMapping.type(list.getType()));
+                }
+            }));
         }
 
         @Override
@@ -1649,17 +1641,19 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitMapExpression(MapExpression map) {
-            Space prefix = sourceBefore("[");
-            JContainer<G.MapEntry> entries;
-            if (map.getMapEntryExpressions().isEmpty()) {
-                entries = JContainer.build(Collections.singletonList(JRightPadded.build(
-                        new G.MapEntry(randomId(), whitespace(), Markers.EMPTY,
-                                JRightPadded.build(new J.Empty(randomId(), sourceBefore(":"), Markers.EMPTY)),
-                                new J.Empty(randomId(), sourceBefore("]"), Markers.EMPTY), null))));
-            } else {
-                entries = JContainer.build(visitRightPadded(map.getMapEntryExpressions().toArray(new ASTNode[0]), "]"));
-            }
-            queue.add(new G.MapLiteral(randomId(), prefix, Markers.EMPTY, entries, typeMapping.type(map.getType())));
+            queue.add(insideParentheses(map, fmt -> {
+                skip("[");
+                JContainer<G.MapEntry> entries;
+                if (map.getMapEntryExpressions().isEmpty()) {
+                    entries = JContainer.build(Collections.singletonList(JRightPadded.build(
+                            new G.MapEntry(randomId(), whitespace(), Markers.EMPTY,
+                                    JRightPadded.build(new J.Empty(randomId(), sourceBefore(":"), Markers.EMPTY)),
+                                    new J.Empty(randomId(), sourceBefore("]"), Markers.EMPTY), null))));
+                } else {
+                    entries = JContainer.build(visitRightPadded(map.getMapEntryExpressions().toArray(new ASTNode[0]), "]"));
+                }
+                return new G.MapLiteral(randomId(), fmt, Markers.EMPTY, entries, typeMapping.type(map.getType()));
+            }));
         }
 
         @Override
@@ -1693,10 +1687,8 @@ public class GroovyParserVisitor {
 
                 Space prefix = whitespace();
                 if (methodNameExpression.equals(source.substring(cursor, cursor + methodNameExpression.length()))) {
-                    cursor += methodNameExpression.length();
-                    name = new J.Identifier(randomId(), prefix, Markers.EMPTY,
-                            emptyList(), methodNameExpression, null, null);
-
+                    skip(methodNameExpression);
+                    name = new J.Identifier(randomId(), prefix, Markers.EMPTY, emptyList(), methodNameExpression, null, null);
                 } else if (select != null && select.getElement() instanceof J.Identifier) {
                     name = (J.Identifier) select.getElement();
                     select = null;
@@ -1746,7 +1738,7 @@ public class GroovyParserVisitor {
                 MethodNode methodNode = (MethodNode) call.getNodeMetaData().get(StaticTypesMarker.DIRECT_METHOD_CALL_TARGET);
                 JavaType.Method methodType = null;
                 if (methodNode == null && call.getObjectExpression() instanceof VariableExpression &&
-                        ((VariableExpression) call.getObjectExpression()).getAccessedVariable() != null) {
+                    ((VariableExpression) call.getObjectExpression()).getAccessedVariable() != null) {
                     // Groovy doesn't know what kind of object this method is being invoked on
                     // But if this invocation is inside a Closure we may have already enriched its parameters with types from the static type checker
                     // Use any such type information to attempt to find a matching method
@@ -1787,8 +1779,7 @@ public class GroovyParserVisitor {
                 } else {
                     methodType = typeMapping.methodType(methodNode);
                 }
-                return new J.MethodInvocation(randomId(), fmt, markers,
-                        select, null, name, args, methodType);
+                return new J.MethodInvocation(randomId(), fmt, markers, select, null, name, args, methodType);
             }));
         }
 
@@ -1831,37 +1822,35 @@ public class GroovyParserVisitor {
             }
             JContainer<Expression> args = visit(call.getArguments());
 
-            queue.add(new J.MethodInvocation(randomId(), fmt, markers,
-                    null, null, name, args, methodType));
+            queue.add(new J.MethodInvocation(randomId(), fmt, markers, null, null, name, args, methodType));
         }
 
         @Override
         public void visitAttributeExpression(AttributeExpression attr) {
-            Space fmt = whitespace();
-            Expression target = visit(attr.getObjectExpression());
-            Space beforeDot = attr.isSafe() ? sourceBefore("?.") :
-                    sourceBefore(attr.isSpreadSafe() ? "*." : ".");
-            J name = visit(attr.getProperty());
-            if (name instanceof J.Literal) {
-                String nameStr = ((J.Literal) name).getValueSource();
-                assert nameStr != null;
-                name = new J.Identifier(randomId(), name.getPrefix(), Markers.EMPTY, emptyList(), nameStr, null, null);
-            }
-            if (attr.isSpreadSafe()) {
-                name = name.withMarkers(name.getMarkers().add(new StarDot(randomId())));
-            }
-            if (attr.isSafe()) {
-                name = name.withMarkers(name.getMarkers().add(new NullSafe(randomId())));
-            }
-            queue.add(new J.FieldAccess(randomId(), fmt, Markers.EMPTY, target, padLeft(beforeDot, (J.Identifier) name), null));
+            queue.add(insideParentheses(attr, fmt -> {
+                Expression target = visit(attr.getObjectExpression());
+                Space beforeDot = attr.isSafe() ? sourceBefore("?.") : sourceBefore(attr.isSpreadSafe() ? "*." : ".");
+                J name = visit(attr.getProperty());
+                if (name instanceof J.Literal) {
+                    String nameStr = ((J.Literal) name).getValueSource();
+                    assert nameStr != null;
+                    name = new J.Identifier(randomId(), name.getPrefix(), Markers.EMPTY, emptyList(), nameStr, null, null);
+                }
+                if (attr.isSpreadSafe()) {
+                    name = name.withMarkers(name.getMarkers().add(new StarDot(randomId())));
+                }
+                if (attr.isSafe()) {
+                    name = name.withMarkers(name.getMarkers().add(new NullSafe(randomId())));
+                }
+                return new J.FieldAccess(randomId(), fmt, Markers.EMPTY, target, padLeft(beforeDot, (J.Identifier) name), null);
+            }));
         }
 
         @Override
         public void visitPropertyExpression(PropertyExpression prop) {
             queue.add(insideParentheses(prop, fmt -> {
                 Expression target = visit(prop.getObjectExpression());
-                Space beforeDot = prop.isSpreadSafe() ? sourceBefore("*.") :
-                        sourceBefore(prop.isSafe() ? "?." : ".");
+                Space beforeDot = prop.isSpreadSafe() ? sourceBefore("*.") : sourceBefore(prop.isSafe() ? "?." : ".");
                 J name = visit(prop.getProperty());
                 if (name instanceof J.Literal) {
                     J.Literal nameLiteral = ((J.Literal) name);
@@ -1920,7 +1909,7 @@ public class GroovyParserVisitor {
                             randomId(), sourceBefore("{"), Markers.EMPTY,
                             JRightPadded.build(false),
                             ListUtils.concat(
-                                    convertAll(statement.getCaseStatements(), t -> Space.EMPTY, t -> Space.EMPTY),
+                                    convertAll(statement.getCaseStatements(), t -> EMPTY, t -> EMPTY),
                                     statement.getDefaultStatement().isEmpty() ? null : JRightPadded.build(visitDefaultCaseStatement((BlockStatement) statement.getDefaultStatement()))
                             ),
                             sourceBefore("}"))));
@@ -1960,7 +1949,7 @@ public class GroovyParserVisitor {
 
             OmitParentheses omitParentheses = null;
             if (source.charAt(cursor) == '(') {
-                cursor++;
+                skip("(");
             } else {
                 omitParentheses = new OmitParentheses(randomId());
                 beforeOpenParen = EMPTY;
@@ -2053,7 +2042,7 @@ public class GroovyParserVisitor {
         public void visitPrefixExpression(PrefixExpression unary) {
             Space fmt = whitespace();
             String typeToken = unary.getOperation().getText();
-            cursor += typeToken.length();
+            skip(typeToken);
 
             J.Unary.Type operator = null;
             switch (typeToken) {
@@ -2077,29 +2066,18 @@ public class GroovyParserVisitor {
 
         public TypeTree visitVariableExpressionType(VariableExpression expression) {
             JavaType type = typeMapping.type(staticType(((org.codehaus.groovy.ast.expr.Expression) expression)));
+            Space prefix = whitespace();
+            String typeName = "";
 
-            if (expression.isDynamicTyped()) {
-                Space prefix = whitespace();
-                String keyword;
-                if (source.substring(cursor).startsWith("final")) {
-                    keyword = "final";
-                } else {
-                    keyword = source.substring(cursor, cursor + 3);
-                }
-                cursor += keyword.length();
-                return new J.Identifier(randomId(),
-                        prefix,
-                        Markers.EMPTY,
-                        emptyList(),
-                        keyword,
-                        type, null);
+            if (!expression.isDynamicTyped() && source.startsWith(expression.getOriginType().getUnresolvedName(), cursor)) {
+                typeName = expression.getOriginType().getUnresolvedName();
+                skip(typeName);
             }
-            Space prefix = sourceBefore(expression.getOriginType().getUnresolvedName());
             J.Identifier ident = new J.Identifier(randomId(),
                     EMPTY,
                     Markers.EMPTY,
                     emptyList(),
-                    expression.getOriginType().getUnresolvedName(),
+                    typeName,
                     type, null);
             if (expression.getOriginType().getGenericsTypes() != null) {
                 return new J.ParameterizedType(randomId(), prefix, Markers.EMPTY, ident, visitTypeParameterizations(
@@ -2182,10 +2160,10 @@ public class GroovyParserVisitor {
             int saveCursor = cursor;
             Space argPrefix = whitespace();
             if (source.charAt(cursor) == '(') {
-                cursor += 1;
+                skip("(");
                 Space infix = whitespace();
                 if (source.charAt(cursor) == ')') {
-                    cursor += 1;
+                    skip(")");
                     markers = markers.add(new EmptyArgumentListPrecedesArgument(randomId(), argPrefix, infix));
                 } else {
                     cursor = saveCursor;
@@ -2317,12 +2295,19 @@ public class GroovyParserVisitor {
         return delimIndex > source.length() - untilDelim.length() ? -1 : delimIndex;
     }
 
+    /**
+     * Get all whitespace characters of the source file between the cursor and the first non-whitespace character.
+     * The cursor will be moved before first non-whitespace character.
+     */
     private Space whitespace() {
         String prefix = source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
         cursor += prefix.length();
         return format(prefix);
     }
 
+    /**
+     * Move the cursor after the token.
+     */
     private String skip(@Nullable String token) {
         if (token == null) {
             //noinspection ConstantConditions
@@ -2359,12 +2344,12 @@ public class GroovyParserVisitor {
                 fullName += "." + part;
 
                 Matcher whitespacePrefix = whitespacePrefixPattern.matcher(part);
-                Space identFmt = whitespacePrefix.matches() ? format(whitespacePrefix.group(0)) : Space.EMPTY;
+                Space identFmt = whitespacePrefix.matches() ? format(whitespacePrefix.group(0)) : EMPTY;
 
                 Matcher whitespaceSuffix = whitespaceSuffixPattern.matcher(part);
                 //noinspection ResultOfMethodCallIgnored
                 whitespaceSuffix.matches();
-                Space namePrefix = i == parts.length - 1 ? Space.EMPTY : format(whitespaceSuffix.group(1));
+                Space namePrefix = i == parts.length - 1 ? EMPTY : format(whitespaceSuffix.group(1));
 
                 expr = new J.FieldAccess(
                         randomId(),
@@ -2400,7 +2385,7 @@ public class GroovyParserVisitor {
         }
         Space prefix = whitespace();
         TypeTree elemType = typeTree(typeTree);
-        JLeftPadded<Space> dimension = padLeft(sourceBefore("["), sourceBefore("]"));
+        JLeftPadded<Space> dimension = sourceStartsWith("...") ? null : padLeft(sourceBefore("["), sourceBefore("]"));
         return new J.ArrayType(randomId(), prefix, Markers.EMPTY,
                 count == 1 ? elemType : mapDimensions(elemType, classNode.getComponentType()),
                 null,
@@ -2435,94 +2420,105 @@ public class GroovyParserVisitor {
             return EMPTY; // unable to find this delimiter
         }
 
-        String prefix = source.substring(cursor, delimIndex);
-        cursor += prefix.length() + untilDelim.length(); // advance past the delimiter
-        return Space.format(prefix);
+        if (delimIndex == cursor) {
+            cursor += untilDelim.length();
+            return EMPTY;
+        }
+
+        Space space = format(source, cursor, delimIndex);
+        cursor = delimIndex + untilDelim.length(); // advance past the delimiter
+        return space;
     }
 
     /**
-     * Gets the length in characters of a String literal.
-     * Attempts to account for a number of different strange compiler behaviors, old bugs, and edge cases.
-     * cursor is presumed to point at the beginning of the node.
+     * Tests if the source beginning at the current cursor starts with the specified delimiter.
+     * Whitespace characters are excluded, the cursor will not be moved.
      */
-    private int sourceLengthOfString(ConstantExpression expr) {
-        // ConstantExpression.getValue() already has resolved escaped characters. So "\t" and a literal tab will look the same.
-        // Since we cannot differentiate between the two, use this alternate method only when an old version of groovy indicates risk
-        // and the literal doesn't contain any characters which might be from an escape sequence. e.g.: tabs, newlines, carriage returns
-        String value = (String) expr.getValue();
-        if (isOlderThanGroovy3() && value.matches("[^\\t\\r\\n\\\\]*")) {
-            int delimiterLength = getDelimiterLength();
-            return delimiterLength + value.length() + delimiterLength;
-        }
-        int lengthAccordingToAst = lengthAccordingToAst(expr);
-        // subtract any parentheses that were included with lengthAccordingToAst
-        Integer insideParenthesesLevel = getInsideParenthesesLevel(expr);
-        if (insideParenthesesLevel != null) {
-            return lengthAccordingToAst - insideParenthesesLevel * 2;
-        }
-
-        return lengthAccordingToAst;
+    private boolean sourceStartsWith(String delimiter) {
+        return source.startsWith(delimiter, indexOfNextNonWhitespace(cursor, source));
     }
 
-    private static @Nullable Integer getInsideParenthesesLevel(ASTNode node) {
+    /**
+     * Returns a string that is a part of this source. The substring begins at the specified beginIndex and extends until delimiter.
+     * The cursor will not be moved.
+     */
+    private String sourceSubstring(int beginIndex, String untilDelim) {
+        int endIndex = source.indexOf(untilDelim, Math.max(beginIndex, cursor + untilDelim.length()));
+        // don't stop if last char is escaped.
+        while (source.charAt(endIndex - 1) == '\\') {
+            endIndex = source.indexOf(untilDelim, endIndex + 1);
+        }
+        return source.substring(beginIndex, endIndex);
+    }
+
+    private @Nullable Integer getInsideParenthesesLevel(ASTNode node) {
         Object rawIpl = node.getNodeMetaData("_INSIDE_PARENTHESES_LEVEL");
         if (rawIpl instanceof AtomicInteger) {
             // On Java 11 and newer _INSIDE_PARENTHESES_LEVEL is an AtomicInteger
             return ((AtomicInteger) rawIpl).get();
-        } else {
+        } else if (rawIpl instanceof Integer) {
             // On Java 8 _INSIDE_PARENTHESES_LEVEL is a regular Integer
             return (Integer) rawIpl;
+        } else if (node instanceof MethodCallExpression) {
+            MethodCallExpression expr = (MethodCallExpression) node;
+            return determineParenthesisLevel(expr.getObjectExpression().getLineNumber(), expr.getLineNumber(), expr.getObjectExpression().getColumnNumber(), expr.getColumnNumber());
+        } else if (node instanceof BinaryExpression) {
+            BinaryExpression expr = (BinaryExpression) node;
+            return determineParenthesisLevel(expr.getLeftExpression().getLineNumber(), expr.getLineNumber(), expr.getLeftExpression().getColumnNumber(), expr.getColumnNumber());
         }
-    }
-
-    private int getDelimiterLength() {
-        String maybeDelimiter = source.substring(cursor, Math.min(cursor + 3, source.length()));
-        int delimiterLength = 0;
-        if (maybeDelimiter.startsWith("$/")) {
-            delimiterLength = 2;
-        } else if (maybeDelimiter.startsWith("\"\"\"") || maybeDelimiter.startsWith("'''")) {
-            delimiterLength = 3;
-        } else if (maybeDelimiter.startsWith("/") || maybeDelimiter.startsWith("\"") || maybeDelimiter.startsWith("'")) {
-            delimiterLength = 1;
-        }
-        return delimiterLength;
+        return null;
     }
 
     /**
-     * Gets the length according to the Groovy compiler's attestation of starting/ending line and column numbers.
-     * On older versions of the JDK/Groovy compiler string literals with following whitespace sometimes erroneously include
-     * the length of the whitespace in the length of the AST node.
-     * So in this method invocation:
-     * foo( 'a' )
-     * the correct source length for the AST node representing 'a' is 3, but in affected groovy versions the length
-     * on the node is '4' because it is also counting the trailing whitespace.
+     * @param childLineNumber  the beginning line number of the first sub node
+     * @param parentLineNumber the beginning line number of the parent node
+     * @param childColumn      the column on the {@code childLineNumber} line where the sub node starts
+     * @param parentColumn     the column on the {@code parentLineNumber} line where the parent node starts
+     * @return the level of parenthesis parsed from the source
      */
-    private int lengthAccordingToAst(ConstantExpression node) {
-        if (!appearsInSource(node)) {
-            return 0;
-        }
-        int lineCount = node.getLastLineNumber() - node.getLineNumber();
-        if (lineCount == 0) {
-            return node.getLastColumnNumber() - node.getColumnNumber() + columnOffset;
-        }
-        int linesSoFar = 0;
-        int length = 0;
-        int finalLineChars = 0;
-        while (true) {
-            char c = source.charAt(cursor + length);
-            if (c == '\n') {
-                linesSoFar++;
+    private int determineParenthesisLevel(int childLineNumber, int parentLineNumber, int childColumn, int parentColumn) {
+        int saveCursor = cursor;
+        whitespace();
+        int untilCursor = cursor;
+        if (childLineNumber > parentLineNumber) {
+            for (int i = 0; i < (childLineNumber - parentLineNumber); i++) {
+                untilCursor = source.indexOf('\n', untilCursor) + 1; // +1; set cursor past `\n`
             }
-            if (linesSoFar == lineCount) {
-                finalLineChars++;
+            untilCursor += childColumn - 1; // -1; skip previous `\n`
+        } else {
+            untilCursor += childColumn - parentColumn;
+        }
+        int count = 0;
+        for (int i = cursor; i < untilCursor; i++) {
+            if (source.charAt(i) == '(') {
+                count++;
             }
+            if (source.charAt(i) == ')') {
+                count--;
+            }
+        }
+        cursor = saveCursor;
+        return Math.max(count, 0);
+    }
 
-            length++;
-
-            if (finalLineChars == node.getLastColumnNumber() + columnOffset) {
-                return length;
-            }
+    private @Nullable String getDelimiter() {
+        String maybeDelimiter = source.substring(cursor, Math.min(cursor + 3, source.length()));
+        if (maybeDelimiter.startsWith("$/")) {
+            return "$/";
+        } else if (maybeDelimiter.startsWith("\"\"\"")) {
+            return "\"\"\"";
+        } else if (maybeDelimiter.startsWith("'''")) {
+            return "'''";
+        } else if (maybeDelimiter.startsWith("~/")) {
+            return "~/";
+        } else if (maybeDelimiter.startsWith("/")) {
+            return "/";
+        } else if (maybeDelimiter.startsWith("\"")) {
+            return "\"";
+        } else if (maybeDelimiter.startsWith("'")) {
+            return "'";
         }
+        return null;
     }
 
     private TypeTree visitTypeTree(ClassNode classNode) {
@@ -2534,17 +2530,6 @@ public class GroovyParserVisitor {
         if (primitiveType != null) {
             return new J.Primitive(randomId(), sourceBefore(classNode.getUnresolvedName()), Markers.EMPTY, primitiveType);
         }
-
-        int saveCursor = cursor;
-        Space fmt = whitespace();
-        if (cursor < source.length() && source.startsWith("def", cursor)) {
-            cursor += 3;
-            return new J.Identifier(randomId(), fmt, Markers.EMPTY, emptyList(), "def",
-                    JavaType.ShallowClass.build("java.lang.Object"), null);
-        } else {
-            cursor = saveCursor;
-        }
-
         return typeTree(classNode, inferredType);
     }
 
@@ -2625,7 +2610,8 @@ public class GroovyParserVisitor {
         int i = cursor;
         for (; i < source.length(); i++) {
             char c = source.charAt(i);
-            if (!(Character.isJavaIdentifierPart(c) || c == '.' || c == '*')) {
+            boolean isVarargs = source.length() > (i + 2) && c == '.' && source.charAt(i + 1) == '.' && source.charAt(i + 2) == '.';
+            if (!(Character.isJavaIdentifierPart(c) || c == '.' || c == '*') || isVarargs) {
                 break;
             }
         }
@@ -2646,7 +2632,7 @@ public class GroovyParserVisitor {
        Can contain a J.FieldAccess, as in a variable declaration with fully qualified type parameterization:
            List<java.lang.String>
      */
-    private JContainer<Expression> visitTypeParameterizations(GenericsType @Nullable[] genericsTypes) {
+    private JContainer<Expression> visitTypeParameterizations(GenericsType @Nullable [] genericsTypes) {
         Space prefix = sourceBefore("<");
         List<JRightPadded<Expression>> parameters;
 
@@ -2663,7 +2649,7 @@ public class GroovyParserVisitor {
                     Space suffix = whitespace();
                     parameters.add(JRightPadded.build(param).withAfter(suffix));
                     if (source.charAt(cursor) == '>') {
-                        cursor++;
+                        skip(">");
                         break;
                     }
                     cursor++;
@@ -2674,14 +2660,9 @@ public class GroovyParserVisitor {
             parameters = new ArrayList<>(genericsTypes.length);
             for (int i = 0; i < genericsTypes.length; i++) {
                 parameters.add(JRightPadded.build(visitTypeParameterization(genericsTypes[i]))
-                        .withAfter(
-                                i < genericsTypes.length - 1 ?
-                                        sourceBefore(",") :
-                                        sourceBefore(">")
-                        ));
+                        .withAfter(i < genericsTypes.length - 1 ? sourceBefore(",") : sourceBefore(">")));
             }
         }
-
 
         return JContainer.build(prefix, parameters, Markers.EMPTY);
     }
@@ -2690,10 +2671,19 @@ public class GroovyParserVisitor {
         int saveCursor = cursor;
         Space prefix = whitespace();
         if (source.charAt(cursor) == '?') {
-            cursor = saveCursor;
-            return visitWildcard(genericsType);
+            skip("?");
+            JLeftPadded<J.Wildcard.Bound> bound = null;
+            NameTree boundedType = null;
+            if (genericsType.getUpperBounds() != null) {
+                bound = padLeft(sourceBefore("extends"), J.Wildcard.Bound.Extends);
+                boundedType = visitTypeTree(genericsType.getUpperBounds()[0]);
+            } else if (genericsType.getLowerBound() != null) {
+                bound = padLeft(sourceBefore("super"), J.Wildcard.Bound.Super);
+                boundedType = visitTypeTree(genericsType.getLowerBound());
+            }
+            return new J.Wildcard(randomId(), prefix, Markers.EMPTY, bound, boundedType);
         } else if (source.charAt(cursor) == '>') {
-            cursor++;
+            skip(">");
             return new J.Empty(randomId(), prefix, Markers.EMPTY);
         }
         cursor = saveCursor;
@@ -2709,19 +2699,14 @@ public class GroovyParserVisitor {
         List<JRightPadded<J.TypeParameter>> typeParameters = new ArrayList<>(genericsTypes.length);
         for (int i = 0; i < genericsTypes.length; i++) {
             typeParameters.add(JRightPadded.build(visitTypeParameter(genericsTypes[i]))
-                    .withAfter(
-                            i < genericsTypes.length - 1 ?
-                                    sourceBefore(",") :
-                                    sourceBefore(">")
-                    ));
+                    .withAfter(i < genericsTypes.length - 1 ? sourceBefore(",") : sourceBefore(">")));
         }
         return JContainer.build(prefix, typeParameters, Markers.EMPTY);
     }
 
     private J.TypeParameter visitTypeParameter(GenericsType genericType) {
         Space prefix = whitespace();
-        Expression name = typeTree(null)
-                .withType(typeMapping.type(genericType));
+        Expression name = typeTree(null).withType(typeMapping.type(genericType));
         JContainer<TypeTree> bounds = null;
         if (genericType.getUpperBounds() != null) {
             Space boundsPrefix = sourceBefore("extends");
@@ -2729,11 +2714,7 @@ public class GroovyParserVisitor {
             List<JRightPadded<TypeTree>> convertedBounds = new ArrayList<>(upperBounds.length);
             for (int i = 0; i < upperBounds.length; i++) {
                 convertedBounds.add(JRightPadded.build(visitTypeTree(upperBounds[i]))
-                        .withAfter(
-                                i < upperBounds.length - 1 ?
-                                        sourceBefore("&") :
-                                        EMPTY
-                        ));
+                        .withAfter(i < upperBounds.length - 1 ? sourceBefore("&") : EMPTY));
             }
             bounds = JContainer.build(boundsPrefix, convertedBounds, Markers.EMPTY);
         } else if (genericType.getLowerBound() != null) {
@@ -2747,34 +2728,19 @@ public class GroovyParserVisitor {
         return new J.TypeParameter(randomId(), prefix, Markers.EMPTY, emptyList(), emptyList(), name, bounds);
     }
 
-    private J.Wildcard visitWildcard(GenericsType genericType) {
-        Space namePrefix = sourceBefore("?");
-
-        JLeftPadded<J.Wildcard.Bound> bound;
-        NameTree boundedType;
-        if (genericType.getUpperBounds() != null) {
-            bound = padLeft(sourceBefore("extends"), J.Wildcard.Bound.Extends);
-            boundedType = visitTypeTree(genericType.getUpperBounds()[0]);
-        } else if (genericType.getLowerBound() != null) {
-            bound = padLeft(sourceBefore("super"), J.Wildcard.Bound.Super);
-            boundedType = visitTypeTree(genericType.getLowerBound());
-        } else {
-            bound = null;
-            boundedType = null;
-        }
-
-        return new J.Wildcard(randomId(), namePrefix, Markers.EMPTY, bound, boundedType);
-    }
-
     /**
      * Sometimes the groovy compiler inserts phantom elements into argument lists and class bodies,
-     * presumably to pass type information around. These elements do not appear in source code and should not
-     * be represented in our AST.
+     * presumably to pass type information around. Other times the groovy compiler adds extra transform annotations.
+     * These elements do not appear in source code and should not be represented in our LST.
      *
      * @param node possible phantom node
      * @return true if the node reports that it does have a position within the source code
      */
-    private static boolean appearsInSource(ASTNode node) {
+    private boolean appearsInSource(ASTNode node) {
+        if (node instanceof AnnotationNode) {
+            return sourceStartsWith("@" + ((AnnotationNode) node).getClassNode().getUnresolvedName());
+        }
+
         return node.getColumnNumber() >= 0 && node.getLineNumber() >= 0 && node.getLastColumnNumber() >= 0 && node.getLastLineNumber() >= 0;
     }
 
@@ -2809,5 +2775,24 @@ public class GroovyParserVisitor {
         } else {
             return inferred;
         }
+    }
+
+    private static final Map<String, J.Modifier.Type> modifierNameToType;
+    static {
+        modifierNameToType = new LinkedHashMap<>();
+        modifierNameToType.put("def", J.Modifier.Type.LanguageExtension);
+        modifierNameToType.put("var", J.Modifier.Type.LanguageExtension);
+        modifierNameToType.put("public", J.Modifier.Type.Public);
+        modifierNameToType.put("protected", J.Modifier.Type.Protected);
+        modifierNameToType.put("private", J.Modifier.Type.Private);
+        modifierNameToType.put("abstract", J.Modifier.Type.Abstract);
+        modifierNameToType.put("static", J.Modifier.Type.Static);
+        modifierNameToType.put("final", J.Modifier.Type.Final);
+        modifierNameToType.put("volatile", J.Modifier.Type.Volatile);
+        modifierNameToType.put("synchronized", J.Modifier.Type.Synchronized);
+        modifierNameToType.put("transient", J.Modifier.Type.Transient);
+        modifierNameToType.put("native", J.Modifier.Type.Native);
+        modifierNameToType.put("default", J.Modifier.Type.Default);
+        modifierNameToType.put("strictfp", J.Modifier.Type.Strictfp);
     }
 }
