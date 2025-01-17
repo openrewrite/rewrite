@@ -348,12 +348,12 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 Markers.EMPTY,
                 type,
                 null,
-                JContainer.empty(),
+                null,
                 JContainer.build(
                         node.getLabels().isEmpty() ? EMPTY : sourceBefore("case"),
                         node.getLabels().isEmpty() || node.getLabels().getFirst() instanceof DefaultCaseLabelTree ?
                                 List.of(JRightPadded.build(new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), skip("default"), null, null))) :
-                                convertAll(node.getLabels(), commaDelim, t -> EMPTY),
+                                convertAll(node.getLabels(), commaDelim, ignored -> sourceBefore("when", '-')),
                         Markers.EMPTY
                 ),
                 convert(node.getGuard()),

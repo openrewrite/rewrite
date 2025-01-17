@@ -490,6 +490,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         }
         visitContainer("", case_.getPadding().getCaseLabels(), JContainer.Location.CASE_LABEL, ",", "", p);
         if (case_.getGuard() != null) {
+            p.append("when");
             visit(case_.getGuard(), p);
         }
         visitSpace(case_.getPadding().getStatements().getBefore(), Space.Location.CASE, p);
