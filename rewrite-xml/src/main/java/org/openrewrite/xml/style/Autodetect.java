@@ -52,12 +52,12 @@ public class Autodetect extends NamedStyles {
         private final IndentStatistics indentStatistics = new IndentStatistics();
         private final GeneralFormatStatistics generalFormatStatistics = new GeneralFormatStatistics();
         private final FindIndentXmlVisitor findIndentXmlVisitor = new FindIndentXmlVisitor();
-        private final FindLineFormatJavaVisitor findLineFormatJavaVisitor = new FindLineFormatJavaVisitor();
+        private final FindLineFormatXmlVisitor findLineFormatXmlVisitor = new FindLineFormatXmlVisitor();
 
         public void sample(SourceFile xml) {
             if(xml instanceof Xml.Document) {
                 findIndentXmlVisitor.visit(xml, indentStatistics);
-                findLineFormatJavaVisitor.visit(xml, generalFormatStatistics);
+                findLineFormatXmlVisitor.visit(xml, generalFormatStatistics);
             }
         }
 
@@ -131,7 +131,7 @@ public class Autodetect extends NamedStyles {
         }
     }
 
-    private static class FindLineFormatJavaVisitor extends XmlVisitor<GeneralFormatStatistics> {
+    private static class FindLineFormatXmlVisitor extends XmlVisitor<GeneralFormatStatistics> {
         @Override
         public @Nullable Xml visit(@Nullable Tree tree, GeneralFormatStatistics stats) {
             if (tree instanceof Xml) {
