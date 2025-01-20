@@ -88,6 +88,28 @@ class ClassDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void extendsObject() {
+        rewriteRun(
+          groovy(
+            """
+              class B extends Object {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void extendsScript() {
+        rewriteRun(
+          groovy(
+            """
+              abstract class B extends Script {}
+              """
+          )
+        );
+    }
+
+    @Test
     void interfaceExtendsInterface() {
         rewriteRun(
           groovy(
@@ -353,7 +375,7 @@ class ClassDeclarationTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/pull/4346")
     @Test
-    @Disabled("Known issue; still need to explore a fix")
+    @ExpectedToFail("Known issue; still need to explore a fix")
     void classExtendsGroovyLangScript() {
         rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.none()),

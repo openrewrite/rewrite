@@ -232,4 +232,17 @@ class YamlParserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void pipeLiteralInASequenceWithDoubleQuotes() {
+        rewriteRun(
+          yaml(
+            """
+               - "one": |
+                   two
+                 "three": "four"
+               """
+          )
+        );
+    }
 }
