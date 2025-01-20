@@ -745,6 +745,17 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return i;
     }
 
+    public J visitDeconstructionPattern(J.DeconstructionPattern deconstructionPattern, P p) {
+        J.DeconstructionPattern d = deconstructionPattern;
+        d = d.withPrefix(visitSpace(d.getPrefix(), Space.Location.PATTERN_PREFIX, p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        d = d.withDeconstructor(visitRightPadded(d.getDeconstructor(), JRightPadded.Location.DECONSTRUCTOR, p));
+        d = d.withNested(visitContainer(d.getNested(), JContainer.Location.DECONSTRUCTOR, p));
+        d = d.withType(visitType(d.getType(), p));
+        return d;
+
+    }
+
     public J visitIntersectionType(J.IntersectionType intersectionType, P p) {
         J.IntersectionType i = intersectionType;
         i = i.withPrefix(visitSpace(i.getPrefix(), Space.Location.INTERSECTION_TYPE_PREFIX, p));

@@ -3052,6 +3052,76 @@ public interface J extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class DeconstructionPattern implements J, Pattern, TypedTree {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        JRightPadded<Expression> deconstructor;
+
+        @With
+        @Getter
+        JContainer<Pattern> nested;
+
+        @Getter
+        @With
+        JavaType type;
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
+
+        @Override
+        public CoordinateBuilder.Pattern getCoordinates() {
+            return new CoordinateBuilder.Pattern(this);
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final DeconstructionPattern t;
+
+            public JRightPadded<Expression> getDeconstructor() {
+                return t.deconstructor;
+            }
+
+            public DeconstructionPattern withDeconstructor(JRightPadded<Expression> deconstructor) {
+                return t.deconstructor == deconstructor ? t : new DeconstructionPattern(t.id, t.prefix, t.markers, deconstructor, t.nested, t.type);
+            }
+
+            @Deprecated
+            public JContainer<Pattern> getNested() {
+                return t.nested;
+            }
+
+            @Deprecated
+            public DeconstructionPattern withNested(JContainer<Pattern> nested) {
+                return t.nested == nested ? t : new DeconstructionPattern(t.id, t.prefix, t.markers, t.deconstructor, nested, t.type);
+            }
+        }
+
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class IntersectionType implements J, TypeTree, Expression {
         @Nullable
         @NonFinal

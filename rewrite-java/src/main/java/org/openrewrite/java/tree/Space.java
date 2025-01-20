@@ -410,6 +410,7 @@ public class Space {
         PARAMETERIZED_TYPE_PREFIX,
         PARENTHESES_PREFIX,
         PARENTHESES_SUFFIX,
+        PATTERN_PREFIX,
         PERMITS,
         PERMITS_SUFFIX,
         PRIMITIVE_PREFIX,

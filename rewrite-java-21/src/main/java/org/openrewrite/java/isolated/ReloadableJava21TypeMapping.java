@@ -376,6 +376,8 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
             return variableType(((JCTree.JCVariableDecl) tree).sym);
         } else if (tree instanceof JCTree.JCAnnotatedType && ((JCTree.JCAnnotatedType) tree).getUnderlyingType() instanceof JCTree.JCArrayTypeTree) {
             return annotatedArray((JCTree.JCAnnotatedType) tree);
+        } else if (tree instanceof JCTree.JCRecordPattern) {
+            symbol = ((JCTree.JCRecordPattern) tree).record;
         }
 
         return type(((JCTree) tree).type, symbol);
