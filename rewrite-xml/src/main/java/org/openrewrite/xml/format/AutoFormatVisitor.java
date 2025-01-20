@@ -58,8 +58,8 @@ public class AutoFormatVisitor<P> extends XmlVisitor<P> {
 
         TabsAndIndentsStyle tabsStyle =
                 doc.getStyleOrFromAutodetect(TabsAndIndentsStyle.class, () -> Autodetect.detector().sample(doc).build());
-        t = new NormalizeTabsOrSpacesVisitor<>(tabsStyle,
-                stopAfter).visit(t, p, cursor.fork());
+        t = new NormalizeTabsOrSpacesVisitor<>(tabsStyle, stopAfter)
+                .visit(t, p, cursor.fork());
 
         t = new TabsAndIndentsVisitor<>(tabsStyle, stopAfter)
                 .visit(t, p, cursor.fork());
