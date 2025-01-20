@@ -426,7 +426,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
     }
 
     private JavaType.@Nullable Variable variableType(@Nullable Symbol symbol,
-                                                     JavaType.@Nullable FullyQualified owner) {
+            JavaType.@Nullable FullyQualified owner) {
         if (!(symbol instanceof Symbol.VarSymbol)) {
             return null;
         }
