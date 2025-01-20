@@ -502,6 +502,17 @@ public class GroovyParserVisitor {
             List<J.Modifier> modifiers = visitModifiers(method.getModifiers());
             boolean isConstructorOfInnerNonStaticClass = false;
             RedundantDef redundantDef = getRedundantDefMarker(method);
+            J.TypeParameters typeParameters = null;
+            if (method.getGenericsTypes() != null) {
+                Space prefix = sourceBefore("<");
+                GenericsType[] genericsTypes = method.getGenericsTypes();
+                List<JRightPadded<J.TypeParameter>> typeParametersList = new ArrayList<>(genericsTypes.length);
+                for (int i = 0; i < genericsTypes.length; i++) {
+                    typeParametersList.add(JRightPadded.build(visitTypeParameter(genericsTypes[i]))
+                            .withAfter(i < genericsTypes.length - 1 ? sourceBefore(",") : sourceBefore(">")));
+                }
+                typeParameters = new J.TypeParameters(randomId(), prefix, Markers.EMPTY, emptyList(), typeParametersList);
+            }
             TypeTree returnType = method instanceof ConstructorNode ? null : visitTypeTree(method.getReturnType());
 
             Space namePrefix = whitespace();
@@ -612,7 +623,7 @@ public class GroovyParserVisitor {
                     redundantDef == null ? Markers.EMPTY : Markers.EMPTY.add(redundantDef),
                     annotations,
                     modifiers,
-                    null,
+                    typeParameters,
                     returnType,
                     new J.MethodDeclaration.IdentifierWithAnnotations(name, emptyList()),
                     JContainer.build(beforeParen, params, Markers.EMPTY),

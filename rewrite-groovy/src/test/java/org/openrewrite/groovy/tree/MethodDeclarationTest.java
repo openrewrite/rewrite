@@ -80,6 +80,19 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void genericTypeParameter() {
+        rewriteRun(
+          groovy(
+            """
+              interface Foo {
+                  <T extends Task> T task(Class<T> type)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void emptyArguments() {
         rewriteRun(
           groovy("def foo( ) {}")
