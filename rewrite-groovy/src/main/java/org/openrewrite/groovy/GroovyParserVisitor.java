@@ -41,9 +41,9 @@ import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.marker.Semicolon;
 import org.openrewrite.java.marker.TrailingComma;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.Statement;
-import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.lang.annotation.Annotation;
@@ -154,10 +154,8 @@ public class GroovyParserVisitor {
         }
 
         for (ClassNode aClass : ast.getClasses()) {
-            if (aClass.getSuperClass() == null ||
-                !("groovy.lang.Script".equals(aClass.getSuperClass().getName()) ||
-                  "RewriteGradleProject".equals(aClass.getSuperClass().getName()) ||
-                  "RewriteSettings".equals(aClass.getSuperClass().getName()))) {
+            // skip over the synthetic script class
+            if (!aClass.getName().equals(ast.getMainClassName()) || !aClass.getName().endsWith("doesntmatter")) {
                 sortedByPosition.computeIfAbsent(pos(aClass), i -> new ArrayList<>()).add(aClass);
             }
         }
@@ -252,8 +250,15 @@ public class GroovyParserVisitor {
             }
 
             JLeftPadded<TypeTree> extendings = null;
-            if (clazz.getSuperClass().getLineNumber() >= 0) {
-                extendings = padLeft(sourceBefore("extends"), visitTypeTree(clazz.getSuperClass()));
+            if (kindType == J.ClassDeclaration.Kind.Type.Class) {
+                int saveCursor = cursor;
+                Space extendsPrefix = whitespace();
+                if (source.startsWith("extends", cursor)) {
+                    skip("extends");
+                    extendings = padLeft(extendsPrefix, visitTypeTree(clazz.getSuperClass()));
+                } else {
+                    cursor = saveCursor;
+                }
             }
 
             JContainer<TypeTree> implementings = null;
