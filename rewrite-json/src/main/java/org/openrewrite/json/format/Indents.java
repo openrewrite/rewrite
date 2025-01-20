@@ -45,11 +45,7 @@ public class Indents extends Recipe {
     private static class TabsAndIndentsFromCompilationUnitStyle extends JsonIsoVisitor<ExecutionContext> {
         @Override
         public Json. Document visitDocument(Json.Document docs, ExecutionContext ctx) {
-            TabsAndIndentsStyle style = docs.getStyle(TabsAndIndentsStyle.class);
-            if (style == null) {
-                style = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(Autodetect.detector().sample(docs).build()));
-                assert(style != null);
-            }
+            TabsAndIndentsStyle style = docs.getStyleOrFromAutodetect(TabsAndIndentsStyle.class, () -> Autodetect.detector().sample(docs).build());
             doAfterVisit(new TabsAndIndentsVisitor<>(style, null));
             return docs;
         }

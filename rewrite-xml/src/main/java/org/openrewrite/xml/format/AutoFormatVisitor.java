@@ -56,16 +56,10 @@ public class AutoFormatVisitor<P> extends XmlVisitor<P> {
 
         t = new LineBreaksVisitor<>(stopAfter).visit(t, p, cursor.fork());
 
-        TabsAndIndentsStyle tabsStyle = Optional.ofNullable(doc.getStyle(TabsAndIndentsStyle.class))
-                .orElseGet(() -> {
-                    Autodetect.Detector detector = Autodetect.detector();
-                    detector.sample(doc);
-                    return NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(detector.build()));
-                });
-        assert tabsStyle != null;
-
-        t = new NormalizeTabsOrSpacesVisitor<>(tabsStyle, stopAfter)
-                .visit(t, p, cursor.fork());
+        TabsAndIndentsStyle tabsStyle =
+                doc.getStyleOrFromAutodetect(TabsAndIndentsStyle.class, () -> Autodetect.detector().sample(doc).build());
+        t = new NormalizeTabsOrSpacesVisitor<>(tabsStyle,
+                stopAfter).visit(t, p, cursor.fork());
 
         t = new TabsAndIndentsVisitor<>(tabsStyle, stopAfter)
                 .visit(t, p, cursor.fork());

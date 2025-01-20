@@ -43,10 +43,7 @@ public class Indents extends Recipe {
     private static class TabsAndIndentsFromCompilationUnitStyle extends YamlIsoVisitor<ExecutionContext> {
         @Override
         public Yaml.Documents visitDocuments(Yaml.Documents docs, ExecutionContext ctx) {
-            IndentsStyle style = docs.getStyle(IndentsStyle.class);
-            if (style == null) {
-                style = Autodetect.tabsAndIndents(docs, YamlDefaultStyles.indents());
-            }
+            IndentsStyle style = docs.getStyleOrDefault(IndentsStyle.class, () -> Autodetect.tabsAndIndents(docs, YamlDefaultStyles.indents()));
             doAfterVisit(new IndentsVisitor<>(style, null));
             return docs;
         }

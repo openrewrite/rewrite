@@ -45,12 +45,14 @@ public class AutoFormatVisitor<P> extends YamlIsoVisitor<P> {
 
         y = new MinimumViableSpacingVisitor<>(stopAfter).visitNonNull(y, p, cursor.fork());
 
-        y = new IndentsVisitor<>(Optional.ofNullable(docs.getStyle(IndentsStyle.class))
-                .orElse(Autodetect.tabsAndIndents(docs, YamlDefaultStyles.indents())), stopAfter)
+        y = new IndentsVisitor<>(
+                    docs.getStyle(IndentsStyle.class, Autodetect.tabsAndIndents(docs, YamlDefaultStyles.indents())),
+                    stopAfter)
                 .visitNonNull(y, p, cursor.fork());
 
-        y = new NormalizeLineBreaksVisitor<>(Optional.ofNullable(docs.getStyle(GeneralFormatStyle.class))
-                .orElse(Autodetect.generalFormat(docs)), stopAfter)
+        y = new NormalizeLineBreaksVisitor<>(
+                docs.getStyle(GeneralFormatStyle.class, Autodetect.generalFormat(docs)),
+                stopAfter)
                 .visitNonNull(y, p, cursor.fork());
 
         return y;
@@ -62,13 +64,15 @@ public class AutoFormatVisitor<P> extends YamlIsoVisitor<P> {
 
         y = (Yaml.Documents) new MinimumViableSpacingVisitor<>(stopAfter).visitNonNull(y, p);
 
-        y = (Yaml.Documents) new IndentsVisitor<>(Optional.ofNullable(documents.getStyle(IndentsStyle.class))
-                .orElse(Autodetect.tabsAndIndents(y, YamlDefaultStyles.indents())), stopAfter)
-                .visitNonNull(documents, p);
+        y = (Yaml.Documents) new IndentsVisitor<>(
+                documents.getStyle(IndentsStyle.class, Autodetect.tabsAndIndents(documents, YamlDefaultStyles.indents())),
+                stopAfter)
+                .visitNonNull(y, p);
 
-        y = (Yaml.Documents) new NormalizeLineBreaksVisitor<>(Optional.ofNullable(documents.getStyle(GeneralFormatStyle.class))
-                .orElse(Autodetect.generalFormat(y)), stopAfter)
-                .visitNonNull(documents, p);
+        y = (Yaml.Documents) new NormalizeLineBreaksVisitor<>(
+                documents.getStyle(GeneralFormatStyle.class, Autodetect.generalFormat(documents)),
+                stopAfter)
+                .visitNonNull(y, p);
 
         return y;
     }

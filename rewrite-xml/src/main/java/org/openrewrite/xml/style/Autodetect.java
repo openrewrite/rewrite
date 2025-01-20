@@ -54,11 +54,12 @@ public class Autodetect extends NamedStyles {
         private final FindIndentXmlVisitor findIndentXmlVisitor = new FindIndentXmlVisitor();
         private final FindLineFormatXmlVisitor findLineFormatXmlVisitor = new FindLineFormatXmlVisitor();
 
-        public void sample(SourceFile xml) {
+        public Detector sample(SourceFile xml) {
             if(xml instanceof Xml.Document) {
                 findIndentXmlVisitor.visit(xml, indentStatistics);
                 findLineFormatXmlVisitor.visit(xml, generalFormatStatistics);
             }
+            return this;
         }
 
         public Autodetect build() {
