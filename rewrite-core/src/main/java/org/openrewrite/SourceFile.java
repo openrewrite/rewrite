@@ -88,7 +88,7 @@ public interface SourceFile extends Tree {
         return s == null ? defaultStyle.get() : s;
     }
 
-    default <S extends Style> @NotNull S getStyleOrFromAutodetect(Class<S> style, Supplier<NamedStyles> autodetectedStyle) {
+    default <S extends Style> S getStyleOrFromAutodetect(Class<S> style, Supplier<NamedStyles> autodetectedStyle) {
         S s = getStyle(style);
         if (s != null) {
             return s;
