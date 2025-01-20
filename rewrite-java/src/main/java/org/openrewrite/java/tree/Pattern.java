@@ -16,5 +16,5 @@
 package org.openrewrite.java.tree;
 
 public interface Pattern extends J {
-    CoordinateBuilder.Pattern getCoordinates();
+    CoordinateBuilder.DeconstructionPattern getCoordinates();
 }

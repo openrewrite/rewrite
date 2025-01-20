@@ -3094,8 +3094,8 @@ public interface J extends Tree {
         }
 
         @Override
-        public CoordinateBuilder.Pattern getCoordinates() {
-            return new CoordinateBuilder.Pattern(this);
+        public CoordinateBuilder.DeconstructionPattern getCoordinates() {
+            return new CoordinateBuilder.DeconstructionPattern(this);
         }
 
         @RequiredArgsConstructor

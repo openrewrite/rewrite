@@ -734,7 +734,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
 
     @Override
     public J visitDeconstructionPattern(DeconstructionPattern deconstructionPattern, PrintOutputCapture<P> p) {
-        beforeSyntax(deconstructionPattern, Space.Location.PATTERN_PREFIX, p);
+        beforeSyntax(deconstructionPattern, Space.Location.DECONSTRUCTOR_PREFIX, p);
         visitRightPadded(deconstructionPattern.getDeconstructor(), JRightPadded.Location.DECONSTRUCTOR, p);
         visitContainer("(", deconstructionPattern.getNested(), JContainer.Location.DECONSTRUCTOR, ",", ")", p);
         afterSyntax(deconstructionPattern, p);

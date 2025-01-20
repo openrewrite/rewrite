@@ -50,7 +50,7 @@ public class JRightPadded<T> {
         CASE_LABEL(Space.Location.CASE_LABEL),
         CASE_BODY(Space.Location.CASE_BODY),
         CATCH_ALTERNATIVE(Space.Location.CATCH_ALTERNATIVE_SUFFIX),
-        DECONSTRUCTOR(Space.Location.PATTERN_PREFIX),
+        DECONSTRUCTOR(Space.Location.DECONSTRUCTOR),
         DIMENSION(Space.Location.DIMENSION_SUFFIX),
         ENUM_VALUE(Space.Location.ENUM_VALUE_SUFFIX),
         FOR_BODY(Space.Location.FOR_BODY_SUFFIX),

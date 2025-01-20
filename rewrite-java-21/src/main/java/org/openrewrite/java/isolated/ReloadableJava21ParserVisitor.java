@@ -814,8 +814,6 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         }
     }
 
-
-
     @Override
     public J visitIntersectionType(IntersectionTypeTree node, Space fmt) {
         JContainer<TypeTree> bounds = node.getBounds().isEmpty() ? null :
