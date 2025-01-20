@@ -3084,6 +3084,11 @@ public interface J extends Tree {
         JavaType type;
 
         @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitDeconstructionPattern(this, p);
+        }
+
+        @Override
         public String toString() {
             return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
         }
