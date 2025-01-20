@@ -15,7 +15,6 @@
  */
 package org.openrewrite;
 
-import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.style.NamedStyles;
