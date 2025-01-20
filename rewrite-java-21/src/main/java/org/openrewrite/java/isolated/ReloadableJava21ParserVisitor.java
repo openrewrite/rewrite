@@ -800,7 +800,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         if (pattern instanceof JCBindingPattern b) {
             return new J.Identifier(randomId(), sourceBefore(b.getVariable().getName().toString()), Markers.EMPTY, emptyList(), b.getVariable().getName().toString(),
                     type, typeMapping.variableType(b.var.sym));
-        } else if (pattern instanceof JCRecordPattern r) {
+        } else if (pattern instanceof DeconstructionPatternTree r) {
             return visitDeconstructionPattern(r, whitespace());
         } else {
             if (pattern == null) {
