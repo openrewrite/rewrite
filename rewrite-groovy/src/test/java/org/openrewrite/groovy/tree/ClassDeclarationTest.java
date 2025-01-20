@@ -88,6 +88,28 @@ class ClassDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void extendsObject() {
+        rewriteRun(
+          groovy(
+            """
+              class B extends Object {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void extendsScript() {
+        rewriteRun(
+          groovy(
+            """
+              abstract class B extends Script {}
+              """
+          )
+        );
+    }
+
+    @Test
     void interfaceExtendsInterface() {
         rewriteRun(
           groovy(
