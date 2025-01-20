@@ -26,11 +26,6 @@ import static org.openrewrite.java.Assertions.java;
 @MinimumJava21
 class RecordPatternMatchingTest implements RewriteTest {
 
-    @Override
-    public void defaults(RecipeSpec spec) {
-        spec.typeValidationOptions(TypeValidation.all().unknown(false));
-    }
-
     @Test
     void shouldParseJava21PatternMatchForRecords() {
         rewriteRun(
@@ -46,7 +41,8 @@ class RecordPatternMatchingTest implements RewriteTest {
                   }
               }
               """
-          ));
+          )
+        );
     }
 
     @Test
@@ -68,7 +64,8 @@ class RecordPatternMatchingTest implements RewriteTest {
                   }
               }
               """
-          ));
+          )
+        );
     }
 
 }
