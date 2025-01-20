@@ -45,15 +45,13 @@ public class AutoFormatVisitor<P> extends JsonIsoVisitor<P> {
         Autodetect autodetectedStyle = Autodetect.detector().sample(doc).build();
         Json js = tree;
 
-        TabsAndIndentsStyle taiStyle = Optional.ofNullable(doc.getStyle(TabsAndIndentsStyle.class))
-                .orElseGet(() -> NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(autodetectedStyle)));
-        assert(taiStyle != null);
-        js = new TabsAndIndentsVisitor<>(taiStyle, stopAfter).visitNonNull(js, p, cursor.fork());
+        js = new TabsAndIndentsVisitor<>(
+                doc.getStyleOrFromAutodetect(TabsAndIndentsStyle.class, () -> autodetectedStyle),
+                stopAfter).visitNonNull(js, p, cursor.fork());
 
-        GeneralFormatStyle gfStyle = Optional.ofNullable(doc.getStyle(GeneralFormatStyle.class))
-                        .orElseGet(() -> NamedStyles.merge(GeneralFormatStyle.class, singletonList(autodetectedStyle)));
-        assert(gfStyle != null);
-        js = new NormalizeLineBreaksVisitor<>(gfStyle, stopAfter).visitNonNull(js, p, cursor.fork());
+        js = new NormalizeLineBreaksVisitor<>(
+                doc.getStyleOrFromAutodetect(GeneralFormatStyle.class, () -> autodetectedStyle),
+                stopAfter).visitNonNull(js, p, cursor.fork());
 
         return js;
     }
@@ -62,15 +60,13 @@ public class AutoFormatVisitor<P> extends JsonIsoVisitor<P> {
     public Json.Document visitDocument(Json.Document js, P p) {
         Autodetect autodetectedStyle = Autodetect.detector().sample(js).build();
 
-        TabsAndIndentsStyle taiStyle = Optional.ofNullable(js.getStyle(TabsAndIndentsStyle.class))
-                .orElseGet(() -> NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(autodetectedStyle)));
-        assert(taiStyle != null);
-        js = (Json.Document) new TabsAndIndentsVisitor<>(taiStyle, stopAfter).visitNonNull(js, p);
+        js = (Json.Document) new TabsAndIndentsVisitor<>(
+                js.getStyleOrFromAutodetect(TabsAndIndentsStyle.class, () -> autodetectedStyle),
+                stopAfter).visitNonNull(js, p);
 
-        GeneralFormatStyle gfStyle = Optional.ofNullable(js.getStyle(GeneralFormatStyle.class))
-                .orElseGet(() -> NamedStyles.merge(GeneralFormatStyle.class, singletonList(autodetectedStyle)));
-        assert(gfStyle != null);
-        js = (Json.Document) new NormalizeLineBreaksVisitor<>(gfStyle, stopAfter).visitNonNull(js, p);
+        js = (Json.Document) new NormalizeLineBreaksVisitor<>(
+                js.getStyleOrFromAutodetect(GeneralFormatStyle.class, () -> autodetectedStyle),
+                stopAfter).visitNonNull(js, p);
 
         return js;
     }

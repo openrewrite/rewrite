@@ -41,10 +41,7 @@ public class TabsAndIndents extends Recipe {
     private static class TabsAndIndentsFromCompilationUnitStyle extends XmlIsoVisitor<ExecutionContext> {
         @Override
         public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
-            TabsAndIndentsStyle style = document.getStyle(TabsAndIndentsStyle.class);
-            if (style == null) {
-                style = TabsAndIndentsStyle.DEFAULT;
-            }
+            TabsAndIndentsStyle style = document.getStyle(TabsAndIndentsStyle.class, TabsAndIndentsStyle.DEFAULT);
             return (Xml.Document) new TabsAndIndentsVisitor<>(style).visitNonNull(document, ctx);
         }
     }

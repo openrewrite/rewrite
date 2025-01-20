@@ -25,6 +25,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
+
+import static java.util.Collections.singletonList;
 
 public interface SourceFile extends Tree {
 
@@ -77,6 +80,21 @@ public interface SourceFile extends Tree {
     default <S extends Style> S getStyle(Class<S> style, S defaultStyle) {
         S s = getStyle(style);
         return s == null ? defaultStyle : s;
+    }
+
+    default <S extends Style> S getStyleOrDefault(Class<S> style, Supplier<S> defaultStyle) {
+        S s = getStyle(style);
+        return s == null ? defaultStyle.get() : s;
+    }
+
+    default <S extends Style> S getStyleOrFromAutodetect(Class<S> style, Supplier<NamedStyles> autodetectedStyle) {
+        S s = getStyle(style);
+        if (s != null) {
+            return s;
+        }
+        S ret = NamedStyles.merge(style, singletonList(autodetectedStyle.get()));
+        assert(ret != null);
+        return ret;
     }
 
     default <P> byte[] printAllAsBytes(P p) {

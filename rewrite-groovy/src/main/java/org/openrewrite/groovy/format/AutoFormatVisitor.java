@@ -50,27 +50,23 @@ public class AutoFormatVisitor<P> extends GroovyIsoVisitor<P> {
 
         J t = new NormalizeFormatVisitor<>(stopAfter).visit(tree, p, cursor.fork());
 
-        t = new BlankLinesVisitor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
-                .orElse(IntelliJ.blankLines()), stopAfter)
+        t = new BlankLinesVisitor<>(cu.getStyleOrDefault(BlankLinesStyle.class, IntelliJ::blankLines), stopAfter)
                 .visit(t, p, cursor.fork());
 
-        t = new WrappingAndBracesVisitor<>(Optional.ofNullable(cu.getStyle(WrappingAndBracesStyle.class))
-                .orElse(IntelliJ.wrappingAndBraces()), stopAfter)
+        t = new WrappingAndBracesVisitor<>(cu.getStyleOrDefault(WrappingAndBracesStyle.class, IntelliJ::wrappingAndBraces), stopAfter)
                 .visit(t, p, cursor.fork());
 
         t = new SpacesVisitor<>(
-                Optional.ofNullable(cu.getStyle(SpacesStyle.class)).orElse(IntelliJ.spaces()),
+                cu.getStyleOrDefault(SpacesStyle.class, IntelliJ::spaces),
                 cu.getStyle(EmptyForInitializerPadStyle.class),
                 cu.getStyle(EmptyForIteratorPadStyle.class),
                 stopAfter
         ).visit(t, p, cursor.fork());
 
-        t = new NormalizeTabsOrSpacesVisitor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
-                .orElse(IntelliJ.tabsAndIndents()), stopAfter)
+        t = new NormalizeTabsOrSpacesVisitor<>(cu.getStyleOrDefault(TabsAndIndentsStyle.class, IntelliJ::tabsAndIndents), stopAfter)
                 .visit(t, p, cursor.fork());
 
-        t = new TabsAndIndentsVisitor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
-                .orElse(IntelliJ.tabsAndIndents()), stopAfter)
+        t = new TabsAndIndentsVisitor<>(cu.getStyleOrDefault(TabsAndIndentsStyle.class, IntelliJ::tabsAndIndents), stopAfter)
                 .visit(t, p, cursor.fork());
 
         t = new NormalizeLineBreaksVisitor<>(Optional.ofNullable(cu.getStyle(GeneralFormatStyle.class))
