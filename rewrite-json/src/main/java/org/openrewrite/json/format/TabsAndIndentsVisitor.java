@@ -15,7 +15,6 @@
  */
 package org.openrewrite.json.format;
 
-import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
@@ -108,7 +107,7 @@ public class TabsAndIndentsVisitor<P> extends JsonIsoVisitor<P> {
         return json;
     }
 
-    private @NotNull String getCurrentIndent() {
+    private String getCurrentIndent() {
         String ret = getCursor().getNearestMessage("indentToUse");
         if (ret == null) {
             // This is basically the first object we visit, not necessarily the root-level object as we might be

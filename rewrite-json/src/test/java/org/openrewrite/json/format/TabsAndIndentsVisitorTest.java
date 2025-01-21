@@ -21,7 +21,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.json.Assertions.json;
 
-public class TabsAndIndentsVisitorTest implements RewriteTest {
+class TabsAndIndentsVisitorTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new Indents());
