@@ -5122,7 +5122,14 @@ public interface J extends Tree {
                 public J visitBlock(Block block, AtomicReference<JavaType> javaType) {
                     if (!block.getStatements().isEmpty()) {
                         Case caze = (Case) block.getStatements().get(0);
-                        javaType.set(caze.getExpressions().get(0).getType());
+                        for (J j : caze.getCaseLabels()) {
+                            if (j instanceof TypedTree) {
+                                if (((TypedTree) j).getType() != null) {
+                                    javaType.set(((TypedTree) j).getType());
+                                    break;
+                                }
+                            }
+                        }
                     }
                     return block;
                 }
