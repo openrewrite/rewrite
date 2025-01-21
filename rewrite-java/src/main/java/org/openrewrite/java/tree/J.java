@@ -3110,12 +3110,10 @@ public interface J extends Tree {
                 return t.deconstructor == deconstructor ? t : new DeconstructionPattern(t.id, t.prefix, t.markers, deconstructor, t.nested, t.type);
             }
 
-            @Deprecated
             public JContainer<Pattern> getNested() {
                 return t.nested;
             }
 
-            @Deprecated
             public DeconstructionPattern withNested(JContainer<Pattern> nested) {
                 return t.nested == nested ? t : new DeconstructionPattern(t.id, t.prefix, t.markers, t.deconstructor, nested, t.type);
             }
