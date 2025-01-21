@@ -1257,7 +1257,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         return new J.SwitchExpression(randomId(), fmt, Markers.EMPTY,
                 convert(node.getExpression()),
                 new J.Block(randomId(), sourceBefore("{"), Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
-                        convertAll(node.getCases(), noDelim, noDelim), sourceBefore("}")));
+                        convertAll(node.getCases(), noDelim, noDelim), sourceBefore("}")), typeMapping.type(node));
     }
 
     @Override

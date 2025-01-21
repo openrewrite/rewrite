@@ -42,7 +42,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 
 import static java.util.Collections.emptyList;
@@ -5114,34 +5113,10 @@ public interface J extends Tree {
         @With
         Block cases;
 
-        @Override
-        @Transient
-        public @Nullable JavaType getType() {
-            return new JavaVisitor<AtomicReference<JavaType>>() {
-                @Override
-                public J visitBlock(Block block, AtomicReference<JavaType> javaType) {
-                    if (!block.getStatements().isEmpty()) {
-                        Case caze = (Case) block.getStatements().get(0);
-                        for (J j : caze.getCaseLabels()) {
-                            if (j instanceof TypedTree) {
-                                if (((TypedTree) j).getType() != null) {
-                                    javaType.set(((TypedTree) j).getType());
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    return block;
-                }
-            }.reduce(this, new AtomicReference<>()).get();
-        }
-
-        @Override
-        public <T extends J> T withType(@Nullable JavaType type) {
-            // a switch expression's type is driven by its case statements
-            //noinspection unchecked
-            return (T) this;
-        }
+        @With
+        @Nullable
+        @Getter
+        JavaType type;
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
