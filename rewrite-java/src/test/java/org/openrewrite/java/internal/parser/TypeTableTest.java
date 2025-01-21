@@ -61,9 +61,6 @@ public class TypeTableTest implements RewriteTest {
             for (Path classpath : JavaParser.runtimeClasspath()) {
                 jarsSize += writeJar(classpath, writer);
             }
-
-            System.out.println("Total size of type table " + humanReadableByteCount(Files.size(tsv)));
-            System.out.println("Total size of jars " + humanReadableByteCount(jarsSize));
         }
     }
 
