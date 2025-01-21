@@ -33,7 +33,9 @@ import java.util.*;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
+import static java.util.Objects.requireNonNull;
 import static org.objectweb.asm.ClassReader.SKIP_CODE;
 import static org.objectweb.asm.Opcodes.V1_8;
 import static org.openrewrite.java.internal.parser.JavaParserCaller.findCaller;
@@ -114,50 +116,52 @@ public class TypeTable implements JavaParserClasspathLoader {
     @RequiredArgsConstructor
     static class Reader {
         private final ExecutionContext ctx;
-        private GroupArtifactVersion gav;
+        private @Nullable GroupArtifactVersion gav;
         private final Map<ClassDefinition, List<Member>> membersByClassName = new HashMap<>();
 
         public void read(InputStream is, Collection<String> artifactNames) throws IOException {
-            if (is != null) {
-                try (BufferedReader in = new BufferedReader(new InputStreamReader(is))) {
-                    in.lines().skip(1).map(line -> line.split("\t", -1)).forEach(fields -> {
-                        GroupArtifactVersion rowGav = new GroupArtifactVersion(fields[0], fields[1], fields[2]);
-                        if (!rowGav.equals(gav)) {
-                            writeClassesDir();
-                        }
+            Set<Pattern> artifactNamePatterns = artifactNames.stream()
+                    .map(name -> Pattern.compile(name + ".*"))
+                    .collect(Collectors.toSet());
 
-                        String artifactVersion = fields[1] + "-" + fields[2];
+            try (BufferedReader in = new BufferedReader(new InputStreamReader(is))) {
+                in.lines().skip(1).map(line -> line.split("\t", -1)).forEach(fields -> {
+                    GroupArtifactVersion rowGav = new GroupArtifactVersion(fields[0], fields[1], fields[2]);
+                    if (!rowGav.equals(gav)) {
+                        writeClassesDir();
+                    }
 
-                        for (String artifactName : artifactNames) {
-                            if (Pattern.compile(artifactName + ".*").matcher(artifactVersion).matches()) {
-                                gav = rowGav;
-                                break;
-                            }
-                        }
+                    String artifactVersion = fields[1] + "-" + fields[2];
 
-                        if (gav != null) {
-                            Member member = new Member(
-                                    new ClassDefinition(
-                                            Integer.parseInt(fields[3]),
-                                            fields[4],
-                                            fields[5].isEmpty() ? null : fields[5],
-                                            fields[6].isEmpty() ? null : fields[6],
-                                            fields[7].isEmpty() ? null : fields[7].split("\\|")
-                                    ),
-                                    Integer.parseInt(fields[8]),
-                                    fields[9],
-                                    fields[10],
-                                    fields[11].isEmpty() ? null : fields[11],
-                                    fields[12].isEmpty() ? null : fields[12].split("\\|")
-                            );
-                            membersByClassName
-                                    .computeIfAbsent(member.getClassDefinition(), cd -> new ArrayList<>())
-                                    .add(member);
+                    for (Pattern artifactNamePattern : artifactNamePatterns) {
+                        if (artifactNamePattern.matcher(artifactVersion).matches()) {
+                            gav = rowGav;
+                            break;
                         }
-                    });
-                }
-                writeClassesDir();
+                    }
+
+                    if (gav != null) {
+                        Member member = new Member(
+                                new ClassDefinition(
+                                        Integer.parseInt(fields[3]),
+                                        fields[4],
+                                        fields[5].isEmpty() ? null : fields[5],
+                                        fields[6].isEmpty() ? null : fields[6],
+                                        fields[7].isEmpty() ? null : fields[7].split("\\|")
+                                ),
+                                Integer.parseInt(fields[8]),
+                                fields[9],
+                                fields[10],
+                                fields[11].isEmpty() ? null : fields[11],
+                                fields[12].isEmpty() ? null : fields[12].split("\\|")
+                        );
+                        membersByClassName
+                                .computeIfAbsent(member.getClassDefinition(), cd -> new ArrayList<>())
+                                .add(member);
+                    }
+                });
             }
+            writeClassesDir();
         }
 
         private void writeClassesDir() {
@@ -306,6 +310,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                         if (entry.getName().endsWith(".class")) {
                             try (InputStream inputStream = jarFile.getInputStream(entry)) {
                                 new ClassReader(inputStream).accept(new ClassVisitor(Opcodes.ASM9) {
+                                    @Nullable
                                     ClassDefinition classDefinition;
 
                                     @Override
@@ -316,14 +321,14 @@ public class TypeTable implements JavaParserClasspathLoader {
 
                                     @Override
                                     public FieldVisitor visitField(int access, String name, String descriptor, String signature, Object value) {
-                                        classDefinition.writeField(access, name, descriptor, signature);
+                                        requireNonNull(classDefinition).writeField(access, name, descriptor, signature);
                                         return super.visitField(access, name, descriptor, signature, value);
                                     }
 
                                     @Override
                                     public MethodVisitor visitMethod(int access, String name, String descriptor,
                                                                      String signature, String[] exceptions) {
-                                        classDefinition.writeMethod(access, name, descriptor, signature, null, exceptions);
+                                        requireNonNull(classDefinition).writeMethod(access, name, descriptor, signature, null, exceptions);
                                         return super.visitMethod(access, name, descriptor, signature, exceptions);
                                     }
                                 }, SKIP_CODE);
@@ -336,7 +341,7 @@ public class TypeTable implements JavaParserClasspathLoader {
             }
 
             public ClassDefinition classDefinition(int access, String name, @Nullable String signature,
-                                                   String superclassName, @Nullable String[] superinterfaceSignatures) {
+                                                   String superclassName, String @Nullable [] superinterfaceSignatures) {
                 return new ClassDefinition(this, access, name, signature, superclassName, superinterfaceSignatures);
             }
         }
@@ -346,16 +351,17 @@ public class TypeTable implements JavaParserClasspathLoader {
             Jar jar;
             int classAccess;
             String className;
+
             @Nullable
             String classSignature;
+
             String classSuperclassName;
-            @Nullable
-            String[] classSuperinterfaceSignatures;
+            String @Nullable [] classSuperinterfaceSignatures;
 
             public void writeMethod(int access, String name, String descriptor,
                                     @Nullable String signature,
-                                    @Nullable String[] parameterNames,
-                                    @Nullable String[] exceptions) {
+                                    String @Nullable [] parameterNames,
+                                    String @Nullable [] exceptions) {
                 if (((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & access) == 0) {
                     out.printf(
                             "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s%n",
@@ -400,8 +406,7 @@ public class TypeTable implements JavaParserClasspathLoader {
         @Nullable
         String superclassSignature;
 
-        @Nullable
-        String[] superinterfaceSignatures;
+        String @Nullable [] superinterfaceSignatures;
     }
 
     @Value
@@ -410,7 +415,10 @@ public class TypeTable implements JavaParserClasspathLoader {
         int access;
         String name;
         String descriptor;
+
+        @Nullable
         String signature;
-        String[] exceptions;
+
+        String @Nullable [] exceptions;
     }
 }
