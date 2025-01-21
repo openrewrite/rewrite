@@ -126,12 +126,13 @@ public interface JavaParser extends Parser {
         Set<String> missingArtifactNames = new LinkedHashSet<>(Arrays.asList(artifactNamesWithVersions));
 
         try (RewriteClasspathJarClasspathLoader rewriteClasspathJarClasspathLoader = new RewriteClasspathJarClasspathLoader(ctx)) {
-            for (JavaParserClasspathLoader locator : new JavaParserClasspathLoader[]{
-                    new TypeTable(ctx, missingArtifactNames),
-                    rewriteClasspathJarClasspathLoader,
-            }) {
+            List<JavaParserClasspathLoader> loaders = new ArrayList<>(2);
+            Optional.ofNullable(TypeTable.fromClasspath(ctx, missingArtifactNames)).ifPresent(loaders::add);
+            loaders.add(rewriteClasspathJarClasspathLoader);
+
+            for (JavaParserClasspathLoader loader : loaders) {
                 for (String missingArtifactName : new ArrayList<>(missingArtifactNames)) {
-                    Path located = locator.load(missingArtifactName);
+                    Path located = loader.load(missingArtifactName);
                     if (located != null) {
                         artifacts.add(located);
                         missingArtifactNames.remove(missingArtifactName);

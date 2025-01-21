@@ -78,8 +78,12 @@ public class TypeTable implements JavaParserClasspathLoader {
 
     private static final Map<GroupArtifactVersion, Path> classesDirByArtifact = new LinkedHashMap<>();
 
-    public TypeTable(ExecutionContext ctx, Collection<String> artifactNames) {
-        this(ctx, findCaller().getClassLoader().getResourceAsStream(DEFAULT_RESOURCE_PATH), artifactNames);
+    public static @Nullable TypeTable fromClasspath(ExecutionContext ctx, Collection<String> artifactNames) {
+        try (InputStream is = findCaller().getClassLoader().getResourceAsStream(DEFAULT_RESOURCE_PATH)) {
+            return is == null ? null : new TypeTable(ctx, is, artifactNames);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     public TypeTable(ExecutionContext ctx, InputStream is, Collection<String> artifactNames) {
