@@ -35,12 +35,10 @@ dependencies {
     testImplementation("org.assertj:assertj-core:latest.release")
     testImplementation("org.junit.jupiter:junit-jupiter-api:latest.release")
     testImplementation("org.junit.jupiter:junit-jupiter-params:latest.release")
-    testImplementation("org.junit-pioneer:junit-pioneer:2.0.0")
+    testImplementation("org.junit-pioneer:junit-pioneer:latest.release")
     testImplementation("org.openrewrite:rewrite-test")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:latest.release")
     testRuntimeOnly("org.openrewrite:rewrite-java-17")
-    testRuntimeOnly("com.squareup.misk:misk-prometheus:latest.release")
-    testRuntimeOnly("com.squareup.misk:misk-metrics:latest.release")
 
     testImplementation("com.github.ajalt.clikt:clikt:3.5.0")
     testImplementation("com.squareup:javapoet:1.13.0")

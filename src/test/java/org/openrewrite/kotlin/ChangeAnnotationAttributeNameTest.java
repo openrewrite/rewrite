@@ -34,15 +34,16 @@ class ChangeAnnotationAttributeNameTest implements RewriteTest {
               "newValue"
             ))
             .parser(KotlinParser.builder().classpath("junit-jupiter-api")),
+          //language=kotlin
           kotlin(
             """
               package sample
-              
+
               import org.junit.jupiter.api.Tag
               import org.junit.jupiter.api.Tags
-              
+
               class SampleTest {
-              
+
                   @Tags(
                       value = [
                           Tag(value = "Sample01"),
@@ -55,12 +56,12 @@ class ChangeAnnotationAttributeNameTest implements RewriteTest {
               """,
             """
               package sample
-              
+
               import org.junit.jupiter.api.Tag
               import org.junit.jupiter.api.Tags
-              
+
               class SampleTest {
-              
+
                   @Tags(
                       value = [
                           Tag(newValue = "Sample01"),

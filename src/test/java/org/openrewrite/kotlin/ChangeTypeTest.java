@@ -45,14 +45,14 @@ class ChangeTypeTest implements RewriteTest {
           kotlin(
             """
               import a.b.Original
-              
+
               class A {
                   val type : Original = Original()
               }
               """,
             """
               import x.y.Target
-              
+
               class A {
                   val type : Target = Target()
               }
@@ -72,14 +72,14 @@ class ChangeTypeTest implements RewriteTest {
           kotlin(
             """
               import a.b.Original
-              
+
               class A {
                   val type : `Original` = Original()
               }
               """,
             """
               import x.y.Target
-              
+
               class A {
                   val type : `Target` = Target()
               }
@@ -100,14 +100,14 @@ class ChangeTypeTest implements RewriteTest {
           kotlin(
             """
               import a.b.`Original`
-              
+
               class A {
                   val type : Original = Original()
               }
               """,
             """
               import x.y.Target
-              
+
               class A {
                   val type : Target = Target()
               }
@@ -127,14 +127,14 @@ class ChangeTypeTest implements RewriteTest {
           kotlin(
             """
               import a.b.Original as MyAlias
-              
+
               class A {
                   val type : MyAlias = MyAlias()
               }
               """,
             """
               import x.y.Target as MyAlias
-              
+
               class A {
                   val type : MyAlias = MyAlias()
               }
@@ -160,16 +160,16 @@ class ChangeTypeTest implements RewriteTest {
           kotlin(
             """
               package example
-              
+
               import a.b.Original
-              
+
               fun test(original: Original<String>) { }
               """,
             """
               package example
-              
+
               import x.y.Target
-              
+
               fun test(original: Target<String>) { }
               """
           )
@@ -194,16 +194,16 @@ class ChangeTypeTest implements RewriteTest {
           kotlin(
             """
               package example
-              
+
               import a.b.Original as MyAlias
-              
+
               fun test(original: MyAlias<String>) { }
               """,
             """
               package example
-              
+
               import x.y.Target as MyAlias
-              
+
               fun test(original: MyAlias<String>) { }
               """
           )
@@ -226,7 +226,7 @@ class ChangeTypeTest implements RewriteTest {
           kotlin(
             """
               package example
-              
+
               fun test(original: a.b.Original<String>) { }
               """,
             """
@@ -403,31 +403,6 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
-    @Disabled
-    @Test
-    void fromLibrary() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeType(
-            "misk.metrics.backends.prometheus.v2.PrometheusMetrics",
-              "misk.metrics.v2.Metrics", true))
-            .parser(KotlinParser.builder()
-              .classpath("misk-prometheus", "misk-metrics"))
-          ,
-          kotlin(
-            """
-              import misk.metrics.backends.prometheus.v2.PrometheusMetrics
-              
-              class A(val a: PrometheusMetrics)
-              """,
-            """
-              import java.util.LinkedList as MyList
-              
-              class A(val a: Metrics)
-              """
-          )
-        );
-    }
-
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/433")
     @Test
     void changeImportSecondaryConstructor() {
@@ -435,20 +410,20 @@ class ChangeTypeTest implements RewriteTest {
           kotlin(
             """
               package a.b
-              
+
               open class Original
               """),
           kotlin(
             """
               import a.b.Original
-              
+
               class A() : Original() {
                     constructor(s1: String): this()
               }
               """,
             """
               import x.y.Target
-              
+
               class A() : Target() {
                     constructor(s1: String): this()
               }
@@ -470,13 +445,13 @@ class ChangeTypeTest implements RewriteTest {
           kotlin(
             """
               import a.b.Original
-              
+
               @Original
               class A
               """,
             """
               import x.y.Target
-              
+
               @Target
               class A
               """
@@ -498,7 +473,7 @@ class ChangeTypeTest implements RewriteTest {
           kotlin(
             """
               import a.b.Original
-              
+
               class A (
                 @get:Original
                 val field: String
@@ -506,7 +481,7 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               import x.y.Target
-              
+
               class A (
                 @get:Target
                 val field: String
