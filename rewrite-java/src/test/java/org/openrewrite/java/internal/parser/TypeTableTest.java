@@ -33,7 +33,7 @@ import static io.micrometer.core.instrument.util.DoubleFormat.decimalOrNan;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
-public class TypeTableTest implements RewriteTest {
+class TypeTableTest implements RewriteTest {
     Path tsv;
     ExecutionContext ctx = new InMemoryExecutionContext();
 
