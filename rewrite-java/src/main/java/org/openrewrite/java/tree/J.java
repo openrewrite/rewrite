@@ -3073,11 +3073,17 @@ public interface J extends Tree {
 
         @With
         @Getter
-        JRightPadded<Expression> deconstructor;
+        Expression deconstructor;
 
-        @With
-        @Getter
         JContainer<Pattern> nested;
+
+        public List<Pattern> getNested() {
+            return nested.getElements();
+        }
+
+        public DeconstructionPattern withNested(List<Pattern> nested) {
+            return getPadding().withNested(JContainer.withElements(this.nested, nested));
+        }
 
         @Getter
         @With
@@ -3098,17 +3104,24 @@ public interface J extends Tree {
             return new CoordinateBuilder.DeconstructionPattern(this);
         }
 
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
         @RequiredArgsConstructor
         public static class Padding {
             private final DeconstructionPattern t;
-
-            public JRightPadded<Expression> getDeconstructor() {
-                return t.deconstructor;
-            }
-
-            public DeconstructionPattern withDeconstructor(JRightPadded<Expression> deconstructor) {
-                return t.deconstructor == deconstructor ? t : new DeconstructionPattern(t.id, t.prefix, t.markers, deconstructor, t.nested, t.type);
-            }
 
             public JContainer<Pattern> getNested() {
                 return t.nested;

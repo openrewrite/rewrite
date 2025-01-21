@@ -791,7 +791,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         return new J.DeconstructionPattern(randomId(),
                 fmt,
                 Markers.EMPTY,
-                convert(node.getDeconstructor(), t -> sourceBefore("(")),
+                convert(node.getDeconstructor()),
                 JContainer.build(convertAll(node.getNestedPatterns(), commaDelim, t -> sourceBefore(")"))),
                 type);
     }
