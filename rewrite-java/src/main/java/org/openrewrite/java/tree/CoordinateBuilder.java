@@ -37,21 +37,21 @@ public abstract class CoordinateBuilder {
         return new JavaCoordinates(tree, location, JavaCoordinates.Mode.REPLACEMENT, null);
     }
 
-    public static class DeconstructionPattern extends CoordinateBuilder {
-        public DeconstructionPattern(org.openrewrite.java.tree.Pattern tree) {
+    public static class Pattern extends CoordinateBuilder {
+        public Pattern(org.openrewrite.java.tree.Pattern tree) {
             super(tree);
         }
 
         public JavaCoordinates after() {
-            return after(Space.Location.DECONSTRUCTOR_PREFIX);
+            return after(Space.Location.PATTERN_PREFIX);
         }
 
         public JavaCoordinates before() {
-            return before(Space.Location.DECONSTRUCTOR_PREFIX);
+            return before(Space.Location.PATTERN_PREFIX);
         }
 
         public JavaCoordinates replace() {
-            return replace(Space.Location.DECONSTRUCTOR_PREFIX);
+            return replace(Space.Location.PATTERN_PREFIX);
         }
     }
 

@@ -3075,13 +3075,13 @@ public interface J extends Tree {
         @Getter
         Expression deconstructor;
 
-        JContainer<Pattern> nested;
+        JContainer<J> nested;
 
-        public List<Pattern> getNested() {
+        public List<J> getNested() {
             return nested.getElements();
         }
 
-        public DeconstructionPattern withNested(List<Pattern> nested) {
+        public DeconstructionPattern withNested(List<J> nested) {
             return getPadding().withNested(JContainer.withElements(this.nested, nested));
         }
 
@@ -3100,8 +3100,8 @@ public interface J extends Tree {
         }
 
         @Override
-        public CoordinateBuilder.DeconstructionPattern getCoordinates() {
-            return new CoordinateBuilder.DeconstructionPattern(this);
+        public CoordinateBuilder.Pattern getCoordinates() {
+            return new CoordinateBuilder.Pattern(this);
         }
 
         public Padding getPadding() {
@@ -3123,11 +3123,11 @@ public interface J extends Tree {
         public static class Padding {
             private final DeconstructionPattern t;
 
-            public JContainer<Pattern> getNested() {
+            public JContainer<J> getNested() {
                 return t.nested;
             }
 
-            public DeconstructionPattern withNested(JContainer<Pattern> nested) {
+            public DeconstructionPattern withNested(JContainer<J> nested) {
                 return t.nested == nested ? t : new DeconstructionPattern(t.id, t.prefix, t.markers, t.deconstructor, nested, t.type);
             }
         }
