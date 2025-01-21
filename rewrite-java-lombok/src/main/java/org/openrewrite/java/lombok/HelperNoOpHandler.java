@@ -17,15 +17,12 @@ package org.openrewrite.java.lombok;
 
 import com.sun.tools.javac.tree.JCTree;
 import lombok.core.AnnotationValues;
-import lombok.core.HandlerPriority;
-import lombok.extern.jackson.Jacksonized;
+import lombok.experimental.Helper;
 import lombok.javac.JavacAnnotationHandler;
 import lombok.javac.JavacNode;
 
-@SuppressWarnings("SpellCheckingInspection")
-@HandlerPriority(-512)
-public class JacksonizedHandler extends JavacAnnotationHandler<Jacksonized> {
+public class HelperNoOpHandler extends JavacAnnotationHandler<Helper> {
     @Override
-    public void handle(AnnotationValues<Jacksonized> annotation, JCTree.JCAnnotation ast, JavacNode annotationNode) {
+    public void handle(AnnotationValues<Helper> annotation, JCTree.JCAnnotation ast, JavacNode annotationNode) {
     }
 }

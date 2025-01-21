@@ -177,6 +177,28 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
+    void useClassAsArgument() {
+        rewriteRun(
+          groovy(
+            """
+              foo(String)
+              """
+          )
+        );
+    }
+
+    @Test
+    void useClassAsArgumentJavaStyle() {
+        rewriteRun(
+          groovy(
+            """
+              foo(String.class)
+              """
+          )
+        );
+    }
+
+    @Test
     @SuppressWarnings("GroovyAssignabilityCheck")
     void closureWithImplicitParameter() {
         rewriteRun(
@@ -186,6 +208,22 @@ class MethodInvocationTest implements RewriteTest {
               acceptsClosure {
                   println(it)
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void closureInObjectInObject() {
+        rewriteRun(
+          groovy(
+            """
+              class Test {
+                Test child = new Test()
+                def acceptsClosure(Closure cl) {}
+              }
+              
+              new Test().child.acceptsClosure {}
               """
           )
         );
@@ -319,6 +357,25 @@ class MethodInvocationTest implements RewriteTest {
               foo {
                   return
               }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4055")
+    @Test
+    void chainOfMethodInvocations() {
+        rewriteRun(
+          groovy(
+            """
+              Micronaut.build(args)
+                      .banner(false)
+                      .propertySources(PropertySource.of("my-config", [name: "MyApp"]))
+                      .environments("prod") // Only prod
+                      .overrideConfig("custom-config.yml") // Load custom config
+                      .packages("com.company")
+                      .mainClass(Application)
+                      .start()
               """
           )
         );

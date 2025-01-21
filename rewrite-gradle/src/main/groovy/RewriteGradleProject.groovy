@@ -78,6 +78,7 @@ interface DependencyHandlerSpec extends DependencyHandler {
     Dependency earlib(Object... dependencyNotation)
     Dependency earlib(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
 
+    @Override
     void constraints(Action<? super DependencyConstraintHandler> configureAction)
 }
 

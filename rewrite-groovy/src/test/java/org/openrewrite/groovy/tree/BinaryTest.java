@@ -16,6 +16,7 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -72,6 +73,18 @@ class BinaryTest implements RewriteTest {
               def foo(int a) {
                   60 + a
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void regexPatternOperator() {
+        rewriteRun(
+          groovy(
+            """
+              def PATTERN = ~/foo/
+              def result = PATTERN.matcher('4711').matches()
               """
           )
         );

@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,16 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.lombok;
+@NullMarked
+@NonNullFields
+package org.openrewrite.toml.internal;
 
-import com.sun.tools.javac.tree.JCTree;
-import lombok.core.AnnotationValues;
-import lombok.experimental.ExtensionMethod;
-import lombok.javac.JavacAnnotationHandler;
-import lombok.javac.JavacNode;
-
-public class ExtensionMethodHandler extends JavacAnnotationHandler<ExtensionMethod> {
-    @Override
-    public void handle(AnnotationValues<ExtensionMethod> annotationValues, JCTree.JCAnnotation jcAnnotation, JavacNode javacNode) {
-    }
-}
+import org.jspecify.annotations.NullMarked;
+import org.openrewrite.internal.lang.NonNullFields;

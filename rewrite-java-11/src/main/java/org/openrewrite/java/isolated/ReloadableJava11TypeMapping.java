@@ -22,7 +22,6 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
 import org.openrewrite.java.internal.JavaTypeCache;
-import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
@@ -232,8 +231,9 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
     private JavaType.FullyQualified classType(Type.ClassType classType, String signature) {
         Symbol.ClassSymbol sym = (Symbol.ClassSymbol) classType.tsym;
         Type.ClassType symType = (Type.ClassType) sym.type;
+        String fqn = sym.flatName().toString();
 
-        JavaType.FullyQualified fq = typeCache.get(sym.flatName().toString());
+        JavaType.FullyQualified fq = typeCache.get(fqn);
         JavaType.Class clazz = (JavaType.Class) (fq instanceof JavaType.Parameterized ? ((JavaType.Parameterized) fq).getType() : fq);
         if (clazz == null) {
             if (!sym.completer.isTerminal()) {
@@ -243,12 +243,12 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
             clazz = new JavaType.Class(
                     null,
                     sym.flags_field,
-                    sym.flatName().toString(),
+                    fqn,
                     getKind(sym),
                     null, null, null, null, null, null, null
             );
 
-            typeCache.put(sym.flatName().toString(), clazz);
+            typeCache.put(fqn, clazz);
 
             JavaType.FullyQualified supertype = TypeUtils.asFullyQualified(type(symType.supertype_field));
 
@@ -276,7 +276,7 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
                     if (elem instanceof Symbol.VarSymbol &&
                             (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
                                     Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
-                        if (sym.flatName().toString().equals("java.lang.String") && elem.name.toString().equals("serialPersistentFields")) {
+                        if (fqn.equals("java.lang.String") && elem.name.toString().equals("serialPersistentFields")) {
                             // there is a "serialPersistentFields" member within the String class which is used in normal Java
                             // serialization to customize how the String field is serialized. This field is tripping up Jackson
                             // serialization and is intentionally filtered to prevent errors.
@@ -358,12 +358,19 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
             return variableType(((JCTree.JCVariableDecl) tree).sym);
         } else if (tree instanceof JCTree.JCAnnotatedType && ((JCTree.JCAnnotatedType) tree).getUnderlyingType() instanceof JCTree.JCArrayTypeTree) {
             return annotatedArray((JCTree.JCAnnotatedType) tree);
+        } else if (tree instanceof JCTree.JCClassDecl) {
+            symbol = ((JCTree.JCClassDecl) tree).sym;
+        } else if (tree instanceof JCTree.JCFieldAccess) {
+            symbol = ((JCTree.JCFieldAccess) tree).sym;
         }
 
         return type(((JCTree) tree).type, symbol);
     }
 
-    private @Nullable JavaType type(Type type, Symbol symbol) {
+    private @Nullable JavaType type(@Nullable Type type, @Nullable Symbol symbol) {
+        if (type == null && symbol != null) {
+            type = symbol.type;
+        }
         if (type instanceof Type.MethodType || type instanceof Type.ForAll) {
             return methodInvocationType(type, symbol);
         }
@@ -453,6 +460,10 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
      * @return Method type attribution.
      */
     public JavaType.@Nullable Method methodInvocationType(com.sun.tools.javac.code.@Nullable Type selectType, @Nullable Symbol symbol) {
+        /*
+         TODO: AttrRecover class does not exist for java 11; there is JCNoType
+          in the Type.class, so maybe it is possible to retrieve this information...
+         */
         if (selectType == null || selectType instanceof Type.ErrorType || symbol == null || symbol.kind == Kinds.Kind.ERR || symbol.type instanceof Type.UnknownType) {
             return null;
         }

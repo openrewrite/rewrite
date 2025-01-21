@@ -47,6 +47,7 @@ public class JRightPadded<T> {
         BLOCK_STATEMENT(Space.Location.BLOCK_STATEMENT_SUFFIX),
         CASE(Space.Location.CASE_SUFFIX),
         CASE_EXPRESSION(Space.Location.CASE_EXPRESSION),
+        CASE_LABEL(Space.Location.CASE_LABEL),
         CASE_BODY(Space.Location.CASE_BODY),
         CATCH_ALTERNATIVE(Space.Location.CATCH_ALTERNATIVE_SUFFIX),
         DIMENSION(Space.Location.DIMENSION_SUFFIX),

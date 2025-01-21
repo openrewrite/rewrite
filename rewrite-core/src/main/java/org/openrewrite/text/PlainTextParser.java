@@ -20,7 +20,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.EncodingDetectingInputStream;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
@@ -33,8 +32,6 @@ import java.util.Collection;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-
-import static org.openrewrite.Tree.randomId;
 
 public class PlainTextParser implements Parser {
 
@@ -73,17 +70,13 @@ public class PlainTextParser implements Parser {
             try {
                 EncodingDetectingInputStream is = input.getSource(ctx);
                 String sourceStr = is.readFully();
-                PlainText plainText = new PlainText(
-                        randomId(),
-                        path,
-                        Markers.EMPTY,
-                        is.getCharset().name(),
-                        is.isCharsetBomMarked(),
-                        input.getFileAttributes(),
-                        null,
-                        sourceStr,
-                        null
-                );
+                PlainText plainText = PlainText.builder()
+                        .sourcePath(path)
+                        .charsetName(is.getCharset().name())
+                        .charsetBomMarked(is.isCharsetBomMarked())
+                        .fileAttributes(input.getFileAttributes())
+                        .text(sourceStr)
+                        .build();
                 parsingListener.parsed(input, plainText);
                 return plainText;
             } catch (Throwable t) {

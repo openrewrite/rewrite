@@ -86,6 +86,28 @@ class AssignmentTest implements RewriteTest {
     }
 
     @Test
+    void classAssignment() {
+        rewriteRun(
+          groovy(
+            """
+              def s = String
+              """
+          )
+        );
+    }
+
+    @Test
+    void classAssignmentJavaStyle() {
+        rewriteRun(
+          groovy(
+            """
+              def s = String.class
+              """
+          )
+        );
+    }
+
+    @Test
     void unaryMinus() {
         rewriteRun(
           groovy(
@@ -134,7 +156,7 @@ class AssignmentTest implements RewriteTest {
             """
               def startItem = '|  ', endItem = '  |'
               def repeatLength = startItem.length() + output.length() + endItem.length()
-              println("\\n" + ("-" * repeatLength) + "\\n" + startItem + output + endItem + "\\n" + ("-" * repeatLength))
+              println("\\n" + ("-" * repeatLength) + "\\n|  " + startItem + output + endItem + "  |\\n" + ("-" * repeatLength))
               """
           )
         );

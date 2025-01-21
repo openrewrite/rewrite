@@ -15,7 +15,7 @@ dependencies {
 
     api("org.jspecify:jspecify:latest.release")
 
-    implementation("org.apache.commons:commons-compress:latest.release")
+    implementation("org.apache.commons:commons-lang3:latest.release")
 
     implementation("io.micrometer:micrometer-core:1.9.+")
     implementation("io.github.classgraph:classgraph:latest.release")

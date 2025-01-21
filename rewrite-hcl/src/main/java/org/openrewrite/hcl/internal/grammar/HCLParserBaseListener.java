@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -219,6 +219,18 @@ public class HCLParserBaseListener implements HCLParserListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitIndexAccessExpression(HCLParser.IndexAccessExpressionContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterLegacyIndexAttributeExpression(HCLParser.LegacyIndexAttributeExpressionContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitLegacyIndexAttributeExpression(HCLParser.LegacyIndexAttributeExpressionContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *
@@ -447,6 +459,18 @@ public class HCLParserBaseListener implements HCLParserListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitGetAttr(HCLParser.GetAttrContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterLegacyIndexAttr(HCLParser.LegacyIndexAttrContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitLegacyIndexAttr(HCLParser.LegacyIndexAttrContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *

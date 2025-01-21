@@ -21,6 +21,7 @@ import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
 import org.openrewrite.java.marker.CompactConstructor;
 import org.openrewrite.java.marker.OmitParentheses;
+import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.J.*;
 import org.openrewrite.marker.Marker;
@@ -92,6 +93,16 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
                 p.append(suffix);
             }
         }
+    }
+
+    @Override
+    public <M extends Marker> M visitMarker(Marker marker, PrintOutputCapture<P> p) {
+        if (marker instanceof TrailingComma) {
+            p.append(',');
+            visitSpace(((TrailingComma) marker).getSuffix(), Space.Location.TRAILING_COMMA_SUFFIX, p);
+        }
+        //noinspection unchecked
+        return (M) marker;
     }
 
     @Override
@@ -431,8 +442,8 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
                         getCursor()
                                 .dropParentUntil(
                                         c -> c instanceof Switch ||
-                                                c instanceof SwitchExpression ||
-                                                c == Cursor.ROOT_VALUE
+                                             c instanceof SwitchExpression ||
+                                             c == Cursor.ROOT_VALUE
                                 )
                                 .getValue();
                 if (aSwitch instanceof SwitchExpression) {
@@ -473,11 +484,15 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     @Override
     public J visitCase(Case case_, PrintOutputCapture<P> p) {
         beforeSyntax(case_, Space.Location.CASE_PREFIX, p);
-        Expression elem = case_.getExpressions().get(0);
+        J elem = case_.getCaseLabels().get(0);
         if (!(elem instanceof Identifier) || !((Identifier) elem).getSimpleName().equals("default")) {
             p.append("case");
         }
-        visitContainer("", case_.getPadding().getExpressions(), JContainer.Location.CASE_EXPRESSION, ",", "", p);
+        visitContainer("", case_.getPadding().getCaseLabels(), JContainer.Location.CASE_LABEL, ",", "", p);
+        if (case_.getGuard() != null) {
+            p.append("when");
+            visit(case_.getGuard(), p);
+        }
         visitSpace(case_.getPadding().getStatements().getBefore(), Space.Location.CASE, p);
         p.append(case_.getType() == Case.Type.Statement ? ":" : "->");
         visitStatements(case_.getPadding().getStatements().getPadding()
