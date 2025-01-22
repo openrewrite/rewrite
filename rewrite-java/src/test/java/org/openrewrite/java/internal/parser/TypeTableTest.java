@@ -15,7 +15,9 @@
  */
 package org.openrewrite.java.internal.parser;
 
+import lombok.SneakyThrows;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.ExecutionContext;
@@ -25,9 +27,10 @@ import org.openrewrite.java.JavaParserExecutionContextView;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static io.micrometer.core.instrument.util.DoubleFormat.decimalOrNan;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -63,6 +66,31 @@ class TypeTableTest implements RewriteTest {
             }
             System.out.println("Total size of table " + humanReadableByteCount(Files.size(tsv)));
             System.out.println("Total size of jars " + humanReadableByteCount(jarsSize));
+        }
+    }
+
+    @Disabled
+    @Test
+    void writeAllMavenLocal() throws IOException {
+        Path m2Repo = Paths.get(System.getProperty("user.home"), ".m2", "repository");
+        try (TypeTable.Writer writer = TypeTable.newWriter(Files.newOutputStream(tsv))) {
+            AtomicLong jarsSize = new AtomicLong();
+            AtomicLong jarCount = new AtomicLong();
+            Files.walkFileTree(m2Repo, new SimpleFileVisitor<>() {
+                @SneakyThrows
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                    if (file.toString().endsWith(".jar")) {
+                        jarsSize.addAndGet(writeJar(file, writer));
+                        if (jarCount.incrementAndGet() > 500) {
+                            return FileVisitResult.TERMINATE;
+                        }
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+            System.out.println("Total size of table " + humanReadableByteCount(Files.size(tsv)));
+            System.out.println("Total size of jars " + humanReadableByteCount(jarsSize.get()));
         }
     }
 
