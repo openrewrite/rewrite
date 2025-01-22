@@ -18,6 +18,7 @@ package org.openrewrite.groovy;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.groovy.tree.G;
@@ -180,7 +181,7 @@ class GroovyTypeAttributionTest implements RewriteTest {
     }
 
     @SuppressWarnings({"GrPackage", "OptionalGetWithoutIsPresent"})
-    @Disabled
+    @ExpectedToFail
     @Test
     void infersDelegateViaSimilarGradleApi() {
         rewriteRun(

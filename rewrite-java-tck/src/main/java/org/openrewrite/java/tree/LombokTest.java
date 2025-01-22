@@ -19,9 +19,9 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledOnJre;
-import org.junit.jupiter.api.condition.JRE;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.MinimumJava11;
+import org.openrewrite.java.MinimumJava17;
 import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -34,7 +34,6 @@ import static org.assertj.core.api.CollectionAssert.assertThatCollection;
 import static org.openrewrite.java.Assertions.java;
 
 @SuppressWarnings({"CaughtExceptionImmediatelyRethrown", "LombokGetterMayBeUsed", "LombokSetterMayBeUsed", "DefaultAnnotationParam", "NotNullFieldNotInitialized", "ProtectedMemberInFinalClass", "WriteOnlyObject", "ConcatenationWithEmptyString"})
-@EnabledOnJre({JRE.JAVA_11, JRE.JAVA_17})
 class LombokTest implements RewriteTest {
 
     @BeforeAll
@@ -248,6 +247,12 @@ class LombokTest implements RewriteTest {
                 public static class NoArgsExample {
                   @NonNull private String field;
                 }
+              
+                public void test() {
+                  ConstructorExample<?> x = ConstructorExample.of("desc");
+                  ConstructorExample<?> y = new ConstructorExample<>("1L");
+                  ConstructorExample.NoArgsExample z = new ConstructorExample.NoArgsExample();
+                }
               }
               """
           )
@@ -369,7 +374,57 @@ class LombokTest implements RewriteTest {
     }
 
     @Test
+    void gett() {
+        rewriteRun(
+          java(
+            """
+              import lombok.Getter;
+              
+              public class WithExample {
+                @Getter int age;
+              
+                public WithExample(int age) {
+                  this.age = age;
+                }
+              
+                void test() {
+                    int x = getAge();
+                }
+              }
+              """
+          )
+        );
+    }
+
+    //TODO fix for Java 8 and 11
+    @Test
+    @MinimumJava17
     void with() {
+        rewriteRun(
+          java(
+            """
+              import lombok.With;
+              
+              public class WithExample {
+                @With int age;
+              
+                public WithExample(int age) {
+                  this.age = age;
+                }
+              
+                void test() {
+                    WithExample x = withAge("name", 23);
+                }
+              }
+              """
+          )
+        );
+    }
+
+    //TODO fix for Java 8 and 11
+    @Test
+    @MinimumJava17
+    void withWithParams() {
         rewriteRun(
           java(
             """
@@ -384,6 +439,42 @@ class LombokTest implements RewriteTest {
                 public WithExample(@NonNull String name, int age) {
                   this.name = name;
                   this.age = age;
+                }
+              
+                static void test() {
+                    WithExample x = new WithExample("old name", 22);
+                    x.withName("name", 23);
+                }
+              }
+              """
+          )
+        );
+    }
+
+    //TODO fix for Java 8 and 11
+    @Test
+    @MinimumJava17
+    void withOnClass() {
+        rewriteRun(
+          java(
+            """
+              import lombok.AccessLevel;
+              import lombok.NonNull;
+              import lombok.With;
+              
+              @With
+              public class WithExample {
+                private final String name;
+                private final int age;
+              
+                public WithExample(String name, int age) {
+                  this.name = name;
+                  this.age = age;
+                }
+              
+                void test() {
+                    WithExample x = new WithExample("old name", 22);
+                    x.withName("name", 23);
                 }
               }
               """
@@ -437,7 +528,7 @@ class LombokTest implements RewriteTest {
     }
 
     @Test
-    void jul() {
+    void log() {
         rewriteRun(
           java(
             """
@@ -452,6 +543,23 @@ class LombokTest implements RewriteTest {
                   void m() {
                       log.info("string = " + string);
                       log.info(() -> String.format("map = %s", map));
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void var() {
+        rewriteRun(
+          java(
+            """
+              import lombok.var;
+              
+              class Test {
+                  void test() {
+                      var s = "foo";
                   }
               }
               """
@@ -696,6 +804,7 @@ class LombokTest implements RewriteTest {
     }
 
     @Test
+    @MinimumJava11
     void jacksonized() {
         rewriteRun(
           spec -> spec.parser(JavaParser.fromJavaVersion().classpath("jackson-annotations", "lombok")),
@@ -725,6 +834,11 @@ class LombokTest implements RewriteTest {
               
               @StandardException
               public class ExampleException extends Exception {
+                  public void test() {
+                      new ExampleException("message");
+                      new ExampleException(new RuntimeException("message"));
+                      new ExampleException("message", new RuntimeException("message"));
+                  }
               }
               """
           )
@@ -732,29 +846,27 @@ class LombokTest implements RewriteTest {
     }
 
     @Test
+    @MinimumJava11
     void onConstructor() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.builder().allowMissingType(o -> {
-              assert o instanceof FindMissingTypes.MissingTypeResult;
-              FindMissingTypes.MissingTypeResult result = (FindMissingTypes.MissingTypeResult) o;
-              // type attribution is missing for annotation args, as it was intentionally removed for processing.
-              return result.getPath().startsWith("Identifier->Annotation->");
-          }).build()),
+          java(
+            """
+              public @interface Inject {}
+              public @interface Id {}
+              public @interface Column { String name(); }
+              public @interface Max { long value(); }
+              """
+          ),
           java(
             """
               import lombok.AllArgsConstructor;
               import lombok.Getter;
               import lombok.Setter;
               
-              import javax.inject.Inject;
-              import javax.persistence.Id;
-              import javax.persistence.Column;
-              import javax.validation.constraints.Max;
-              
-              @AllArgsConstructor(onConstructor=@__(@Inject))
+              @AllArgsConstructor(onConstructor_=@Inject)
               public class OnXExample {
-                  @Getter(onMethod_={@Id, @Column(name="unique-id")}) //JDK8
-                  @Setter(onParam_=@Max(10000)) //JDK8
+                  @Getter(onMethod_={@Id, @Column(name="unique-id")})
+                  @Setter(onParam_=@Max(10000))
                   private long unid;
               
                   public void test() {
@@ -769,17 +881,14 @@ class LombokTest implements RewriteTest {
     }
 
     @Test
+    @MinimumJava11
     void onConstructorNoArgs() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.builder().allowMissingType(o -> {
-              assert o instanceof FindMissingTypes.MissingTypeResult;
-              FindMissingTypes.MissingTypeResult result = (FindMissingTypes.MissingTypeResult) o;
-              if (result.getJ() instanceof J.Identifier identifier) {
-                  // type attribution is missing for annotation args, as it was intentionally removed for processing.
-                  return identifier.getSimpleName().equals("__") || identifier.getSimpleName().equals("Inject");
-              }
-              return false;
-          }).build()),
+          java(
+            """
+              public @interface Inject {}
+              """
+          ),
           java(
             """
               import lombok.NoArgsConstructor;
@@ -788,8 +897,8 @@ class LombokTest implements RewriteTest {
               
               import javax.inject.Inject;
               
-              @NoArgsConstructor(onConstructor = @__(@Inject))
-              @RequiredArgsConstructor(onConstructor = @__(@Inject))
+              @NoArgsConstructor(onConstructor_ = @Inject)
+              @RequiredArgsConstructor(onConstructor_ = @Inject)
               public class OnXExample {
                   @NonNull private Long unid;
               
@@ -810,6 +919,127 @@ class LombokTest implements RewriteTest {
     @SuppressWarnings("MismatchedReadAndWriteOfArray")
     @Nested
     class LessSupported {
+        /*
+         java 8 cannot figure out all type checking:
+         - When the @AllArgsConstructorHandler, @NoArgsConstructorHandler and @NoArgsConstructorHandler annotations are
+           used with the `onConstructor_` param, Lombok does not call the JavacAnnotationHandlers.
+         - The @Jacksonized annotation does somehow turns into `ClassDeclaration->CompilationUni` error
+         */
+
+        @Test
+        // TODO: Find solution and remove this test
+        void jacksonizedForJava8() {
+            rewriteRun(
+              spec -> spec
+                .parser(JavaParser.fromJavaVersion().classpath("jackson-annotations", "lombok"))
+                .typeValidationOptions(TypeValidation.builder().allowMissingType(o -> {
+                    assert o instanceof FindMissingTypes.MissingTypeResult;
+                    FindMissingTypes.MissingTypeResult result = (FindMissingTypes.MissingTypeResult) o;
+                    // Using the @Jacksonized annotation in java 8 just breaks it all
+                    return result.getPath().startsWith("ClassDeclaration->CompilationUnit") ||
+                      result.getPath().startsWith("Identifier->Annotation")||
+                      result.getPath().startsWith("Identifier->ParameterizedType");
+                }).build()),
+              java(
+                """
+                  import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+                  import lombok.Builder;
+                  import lombok.extern.jackson.Jacksonized;
+                  
+                  @Jacksonized
+                  @Builder
+                  @JsonIgnoreProperties(ignoreUnknown = true)
+                  public class JacksonExample {
+                      private List<String> strings;
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        // TODO: Find solution and remove this test
+        void onConstructorForJava8() {
+            rewriteRun(
+              spec -> spec.typeValidationOptions(TypeValidation.builder().allowMissingType(o -> {
+                  assert o instanceof FindMissingTypes.MissingTypeResult;
+                  FindMissingTypes.MissingTypeResult result = (FindMissingTypes.MissingTypeResult) o;
+                  // The AllArgsConstructorHandler, GetterHandler and SetterHandler do not run at all for java 8,
+                  // so no generated constructors and methods, thus no types.
+                  return result.getPath().startsWith("NewClass->") || result.getPath().startsWith("MethodInvocation->");
+              }).build()),
+              java(
+                """
+                  public @interface Inject {}
+                  public @interface Id {}
+                  public @interface Column { String name(); }
+                  public @interface Max { long value(); }
+                  """
+              ),
+              java(
+                """
+                  import lombok.AllArgsConstructor;
+                  import lombok.Getter;
+                  import lombok.Setter;
+                  
+                  @AllArgsConstructor(onConstructor_=@Inject)
+                  public class OnXExample {
+                      @Getter(onMethod_={@Id, @Column(name="unique-id")})
+                      @Setter(onParam_=@Max(10000))
+                      private long unid;
+                  
+                      public void test() {
+                          OnXExample x = new OnXExample(1L);
+                          x.setUnid(2L);
+                          System.out.println(x.getUnid());
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        // TODO: Find solution and remove this test
+        void onConstructorNoArgsForJava8() {
+            rewriteRun(
+              spec -> spec.typeValidationOptions(TypeValidation.builder().allowMissingType(o -> {
+                  assert o instanceof FindMissingTypes.MissingTypeResult;
+                  FindMissingTypes.MissingTypeResult result = (FindMissingTypes.MissingTypeResult) o;
+                  // The NoArgsConstructor and RequiredArgsConstructor do not run at all for java 8,
+                  // so no generated constructors, thus no types.
+                  return result.getPath().startsWith("NewClass->");
+              }).build()),
+              java(
+                """
+                  public @interface Inject {}
+                  public @interface Ignore {} // somehow we need this, to prevent `ClassDeclaration->CompilationUnit` errors
+                  """
+              ),
+              java(
+                """
+                  import lombok.NoArgsConstructor;
+                  import lombok.NonNull;
+                  import lombok.RequiredArgsConstructor;
+                  
+                  import javax.inject.Inject;
+                  
+                  @NoArgsConstructor(onConstructor_=@Inject)
+                  @RequiredArgsConstructor(onConstructor_=@Inject)
+                  public class OnXExample {
+                      @NonNull private Long unid;
+                  
+                      public void test() {
+                          new OnXExample();
+                          new OnXExample(1L);
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+
         @Test
         void extensionMethod() {
             rewriteRun(

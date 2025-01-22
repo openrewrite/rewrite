@@ -57,6 +57,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         JRightPadded<J.Package> pkg = cu.getPadding().getPackageDeclaration();
         if (pkg != null) {
             visit(pkg.getElement(), p);
+            visitMarkers(pkg.getMarkers(), p);
             visitSpace(pkg.getAfter(), Space.Location.PACKAGE_SUFFIX, p);
         }
 

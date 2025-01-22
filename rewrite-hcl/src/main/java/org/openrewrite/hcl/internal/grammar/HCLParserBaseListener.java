@@ -224,6 +224,18 @@ public class HCLParserBaseListener implements HCLParserListener {
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
+	@Override public void enterLegacyIndexAttributeExpression(HCLParser.LegacyIndexAttributeExpressionContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitLegacyIndexAttributeExpression(HCLParser.LegacyIndexAttributeExpressionContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
 	@Override public void enterForExpression(HCLParser.ForExpressionContext ctx) { }
 	/**
 	 * {@inheritDoc}
@@ -447,6 +459,18 @@ public class HCLParserBaseListener implements HCLParserListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitGetAttr(HCLParser.GetAttrContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterLegacyIndexAttr(HCLParser.LegacyIndexAttrContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitLegacyIndexAttr(HCLParser.LegacyIndexAttrContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *

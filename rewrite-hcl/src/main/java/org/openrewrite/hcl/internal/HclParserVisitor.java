@@ -410,6 +410,25 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
     }
 
     @Override
+    public Hcl visitLegacyIndexAttributeExpression(HCLParser.LegacyIndexAttributeExpressionContext ctx) {
+        return convert(ctx, (c, prefix) -> {
+            String valueSource = c.legacyIndexAttr().NumericLiteral().getText();
+            Integer value = Integer.parseInt(valueSource);
+            return new Hcl.LegacyIndexAttributeAccess(
+                    randomId(),
+                    Space.format(prefix),
+                    Markers.EMPTY,
+                    new HclRightPadded<>(
+                            (Expression) visit(c.exprTerm()),
+                            sourceBefore("."),
+                            Markers.EMPTY
+                    ),
+                    new Hcl.Literal(randomId(), Space.format(prefix(c.legacyIndexAttr().NumericLiteral())), Markers.EMPTY, value, valueSource)
+            );
+        });
+    }
+
+    @Override
     public Hcl visitLiteralValue(HCLParser.LiteralValueContext ctx) {
         return convert(ctx, (c, prefix) -> {
             Object value;
@@ -742,25 +761,26 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
 
         int delimIndex = cursor;
         for (; delimIndex < source.length() - untilDelim.length() + 1; delimIndex++) {
-            if (inSingleLineComment && source.charAt(delimIndex) == '\n') {
-                inSingleLineComment = false;
+            if (inSingleLineComment) {
+                if (source.charAt(delimIndex) == '\n') {
+                    inSingleLineComment = false;
+                }
             } else {
                 if (source.length() - untilDelim.length() > delimIndex + 1) {
                     if ('#' == source.charAt(delimIndex)) {
                         inSingleLineComment = true;
-                        delimIndex++;
                     } else switch (source.substring(delimIndex, delimIndex + 2)) {
                         case "//":
                             inSingleLineComment = true;
-                            delimIndex += 2;
+                            delimIndex += 1;
                             break;
                         case "/*":
                             inMultiLineComment = true;
-                            delimIndex += 2;
+                            delimIndex += 1;
                             break;
                         case "*/":
                             inMultiLineComment = false;
-                            delimIndex += 2;
+                            delimIndex += 1;
                             break;
                     }
                 }

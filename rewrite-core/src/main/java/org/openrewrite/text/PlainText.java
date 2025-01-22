@@ -38,7 +38,7 @@ import static org.openrewrite.internal.ListUtils.nullIfEmpty;
  */
 @Value
 @Builder
-@AllArgsConstructor
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class PlainText implements SourceFileWithReferences, Tree {
 
     @Builder.Default
@@ -82,12 +82,26 @@ public class PlainText implements SourceFileWithReferences, Tree {
     @Builder.Default
     String text = "";
 
+    @Nullable
     List<Snippet> snippets;
 
     @Nullable
     @NonFinal
     @ToString.Exclude
     transient SoftReference<References> references;
+
+    public PlainText(UUID id, Path sourcePath, Markers markers, @Nullable String charsetName, boolean charsetBomMarked,
+                     @Nullable FileAttributes fileAttributes, @Nullable Checksum checksum, String text, @Nullable List<Snippet> snippets) {
+        this.id = id;
+        this.sourcePath = sourcePath;
+        this.markers = markers;
+        this.charsetName = charsetName;
+        this.charsetBomMarked = charsetBomMarked;
+        this.fileAttributes = fileAttributes;
+        this.checksum = checksum;
+        this.text = text;
+        this.snippets = snippets;
+    }
 
     @Override
     public References getReferences() {

@@ -17,18 +17,21 @@ package org.openrewrite.java.isolated;
 
 import com.sun.source.tree.Tree;
 import com.sun.tools.javac.code.*;
+import com.sun.tools.javac.comp.AttrRecover;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Pair;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
 import org.openrewrite.java.internal.JavaTypeCache;
-import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 import javax.lang.model.type.NullType;
 import javax.lang.model.type.TypeMirror;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -369,7 +372,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
         if (type == null && symbol != null) {
             type = symbol.type;
         }
-        if (type instanceof Type.MethodType || type instanceof Type.ForAll) {
+        if (type instanceof Type.MethodType || type instanceof Type.ForAll || (type instanceof Type.ErrorType && type.getOriginalType() instanceof Type.MethodType)) {
             return methodInvocationType(type, symbol);
         }
         return type(type);
@@ -457,7 +460,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
      * @param symbol     The method symbol.
      * @return Method type attribution.
      */
-    public JavaType.@Nullable Method methodInvocationType(@Nullable Type selectType, @Nullable Symbol symbol) {
+    public JavaType.@Nullable Method methodInvocationType(com.sun.tools.javac.code.@Nullable Type selectType, @Nullable Symbol symbol) {
         if (selectType == null || selectType instanceof Type.ErrorType || symbol == null || symbol.kind == Kinds.Kind.ERR || symbol.type instanceof Type.UnknownType) {
             return null;
         }

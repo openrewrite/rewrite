@@ -15,15 +15,15 @@
  */
 package org.openrewrite.groovy.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
 class EnumTest implements RewriteTest {
 
-    @Disabled
+    @ExpectedToFail
     @Test
     void enumDefinition() {
         rewriteRun(
@@ -38,7 +38,7 @@ class EnumTest implements RewriteTest {
         );
     }
 
-    @Disabled
+    @ExpectedToFail
     @Test
     void innerEnum() {
         rewriteRun(
@@ -54,7 +54,7 @@ class EnumTest implements RewriteTest {
         );
     }
 
-    @Disabled
+    @ExpectedToFail
     @Test
     void enumWithAnnotations() {
         rewriteRun(
@@ -72,7 +72,7 @@ class EnumTest implements RewriteTest {
         );
     }
 
-    @Disabled
+    @ExpectedToFail
     @Test
     void anonymousClassInitializer() {
         rewriteRun(
@@ -99,7 +99,7 @@ class EnumTest implements RewriteTest {
         );
     }
 
-    @Disabled
+    @ExpectedToFail
     @Test
     void enumConstructor() {
         rewriteRun(
@@ -123,7 +123,7 @@ class EnumTest implements RewriteTest {
         );
     }
 
-    @Disabled
+    @ExpectedToFail
     @Test
     void noArguments() {
         rewriteRun(
@@ -137,7 +137,7 @@ class EnumTest implements RewriteTest {
         );
     }
 
-    @Disabled
+    @ExpectedToFail
     @Test
     void enumWithParameters() {
         rewriteRun(
@@ -154,7 +154,7 @@ class EnumTest implements RewriteTest {
         );
     }
 
-    @Disabled
+    @ExpectedToFail
     @Test
     void enumWithoutParameters() {
         rewriteRun(
@@ -164,7 +164,7 @@ class EnumTest implements RewriteTest {
         );
     }
 
-    @Disabled
+    @ExpectedToFail
     @Test
     void enumUnnecessarilyTerminatedWithSemicolon() {
         rewriteRun(
@@ -174,7 +174,7 @@ class EnumTest implements RewriteTest {
         );
     }
 
-    @Disabled
+    @ExpectedToFail
     @Test
     void enumWithEmptyParameters() {
         rewriteRun(
