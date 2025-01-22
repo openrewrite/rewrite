@@ -5130,12 +5130,7 @@ public interface J extends Tree {
         @Deprecated
         @ApiStatus.ScheduledForRemoval(inVersion = "2025-05-01")
         public SwitchExpression(UUID id, Space prefix, Markers markers, ControlParentheses<Expression> selector, Block cases) {
-            this.id = id;
-            this.prefix = prefix;
-            this.markers = markers;
-            this.selector = selector;
-            this.cases = cases;
-            this.type = new JavaVisitor<AtomicReference<@Nullable JavaType>>() {
+            this(id, prefix, markers, selector, cases, new JavaVisitor<AtomicReference<@Nullable JavaType>>() {
                 @Override
                 public J visitBlock(Block block, AtomicReference<@Nullable JavaType> javaType) {
                     if (!block.getStatements().isEmpty()) {
@@ -5144,7 +5139,7 @@ public interface J extends Tree {
                     }
                     return block;
                 }
-            }.reduce(this, new AtomicReference<>()).get();
+            }.reduce(cases, new AtomicReference<>()).get());
         }
 
         @Override
