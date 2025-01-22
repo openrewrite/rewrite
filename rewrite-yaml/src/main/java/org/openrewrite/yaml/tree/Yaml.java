@@ -362,6 +362,9 @@ public interface Yaml extends Tree {
         @Nullable
         Anchor anchor;
 
+        @Nullable
+        Tag tag;
+
         @Override
         public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
             return v.visitSequence(this, p);
@@ -370,7 +373,7 @@ public interface Yaml extends Tree {
         @Override
         public Sequence copyPaste() {
             return new Sequence(randomId(), Markers.EMPTY, openingBracketPrefix,
-                    entries.stream().map(Entry::copyPaste).collect(toList()), closingBracketPrefix, anchor);
+                    entries.stream().map(Entry::copyPaste).collect(toList()), closingBracketPrefix, anchor, tag);
         }
 
         @Override
@@ -504,6 +507,41 @@ public interface Yaml extends Tree {
         @Override
         public String toString() {
             return "Yaml.Anchor(" + key + ")";
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Tag implements Yaml {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        String prefix;
+
+        @With
+        String suffix;
+
+        @With
+        Markers markers;
+
+        @With
+        String name;
+
+        @Override
+        public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
+            return v.visitTag(this, p);
+        }
+
+        @Override
+        public Tag copyPaste() {
+            return new Tag(randomId(), prefix, suffix, Markers.EMPTY, name);
+        }
+
+        @Override
+        public String toString() {
+            return "Yaml.Tag(" + name + ")";
         }
     }
 }

@@ -237,11 +237,54 @@ class YamlParserTest implements RewriteTest {
     void pipeLiteralInASequenceWithDoubleQuotes() {
         rewriteRun(
           yaml(
-            """
+               """
                - "one": |
                    two
                  "three": "four"
                """
+          )
+        );
+    }
+
+    @Test
+    void tagsAsInCloudFormation() {
+        rewriteRun(
+          yaml(
+            """
+            AttributeDefinitions: !Dynamo
+              - AttributeName: Title
+            """
+          )
+        );
+    }
+
+    @Test
+    void tagsAsInScalar() {
+        rewriteRun(
+          yaml(
+            """
+            AttributeDefinitions: !Dynamo Title
+            """
+          )
+        );
+    }
+
+    @Test
+    void globalTags() {
+        rewriteRun(
+          yaml(
+            """
+            age: !!int "42"
+            pi: !!float "3.14159"
+            is_valid: !!bool "true"
+            names: !!seq
+              - Alice
+              - Bob
+              - Charlie
+            person: !!map
+              name: John Doe
+              age: 30
+            """
           )
         );
     }

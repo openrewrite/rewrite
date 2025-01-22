@@ -170,6 +170,17 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
         return alias;
     }
 
+    @Override
+    public Yaml visitTag(Yaml.Tag tag, PrintOutputCapture<P> p) {
+        visitMarkers(tag.getMarkers(), p);
+        p
+                .append(tag.getPrefix())
+                .append(tag.getName())
+                .append(tag.getSuffix());
+        afterSyntax(tag, p);
+        return tag;
+    }
+
     private static final UnaryOperator<String> YAML_MARKER_WRAPPER =
             out -> "~~" + out + (out.isEmpty() ? "" : "~~") + ">";
 

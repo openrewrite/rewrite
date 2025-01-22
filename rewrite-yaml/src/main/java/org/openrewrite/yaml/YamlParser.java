@@ -329,19 +329,32 @@ public class YamlParser implements org.openrewrite.Parser {
                                 fmt = fmt.substring(0, dashPrefixIndex);
                             }
                         }
-
                         String fullPrefix = reader.readStringFromBuffer(lastEnd, event.getEndMark().getIndex());
                         String startBracketPrefix = null;
                         int openingBracketIndex = commentAwareIndexOf('[', fullPrefix);
+                        int startIndex = commentAwareIndexOf(':', fullPrefix) + 1;
                         if (openingBracketIndex != -1) {
-                            int startIndex = commentAwareIndexOf(':', fullPrefix) + 1;
                             startBracketPrefix = fullPrefix.substring(startIndex, openingBracketIndex);
+                        }
+                        Yaml.Tag tag = null;
+                        if (sse.getTag() != null) {
+                            String prefixAfterColon = fullPrefix.substring(startIndex);
+                            final int tagStartIndex = prefixAfterColon.indexOf('!');
+                            String tagPrefix = prefixAfterColon.substring(0, tagStartIndex);
+                            int i = tagStartIndex;
+                            while (i < prefixAfterColon.length() && !Character.isWhitespace(prefixAfterColon.charAt(i))) {
+                                i++;
+                            }
+                            // Cannot use sse.getTag() here, because it is sometimes expanded, e.g. `!!seq` becomes `tag:yaml.org,2002:seq`
+                            String tagName = prefixAfterColon.substring(tagStartIndex, i);
+                            String tagSuffix = prefixAfterColon.substring(i, prefixAfterColon.length() - 2);
+                            tag = new Yaml.Tag(randomId(), tagPrefix, tagSuffix, Markers.EMPTY, tagName);
                         }
                         lastEnd = event.getEndMark().getIndex();
                         if (shouldUseYamlParserBugWorkaround(sse)) {
                             lastEnd--;
                         }
-                        blockStack.push(new SequenceBuilder(fmt, startBracketPrefix, anchor));
+                        blockStack.push(new SequenceBuilder(fmt, startBracketPrefix, anchor, tag));
                         break;
                     }
                     case Alias: {
@@ -512,13 +525,15 @@ public class YamlParser implements org.openrewrite.Parser {
 
 
         private final Yaml.@Nullable Anchor anchor;
+        private final Yaml.@Nullable Tag tag;
 
         private final List<Yaml.Sequence.Entry> entries = new ArrayList<>();
 
-        private SequenceBuilder(String prefix, @Nullable String startBracketPrefix, Yaml.@Nullable Anchor anchor) {
+        private SequenceBuilder(String prefix, @Nullable String startBracketPrefix, Yaml.@Nullable Anchor anchor, Yaml.@Nullable Tag tag) {
             this.prefix = prefix;
             this.startBracketPrefix = startBracketPrefix;
             this.anchor = anchor;
+            this.tag = tag;
         }
 
         @Override
@@ -544,7 +559,7 @@ public class YamlParser implements org.openrewrite.Parser {
 
         @Override
         public SequenceWithPrefix build() {
-            return new SequenceWithPrefix(prefix, startBracketPrefix, entries, null, anchor);
+            return new SequenceWithPrefix(prefix, startBracketPrefix, entries, null, anchor, tag);
         }
     }
 
@@ -584,8 +599,8 @@ public class YamlParser implements org.openrewrite.Parser {
     private static class SequenceWithPrefix extends Yaml.Sequence {
         private String prefix;
 
-        public SequenceWithPrefix(String prefix, @Nullable String startBracketPrefix, List<Yaml.Sequence.Entry> entries, @Nullable String endBracketPrefix, @Nullable Anchor anchor) {
-            super(randomId(), Markers.EMPTY, startBracketPrefix, entries, endBracketPrefix, anchor);
+        public SequenceWithPrefix(String prefix, @Nullable String startBracketPrefix, List<Yaml.Sequence.Entry> entries, @Nullable String endBracketPrefix, @Nullable Anchor anchor, @Nullable Tag tag) {
+            super(randomId(), Markers.EMPTY, startBracketPrefix, entries, endBracketPrefix, anchor, tag);
             this.prefix = prefix;
         }
 
@@ -610,7 +625,8 @@ public class YamlParser implements org.openrewrite.Parser {
                                     sequenceWithPrefix.getOpeningBracketPrefix(),
                                     ListUtils.mapFirst(sequenceWithPrefix.getEntries(), e -> e.withPrefix(sequenceWithPrefix.getPrefix())),
                                     sequenceWithPrefix.getClosingBracketPrefix(),
-                                    sequenceWithPrefix.getAnchor()
+                                    sequenceWithPrefix.getAnchor(),
+                                    sequenceWithPrefix.getTag()
                             ), p);
                 }
                 return super.visitSequence(sequence, p);
