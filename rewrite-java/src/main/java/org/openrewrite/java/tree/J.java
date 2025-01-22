@@ -1117,8 +1117,8 @@ public interface J extends Tree {
 
         @Deprecated
         @ApiStatus.ScheduledForRemoval(inVersion = "2025-05-01")
-        public Case(UUID id, Space prefix, Markers markers, Type type, @Deprecated @Nullable Expression pattern, JContainer<Expression> expressions, JContainer<Statement> statements, @Nullable JRightPadded<J> body) {
-            this(id, prefix, markers, type, pattern, expressions, null, null, statements, body);
+        public Case(UUID id, Space prefix, Markers markers, Type type, JContainer<Expression> expressions, JContainer<Statement> statements, @Nullable JRightPadded<J> body) {
+            this(id, prefix, markers, type, null, expressions, null, null, statements, body);
         }
 
         @Override
