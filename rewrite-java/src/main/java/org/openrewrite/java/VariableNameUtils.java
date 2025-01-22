@@ -50,7 +50,7 @@ public class VariableNameUtils {
         Set<String> namesInScope = findNamesInScope(scope);
         // Generate a new name to prevent namespace shadowing.
         String newName = baseName;
-        if (GenerationStrategy.INCREMENT_NUMBER.equals(strategy)) {
+        if (GenerationStrategy.INCREMENT_NUMBER == strategy) {
             StringBuilder postFix = new StringBuilder();
             char[] charArray = baseName.toCharArray();
             for (int i = charArray.length - 1; i >= 0; i--) {

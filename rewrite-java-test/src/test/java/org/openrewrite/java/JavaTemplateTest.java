@@ -72,7 +72,7 @@ class JavaTemplateTest implements RewriteTest {
               @Override
               public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
                   if ((assignment.getAssignment() instanceof J.Literal) &&
-                      ((J.Literal) assignment.getAssignment()).getValue().equals(1)) {
+                    ((J.Literal) assignment.getAssignment()).getValue().equals(1)) {
                       return JavaTemplate.builder("value = 0")
                         .contextSensitive()
                         .build()
@@ -1335,6 +1335,90 @@ class JavaTemplateTest implements RewriteTest {
                   void test() {
                       new StepBuilder()
                           .<String>method();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-logging-frameworks/issues/185")
+    @Test
+    void replaceMethodArgumentsInIfStatementWithoutBraces() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                  if (new MethodMatcher("Foo bar(..)").matches(mi) &&
+                    mi.getArguments().get(0) instanceof J.Binary) {
+                      return JavaTemplate.builder("\"Hello, {}\", \"World!\"")
+                        .contextSensitive()
+                        .build()
+                        .apply(new Cursor(getCursor().getParent(), mi), mi.getCoordinates().replaceArguments());
+                  }
+                  return mi;
+              }
+          })),
+          java(
+            """
+              class Foo {
+                  void foo(boolean condition) {
+                      if (condition)
+                          bar("Hello, " + "World!");
+                  }
+                  String bar(String... arg){ return null; }
+              }
+              """,
+            """
+              class Foo {
+                  void foo(boolean condition) {
+                      if (condition)
+                          bar("Hello, {}", "World!");
+                  }
+                  String bar(String... arg){ return null; }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceVariableDeclarationWithFinalVar() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  J.VariableDeclarations vd = super.visitVariableDeclarations(multiVariable, ctx);
+                  if (TypeUtils.isString(vd.getType()) && "String".equals(((J.Identifier) vd.getTypeExpression()).getSimpleName())) {
+                      JavaCoordinates coordinates = vd.getCoordinates().replace();
+                      return JavaTemplate.builder("final var #{}")
+                        .contextSensitive()
+                        .doBeforeParseTemplate(System.out::println)
+                        .build()
+                        .apply(getCursor(), coordinates, new Object[]{vd.getVariables().get(0).getSimpleName()});
+                  }
+                  return vd;
+              }
+          })),
+          java(
+            """
+              import java.util.List;
+              import java.util.ArrayList;
+              
+              class A {
+                  void bar(List<String> lst) {
+                      for (String s : lst) {}
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              import java.util.ArrayList;
+              
+              class A {
+                  void bar(List<String> lst) {
+                      for (final var s : lst) {}
                   }
               }
               """

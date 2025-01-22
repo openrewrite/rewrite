@@ -255,7 +255,9 @@ class JavaTemplateTest6Test implements RewriteTest {
           })).afterRecipe(run -> {
               J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().get(0).getAfter();
               J.MethodDeclaration testMethodDecl = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
-              assertThat(testMethodDecl.getMethodType().getThrownExceptions().stream().map(JavaType.FullyQualified::getFullyQualifiedName))
+              assertThat(testMethodDecl.getMethodType().getThrownExceptions().stream()
+                .map(JavaType.FullyQualified.class::cast)
+                .map(JavaType.FullyQualified::getFullyQualifiedName))
                 .containsExactly("java.lang.Exception");
           }),
           java(

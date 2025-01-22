@@ -150,7 +150,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         // if the resolved dependency exists AND it does not represent an artifact that was parsed
                         // as a source file, attempt to find a new version.
                         try {
-                            String newerVersion = MavenDependency.findNewerVersion(d.getGroupId(), d.getArtifactId(),  d.getVersion(), getResolutionResult(), metadataFailures,
+                            String newerVersion = MavenDependency.findNewerVersion(d.getGroupId(), d.getArtifactId(), d.getVersion(), getResolutionResult(), metadataFailures,
                                     versionComparator, ctx);
                             if (newerVersion != null) {
                                 Optional<Xml.Tag> version = tag.getChild("version");
@@ -298,10 +298,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         } else if (Boolean.TRUE.equals(overrideManagedVersion)) {
                             ResolvedManagedDependency dm = findManagedDependency(t);
                             // if a managed dependency is expressed as a property, change the property value
+                            // do this only when a requested bom is absent, otherwise changing property has no effect
                             if (dm != null &&
                                 dm.getRequested().getVersion() != null &&
                                 dm.getRequested().getVersion().startsWith("${") &&
-                                !implicitlyDefinedVersionProperties.contains(dm.getRequested().getVersion())) {
+                                !implicitlyDefinedVersionProperties.contains(dm.getRequested().getVersion()) &&
+                                dm.getRequestedBom() == null) {
                                 doAfterVisit(new ChangePropertyValue(dm.getRequested().getVersion().substring(2,
                                         dm.getRequested().getVersion().length() - 1),
                                         newerVersion, overrideManagedVersion, false).getVisitor());

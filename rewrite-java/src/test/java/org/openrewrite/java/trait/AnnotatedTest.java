@@ -62,4 +62,44 @@ class AnnotatedTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void checkOnArray() {
+        rewriteRun(
+          spec ->
+            spec.recipe(RewriteTest.toRecipe(() ->
+              annotated("@Example(other=\"World\")")
+                .asVisitor(a -> SearchResult.found(a.getTree()))
+            )),
+          java(
+            //language=java
+            """
+              import java.lang.annotation.ElementType; 
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              import java.lang.annotation.Target;
+              
+              @Target(ElementType.TYPE)
+              @Retention(RetentionPolicy.RUNTIME)
+              @interface Example {
+                  String[] other;
+              }
+              """
+          ),
+          java(
+            //language=java
+            """
+              @Example(other = {"Hello", "World"})
+              class Test {
+              }
+              """,
+            //language=java
+            """
+              /*~~>*/@Example(other = {"Hello", "World"})
+              class Test {
+              }
+              """
+          )
+        );
+    }
 }

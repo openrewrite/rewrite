@@ -23,7 +23,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
-@SuppressWarnings("GroovyUnusedAssignment")
+@SuppressWarnings({"GroovyUnusedAssignment", "GrUnnecessaryDefModifier", "GrMethodMayBeStatic"})
 class CompilationUnitTest implements RewriteTest {
 
     @SuppressWarnings("GrPackage")
@@ -99,10 +99,10 @@ class CompilationUnitTest implements RewriteTest {
           groovy(
             """
               def p = Paths.get("abc")
-
+              
               import java.io.File
               def f = new File(p.toFile(), "def")
-
+              
               import java.io.InputStream
               f.withInputStream { InputStream io ->
                 io.read()
@@ -119,6 +119,33 @@ class CompilationUnitTest implements RewriteTest {
             """
               import com.example.MyClass
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4704")
+    @Test
+    void addingToMaps() {
+        rewriteRun(
+          groovy(
+                """
+            class Pair {
+                String foo
+                String bar
+                Pair(String foo, String bar) {
+                    this.foo = foo
+                    this.bar = bar
+                }
+            }
+            class A {
+                def foo(List l) {
+                    l.add(new Pair("foo", "bar"))
+                    l.add(new Pair("foo", "bar"))
+                    l.add(new Pair("foo", "bar"))
+                    l.add(new Pair("foo", "bar"))
+                }
+            }
+            """
           )
         );
     }

@@ -25,6 +25,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
@@ -60,7 +61,7 @@ public class BlockStatementTemplateGenerator {
 
                     // for CoordinateBuilder.MethodDeclaration#replaceBody()
                     if (cursor.getValue() instanceof J.MethodDeclaration &&
-                        location.equals(Space.Location.BLOCK_PREFIX)) {
+                            location == Space.Location.BLOCK_PREFIX) {
                         J.MethodDeclaration method = cursor.getValue();
                         J.MethodDeclaration m = method.withBody(null).withLeadingAnnotations(emptyList()).withPrefix(Space.EMPTY);
                         before.insert(0, m.printTrimmed(cursor.getParentOrThrow()).trim() + '{');
@@ -308,7 +309,12 @@ public class BlockStatementTemplateGenerator {
             Optional<Expression> arg = annotation.getArguments().stream().filter(a -> a == prior).findFirst();
             if (arg.isPresent()) {
                 StringBuilder beforeBuffer = new StringBuilder();
-                beforeBuffer.append('@').append(((JavaType.Class) annotation.getType()).getFullyQualifiedName()).append('(');
+                String name = annotation.getType() instanceof JavaType.Class ?
+                        ((JavaType.Class) annotation.getType()).getFullyQualifiedName() :
+                        annotation.getType() instanceof JavaType.FullyQualified ?
+                                ((JavaType.FullyQualified) annotation.getType()).getFullyQualifiedName() :
+                                annotation.getSimpleName();
+                beforeBuffer.append('@').append(name).append('(');
                 before.insert(0, beforeBuffer);
                 after.append(')').append('\n');
 
@@ -409,7 +415,7 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.ForEachLoop.Control) {
             J.ForEachLoop.Control c = (J.ForEachLoop.Control) j;
             if (referToSameElement(prior, c.getVariable())) {
-                after.append(" = /*" + STOP_COMMENT + "/*").append(c.getIterable().printTrimmed(cursor));
+                after.append(" = /*" + STOP_COMMENT + "*/").append(c.getIterable().printTrimmed(cursor));
             } else if (referToSameElement(prior, c.getIterable())) {
                 before.insert(0, "Object __b" + cursor.getPathAsStream().count() + "__ =");
                 after.append(";");
@@ -463,16 +469,18 @@ public class BlockStatementTemplateGenerator {
             // If prior is a type parameter, wrap in __M__.anyT<prior>()
             // For anything else, ignore the invocation
             J.MethodInvocation m = (J.MethodInvocation) j;
+            J firstEnclosing = cursor.getParentOrThrow().firstEnclosing(J.class);
             if (m.getArguments().stream().anyMatch(arg -> referToSameElement(prior, arg))) {
                 before.insert(0, "__M__.any(");
-                if (cursor.getParentOrThrow().firstEnclosing(J.class) instanceof J.Block) {
+                if (firstEnclosing instanceof J.Block || firstEnclosing instanceof J.Case || 
+                    firstEnclosing instanceof J.If || firstEnclosing instanceof J.If.Else) {
                     after.append(");");
                 } else {
                     after.append(")");
                 }
             } else if (m.getTypeParameters() != null && m.getTypeParameters().stream().anyMatch(tp -> referToSameElement(prior, tp))) {
                 before.insert(0, "__M__.anyT<");
-                if (cursor.getParentOrThrow().firstEnclosing(J.class) instanceof J.Block) {
+                if (firstEnclosing instanceof J.Block || firstEnclosing instanceof J.Case) {
                     after.append(">();");
                 } else {
                     after.append(">()");
@@ -481,7 +489,7 @@ public class BlockStatementTemplateGenerator {
                 List<Comment> comments = new ArrayList<>(1);
                 comments.add(new TextComment(true, STOP_COMMENT, "", Markers.EMPTY));
                 after.append(".").append(m.withSelect(null).withComments(comments).printTrimmed(cursor.getParentOrThrow()));
-                if (cursor.getParentOrThrow().firstEnclosing(J.class) instanceof J.Block) {
+                if (firstEnclosing instanceof J.Block || firstEnclosing instanceof J.Case) {
                     after.append(";");
                 }
             }
@@ -560,6 +568,8 @@ public class BlockStatementTemplateGenerator {
             J.EnumValue ev = (J.EnumValue) j;
             before.insert(0, ev.getName());
         } else if (j instanceof J.EnumValueSet) {
+            after.append(";");
+        } else if (j instanceof J.Case) {
             after.append(";");
         }
         contextTemplate(next(cursor), j, before, after, insertionPoint, REPLACEMENT);
@@ -813,6 +823,20 @@ public class BlockStatementTemplateGenerator {
                     }
                 }
                 return mi;
+            }
+
+            @Override
+            public J visitVariableDeclarations(J.VariableDeclarations multiVariable, Integer integer) {
+                List<J.VariableDeclarations.NamedVariable> variables = multiVariable.getVariables();
+                for (J.VariableDeclarations.NamedVariable variable : variables) {
+                    J.VariableDeclarations.NamedVariable.Padding padding = variable.getPadding();
+                    if (padding.getInitializer() != null && stopCommentExists(padding.getInitializer().getBefore().getComments())) {
+                        // Split the variable declarations at the variable with the `STOP_COMMENT` & trim off initializer
+                        List<J.VariableDeclarations.NamedVariable> vars = variables.subList(0, variables.indexOf(variable) + 1);
+                        return multiVariable.withVariables(ListUtils.mapLast(vars, v -> v.withInitializer(null)));
+                    }
+                }
+                return super.visitVariableDeclarations(multiVariable, integer);
             }
         }
     }

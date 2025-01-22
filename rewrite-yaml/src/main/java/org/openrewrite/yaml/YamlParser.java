@@ -52,7 +52,7 @@ import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
 public class YamlParser implements org.openrewrite.Parser {
-    private static final Pattern VARIABLE_PATTERN = Pattern.compile(":\\s*(@[^\n\r@]+@)");
+    private static final Pattern VARIABLE_PATTERN = Pattern.compile(":\\s+(@[^\n\r@]+@)");
 
     @Override
     public Stream<SourceFile> parse(@Language("yml") String... sources) {
@@ -82,8 +82,9 @@ public class YamlParser implements org.openrewrite.Parser {
                         Yaml.Documents docs = (Yaml.Documents) sourceFile;
                         // ensure there is always at least one Document, even in an empty yaml file
                         if (docs.getDocuments().isEmpty()) {
-                            return docs.withDocuments(singletonList(new Yaml.Document(randomId(), "", Markers.EMPTY,
-                                    false, new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null), null)));
+                            Yaml.Document.End end = new Yaml.Document.End(randomId(), "", Markers.EMPTY, false);
+                            Yaml.Mapping mapping = new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null);
+                            return docs.withDocuments(singletonList(new Yaml.Document(randomId(), "", Markers.EMPTY, false, mapping, end)));
                         }
                         return docs;
                     }
@@ -157,7 +158,7 @@ public class YamlParser implements org.openrewrite.Parser {
                                 Markers.EMPTY,
                                 ((DocumentStartEvent) event).getExplicit(),
                                 new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null),
-                                null
+                                new Yaml.Document.End(randomId(), "", Markers.EMPTY, false)
                         );
                         lastEnd = event.getEndMark().getIndex();
                         break;
@@ -193,7 +194,6 @@ public class YamlParser implements org.openrewrite.Parser {
                     }
                     case Scalar: {
                         String fmt = newLine + reader.prefix(lastEnd, event);
-                        newLine = "";
 
                         ScalarEvent scalar = (ScalarEvent) event;
 
@@ -206,6 +206,9 @@ public class YamlParser implements org.openrewrite.Parser {
                         } else {
                             valueStart = lastEnd + fmt.length();
                         }
+                        valueStart = valueStart - newLine.length();
+                        newLine = "";
+
 
                         String scalarValue;
                         switch (scalar.getScalarStyle()) {

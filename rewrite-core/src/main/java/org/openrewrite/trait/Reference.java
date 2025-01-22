@@ -17,6 +17,7 @@ package org.openrewrite.trait;
 
 import org.openrewrite.*;
 
+import java.util.HashSet;
 import java.util.Set;
 
 @Incubating(since = "8.39.0")
@@ -24,23 +25,31 @@ public interface Reference extends Trait<Tree> {
 
     enum Kind {
         TYPE,
-        PACKAGE
+        PACKAGE,
+        IMAGE
     }
 
     Kind getKind();
 
     String getValue();
 
-    default boolean supportsRename() {
-        return false;
-    }
-
     default boolean matches(Matcher matcher) {
         return matcher.matchesReference(this);
     }
 
-    default TreeVisitor<Tree, ExecutionContext> rename(Renamer renamer, String replacement) {
-        return renamer.rename(replacement);
+    default boolean supportsRename() {
+        return false;
+    }
+
+    /**
+     * Applies the {@link org.openrewrite.trait.Reference.Renamer} to the provided cursor to compute a new reference value.
+     * Note that this method only provides the logic for computing a new {@link org.openrewrite.Tree} with a renamed value,
+     * specific to the reference type. Hence, the reference itself is not changed, nor are the reference cursor
+     * {@link org.openrewrite.trait.Reference#getCursor()} or value {@link org.openrewrite.trait.Reference#getValue()}
+     * used to compute the new value.
+     */
+    default Tree rename(Renamer renamer, Cursor cursor, ExecutionContext ctx) {
+        throw new UnsupportedOperationException();
     }
 
     interface Provider {
@@ -50,13 +59,34 @@ public interface Reference extends Trait<Tree> {
         boolean isAcceptable(SourceFile sourceFile);
     }
 
-    interface Matcher {
-        boolean matchesReference(Reference value);
+    abstract class AbstractProvider<U extends Reference> implements Provider {
+        protected abstract SimpleTraitMatcher<U> getMatcher();
+
+        @Override
+        public Set<Reference> getReferences(SourceFile sourceFile) {
+            Set<Reference> references = new HashSet<>();
+            getMatcher().asVisitor(reference -> {
+                references.add(reference);
+                return reference.getTree();
+            }).visit(sourceFile, 0);
+            return references;
+        }
     }
 
-    interface Renamer {
-        default TreeVisitor<Tree, ExecutionContext> rename(String replacement) {
+    interface Matcher {
+
+        boolean matchesReference(Reference value);
+
+        default Renamer createRenamer(String newName) {
             throw new UnsupportedOperationException();
         }
+    }
+
+    @FunctionalInterface
+    interface Renamer {
+        /**
+         * Compute a renamed value for a reference.
+         */
+        String rename(Reference reference);
     }
 }

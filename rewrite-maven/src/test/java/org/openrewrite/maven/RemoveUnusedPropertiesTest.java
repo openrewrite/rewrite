@@ -18,6 +18,7 @@ package org.openrewrite.maven;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -33,6 +34,7 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
         spec.recipe(new RemoveUnusedProperties(null));
     }
 
+    @DocumentExample
     @Test
     void removesWholePropertiesSection() {
         rewriteRun(

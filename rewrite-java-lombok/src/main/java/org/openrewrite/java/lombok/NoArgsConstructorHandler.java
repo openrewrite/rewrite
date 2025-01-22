@@ -38,7 +38,8 @@ public class NoArgsConstructorHandler  extends JavacAnnotationHandler<NoArgsCons
                 if (originalArg instanceof JCTree.JCAssign && ((JCTree.JCAssign) originalArg).getVariable() instanceof JCTree.JCIdent) {
                     JCTree.JCAssign assign = (JCTree.JCAssign) originalArg;
                     JCTree.JCIdent ident = (JCTree.JCIdent) assign.getVariable();
-                    if ("onConstructor".equals(ident.getName().toString())) {
+                    String name = ident.getName().toString();
+                    if (name.equals("onConstructor") || name.equals("onConstructor_")) {
                         continue;
                     }
                 }

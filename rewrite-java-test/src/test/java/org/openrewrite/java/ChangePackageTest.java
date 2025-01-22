@@ -30,7 +30,9 @@ import java.nio.file.Paths;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.properties.Assertions.properties;
 import static org.openrewrite.xml.Assertions.xml;
+import static org.openrewrite.yaml.Assertions.yaml;
 
 @SuppressWarnings("ConstantConditions")
 class ChangePackageTest implements RewriteTest {
@@ -479,11 +481,11 @@ class ChangePackageTest implements RewriteTest {
               }
               """,
             """
-            import org.openrewrite.test.other.Test;
-            class A {
-                Test test = null;
-            }
-            """,
+              import org.openrewrite.test.other.Test;
+              class A {
+                  Test test = null;
+              }
+              """,
             spec -> spec.afterRecipe(cu -> {
                 assertThat(cu.findType("org.openrewrite.other.Test")).isEmpty();
                 assertThat(cu.findType("org.openrewrite.test.other.Test")).isNotEmpty();
@@ -537,11 +539,11 @@ class ChangePackageTest implements RewriteTest {
               }
               """,
             """
-            import org.openrewrite.test.other.Test;
-            class A {
-                Test test = null;
-            }
-            """,
+              import org.openrewrite.test.other.Test;
+              class A {
+                  Test test = null;
+              }
+              """,
             spec -> spec.afterRecipe(cu -> {
                 assertThat(cu.findType("org.openrewrite.other.Test")).isEmpty();
                 assertThat(cu.findType("org.openrewrite.test.other.Test")).isNotEmpty();
@@ -595,11 +597,11 @@ class ChangePackageTest implements RewriteTest {
               }
               """,
             """
-            import org.openrewrite.test.other.Test;
-            class A {
-                Test test = null;
-            }
-            """,
+              import org.openrewrite.test.other.Test;
+              class A {
+                  Test test = null;
+              }
+              """,
             spec -> spec.afterRecipe(cu -> {
                 assertThat(cu.findType("org.openrewrite.other.Test")).isEmpty();
                 assertThat(cu.findType("org.openrewrite.test.other.Test")).isNotEmpty();
@@ -754,7 +756,7 @@ class ChangePackageTest implements RewriteTest {
     void annotationArgument() {
         rewriteRun(
           java(
-                """
+            """
               package org.openrewrite;
               public class Argument {}
               """,
@@ -806,7 +808,7 @@ class ChangePackageTest implements RewriteTest {
     void annotationArgumentNamed() {
         rewriteRun(
           java(
-                """
+            """
               package org.openrewrite;
               public class Argument {}
               """,
@@ -856,7 +858,7 @@ class ChangePackageTest implements RewriteTest {
     void annotationArgumentFullyQualified() {
         rewriteRun(
           java(
-                """
+            """
               package org.openrewrite;
               public class Argument {}
               """,
@@ -904,7 +906,7 @@ class ChangePackageTest implements RewriteTest {
     void annotationArgumentNamedFullyQualified() {
         rewriteRun(
           java(
-                """
+            """
               package org.openrewrite;
               public class Argument {}
               """,
@@ -1488,7 +1490,7 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               import static org.openrewrite.Test.stat;
-
+              
               public class B {
                   public void test() {
                       stat();
@@ -1497,7 +1499,7 @@ class ChangePackageTest implements RewriteTest {
               """,
             """
               import static org.openrewrite.test.Test.stat;
-
+              
               public class B {
                   public void test() {
                       stat();
@@ -1773,6 +1775,46 @@ class ChangePackageTest implements RewriteTest {
               """
           )
         );
+    }
 
+    @Test
+    void changeTypeInPropertiesFile() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("java.lang", "java.cool", true)),
+          properties(
+            """
+              a.property=java.lang.String
+              b.property=java.lang.test.String
+              c.property=String
+              """,
+            """
+              a.property=java.cool.String
+              b.property=java.cool.test.String
+              c.property=String
+              """,
+            spec -> spec.path("application.properties"))
+        );
+    }
+
+    @Test
+    void changePackageInYaml() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("java.lang", "java.cool", true)),
+          yaml(
+            """
+              root:
+                  a: java.lang.String
+                  b: java.lang.test.String
+                  c: String
+              """,
+            """
+              root:
+                  a: java.cool.String
+                  b: java.cool.test.String
+                  c: String
+              """,
+            spec -> spec.path("application.yaml")
+          )
+        );
     }
 }

@@ -55,6 +55,15 @@ public class AddBuildPlugin extends Recipe {
     @Nullable
     Boolean apply;
 
+    @Option(displayName = "Accept transitive",
+            description = "Some plugins apply other plugins. When this is set to true no plugin declaration will be added if the plugin is already applied transitively. " +
+                          "When this is set to false the plugin will be added explicitly even if it is already applied transitively. " +
+                          "Defaults to `true`.",
+            valid = {"true", "false"},
+            required = false)
+    @Nullable
+    Boolean acceptTransitive;
+
     @Override
     public String getDisplayName() {
         return "Add Gradle plugin";
@@ -78,7 +87,7 @@ public class AddBuildPlugin extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(
                 new FindGradleProject(FindGradleProject.SearchCriteria.Marker),
-                new AddPluginVisitor(pluginId, version, versionPattern, apply)
+                new AddPluginVisitor(pluginId, version, versionPattern, apply, acceptTransitive)
         );
     }
 }

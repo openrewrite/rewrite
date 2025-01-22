@@ -18,12 +18,14 @@ package org.openrewrite.java.isolated;
 import com.sun.tools.javac.comp.*;
 import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javac.main.JavaCompiler;
+import com.sun.tools.javac.main.Option;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.Log;
 import com.sun.tools.javac.util.Options;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
+import lombok.Getter;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.objectweb.asm.ClassReader;
@@ -43,20 +45,28 @@ import org.openrewrite.style.NamedStyles;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
+import org.slf4j.LoggerFactory;
 
+import javax.annotation.processing.Processor;
 import javax.tools.JavaFileManager;
 import javax.tools.JavaFileObject;
 import javax.tools.SimpleJavaFileObject;
 import javax.tools.StandardLocation;
 import java.io.*;
+import java.lang.reflect.Constructor;
 import java.net.URI;
+import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 
 /**
@@ -77,14 +87,16 @@ public class ReloadableJava11Parser implements JavaParser {
     private final JavaCompiler compiler;
     private final ResettableLog compilerLog;
     private final Collection<NamedStyles> styles;
+    private final List<Processor> annotationProcessors;
 
-    private ReloadableJava11Parser(boolean logCompilationWarningsAndErrors,
-                                   @Nullable Collection<Path> classpath,
-                                   Collection<byte[]> classBytesClasspath,
-                                   @Nullable Collection<Input> dependsOn,
-                                   Charset charset,
-                                   Collection<NamedStyles> styles,
-                                   JavaTypeCache typeCache) {
+    private ReloadableJava11Parser(
+            boolean logCompilationWarningsAndErrors,
+            @Nullable Collection<Path> classpath,
+            Collection<byte[]> classBytesClasspath,
+            @Nullable Collection<Input> dependsOn,
+            Charset charset,
+            Collection<NamedStyles> styles,
+            JavaTypeCache typeCache) {
         this.classpath = classpath;
         this.dependsOn = dependsOn;
         this.styles = styles;
@@ -105,6 +117,70 @@ public class ReloadableJava11Parser implements JavaParser {
         // https://docs.oracle.com/en/java/javacard/3.1/guide/setting-java-compiler-options.html
         Options.instance(context).put("-g", "-g");
         Options.instance(context).put("-proc", "none");
+
+        // Ensure type attribution continues despite errors in individual files or nodes.
+        // If an error occurs in a single file or node, type attribution should still proceed
+        // for all other source files and unaffected nodes within the same file.
+        Options.instance(context).put("should-stop.ifError", "GENERATE");
+
+        LOMBOK:
+        if (System.getenv().getOrDefault("REWRITE_LOMBOK", System.getProperty("rewrite.lombok")) != null &&
+                classpath != null && classpath.stream().anyMatch(it -> it.toString().contains("lombok"))) {
+            Processor lombokProcessor = null;
+            try {
+                // https://projectlombok.org/contributing/lombok-execution-path
+                List<String> overrideClasspath = new ArrayList<>();
+                for (Path part : classpath) {
+                    if (part.toString().contains("lombok")) {
+                        overrideClasspath.add(part.toString());
+                    }
+                }
+                // make sure the rewrite-java-lombok dependency comes first
+                boolean found = false;
+                for (int i = 0; i < overrideClasspath.size(); i++) {
+                    if (overrideClasspath.get(i).contains("rewrite-java-lombok")) {
+                        overrideClasspath.add(0, overrideClasspath.remove(i));
+                        found = true;
+                    }
+                }
+                if (!found) {
+                    // try to find `rewrite-java-lombok` using class loader
+                    URL resource = getClass().getClassLoader().getResource("org/openrewrite/java/lombok/OpenRewriteConfigurationKeysLoader.class");
+                    if (resource != null && resource.getProtocol().equals("jar") && resource.getPath().startsWith("file:")) {
+                        String path = Paths.get(URI.create(resource.getPath().substring(0, resource.getPath().indexOf("!")))).toString();
+                        overrideClasspath.add(0, path);
+                    } else {
+                        break LOMBOK;
+                    }
+                }
+                System.setProperty("shadow.override.lombok", String.join(File.pathSeparator, overrideClasspath));
+
+                Class<?> shadowLoaderClass = Class.forName("lombok.launch.ShadowClassLoader", true, getClass().getClassLoader());
+                Constructor<?> shadowLoaderConstructor = shadowLoaderClass.getDeclaredConstructor(
+                        Class.forName("java.lang.ClassLoader"),
+                        Class.forName("java.lang.String"),
+                        Class.forName("java.lang.String"),
+                        Class.forName("java.util.List"),
+                        Class.forName("java.util.List"));
+                shadowLoaderConstructor.setAccessible(true);
+
+                ClassLoader lombokShadowLoader = (ClassLoader) shadowLoaderConstructor.newInstance(
+                        getClass().getClassLoader(),
+                        "lombok",
+                        null,
+                        emptyList(),
+                        singletonList("lombok.patcher.Symbols")
+                );
+                lombokProcessor = (Processor) lombokShadowLoader.loadClass("lombok.core.AnnotationProcessor").getDeclaredConstructor().newInstance();
+                Options.instance(context).put(Option.PROCESSOR, "lombok.launch.AnnotationProcessorHider$AnnotationProcessor");
+            } catch (ReflectiveOperationException ignore) {
+                // Lombok was not found or could not be initialized
+            } finally {
+                annotationProcessors = lombokProcessor != null ? singletonList(lombokProcessor) : emptyList();
+            }
+        } else {
+            annotationProcessors = emptyList();
+        }
 
         // MUST be created ahead of compiler construction
         new TimedTodo(context);
@@ -127,7 +203,7 @@ public class ReloadableJava11Parser implements JavaParser {
                 if (logCompilationWarningsAndErrors) {
                     String log = new String(Arrays.copyOfRange(cbuf, off, len));
                     if (!log.isBlank()) {
-                        org.slf4j.LoggerFactory.getLogger(ReloadableJava11Parser.class).warn(log);
+                        LoggerFactory.getLogger(ReloadableJava11Parser.class).warn(log);
                     }
                 }
             }
@@ -191,37 +267,44 @@ public class ReloadableJava11Parser implements JavaParser {
         }
 
         LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = new LinkedHashMap<>();
-        acceptedInputs(sourceFiles).forEach(input1 -> {
-            try {
-                JCTree.JCCompilationUnit jcCompilationUnit = compiler.parse(new ReloadableJava11ParserInputFileObject(input1, ctx));
-                cus.put(input1, jcCompilationUnit);
-            } catch (IllegalStateException e) {
-                if ("endPosTable already set".equals(e.getMessage())) {
-                    throw new IllegalStateException(
-                            "Call reset() on JavaParser before parsing another set of source files that " +
-                            "have some of the same fully qualified names. Source file [" +
-                            input1.getPath() + "]\n[\n" + StringUtils.readFully(input1.getSource(ctx), getCharset(ctx)) + "\n]", e);
-                }
-                throw e;
-            }
-        });
-
+        List<ReloadableJava11ParserInputFileObject> inputFileObjects = acceptedInputs(sourceFiles)
+                .map(input -> new ReloadableJava11ParserInputFileObject(input, ctx))
+                .collect(Collectors.toList());
+        if (!annotationProcessors.isEmpty()) {
+            compiler.initProcessAnnotations(annotationProcessors, inputFileObjects, emptyList());
+        }
         try {
-            initModules(cus.values());
-            enterAll(cus.values());
-
-            // For some reason this is necessary in JDK 9+, where the internal block counter that
-            // annotationsBlocked() tests against remains >0 after attribution.
-            Annotate annotate = Annotate.instance(context);
-            while (annotate.annotationsBlocked()) {
-                annotate.unblockAnnotations(); // also flushes once unblocked
+            //noinspection unchecked
+            com.sun.tools.javac.util.List<JCTree.JCCompilationUnit> jcCompilationUnits = compiler.parseFiles((List<JavaFileObject>) (List<?>) inputFileObjects);
+            for (int i = 0; i < inputFileObjects.size(); i++) {
+                cus.put(inputFileObjects.get(i).getInput(), jcCompilationUnits.get(i));
             }
+            try {
+                initModules(cus.values());
+                enterAll(cus.values());
 
-            compiler.attribute(compiler.todo);
-        } catch (Throwable t) {
-            // when symbol entering fails on problems like missing types, attribution can often times proceed
-            // unhindered, but it sometimes cannot (so attribution is always a BEST EFFORT in the presence of errors)
-            ctx.getOnError().accept(new JavaParsingException("Failed symbol entering or attribution", t));
+                // For some reason this is necessary in JDK 9+, where the internal block counter that
+                // annotationsBlocked() tests against remains >0 after attribution.
+                Annotate annotate = Annotate.instance(context);
+                while (annotate.annotationsBlocked()) {
+                    annotate.unblockAnnotations(); // also flushes once unblocked
+                }
+                if (!annotationProcessors.isEmpty()) {
+                    compiler.processAnnotations(jcCompilationUnits, emptyList());
+                }
+                compiler.attribute(compiler.todo);
+            } catch (Throwable t) {
+                // when symbol entering fails on problems like missing types, attribution can often times proceed
+                // unhindered, but it sometimes cannot (so attribution is always best-effort in the presence of errors)
+                ctx.getOnError().accept(new JavaParsingException("Failed symbol entering or attribution", t));
+            }
+        } catch (IllegalStateException e) {
+            if ("endPosTable already set".equals(e.getMessage())) {
+                throw new IllegalStateException(
+                        "Call reset() on JavaParser before parsing another set of source files that " +
+                                "have some of the same fully qualified names.", e);
+            }
+            throw e;
         }
         return cus;
     }
@@ -361,8 +444,7 @@ public class ReloadableJava11Parser implements JavaParser {
         public Iterable<JavaFileObject> list(Location location, String packageName, Set<JavaFileObject.Kind> kinds, boolean recurse) throws IOException {
             if (StandardLocation.CLASS_PATH.equals(location)) {
                 Iterable<JavaFileObject> listed = super.list(location, packageName, kinds, recurse);
-                return Stream.concat(
-                        classByteClasspath.stream()
+                return Stream.concat(classByteClasspath.stream()
                                 .filter(jfo -> jfo.getPackage().equals(packageName)),
                         StreamSupport.stream(listed.spliterator(), false)
                 ).collect(toList());
@@ -373,6 +455,7 @@ public class ReloadableJava11Parser implements JavaParser {
 
     private static class PackageAwareJavaFileObject extends SimpleJavaFileObject {
         private final String pkg;
+        @Getter
         private final String className;
         private final byte[] classBytes;
 
@@ -404,10 +487,6 @@ public class ReloadableJava11Parser implements JavaParser {
 
         public String getPackage() {
             return pkg;
-        }
-
-        public String getClassName() {
-            return className;
         }
 
         @Override

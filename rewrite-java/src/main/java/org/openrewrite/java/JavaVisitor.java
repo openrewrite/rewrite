@@ -423,7 +423,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         } else {
             c = (J.Case) temp;
         }
-        c = c.getPadding().withExpressions(visitContainer(c.getPadding().getExpressions(), JContainer.Location.CASE_EXPRESSION, p));
+        c = c.getPadding().withCaseLabels(visitContainer(c.getPadding().getCaseLabels(), JContainer.Location.CASE_LABEL, p));
+        c = c.withGuard(visitAndCast(c.getGuard(), p));
         c = c.getPadding().withBody(visitRightPadded(c.getPadding().getBody(), JRightPadded.Location.CASE_BODY, p));
         c = c.getPadding().withStatements(visitContainer(c.getPadding().getStatements(), JContainer.Location.CASE, p));
         return c;
@@ -1406,7 +1407,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     public <J2 extends J> @Nullable JContainer<J2> visitContainer(@Nullable JContainer<J2> container,
-                                                        JContainer.Location loc, P p) {
+                                                                  JContainer.Location loc, P p) {
         if (container == null) {
             //noinspection ConstantConditions
             return null;
@@ -1421,6 +1422,13 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return js == container.getPadding().getElements() && before == container.getBefore() ?
                 container :
                 JContainer.build(before, js, container.getMarkers());
+    }
+
+    public J visitErroneous(J.Erroneous erroneous, P p) {
+        J.Erroneous u = erroneous;
+        u = u.withPrefix(visitSpace(u.getPrefix(), Space.Location.ERRONEOUS, p));
+        u = u.withMarkers(visitMarkers(u.getMarkers(), p));
+        return u;
     }
 
     /**
@@ -1456,7 +1464,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             Object childScope = it.next();
             if (childScope instanceof J.ClassDeclaration) {
                 J.ClassDeclaration childClass = (J.ClassDeclaration) childScope;
-                if (!(childClass.getKind().equals(J.ClassDeclaration.Kind.Type.Class)) ||
+                if (childClass.getKind() != J.ClassDeclaration.Kind.Type.Class ||
                     childClass.hasModifier(J.Modifier.Type.Static)) {
                     //Short circuit the search if a terminating element is encountered.
                     return false;
