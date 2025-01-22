@@ -34,6 +34,7 @@ import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -92,8 +93,15 @@ public class RemoteArchive implements Remote {
         try {
             Path localArchive = cache.compute(uri, () -> {
                 //noinspection resource
+                if ("file".equals(uri.getScheme())) {
+                    return Files.newInputStream(Paths.get(uri));
+                }
                 HttpSender.Response response = httpSender.send(httpSender.get(uri.toString()).build());
-                return response.getBody();
+                if (response.isSuccessful()) {
+                    return response.getBody();
+                } else {
+                    throw new IllegalStateException("Failed to download " + uri + " to artifact cache got an " + response.getCode());
+                }
             }, ctx.getOnError());
 
             if (localArchive == null) {

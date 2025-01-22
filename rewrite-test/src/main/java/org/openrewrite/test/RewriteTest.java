@@ -23,16 +23,15 @@ import org.openrewrite.*;
 import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.OptionDescriptor;
-import org.openrewrite.internal.InMemoryDiffEntry;
-import org.openrewrite.internal.RecipeIntrospectionUtils;
-import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.WhitespaceValidationService;
+import org.openrewrite.internal.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
 import org.openrewrite.tree.ParseError;
+import org.openrewrite.tree.ParsingExecutionContextView;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -216,9 +215,9 @@ public interface RewriteTest extends SourceSpecs {
         }
         List<Validated<Object>> validations = new ArrayList<>();
         recipe.validateAll(ctx, validations);
-        assertThat(validations)
+        assertThat(validations.stream().filter(Validated::isInvalid))
                 .as("Recipe validation must have no failures")
-                .noneMatch(Validated::isInvalid);
+                .isEmpty();
 
         Map<Parser.Builder, List<SourceSpec<?>>> sourceSpecsByParser = new HashMap<>();
         List<Parser.Builder> methodSpecParsers = testMethodSpec.parsers;
@@ -368,6 +367,9 @@ public interface RewriteTest extends SourceSpecs {
             lss = new LargeSourceSetCheckingExpectedCycles(expectedCyclesThatMakeChanges, runnableSourceFiles);
         }
 
+        recipeCtx = CursorValidatingExecutionContextView.view(recipeCtx)
+                .setValidateCursorAcyclic(TypeValidation.before(testMethodSpec, testClassSpec).cursorAcyclic())
+                .setValidateImmutableExecutionContext(TypeValidation.before(testMethodSpec, testClassSpec).immutableExecutionContext());
         RecipeRun recipeRun = recipe.run(
                 lss,
                 recipeCtx,
@@ -628,7 +630,14 @@ public interface RewriteTest extends SourceSpecs {
     }
 
     default ExecutionContext defaultExecutionContext(SourceSpec<?>[] sourceSpecs) {
-        return new InMemoryExecutionContext(t -> fail("Failed to parse sources or run recipe", t));
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext(t -> {
+            if (t instanceof RecipeRunException){
+                fail("Failed to run recipe at " + ((RecipeRunException) t).getCursor(), t);
+            }
+            fail("Failed to parse sources or run recipe", t);
+        });
+        ParsingExecutionContextView.view(ctx).setCharset(StandardCharsets.UTF_8);
+        return ctx;
     }
 
     @Override

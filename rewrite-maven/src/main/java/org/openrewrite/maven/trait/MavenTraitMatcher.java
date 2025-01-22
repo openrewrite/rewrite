@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven.trait;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.maven.MavenVisitor;
@@ -27,7 +28,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public abstract class MavenTraitMatcher<U extends Trait<?>> extends SimpleTraitMatcher<U> {
 
-    protected MavenResolutionResult getResolutionResult(Cursor cursor) {
+    protected @Nullable MavenResolutionResult getResolutionResult(Cursor cursor) {
         AtomicReference<MavenResolutionResult> mrr = new AtomicReference<>();
         new MavenVisitor<Integer>() {
             @Override

@@ -23,6 +23,7 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 import org.openrewrite.text.PlainText;
 
 import java.nio.file.Path;
@@ -76,6 +77,103 @@ class RewriteTestTest implements RewriteTest {
           () -> rewriteRun(
             spec -> spec.recipe(new CreatesTwoFilesSamePath()),
             text(null, "duplicate", spec -> spec.path("duplicate.txt"))));
+    }
+
+    @Test
+    void cursorValidation() {
+        assertThrows(AssertionError.class, () ->
+          rewriteRun(
+            spec -> spec.recipe(new ImproperCursorUsage()),
+            text("")
+          )
+        );
+
+        rewriteRun(
+          spec -> spec.recipe(new ImproperCursorUsage()).typeValidationOptions(TypeValidation.builder()
+            .cursorAcyclic(false)
+            .build()),
+          text("")
+        );
+    }
+
+
+    @Test
+    void rejectRecipeValidationFailure() {
+        assertThrows(AssertionError.class, () ->
+          rewriteRun(
+            spec -> spec.recipeFromYaml("""
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.RefersToNonExistentRecipe
+              displayName: Refers to non-existent recipe
+              description: Deliberately has a non-existent recipe in its recipe list to trigger a validation failure.
+              recipeList:
+                - org.openrewrite.DoesNotExist
+              
+              """, "org.openrewrite.RefersToNonExistentRecipe")
+          ));
+    }
+
+    @Test
+    void rejectExecutionContextMutation() {
+        assertThrows(AssertionError.class, () ->
+          rewriteRun(
+            spec -> spec.recipe(new MutateExecutionContext()),
+            text("irrelevant")
+          ));
+    }
+}
+
+@Value
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+class MutateExecutionContext extends Recipe {
+
+    @Override
+    public String getDisplayName() {
+        return "Mutate execution context";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Mutates the execution context to trigger a validation failure.";
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new TreeVisitor<>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                ctx.putMessage("mutated", true);
+                return tree;
+            }
+        };
+    }
+}
+
+@Value
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+class ImproperCursorUsage extends Recipe {
+
+    @Override
+    public String getDisplayName() {
+        return "Uses cursor improperly";
+    }
+
+    @Override
+    public String getDescription() {
+        return "LST elements are acyclic. So a cursor which indicates an element is its own parent is invalid.";
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        //noinspection NullableProblems
+        return new TreeVisitor<>() {
+            @Override
+            public @Nullable Tree visit(Tree tree, ExecutionContext ctx) {
+                return new TreeVisitor<>(){}.visit(tree, ctx, new Cursor(getCursor(), tree));
+            }
+        };
     }
 }
 

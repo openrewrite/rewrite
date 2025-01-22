@@ -113,6 +113,33 @@ class JsonPathMatcherTest {
     }
 
     @Test
+    void complex() {
+        assertMatched(
+          "..spec.containers[:1].resources.limits.cpu",
+          List.of(
+            //language=yaml
+            """
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                labels:
+                  app: application
+              spec:
+                template:
+                  spec:
+                    containers:
+                      - image: nginx:latest
+                        name: nginx
+                        resources:
+                          limits:
+                            cpu: "64Mi"
+            """
+          ),
+          List.of("cpu: \"64Mi\"")
+        );
+    }
+
+    @Test
     void doesNotMatchMissingProperty() {
         assertNotMatched(
           "$.none",
@@ -457,6 +484,36 @@ class JsonPathMatcherTest {
     }
 
     @Test
+    void documentLevelSequenceWildcard() {
+        assertMatched(
+          "$[*].id",
+          List.of(
+            """
+              - id: 0
+              - id: 1
+              - id: 2
+              """
+          ),
+          List.of("id: 0", "id: 1", "id: 2")
+        );
+    }
+
+    @Test
+    void documentLevelSequenceSingle() {
+        assertMatched(
+          "$[1].id",
+          List.of(
+            """
+              - id: 0
+              - id: 1
+              - id: 2
+              """
+          ),
+          List.of("id: 1")
+        );
+    }
+
+    @Test
     void bracketOperatorByNames() {
         assertMatched(
           "$.root['literal', 'object']",
@@ -777,8 +834,8 @@ class JsonPathMatcherTest {
         var results = visit(before, jsonPath, printMatches);
         assertThat(results).hasSize(after.size());
         for (int i = 0; i < results.size(); i++) {
-            assertThat(StringUtils.trimIndent(results.get(i)).replaceAll("\s+", "  "))
-              .isEqualTo(StringUtils.trimIndent(after.get(i)).replaceAll("\s+", "  "));
+            assertThat(StringUtils.trimIndent(results.get(i)).replaceAll("\\s+", "  "))
+              .isEqualTo(StringUtils.trimIndent(after.get(i)).replaceAll("\\s+", "  "));
         }
     }
 

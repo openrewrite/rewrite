@@ -51,7 +51,7 @@ public class ReloadableJava17ParserInputFileObject implements JavaFileObject {
     }
 
     @Override
-    public URI toUri() {
+    public @Nullable URI toUri() {
         if (path == null) {
             //noinspection ConstantConditions
             return null;
@@ -60,7 +60,7 @@ public class ReloadableJava17ParserInputFileObject implements JavaFileObject {
     }
 
     @Override
-    public String getName() {
+    public @Nullable String getName() {
         if (path == null) {
             //noinspection ConstantConditions
             return null;
@@ -111,7 +111,7 @@ public class ReloadableJava17ParserInputFileObject implements JavaFileObject {
     @Override
     public boolean isNameCompatible(String simpleName, Kind kind) {
         String baseName = simpleName + kind.extension;
-        return kind.equals(getKind()) &&
+        return kind == getKind() &&
                 path.getFileName().toString().equals(baseName);
     }
 

@@ -34,6 +34,7 @@ import org.openrewrite.semver.Semver;
 
 import java.util.*;
 
+import static java.util.Collections.*;
 import static java.util.Objects.requireNonNull;
 
 @Value
@@ -115,8 +116,6 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     @Nullable
     Boolean acceptTransitive;
 
-    static final String DEPENDENCY_PRESENT = "org.openrewrite.gradle.AddDependency.DEPENDENCY_PRESENT";
-
     @Override
     public String getDisplayName() {
         return "Add Gradle dependency";
@@ -155,7 +154,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     public TreeVisitor<?, ExecutionContext> getScanner(Scanned acc) {
         return new TreeVisitor<Tree, ExecutionContext>() {
 
-            UsesType<ExecutionContext> usesType;
+            @Nullable
+            UsesType<ExecutionContext> usesType = null;
             private boolean usesType(SourceFile sourceFile, ExecutionContext ctx) {
                 if(onlyIfUsing == null) {
                     return true;
@@ -168,15 +168,18 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                SourceFile sourceFile = (SourceFile) requireNonNull(tree);
-                sourceFile.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject ->
-                        sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet -> {
-                            if (usesType(sourceFile, ctx)) {
-                                acc.usingType = true;
-                                Set<String> configurations = acc.configurationsByProject.computeIfAbsent(javaProject, ignored -> new HashSet<>());
-                                configurations.add("main".equals(sourceSet.getName()) ? "implementation" : sourceSet.getName() + "Implementation");
-                            }
-                        }));
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
+                SourceFile sourceFile = (SourceFile) tree;
+                sourceFile.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject -> {
+                    if (usesType(sourceFile, ctx)) {
+                        acc.usingType = true;
+                    }
+                    Set<String> configurations = acc.configurationsByProject.computeIfAbsent(javaProject, ignored -> new HashSet<>());
+                    sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet ->
+                            configurations.add("main".equals(sourceSet.getName()) ? "implementation" : sourceSet.getName() + "Implementation"));
+                });
                 return tree;
             }
         };
@@ -184,7 +187,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Scanned acc) {
-        return Preconditions.check(acc.usingType && !acc.configurationsByProject.isEmpty(),
+        return Preconditions.check((onlyIfUsing == null || acc.usingType) && !acc.configurationsByProject.isEmpty(),
                 Preconditions.check(new IsBuildGradle<>(), new GroovyIsoVisitor<ExecutionContext>() {
 
                     @Override
@@ -214,7 +217,12 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
                         GradleProject gp = maybeGp.get();
 
-                        Set<String> resolvedConfigurations = StringUtils.isBlank(configuration) ? acc.configurationsByProject.get(jp) : new HashSet<>(Collections.singletonList(configuration));
+                        Set<String> resolvedConfigurations = StringUtils.isBlank(configuration) ?
+                                acc.configurationsByProject.getOrDefault(jp, new HashSet<>()) :
+                                new HashSet<>(singletonList(configuration));
+                        if (resolvedConfigurations.isEmpty()) {
+                            resolvedConfigurations.add("implementation");
+                        }
                         Set<String> tmpConfigurations = new HashSet<>(resolvedConfigurations);
                         for (String tmpConfiguration : tmpConfigurations) {
                             GradleDependencyConfiguration gdc = gp.getConfiguration(tmpConfiguration);
@@ -225,7 +233,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
                         tmpConfigurations = new HashSet<>(resolvedConfigurations);
                         for (String tmpConfiguration : tmpConfigurations) {
-                            GradleDependencyConfiguration gdc = gp.getConfiguration(tmpConfiguration);
+                            GradleDependencyConfiguration gdc = requireNonNull((gp.getConfiguration(tmpConfiguration)));
                             for (GradleDependencyConfiguration transitive : gp.configurationsExtendingFrom(gdc, true)) {
                                 if (resolvedConfigurations.contains(transitive.getName()) ||
                                         (Boolean.TRUE.equals(acceptTransitive) && transitive.findResolvedDependency(groupId, artifactId) != null)) {
@@ -248,7 +256,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     }
 
                     private boolean isTopLevel(Cursor cursor) {
-                        return cursor.getParent().firstEnclosing(J.MethodInvocation.class) == null;
+                        return cursor.getParentOrThrow().firstEnclosing(J.MethodInvocation.class) == null;
                     }
                 })
         );

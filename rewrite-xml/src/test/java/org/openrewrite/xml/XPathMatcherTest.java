@@ -118,7 +118,13 @@ class XPathMatcherTest {
         assertThat(match("/dependencies/dependency", xmlDoc)).isTrue();
         assertThat(match("/dependencies/*/artifactId", xmlDoc)).isTrue();
         assertThat(match("/dependencies/*", xmlDoc)).isTrue();
+        assertThat(match("/dependencies//dependency", xmlDoc)).isTrue();
+        assertThat(match("/dependencies//dependency//groupId", xmlDoc)).isTrue();
+
+        // negative matches
         assertThat(match("/dependencies/dne", xmlDoc)).isFalse();
+        assertThat(match("/dependencies//dne", xmlDoc)).isFalse();
+        assertThat(match("/dependencies//dependency//dne", xmlDoc)).isFalse();
     }
 
     @Test
@@ -127,6 +133,17 @@ class XPathMatcherTest {
         assertThat(match("/dependencies/dependency/artifactId/@scope", xmlDoc)).isTrue();
         assertThat(match("/dependencies/dependency/artifactId/@*", xmlDoc)).isTrue();
         assertThat(match("/dependencies/dependency/groupId/@*", xmlDoc)).isFalse();
+        assertThat(match("/dependencies//dependency//@scope", xmlDoc)).isTrue();
+        assertThat(match("/dependencies//dependency//artifactId//@scope", xmlDoc)).isTrue();
+        assertThat(match("/dependencies//dependency//@*", xmlDoc)).isTrue();
+        assertThat(match("/dependencies//dependency//artifactId//@*", xmlDoc)).isTrue();
+
+        // negative matches
+        assertThat(match("/dependencies/dependency/artifactId/@dne", xmlDoc)).isFalse();
+        assertThat(match("/dependencies/dependency/artifactId/@dne", xmlDoc)).isFalse();
+        assertThat(match("/dependencies//dependency//@dne", xmlDoc)).isFalse();
+        assertThat(match("/dependencies//dependency//artifactId//@dne", xmlDoc)).isFalse();
+
     }
 
     @Test
@@ -136,8 +153,6 @@ class XPathMatcherTest {
         assertThat(match("//dependency", xmlDoc)).isTrue();
         assertThat(match("dependency/*", xmlDoc)).isTrue();
         assertThat(match("dne", xmlDoc)).isFalse();
-        assertThat(match("/dependencies//dependency", xmlDoc)).isTrue();
-        assertThat(match("/dependencies//dependency/groupId", xmlDoc)).isTrue();
     }
 
     @Test
@@ -145,6 +160,51 @@ class XPathMatcherTest {
         assertThat(match("dependency/artifactId/@scope", xmlDoc)).isTrue();
         assertThat(match("dependency/artifactId/@*", xmlDoc)).isTrue();
         assertThat(match("//dependency/artifactId/@scope", xmlDoc)).isTrue();
+    }
+
+    @Test
+    void matchNestedElementsWithSameName() {
+        var xml = new XmlParser().parse(
+          """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <root>
+                <element foo="bar">
+                    <element foo="bar">
+                        <test>auie</test>
+                    </element>
+                    <element qux="quux" />
+                </element>
+            </root>
+            """
+        ).toList().get(0);
+
+        // no / at start
+        assertThat(match("element/test", xml)).isTrue();
+        assertThat(match("element[@foo='bar']/test", xml)).isTrue();
+        assertThat(match("element[@foo='baz']/test", xml)).isFalse();
+        assertThat(match("element/@qux", xml)).isTrue();
+        assertThat(match("dne[@foo='bar']/test", xml)).isFalse();
+
+        // // at start
+        assertThat(match("//element/test", xml)).isTrue();
+        assertThat(match("//element[@foo='bar']/test", xml)).isTrue();
+        assertThat(match("//element[@foo='baz']/test", xml)).isFalse();
+        assertThat(match("//element/@qux", xml)).isTrue();
+        assertThat(match("//dne[@foo='bar']/test", xml)).isFalse();
+
+        // TODO // in the middle without / (or with //) at start (not currently supported)
+//        assertThat(match("root//element/test", xml)).isTrue();
+//        assertThat(match("root//element[@foo='bar']/test", xml)).isTrue();
+//        assertThat(match("root//element[@foo='baz']/test", xml)).isFalse();
+//        assertThat(match("root//element/@qux", xml)).isTrue();
+//        assertThat(match("root//dne[@foo='bar']/test", xml)).isFalse();
+
+        // // in the middle with / at start
+        assertThat(match("/root//element/test", xml)).isTrue();
+        assertThat(match("/root//element[@foo='bar']/test", xml)).isTrue();
+        assertThat(match("/root//element[@foo='baz']/test", xml)).isFalse();
+        assertThat(match("/root//element/@qux", xml)).isTrue();
+        assertThat(match("/root//dne[@foo='bar']/test", xml)).isFalse();
     }
 
     @Test
@@ -163,8 +223,10 @@ class XPathMatcherTest {
           pomXml1)).isTrue();
         assertThat(match("/project/build//plugins/plugin/configuration/source",
           pomXml2)).isTrue();
-//        assertThat(match("/project/build//plugin/configuration/source", pomXml2)).isTrue(); // TODO: seems parser only handles // up to 1 level
-//        assertThat(match("/project//configuration/source", pomXml2)).isTrue(); // TODO: was already failing previously
+        // skip 2+ levels with //
+        assertThat(match("/project/build//plugin/configuration/source", pomXml2)).isTrue();
+        assertThat(match("/project//configuration/source", pomXml2)).isTrue();
+        assertThat(match("/project//plugin//source", pomXml2)).isTrue();
     }
 
     private final SourceFile attributeXml = new XmlParser().parse(
@@ -203,7 +265,7 @@ class XPathMatcherTest {
         // relative xpath with wildcard element
         assertThat(match("//*[@foo='bar']", attributeXml)).isTrue();
         assertThat(match("//*[@foo='baz']", attributeXml)).isFalse();
-//        assertThat(match("//*[foo='bar']", attributeXml)).isFalse(); // TODO: fix relative xpath with condition
+        assertThat(match("//*[foo='bar']", attributeXml)).isFalse();
         assertThat(match("//*[foo='baz']", attributeXml)).isTrue();
     }
 
@@ -220,7 +282,7 @@ class XPathMatcherTest {
             </root>
             """
         ).toList().get(0);
-//        assertThat(match("//element1[foo='bar']", xml)).isFalse(); // TODO: fix - was already failing before * changes
+        assertThat(match("//element1[foo='bar']", xml)).isFalse();
         assertThat(match("//element1[foo='baz']", xml)).isTrue();
         assertThat(match("//element1[@foo='bar']", xml)).isTrue();
         assertThat(match("//element1[foo='baz']/test", xml)).isTrue();
@@ -275,8 +337,7 @@ class XPathMatcherTest {
         assertThat(match("//ns2:element2[local-name()='element2']", namespacedXml)).isTrue();
         assertThat(match("//dne[local-name()='dne']", namespacedXml)).isFalse();
 
-        // TODO: fix mid-path // with condition
-//        assertThat(match("/root//element1[local-name()='element1']", namespacedXml)).isTrue();
+        assertThat(match("/root//element1[local-name()='element1']", namespacedXml)).isTrue();
     }
 
     @Test
@@ -300,9 +361,8 @@ class XPathMatcherTest {
         assertThat(match("//element1[@*='dne']", namespacedXml)).isFalse();
         assertThat(match("/root/element1[@*='content3']", namespacedXml)).isTrue();
         assertThat(match("/root/element1[@*='dne']", namespacedXml)).isFalse();
-        // TODO: fix mid-path // match with condition
-//        assertThat(match("/root//element1[@*='content3']", namespacedXml)).isTrue();
-//        assertThat(match("/root//element1[@*='dne']", namespacedXml)).isFalse();
+        assertThat(match("/root//element1[@*='content3']", namespacedXml)).isTrue();
+        assertThat(match("/root//element1[@*='dne']", namespacedXml)).isFalse();
     }
 
     @Test
@@ -327,9 +387,8 @@ class XPathMatcherTest {
         assertThat(match("/root/parent/element3/@ns3:attr[namespace-uri()='http://www.example.com/namespace3']", namespacedXml)).isTrue();
         assertThat(match("//element3/@ns3:attr[namespace-uri()='http://www.example.com/namespace3']", namespacedXml)).isTrue();
 
-        // TODO: fix mid-path // match with attribute element
-//        assertThat(match("/root//element1/@*", namespacedXml)).isTrue();
-//        assertThat(match("/root//element1/@*[namespace-uri()='http://www.example.com/namespace3']", namespacedXml)).isTrue();
+        assertThat(match("/root//element1/@*", namespacedXml)).isTrue();
+        assertThat(match("/root//element1/@*[namespace-uri()='http://www.example.com/namespace3']", namespacedXml)).isTrue();
     }
 
     @Test

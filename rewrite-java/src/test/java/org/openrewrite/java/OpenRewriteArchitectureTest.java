@@ -61,13 +61,13 @@ public class OpenRewriteArchitectureTest {
                     events.add(SimpleConditionEvent.violated(javaPackage, message));
                 }
             }
-        }.and(new ArchCondition<>("be annotated with @NonNullApi") {
+        }.and(new ArchCondition<>("be annotated with @NullMarked") {
             @Override
             public void check(JavaPackage javaPackage, ConditionEvents events) {
                 javaPackage.tryGetPackageInfo()
                         .filter(packageInfo -> !packageInfo.isAnnotatedWith(NullMarked.class))
                         .ifPresent(packageInfo -> events.add(SimpleConditionEvent.violated(javaPackage,
-                                String.format("Package '%s' is not annotated as @NonNullApi", javaPackage.getName()))));
+                                String.format("Package '%s' is not annotated as @NullMarked", javaPackage.getName()))));
             }
         });
     }

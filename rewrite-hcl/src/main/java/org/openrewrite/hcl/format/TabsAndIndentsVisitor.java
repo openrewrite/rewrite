@@ -103,7 +103,7 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
         IndentType indentType = getCursor().getParentOrThrow().getNearestMessage("indentType", IndentType.ALIGN);
 
         // block spaces are always aligned to their parent
-        boolean alignBlockToParent = loc.equals(Space.Location.BLOCK_CLOSE) || loc.equals(Space.Location.OBJECT_VALUE_ATTRIBUTE_SUFFIX);
+        boolean alignBlockToParent = loc == Space.Location.BLOCK_CLOSE || loc == Space.Location.OBJECT_VALUE_ATTRIBUTE_SUFFIX;
 
         if (alignBlockToParent) {
             indentType = IndentType.ALIGN;
@@ -125,7 +125,7 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
     }
 
     @Override
-    public <T> HclRightPadded<T> visitRightPadded(@Nullable HclRightPadded<T> right, HclRightPadded.Location loc, P p) {
+    public <T> @Nullable HclRightPadded<T> visitRightPadded(@Nullable HclRightPadded<T> right, HclRightPadded.Location loc, P p) {
         if (right == null) {
             //noinspection ConstantConditions
             return null;
@@ -266,7 +266,7 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
             space = space.withComments(ListUtils.map(space.getComments(), c -> {
                 // The suffix of the last element in the comment list sets the whitespace for the end of the block.
                 // The column for comments that come before the last element are incremented.
-                int incrementBy = spaceLocation.equals(Space.Location.BLOCK_CLOSE) && !c.equals(lastElement) ? style.getIndentSize() : 0;
+                int incrementBy = spaceLocation == Space.Location.BLOCK_CLOSE && !c.equals(lastElement) ? style.getIndentSize() : 0;
                 return c.getStyle() == Comment.Style.INLINE ?
                         indentMultilineComment(c, column + incrementBy) :
                         indentSingleLineComment(c, column + incrementBy);
@@ -274,8 +274,8 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
 
             // Prevent formatting trailing comments, the whitespace in a trailing comment won't have a new line character.
             // Compilation unit prefixes are an exception, since they do not exist in a block.
-            if (space.getWhitespace().contains("\n") || spaceLocation.equals(Space.Location.CONFIG_FILE)) {
-                int incrementBy = spaceLocation.equals(Space.Location.BLOCK_CLOSE) ? style.getIndentSize() : 0;
+            if (space.getWhitespace().contains("\n") || spaceLocation == Space.Location.CONFIG_FILE) {
+                int incrementBy = spaceLocation == Space.Location.BLOCK_CLOSE ? style.getIndentSize() : 0;
                 int indent = getLengthOfWhitespace(space.getWhitespace());
                 if (indent != (column + incrementBy)) {
                     int shift = column + incrementBy - indent;

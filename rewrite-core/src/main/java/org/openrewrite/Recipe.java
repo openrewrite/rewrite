@@ -211,10 +211,11 @@ public abstract class Recipe implements Cloneable {
 
     protected RecipeDescriptor createRecipeDescriptor() {
         List<OptionDescriptor> options = getOptionDescriptors();
-        List<RecipeDescriptor> recipeList1 = new ArrayList<>();
+        ArrayList<RecipeDescriptor> recipeList1 = new ArrayList<>();
         for (Recipe next : getRecipeList()) {
             recipeList1.add(next.getDescriptor());
         }
+        recipeList1.trimToSize();
         URI recipeSource;
         try {
             recipeSource = getClass().getProtectionDomain().getCodeSource().getLocation().toURI();
@@ -233,7 +234,7 @@ public abstract class Recipe implements Cloneable {
             recipe = ((DelegatingRecipe) this).getDelegate();
         }
 
-        List<OptionDescriptor> options = new ArrayList<>();
+        ArrayList<OptionDescriptor> options = new ArrayList<>();
 
         for (Field field : recipe.getClass().getDeclaredFields()) {
             Object value;
@@ -255,6 +256,7 @@ public abstract class Recipe implements Cloneable {
                         value));
             }
         }
+        options.trimToSize();
         return options;
     }
 

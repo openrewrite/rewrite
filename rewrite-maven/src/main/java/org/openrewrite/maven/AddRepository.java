@@ -170,7 +170,7 @@ public class AddRepository extends Recipe {
                                 repositories = (Xml.Tag) new AddToTagVisitor<>(repo, Xml.Tag.build(assembleReleases()))
                                         .visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
                             } else {
-                                repositories = (Xml.Tag) new RemoveContentVisitor<>(releases, true)
+                                repositories = (Xml.Tag) new RemoveContentVisitor<>(releases, true, true)
                                         .visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
                                 if (!isNoSnapshots()) {
                                     repositories = (Xml.Tag) new AddToTagVisitor<>(repo, Xml.Tag.build(assembleReleases()))
@@ -184,7 +184,7 @@ public class AddRepository extends Recipe {
                             if (snapshots == null) {
                                 repositories = (Xml.Tag) new AddToTagVisitor<>(repo, Xml.Tag.build(assembleSnapshots())).visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
                             } else {
-                                repositories = (Xml.Tag) new RemoveContentVisitor<>(snapshots, true).visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
+                                repositories = (Xml.Tag) new RemoveContentVisitor<>(snapshots, true, true).visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
                                 if (!isNoSnapshots()) {
                                     repositories = (Xml.Tag) new AddToTagVisitor<>(repo, Xml.Tag.build(assembleSnapshots())).visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
                                 }

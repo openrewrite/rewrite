@@ -18,6 +18,7 @@ package org.openrewrite.maven.trait;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.trait.Trait;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
@@ -29,6 +30,7 @@ public class MavenPlugin implements Trait<Xml.Tag> {
     static final XPathMatcher PLUGIN_MATCHER = new XPathMatcher("//plugins/plugin");
 
     Cursor cursor;
+
     String groupId;
 
     @Nullable
@@ -59,10 +61,11 @@ public class MavenPlugin implements Trait<Xml.Tag> {
 
         private Optional<String> getProperty(Cursor cursor, String property) {
             Xml.Tag tag = cursor.getValue();
-            if (getResolutionResult(cursor).getPom().getProperties() != null) {
+            MavenResolutionResult resolutionResult = getResolutionResult(cursor);
+            if (resolutionResult != null && resolutionResult.getPom().getProperties() != null) {
                 if (tag.getChildValue(property).isPresent() && tag.getChildValue(property).get().trim().startsWith("${")) {
                     String propertyKey = tag.getChildValue(property).get().trim();
-                    return Optional.ofNullable(getResolutionResult(cursor).getPom().getValue(propertyKey));
+                    return Optional.ofNullable(resolutionResult.getPom().getValue(propertyKey));
                 }
             }
             return tag.getChildValue(property);

@@ -15,14 +15,12 @@
  */
 package org.openrewrite.java.trait;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
-import java.util.List;
-
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.java.trait.Traits.literal;
@@ -40,7 +38,7 @@ class LiteralTest implements RewriteTest {
                   // coerce various numeric literal types to an Integer
                   // if we like
                   return SearchResult.found(lit.getTree(),
-                    lit.getValue(Integer.class).toString());
+                    requireNonNull(lit.getValue(Integer.class)).toString());
               })
             )
           ),
@@ -68,8 +66,7 @@ class LiteralTest implements RewriteTest {
               literal().asVisitor(lit -> {
                   assertThat(lit.isNotNull()).isTrue();
                   return SearchResult.found(lit.getTree(),
-                    String.join(",", lit.getValue(new TypeReference<List<String>>() {
-                    })));
+                    String.join(",", lit.getStrings()));
               })
             )
           ),

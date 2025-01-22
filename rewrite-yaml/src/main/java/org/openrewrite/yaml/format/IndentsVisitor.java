@@ -19,14 +19,22 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.yaml.MultilineScalarChanged;
 import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.style.IndentsStyle;
 import org.openrewrite.yaml.tree.Yaml;
 
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
+
+    private static final Pattern LINE_BREAK = Pattern.compile("\\R");
+    private static final Pattern COMMENT_PATTERN = Pattern.compile("^(\\s*)(.*\\R?)", Pattern.MULTILINE);
+
     private final IndentsStyle style;
 
     @Nullable
@@ -44,7 +52,7 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
             Yaml y = c.getValue();
             String prefix = y.getPrefix();
 
-            if (prefix.contains("\n")) {
+            if (StringUtils.hasLineBreak(prefix)) {
                 int indent = findIndent(prefix);
                 if (indent != 0) {
                     c.putMessage("lastIndent", indent);
@@ -66,7 +74,7 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
 
         Yaml y = tree;
         int indent = getCursor().getNearestMessage("lastIndent", 0);
-        if (y.getPrefix().contains("\n") && !isUnindentedTopLevel()) {
+        if (StringUtils.hasLineBreak(y.getPrefix()) && !isUnindentedTopLevel()) {
             if (y instanceof Yaml.Sequence.Entry) {
                 indent = getCursor().getParentOrThrow().getMessage("sequenceEntryIndent", indent);
 
@@ -92,13 +100,27 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
             } else {
                 y = y.withPrefix(indentComments(y.getPrefix(), indent));
             }
+        } else if (y instanceof Yaml.Scalar && y.getMarkers().findFirst(MultilineScalarChanged.class).isPresent()) {
+            int indentValue = indent;
+            if (!y.getMarkers().findFirst(MultilineScalarChanged.class).get().isAdded() && indent != 0) {
+                indentValue += style.getIndentSize();
+            }
+            indentValue += y.getMarkers().findFirst(MultilineScalarChanged.class).get().getIndent();
+
+            String[] lines = LINE_BREAK.split(((Yaml.Scalar) y).getValue());
+            String newValue = lines[0] +
+                    ("\n" + StringUtils.trimIndent(String.join("\n", Arrays.copyOfRange(lines, 1, lines.length))))
+                            .replaceAll("\\R", "\n" + StringUtils.repeat(" ", indentValue));
+
+            y = ((Yaml.Scalar) y).withValue(newValue);
         }
+
         return y;
     }
 
     private boolean isUnindentedTopLevel() {
         return getCursor().getParentOrThrow().getValue() instanceof Yaml.Document ||
-                getCursor().getParentOrThrow(2).getValue() instanceof Yaml.Document;
+               getCursor().getParentOrThrow(2).getValue() instanceof Yaml.Document;
     }
 
     @Override
@@ -118,30 +140,46 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
     }
 
     private String indentTo(String prefix, int column) {
-        if (!prefix.contains("\n")) {
-            return prefix;
+        if (StringUtils.hasLineBreak(prefix)) {
+            int indent = findIndent(prefix);
+            if (indent != column) {
+                int shift = column - indent;
+                prefix = indent(prefix, shift);
+            }
         }
-
-        int indent = findIndent(prefix);
-        prefix = indentComments(prefix, indent);
-        if (indent != column) {
-            int shift = column - indent;
-            prefix = indent(prefix, shift);
-        }
-
-        return prefix;
+        return indentComments(prefix, column);
     }
 
-    private String indentComments(String prefix, int indent) {
+    private String indentComments(String prefix, int column) {
         // If the prefix contains a newline followed by a comment ensure the comment begins at the indentation column
         if (prefix.contains("#")) {
-            String reindentedComments = prefix.replaceAll("\n\\s*#", "\n" + StringUtils.repeat(" ", indent) + "#");
-            // If a document begins with a comment it might not have a newline before it
-            if (getCursor().getValue() instanceof Yaml.Document) {
-                reindentedComments = prefix.replaceFirst("^\\s*#", "#");
+            Matcher m = COMMENT_PATTERN.matcher(prefix);
+            StringBuilder result = new StringBuilder();
+            String indent = StringUtils.repeat(" ", column);
+            boolean firstLine = true;
+            while (m.find()) {
+                String whitespace = m.group(1);
+                String comment = m.group(2);
+                int newlineCount = StringUtils.countOccurrences(whitespace, "\n");
+                if (firstLine && newlineCount == 0) {
+                    if (getCursor().getValue() instanceof Yaml.Documents || getCursor().getValue() instanceof Yaml.Document) {
+                        // Comments on a top-level
+                        result.append(indent);
+                    } else {
+                        // Comments can be on the end of a line and should not necessarily be moved to their own line
+                        result.append(whitespace);
+                    }
+
+                    result.append(comment);
+                } else {
+                    result.append(StringUtils.repeat("\n", newlineCount))
+                            .append(indent)
+                            .append(comment);
+                }
+                firstLine = false;
             }
-            if (!reindentedComments.equals(prefix)) {
-                prefix = reindentedComments;
+            if (!prefix.contentEquals(result)) {
+                prefix = result.toString();
             }
         }
         return prefix;

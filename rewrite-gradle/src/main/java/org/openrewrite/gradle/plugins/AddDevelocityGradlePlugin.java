@@ -92,7 +92,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
     @Nullable
     Boolean uploadInBackground;
 
-    @Option(displayName = "Publish Criteria",
+    @Option(displayName = "Publish criteria",
             description = "When set to `Always` the plugin will publish build scans of every single build. " +
                           "When set to `Failure` the plugin will only publish build scans when the build fails. " +
                           "When omitted scans will be published only when the `--scan` option is passed to the build.",
@@ -210,7 +210,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
     }
 
     private G.CompilationUnit withPlugin(G.CompilationUnit cu, String pluginId, String newVersion, VersionComparator versionComparator, ExecutionContext ctx) {
-        cu = (G.CompilationUnit) new AddPluginVisitor(pluginId, newVersion, null, null)
+        cu = (G.CompilationUnit) new AddPluginVisitor(pluginId, newVersion, null, null, false)
                 .visitNonNull(cu, ctx);
         cu = (G.CompilationUnit) new UpgradePluginVersion(pluginId, newVersion, null).getVisitor()
                 .visitNonNull(cu, ctx);

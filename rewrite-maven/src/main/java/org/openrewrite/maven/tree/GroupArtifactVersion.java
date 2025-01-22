@@ -41,7 +41,7 @@ public class GroupArtifactVersion implements Serializable {
     }
 
     public GroupArtifact asGroupArtifact() {
-        return new GroupArtifact(groupId, artifactId);
+        return new GroupArtifact(groupId == null ? "" : groupId, artifactId);
     }
 
     public GroupArtifactVersion withGroupArtifact(GroupArtifact ga) {

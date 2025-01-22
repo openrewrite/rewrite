@@ -86,7 +86,7 @@ public class ChangeDependencyClassifier extends Recipe {
                     Optional<Xml.Tag> classifier = tag.getChild("classifier");
                     if (classifier.isPresent()) {
                         if (newClassifier == null) {
-                            doAfterVisit(new RemoveContentVisitor<>(classifier.get(), false));
+                            doAfterVisit(new RemoveContentVisitor<>(classifier.get(), false, true));
                         } else if (!newClassifier.equals(classifier.get().getValue().orElse(null))) {
                             doAfterVisit(new ChangeTagValueVisitor<>(classifier.get(), newClassifier));
                         }

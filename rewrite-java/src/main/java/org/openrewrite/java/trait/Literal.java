@@ -28,15 +28,17 @@ import org.openrewrite.trait.SimpleTraitMatcher;
 import org.openrewrite.trait.Trait;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 
 /**
  * A literal in Java is either a {@link J.Literal} or a {@link J.NewArray}
- * that has a non-null initializer that, itself, contains literals or new 
- * arrays that recursively contain these constraints. In other languages 
+ * that has a non-null initializer that, itself, contains literals or new
+ * arrays that recursively contain these constraints. In other languages
  * this trait is inclusive of constructs like list or map literals.
  */
 @RequiredArgsConstructor
@@ -47,31 +49,62 @@ public class Literal implements Trait<Expression> {
     private final ObjectMapper mapper;
 
     public boolean isNull() {
-        return getTree() instanceof J.Literal && ((J.Literal) getTree()).getValue() == null;
+        if (getTree() instanceof J.Literal) {
+            return ((J.Literal) getTree()).getValue() == null;
+        } else if(getTree() instanceof J.NewArray) {
+            J.NewArray newArray = (J.NewArray) getTree();
+            return newArray.getInitializer() == null;
+        }
+        return true;
     }
 
     public boolean isNotNull() {
         return !isNull();
     }
 
-    public String getString() {
+    /**
+     * @return true if the value represented by this literal is an array.
+     */
+    public boolean isArray() {
+        return getTree() instanceof J.NewArray;
+    }
+
+    /**
+     *
+     * @return the value of this expression as String if possible, or null if it is an array literal or otherwise unavailable.
+     */
+    public @Nullable String getString() {
+        if (getTree() instanceof J.NewArray) {
+            return null;
+        }
         return getValue(String.class);
     }
 
-    public <@Nullable T> T getValue(Class<T> type) {
+    /**
+     * @return the value of this expression as a list of strings. Works for both single string literals and array literals.
+     */
+    public List<String> getStrings() {
+        if(getTree() instanceof J.Literal) {
+            String stringValue = getString();
+            return stringValue == null ? emptyList() : singletonList(stringValue);
+        }
+        List<String> result = getValue(new TypeReference<List<String>>() {});
+        return result == null ? Collections.emptyList() : result;
+    }
+
+    public <T> @Nullable T getValue(Class<T> type) {
         return getValue(mapper.constructType(type));
     }
 
-    public <@Nullable T> T getValue(TypeReference<T> type) {
+    public <T> @Nullable T getValue(TypeReference<T> type) {
         return getValue(mapper.constructType(type));
     }
 
-    public <@Nullable T> T getValue(JavaType type) {
+    public <T> @Nullable T getValue(JavaType type) {
         Expression lit = getTree();
         if (lit instanceof J.Literal) {
             J.Literal literal = (J.Literal) lit;
             if (literal.getValue() == null) {
-                //noinspection DataFlowIssue
                 return null;
             } else if (type.isCollectionLikeType()) {
                 List<?> l = singletonList(literal.getValue());
@@ -83,7 +116,6 @@ public class Literal implements Trait<Expression> {
             List<Object> untyped = untypedInitializerLiterals((J.NewArray) lit);
             return mapper.convertValue(untyped, type);
         }
-        //noinspection DataFlowIssue
         return null;
     }
 
@@ -91,6 +123,7 @@ public class Literal implements Trait<Expression> {
         List<Object> acc = new ArrayList<>();
         for (Expression init : requireNonNull(newArray.getInitializer())) {
             if (init instanceof J.Literal) {
+                //noinspection DataFlowIssue
                 acc.add(((J.Literal) init).getValue());
             } else {
                 acc.add(untypedInitializerLiterals((J.NewArray) init));
@@ -109,6 +142,7 @@ public class Literal implements Trait<Expression> {
          *               but possibly when you want a custom type factory.
          * @return This matcher with a customized mapper set.
          */
+        @SuppressWarnings("unused")
         public Matcher mapper(ObjectMapper mapper) {
             this.mapper = mapper;
             return this;

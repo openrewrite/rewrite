@@ -107,6 +107,23 @@ class VariableNameUtilsTest implements RewriteTest {
     }
 
     @Test
+    void enumFieldNames() {
+        rewriteRun(
+          baseTest("myType", "myType,TYPES"),
+          java(
+            """
+              class Test {
+                  TYPES myType;
+              }
+              enum TYPES {
+               VALUE, NUMBER, TEXT
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void allClassFieldsAreFound() {
         rewriteRun(
           baseTest("methodBlock", "methodBlock,classBlockA,classBlockB"),

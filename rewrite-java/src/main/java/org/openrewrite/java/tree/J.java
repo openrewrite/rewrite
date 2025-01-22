@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
+import org.jetbrains.annotations.ApiStatus;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -134,7 +135,7 @@ public interface J extends Tree {
         }
 
         /**
-         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(J)} instead.
+         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(Cursor)} instead.
          */
         @Deprecated
         public List<Annotation> getAllAnnotations() {
@@ -218,7 +219,7 @@ public interface J extends Tree {
         }
 
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             return annotationType.getType();
         }
 
@@ -1027,14 +1028,36 @@ public interface J extends Tree {
             return withExpressions(ListUtils.mapFirst(getExpressions(), first -> pattern));
         }
 
-        JContainer<Expression> expressions;
-
+        /**
+         * @deprecated As of Java 21 this is referred to as case labels and can be broader than just Expressions.
+         * Use {@link #getCaseLabels} and {@link #withCaseLabels(List)} instead.
+         */
+        @Deprecated
         public List<Expression> getExpressions() {
-            return expressions.getElements();
+            return caseLabels.getElements().stream().filter(Expression.class::isInstance).map(Expression.class::cast).collect(toList());
         }
 
+        /**
+         * @deprecated As of Java 21 this is referred to as case labels and can be broader than just Expressions.
+         * Use {@link #getCaseLabels} and {@link #withCaseLabels(List)} instead.
+         */
         public Case withExpressions(List<Expression> expressions) {
-            return getPadding().withExpressions(requireNonNull(JContainer.withElementsNullable(this.expressions, expressions)));
+            if (caseLabels.getElements().stream().allMatch(Expression.class::isInstance)) {
+                //noinspection unchecked
+                return getPadding().withCaseLabels(requireNonNull(JContainer.withElementsNullable(this.caseLabels, (List<J>) (List<?>) expressions)));
+            } else {
+                throw new IllegalStateException("caseLabels contains an entry that is not an Expression, use withCaseLabels instead.");
+            }
+        }
+
+        JContainer<J> caseLabels;
+
+        public List<J> getCaseLabels() {
+            return caseLabels.getElements();
+        }
+
+        public Case withCaseLabels(List<J> caseLabels) {
+            return getPadding().withCaseLabels(requireNonNull(JContainer.withElementsNullable(this.caseLabels, caseLabels)));
         }
 
         /**
@@ -1067,19 +1090,35 @@ public interface J extends Tree {
             return getPadding().withBody(JRightPadded.withElement(this.body, body));
         }
 
+        @Nullable
+        @Getter
+        @With
+        Expression guard;
+
         @JsonCreator
-        public Case(UUID id, Space prefix, Markers markers, Type type, @Deprecated @Nullable Expression pattern, JContainer<Expression> expressions, JContainer<Statement> statements, @Nullable JRightPadded<J> body) {
+        public Case(UUID id, Space prefix, Markers markers, Type type, @Deprecated @Nullable Expression pattern, @Nullable JContainer<Expression> expressions, @Nullable JContainer<J> caseLabels, @Nullable Expression guard, JContainer<Statement> statements, @Nullable JRightPadded<J> body) {
             this.id = id;
             this.prefix = prefix;
             this.markers = markers;
             this.type = type;
             if (pattern != null) {
-                this.expressions = requireNonNull(JContainer.withElementsNullable(null, singletonList(pattern)));
+                this.caseLabels = requireNonNull(JContainer.withElementsNullable(null, singletonList(pattern)));
+            } else if (expressions != null) {
+                this.caseLabels = JContainer.build(expressions.getBefore(), expressions.getElements().stream().map(J.class::cast).map(JRightPadded::build).collect(toList()), expressions.getMarkers());
+            } else if (caseLabels != null) {
+                this.caseLabels = caseLabels;
             } else {
-                this.expressions = expressions;
+                this.caseLabels = JContainer.empty();
             }
+            this.guard = guard;
             this.statements = statements;
             this.body = body;
+        }
+
+        @Deprecated
+        @ApiStatus.ScheduledForRemoval(inVersion = "2025-05-01")
+        public Case(UUID id, Space prefix, Markers markers, Type type, JContainer<Expression> expressions, JContainer<Statement> statements, @Nullable JRightPadded<J> body) {
+            this(id, prefix, markers, type, null, expressions, null, null, statements, body);
         }
 
         @Override
@@ -1127,7 +1166,7 @@ public interface J extends Tree {
             }
 
             public Case withBody(@Nullable JRightPadded<J> body) {
-                return t.body == body ? t : new Case(t.id, t.prefix, t.markers, t.type, null, t.expressions, t.statements, body);
+                return t.body == body ? t : new Case(t.id, t.prefix, t.markers, t.type, null, null, t.caseLabels, t.guard, t.statements, body);
             }
 
             public JContainer<Statement> getStatements() {
@@ -1135,15 +1174,38 @@ public interface J extends Tree {
             }
 
             public Case withStatements(JContainer<Statement> statements) {
-                return t.statements == statements ? t : new Case(t.id, t.prefix, t.markers, t.type, null, t.expressions, statements, t.body);
+                return t.statements == statements ? t : new Case(t.id, t.prefix, t.markers, t.type, null, null, t.caseLabels, t.guard, statements, t.body);
             }
 
+            /**
+             * @deprecated As of Java 21 this is referred to as case labels and can be broader than just Expressions.
+             * Use {@link #getCaseLabels} and {@link #withCaseLabels(JContainer)} instead.
+             */
+            @Deprecated
             public JContainer<Expression> getExpressions() {
-                return t.expressions;
+                return JContainer.build(t.caseLabels.getBefore(), t.caseLabels.getElements().stream().filter(Expression.class::isInstance).map(Expression.class::cast).map(JRightPadded::build).collect(toList()), t.caseLabels.getMarkers());
             }
 
+            /**
+             * @deprecated As of Java 21 this is referred to as case labels and can be broader than just Expressions.
+             * Use {@link #getCaseLabels} and {@link #withCaseLabels(JContainer)} instead.
+             */
+            @Deprecated
             public Case withExpressions(JContainer<Expression> expressions) {
-                return t.expressions == expressions ? t : new Case(t.id, t.prefix, t.markers, t.type, null, expressions, t.statements, t.body);
+                if (t.getExpressions() == expressions) {
+                    return t;
+                } else if (t.caseLabels.getElements().stream().allMatch(Expression.class::isInstance)) {
+                    return new Case(t.id, t.prefix, t.markers, t.type, null, expressions, null, t.guard, t.statements, t.body);
+                }
+                throw new IllegalStateException("caseLabels contains an entry that is not an Expression, use withCaseLabels instead.");
+            }
+
+            public JContainer<J> getCaseLabels() {
+                return t.caseLabels;
+            }
+
+            public Case withCaseLabels(JContainer<J> caseLabels) {
+                return t.caseLabels == caseLabels ? t : new Case(t.id, t.prefix, t.markers, t.type, null, null, caseLabels, t.guard, t.statements, t.body);
             }
         }
     }
@@ -1222,6 +1284,12 @@ public interface J extends Tree {
         @Nullable
         JLeftPadded<TypeTree> extendings;
 
+        /**
+         * This is used to access the parent class.
+         *
+         * @return The parent class of the ClassDeclaration. If the ClassDeclaration is a class, this will return the
+         * class specified by the 'extends' keyword. If the ClassDeclaration is an interface, this will return null.
+         */
         public @Nullable TypeTree getExtends() {
             return extendings == null ? null : extendings.getElement();
         }
@@ -1233,6 +1301,13 @@ public interface J extends Tree {
         @Nullable
         JContainer<TypeTree> implementings;
 
+        /**
+         * This is used to access the parent interfaces.
+         *
+         * @return A list of the parent interfaces of the ClassDeclaration. If the ClassDeclaration is a class, this
+         * will return the interfaces specified by the 'implements' keyword. If the ClassDeclaration is an interface,
+         * this will return the interfaces specified by the 'extends' keyword.
+         */
         public @Nullable List<TypeTree> getImplements() {
             return implementings == null ? null : implementings.getElements();
         }
@@ -1279,7 +1354,7 @@ public interface J extends Tree {
         }
 
         /**
-         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(J)} instead.
+         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(Cursor)} instead.
          */
         @Deprecated
         // gather annotations from everywhere they may occur
@@ -1760,7 +1835,7 @@ public interface J extends Tree {
         Markers markers;
 
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             return null;
         }
 
@@ -1966,21 +2041,30 @@ public interface J extends Tree {
         }
 
         public boolean isFullyQualifiedClassReference(String className) {
-            return isFullyQualifiedClassReference(this, className);
-        }
-
-        private boolean isFullyQualifiedClassReference(J.FieldAccess fieldAccess, String className) {
-            if (!className.contains(".")) {
+            if (getName().getFieldType() == null && getName().getType() instanceof JavaType.FullyQualified &&
+                !(getName().getType() instanceof JavaType.Unknown) &&
+                TypeUtils.fullyQualifiedNamesAreEqual(((JavaType.FullyQualified) getName().getType()).getFullyQualifiedName(), className)) {
+                return true;
+            } else if (!className.contains(".")) {
                 return false;
             }
-            if (!fieldAccess.getName().getSimpleName().equals(className.substring(className.lastIndexOf('.') + 1))) {
+            return isFullyQualifiedClassReference(this, TypeUtils.toFullyQualifiedName(className), className.length());
+        }
+
+        private boolean isFullyQualifiedClassReference(J.FieldAccess fieldAccess, String className, int prevDotIndex) {
+            int dotIndex = className.lastIndexOf('.', prevDotIndex - 1);
+            if (dotIndex < 0) {
+                return false;
+            }
+            String simpleName = fieldAccess.getName().getSimpleName();
+            if (!simpleName.regionMatches(0, className, dotIndex + 1, Math.max(simpleName.length(), prevDotIndex - dotIndex - 1))) {
                 return false;
             }
             if (fieldAccess.getTarget() instanceof J.FieldAccess) {
-                return isFullyQualifiedClassReference((J.FieldAccess) fieldAccess.getTarget(), className.substring(0, className.lastIndexOf('.')));
+                return isFullyQualifiedClassReference((J.FieldAccess) fieldAccess.getTarget(), className, dotIndex);
             }
             if (fieldAccess.getTarget() instanceof Identifier) {
-                return ((Identifier) fieldAccess.getTarget()).getSimpleName().equals(className.substring(0, className.lastIndexOf('.')));
+                return ((Identifier) fieldAccess.getTarget()).getSimpleName().equals(className.substring(0, dotIndex));
             }
             return false;
         }
@@ -3674,7 +3758,7 @@ public interface J extends Tree {
         }
 
         /**
-         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(J)} instead.
+         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(Cursor)} instead.
          */
         @Deprecated
         // gather annotations from everywhere they may occur
@@ -4015,6 +4099,11 @@ public interface J extends Tree {
         @Getter
         List<Annotation> annotations;
 
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitModifier(this, p);
+        }
+
         /**
          * @deprecated Use {@link #Modifier(UUID, Space, Markers, String, Type, List)} instead.
          */
@@ -4035,7 +4124,7 @@ public interface J extends Tree {
 
         /**
          * These types are sorted in order of their recommended appearance in a list of modifiers, as defined in the
-         * <a href="https://rules.sonarsource.com/java/tag/convention/RSPEC-S1124">JLS</a>.
+         * <a href="https://rules.sonarsource.com/java/tag/convention/RSPEC-1124">JLS</a>.
          */
         public enum Type {
             Default,
@@ -4830,7 +4919,7 @@ public interface J extends Tree {
         }
 
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             J2 element = tree.getElement();
             if (element instanceof Expression) {
                 return ((Expression) element).getType();
@@ -5015,6 +5104,7 @@ public interface J extends Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
+    @RequiredArgsConstructor
     final class SwitchExpression implements J, Expression, TypedTree {
         @With
         @EqualsAndHashCode.Include
@@ -5032,26 +5122,24 @@ public interface J extends Tree {
         @With
         Block cases;
 
-        @Override
-        @Transient
-        public @Nullable JavaType getType() {
-            return new JavaVisitor<AtomicReference<JavaType>>() {
+        @With
+        @Nullable
+        @Getter
+        JavaType type;
+
+        @Deprecated
+        @ApiStatus.ScheduledForRemoval(inVersion = "2025-05-01")
+        public SwitchExpression(UUID id, Space prefix, Markers markers, ControlParentheses<Expression> selector, Block cases) {
+            this(id, prefix, markers, selector, cases, new JavaVisitor<AtomicReference<@Nullable JavaType>>() {
                 @Override
-                public J visitBlock(Block block, AtomicReference<JavaType> javaType) {
+                public J visitBlock(Block block, AtomicReference<@Nullable JavaType> javaType) {
                     if (!block.getStatements().isEmpty()) {
                         Case caze = (Case) block.getStatements().get(0);
-                        javaType.set(caze.getExpressions().get(0).getType());
+                        javaType.set(caze.getExpressions().isEmpty() ? null : caze.getExpressions().get(0).getType());
                     }
                     return block;
                 }
-            }.reduce(this, new AtomicReference<>()).get();
-        }
-
-        @Override
-        public <T extends J> T withType(@Nullable JavaType type) {
-            // a switch expression's type is driven by its case statements
-            //noinspection unchecked
-            return (T) this;
+            }.reduce(cases, new AtomicReference<>()).get());
         }
 
         @Override
@@ -5792,7 +5880,7 @@ public interface J extends Tree {
         }
 
         /**
-         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(J)} instead.
+         * @deprecated Use {@link org.openrewrite.java.service.AnnotationService#getAllAnnotations(Cursor)} instead.
          */
         @Deprecated
         // gather annotations from everywhere they may occur
@@ -6096,7 +6184,7 @@ public interface J extends Tree {
         NameTree boundedType;
 
         @Override
-        public JavaType getType() {
+        public @Nullable JavaType getType() {
             return null;
         }
 
@@ -6239,6 +6327,54 @@ public interface J extends Tree {
             public <P> J acceptJava(JavaVisitor<P> v, P p) {
                 return v.visitUnknownSource(this, p);
             }
+        }
+    }
+
+    /**
+     * A node that represents an erroneous element.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    @With
+    final class Erroneous implements Statement, Expression {
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
+        String text;
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitErroneous(this, p);
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return JavaType.Unknown.getInstance();
+        }
+
+        @Override
+        public <T extends J> T withType(@Nullable JavaType type) {
+            return (T) this;
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
         }
     }
 }

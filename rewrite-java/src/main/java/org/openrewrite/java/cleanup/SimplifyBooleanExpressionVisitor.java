@@ -143,6 +143,21 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                             .withTruePart(asTernary.getFalsePart())
                             .withFalsePart(asTernary.getTruePart());
                 }
+            } else if (asTernary.getCondition() instanceof J.Literal) {
+                if (isLiteralTrue(asTernary.getCondition())) {
+                    j = asTernary.getTruePart();
+                } else if (isLiteralFalse(asTernary.getCondition())) {
+                    j = asTernary.getFalsePart();
+                }
+            } else if (asTernary.getCondition() instanceof J.Parentheses) {
+                J.Parentheses<Expression> parenthesized = (J.Parentheses<Expression>) asTernary.getCondition();
+                if (parenthesized.getTree() instanceof J.Literal) {
+                    if (isLiteralTrue(parenthesized.getTree())) {
+                        j = asTernary.getTruePart();
+                    } else if (isLiteralFalse(parenthesized.getTree())) {
+                        j = asTernary.getFalsePart();
+                    }
+                }
             }
         }
         return j;
@@ -225,6 +240,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
     }
 
     private final MethodMatcher isEmpty = new MethodMatcher("java.lang.String isEmpty()");
+    private final MethodMatcher equals = new MethodMatcher("java.lang.String equals(java.lang.Object)");
 
     @Override
     public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
@@ -235,6 +251,13 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
             select instanceof J.Literal &&
             select.getType() == JavaType.Primitive.String) {
             return booleanLiteral(method, J.Literal.isLiteralValue(select, ""));
+        } else if (equals.matches(asMethod)) {
+            Expression arg = asMethod.getArguments().get(0);
+            if (arg instanceof J.Literal && select instanceof J.Literal) {
+                return booleanLiteral(method, ((J.Literal) select).getValue().equals(((J.Literal) arg).getValue()));
+            } else if (SemanticallyEqual.areEqual(select, arg)) {
+                return booleanLiteral(method, true);
+            }
         }
         return j;
     }
