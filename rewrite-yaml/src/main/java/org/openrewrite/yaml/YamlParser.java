@@ -209,6 +209,25 @@ public class YamlParser implements org.openrewrite.Parser {
                         valueStart = valueStart - newLine.length();
                         newLine = "";
 
+                        Yaml.Tag tag = null;
+                        if (scalar.getTag() != null) {
+                            String potentialScalarValue = reader.readStringFromBuffer(valueStart, event.getEndMark().getIndex() - 1);
+                            assert(potentialScalarValue.contains("!"));
+                            final int tagStartIndex = potentialScalarValue.indexOf('!');
+                            String tagPrefix = potentialScalarValue.substring(0, tagStartIndex);
+                            int indexOfTagName = tagStartIndex;
+                            while (indexOfTagName < potentialScalarValue.length() && !Character.isWhitespace(potentialScalarValue.charAt(indexOfTagName))) {
+                                indexOfTagName++;
+                            }
+                            String tagName = potentialScalarValue.substring(tagStartIndex, indexOfTagName);
+                            int indexOfSpaceAfterTag = indexOfTagName;
+                            while (indexOfSpaceAfterTag < potentialScalarValue.length() && Character.isWhitespace(potentialScalarValue.charAt(indexOfSpaceAfterTag))) {
+                                indexOfSpaceAfterTag++;
+                            }
+                            String tagSuffix = potentialScalarValue.substring(indexOfTagName, indexOfSpaceAfterTag);
+                            valueStart = valueStart + indexOfSpaceAfterTag;
+                            tag = new Yaml.Tag(randomId(), tagPrefix, tagSuffix, Markers.EMPTY, tagName);
+                        }
 
                         String scalarValue;
                         switch (scalar.getScalarStyle()) {
@@ -252,12 +271,9 @@ public class YamlParser implements org.openrewrite.Parser {
                             case PLAIN:
                             default:
                                 style = Yaml.Scalar.Style.PLAIN;
-                                if (!scalarValue.startsWith("@") && event.getStartMark().getIndex() >= reader.getBufferIndex()) {
-                                    scalarValue = reader.readStringFromBuffer(event.getStartMark().getIndex(), event.getEndMark().getIndex() - 1);
-                                }
                                 break;
                         }
-                        Yaml.Scalar finalScalar = new Yaml.Scalar(randomId(), fmt, Markers.EMPTY, style, anchor, scalarValue);
+                        Yaml.Scalar finalScalar = new Yaml.Scalar(randomId(), fmt, Markers.EMPTY, style, anchor, tag, scalarValue);
                         BlockBuilder builder = blockStack.isEmpty() ? null : blockStack.peek();
                         if (builder instanceof SequenceBuilder) {
                             // Inline sequences like [1, 2] need to keep track of any whitespace between the element

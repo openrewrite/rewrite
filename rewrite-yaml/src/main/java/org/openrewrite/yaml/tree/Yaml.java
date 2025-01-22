@@ -230,6 +230,9 @@ public interface Yaml extends Tree {
         @Nullable
         Anchor anchor;
 
+        @Nullable
+        Tag tag;
+
         String value;
 
         public enum Style {
@@ -247,7 +250,7 @@ public interface Yaml extends Tree {
 
         @Override
         public Scalar copyPaste() {
-            return new Scalar(randomId(), prefix, Markers.EMPTY, style, anchor, value);
+            return new Scalar(randomId(), prefix, Markers.EMPTY, style, anchor, tag, value);
         }
 
         @Override

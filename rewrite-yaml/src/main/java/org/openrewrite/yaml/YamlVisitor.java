@@ -92,7 +92,9 @@ public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
     }
 
     public Yaml visitScalar(Yaml.Scalar scalar, P p) {
-        return scalar.withAnchor(visitAndCast(scalar.getAnchor(), p))
+        return scalar
+                .withAnchor(visitAndCast(scalar.getAnchor(), p))
+                .withTag(visitAndCast(scalar.getTag(), p))
                 .withMarkers(visitMarkers(scalar.getMarkers(), p));
     }
 

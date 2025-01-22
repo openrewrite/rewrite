@@ -116,6 +116,9 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
     @Override
     public Yaml visitScalar(Yaml.Scalar scalar, PrintOutputCapture<P> p) {
         beforeSyntax(scalar, p);
+        if (scalar.getTag() != null) {
+            visit(scalar.getTag(), p);
+        }
         if (scalar.getAnchor() != null) {
             visit(scalar.getAnchor(), p);
         }
