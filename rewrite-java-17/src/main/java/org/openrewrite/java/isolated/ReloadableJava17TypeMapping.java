@@ -29,8 +29,6 @@ import org.openrewrite.java.tree.TypeUtils;
 
 import javax.lang.model.type.NullType;
 import javax.lang.model.type.TypeMirror;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
@@ -604,7 +602,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
 
             List<String> declaredFormalTypeNames = null;
             for (Symbol.TypeVariableSymbol typeParam : methodSymbol.getTypeParameters()) {
-                if(typeParam.owner == methodSymbol) {
+                if (typeParam.owner == methodSymbol) {
                     if (declaredFormalTypeNames == null) {
                         declaredFormalTypeNames = new ArrayList<>();
                     }
