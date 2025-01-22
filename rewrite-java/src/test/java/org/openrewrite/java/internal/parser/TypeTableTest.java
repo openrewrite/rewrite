@@ -44,7 +44,7 @@ class TypeTableTest implements RewriteTest {
     void before() {
         ctx.putMessage(TypeTable.VERIFY_CLASS_WRITING, true);
         JavaParserExecutionContextView.view(ctx).setParserClasspathDownloadTarget(temp.toFile());
-        tsv = temp.resolve("types.tsv");
+        tsv = temp.resolve("types.tsv.zip");
         System.out.println(tsv);
     }
 
@@ -61,6 +61,8 @@ class TypeTableTest implements RewriteTest {
             for (Path classpath : JavaParser.runtimeClasspath()) {
                 jarsSize += writeJar(classpath, writer);
             }
+            System.out.println("Total size of table " + humanReadableByteCount(Files.size(tsv)));
+            System.out.println("Total size of jars " + humanReadableByteCount(jarsSize));
         }
     }
 
