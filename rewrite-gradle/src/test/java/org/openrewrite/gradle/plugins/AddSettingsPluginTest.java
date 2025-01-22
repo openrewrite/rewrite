@@ -34,7 +34,7 @@ class AddSettingsPluginTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withToolingApi())
-          .recipe(new AddSettingsPlugin("com.gradle.enterprise", "3.11.x", null, null));
+          .recipe(new AddSettingsPlugin("com.gradle.enterprise", "3.11.x", null, null, null));
     }
 
     @Test
@@ -80,7 +80,7 @@ class AddSettingsPluginTest implements RewriteTest {
             """
               plugins {
               }
-                            
+
               rootProject.name = 'my-project'
               """,
             interpolateResolvedVersion(
@@ -88,7 +88,7 @@ class AddSettingsPluginTest implements RewriteTest {
                 plugins {
                     id 'com.gradle.enterprise' version '%s'
                 }
-                              
+
                 rootProject.name = 'my-project'
                 """
             )
@@ -132,7 +132,7 @@ class AddSettingsPluginTest implements RewriteTest {
     void addPluginApplyFalse() {
         rewriteRun(
           spec -> spec.beforeRecipe(withToolingApi())
-            .recipe(new AddSettingsPlugin("com.gradle.enterprise", "3.11.x", null, false)),
+            .recipe(new AddSettingsPlugin("com.gradle.enterprise", "3.11.x", null, false, null)),
           settingsGradle(
             "",
             interpolateResolvedVersion(
