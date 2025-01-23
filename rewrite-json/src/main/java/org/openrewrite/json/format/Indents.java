@@ -46,7 +46,7 @@ public class Indents extends Recipe {
     private static class TabsAndIndentsFromCompilationUnitStyle extends JsonIsoVisitor<ExecutionContext> {
         @Override
         public Json. Document visitDocument(Json.Document docs, ExecutionContext ctx) {
-            TabsAndIndentsStyle style = Style.from(TabsAndIndentsStyle.class, docs, () -> Autodetect.detector().sample(docs).build().getStyle(TabsAndIndentsStyle.class));
+            TabsAndIndentsStyle style = Style.from(TabsAndIndentsStyle.class, docs, Autodetect.detector().sample(docs).build()::getStyle);
             doAfterVisit(new TabsAndIndentsVisitor<>(style, null));
             return docs;
         }
