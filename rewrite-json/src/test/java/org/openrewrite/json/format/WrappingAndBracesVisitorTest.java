@@ -21,10 +21,10 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.json.Assertions.json;
 
-class NewLinesVisitorTest implements RewriteTest {
+class WrappingAndBracesVisitorTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new NewLines());
+        spec.recipe(new WrappingAndBraces());
     }
 
     @Test

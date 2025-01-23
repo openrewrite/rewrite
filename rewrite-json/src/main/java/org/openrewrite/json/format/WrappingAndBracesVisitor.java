@@ -27,11 +27,11 @@ import java.util.List;
 
 import static java.util.Collections.emptyList;
 
-public class NewLinesVisitor<P> extends JsonIsoVisitor<P> {
+public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
     @Nullable
     private final Tree stopAfter;
 
-    public NewLinesVisitor(@Nullable Tree stopAfter) {
+    public WrappingAndBracesVisitor(@Nullable Tree stopAfter) {
         this.stopAfter = stopAfter;
     }
 

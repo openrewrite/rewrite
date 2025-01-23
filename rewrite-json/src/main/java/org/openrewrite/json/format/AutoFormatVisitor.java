@@ -23,10 +23,7 @@ import org.openrewrite.json.style.Autodetect;
 import org.openrewrite.json.style.TabsAndIndentsStyle;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.style.GeneralFormatStyle;
-import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
-
-import java.util.function.Supplier;
 
 public class AutoFormatVisitor<P> extends JsonIsoVisitor<P> {
     @Nullable
@@ -51,7 +48,7 @@ public class AutoFormatVisitor<P> extends JsonIsoVisitor<P> {
         TabsAndIndentsStyle tabsIndentsStyle = Style.from(TabsAndIndentsStyle.class, doc, () -> autodetectedStyle.getStyle(TabsAndIndentsStyle.class));
         GeneralFormatStyle generalStyle = Style.from(GeneralFormatStyle.class, doc, () -> autodetectedStyle.getStyle(GeneralFormatStyle.class));
 
-        js = new NewLinesVisitor<>(stopAfter).visitNonNull(js, p, cursor.fork());
+        js = new WrappingAndBracesVisitor<>(stopAfter).visitNonNull(js, p, cursor.fork());
         js = new TabsAndIndentsVisitor<>(tabsIndentsStyle, stopAfter).visitNonNull(js, p, cursor.fork());
         js = new NormalizeLineBreaksVisitor<>(generalStyle, stopAfter).visitNonNull(js, p, cursor.fork());
         return js;
@@ -64,7 +61,7 @@ public class AutoFormatVisitor<P> extends JsonIsoVisitor<P> {
         TabsAndIndentsStyle tabsIndentsStyle = Style.from(TabsAndIndentsStyle.class, js, () -> autodetectedStyle.getStyle(TabsAndIndentsStyle.class));
         GeneralFormatStyle generalStyle = Style.from(GeneralFormatStyle.class, js, () -> autodetectedStyle.getStyle(GeneralFormatStyle.class));
 
-        js = (Json.Document) new NewLinesVisitor<>(stopAfter).visitNonNull(js, p);
+        js = (Json.Document) new WrappingAndBracesVisitor<>(stopAfter).visitNonNull(js, p);
         js = (Json.Document) new TabsAndIndentsVisitor<>(tabsIndentsStyle, stopAfter).visitNonNull(js, p);
         js = (Json.Document) new NormalizeLineBreaksVisitor<>(generalStyle, stopAfter).visitNonNull(js, p);
 

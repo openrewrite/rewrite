@@ -18,7 +18,7 @@ package org.openrewrite.json.format;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 
-public class NewLines extends Recipe {
+public class WrappingAndBraces extends Recipe {
     @Override
     public String getDisplayName() {
         return "JSON new lines";
@@ -30,7 +30,7 @@ public class NewLines extends Recipe {
     }
 
     @Override
-    public NewLinesVisitor<ExecutionContext> getVisitor() {
-        return new NewLinesVisitor<>(null);
+    public WrappingAndBracesVisitor<ExecutionContext> getVisitor() {
+        return new WrappingAndBracesVisitor<>(null);
     }
 }
