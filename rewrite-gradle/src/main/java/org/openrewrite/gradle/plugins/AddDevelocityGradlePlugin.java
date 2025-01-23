@@ -315,7 +315,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
     }
 
     private static String getIndent(G.CompilationUnit cu) {
-        TabsAndIndentsStyle style = Style.from(TabsAndIndentsStyle.class, cu, IntelliJ.tabsAndIndents());
+        TabsAndIndentsStyle style = Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents);
         if (style.getUseTabCharacter()) {
             return "\t";
         } else {

@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 public interface SourceFile extends Tree {
 
@@ -78,11 +79,11 @@ public interface SourceFile extends Tree {
     }
 
     /**
-     * @deprecated Use {@link org.openrewrite.style.Style#from(Class, SourceFile, S)} instead.
+     * @deprecated Use {@link org.openrewrite.style.Style#from(Class, SourceFile, Supplier)} instead.
      */
     @Deprecated
     default <S extends Style> S getStyle(Class<S> styleClass, S defaultStyle) {
-        return Style.from(styleClass, this, defaultStyle);
+        return Style.from(styleClass, this, () -> defaultStyle);
     }
 
     default <P> byte[] printAllAsBytes(P p) {

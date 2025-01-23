@@ -45,12 +45,12 @@ public class AutoFormatVisitor<P> extends YamlIsoVisitor<P> {
         y = new MinimumViableSpacingVisitor<>(stopAfter).visitNonNull(y, p, cursor.fork());
 
         y = new IndentsVisitor<>(
-                Style.from(IndentsStyle.class, docs, Autodetect.tabsAndIndents(docs, YamlDefaultStyles.indents())),
+                Style.from(IndentsStyle.class, docs, () -> Autodetect.tabsAndIndents(docs, YamlDefaultStyles.indents())),
                     stopAfter)
                 .visitNonNull(y, p, cursor.fork());
 
         y = new NormalizeLineBreaksVisitor<>(
-                Style.from(GeneralFormatStyle.class, docs, Autodetect.generalFormat(docs)),
+                Style.from(GeneralFormatStyle.class, docs, () -> Autodetect.generalFormat(docs)),
                 stopAfter)
                 .visitNonNull(y, p, cursor.fork());
 
@@ -64,12 +64,12 @@ public class AutoFormatVisitor<P> extends YamlIsoVisitor<P> {
         y = (Yaml.Documents) new MinimumViableSpacingVisitor<>(stopAfter).visitNonNull(y, p);
 
         y = (Yaml.Documents) new IndentsVisitor<>(
-                Style.from(IndentsStyle.class, documents, Autodetect.tabsAndIndents(documents, YamlDefaultStyles.indents())),
+                Style.from(IndentsStyle.class, documents, () -> Autodetect.tabsAndIndents(documents, YamlDefaultStyles.indents())),
                 stopAfter)
                 .visitNonNull(y, p);
 
         y = (Yaml.Documents) new NormalizeLineBreaksVisitor<>(
-                Style.from(GeneralFormatStyle.class, documents, Autodetect.generalFormat(documents)),
+                Style.from(GeneralFormatStyle.class, documents, () -> Autodetect.generalFormat(documents)),
                 stopAfter)
                 .visitNonNull(y, p);
 

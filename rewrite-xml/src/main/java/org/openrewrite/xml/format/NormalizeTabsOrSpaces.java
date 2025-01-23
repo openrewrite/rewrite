@@ -43,7 +43,7 @@ public class NormalizeTabsOrSpaces extends Recipe {
     private static class TabsAndIndentsFromCompilationUnitStyle extends XmlIsoVisitor<ExecutionContext> {
         @Override
         public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
-            TabsAndIndentsStyle style = Style.from(TabsAndIndentsStyle.class, document, TabsAndIndentsStyle.DEFAULT);
+            TabsAndIndentsStyle style = Style.from(TabsAndIndentsStyle.class, document, () -> TabsAndIndentsStyle.DEFAULT);
             return (Xml.Document) new NormalizeTabsOrSpacesVisitor<>(style).visitNonNull(document, ctx);
         }
     }

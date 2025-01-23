@@ -50,11 +50,6 @@ public interface Style {
         return NamedStyles.merge(styleClass, sf.getMarkers().findAll(NamedStyles.class));
     }
 
-    static <S extends Style> @Nullable S from(Class<S> styleClass, SourceFile sf, S defaultValue) {
-        S s = from(styleClass, sf);
-        return s == null ? defaultValue : s;
-    }
-
     static <S extends Style> S from(Class<S> styleClass, SourceFile sf, Supplier<S> defaultStyle) {
         S s = from(styleClass, sf);
         return s == null ? defaultStyle.get() : s;

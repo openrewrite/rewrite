@@ -169,7 +169,7 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
                 switch (sourcePath) {
                     case "pom.xml":
                         acc.setMavenProject(true);
-                        acc.setUseCRLFNewLines(Style.from(GeneralFormatStyle.class, sourceFile, new GeneralFormatStyle(false))
+                        acc.setUseCRLFNewLines(Style.from(GeneralFormatStyle.class, sourceFile, () -> new GeneralFormatStyle(false))
                                 .isUseCRLFNewLines());
                         break;
                     case EXTENSIONS_XML_PATH:

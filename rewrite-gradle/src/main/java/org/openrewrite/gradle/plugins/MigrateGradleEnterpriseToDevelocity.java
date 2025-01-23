@@ -276,7 +276,8 @@ public class MigrateGradleEnterpriseToDevelocity extends Recipe {
         }
 
         private String getIndent(G.CompilationUnit cu) {
-            TabsAndIndentsStyle style = Style.from(TabsAndIndentsStyle.class, cu, IntelliJ.tabsAndIndents());
+            TabsAndIndentsStyle defaultValue = IntelliJ.tabsAndIndents();
+            TabsAndIndentsStyle style = Style.from(TabsAndIndentsStyle.class, cu, () -> defaultValue);
             if (style.getUseTabCharacter()) {
                 return "\t";
             } else {
