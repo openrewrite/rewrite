@@ -87,11 +87,7 @@ public class AutoFormatVisitor<P> extends XmlVisitor<P> {
         t = (Xml.Document) new LineBreaksVisitor<>(stopAfter).visit(t, p);
 
         TabsAndIndentsStyle tabsStyle = Optional.ofNullable(Style.from(TabsAndIndentsStyle.class, doc))
-                .orElseGet(() -> {
-                    Autodetect.Detector detector = Autodetect.detector();
-                    detector.sample(doc);
-                    return NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(detector.build()));
-                });
+                .orElseGet(() -> Autodetect.detector().sample(doc).build().getStyle(TabsAndIndentsStyle.class));
         assert tabsStyle != null;
 
         t = (Xml.Document) new NormalizeTabsOrSpacesVisitor<>(tabsStyle, stopAfter).visit(t, p);
