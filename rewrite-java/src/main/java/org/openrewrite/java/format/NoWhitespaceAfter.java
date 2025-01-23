@@ -22,7 +22,10 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.*;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.style.Style;
+
+import java.util.function.Supplier;
 
 import static java.util.Objects.requireNonNull;
 
@@ -63,16 +66,8 @@ public class NoWhitespaceAfter extends Recipe {
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 SourceFile cu = (SourceFile) requireNonNull(tree);
-                if (cu.getStyle(SpacesStyle.class) == null) {
-                    spacesStyle = IntelliJ.spaces();
-                } else {
-                    spacesStyle = cu.getStyle(SpacesStyle.class);
-                }
-                if (cu.getStyle(NoWhitespaceAfterStyle.class) == null) {
-                    noWhitespaceAfterStyle = Checkstyle.noWhitespaceAfterStyle();
-                } else {
-                    noWhitespaceAfterStyle = Style.from(NoWhitespaceAfterStyle.class, cu);
-                }
+                spacesStyle = Style.from(SpacesStyle.class, cu, IntelliJ::spaces);
+                noWhitespaceAfterStyle = Style.from(NoWhitespaceAfterStyle.class, cu, Checkstyle::noWhitespaceAfterStyle);
                 emptyForInitializerPadStyle = Style.from(EmptyForInitializerPadStyle.class, cu);
                 emptyForIteratorPadStyle = Style.from(EmptyForIteratorPadStyle.class, cu);
             }

@@ -43,8 +43,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
             if(cu == null) {
                 style = Checkstyle.unnecessaryParentheses();
             } else {
-                UnnecessaryParenthesesStyle defaultStyle = Checkstyle.unnecessaryParentheses();
-                style = Style.from(UnnecessaryParenthesesStyle.class, ((SourceFile) cu), () -> defaultStyle);
+                style = Style.from(UnnecessaryParenthesesStyle.class, cu, Checkstyle::unnecessaryParentheses);
             }
         }
         return style;

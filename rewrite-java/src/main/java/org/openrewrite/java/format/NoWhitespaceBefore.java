@@ -63,16 +63,8 @@ public class NoWhitespaceBefore extends Recipe {
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 SourceFile cu = (SourceFile) requireNonNull(tree);
-                if (cu.getStyle(SpacesStyle.class) == null) {
-                    spacesStyle = IntelliJ.spaces();
-                } else {
-                    spacesStyle = cu.getStyle(SpacesStyle.class);
-                }
-                if (cu.getStyle(NoWhitespaceBeforeStyle.class) == null) {
-                    noWhitespaceBeforeStyle = Checkstyle.noWhitespaceBeforeStyle();
-                } else {
-                    noWhitespaceBeforeStyle = Style.from(NoWhitespaceBeforeStyle.class, cu);
-                }
+                spacesStyle = Style.from(SpacesStyle.class, cu, IntelliJ::spaces);
+                noWhitespaceBeforeStyle = Style.from(NoWhitespaceBeforeStyle.class, cu, Checkstyle::noWhitespaceBeforeStyle);
                 emptyForInitializerPadStyle = Style.from(EmptyForInitializerPadStyle.class, cu);
                 emptyForIteratorPadStyle = Style.from(EmptyForIteratorPadStyle.class, cu);
             }
