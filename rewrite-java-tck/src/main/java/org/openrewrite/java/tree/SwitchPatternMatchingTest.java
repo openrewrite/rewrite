@@ -152,4 +152,27 @@ class SwitchPatternMatchingTest implements RewriteTest {
           ));
     }
 
+    @Test
+    void shouldParseRecordPatternMatchingInSwitch() {
+        rewriteRun(
+          java(
+            //language=java
+            """
+              class Test {
+                  public interface Printable {}
+                  record A(String A) implements Printable {}
+                  record B(Integer B) implements Printable {}
+              
+                  void integerTester(Printable prt) {
+                      switch (prt) {
+                          case A(String a) -> System.out.println(a);
+                          case B(Integer b) -> System.out.println(b);
+                          default -> throw new IllegalStateException("Unexpected value: " + prt);
+                      }
+                  }
+              }
+              """
+          ));
+    }
+
 }

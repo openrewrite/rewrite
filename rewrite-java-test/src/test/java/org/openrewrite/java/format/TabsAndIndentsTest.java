@@ -174,6 +174,31 @@ class TabsAndIndentsTest implements RewriteTest {
     }
 
     @Test
+    void firstParameterNameConflictWithReturnTypeAndMethodName() {
+        rewriteRun(
+          tabsAndIndents(style -> style.withMethodDeclarationParameters(new TabsAndIndentsStyle.MethodDeclarationParameters(true))),
+          java(
+            """
+              class Test {
+                  private String first(String first,
+                                                int times,
+                                                String third) {
+                  }
+              }
+              """,
+            """
+              class Test {
+                  private String first(String first,
+                                       int times,
+                                       String third) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void alignMethodDeclarationParamsWhenContinuationIndentUsingTabs() {
         rewriteRun(
           tabsAndIndents(style -> style.withUseTabCharacter(true)),

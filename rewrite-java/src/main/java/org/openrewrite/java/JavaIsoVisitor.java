@@ -195,6 +195,11 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     }
 
     @Override
+    public J.DeconstructionPattern visitDeconstructionPattern(J.DeconstructionPattern deconstructionPattern, P p) {
+        return (J.DeconstructionPattern) super.visitDeconstructionPattern(deconstructionPattern, p);
+    }
+
+    @Override
     public J.IntersectionType visitIntersectionType(J.IntersectionType intersectionType, P p) {
         return (J.IntersectionType) super.visitIntersectionType(intersectionType, p);
     }
