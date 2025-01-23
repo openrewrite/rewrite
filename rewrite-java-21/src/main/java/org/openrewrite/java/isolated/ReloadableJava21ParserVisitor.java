@@ -785,10 +785,23 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 type);
     }
 
+    @Override
+    public J visitDeconstructionPattern(DeconstructionPatternTree node, Space fmt) {
+        JavaType type = typeMapping.type(node);
+        return new J.DeconstructionPattern(randomId(),
+                fmt,
+                Markers.EMPTY,
+                convert(node.getDeconstructor()),
+                JContainer.build(sourceBefore("("), convertAll(node.getNestedPatterns(), commaDelim, t -> sourceBefore(")")), Markers.EMPTY),
+                type);
+    }
+
     private @Nullable J getNodePattern(@Nullable PatternTree pattern, JavaType type) {
         if (pattern instanceof JCBindingPattern b) {
             return new J.Identifier(randomId(), sourceBefore(b.getVariable().getName().toString()), Markers.EMPTY, emptyList(), b.getVariable().getName().toString(),
                     type, typeMapping.variableType(b.var.sym));
+        } else if (pattern instanceof DeconstructionPatternTree r) {
+            return visitDeconstructionPattern(r, whitespace());
         } else {
             if (pattern == null) {
                 return null;
