@@ -52,7 +52,7 @@ class AutodetectTest implements RewriteTest {
         var styles = detector.build();
         assertThat(styles.getName()).isEqualTo("org.openrewrite.gradle.Autodetect");
 
-        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+        var tabsAndIndents = styles.getStyle(TabsAndIndentsStyle.class);
         assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
         assertThat(tabsAndIndents.getTabSize()).isEqualTo(2);
         assertThat(tabsAndIndents.getIndentSize()).isEqualTo(2);

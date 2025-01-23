@@ -24,8 +24,10 @@ import org.openrewrite.java.style.*;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.style.GeneralFormatStyle;
+import org.openrewrite.style.Style;
 
 import java.util.Optional;
+import java.util.function.Supplier;
 
 import static org.openrewrite.java.format.AutodetectGeneralFormatStyle.autodetectGeneralFormatStyle;
 
@@ -50,30 +52,26 @@ public class AutoFormatVisitor<P> extends GroovyIsoVisitor<P> {
 
         J t = new NormalizeFormatVisitor<>(stopAfter).visit(tree, p, cursor.fork());
 
-        t = new BlankLinesVisitor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
-                .orElse(IntelliJ.blankLines()), stopAfter)
+        t = new BlankLinesVisitor<>(Style.from(BlankLinesStyle.class, cu, IntelliJ::blankLines), stopAfter)
                 .visit(t, p, cursor.fork());
 
-        t = new WrappingAndBracesVisitor<>(Optional.ofNullable(cu.getStyle(WrappingAndBracesStyle.class))
-                .orElse(IntelliJ.wrappingAndBraces()), stopAfter)
+        t = new WrappingAndBracesVisitor<>(Style.from(WrappingAndBracesStyle.class, cu, IntelliJ::wrappingAndBraces), stopAfter)
                 .visit(t, p, cursor.fork());
 
         t = new SpacesVisitor<>(
-                Optional.ofNullable(cu.getStyle(SpacesStyle.class)).orElse(IntelliJ.spaces()),
+                Style.from(SpacesStyle.class, cu, IntelliJ::spaces),
                 cu.getStyle(EmptyForInitializerPadStyle.class),
-                cu.getStyle(EmptyForIteratorPadStyle.class),
+                Style.from(EmptyForIteratorPadStyle.class, cu),
                 stopAfter
         ).visit(t, p, cursor.fork());
 
-        t = new NormalizeTabsOrSpacesVisitor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
-                .orElse(IntelliJ.tabsAndIndents()), stopAfter)
+        t = new NormalizeTabsOrSpacesVisitor<>(Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents), stopAfter)
                 .visit(t, p, cursor.fork());
 
-        t = new TabsAndIndentsVisitor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
-                .orElse(IntelliJ.tabsAndIndents()), stopAfter)
+        t = new TabsAndIndentsVisitor<>(Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents), stopAfter)
                 .visit(t, p, cursor.fork());
 
-        t = new NormalizeLineBreaksVisitor<>(Optional.ofNullable(cu.getStyle(GeneralFormatStyle.class))
+        t = new NormalizeLineBreaksVisitor<>(Optional.ofNullable(Style.from(GeneralFormatStyle.class, cu))
                 .orElse(autodetectGeneralFormatStyle(cu)), stopAfter)
                 .visit(t, p, cursor.fork());
 
