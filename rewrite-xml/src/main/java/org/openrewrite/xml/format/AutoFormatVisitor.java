@@ -20,6 +20,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.NamedStyles;
+import org.openrewrite.style.Style;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.style.Autodetect;
 import org.openrewrite.xml.style.TabsAndIndentsStyle;
@@ -57,14 +58,14 @@ public class AutoFormatVisitor<P> extends XmlVisitor<P> {
         t = new LineBreaksVisitor<>(stopAfter).visit(t, p, cursor.fork());
 
         TabsAndIndentsStyle tabsStyle =
-                doc.getStyleOrFromAutodetect(TabsAndIndentsStyle.class, () -> Autodetect.detector().sample(doc).build());
+                Style.fromAutodetect(TabsAndIndentsStyle.class, doc, () -> Autodetect.detector().sample(doc).build());
         t = new NormalizeTabsOrSpacesVisitor<>(tabsStyle, stopAfter)
                 .visit(t, p, cursor.fork());
 
         t = new TabsAndIndentsVisitor<>(tabsStyle, stopAfter)
                 .visit(t, p, cursor.fork());
 
-        t = new NormalizeLineBreaksVisitor<>(Optional.ofNullable(doc.getStyle(GeneralFormatStyle.class))
+        t = new NormalizeLineBreaksVisitor<>(Optional.ofNullable(Style.from(GeneralFormatStyle.class, doc))
                 .orElse(autodetectGeneralFormatStyle(doc)), stopAfter)
                 .visit(t, p, cursor.fork());
 
@@ -83,7 +84,7 @@ public class AutoFormatVisitor<P> extends XmlVisitor<P> {
 
         t = (Xml.Document) new LineBreaksVisitor<>(stopAfter).visit(t, p);
 
-        TabsAndIndentsStyle tabsStyle = Optional.ofNullable(doc.getStyle(TabsAndIndentsStyle.class))
+        TabsAndIndentsStyle tabsStyle = Optional.ofNullable(Style.from(TabsAndIndentsStyle.class, doc))
                 .orElseGet(() -> {
                     Autodetect.Detector detector = Autodetect.detector();
                     detector.sample(doc);
@@ -95,7 +96,7 @@ public class AutoFormatVisitor<P> extends XmlVisitor<P> {
 
         t = (Xml.Document) new TabsAndIndentsVisitor<>(tabsStyle, stopAfter).visit(t, p);
 
-        t = (Xml.Document) new NormalizeLineBreaksVisitor<>(Optional.ofNullable(doc.getStyle(GeneralFormatStyle.class))
+        t = (Xml.Document) new NormalizeLineBreaksVisitor<>(Optional.ofNullable(Style.from(GeneralFormatStyle.class, doc))
                 .orElse(autodetectGeneralFormatStyle(doc)), stopAfter)
                 .visit(t, p);
 

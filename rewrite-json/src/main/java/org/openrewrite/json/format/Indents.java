@@ -22,9 +22,7 @@ import org.openrewrite.json.JsonIsoVisitor;
 import org.openrewrite.json.style.Autodetect;
 import org.openrewrite.json.style.TabsAndIndentsStyle;
 import org.openrewrite.json.tree.Json;
-import org.openrewrite.style.NamedStyles;
-
-import static java.util.Collections.singletonList;
+import org.openrewrite.style.Style;
 
 public class Indents extends Recipe {
     @Override
@@ -45,7 +43,7 @@ public class Indents extends Recipe {
     private static class TabsAndIndentsFromCompilationUnitStyle extends JsonIsoVisitor<ExecutionContext> {
         @Override
         public Json. Document visitDocument(Json.Document docs, ExecutionContext ctx) {
-            TabsAndIndentsStyle style = docs.getStyleOrFromAutodetect(TabsAndIndentsStyle.class, () -> Autodetect.detector().sample(docs).build());
+            TabsAndIndentsStyle style = Style.fromAutodetect(TabsAndIndentsStyle.class, docs, () -> Autodetect.detector().sample(docs).build());
             doAfterVisit(new TabsAndIndentsVisitor<>(style, null));
             return docs;
         }

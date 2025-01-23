@@ -37,6 +37,7 @@ import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.style.GeneralFormatStyle;
+import org.openrewrite.style.Style;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.XmlIsoVisitor;
@@ -168,7 +169,7 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
                 switch (sourcePath) {
                     case "pom.xml":
                         acc.setMavenProject(true);
-                        acc.setUseCRLFNewLines(sourceFile.getStyle(GeneralFormatStyle.class, new GeneralFormatStyle(false))
+                        acc.setUseCRLFNewLines(Style.from(GeneralFormatStyle.class, sourceFile, new GeneralFormatStyle(false))
                                 .isUseCRLFNewLines());
                         break;
                     case EXTENSIONS_XML_PATH:

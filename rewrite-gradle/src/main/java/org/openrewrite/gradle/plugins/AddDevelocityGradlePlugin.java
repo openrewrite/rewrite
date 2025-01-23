@@ -38,6 +38,7 @@ import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
+import org.openrewrite.style.Style;
 
 import java.nio.file.Paths;
 import java.util.Optional;
@@ -314,7 +315,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
     }
 
     private static String getIndent(G.CompilationUnit cu) {
-        TabsAndIndentsStyle style = cu.getStyle(TabsAndIndentsStyle.class, IntelliJ.tabsAndIndents());
+        TabsAndIndentsStyle style = Style.from(TabsAndIndentsStyle.class, cu, IntelliJ.tabsAndIndents());
         if (style.getUseTabCharacter()) {
             return "\t";
         } else {

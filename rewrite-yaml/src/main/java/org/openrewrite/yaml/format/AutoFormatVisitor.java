@@ -19,13 +19,12 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.style.GeneralFormatStyle;
+import org.openrewrite.style.Style;
 import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.style.Autodetect;
 import org.openrewrite.yaml.style.IndentsStyle;
 import org.openrewrite.yaml.style.YamlDefaultStyles;
 import org.openrewrite.yaml.tree.Yaml;
-
-import java.util.Optional;
 
 public class AutoFormatVisitor<P> extends YamlIsoVisitor<P> {
     @Nullable
@@ -46,12 +45,12 @@ public class AutoFormatVisitor<P> extends YamlIsoVisitor<P> {
         y = new MinimumViableSpacingVisitor<>(stopAfter).visitNonNull(y, p, cursor.fork());
 
         y = new IndentsVisitor<>(
-                    docs.getStyle(IndentsStyle.class, Autodetect.tabsAndIndents(docs, YamlDefaultStyles.indents())),
+                Style.from(IndentsStyle.class, docs, Autodetect.tabsAndIndents(docs, YamlDefaultStyles.indents())),
                     stopAfter)
                 .visitNonNull(y, p, cursor.fork());
 
         y = new NormalizeLineBreaksVisitor<>(
-                docs.getStyle(GeneralFormatStyle.class, Autodetect.generalFormat(docs)),
+                Style.from(GeneralFormatStyle.class, docs, Autodetect.generalFormat(docs)),
                 stopAfter)
                 .visitNonNull(y, p, cursor.fork());
 
@@ -65,12 +64,12 @@ public class AutoFormatVisitor<P> extends YamlIsoVisitor<P> {
         y = (Yaml.Documents) new MinimumViableSpacingVisitor<>(stopAfter).visitNonNull(y, p);
 
         y = (Yaml.Documents) new IndentsVisitor<>(
-                documents.getStyle(IndentsStyle.class, Autodetect.tabsAndIndents(documents, YamlDefaultStyles.indents())),
+                Style.from(IndentsStyle.class, documents, Autodetect.tabsAndIndents(documents, YamlDefaultStyles.indents())),
                 stopAfter)
                 .visitNonNull(y, p);
 
         y = (Yaml.Documents) new NormalizeLineBreaksVisitor<>(
-                documents.getStyle(GeneralFormatStyle.class, Autodetect.generalFormat(documents)),
+                Style.from(GeneralFormatStyle.class, documents, Autodetect.generalFormat(documents)),
                 stopAfter)
                 .visitNonNull(y, p);
 

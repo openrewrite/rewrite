@@ -19,7 +19,12 @@ import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
+
+import java.util.function.Supplier;
+
+import static java.util.Collections.singletonList;
 
 /**
  * Styles represent project-level standards that each source file is expected to follow, e.g.
@@ -40,4 +45,28 @@ public interface Style {
     }
 
     default Style applyDefaults() { return this; }
+
+    static <S extends Style> @Nullable S from(Class<S> styleClass, SourceFile sf) {
+        return NamedStyles.merge(styleClass, sf.getMarkers().findAll(NamedStyles.class));
+    }
+
+    static <S extends Style> @Nullable S from(Class<S> styleClass, SourceFile sf, S defaultValue) {
+        S s = from(styleClass, sf);
+        return s == null ? defaultValue : s;
+    }
+
+    static <S extends Style> S from(Class<S> styleClass, SourceFile sf, Supplier<S> defaultStyle) {
+        S s = from(styleClass, sf);
+        return s == null ? defaultStyle.get() : s;
+    }
+
+    static <S extends Style> S fromAutodetect(Class<S> styleClass, SourceFile sf, Supplier<NamedStyles> autodetectedStyle) {
+        S s = from(styleClass, sf);
+        if (s != null) {
+            return s;
+        }
+        S ret = NamedStyles.merge(styleClass, singletonList(autodetectedStyle.get()));
+        assert(ret != null);
+        return ret;
+    }
 }

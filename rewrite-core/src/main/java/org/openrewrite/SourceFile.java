@@ -17,7 +17,6 @@ package org.openrewrite;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 
 import java.nio.charset.Charset;
@@ -25,9 +24,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
-import java.util.function.Supplier;
-
-import static java.util.Collections.singletonList;
 
 public interface SourceFile extends Tree {
 
@@ -73,28 +69,20 @@ public interface SourceFile extends Tree {
 
     <T extends SourceFile> T withFileAttributes(@Nullable FileAttributes fileAttributes);
 
-    default <S extends Style> @Nullable S getStyle(Class<S> style) {
-        return NamedStyles.merge(style, getMarkers().findAll(NamedStyles.class));
+    /**
+     * @deprecated Use {@link org.openrewrite.style.Style#from(Class, SourceFile)} instead.
+     */
+    @Deprecated
+    default <S extends Style> @Nullable S getStyle(Class<S> styleClass) {
+        return Style.from(styleClass, this);
     }
 
-    default <S extends Style> S getStyle(Class<S> style, S defaultStyle) {
-        S s = getStyle(style);
-        return s == null ? defaultStyle : s;
-    }
-
-    default <S extends Style> S getStyleOrDefault(Class<S> style, Supplier<S> defaultStyle) {
-        S s = getStyle(style);
-        return s == null ? defaultStyle.get() : s;
-    }
-
-    default <S extends Style> S getStyleOrFromAutodetect(Class<S> style, Supplier<NamedStyles> autodetectedStyle) {
-        S s = getStyle(style);
-        if (s != null) {
-            return s;
-        }
-        S ret = NamedStyles.merge(style, singletonList(autodetectedStyle.get()));
-        assert(ret != null);
-        return ret;
+    /**
+     * @deprecated Use {@link org.openrewrite.style.Style#from(Class, SourceFile, S)} instead.
+     */
+    @Deprecated
+    default <S extends Style> S getStyle(Class<S> styleClass, S defaultStyle) {
+        return Style.from(styleClass, this, defaultStyle);
     }
 
     default <P> byte[] printAllAsBytes(P p) {

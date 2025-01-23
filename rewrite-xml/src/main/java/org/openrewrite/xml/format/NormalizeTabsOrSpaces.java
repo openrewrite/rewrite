@@ -18,6 +18,7 @@ package org.openrewrite.xml.format;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.style.Style;
 import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.style.TabsAndIndentsStyle;
 import org.openrewrite.xml.tree.Xml;
@@ -42,7 +43,7 @@ public class NormalizeTabsOrSpaces extends Recipe {
     private static class TabsAndIndentsFromCompilationUnitStyle extends XmlIsoVisitor<ExecutionContext> {
         @Override
         public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
-            TabsAndIndentsStyle style = document.getStyle(TabsAndIndentsStyle.class, TabsAndIndentsStyle.DEFAULT);
+            TabsAndIndentsStyle style = Style.from(TabsAndIndentsStyle.class, document, TabsAndIndentsStyle.DEFAULT);
             return (Xml.Document) new NormalizeTabsOrSpacesVisitor<>(style).visitNonNull(document, ctx);
         }
     }
