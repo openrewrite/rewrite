@@ -19,7 +19,6 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
-import org.jetbrains.annotations.ApiStatus;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -43,7 +42,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 
 import static java.util.Collections.emptyList;
@@ -1113,12 +1111,6 @@ public interface J extends Tree {
             this.guard = guard;
             this.statements = statements;
             this.body = body;
-        }
-
-        @Deprecated
-        @ApiStatus.ScheduledForRemoval(inVersion = "2025-05-01")
-        public Case(UUID id, Space prefix, Markers markers, Type type, JContainer<Expression> expressions, JContainer<Statement> statements, @Nullable JRightPadded<J> body) {
-            this(id, prefix, markers, type, null, expressions, null, null, statements, body);
         }
 
         @Override
@@ -5126,21 +5118,6 @@ public interface J extends Tree {
         @Nullable
         @Getter
         JavaType type;
-
-        @Deprecated
-        @ApiStatus.ScheduledForRemoval(inVersion = "2025-05-01")
-        public SwitchExpression(UUID id, Space prefix, Markers markers, ControlParentheses<Expression> selector, Block cases) {
-            this(id, prefix, markers, selector, cases, new JavaVisitor<AtomicReference<@Nullable JavaType>>() {
-                @Override
-                public J visitBlock(Block block, AtomicReference<@Nullable JavaType> javaType) {
-                    if (!block.getStatements().isEmpty()) {
-                        Case caze = (Case) block.getStatements().get(0);
-                        javaType.set(caze.getExpressions().isEmpty() ? null : caze.getExpressions().get(0).getType());
-                    }
-                    return block;
-                }
-            }.reduce(cases, new AtomicReference<>()).get());
-        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
