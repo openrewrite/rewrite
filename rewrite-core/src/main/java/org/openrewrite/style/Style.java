@@ -53,9 +53,4 @@ public interface Style {
         S s = from(styleClass, sf);
         return s == null ? defaultStyle.get() : s;
     }
-
-    static <S extends Style> S from(Class<S> styleClass, SourceFile sf, Function<Class<S>, S> defaultStyle) {
-        S s = from(styleClass, sf);
-        return s == null ? defaultStyle.apply(styleClass) : s;
-    }
 }
