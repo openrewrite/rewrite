@@ -74,9 +74,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     private String linebreak() {
         if (linebreak == null) {
             linebreak = Optional.ofNullable(getCursor().firstEnclosing(Yaml.Documents.class))
-                    .map(docs -> {
-                        return Style.from(GeneralFormatStyle.class, docs);
-                    })
+                    .map(docs -> Style.from(GeneralFormatStyle.class, docs))
                     .map(format -> format.isUseCRLFNewLines() ? "\r\n" : "\n")
                     .orElse("\n");
         }
