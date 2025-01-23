@@ -23,7 +23,10 @@ import org.openrewrite.json.style.Autodetect;
 import org.openrewrite.json.style.TabsAndIndentsStyle;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.style.GeneralFormatStyle;
+import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
+
+import java.util.function.Supplier;
 
 public class AutoFormatVisitor<P> extends JsonIsoVisitor<P> {
     @Nullable
@@ -42,11 +45,11 @@ public class AutoFormatVisitor<P> extends JsonIsoVisitor<P> {
         Json js = tree;
 
         js = new TabsAndIndentsVisitor<>(
-                Style.fromAutodetect(TabsAndIndentsStyle.class, doc, () -> autodetectedStyle),
+                Style.from(TabsAndIndentsStyle.class, doc, () -> autodetectedStyle.getStyle(TabsAndIndentsStyle.class)),
                 stopAfter).visitNonNull(js, p, cursor.fork());
 
         js = new NormalizeLineBreaksVisitor<>(
-                Style.fromAutodetect(GeneralFormatStyle.class, doc, () -> autodetectedStyle),
+                Style.from(GeneralFormatStyle.class, doc, () -> autodetectedStyle.getStyle(GeneralFormatStyle.class)),
                 stopAfter).visitNonNull(js, p, cursor.fork());
 
         return js;
@@ -57,11 +60,11 @@ public class AutoFormatVisitor<P> extends JsonIsoVisitor<P> {
         Autodetect autodetectedStyle = Autodetect.detector().sample(js).build();
 
         js = (Json.Document) new TabsAndIndentsVisitor<>(
-                Style.fromAutodetect(TabsAndIndentsStyle.class, js, () -> autodetectedStyle),
+                Style.from(TabsAndIndentsStyle.class, js, () -> autodetectedStyle.getStyle(TabsAndIndentsStyle.class)),
                 stopAfter).visitNonNull(js, p);
 
         js = (Json.Document) new NormalizeLineBreaksVisitor<>(
-                Style.fromAutodetect(GeneralFormatStyle.class, js, () -> autodetectedStyle),
+                Style.from(GeneralFormatStyle.class, js, () -> autodetectedStyle.getStyle(GeneralFormatStyle.class)),
                 stopAfter).visitNonNull(js, p);
 
         return js;

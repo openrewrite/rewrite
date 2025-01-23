@@ -27,6 +27,7 @@ import org.openrewrite.xml.style.TabsAndIndentsStyle;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
+import java.util.function.Supplier;
 
 import static java.util.Collections.singletonList;
 import static org.openrewrite.xml.format.AutodetectGeneralFormatStyle.autodetectGeneralFormatStyle;
@@ -58,7 +59,8 @@ public class AutoFormatVisitor<P> extends XmlVisitor<P> {
         t = new LineBreaksVisitor<>(stopAfter).visit(t, p, cursor.fork());
 
         TabsAndIndentsStyle tabsStyle =
-                Style.fromAutodetect(TabsAndIndentsStyle.class, doc, () -> Autodetect.detector().sample(doc).build());
+                Style.from(TabsAndIndentsStyle.class, doc,
+                        () -> Autodetect.detector().sample(doc).build().getStyle(TabsAndIndentsStyle.class));
         t = new NormalizeTabsOrSpacesVisitor<>(tabsStyle, stopAfter)
                 .visit(t, p, cursor.fork());
 
