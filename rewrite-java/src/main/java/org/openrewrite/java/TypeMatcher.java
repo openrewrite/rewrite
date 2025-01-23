@@ -112,12 +112,11 @@ public class TypeMatcher implements Reference.Matcher {
 
     @Override
     public boolean matchesReference(Reference reference) {
-        return reference.getKind().equals(Reference.Kind.TYPE) && matchesTargetTypeName(reference.getValue());
+        return reference.getKind() == Reference.Kind.TYPE && matchesTargetTypeName(reference.getValue());
     }
 
     @Override
     public Reference.Renamer createRenamer(String newName) {
         return reference -> newName;
     }
-
 }

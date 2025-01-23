@@ -31,7 +31,7 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Parser;
-import org.openrewrite.ipc.http.OkHttpSender;
+import org.openrewrite.maven.http.OkHttpSender;
 import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.test.RewriteTest;
@@ -3355,6 +3355,35 @@ class MavenParserTest implements RewriteTest {
               </project>
               """
             )
+          )
+        );
+    }
+
+    @Test
+    void systemPropertyTakesPrecedence() {
+        System.setProperty("hatversion", "2.3.0");
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>parent</artifactId>
+                <version>1.0-SNAPSHOT</version>
+                <packaging>pom</packaging>
+                <name>parent</name>
+                <url>http://www.example.com</url>
+                <properties>
+                  <hatversion>SYSTEM_PROPERTY_SHOULD_OVERRIDE_THIS</hatversion>
+                </properties>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.springframework.hateoas</groupId>
+                        <artifactId>spring-hateoas</artifactId>
+                        <version>${hatversion}</version>
+                    </dependency>
+                </dependencies>
+              </project>
+              """
           )
         );
     }

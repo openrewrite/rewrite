@@ -116,6 +116,11 @@ public class ReloadableJava17Parser implements JavaParser {
         Options.instance(context).put("-g", "-g");
         Options.instance(context).put("-proc", "none");
 
+        // Ensure type attribution continues despite errors in individual files or nodes.
+        // If an error occurs in a single file or node, type attribution should still proceed
+        // for all other source files and unaffected nodes within the same file.
+        Options.instance(context).put("should-stop.ifError", "GENERATE");
+
         LOMBOK:
         if (System.getenv().getOrDefault("REWRITE_LOMBOK", System.getProperty("rewrite.lombok")) != null &&
             classpath != null && classpath.stream().anyMatch(it -> it.toString().contains("lombok"))) {

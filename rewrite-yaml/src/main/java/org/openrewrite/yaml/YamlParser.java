@@ -52,7 +52,7 @@ import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
 public class YamlParser implements org.openrewrite.Parser {
-    private static final Pattern VARIABLE_PATTERN = Pattern.compile(":\\s*(@[^\n\r@]+@)");
+    private static final Pattern VARIABLE_PATTERN = Pattern.compile(":\\s+(@[^\n\r@]+@)");
 
     @Override
     public Stream<SourceFile> parse(@Language("yml") String... sources) {
@@ -194,7 +194,6 @@ public class YamlParser implements org.openrewrite.Parser {
                     }
                     case Scalar: {
                         String fmt = newLine + reader.prefix(lastEnd, event);
-                        newLine = "";
 
                         ScalarEvent scalar = (ScalarEvent) event;
 
@@ -207,6 +206,9 @@ public class YamlParser implements org.openrewrite.Parser {
                         } else {
                             valueStart = lastEnd + fmt.length();
                         }
+                        valueStart = valueStart - newLine.length();
+                        newLine = "";
+
 
                         String scalarValue;
                         switch (scalar.getScalarStyle()) {

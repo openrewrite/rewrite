@@ -15,7 +15,6 @@
  */
 package org.openrewrite.groovy.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
@@ -32,7 +31,7 @@ import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
-@SuppressWarnings({"GroovyUnusedAssignment", "DataFlowIssue"})
+@SuppressWarnings({"GroovyUnusedAssignment", "DataFlowIssue", "GrUnnecessaryDefModifier"})
 class VariableDeclarationsTest implements RewriteTest {
 
     @Test
@@ -129,7 +128,6 @@ class VariableDeclarationsTest implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
     void singleTypeMultipleVariableDeclaration() {
         rewriteRun(
@@ -137,7 +135,6 @@ class VariableDeclarationsTest implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
     void multipleTypeMultipleVariableDeclaration() {
         rewriteRun(
@@ -190,7 +187,6 @@ class VariableDeclarationsTest implements RewriteTest {
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/4702")
-    @Disabled
     @Test
     void nestedTypeParameters() {
         rewriteRun(
@@ -200,6 +196,31 @@ class VariableDeclarationsTest implements RewriteTest {
                 def map = new HashMap<String, List<String>>()
             }
             """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4705")
+    @Test
+    void defAndExplicitReturnType() {
+        rewriteRun(
+          groovy(
+            """
+              def /*int*/ int one = 1
+              def /*Object*/ Object two = 2
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4877")
+    @Test
+    void defVariableStartsWithDef() {
+        rewriteRun(
+          groovy(
+            """
+              def defaultPublicStaticFinal = 0
+              """
           )
         );
     }

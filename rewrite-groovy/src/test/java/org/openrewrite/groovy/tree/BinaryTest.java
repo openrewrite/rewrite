@@ -15,8 +15,8 @@
  */
 package org.openrewrite.groovy.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -34,7 +34,10 @@ class BinaryTest implements RewriteTest {
 
           // NOT inside parentheses, but verifies the parser's
           // test for "inside parentheses" condition
-          groovy("(1) + 1")
+          groovy("( 1 ) + 1"),
+          groovy("(1) + 1"),
+          // And combine the two cases
+          groovy("((1) + 1)")
         );
     }
 
@@ -57,6 +60,31 @@ class BinaryTest implements RewriteTest {
             """
               def a = []
               boolean b = 42 in a;
+              """
+          )
+        );
+    }
+
+    @Test
+    void withVariable() {
+        rewriteRun(
+          groovy(
+            """
+              def foo(int a) {
+                  60 + a
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void regexPatternOperator() {
+        rewriteRun(
+          groovy(
+            """
+              def PATTERN = ~/foo/
+              def result = PATTERN.matcher('4711').matches()
               """
           )
         );
@@ -201,17 +229,41 @@ class BinaryTest implements RewriteTest {
         );
     }
 
-    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/4703")
+    @Test
+    void cxds() {
+        rewriteRun(
+          groovy(
+            """
+              def differenceInDays(int time) {
+                  return (int) ((time)/(1000*60*60*24))
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4703")
+    @Test
+    void extraParensAroundInfixOxxxperator() {
+        rewriteRun(
+          groovy(
+            """
+              def timestamp(int hours, int minutes, int seconds) {
+                  30 * (hours)
+                  (((((hours))))) * 30
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4703")
     @Test
     void extraParensAroundInfixOperator() {
         rewriteRun(
           groovy(
             """
-              def foo(Map map) {
-                  ((map.containsKey("foo"))
-                          && ((map.get("foo")).equals("bar")))
-              }
               def timestamp(int hours, int minutes, int seconds) {
                   (hours) * 60 * 60 + (minutes * 60) + seconds
               }

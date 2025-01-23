@@ -234,7 +234,7 @@ public class Space {
 
     @SuppressWarnings("ConstantConditions")
     public static <J2 extends J> @Nullable List<JRightPadded<J2>> formatLastSuffix(@Nullable List<JRightPadded<J2>> trees,
-                                                                         Space suffix) {
+                                                                                   Space suffix) {
         if (trees == null) {
             return null;
         }
@@ -286,31 +286,35 @@ public class Space {
                     printedWs.append(spaces[(i - lastNewline) % 10]);
                 } else if (c == '\t') {
                     printedWs.append(tabs[(i - lastNewline) % 10]);
+                } else {
+                    // should never happen (probably a bug in the parser)
+                    printedWs.append(c);
                 }
             }
         }
+        String whitespaces = printedWs.toString();
 
         return "Space(" +
-               "comments=<" + (comments.size() == 1 ? "1 comment" : comments.size() + " comments") +
-               ">, whitespace='" + printedWs + "')";
+               "comments=<" + (comments.size() == 1 ? "1 comment" : comments.size() + " comments") + ">, " +
+               "whitespace=" + (whitespaces.isEmpty() ? "<empty>" : "'" + whitespaces + "'") + ")";
     }
 
     public enum Location {
-        ANY,
         ANNOTATED_TYPE_PREFIX,
+        ANNOTATIONS,
         ANNOTATION_ARGUMENTS,
         ANNOTATION_ARGUMENT_SUFFIX,
-        ANNOTATIONS,
         ANNOTATION_PREFIX,
+        ANY,
         ARRAY_ACCESS_PREFIX,
         ARRAY_INDEX_SUFFIX,
         ARRAY_TYPE_PREFIX,
-        ASSERT_PREFIX,
         ASSERT_DETAIL,
         ASSERT_DETAIL_PREFIX,
+        ASSERT_PREFIX,
         ASSIGNMENT,
-        ASSIGNMENT_OPERATION_PREFIX,
         ASSIGNMENT_OPERATION_OPERATOR,
+        ASSIGNMENT_OPERATION_PREFIX,
         ASSIGNMENT_PREFIX,
         BINARY_OPERATOR,
         BINARY_PREFIX,
@@ -319,9 +323,10 @@ public class Space {
         BLOCK_STATEMENT_SUFFIX,
         BREAK_PREFIX,
         CASE,
-        CASE_PREFIX,
         CASE_BODY,
         CASE_EXPRESSION,
+        CASE_LABEL,
+        CASE_PREFIX,
         CASE_SUFFIX,
         CATCH_ALTERNATIVE_SUFFIX,
         CATCH_PREFIX,
@@ -331,8 +336,11 @@ public class Space {
         COMPILATION_UNIT_PREFIX,
         CONTINUE_PREFIX,
         CONTROL_PARENTHESES_PREFIX,
-        DIMENSION_PREFIX,
+        DECONSTRUCTION_PATTERN_PREFIX,
+        DECONSTRUCTION_PATTERN_NESTED,
+        DECONSTRUCTION_PATTERN_NESTED_SUFFIX,
         DIMENSION,
+        DIMENSION_PREFIX,
         DIMENSION_SUFFIX,
         DO_WHILE_PREFIX,
         ELSE_PREFIX,
@@ -340,6 +348,7 @@ public class Space {
         ENUM_VALUE_PREFIX,
         ENUM_VALUE_SET_PREFIX,
         ENUM_VALUE_SUFFIX,
+        ERRONEOUS,
         EXPRESSION_PREFIX,
         EXTENDS,
         FIELD_ACCESS_NAME,
@@ -359,9 +368,8 @@ public class Space {
         IF_PREFIX,
         IF_THEN_SUFFIX,
         IMPLEMENTS,
-        IMPORT_ALIAS_PREFIX,
-        PERMITS,
         IMPLEMENTS_SUFFIX,
+        IMPORT_ALIAS_PREFIX,
         IMPORT_PREFIX,
         IMPORT_SUFFIX,
         INSTANCEOF_PREFIX,
@@ -378,9 +386,9 @@ public class Space {
         MEMBER_REFERENCE_CONTAINING,
         MEMBER_REFERENCE_NAME,
         MEMBER_REFERENCE_PREFIX,
+        METHOD_DECLARATION_DEFAULT_VALUE,
         METHOD_DECLARATION_PARAMETERS,
         METHOD_DECLARATION_PARAMETER_SUFFIX,
-        METHOD_DECLARATION_DEFAULT_VALUE,
         METHOD_DECLARATION_PREFIX,
         METHOD_INVOCATION_ARGUMENTS,
         METHOD_INVOCATION_ARGUMENT_SUFFIX,
@@ -405,6 +413,7 @@ public class Space {
         PARAMETERIZED_TYPE_PREFIX,
         PARENTHESES_PREFIX,
         PARENTHESES_SUFFIX,
+        PERMITS,
         PERMITS_SUFFIX,
         PRIMITIVE_PREFIX,
         RECORD_STATE_VECTOR,
@@ -413,8 +422,8 @@ public class Space {
         STATEMENT_PREFIX,
         STATIC_IMPORT,
         STATIC_INIT_SUFFIX,
-        SWITCH_PREFIX,
         SWITCH_EXPRESSION_PREFIX,
+        SWITCH_PREFIX,
         SYNCHRONIZED_PREFIX,
         TERNARY_FALSE,
         TERNARY_PREFIX,
@@ -422,6 +431,7 @@ public class Space {
         THROWS,
         THROWS_SUFFIX,
         THROW_PREFIX,
+        TRAILING_COMMA_SUFFIX,
         TRY_FINALLY,
         TRY_PREFIX,
         TRY_RESOURCE,

@@ -24,6 +24,9 @@ recipeList:
       version: 8.x
       addIfMissing: false
 
+  # https://docs.gradle.org/8.11.1/userguide/upgrading_version_8.html#test_framework_implementation_dependencies
+  - org.openrewrite.gradle.AddJUnitPlatformLauncher
+
   # https://github.com/gradle/gradle/blob/v7.6.4/subprojects/core/src/main/java/org/gradle/api/internal/FeaturePreviews.java
   # https://github.com/gradle/gradle/blob/v8.10.1/subprojects/core/src/main/java/org/gradle/api/internal/FeaturePreviews.java
   - org.openrewrite.gradle.RemoveEnableFeaturePreview:
@@ -32,3 +35,16 @@ recipeList:
       previewFeatureName: VERSION_ORDERING_V2
   - org.openrewrite.gradle.RemoveEnableFeaturePreview:
       previewFeatureName: VERSION_CATALOGS
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.gradle.AddJUnitPlatformLauncher
+displayName: Add JUnit Platform Launcher
+description: Add the JUnit Platform Launcher to the buildscript dependencies.
+recipeList:
+  - org.openrewrite.gradle.AddDependency:
+      groupId: org.junit.platform
+      artifactId: junit-platform-launcher
+      version: 1.x
+      acceptTransitive: true
+      configuration: testRuntimeOnly
+      onlyIfUsing: org.junit.jupiter.api.Test

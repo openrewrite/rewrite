@@ -112,6 +112,42 @@ class RewriteTestTest implements RewriteTest {
               """, "org.openrewrite.RefersToNonExistentRecipe")
           ));
     }
+
+    @Test
+    void rejectExecutionContextMutation() {
+        assertThrows(AssertionError.class, () ->
+          rewriteRun(
+            spec -> spec.recipe(new MutateExecutionContext()),
+            text("irrelevant")
+          ));
+    }
+}
+
+@Value
+@EqualsAndHashCode(callSuper = false)
+@NullMarked
+class MutateExecutionContext extends Recipe {
+
+    @Override
+    public String getDisplayName() {
+        return "Mutate execution context";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Mutates the execution context to trigger a validation failure.";
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new TreeVisitor<>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                ctx.putMessage("mutated", true);
+                return tree;
+            }
+        };
+    }
 }
 
 @Value

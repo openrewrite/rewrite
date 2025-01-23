@@ -23,7 +23,6 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.EncodingDetectingInputStream;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.protobuf.internal.ProtoParserVisitor;
 import org.openrewrite.protobuf.internal.grammar.Protobuf2Lexer;
 import org.openrewrite.protobuf.internal.grammar.Protobuf2Parser;
@@ -35,8 +34,6 @@ import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.nio.file.Path;
 import java.util.stream.Stream;
-
-import static org.openrewrite.Tree.randomId;
 
 public class ProtoParser implements Parser {
 
@@ -57,17 +54,13 @@ public class ProtoParser implements Parser {
 
                         if (sourceStr.contains("proto3")) {
                             // Pending Proto3 support, the best we can do is plain text & not skip files
-                            return new PlainText(
-                                    randomId(),
-                                    path,
-                                    Markers.EMPTY,
-                                    is.getCharset().name(),
-                                    is.isCharsetBomMarked(),
-                                    input.getFileAttributes(),
-                                    null,
-                                    sourceStr,
-                                    null
-                            );
+                            return PlainText.builder()
+                                    .sourcePath(path)
+                                    .charsetName(is.getCharset().name())
+                                    .charsetBomMarked(is.isCharsetBomMarked())
+                                    .fileAttributes(input.getFileAttributes())
+                                    .text(sourceStr)
+                                    .build();
                         }
 
                         Proto.Document document = new ProtoParserVisitor(
