@@ -96,10 +96,9 @@ public class ChangeDependencyConfiguration extends Recipe {
                 GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher()
                         .configuration(configuration);
 
-                if (!(gradleDependencyMatcher.get(getCursor()).isPresent() || dependencyDsl.matches(m))) {
+                if (!gradleDependencyMatcher.get(getCursor()).isPresent() && !dependencyDsl.matches(m)) {
                     return m;
                 }
-
 
                 DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
                 List<Expression> args = m.getArguments();

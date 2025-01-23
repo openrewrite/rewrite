@@ -388,4 +388,37 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void changeWithWildcards() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyConfiguration("*", "*", "testImplementation", "testRuntimeOnly")),
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-maven:latest.release'
+                  testRuntimeOnly 'org.openrewrite:rewrite-gradle:latest.release'
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-maven:latest.release'
+                  testImplementation 'org.openrewrite:rewrite-gradle:latest.release'
+              }
+              """
+          )
+        );
+    }
 }
