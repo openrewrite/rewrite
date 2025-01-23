@@ -747,10 +747,10 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     public J visitDeconstructionPattern(J.DeconstructionPattern deconstructionPattern, P p) {
         J.DeconstructionPattern d = deconstructionPattern;
-        d = d.withPrefix(visitSpace(d.getPrefix(), Space.Location.PATTERN_PREFIX, p));
+        d = d.withPrefix(visitSpace(d.getPrefix(), Space.Location.DECONSTRUCTION_PATTERN_PREFIX, p));
         d = d.withMarkers(visitMarkers(d.getMarkers(), p));
         d = d.withDeconstructor(visitAndCast(d.getDeconstructor(), p));
-        d = d.getPadding().withNested(visitContainer(d.getPadding().getNested(), JContainer.Location.PATTERN, p));
+        d = d.getPadding().withNested(visitContainer(d.getPadding().getNested(), JContainer.Location.DECONSTRUCTION_PATTERN_NESTED, p));
         d = d.withType(visitType(d.getType(), p));
         return d;
 
