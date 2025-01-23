@@ -19,6 +19,10 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
 import static org.openrewrite.json.Assertions.json;
 
 class AutoFormatTest implements RewriteTest {
@@ -67,4 +71,24 @@ class AutoFormatTest implements RewriteTest {
         );
     }
 
+    @Test
+    void array() throws IOException {
+        rewriteRun(
+          json(
+            """
+            { "allowedValues": ["Four", "Three", 6]
+            }
+            """,
+            """
+            {
+              "allowedValues": [
+                "Four",
+                "Three",
+                6
+              ]
+            }
+            """
+          )
+        );
+    }
 }

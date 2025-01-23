@@ -15,6 +15,7 @@
  */
 package org.openrewrite.json.format;
 
+import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
@@ -38,8 +39,17 @@ public class NewLinesVisitor<P> extends JsonIsoVisitor<P> {
     @Override
     public Json.JsonObject visitObject(Json.JsonObject obj, P p) {
         Json.JsonObject ret = super.visitObject(obj, p);
-        List<JsonRightPadded<Json>> members = ret.getPadding().getMembers();
-        members = ListUtils.mapLast(members, last -> {
+        return ret.getPadding().withMembers(ensureCollectionHasNewLines(ret.getPadding().getMembers()));
+    }
+
+    @Override
+    public Json.Array visitArray(Json.Array array, P p) {
+        Json.Array ret = super.visitArray(array, p);
+        return ret.getPadding().withValues(ensureCollectionHasNewLines(ret.getPadding().getValues()));
+    }
+
+    private static <J extends Json> @NotNull List<JsonRightPadded<J>> ensureCollectionHasNewLines(List<JsonRightPadded<J>> elements) {
+        elements = ListUtils.mapLast(elements, last -> {
             String currentAfterNewLine = last.getAfter().getWhitespaceIndent();
             String currentAfter = last.getAfter().getWhitespace();
             String newAfter = "\n" + currentAfterNewLine;
@@ -49,7 +59,7 @@ public class NewLinesVisitor<P> extends JsonIsoVisitor<P> {
                 return last;
             }
         });
-        members = ListUtils.map(members, elem -> {
+        elements = ListUtils.map(elements, elem -> {
             String oldAfterNewLine = elem.getElement().getPrefix().getWhitespaceIndent();
             String newPrefix = "\n" + oldAfterNewLine;
             if (!newPrefix.equals(elem.getElement().getPrefix().getWhitespace())) {
@@ -58,7 +68,7 @@ public class NewLinesVisitor<P> extends JsonIsoVisitor<P> {
                 return elem;
             }
         });
-        return ret.getPadding().withMembers(members);
+        return elements;
     }
 
     @Override

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.json.format;
 
+import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
@@ -57,7 +58,7 @@ public class TabsAndIndentsVisitor<P> extends JsonIsoVisitor<P> {
     @Override
     public Json preVisit(Json tree, P p) {
         Json json = super.preVisit(tree, p);
-        if (tree instanceof Json.JsonObject) {
+        if (tree instanceof Json.JsonObject || tree instanceof Json.Array) {
             String newIndent = getCurrentIndent() + this.singleIndent;
             getCursor().putMessage("indentToUse", newIndent);
         }
@@ -92,19 +93,25 @@ public class TabsAndIndentsVisitor<P> extends JsonIsoVisitor<P> {
         }
         if (json instanceof Json.JsonObject) {
             Json.JsonObject obj = (Json.JsonObject) json;
-            List<JsonRightPadded<Json>> children = obj.getPadding().getMembers();
-            children = ListUtils.mapLast(children, last -> {
-                String currentAfter = last.getAfter().getWhitespace();
-                String newAfter = "\n" + relativeIndent;
-                if (!newAfter.equals(currentAfter)) {
-                    return last.withAfter(Space.build(newAfter, emptyList()));
-                } else {
-                    return last;
-                }
-            });
-            json = obj.getPadding().withMembers(children);
+            json = obj.getPadding().withMembers(ensureCollectionHasIndents(obj.getPadding().getMembers(), relativeIndent));
+        }
+        if (json instanceof Json.Array) {
+            Json.Array array = (Json.Array) json;
+            json = array.getPadding().withValues(ensureCollectionHasIndents(array.getPadding().getValues(), relativeIndent));
         }
         return json;
+    }
+
+    private static @NotNull <J extends Json> List<JsonRightPadded<J>> ensureCollectionHasIndents(List<JsonRightPadded<J>> elements, String relativeIndent) {
+        return ListUtils.mapLast(elements, last -> {
+            String currentAfter = last.getAfter().getWhitespace();
+            String newAfter = "\n" + relativeIndent;
+            if (!newAfter.equals(currentAfter)) {
+                return last.withAfter(Space.build(newAfter, emptyList()));
+            } else {
+                return last;
+            }
+        });
     }
 
     private String getCurrentIndent() {

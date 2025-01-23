@@ -80,4 +80,22 @@ class NewLinesVisitorTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void arrays() {
+        rewriteRun(
+          json(
+            """
+            [3, 4, 5]
+            """,
+            """
+            [
+            3,
+             4,
+             5
+            ]
+            """
+          )
+        );
+    }
 }
