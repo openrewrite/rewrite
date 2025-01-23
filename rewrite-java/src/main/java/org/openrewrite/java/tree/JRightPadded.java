@@ -61,7 +61,7 @@ public class JRightPadded<T> {
         IF_ELSE(Space.Location.IF_ELSE_SUFFIX),
         IF_THEN(Space.Location.IF_THEN_SUFFIX),
         IMPLEMENTS(Space.Location.IMPLEMENTS_SUFFIX),
-        PATTERN(Space.Location.PATTERN),
+        DECONSTRUCTION_PATTERN_NESTED(Space.Location.DECONSTRUCTION_PATTERN_NESTED_SUFFIX),
         PERMITS(Space.Location.PERMITS_SUFFIX),
         IMPORT(Space.Location.IMPORT_SUFFIX),
         INSTANCEOF(Space.Location.INSTANCEOF_SUFFIX),

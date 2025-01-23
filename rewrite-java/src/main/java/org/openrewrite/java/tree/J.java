@@ -3052,7 +3052,7 @@ public interface J extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class DeconstructionPattern implements J, Pattern, TypedTree {
+    final class DeconstructionPattern implements J, TypedTree {
 
         @Nullable
         @NonFinal
@@ -3097,11 +3097,6 @@ public interface J extends Tree {
         @Override
         public String toString() {
             return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
-        }
-
-        @Override
-        public CoordinateBuilder.Pattern getCoordinates() {
-            return new CoordinateBuilder.Pattern(this);
         }
 
         public Padding getPadding() {

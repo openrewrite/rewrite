@@ -37,24 +37,6 @@ public abstract class CoordinateBuilder {
         return new JavaCoordinates(tree, location, JavaCoordinates.Mode.REPLACEMENT, null);
     }
 
-    public static class Pattern extends CoordinateBuilder {
-        public Pattern(org.openrewrite.java.tree.Pattern tree) {
-            super(tree);
-        }
-
-        public JavaCoordinates after() {
-            return after(Space.Location.PATTERN_PREFIX);
-        }
-
-        public JavaCoordinates before() {
-            return before(Space.Location.PATTERN_PREFIX);
-        }
-
-        public JavaCoordinates replace() {
-            return replace(Space.Location.PATTERN_PREFIX);
-        }
-    }
-
     /**
      * Even though statements are not a superset of expressions,
      * this provides a way for statements that are
