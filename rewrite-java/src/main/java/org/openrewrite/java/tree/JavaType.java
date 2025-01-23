@@ -19,10 +19,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.Value;
-import lombok.With;
+import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
@@ -720,6 +717,7 @@ public interface JavaType {
             return type.getSupertype();
         }
 
+        @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c", include = JsonTypeInfo.As.PROPERTY)
         public interface ElementValue {
             JavaType getElement();
 
@@ -729,13 +727,40 @@ public interface JavaType {
         @Value
         public static class SingleElementValue implements ElementValue {
             JavaType element;
-            Object value;
+
+            @Nullable
+            Object constantValue;
+
+            @Nullable
+            JavaType referenceValue;
+
+            public static SingleElementValue from(JavaType element, Object value) {
+                if (value instanceof JavaType) {
+                    return new SingleElementValue(element, null, (JavaType) value);
+                } else {
+                    return new SingleElementValue(element, value, null);
+                }
+            }
+
+            @Override
+            public Object getValue() {
+                return constantValue != null ? constantValue : referenceValue;
+            }
         }
 
         @Value
         public static class ArrayElementValue implements ElementValue {
             JavaType element;
-            Object[] values;
+            Object @Nullable [] constantValues;
+            JavaType @Nullable [] referenceValues;
+
+            public static ArrayElementValue from(JavaType element, Object[] values) {
+                if (values.length > 0 && values[0] instanceof JavaType) {
+                    return new ArrayElementValue(element, null, (JavaType[]) values);
+                } else {
+                    return new ArrayElementValue(element, values, null);
+                }
+            }
 
             @Override
             public Object getValue() {
@@ -743,7 +768,7 @@ public interface JavaType {
             }
 
             public List<?> getValues() {
-                return Arrays.asList(values);
+                return Arrays.asList(constantValues != null ? constantValues : referenceValues);
             }
         }
     }

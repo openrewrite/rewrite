@@ -704,8 +704,8 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
             Object value = annotationElementValue(attr.snd.getValue());
             JavaType.Method element = requireNonNull(methodDeclarationType(attr.fst, annotType));
             JavaType.Annotation.ElementValue elementValue = value instanceof Object[] ?
-                    new JavaType.Annotation.ArrayElementValue(element, ((Object[]) value)) :
-                    new JavaType.Annotation.SingleElementValue(element, value);
+                    JavaType.Annotation.ArrayElementValue.from(element, ((Object[]) value)) :
+                    JavaType.Annotation.SingleElementValue.from(element, value);
             elementValues.add(elementValue);
         }
         return new JavaType.Annotation(annotType, elementValues);
@@ -722,13 +722,13 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
             for (Attribute attribute : ((Attribute.Array) value).values) {
                 list.add(annotationElementValue(attribute));
             }
-            return list.toArray(new Object[0]);
+            return list.toArray(!list.isEmpty() && list.get(0) instanceof JavaType ? JavaType.EMPTY_JAVA_TYPE_ARRAY : new Object[0]);
         } else if (value instanceof List<?>) {
             List<@Nullable Object> list = new ArrayList<>();
             for (Object o : ((List<?>) value)) {
                 list.add(annotationElementValue(o));
             }
-            return list.toArray(new Object[0]);
+            return list.toArray(!list.isEmpty() && list.get(0) instanceof JavaType ? JavaType.EMPTY_JAVA_TYPE_ARRAY : new Object[0]);
         } else if (value instanceof Attribute.Class) {
             return type(((Attribute.Class) value).classType);
         } else if (value instanceof Attribute.Compound) {
