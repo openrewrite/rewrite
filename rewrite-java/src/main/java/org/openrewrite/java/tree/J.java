@@ -3051,6 +3051,87 @@ public interface J extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class DeconstructionPattern implements J, TypedTree {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        Expression deconstructor;
+
+        JContainer<J> nested;
+
+        public List<J> getNested() {
+            return nested.getElements();
+        }
+
+        public DeconstructionPattern withNested(List<J> nested) {
+            return getPadding().withNested(JContainer.withElements(this.nested, nested));
+        }
+
+        @Getter
+        @With
+        JavaType type;
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitDeconstructionPattern(this, p);
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final DeconstructionPattern t;
+
+            public JContainer<J> getNested() {
+                return t.nested;
+            }
+
+            public DeconstructionPattern withNested(JContainer<J> nested) {
+                return t.nested == nested ? t : new DeconstructionPattern(t.id, t.prefix, t.markers, t.deconstructor, nested, t.type);
+            }
+        }
+
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class IntersectionType implements J, TypeTree, Expression {
         @Nullable
         @NonFinal
@@ -5096,6 +5177,7 @@ public interface J extends Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
+    @RequiredArgsConstructor
     final class SwitchExpression implements J, Expression, TypedTree {
         @With
         @EqualsAndHashCode.Include
