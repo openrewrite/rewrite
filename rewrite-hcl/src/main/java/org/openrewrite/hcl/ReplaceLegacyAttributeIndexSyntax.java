@@ -38,8 +38,8 @@ public class ReplaceLegacyAttributeIndexSyntax extends Recipe {
     public HclVisitor<ExecutionContext> getVisitor() {
         return new HclVisitor<ExecutionContext>() {
             @Override
-            public Hcl.Index visitLegacyIndexAttribute(Hcl.LegacyIndexAttributeAccess legacy, ExecutionContext executionContext) {
-                Hcl.LegacyIndexAttributeAccess ret = (Hcl.LegacyIndexAttributeAccess) super.visitLegacyIndexAttribute(legacy, executionContext);
+            public Hcl.Index visitLegacyIndexAttribute(Hcl.LegacyIndexAttributeAccess legacy, ExecutionContext ctx) {
+                Hcl.LegacyIndexAttributeAccess ret = (Hcl.LegacyIndexAttributeAccess) super.visitLegacyIndexAttribute(legacy, ctx);
                 Hcl.Index.Position position = new Hcl.Index.Position(Tree.randomId(), Space.EMPTY, ret.getIndex().getMarkers(), new HclRightPadded<>(ret.getIndex(), Space.EMPTY, Markers.EMPTY));
                 return new Hcl.Index(Tree.randomId(), ret.getPrefix(), ret.getMarkers(), ret.getBase().getElement(), position);
             }
