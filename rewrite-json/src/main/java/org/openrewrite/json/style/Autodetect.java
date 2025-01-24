@@ -20,11 +20,11 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.json.JsonVisitor;
+import org.openrewrite.json.tree.Json;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.LineWrapSetting;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
-import org.openrewrite.json.tree.Json;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;

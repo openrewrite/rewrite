@@ -23,10 +23,7 @@ import org.openrewrite.json.style.Autodetect;
 import org.openrewrite.json.style.TabsAndIndentsStyle;
 import org.openrewrite.json.style.WrappingAndBracesStyle;
 import org.openrewrite.json.tree.Json;
-import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
-
-import java.util.function.Supplier;
 
 public class Indents extends Recipe {
     @Override

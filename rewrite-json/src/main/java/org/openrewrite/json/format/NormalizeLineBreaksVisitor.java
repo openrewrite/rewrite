@@ -17,9 +17,9 @@ package org.openrewrite.json.format;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
-import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.json.JsonIsoVisitor;
 import org.openrewrite.json.tree.Json;
+import org.openrewrite.style.GeneralFormatStyle;
 
 import static org.openrewrite.format.LineBreaks.normalizeNewLines;
 
