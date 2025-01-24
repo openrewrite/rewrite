@@ -93,7 +93,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     return null;
                 }
 
-                if (!(StringUtils.isBlank(configuration) || methodInvocation.getSimpleName().equals(configuration))) {
+                if (!StringUtils.isBlank(configuration) && !methodInvocation.getSimpleName().equals(configuration)) {
                     return null;
                 }
 
