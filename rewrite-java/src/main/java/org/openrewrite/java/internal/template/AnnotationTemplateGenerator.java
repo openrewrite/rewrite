@@ -71,7 +71,7 @@ public class AnnotationTemplateGenerator {
                     StringBuilder before = new StringBuilder();
                     StringBuilder after = new StringBuilder();
 
-                    template(next(cursor), cursor.getValue(), before, after, newSetFromMap(new IdentityHashMap<>()), cursor.getValue());
+                    template(next(cursor), cursor.getValue(), before, after, newSetFromMap(new IdentityHashMap<>()));
 
                     J j = cursor.getValue();
                     J annotationParent = j instanceof J.Annotation && cursor.getParent() != null ? cursor.getParent().firstEnclosing(J.class) : null;
@@ -116,7 +116,7 @@ public class AnnotationTemplateGenerator {
         return annotations;
     }
 
-    private void template(Cursor cursor, J prior, StringBuilder before, StringBuilder after, Set<J> templated, J.Annotation annotation) {
+    private void template(Cursor cursor, J prior, StringBuilder before, StringBuilder after, Set<J> templated) {
         templated.add(cursor.getValue());
         final J j = cursor.getValue();
         if (j instanceof JavaSourceFile) {
@@ -137,7 +137,7 @@ public class AnnotationTemplateGenerator {
             }
             return;
         } else if (j instanceof J.ClassDeclaration) {
-            classDeclaration(before, after, (J.ClassDeclaration) j, templated, cursor, annotation);
+            classDeclaration(before, after, (J.ClassDeclaration) j, templated, cursor, prior);
         } else if (j instanceof J.Block) {
             J parent = next(cursor).getValue();
             if (parent instanceof J.MethodDeclaration) {
@@ -196,12 +196,12 @@ public class AnnotationTemplateGenerator {
             after.append("};");
         }
 
-        template(next(cursor), j, before, after, templated, annotation);
+        template(next(cursor), j, before, after, templated);
     }
 
-    private void classDeclaration(StringBuilder before, StringBuilder after, J.ClassDeclaration parent, Set<J> templated, Cursor cursor, J.Annotation annotation) {
+    private void classDeclaration(StringBuilder before, StringBuilder after, J.ClassDeclaration parent, Set<J> templated, Cursor cursor, J prior) {
         J.ClassDeclaration c = parent;
-        boolean annotated = isAnnotated(cursor, annotation);
+        boolean annotated = isAnnotated(cursor, prior);
         if (!annotated) {
             for (Statement statement : c.getBody().getStatements()) {
                 if (templated.contains(statement)) {
@@ -217,7 +217,7 @@ public class AnnotationTemplateGenerator {
                     // this is a sibling class. we need declarations for all variables and methods.
                     // setting prior to null will cause them all to be written.
                     before.insert(0, '}');
-                    classDeclaration(before, after, (J.ClassDeclaration) statement, templated, cursor, annotation);
+                    classDeclaration(before, after, (J.ClassDeclaration) statement, templated, cursor, prior);
                 }
             }
         }
@@ -232,10 +232,13 @@ public class AnnotationTemplateGenerator {
         after.append('}');
     }
 
-    private static boolean isAnnotated(Cursor cursor, J.Annotation annotation) {
+    private static boolean isAnnotated(Cursor cursor, J maybeAnnotation) {
+        if (!(maybeAnnotation instanceof J.Annotation)) {
+            return false;
+        }
         Cursor sourceFileCursor = cursor.dropParentUntil(is -> is instanceof JavaSourceFile);
         AnnotationService annotationService = sourceFileCursor.<JavaSourceFile>getValue().service(AnnotationService.class);
-        return annotationService.getAllAnnotations(cursor).contains(annotation);
+        return annotationService.getAllAnnotations(cursor).contains(maybeAnnotation);
     }
 
     private String variable(J.VariableDeclarations variable, Cursor cursor) {
