@@ -733,6 +733,15 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitDeconstructionPattern(DeconstructionPattern deconstructionPattern, PrintOutputCapture<P> p) {
+        beforeSyntax(deconstructionPattern, Space.Location.DECONSTRUCTION_PATTERN_PREFIX, p);
+        visitAndCast(deconstructionPattern.getDeconstructor(), p);
+        visitContainer("(", deconstructionPattern.getPadding().getNested(), JContainer.Location.DECONSTRUCTION_PATTERN_NESTED, ",", ")", p);
+        afterSyntax(deconstructionPattern, p);
+        return deconstructionPattern;
+    }
+
+    @Override
     public J visitIntersectionType(IntersectionType intersectionType, PrintOutputCapture<P> p) {
         beforeSyntax(intersectionType, Space.Location.INTERSECTION_TYPE_PREFIX, p);
         visitContainer("", intersectionType.getPadding().getBounds(), JContainer.Location.TYPE_BOUNDS, "&", "", p);

@@ -1817,4 +1817,26 @@ class ChangePackageTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void changeNonRecursivePackageInYamlKey() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("org.apache.http", "org.apache.hc.core5.http", false)),
+          yaml(
+            """
+              logging:
+                level:
+                  org.apache.hc: debug
+                  org.apache.http: debug
+              """,
+            """
+              logging:
+                level:
+                  org.apache.hc: debug
+                  org.apache.hc.core5.http: debug
+              """,
+            spec -> spec.path("application.yaml")
+          )
+        );
+    }
 }

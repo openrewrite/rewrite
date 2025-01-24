@@ -19,7 +19,6 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
-import org.jetbrains.annotations.ApiStatus;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -43,7 +42,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 
 import static java.util.Collections.emptyList;
@@ -1113,12 +1111,6 @@ public interface J extends Tree {
             this.guard = guard;
             this.statements = statements;
             this.body = body;
-        }
-
-        @Deprecated
-        @ApiStatus.ScheduledForRemoval(inVersion = "2025-05-01")
-        public Case(UUID id, Space prefix, Markers markers, Type type, JContainer<Expression> expressions, JContainer<Statement> statements, @Nullable JRightPadded<J> body) {
-            this(id, prefix, markers, type, null, expressions, null, null, statements, body);
         }
 
         @Override
@@ -3053,6 +3045,87 @@ public interface J extends Tree {
                 return t.expression == expression ? t : new InstanceOf(t.id, t.prefix, t.markers, expression, t.clazz, t.pattern, t.type);
             }
         }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class DeconstructionPattern implements J, TypedTree {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        Expression deconstructor;
+
+        JContainer<J> nested;
+
+        public List<J> getNested() {
+            return nested.getElements();
+        }
+
+        public DeconstructionPattern withNested(List<J> nested) {
+            return getPadding().withNested(JContainer.withElements(this.nested, nested));
+        }
+
+        @Getter
+        @With
+        JavaType type;
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitDeconstructionPattern(this, p);
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final DeconstructionPattern t;
+
+            public JContainer<J> getNested() {
+                return t.nested;
+            }
+
+            public DeconstructionPattern withNested(JContainer<J> nested) {
+                return t.nested == nested ? t : new DeconstructionPattern(t.id, t.prefix, t.markers, t.deconstructor, nested, t.type);
+            }
+        }
+
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -5126,21 +5199,6 @@ public interface J extends Tree {
         @Nullable
         @Getter
         JavaType type;
-
-        @Deprecated
-        @ApiStatus.ScheduledForRemoval(inVersion = "2025-05-01")
-        public SwitchExpression(UUID id, Space prefix, Markers markers, ControlParentheses<Expression> selector, Block cases) {
-            this(id, prefix, markers, selector, cases, new JavaVisitor<AtomicReference<@Nullable JavaType>>() {
-                @Override
-                public J visitBlock(Block block, AtomicReference<@Nullable JavaType> javaType) {
-                    if (!block.getStatements().isEmpty()) {
-                        Case caze = (Case) block.getStatements().get(0);
-                        javaType.set(caze.getExpressions().isEmpty() ? null : caze.getExpressions().get(0).getType());
-                    }
-                    return block;
-                }
-            }.reduce(cases, new AtomicReference<>()).get());
-        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {

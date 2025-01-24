@@ -103,6 +103,7 @@ public class JContainer<T> {
         CASE(Space.Location.CASE, JRightPadded.Location.CASE),
         CASE_EXPRESSION(Space.Location.CASE_EXPRESSION, JRightPadded.Location.CASE_EXPRESSION),
         CASE_LABEL(Space.Location.CASE_LABEL, JRightPadded.Location.CASE_LABEL),
+        DECONSTRUCTION_PATTERN_NESTED(Space.Location.DECONSTRUCTION_PATTERN_NESTED, JRightPadded.Location.DECONSTRUCTION_PATTERN_NESTED),
         IMPLEMENTS(Space.Location.IMPLEMENTS, JRightPadded.Location.IMPLEMENTS),
         PERMITS(Space.Location.PERMITS, JRightPadded.Location.PERMITS),
         LANGUAGE_EXTENSION(Space.Location.LANGUAGE_EXTENSION, JRightPadded.Location.LANGUAGE_EXTENSION),

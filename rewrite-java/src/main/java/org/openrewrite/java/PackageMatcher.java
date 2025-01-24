@@ -54,10 +54,12 @@ public class PackageMatcher implements Reference.Matcher {
 
     String getReplacement(String value, @Nullable String oldValue, String newValue) {
         if (oldValue != null) {
-            if (recursive) {
-                return value.replace(oldValue, newValue);
-            } else if (value.startsWith(oldValue) && Character.isUpperCase(value.charAt(oldValue.length() + 1))) {
-                return value.replace(oldValue, newValue);
+            if (value.equals(oldValue)) {
+                return newValue;
+            } else if (value.startsWith(oldValue)) {
+                if (recursive || value.length() > oldValue.length() + 1 && Character.isUpperCase(value.charAt(oldValue.length() + 1))) {
+                    return newValue + value.substring(oldValue.length());
+                }
             }
         }
         return value;

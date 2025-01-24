@@ -24,6 +24,7 @@ import org.openrewrite.gradle.util.Dependency;
 import org.openrewrite.gradle.util.DependencyStringNotationConverter;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -96,7 +97,7 @@ public class ChangeDependencyConfiguration extends Recipe {
                 GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher()
                         .configuration(configuration);
 
-                if (!(gradleDependencyMatcher.get(getCursor()).isPresent() || dependencyDsl.matches(m))) {
+                if (!gradleDependencyMatcher.get(getCursor()).isPresent() && !matchesOtherDependency(m)) {
                     return m;
                 }
 
@@ -222,6 +223,23 @@ public class ChangeDependencyConfiguration extends Recipe {
                 }
 
                 return m.withName(m.getName().withSimpleName(newConfiguration));
+            }
+
+            private boolean matchesOtherDependency(J.MethodInvocation m) {
+                if (!dependencyDsl.matches(m)) {
+                    return false;
+                }
+
+                if (m.getArguments().isEmpty() || !(m.getArguments().get(0) instanceof J.MethodInvocation)) {
+                    return false;
+                }
+
+                J.MethodInvocation inner = (J.MethodInvocation) m.getArguments().get(0);
+                if (!(inner.getSimpleName().equals("project") || inner.getSimpleName().equals("platform") || inner.getSimpleName().equals("enforcedPlatform"))) {
+                    return false;
+                }
+
+                return StringUtils.isBlank(configuration) || configuration.equals(m.getSimpleName());
             }
         });
     }
