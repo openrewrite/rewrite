@@ -15,7 +15,6 @@
  */
 package org.openrewrite.json.format;
 
-import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
@@ -76,7 +75,7 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
         return super.visit(tree, p);
     }
 
-    private static <JS extends Json> @NotNull List<JsonRightPadded<JS>> applyWrappingStyleToPrefixes(List<JsonRightPadded<JS>> elements, LineWrapSetting wrap) {
+    private static <JS extends Json> List<JsonRightPadded<JS>> applyWrappingStyleToPrefixes(List<JsonRightPadded<JS>> elements, LineWrapSetting wrap) {
         final String possibleNewLine = wrap.delimiter();
         return ListUtils.map(elements, elem -> {
             String oldAfterNewLine = elem.getElement().getPrefix().getWhitespaceIndent();
@@ -89,7 +88,7 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
         });
     }
 
-    private static <JS extends Json> @NotNull List<JsonRightPadded<JS>> applyWrappingStyleToLastChildSuffix(List<JsonRightPadded<JS>> elements, LineWrapSetting wrap) {
+    private static <JS extends Json> List<JsonRightPadded<JS>> applyWrappingStyleToLastChildSuffix(List<JsonRightPadded<JS>> elements, LineWrapSetting wrap) {
         final String possibleNewLine = wrap.delimiter();
         return ListUtils.mapLast(elements, last -> {
             String currentAfterNewLine = last.getAfter().getWhitespaceIndent();
