@@ -20,6 +20,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.json.JsonIsoVisitor;
 import org.openrewrite.json.style.TabsAndIndentsStyle;
+import org.openrewrite.json.style.WrappingAndBracesStyle;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonRightPadded;
 import org.openrewrite.json.tree.Space;
@@ -30,28 +31,25 @@ import java.util.Optional;
 import static java.util.Collections.emptyList;
 
 public class TabsAndIndentsVisitor<P> extends JsonIsoVisitor<P> {
-
-    private final TabsAndIndentsStyle style;
-
     private final String singleIndent;
+    private final String objectsWrappingDelimiter;
 
     @Nullable
     private final Tree stopAfter;
 
-    public TabsAndIndentsVisitor(TabsAndIndentsStyle style, @Nullable Tree stopAfter) {
-        this.style = style;
+    public TabsAndIndentsVisitor(WrappingAndBracesStyle wrappingAndBracesStyle, TabsAndIndentsStyle tabsAndIndentsStyle, @Nullable Tree stopAfter) {
         this.stopAfter = stopAfter;
 
-        if (style.getUseTabCharacter()) {
+        if (tabsAndIndentsStyle.getUseTabCharacter()) {
             this.singleIndent = "\t";
         } else {
             StringBuilder sb = new StringBuilder();
-            for (int j = 0; j < style.getIndentSize(); j++) {
+            for (int j = 0; j < tabsAndIndentsStyle.getIndentSize(); j++) {
                 sb.append(" ");
             }
             singleIndent = sb.toString();
         }
-
+        this.objectsWrappingDelimiter = wrappingAndBracesStyle.getWrapObjects().delimiter();
     }
 
     @Override
@@ -95,7 +93,7 @@ public class TabsAndIndentsVisitor<P> extends JsonIsoVisitor<P> {
             List<JsonRightPadded<Json>> children = obj.getPadding().getMembers();
             children = ListUtils.mapLast(children, last -> {
                 String currentAfter = last.getAfter().getWhitespace();
-                String newAfter = "\n" + relativeIndent;
+                String newAfter = objectsWrappingDelimiter + relativeIndent;
                 if (!newAfter.equals(currentAfter)) {
                     return last.withAfter(Space.build(newAfter, emptyList()));
                 } else {

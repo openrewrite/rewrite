@@ -15,13 +15,17 @@
  */
 package org.openrewrite.json.format;
 
+import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.json.JsonIsoVisitor;
+import org.openrewrite.json.style.WrappingAndBracesStyle;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonRightPadded;
+import org.openrewrite.json.tree.JsonValue;
 import org.openrewrite.json.tree.Space;
+import org.openrewrite.style.LineWrapSetting;
 
 import java.util.List;
 
@@ -31,7 +35,10 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
     @Nullable
     private final Tree stopAfter;
 
-    public WrappingAndBracesVisitor(@Nullable Tree stopAfter) {
+    private final WrappingAndBracesStyle style;
+
+    public WrappingAndBracesVisitor(WrappingAndBracesStyle style, @Nullable Tree stopAfter) {
+        this.style = style;
         this.stopAfter = stopAfter;
     }
 
@@ -39,26 +46,18 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
     public Json.JsonObject visitObject(Json.JsonObject obj, P p) {
         Json.JsonObject ret = super.visitObject(obj, p);
         List<JsonRightPadded<Json>> members = ret.getPadding().getMembers();
-        members = ListUtils.mapLast(members, last -> {
-            String currentAfterNewLine = last.getAfter().getWhitespaceIndent();
-            String currentAfter = last.getAfter().getWhitespace();
-            String newAfter = "\n" + currentAfterNewLine;
-            if (!newAfter.equals(currentAfter)) {
-                return last.withAfter(Space.build(newAfter, emptyList()));
-            } else {
-                return last;
-            }
-        });
-        members = ListUtils.map(members, elem -> {
-            String oldAfterNewLine = elem.getElement().getPrefix().getWhitespaceIndent();
-            String newPrefix = "\n" + oldAfterNewLine;
-            if (!newPrefix.equals(elem.getElement().getPrefix().getWhitespace())) {
-                return elem.withElement(elem.getElement().withPrefix(Space.build(newPrefix, emptyList())));
-            } else {
-                return elem;
-            }
-        });
+        members = applyWrappingStyleToLastChildSuffix(members, this.style.getWrapObjects());
+        members = applyWrappingStyleToPrefixes(members, this.style.getWrapObjects());
         return ret.getPadding().withMembers(members);
+    }
+
+    @Override
+    public Json.Array visitArray(Json.Array array, P p) {
+        Json.Array ret = super.visitArray(array, p);
+        List<JsonRightPadded<JsonValue>> members = ret.getPadding().getValues();
+        members = applyWrappingStyleToLastChildSuffix(members, this.style.getWrapArrays());
+        members = applyWrappingStyleToPrefixes(members, this.style.getWrapArrays());
+        return ret.getPadding().withValues(members);
     }
 
     @Override
@@ -77,4 +76,30 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
         return super.visit(tree, p);
     }
 
+    private static <JS extends Json> @NotNull List<JsonRightPadded<JS>> applyWrappingStyleToPrefixes(List<JsonRightPadded<JS>> elements, LineWrapSetting wrap) {
+        final String possibleNewLine = wrap.delimiter();
+        return ListUtils.map(elements, elem -> {
+            String oldAfterNewLine = elem.getElement().getPrefix().getWhitespaceIndent();
+            String newPrefix = possibleNewLine + oldAfterNewLine;
+            if (!newPrefix.equals(elem.getElement().getPrefix().getWhitespace())) {
+                return elem.withElement(elem.getElement().withPrefix(Space.build(newPrefix, emptyList())));
+            } else {
+                return elem;
+            }
+        });
+    }
+
+    private static <JS extends Json> @NotNull List<JsonRightPadded<JS>> applyWrappingStyleToLastChildSuffix(List<JsonRightPadded<JS>> elements, LineWrapSetting wrap) {
+        final String possibleNewLine = wrap.delimiter();
+        return ListUtils.mapLast(elements, last -> {
+            String currentAfterNewLine = last.getAfter().getWhitespaceIndent();
+            String currentAfter = last.getAfter().getWhitespace();
+            String newAfter = possibleNewLine + currentAfterNewLine;
+            if (!newAfter.equals(currentAfter)) {
+                return last.withAfter(Space.build(newAfter, emptyList()));
+            } else {
+                return last;
+            }
+        });
+    }
 }

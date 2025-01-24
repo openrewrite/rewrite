@@ -16,6 +16,10 @@
 package org.openrewrite.style;
 
 public enum LineWrapSetting {
-    DoNotWrap, WrapAlways
+    DoNotWrap, WrapAlways;
     // Eventually we would add values like WrapIfTooLong or ChopIfTooLong
+
+    public String delimiter() {
+        return this == DoNotWrap ? "" : "\n";
+    }
 }
