@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.service.AnnotationService;
 import org.openrewrite.java.tree.*;
 
 import java.util.ArrayList;
@@ -70,7 +71,7 @@ public class AnnotationTemplateGenerator {
                     StringBuilder before = new StringBuilder();
                     StringBuilder after = new StringBuilder();
 
-                    template(next(cursor), cursor.getValue(), before, after, newSetFromMap(new IdentityHashMap<>()));
+                    template(next(cursor), cursor.getValue(), before, after, newSetFromMap(new IdentityHashMap<>()), cursor.getValue());
 
                     J j = cursor.getValue();
                     J annotationParent = j instanceof J.Annotation && cursor.getParent() != null ? cursor.getParent().firstEnclosing(J.class) : null;
@@ -115,9 +116,9 @@ public class AnnotationTemplateGenerator {
         return annotations;
     }
 
-    private void template(Cursor cursor, J prior, StringBuilder before, StringBuilder after, Set<J> templated) {
+    private void template(Cursor cursor, J prior, StringBuilder before, StringBuilder after, Set<J> templated, J.Annotation annotation) {
         templated.add(cursor.getValue());
-        J j = cursor.getValue();
+        final J j = cursor.getValue();
         if (j instanceof JavaSourceFile) {
             JavaSourceFile cu = (JavaSourceFile) j;
             for (J.Import anImport : cu.getImports()) {
@@ -132,16 +133,14 @@ public class AnnotationTemplateGenerator {
             }
             List<J.ClassDeclaration> classes = cu.getClasses();
             if (!classes.get(classes.size() - 1).getName().getSimpleName().equals("$Placeholder")) {
-                after.append("@interface $Placeholder {}");
+                after.append("\n@interface $Placeholder {}");
             }
             return;
-        }
-        if (j instanceof J.Block) {
+        } else if (j instanceof J.ClassDeclaration) {
+            classDeclaration(before, after, (J.ClassDeclaration) j, templated, cursor, annotation);
+        } else if (j instanceof J.Block) {
             J parent = next(cursor).getValue();
-            if (parent instanceof J.ClassDeclaration) {
-                classDeclaration(before, (J.ClassDeclaration) parent, templated, cursor);
-                after.append('}');
-            } else if (parent instanceof J.MethodDeclaration) {
+            if (parent instanceof J.MethodDeclaration) {
                 J.MethodDeclaration m = (J.MethodDeclaration) parent;
 
                 // variable declarations up to the point of insertion
@@ -197,32 +196,46 @@ public class AnnotationTemplateGenerator {
             after.append("};");
         }
 
-        template(next(cursor), j, before, after, templated);
+        template(next(cursor), j, before, after, templated, annotation);
     }
 
-    private void classDeclaration(StringBuilder before, J.ClassDeclaration parent, Set<J> templated, Cursor cursor) {
+    private void classDeclaration(StringBuilder before, StringBuilder after, J.ClassDeclaration parent, Set<J> templated, Cursor cursor, J.Annotation annotation) {
         J.ClassDeclaration c = parent;
-        for (Statement statement : c.getBody().getStatements()) {
-            if (templated.contains(statement)) {
-                continue;
-            }
-
-            if (statement instanceof J.VariableDeclarations) {
-                J.VariableDeclarations v = (J.VariableDeclarations) statement;
-                if (v.hasModifier(J.Modifier.Type.Final) && v.hasModifier(J.Modifier.Type.Static)) {
-                    before.insert(0, variable((J.VariableDeclarations) statement, cursor) + ";\n");
+        boolean annotated = isAnnotated(cursor, annotation);
+        if (!annotated) {
+            for (Statement statement : c.getBody().getStatements()) {
+                if (templated.contains(statement)) {
+                    continue;
                 }
-            } else if (statement instanceof J.ClassDeclaration) {
-                // this is a sibling class. we need declarations for all variables and methods.
-                // setting prior to null will cause them all to be written.
-                before.insert(0, '}');
-                classDeclaration(before, (J.ClassDeclaration) statement, templated, cursor);
+
+                if (statement instanceof J.VariableDeclarations) {
+                    J.VariableDeclarations v = (J.VariableDeclarations) statement;
+                    if (v.hasModifier(J.Modifier.Type.Final) && v.hasModifier(J.Modifier.Type.Static)) {
+                        before.insert(0, variable((J.VariableDeclarations) statement, cursor) + ";\n");
+                    }
+                } else if (statement instanceof J.ClassDeclaration) {
+                    // this is a sibling class. we need declarations for all variables and methods.
+                    // setting prior to null will cause them all to be written.
+                    before.insert(0, '}');
+                    classDeclaration(before, after, (J.ClassDeclaration) statement, templated, cursor, annotation);
+                }
             }
         }
         c = c.withBody(J.Block.createEmptyBlock()).withLeadingAnnotations(null).withPrefix(Space.EMPTY);
         String printed = c.printTrimmed(cursor);
         int braceIndex = printed.lastIndexOf('{');
-        before.insert(0, braceIndex == -1 ? printed + '{' : printed.substring(0, braceIndex + 1));
+        if (annotated) {
+            after.append(braceIndex == -1 ? printed + '{' : printed.substring(0, braceIndex + 1));
+        } else {
+            before.insert(0, braceIndex == -1 ? printed + '{' : printed.substring(0, braceIndex + 1));
+        }
+        after.append('}');
+    }
+
+    private static boolean isAnnotated(Cursor cursor, J.Annotation annotation) {
+        Cursor sourceFileCursor = cursor.dropParentUntil(is -> is instanceof JavaSourceFile);
+        AnnotationService annotationService = sourceFileCursor.<JavaSourceFile>getValue().service(AnnotationService.class);
+        return annotationService.getAllAnnotations(cursor).contains(annotation);
     }
 
     private String variable(J.VariableDeclarations variable, Cursor cursor) {
