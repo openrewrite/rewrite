@@ -139,11 +139,9 @@ public class TypeUtils {
             JavaType.Method method1 = (JavaType.Method) type1;
             JavaType.Method method2 = (JavaType.Method) type2;
             if (!method1.getName().equals(method2.getName()) ||
-                method1.getFlags().size() != method2.getFlags().size() ||
-                !method1.getFlags().containsAll(method2.getFlags()) ||
+                method1.getFlagsBitMap() != method2.getFlagsBitMap() ||
                 !TypeUtils.isOfType(method1.getDeclaringType(), method2.getDeclaringType()) ||
                 !TypeUtils.isOfType(method1.getReturnType(), method2.getReturnType()) ||
-                method1.getAnnotations().size() != method2.getAnnotations().size() ||
                 method1.getThrownExceptions().size() != method2.getThrownExceptions().size() ||
                 method1.getParameterTypes().size() != method2.getParameterTypes().size()) {
                 return false;
@@ -156,11 +154,6 @@ public class TypeUtils {
             }
             for (int index = 0; index < method1.getThrownExceptions().size(); index++) {
                 if (!TypeUtils.isOfType(method1.getThrownExceptions().get(index), method2.getThrownExceptions().get(index))) {
-                    return false;
-                }
-            }
-            for (int index = 0; index < method1.getAnnotations().size(); index++) {
-                if (!TypeUtils.isOfType(method1.getAnnotations().get(index), method2.getAnnotations().get(index))) {
                     return false;
                 }
             }
