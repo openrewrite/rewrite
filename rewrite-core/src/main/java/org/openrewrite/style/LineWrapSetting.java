@@ -19,7 +19,7 @@ public enum LineWrapSetting {
     DoNotWrap, WrapAlways;
     // Eventually we would add values like WrapIfTooLong or ChopIfTooLong
 
-    public String delimiter() {
-        return this == DoNotWrap ? "" : "\n";
+    public String delimiter(GeneralFormatStyle generalFormatStyle) {
+        return this == DoNotWrap ? "" : generalFormatStyle.newLine();
     }
 }

@@ -24,6 +24,7 @@ import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonRightPadded;
 import org.openrewrite.json.tree.JsonValue;
 import org.openrewrite.json.tree.Space;
+import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.LineWrapSetting;
 
 import java.util.List;
@@ -34,28 +35,34 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
     @Nullable
     private final Tree stopAfter;
 
-    private final WrappingAndBracesStyle style;
+    private final WrappingAndBracesStyle wrappingAndBracesStyle;
+    private final GeneralFormatStyle generalFormatStyle;
 
-    public WrappingAndBracesVisitor(WrappingAndBracesStyle style, @Nullable Tree stopAfter) {
-        this.style = style;
+    public WrappingAndBracesVisitor(WrappingAndBracesStyle wrappingAndBracesStyle,
+                                    GeneralFormatStyle generalFormatStyle,
+                                    @Nullable Tree stopAfter) {
+        this.wrappingAndBracesStyle = wrappingAndBracesStyle;
+        this.generalFormatStyle = generalFormatStyle;
         this.stopAfter = stopAfter;
     }
 
     @Override
     public Json.JsonObject visitObject(Json.JsonObject obj, P p) {
         Json.JsonObject ret = super.visitObject(obj, p);
+        final String possibleNewLine = this.wrappingAndBracesStyle.getWrapObjects().delimiter(generalFormatStyle);
         List<JsonRightPadded<Json>> members = ret.getPadding().getMembers();
-        members = applyWrappingStyleToLastChildSuffix(members, this.style.getWrapObjects());
-        members = applyWrappingStyleToPrefixes(members, this.style.getWrapObjects());
+        members = applyWrappingStyleToLastChildSuffix(members, possibleNewLine);
+        members = applyWrappingStyleToPrefixes(members, possibleNewLine);
         return ret.getPadding().withMembers(members);
     }
 
     @Override
     public Json.Array visitArray(Json.Array array, P p) {
         Json.Array ret = super.visitArray(array, p);
+        final String possibleNewLine = this.wrappingAndBracesStyle.getWrapArrays().delimiter(generalFormatStyle);
         List<JsonRightPadded<JsonValue>> members = ret.getPadding().getValues();
-        members = applyWrappingStyleToLastChildSuffix(members, this.style.getWrapArrays());
-        members = applyWrappingStyleToPrefixes(members, this.style.getWrapArrays());
+        members = applyWrappingStyleToLastChildSuffix(members, possibleNewLine);
+        members = applyWrappingStyleToPrefixes(members, possibleNewLine);
         return ret.getPadding().withValues(members);
     }
 
@@ -75,8 +82,7 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
         return super.visit(tree, p);
     }
 
-    private static <JS extends Json> List<JsonRightPadded<JS>> applyWrappingStyleToPrefixes(List<JsonRightPadded<JS>> elements, LineWrapSetting wrap) {
-        final String possibleNewLine = wrap.delimiter();
+    private static <JS extends Json> List<JsonRightPadded<JS>> applyWrappingStyleToPrefixes(List<JsonRightPadded<JS>> elements, String possibleNewLine) {
         return ListUtils.map(elements, elem -> {
             String oldAfterNewLine = elem.getElement().getPrefix().getWhitespaceIndent();
             String newPrefix = possibleNewLine + oldAfterNewLine;
@@ -88,8 +94,7 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
         });
     }
 
-    private static <JS extends Json> List<JsonRightPadded<JS>> applyWrappingStyleToLastChildSuffix(List<JsonRightPadded<JS>> elements, LineWrapSetting wrap) {
-        final String possibleNewLine = wrap.delimiter();
+    private static <JS extends Json> List<JsonRightPadded<JS>> applyWrappingStyleToLastChildSuffix(List<JsonRightPadded<JS>> elements, String possibleNewLine) {
         return ListUtils.mapLast(elements, last -> {
             String currentAfterNewLine = last.getAfter().getWhitespaceIndent();
             String currentAfter = last.getAfter().getWhitespace();

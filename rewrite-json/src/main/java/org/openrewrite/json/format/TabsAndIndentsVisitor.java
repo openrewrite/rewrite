@@ -24,6 +24,7 @@ import org.openrewrite.json.style.WrappingAndBracesStyle;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonRightPadded;
 import org.openrewrite.json.tree.Space;
+import org.openrewrite.style.GeneralFormatStyle;
 
 import java.util.List;
 import java.util.Optional;
@@ -37,7 +38,10 @@ public class TabsAndIndentsVisitor<P> extends JsonIsoVisitor<P> {
     @Nullable
     private final Tree stopAfter;
 
-    public TabsAndIndentsVisitor(WrappingAndBracesStyle wrappingAndBracesStyle, TabsAndIndentsStyle tabsAndIndentsStyle, @Nullable Tree stopAfter) {
+    public TabsAndIndentsVisitor(WrappingAndBracesStyle wrappingAndBracesStyle,
+                                 TabsAndIndentsStyle tabsAndIndentsStyle,
+                                 GeneralFormatStyle generalFormatStyle,
+                                 @Nullable Tree stopAfter) {
         this.stopAfter = stopAfter;
 
         if (tabsAndIndentsStyle.getUseTabCharacter()) {
@@ -49,7 +53,7 @@ public class TabsAndIndentsVisitor<P> extends JsonIsoVisitor<P> {
             }
             singleIndent = sb.toString();
         }
-        this.objectsWrappingDelimiter = wrappingAndBracesStyle.getWrapObjects().delimiter();
+        this.objectsWrappingDelimiter = wrappingAndBracesStyle.getWrapObjects().delimiter(generalFormatStyle);
     }
 
     @Override
