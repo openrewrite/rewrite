@@ -17,15 +17,11 @@ package org.openrewrite;
 
 import lombok.Value;
 import lombok.With;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.config.ColumnDescriptor;
 import org.openrewrite.config.DataTableDescriptor;
-import org.openrewrite.internal.lang.Nullable;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.PrintWriter;
+import java.io.*;
 import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -46,8 +42,7 @@ public class RecipeRun {
     @With
     Map<DataTable<?>, List<?>> dataTables;
 
-    @Nullable
-    public DataTable<?> getDataTable(String name) {
+    public @Nullable DataTable<?> getDataTable(String name) {
         for (DataTable<?> dataTable : dataTables.keySet()) {
             if (dataTable.getName().equals(name)) {
                 return dataTable;
@@ -56,8 +51,7 @@ public class RecipeRun {
         return null;
     }
 
-    @Nullable
-    public <E> List<E> getDataTableRows(String name) {
+    public <E> @Nullable List<E> getDataTableRows(String name) {
         for (Map.Entry<DataTable<?>, List<?>> dataTableAndRows : dataTables.entrySet()) {
             if (dataTableAndRows.getKey().getName().equals(name)) {
                 //noinspection unchecked
@@ -111,8 +105,7 @@ public class RecipeRun {
                 try {
                     Field field = row.getClass().getDeclaredField(fieldName);
                     field.setAccessible(true);
-                    //Assume every column value is printable with toString
-                    rowValues.add(formatForCsv(field.get(row).toString()));
+                    rowValues.add(formatForCsv(field.get(row)));
                 } catch (NoSuchFieldException | IllegalAccessException e) {
                     ctx.getOnError().accept(e);
                 }
@@ -121,9 +114,10 @@ public class RecipeRun {
         }
     }
 
-    private static String formatForCsv(@Nullable String data) {
+    private static String formatForCsv(@Nullable Object data) {
         if (data != null) {
-            return String.format("\"%s\"", data.replace("\"", "\"\""));
+            // Assume every column value is printable with toString
+            return String.format("\"%s\"", data.toString().replace("\"", "\"\""));
         } else {
             return "\"\"";
         }

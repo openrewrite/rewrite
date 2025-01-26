@@ -415,7 +415,8 @@ class AppendToSequenceTest implements RewriteTest {
                   value: "name: \\"env-var-3\\"\\n    value: \\"value-3\\""
                   fileMatcher: devops/deploy/dev-vars.yaml
             """, "com.demo.migration-not-working"),
-          yaml("""
+          yaml(
+                """
               name_squad: "squad1"
               azure_keyvault: "yupiyouh2"
               replicas_plan:

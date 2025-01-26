@@ -18,10 +18,10 @@ package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
-import org.openrewrite.test.RewriteTest;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.test.RewriteTest;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,7 +37,7 @@ class ClassDeclarationTest implements RewriteTest {
             """
               public class A {
                   int n
-                  
+
                   def sum(int m) {
                       n+m
                   }
@@ -79,6 +79,28 @@ class ClassDeclarationTest implements RewriteTest {
           groovy(
             """
               public abstract class A {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void extendsObject() {
+        rewriteRun(
+          groovy(
+            """
+              class B extends Object {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void extendsScript() {
+        rewriteRun(
+          groovy(
+            """
+              abstract class B extends Script {}
               """
           )
         );
@@ -128,9 +150,22 @@ class ClassDeclarationTest implements RewriteTest {
           groovy(
             """ 
               package org.openrewrite
-               
+
               public class A{}
-               """
+              """
+          )
+        );
+    }
+
+    @Test
+    void hasPackageWithTrailingComma() {
+        rewriteRun(
+          groovy(
+            """ 
+              package org.openrewrite;
+
+              class A{}
+              """
           )
         );
     }
@@ -168,7 +203,7 @@ class ClassDeclarationTest implements RewriteTest {
           groovy(
             """
               import groovy.transform.PackageScope
-                            
+
               @PackageScope
               class A {}
               """,
@@ -219,6 +254,20 @@ class ClassDeclarationTest implements RewriteTest {
               interface C {
                   class Inner {
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4705")
+    @Test
+    void constructorWithDef() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  def A() {}
               }
               """
           )
@@ -285,6 +334,128 @@ class ClassDeclarationTest implements RewriteTest {
                 assertThat(requireNonNull(TypeUtils.asFullyQualified(type)).getFullyQualifiedName())
                   .isEqualTo("java.lang.Deprecated");
             })
+          )
+        );
+    }
+
+    @Test
+    void instanceInitializerBlock() {
+        rewriteRun(
+          groovy(
+                """
+            class A {
+                int a
+                {
+                    a = 1
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void staticInitializer() {
+        rewriteRun(
+          groovy(
+                """
+            class A {
+                static int a
+                static {
+                    a = 1
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void anonymousInnerClass() {
+        rewriteRun(
+          groovy(
+            """
+              interface Something {}
+              
+              class Test {
+                  Something something = new Something() {}
+                  static def test() {
+                      new Something() {}
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4063")
+    void nestedClassWithoutParameters() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  class B {
+                      B() {}
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4063")
+    void nestedClass() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  class B {
+                      String a;String[] b
+                      B(String $a, String... b) {
+                          this.a = $a
+                          this.b = b
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4063")
+    void nestedStaticClassWithoutParameters() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  static class B {
+                      B() {}
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4063")
+    void nestedStaticClass() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  static class B {
+                      String a;String[] b
+                      B(String a, String... b) {
+                          this.a = a
+                          this.b = b
+                      }
+                  }
+              }
+              """
           )
         );
     }

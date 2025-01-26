@@ -17,10 +17,11 @@ package org.openrewrite.yaml;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.NameCaseConvention;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.Iterator;
@@ -35,11 +36,11 @@ public class ChangePropertyValue extends Recipe {
             example = "management.metrics.binders.*.enabled")
     String propertyKey;
 
-    @Option(displayName = "New value",
+    @Option(example = "newValue", displayName = "New value",
             description = "The new value to be used for key specified by `propertyKey`.")
     String newValue;
 
-    @Option(displayName = "Old value",
+    @Option(example = "oldValue", displayName = "Old value",
             required = false,
             description = "Only change the property value if it matches the configured `oldValue`.")
     @Nullable
@@ -59,6 +60,14 @@ public class ChangePropertyValue extends Recipe {
     @Nullable
     Boolean relaxedBinding;
 
+
+    @Option(displayName = "File pattern",
+            description = "A glob expression representing a file path to search for (relative to the project root). Blank/null matches all.",
+            required = false,
+            example = ".github/workflows/*.yml")
+    @Nullable
+    String filePattern;
+
     @Override
     public String getDisplayName() {
         return "Change YAML property";
@@ -75,7 +84,7 @@ public class ChangePropertyValue extends Recipe {
     }
 
     @Override
-    public Validated validate() {
+    public Validated<Object> validate() {
         return super.validate().and(
                 Validated.test("oldValue", "is required if `regex` is enabled", oldValue,
                         value -> !(Boolean.TRUE.equals(regex) && StringUtils.isNullOrEmpty(value))));
@@ -83,49 +92,67 @@ public class ChangePropertyValue extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new YamlIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new FindSourceFiles(filePattern), new YamlIsoVisitor<ExecutionContext>() {
             @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, ctx);
                 String prop = getProperty(getCursor());
                 if (matchesPropertyKey(prop) && matchesOldValue(e.getValue())) {
-                    Yaml.Scalar updatedValue = updateValue(e.getValue());
+                    Yaml.Block updatedValue = updateValue(e.getValue());
                     if (updatedValue != null) {
                         e = e.withValue(updatedValue);
                     }
                 }
                 return e;
             }
-        };
+        });
     }
 
-    @Nullable // returns null if value should not change
-    private Yaml.Scalar updateValue(Yaml.Block value) {
-        if (!(value instanceof Yaml.Scalar)) {
-            return null;
+    // returns null if value should not change
+    private Yaml.@Nullable Block updateValue(Yaml.Block value) {
+        if (value instanceof Yaml.Scalar) {
+            Yaml.Scalar scalar = (Yaml.Scalar) value;
+            Yaml.Scalar newScalar = scalar.withValue(Boolean.TRUE.equals(regex) ?
+                    scalar.getValue().replaceAll(Objects.requireNonNull(oldValue), newValue) :
+                    newValue);
+            return scalar.getValue().equals(newScalar.getValue()) ? null : newScalar;
         }
-        Yaml.Scalar scalar = (Yaml.Scalar) value;
-        Yaml.Scalar newScalar = scalar.withValue(Boolean.TRUE.equals(regex)
-                ? scalar.getValue().replaceAll(Objects.requireNonNull(oldValue), newValue)
-                : newValue);
-        return scalar.getValue().equals(newScalar.getValue()) ? null : newScalar;
+        if (value instanceof Yaml.Sequence) {
+            Yaml.Sequence sequence = (Yaml.Sequence) value;
+            return sequence.withEntries(ListUtils.map(sequence.getEntries(), entry -> {
+                if (matchesOldValue(entry.getBlock())) {
+                    Yaml.Block updatedValue = updateValue(entry.getBlock());
+                    if (updatedValue != null) {
+                        return entry.withBlock(updatedValue);
+                    }
+                }
+                return entry;
+            }));
+        }
+        return null;
     }
 
     private boolean matchesPropertyKey(String prop) {
-        return !Boolean.FALSE.equals(relaxedBinding)
-                ? NameCaseConvention.matchesGlobRelaxedBinding(prop, propertyKey)
-                : StringUtils.matchesGlob(prop, propertyKey);
+        return !Boolean.FALSE.equals(relaxedBinding) ?
+                NameCaseConvention.matchesGlobRelaxedBinding(prop, propertyKey) :
+                StringUtils.matchesGlob(prop, propertyKey);
     }
 
     private boolean matchesOldValue(Yaml.Block value) {
-        if (!(value instanceof Yaml.Scalar)) {
-            return false;
+        if (value instanceof Yaml.Scalar) {
+            Yaml.Scalar scalar = (Yaml.Scalar) value;
+            return StringUtils.isNullOrEmpty(oldValue) ||
+                   (Boolean.TRUE.equals(regex) ?
+                           Pattern.compile(oldValue).matcher(scalar.getValue()).find() :
+                           scalar.getValue().equals(oldValue));
+        } else if (value instanceof Yaml.Sequence) {
+            for (Yaml.Sequence.Entry entry : ((Yaml.Sequence) value).getEntries()) {
+                if (matchesOldValue(entry.getBlock())) {
+                    return true;
+                }
+            }
         }
-        Yaml.Scalar scalar = (Yaml.Scalar) value;
-        return StringUtils.isNullOrEmpty(oldValue) ||
-               (Boolean.TRUE.equals(regex)
-                       ? Pattern.compile(oldValue).matcher(scalar.getValue()).find()
-                       : scalar.getValue().equals(oldValue));
+        return false;
     }
 
     private static String getProperty(Cursor cursor) {

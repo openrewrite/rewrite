@@ -17,6 +17,7 @@ package org.openrewrite.gradle.plugins;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.DependencyVersionSelector;
 import org.openrewrite.gradle.IsBuildGradle;
@@ -29,14 +30,12 @@ import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.tree.GroupArtifact;
-import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.semver.Semver;
 
 import java.util.Collections;
@@ -58,12 +57,12 @@ public class ChangePlugin extends Recipe {
             example = "org.openrewrite.rewrite")
     String pluginId;
 
-    @Option(displayName = "New Plugin ID",
+    @Option(displayName = "New plugin ID",
             description = "The new Gradle plugin id.",
             example = "org.openrewrite.rewrite")
     String newPluginId;
 
-    @Option(displayName = "New Plugin Version",
+    @Option(displayName = "New plugin version",
             description = "An exact version number or node-style semver selector used to select the version number. " +
                           "You can also use `latest.release` for the latest available version and `latest.patch` if " +
                           "the current version is a valid semantic version. For more details, you can look at the documentation " +
@@ -105,7 +104,9 @@ public class ChangePlugin extends Recipe {
         return Preconditions.check(
                 Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()),
                 new GroovyIsoVisitor<ExecutionContext>() {
+                    @Nullable
                     GradleProject gradleProject;
+                    @Nullable
                     GradleSettings gradleSettings;
 
                     @Override
@@ -129,7 +130,7 @@ public class ChangePlugin extends Recipe {
                                     return plugin;
                                 }));
                                 g = g.withMarkers(g.getMarkers().setByType(updatedGp));
-                            } else {
+                            } else if (gradleSettings != null) {
                                 GradleSettings updatedGs = gradleSettings.withPlugins(ListUtils.map(gradleSettings.getPlugins(), plugin -> {
                                     if (pluginId.equals(plugin.getId())) {
                                         return new GradlePluginDescriptor("unknown", newPluginId);
@@ -159,7 +160,7 @@ public class ChangePlugin extends Recipe {
 
                     private J.MethodInvocation maybeUpdateVersion(J.MethodInvocation m, ExecutionContext ctx) {
                         J.MethodInvocation select = (J.MethodInvocation) m.getSelect();
-                        if (!pluginId.equals(((J.Literal) select.getArguments().get(0)).getValue())) {
+                        if (select == null || !pluginId.equals(((J.Literal) select.getArguments().get(0)).getValue())) {
                             return m;
                         }
 
@@ -217,7 +218,7 @@ public class ChangePlugin extends Recipe {
                         }
 
                         G.MapEntry entry = (G.MapEntry) args.get(0);
-                        if (!(entry.getKey() instanceof J.Literal) && !(entry.getValue() instanceof J.Literal)) {
+                        if (!(entry.getKey() instanceof J.Literal) || !(entry.getValue() instanceof J.Literal)) {
                             return m;
                         }
 
@@ -243,13 +244,6 @@ public class ChangePlugin extends Recipe {
 
                         entry = entry.withValue(ChangeStringLiteral.withStringValue(valueLiteral, newPluginId));
                         return m.withArguments(ListUtils.concat(entry, args.subList(1, args.size())));
-                    }
-
-                    private List<MavenRepository> getPluginRepositories() {
-                        if (gradleProject != null) {
-                            return gradleProject.getMavenPluginRepositories();
-                        }
-                        return gradleSettings.getPluginRepositories();
                     }
                 }
         );

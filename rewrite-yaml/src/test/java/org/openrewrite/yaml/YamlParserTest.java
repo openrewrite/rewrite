@@ -65,6 +65,45 @@ class YamlParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4176")
+    void listsAndListsOfLists() {
+        rewriteRun(
+          yaml(
+            """
+              root:
+                normalListOfScalars:
+                - a
+                -  b
+                normalListOfScalarsWithIndentation:
+                  -  a
+                  - b
+                normalListOfMappings:
+                  - a: b
+                    c:  d
+                  - e:  f
+                normalListOfSquareBracketLists:
+                  -   [ mno, pqr]
+                  -  [stu , vwx]
+                squareList: [x, y, z]
+                listOfListsOfScalars:
+                - - a
+                  -  b
+                listOfListsOfScalarsWithIndentation:
+                  - - a
+                    -  b
+                listOfListsOfMappings:
+                  - - a:  b
+                      c: d
+                    - e:  f
+                listOfListsOfSquareBracketLists:
+                  - - [mno, pqr ]
+                    -  [stu , vwx]
+              """
+          )
+        );
+    }
+
     @SuppressWarnings("OptionalGetWithoutIsPresent")
     @ParameterizedTest
     @ValueSource(strings = {
@@ -126,6 +165,83 @@ class YamlParserTest implements RewriteTest {
                 "nul": "\\u0000"
                 "reverse-solidus": "\\u005c"
               """
+          )
+        );
+    }
+
+    @Test
+    void troublesomeYaml() {
+        rewriteRun(
+          yaml(
+            """
+              configDefinitions:
+                appConfig:
+                  description: "App config for consumer."
+                  resolutionPaths:
+                    - default: "/envProfile"
+                  properties:
+                    container:
+                      description: "Container to use to the cosmos client."
+                      type: "STRING"
+                      kind: "SINGLE"
+                      defaultValue: "UUIDItem"
+                      rules:
+                        possibleValues: []
+                    database:
+                      description: "Database to connect and use."
+                      type: "STRING"
+                      kind: "SINGLE"
+                      defaultValue: "ForkliftPocDB"
+                      rules:
+                        possibleValues: []
+                appConfig2:
+                  description: "App config for consumer."
+                  resolutionPaths:
+                    - default: "/envProfile"
+                  properties:
+                    container:
+                      description: "Container to use to the cosmos client."
+                      type: "STRING"
+                      kind: "SINGLE"
+                      defaultValue: "CosmosSDKTest"
+                      rules:
+                        possibleValues: []
+                    database:
+                      description: "Database to connect and use."
+                      type: "STRING"
+                      kind: "SINGLE"
+                      rules:
+                        possibleValues: []
+              """
+          )
+        );
+    }
+
+    @Test
+    void atSymbols() {
+        rewriteRun(
+          yaml(
+            // BTW, the @ sign is forbidden as the first character of a scalar value by the YAML spec:
+            // https://github.com/yaml/yaml-spec/blob/1b1a1be43bd6e0cfec45caf0e40af3b5d2bb7f8a/spec/1.2.2/spec.md#L1877
+            """
+              root:
+                specifier: npm:@testing-library/vue@5.0.4
+                date: @build.timestamp@
+                version: @project.version@
+              """
+          )
+        );
+    }
+
+    @Test
+    void pipeLiteralInASequenceWithDoubleQuotes() {
+        rewriteRun(
+          yaml(
+            """
+               - "one": |
+                   two
+                 "three": "four"
+               """
           )
         );
     }

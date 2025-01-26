@@ -15,7 +15,7 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * In addition to the signature formats described below, implementations should provide a way of retrieving method
@@ -32,7 +32,7 @@ public interface JavaTypeSignatureBuilder {
      * @return The type signature. If <code>t</code> is null, the signature is <code>{undefined}</code>.
      */
     String signature(@Nullable Object type);
-    
+
     /**
      * @param type An array type.
      * @return Formatted like <code>Integer[]</code>.

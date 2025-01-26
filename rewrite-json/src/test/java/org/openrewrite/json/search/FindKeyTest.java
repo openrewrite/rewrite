@@ -30,7 +30,8 @@ class FindKeyTest implements RewriteTest {
     void findKey() {
         rewriteRun(
           spec -> spec.recipe(new FindKey("$.metadata.name")),
-          json("""
+          json(
+                """
               {
                 "apiVersion": "v1",
                 "metadata": {
@@ -57,7 +58,8 @@ class FindKeyTest implements RewriteTest {
     void findKeyWithMultipleBinaryExpressions() {
         rewriteRun(
           spec -> spec.recipe(new FindKey("$.foo.bar[?(@.types == 'something' && @.group == 'group' && @.category == 'match' && @.type == 'type')].pattern")),
-          json("""
+          json(
+                """
               {
                 "foo": {
                   "bar": [

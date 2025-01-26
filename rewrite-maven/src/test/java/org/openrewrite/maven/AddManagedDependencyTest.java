@@ -214,40 +214,88 @@ class AddManagedDependencyTest implements RewriteTest {
             "${quarkus.platform.version}", "import", "pom", null,null, null, null, null)),
           pomXml(
             """
-              <project>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>core</artifactId>
-                <version>1</version>
-                <properties>
-                  <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
-                  <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
-                  <quarkus.platform.version>3.2.3.Final</quarkus.platform.version>
-                </properties>
-              </project>
+            <project>
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>core</artifactId>
+              <version>1</version>
+              <properties>
+                <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
+                <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
+                <quarkus.platform.version>3.2.3.Final</quarkus.platform.version>
+              </properties>
+            </project>
             """,
+            """
+            <project>
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>core</artifactId>
+              <version>1</version>
+              <properties>
+                <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
+                <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
+                <quarkus.platform.version>3.2.3.Final</quarkus.platform.version>
+              </properties>
+              <dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>${quarkus.platform.group-id}</groupId>
+                    <artifactId>${quarkus.platform.artifact-id}</artifactId>
+                    <version>${quarkus.platform.version}</version>
+                    <type>pom</type>
+                    <scope>import</scope>
+                  </dependency>
+                </dependencies>
+              </dependencyManagement>
+            </project>
+            """
+          )
+        );
+    }
+
+    @Test
+    void versionSelectionTakesExistingIntoAccount() {
+        rewriteRun(
+          spec -> spec.recipes(new AddManagedDependency("com.fasterxml.jackson.core", "jackson-databind", "latest.patch", null,
+            null, null, null, null, null, true)),
+          //language=xml
+          pomXml(
             """
               <project>
                 <groupId>com.mycompany.app</groupId>
-                <artifactId>core</artifactId>
+                <artifactId>my-app</artifactId>
                 <version>1</version>
-                <properties>
-                  <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
-                  <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
-                  <quarkus.platform.version>3.2.3.Final</quarkus.platform.version>
-                </properties>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.openrewrite</groupId>
+                    <artifactId>rewrite-java</artifactId>
+                    <version>7.0.0</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
                 <dependencyManagement>
                   <dependencies>
                     <dependency>
-                      <groupId>${quarkus.platform.group-id}</groupId>
-                      <artifactId>${quarkus.platform.artifact-id}</artifactId>
-                      <version>${quarkus.platform.version}</version>
-                      <type>pom</type>
-                      <scope>import</scope>
+                      <groupId>com.fasterxml.jackson.core</groupId>
+                      <artifactId>jackson-databind</artifactId>
+                      <version>2.12.7.2</version>
                     </dependency>
                   </dependencies>
                 </dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.openrewrite</groupId>
+                    <artifactId>rewrite-java</artifactId>
+                    <version>7.0.0</version>
+                  </dependency>
+                </dependencies>
               </project>
-            """
+              """
           )
         );
     }

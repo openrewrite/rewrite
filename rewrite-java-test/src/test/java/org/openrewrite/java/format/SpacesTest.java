@@ -4823,13 +4823,34 @@ class SpacesTest implements RewriteTest {
           java(
             """
               import java.util.List;
-              @Deprecated("version" /* some comment */)
+              @Deprecated(since = "version" /* some comment */)
               class Test {
                   void foo() {
                       List.of( // another comment
                           1,
                           2
                       );
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void spaceBetweenAnnotations() {
+        rewriteRun(
+          spaces(),
+          java(
+            """
+              class A {
+                  void m(@Deprecated@SuppressWarnings("ALL") int a) {
+                  }
+              }
+              """,
+            """
+              class A {
+                  void m(@Deprecated @SuppressWarnings("ALL") int a) {
                   }
               }
               """

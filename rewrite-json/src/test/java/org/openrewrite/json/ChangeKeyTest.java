@@ -31,7 +31,8 @@ class ChangeKeyTest implements RewriteTest {
             "$.description",
             "\"newDescription\""
           )),
-          json("""
+          json(
+                """
               {
                 "id": "something",
                 "description": "desc",
@@ -57,7 +58,8 @@ class ChangeKeyTest implements RewriteTest {
             "$.metadata.name",
             "\"name2\""
           )),
-          json("""
+          json(
+                """
               {
                 "apiVersion": "v1",
                 "metadata": {
@@ -86,7 +88,8 @@ class ChangeKeyTest implements RewriteTest {
             "$.subjects.kind",
             "\"kind2\""
           )),
-          json("""
+          json(
+                """
               {
                 "subjects": [
                   {

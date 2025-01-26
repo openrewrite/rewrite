@@ -39,7 +39,7 @@ public class RemoveEmptyXmlTags extends Recipe {
                 Xml.Tag t = super.visitTag(tag, ctx);
                 //noinspection ConstantValue
                 if (t != null && (t.getContent() == null || t.getContent().isEmpty()) && t.getAttributes().isEmpty()) {
-                    doAfterVisit(new RemoveContentVisitor<>(t, true));
+                    doAfterVisit(new RemoveContentVisitor<>(t, true, true));
                 }
                 return t;
             }

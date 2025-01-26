@@ -40,23 +40,25 @@ public class ExecutionContextParameterName extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new UsesType<>("org.openrewrite.Recipe", false), new JavaIsoVisitor<ExecutionContext>() {
-            @Override
-            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
-                for (Statement parameter : m.getParameters()) {
-                    if (parameter instanceof J.VariableDeclarations) {
-                        J.VariableDeclarations param = (J.VariableDeclarations) parameter;
-                        if (TypeUtils.isOfClassType(param.getType(),
-                                "org.openrewrite.ExecutionContext")) {
-                            m = (J.MethodDeclaration) new RenameVariable<ExecutionContext>(param.getVariables().get(0), "ctx")
-                                    .visitNonNull(m, ctx);
+        return Preconditions.check(Preconditions.or(
+                        new UsesType<>("org.openrewrite.Recipe", false),
+                        new UsesType<>("org.openrewrite.Visitor", false)),
+                new JavaIsoVisitor<ExecutionContext>() {
+                    @Override
+                    public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                        J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
+                        for (Statement parameter : m.getParameters()) {
+                            if (parameter instanceof J.VariableDeclarations) {
+                                J.VariableDeclarations param = (J.VariableDeclarations) parameter;
+                                if (TypeUtils.isOfClassType(param.getType(),
+                                        "org.openrewrite.ExecutionContext")) {
+                                    m = (J.MethodDeclaration) new RenameVariable<ExecutionContext>(param.getVariables().get(0), "ctx")
+                                            .visitNonNull(m, ctx);
+                                }
+                            }
                         }
+                        return m;
                     }
-                }
-
-                return m;
-            }
-        });
+                });
     }
 }

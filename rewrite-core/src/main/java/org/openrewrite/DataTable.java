@@ -37,10 +37,10 @@ public class DataTable<Row> {
     private final Class<Row> type;
 
     @Language("markdown")
-    private final String displayName;
+    private final @NlsRewrite.DisplayName String displayName;
 
     @Language("markdown")
-    private final String description;
+    private final @NlsRewrite.Description String description;
 
     @Setter
     private boolean enabled = true;

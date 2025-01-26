@@ -15,7 +15,7 @@
  */
 package org.openrewrite.maven.cache;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.tree.ResolvedDependency;
 
 import java.io.IOException;
@@ -26,14 +26,14 @@ import java.util.function.Consumer;
 
 public interface MavenArtifactCache {
     MavenArtifactCache NOOP = new MavenArtifactCache() {
+
         @Override
-        public Path getArtifact(ResolvedDependency dependency) {
+        public @Nullable Path getArtifact(ResolvedDependency dependency) {
             return null;
         }
 
         @Override
-        @Nullable
-        public Path putArtifact(ResolvedDependency dependency, InputStream is, Consumer<Throwable> onError) {
+        public @Nullable Path putArtifact(ResolvedDependency dependency, InputStream is, Consumer<Throwable> onError) {
             try {
                 is.close();
             } catch (IOException e) {
@@ -49,8 +49,7 @@ public interface MavenArtifactCache {
     @Nullable
     Path putArtifact(ResolvedDependency dependency, InputStream is, Consumer<Throwable> onError);
 
-    @Nullable
-    default Path computeArtifact(ResolvedDependency dependency, Callable<@Nullable InputStream> artifactStream,
+    default @Nullable Path computeArtifact(ResolvedDependency dependency, Callable<@Nullable InputStream> artifactStream,
                                  Consumer<Throwable> onError) {
         Path artifact = getArtifact(dependency);
         if (artifact == null) {
@@ -69,15 +68,13 @@ public interface MavenArtifactCache {
         MavenArtifactCache me = this;
         return new MavenArtifactCache() {
             @Override
-            @Nullable
-            public Path getArtifact(ResolvedDependency dependency) {
+            public @Nullable Path getArtifact(ResolvedDependency dependency) {
                 Path artifact = me.getArtifact(dependency);
                 return artifact == null ? other.getArtifact(dependency) : artifact;
             }
 
             @Override
-            @Nullable
-            public Path putArtifact(ResolvedDependency dependency, InputStream is, Consumer<Throwable> onError) {
+            public @Nullable Path putArtifact(ResolvedDependency dependency, InputStream is, Consumer<Throwable> onError) {
                 Path artifact = me.putArtifact(dependency, is, onError);
                 return artifact == null ? other.putArtifact(dependency, is, onError) : artifact;
             }

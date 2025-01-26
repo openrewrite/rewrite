@@ -31,7 +31,8 @@ class DeclaresTypeTest implements RewriteTest {
     @DocumentExample
     @Test
     void declares() {
-        rewriteRun(java("""
+        rewriteRun(java(
+                """
         package com.sample;
         public class Foo{}
         """, """
@@ -42,7 +43,8 @@ class DeclaresTypeTest implements RewriteTest {
 
     @Test
     void notDeclares() {
-        rewriteRun(java("""
+        rewriteRun(java(
+                """
         package com.sample;
         public class Fooz{}
         """));

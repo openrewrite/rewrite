@@ -16,19 +16,18 @@
 package org.openrewrite.maven;
 
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.ChangePackage;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.java.Assertions.mavenProject;
-import static org.openrewrite.java.Assertions.srcMainJava;
-import static org.openrewrite.java.Assertions.srcTestJava;
+import static org.openrewrite.java.Assertions.*;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -40,7 +39,6 @@ class AddDependencyTest implements RewriteTest {
           .classpath("junit-jupiter-api", "guava", "jackson-databind", "jackson-core"));
     }
 
-    @SuppressWarnings("UnstableApiUsage")
     @Language("java")
     private final String usingGuavaIntMath = """
           import com.google.common.math.IntMath;
@@ -378,6 +376,110 @@ class AddDependencyTest implements RewriteTest {
                             </dependency>
                         </dependencies>
                     </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void doNotAddBecauseAlreadyTransitiveNoCompileScope() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("org.junit.jupiter:junit-jupiter-api:5.10.3", null, true)),
+          mavenProject(
+            "project",
+            srcTestJava(
+              java(
+                """
+                  class MyTest {
+                      @org.junit.jupiter.api.Test
+                      void test() {}
+                  }
+                  """
+              )
+            ),
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.junit.jupiter</groupId>
+                            <artifactId>junit-jupiter-engine</artifactId>
+                            <version>5.7.1</version>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void addDependencyAcceptsTransitiveAlreadyInTestScope() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("org.junit.jupiter:junit-jupiter-api:5.10.3", "org.junit.jupiter..*", true)),
+          mavenProject(
+            "project",
+            srcMainJava(
+              java(
+                """
+                  class MyMain {
+                      @org.junit.jupiter.api.Test
+                      void test() {}
+                  }
+                  """
+              )
+            ),
+            srcTestJava(
+              java(
+                """
+                  class MyTest {
+                      @org.junit.jupiter.api.Test
+                      void test() {}
+                  }
+                  """
+              )
+            ),
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.junit.jupiter</groupId>
+                            <artifactId>junit-jupiter-engine</artifactId>
+                            <version>5.7.1</version>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """,
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.junit.jupiter</groupId>
+                            <artifactId>junit-jupiter-api</artifactId>
+                            <version>5.10.3</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>org.junit.jupiter</groupId>
+                            <artifactId>junit-jupiter-engine</artifactId>
+                            <version>5.7.1</version>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
                 """
             )
           )
@@ -913,6 +1015,77 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
+    void preferRootPom() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre")),
+          mavenProject("root",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>root</artifactId>
+                    <version>1</version>
+                    <modules>
+                        <module>project1</module>
+                        <module>project2</module>
+                    </modules>
+                </project>
+                """,
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>root</artifactId>
+                    <version>1</version>
+                    <modules>
+                        <module>project1</module>
+                        <module>project2</module>
+                    </modules>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>29.0-jre</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            )
+          ),
+          mavenProject("project1",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>project1</artifactId>
+                    <version>1</version>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>root</artifactId>
+                        <version>1</version>
+                    </parent>
+                </project>
+                """)
+          ),
+          mavenProject("project2",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>project2</artifactId>
+                    <version>1</version>
+                    <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>root</artifactId>
+                        <version>1</version>
+                    </parent>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
     void rawVisitorDoesNotDuplicate() {
         rewriteRun(
           spec -> spec.recipe(
@@ -968,82 +1141,82 @@ class AddDependencyTest implements RewriteTest {
             ),
             pomXml(
               """
-                    <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      <groupId>org.springframework.samples</groupId>
-                      <artifactId>spring-petclinic</artifactId>
-                      <version>2.7.3</version>
-                    
-                      <parent>
-                        <groupId>org.springframework.boot</groupId>
-                        <artifactId>spring-boot-starter-parent</artifactId>
-                        <version>3.0.5</version>
-                      </parent>
-                      <name>petclinic</name>
-                    
-                      <properties>
-                        <jakarta-servlet.version>5.0.0</jakarta-servlet.version>
-                    
-                        <java.version>17</java.version>
-                        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-                        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-                    
-                        <webjars-bootstrap.version>5.1.3</webjars-bootstrap.version>
-                        <webjars-font-awesome.version>4.7.0</webjars-font-awesome.version>
-                    
-                        <jacoco.version>0.8.8</jacoco.version>
-                    
-                      </properties>
-                    
-                      <dependencies>
-                        <dependency>
-                          <groupId>org.springframework.boot</groupId>
-                          <artifactId>spring-boot-starter-data-jpa</artifactId>
-                        </dependency>
-                      </dependencies>
-                    
-                    </project>
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.springframework.samples</groupId>
+                  <artifactId>spring-petclinic</artifactId>
+                  <version>2.7.3</version>
+                
+                  <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>3.0.5</version>
+                  </parent>
+                  <name>petclinic</name>
+                
+                  <properties>
+                    <jakarta-servlet.version>5.0.0</jakarta-servlet.version>
+                
+                    <java.version>17</java.version>
+                    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+                    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+                
+                    <webjars-bootstrap.version>5.1.3</webjars-bootstrap.version>
+                    <webjars-font-awesome.version>4.7.0</webjars-font-awesome.version>
+                
+                    <jacoco.version>0.8.8</jacoco.version>
+                
+                  </properties>
+                
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-data-jpa</artifactId>
+                    </dependency>
+                  </dependencies>
+                
+                </project>
                 """,
               """
-                    <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      <groupId>org.springframework.samples</groupId>
-                      <artifactId>spring-petclinic</artifactId>
-                      <version>2.7.3</version>
-                    
-                      <parent>
-                        <groupId>org.springframework.boot</groupId>
-                        <artifactId>spring-boot-starter-parent</artifactId>
-                        <version>3.0.5</version>
-                      </parent>
-                      <name>petclinic</name>
-                    
-                      <properties>
-                        <jakarta-servlet.version>5.0.0</jakarta-servlet.version>
-                    
-                        <java.version>17</java.version>
-                        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-                        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-                    
-                        <webjars-bootstrap.version>5.1.3</webjars-bootstrap.version>
-                        <webjars-font-awesome.version>4.7.0</webjars-font-awesome.version>
-                    
-                        <jacoco.version>0.8.8</jacoco.version>
-                    
-                      </properties>
-                    
-                      <dependencies>
-                        <dependency>
-                          <groupId>jakarta.xml.bind</groupId>
-                          <artifactId>jakarta.xml.bind-api</artifactId>
-                        </dependency>
-                        <dependency>
-                          <groupId>org.springframework.boot</groupId>
-                          <artifactId>spring-boot-starter-data-jpa</artifactId>
-                        </dependency>
-                      </dependencies>
-                    
-                    </project>
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.springframework.samples</groupId>
+                  <artifactId>spring-petclinic</artifactId>
+                  <version>2.7.3</version>
+                
+                  <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>3.0.5</version>
+                  </parent>
+                  <name>petclinic</name>
+                
+                  <properties>
+                    <jakarta-servlet.version>5.0.0</jakarta-servlet.version>
+                
+                    <java.version>17</java.version>
+                    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+                    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+                
+                    <webjars-bootstrap.version>5.1.3</webjars-bootstrap.version>
+                    <webjars-font-awesome.version>4.7.0</webjars-font-awesome.version>
+                
+                    <jacoco.version>0.8.8</jacoco.version>
+                
+                  </properties>
+                
+                  <dependencies>
+                    <dependency>
+                      <groupId>jakarta.xml.bind</groupId>
+                      <artifactId>jakarta.xml.bind-api</artifactId>
+                    </dependency>
+                    <dependency>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-data-jpa</artifactId>
+                    </dependency>
+                  </dependencies>
+                
+                </project>
                 """
             )
           )
@@ -1077,6 +1250,7 @@ class AddDependencyTest implements RewriteTest {
           ));
     }
 
+    @DocumentExample
     @Test
     void addDependenciesOnEmptyProject() {
         rewriteRun(
@@ -1104,19 +1278,394 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
-    private AddDependency addDependency(String gav, String onlyIfUsing) {
+    @Test
+    void dependencyThatIsTransitivelyProvidedWithWrongScopeShouldBeAdded() {
+        rewriteRun(
+          spec -> spec
+            .parser(JavaParser.fromJavaVersion()
+              .dependsOn(
+                """
+                  package main.java.checkerframework.checker.nullness.qual;
+                  public @interface NonNull {}
+                  """
+              )
+            )
+            .recipes(
+              new AddDependency("org.checkerframework", "checker-qual", "3.44.0",
+                null, null, null, "main.java.checkerframework..*", null, null, null, null,
+                true),
+              new ChangePackage("main.java.checkerframework", "org.checkerframework", true)
+            ),
+          mavenProject("parent",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <modules>
+                        <module>child</module>
+                    </modules>
+                    <dependencies>
+                        <!-- Has transitive dependency on org.checkerframework:checker-qual -->
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>31.1-jre</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            ),
+            mavenProject("child",
+              srcMainJava(
+                java(
+                  """
+                    import main.java.checkerframework.checker.nullness.qual.NonNull;
+                    class Foo {}
+                    """,
+                  """
+                    import org.checkerframework.checker.nullness.qual.NonNull;
+                    class Foo {}
+                    """
+                )
+              ),
+              pomXml(
+                """
+                  <project>
+                      <parent>
+                          <groupId>com.mycompany.app</groupId>
+                          <artifactId>parent</artifactId>
+                          <version>1</version>
+                          <relativePath>../pom.xml</relativePath>
+                      </parent>
+                      <artifactId>child</artifactId>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>31.1-jre</version>
+                              <scope>test</scope>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <parent>
+                          <groupId>com.mycompany.app</groupId>
+                          <artifactId>parent</artifactId>
+                          <version>1</version>
+                          <relativePath>../pom.xml</relativePath>
+                      </parent>
+                      <artifactId>child</artifactId>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.checkerframework</groupId>
+                              <artifactId>checker-qual</artifactId>
+                              <version>3.44.0</version>
+                          </dependency>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>31.1-jre</version>
+                              <scope>test</scope>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """
+              )
+            )
+          )
+        );
+    }
+
+    @Test
+    void dependencyThatIsTransitivelyProvidedWithCorrectScopeShouldNotBeAdded() {
+        rewriteRun(
+          spec -> spec
+            .parser(JavaParser.fromJavaVersion()
+              .dependsOn(
+                """
+                  package main.java.checkerframework.checker.nullness.qual;
+                  public @interface NonNull {}
+                  """
+              )
+            )
+            .recipes(
+              new AddDependency("org.checkerframework", "checker-qual", "3.44.0",
+                null, null, null, "main.java.checkerframework..*", null, null, null, null,
+                true),
+              new ChangePackage("main.java.checkerframework", "org.checkerframework", true)
+            ),
+          mavenProject("parent",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <modules>
+                        <module>child</module>
+                    </modules>
+                    <dependencies>
+                        <!-- Has transitive dependency on org.checkerframework:checker-qual -->
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>31.1-jre</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            ),
+            mavenProject("child",
+              srcTestJava(
+                java(
+                  """
+                    import main.java.checkerframework.checker.nullness.qual.NonNull;
+                    class Foo {}
+                    """,
+                  """
+                    import org.checkerframework.checker.nullness.qual.NonNull;
+                    class Foo {}
+                    """
+                )
+              ),
+              pomXml(
+                """
+                  <project>
+                      <parent>
+                          <groupId>com.mycompany.app</groupId>
+                          <artifactId>parent</artifactId>
+                          <version>1</version>
+                          <relativePath>../pom.xml</relativePath>
+                      </parent>
+                      <artifactId>child</artifactId>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>31.1-jre</version>
+                              <scope>test</scope>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """
+              )
+            )
+          )
+        );
+    }
+
+    @Test
+    void addDependencyToParentPomWhenAggregatingPomIsNotParent() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency(
+            "org.hamcrest",
+            "hamcrest-junit",
+            "2.0.0.0",
+            null,
+            "test",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            true)),
+          mavenProject("my-app-aggregate",
+            pomXml(
+              """
+                <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app-aggregate</artifactId>
+                  <version>1</version>
+                  <modules>
+                    <module>project-parent</module>
+                    <module>project-child</module>
+                  </modules>
+                </project>
+                """
+            )
+          ),
+          mavenProject("project-parent",
+            pomXml(
+              """
+                <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app-parent</artifactId>
+                  <version>1</version>
+                  <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>3.1.5</version>
+                  </parent>
+                </project>
+                """,
+              """
+                <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app-parent</artifactId>
+                  <version>1</version>
+                  <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>3.1.5</version>
+                  </parent>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.hamcrest</groupId>
+                      <artifactId>hamcrest-junit</artifactId>
+                      <version>2.0.0.0</version>
+                      <scope>test</scope>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """
+            )
+          ),
+          mavenProject("my-app-child",
+            pomXml(
+              """
+                <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app-child</artifactId>
+                  <version>1</version>
+                  <parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app-parent</artifactId>
+                    <version>1</version>
+                  </parent>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void addDependencyToAggregatingPomAndParentPomWhenAggregatingPomIsParent() {
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency(
+            "org.hamcrest",
+            "hamcrest-junit",
+            "2.0.0.0",
+            null,
+            "test",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            true)),
+          mavenProject("my-app-aggregate",
+            pomXml(
+              """
+                <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app-aggregate</artifactId>
+                  <version>1</version>
+                  <modules>
+                    <module>my-app-parent</module>
+                    <module>my-app-child</module>
+                  </modules>
+                </project>
+                """,
+              """
+                <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app-aggregate</artifactId>
+                  <version>1</version>
+                  <modules>
+                    <module>my-app-parent</module>
+                    <module>my-app-child</module>
+                  </modules>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.hamcrest</groupId>
+                      <artifactId>hamcrest-junit</artifactId>
+                      <version>2.0.0.0</version>
+                      <scope>test</scope>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """
+            )
+          ),
+          mavenProject("project-parent",
+            pomXml(
+              """
+                <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app-parent</artifactId>
+                  <version>1</version>
+                  <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>3.1.5</version>
+                  </parent>
+                </project>
+                """,
+              """
+                <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app-parent</artifactId>
+                  <version>1</version>
+                  <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>3.1.5</version>
+                  </parent>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.hamcrest</groupId>
+                      <artifactId>hamcrest-junit</artifactId>
+                      <version>2.0.0.0</version>
+                      <scope>test</scope>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """
+            )
+          ),
+          mavenProject("my-app-child",
+            pomXml(
+              """
+                <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app-child</artifactId>
+                  <version>1</version>
+                  <parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app-aggregate</artifactId>
+                    <version>1</version>
+                  </parent>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    private AddDependency addDependency(@SuppressWarnings("SameParameterValue") String gav) {
+        return addDependency(gav, null, null, null);
+    }
+
+    private AddDependency addDependency(String gav, @Nullable String onlyIfUsing) {
         return addDependency(gav, onlyIfUsing, null, null);
     }
 
-    private AddDependency addDependency(String gav, String onlyIfUsing, Boolean acceptTransitive) {
+    private AddDependency addDependency(String gav, @Nullable String onlyIfUsing, @SuppressWarnings("SameParameterValue") Boolean acceptTransitive) {
         return addDependency(gav, onlyIfUsing, null, acceptTransitive);
     }
 
-    private AddDependency addDependency(String gav, String onlyIfUsing, @Nullable String scope) {
+    private AddDependency addDependency(String gav, @Nullable String onlyIfUsing, @Nullable String scope) {
         return addDependency(gav, onlyIfUsing, scope, null);
     }
 
-    private AddDependency addDependency(String gav, String onlyIfUsing, @Nullable String scope, @Nullable Boolean acceptTransitive) {
+    private AddDependency addDependency(String gav, @Nullable String onlyIfUsing, @Nullable String scope, @Nullable Boolean acceptTransitive) {
         String[] gavParts = gav.split(":");
         return new AddDependency(gavParts[0], gavParts[1], gavParts[2], null, scope, true, onlyIfUsing, null, null,
           false, null, acceptTransitive);

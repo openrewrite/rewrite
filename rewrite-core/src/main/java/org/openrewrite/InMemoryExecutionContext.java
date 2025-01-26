@@ -15,7 +15,7 @@
  */
 package org.openrewrite;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
 import java.util.Map;
@@ -60,19 +60,18 @@ public class InMemoryExecutionContext implements ExecutionContext {
     }
 
     @Override
-    @Nullable
-    public <T> T getMessage(String key) {
+    public <T> @Nullable T getMessage(String key) {
         //noinspection unchecked
         return (T) messages.get(key);
     }
 
     @Override
-    @Nullable
-    public <T> T pollMessage(String key) {
+    public <T> @Nullable T pollMessage(String key) {
         //noinspection unchecked
         return (T) messages.remove(key);
     }
 
+    @Override
     public Consumer<Throwable> getOnError() {
         return onError;
     }

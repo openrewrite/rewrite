@@ -16,6 +16,7 @@
 package org.openrewrite.gradle;
 
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
@@ -27,7 +28,6 @@ import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
@@ -41,6 +41,7 @@ import org.openrewrite.maven.tree.*;
 import org.openrewrite.tree.ParseError;
 
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -75,6 +76,9 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
 
     @Nullable
     private String resolvedVersion;
+
+    @Nullable
+    private final Predicate<Cursor> insertPredicate;
 
     @Override
     public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
@@ -220,6 +224,10 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
                 return m;
             }
 
+            if (insertPredicate != null && !insertPredicate.test(getCursor())) {
+                return m;
+            }
+
             J.Lambda dependenciesBlock = (J.Lambda) m.getArguments().get(0);
             if (!(dependenciesBlock.getBody() instanceof J.Block)) {
                 return m;
@@ -282,22 +290,10 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
                             }
                         } else {
                             Space originalPrefix = addDependencyInvocation.getPrefix();
-                            if (currentStatement instanceof J.VariableDeclarations) {
-                                J.VariableDeclarations variableDeclarations = (J.VariableDeclarations) currentStatement;
-                                if (variableDeclarations.getTypeExpression() != null) {
-                                    addDependencyInvocation = addDependencyInvocation.withPrefix(variableDeclarations.getTypeExpression().getPrefix());
-                                }
-                            } else {
-                                addDependencyInvocation = addDependencyInvocation.withPrefix(currentStatement.getPrefix());
-                            }
+                            addDependencyInvocation = addDependencyInvocation.withPrefix(currentStatement.getPrefix());
 
                             if (addDependencyInvocation.getSimpleName().equals(beforeDependency.getSimpleName())) {
-                                if (currentStatement instanceof J.VariableDeclarations) {
-                                    J.VariableDeclarations variableDeclarations = (J.VariableDeclarations) currentStatement;
-                                    if (variableDeclarations.getTypeExpression() != null && !variableDeclarations.getTypeExpression().getPrefix().equals(originalPrefix)) {
-                                        statements.set(i, variableDeclarations.withTypeExpression(variableDeclarations.getTypeExpression().withPrefix(originalPrefix)));
-                                    }
-                                } else if (!currentStatement.getPrefix().equals(originalPrefix)) {
+                                if (!currentStatement.getPrefix().equals(originalPrefix)) {
                                     statements.set(i, currentStatement.withPrefix(originalPrefix));
                                 }
                             }

@@ -16,6 +16,7 @@
 package org.openrewrite.groovy;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.java.ShortenFullyQualifiedTypeReferences;
 import org.openrewrite.test.RecipeSpec;
@@ -58,6 +59,7 @@ class ShortenFullyQualifiedTypeReferencesAdaptabilityTest implements RewriteTest
         );
     }
 
+    @DocumentExample
     @Test
     void importWithLeadingComment() {
         rewriteRun(

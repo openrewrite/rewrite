@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Properties;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.openrewrite.test.SourceSpecs.text;
 
 class EnvironmentTest implements RewriteTest {
@@ -44,6 +45,7 @@ class EnvironmentTest implements RewriteTest {
                 type: specs.openrewrite.org/v1beta/recipe
                 name: test.ChangeTextToHello
                 displayName: Change text to hello
+                description: Test.
                 recipeList:
                     - org.openrewrite.text.ChangeText:
                         toText: Hello
@@ -73,6 +75,7 @@ class EnvironmentTest implements RewriteTest {
                   type: specs.openrewrite.org/v1beta/recipe
                   name: test.ChangeTextToHello
                   displayName: Change text to hello
+                  description: Test.
                   recipeList:
                       - org.openrewrite.text.ChangeText:
                           toText: Hello
@@ -101,6 +104,43 @@ class EnvironmentTest implements RewriteTest {
     }
 
     @Test
+    void activeRecipeNotFoundSuggestions() {
+        var env = Environment.builder()
+          .load(
+            new YamlResourceLoader(
+              //language=yml
+              new ByteArrayInputStream(
+                """
+                  type: specs.openrewrite.org/v1beta/recipe
+                  name: test.ChangeTextToHello
+                  displayName: Change text to hello
+                  description: Test.
+                  recipeList:
+                    - org.openrewrite.text.ChangeText:
+                        toText: Hello
+                  ---
+                  type: specs.openrewrite.org/v1beta/recipe
+                  name: test.ChangeTextToHelloWorld
+                  displayName: Change text to hello world
+                  description: Test.
+                  recipeList:
+                    - org.openrewrite.text.ChangeText:
+                        toText: Hello
+                  """.getBytes()
+              ),
+              URI.create("rewrite.yml"),
+              new Properties()
+            )
+          )
+          .build();
+
+        assertThatExceptionOfType(RecipeException.class)
+          .isThrownBy(() -> env.activateRecipes("foo.ChangeTextToHelloWorld"))
+          .withMessageContaining("foo.ChangeTextToHelloWorld")
+          .withMessageContaining("test.ChangeTextToHelloWorld");
+    }
+
+    @Test
     void recipeWithoutRequiredConfiguration() {
         var env = Environment.builder()
           .load(
@@ -111,6 +151,7 @@ class EnvironmentTest implements RewriteTest {
                   type: specs.openrewrite.org/v1beta/recipe
                   name: test.ChangeTextToHello
                   displayName: Change text to hello
+                  description: Test.
                   recipeList:
                       - org.openrewrite.text.ChangeText
                   """.getBytes()
@@ -136,12 +177,14 @@ class EnvironmentTest implements RewriteTest {
                   type: specs.openrewrite.org/v1beta/recipe
                   name: test.TextMigration
                   displayName: Text migration
+                  description: Test.
                   recipeList:
                       - test.ChangeTextToHello
                   ---
                   type: specs.openrewrite.org/v1beta/recipe
                   name: test.ChangeTextToHello
                   displayName: Change text to hello
+                  description: Test.
                   recipeList:
                       - org.openrewrite.text.ChangeText:
                           toText: Hello
@@ -177,6 +220,7 @@ class EnvironmentTest implements RewriteTest {
                   type: specs.openrewrite.org/v1beta/recipe
                   name: test.TextMigration
                   displayName: Text migration
+                  description: Test.
                   recipeList:
                       - test.ChangeTextToHello
                   """.getBytes()
@@ -226,6 +270,7 @@ class EnvironmentTest implements RewriteTest {
                   type: specs.openrewrite.org/v1beta/recipe
                   name: test.TextMigration
                   displayName: Text migration
+                  description: Test.
                   recipeList:
                       - test.DoesNotExist
                   """.getBytes()
@@ -250,7 +295,8 @@ class EnvironmentTest implements RewriteTest {
                 """
                   type: specs.openrewrite.org/v1beta/recipe
                   name: test.LicenseHeader
-                  displayName: License header.
+                  displayName: License header
+                  description: Test.
                   recipeList:
                     - org.openrewrite.java.AddLicenseHeader: |-
                         LicenseHeader
@@ -276,6 +322,7 @@ class EnvironmentTest implements RewriteTest {
                   type: specs.openrewrite.org/v1beta/recipe
                   name: test.ResultOfFileMkdirsIgnored
                   displayName: Test
+                  description: Test.
                   recipeList:
                     - org.openrewrite.java.ResultOfMethodCallIgnored:
                           methodPattern: 'java.io.File mkdir*()'
@@ -391,6 +438,7 @@ class EnvironmentTest implements RewriteTest {
                 type: specs.openrewrite.org/v1beta/recipe
                 name: test.FooOne
                 displayName: Test
+                description: Test.
                 recipeList:
                   - org.openrewrite.config.RecipeAcceptingParameters:
                         foo: "foo"
@@ -423,6 +471,7 @@ class EnvironmentTest implements RewriteTest {
                 type: specs.openrewrite.org/v1beta/recipe
                 name: test.OrderPreserved
                 displayName: Test
+                description: Test.
                 recipeList:
                   - org.openrewrite.config.RecipeNoParameters
                   - test.FooOne
@@ -438,7 +487,7 @@ class EnvironmentTest implements RewriteTest {
             new Properties()
           ))
           .build();
-        var recipeList = env.activateRecipes("test.OrderPreserved").getRecipeList().get(0).getRecipeList();
+        var recipeList = env.activateRecipes("test.OrderPreserved").getRecipeList();
         assertThat(recipeList.get(0).getName()).isEqualTo("org.openrewrite.config.RecipeNoParameters");
         assertThat(recipeList.get(1).getName()).isEqualTo("test.FooOne");
         assertThat(recipeList.get(2).getName()).isEqualTo("org.openrewrite.config.RecipeAcceptingParameters");
@@ -457,17 +506,18 @@ class EnvironmentTest implements RewriteTest {
                 type: specs.openrewrite.org/v1beta/recipe
                 name: test.Foo
                 displayName: Test
+                description: Test.
                 causesAnotherCycle: true
                 recipeList:
                   - org.openrewrite.config.RecipeNoParameters
-                                
+                
                 """.getBytes()
             ),
             URI.create("rewrite.yml"),
             new Properties()
           )).build();
         var recipe = env.activateRecipes("test.Foo");
-        assertThat(recipe.getRecipeList().get(0).causesAnotherCycle()).isTrue();
+        assertThat(recipe.causesAnotherCycle()).isTrue();
     }
 
     @Test
@@ -480,6 +530,7 @@ class EnvironmentTest implements RewriteTest {
                   type: specs.openrewrite.org/v1beta/recipe
                   name: test.Foo
                   displayName: Test
+                  description: Test.
                   recipeList:
                     - org.openrewrite.config.RecipeNoParameters
                   """.getBytes()
@@ -494,6 +545,7 @@ class EnvironmentTest implements RewriteTest {
                   type: specs.openrewrite.org/v1beta/recipe
                   name: org.openrewrite.config.RecipeNoParameters
                   displayName: Test
+                  description: Test.
                   recipeList:
                     - org.openrewrite.config.RecipeSomeParameters
                   """.getBytes()

@@ -16,8 +16,8 @@
 package org.openrewrite.semver;
 
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
-import org.openrewrite.internal.lang.Nullable;
 
 @Value
 public class LatestPatch implements VersionComparator {
@@ -48,7 +48,7 @@ public class LatestPatch implements VersionComparator {
 
         //noinspection ConstantConditions
         return TildeRange.build("~" + Semver.majorVersion(currentVersion) + "." + Semver.minorVersion(currentVersion), metadataPattern)
-                .<VersionComparator>getValue()
+                .getValue()
                 .compare(currentVersion, v1, v2);
     }
 

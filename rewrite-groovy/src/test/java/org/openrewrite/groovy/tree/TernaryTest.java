@@ -31,7 +31,16 @@ class TernaryTest implements RewriteTest {
 
           // NOT inside parentheses, but verifies the parser's
           // test for "inside parentheses" condition
-          groovy("(true) ? 1 : 2")
+          groovy("(true) ? 1 : 2"),
+          // And combine the two cases
+          groovy("((true) ? 1 : 2)")
+        );
+    }
+
+    @Test
+    void elvisInParens() {
+        rewriteRun(
+          groovy(" ( System.getProperty(\"foo\") ?: false ) ")
         );
     }
 
@@ -58,7 +67,8 @@ class TernaryTest implements RewriteTest {
     @Test
     void complex() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
             (System.env.SYS_USER != null && System.env.SYS_USER != '') ? System.env.SYS_USER : System.env.LOCAL_USER
             (System.env.SYS_PASSWORD != null && System.env.SYS_PASSWORD != '') ? System.env.SYS_PASSWORD : System.env.LOCAL_PASSWORD
             """)

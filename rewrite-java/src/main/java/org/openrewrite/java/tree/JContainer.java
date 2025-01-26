@@ -17,8 +17,8 @@ package org.openrewrite.java.tree;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
 import java.util.List;
@@ -102,6 +102,8 @@ public class JContainer<T> {
         ANNOTATION_ARGUMENTS(Space.Location.ANNOTATION_ARGUMENTS, JRightPadded.Location.ANNOTATION_ARGUMENT),
         CASE(Space.Location.CASE, JRightPadded.Location.CASE),
         CASE_EXPRESSION(Space.Location.CASE_EXPRESSION, JRightPadded.Location.CASE_EXPRESSION),
+        CASE_LABEL(Space.Location.CASE_LABEL, JRightPadded.Location.CASE_LABEL),
+        DECONSTRUCTION_PATTERN_NESTED(Space.Location.DECONSTRUCTION_PATTERN_NESTED, JRightPadded.Location.DECONSTRUCTION_PATTERN_NESTED),
         IMPLEMENTS(Space.Location.IMPLEMENTS, JRightPadded.Location.IMPLEMENTS),
         PERMITS(Space.Location.PERMITS, JRightPadded.Location.PERMITS),
         LANGUAGE_EXTENSION(Space.Location.LANGUAGE_EXTENSION, JRightPadded.Location.LANGUAGE_EXTENSION),
@@ -152,16 +154,12 @@ public class JContainer<T> {
         }
     }
 
-    @Nullable
-    public static <J2 extends J> JContainer<J2> withElementsNullable(@Nullable JContainer<J2> before, @Nullable List<J2> elements) {
-        if (before == null) {
-            if (elements == null || elements.isEmpty()) {
-                return null;
-            }
-            return JContainer.build(Space.EMPTY, JRightPadded.withElements(emptyList(), elements), Markers.EMPTY);
-        }
+    public static <J2 extends J> @Nullable JContainer<J2> withElementsNullable(@Nullable JContainer<J2> before, @Nullable List<J2> elements) {
         if (elements == null || elements.isEmpty()) {
             return null;
+        }
+        if (before == null) {
+            return JContainer.build(Space.EMPTY, JRightPadded.withElements(emptyList(), elements), Markers.EMPTY);
         }
         return before.getPadding().withElements(JRightPadded.withElements(before.elements, elements));
     }

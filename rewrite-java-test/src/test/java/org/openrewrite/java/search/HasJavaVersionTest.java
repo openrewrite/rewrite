@@ -18,6 +18,7 @@ package org.openrewrite.java.search;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
@@ -67,6 +68,7 @@ class HasJavaVersionTest implements RewriteTest {
             ---
             type: specs.openrewrite.org/v1beta/recipe
             name: org.openrewrite.PreconditionTest
+            description: Test.
             preconditions:
               - org.openrewrite.java.search.HasJavaVersion:
                   version: 11
@@ -78,6 +80,7 @@ class HasJavaVersionTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void declarativePreconditionMatch() {
         rewriteRun(
@@ -85,6 +88,7 @@ class HasJavaVersionTest implements RewriteTest {
             ---
             type: specs.openrewrite.org/v1beta/recipe
             name: org.openrewrite.PreconditionTest
+            description: Test.
             preconditions:
               - org.openrewrite.java.search.HasJavaVersion:
                   version: 11
@@ -103,6 +107,7 @@ class HasJavaVersionTest implements RewriteTest {
             ---
             type: specs.openrewrite.org/v1beta/recipe
             name: org.openrewrite.CombinedWithFindMethod
+            description: Test.
             recipeList:
               - org.openrewrite.java.search.HasJavaVersion:
                   version: 11
@@ -140,6 +145,7 @@ class HasJavaVersionTest implements RewriteTest {
             ---
             type: specs.openrewrite.org/v1beta/recipe
             name: org.openrewrite.CombinedWithFindMethod
+            description: Test.
             recipeList:
               - org.openrewrite.java.search.FindMethods:
                   methodPattern: java.util.List add(..)

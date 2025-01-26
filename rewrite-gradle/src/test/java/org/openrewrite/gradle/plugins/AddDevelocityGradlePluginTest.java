@@ -138,7 +138,7 @@ class AddDevelocityGradlePluginTest implements RewriteTest {
               """,
             interpolateResolvedVersion("""
               plugins {
-                  id 'com.gradle.enterprise' version '%s'
+                  id 'com.gradle.develocity' version '%s'
               }
                             
               rootProject.name = 'my-project'
@@ -164,7 +164,7 @@ class AddDevelocityGradlePluginTest implements RewriteTest {
               """,
             interpolateResolvedVersion("""
               plugins {
-                  id 'com.gradle.enterprise' version '%s'
+                  id 'com.gradle.develocity' version '%s'
               }
                             
               rootProject.name = 'my-project'
@@ -176,10 +176,10 @@ class AddDevelocityGradlePluginTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2697")
     @Test
-    void withConfigurationInSettings() {
+    void withGradleEnterpriseConfigurationInSettings() {
         rewriteRun(
           spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")))
-            .recipe(new AddDevelocityGradlePlugin("3.x", "https://ge.sam.com/", true, true, true, AddDevelocityGradlePlugin.PublishCriteria.Always)),
+            .recipe(new AddDevelocityGradlePlugin("3.16.x", "https://ge.sam.com/", true, true, true, AddDevelocityGradlePlugin.PublishCriteria.Always)),
           buildGradle(
             ""
           ),
@@ -197,6 +197,37 @@ class AddDevelocityGradlePluginTest implements RewriteTest {
                       uploadInBackground = true
                       capture {
                           taskInputFiles = true
+                      }
+                  }
+              }
+              """
+            )
+          )
+        );
+    }
+
+    @Test
+    void withDevelocityConfigurationInSettings() {
+        rewriteRun(
+          spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")))
+            .recipe(new AddDevelocityGradlePlugin("3.x", "https://ge.sam.com/", true, true, true, AddDevelocityGradlePlugin.PublishCriteria.Always)),
+          buildGradle(
+            ""
+          ),
+          settingsGradle(
+            "",
+            interpolateResolvedVersion("""
+              plugins {
+                  id 'com.gradle.develocity' version '%s'
+              }
+              develocity {
+                  server = 'https://ge.sam.com/'
+                  allowUntrustedServer = true
+                  buildScan {
+                      publishing.onlyIf { true }
+                      uploadInBackground = true
+                      capture {
+                          fileFingerprints = true
                       }
                   }
               }
@@ -242,7 +273,7 @@ class AddDevelocityGradlePluginTest implements RewriteTest {
           settingsGradle(
             "",
             spec -> spec.after(after -> {
-                Matcher versionMatcher = Pattern.compile("id 'com\\.gradle\\.enterprise' version '(.*?)'").matcher(after);
+                Matcher versionMatcher = Pattern.compile("id 'com\\.gradle\\.develocity' version '(.*?)'").matcher(after);
                 assertThat(versionMatcher.find()).isTrue();
                 String version = versionMatcher.group(1);
                 VersionComparator versionComparator = requireNonNull(Semver.validate("[3.14,)", null).getValue());
@@ -250,7 +281,7 @@ class AddDevelocityGradlePluginTest implements RewriteTest {
 
                 return """
                   plugins {
-                      id 'com.gradle.enterprise' version '%s'
+                      id 'com.gradle.develocity' version '%s'
                   }
                   """.formatted(version);
             })
@@ -279,7 +310,7 @@ class AddDevelocityGradlePluginTest implements RewriteTest {
                */
                
               plugins {
-                  id 'com.gradle.enterprise' version '%s'
+                  id 'com.gradle.develocity' version '%s'
               }
                             
               rootProject.name = 'my-project'

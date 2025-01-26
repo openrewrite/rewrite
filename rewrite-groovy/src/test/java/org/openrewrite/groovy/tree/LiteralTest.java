@@ -16,10 +16,10 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.test.RewriteTest;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.test.RewriteTest;
 
 import java.math.BigDecimal;
 
@@ -85,12 +85,23 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
+    void escapedString() {
+        rewriteRun(
+          groovy(
+            """
+              "f\\"o\\\\\\"o"
+              """
+          )
+        );
+    }
+
+    @Test
     void gString() {
         rewriteRun(
           groovy(
             """
-              "uid: ${ UUID.randomUUID() } "
-               """
+              " uid: ${ UUID.randomUUID() } "
+              """
           )
         );
     }
@@ -110,7 +121,8 @@ class LiteralTest implements RewriteTest {
     @Test
     void gStringMultiPropertyAccess() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
             "$System.env.BAR_BAZ"
             """)
         );
@@ -119,7 +131,8 @@ class LiteralTest implements RewriteTest {
     @Test
     void emptyGString() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
             "${}"
             """)
         );
@@ -128,7 +141,8 @@ class LiteralTest implements RewriteTest {
     @Test
     void nestedGString() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
             " ${ " ${ " " } " } "
             """)
         );
@@ -137,7 +151,8 @@ class LiteralTest implements RewriteTest {
     @Test
     void gStringInterpolateString() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
             " ${""}\\n${" "} "
             """)
         );
@@ -160,6 +175,17 @@ class LiteralTest implements RewriteTest {
           groovy(
             """
               String s = "${ ARTIFACTORY_URL }"
+              """
+          )
+        );
+    }
+
+    @Test
+    void gStringWithEscapedDelimiter() {
+        rewriteRun(
+          groovy(
+            """
+              String s = "<a href=\\"$url\\">${displayName}</a>"
               """
           )
         );
@@ -213,18 +239,6 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
-    void emptyListLiteral() {
-        rewriteRun(
-          groovy(
-            """
-              def a = []
-              def b = [   ]
-              """
-          )
-        );
-    }
-
-    @Test
     void multilineStringWithApostrophes() {
         rewriteRun(
           groovy(
@@ -251,17 +265,6 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
-    void listLiteralTrailingComma() {
-        rewriteRun(
-          groovy(
-            """
-              def a = [ "foo" /* "foo" suffix */ , /* "]" prefix */ ]
-              """
-          )
-        );
-    }
-
-    @Test
     void gStringThatHasEmptyValueExpressionForUnknownReason() {
         rewriteRun(
           groovy(
@@ -278,13 +281,39 @@ class LiteralTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              "\\\\n\\t"
-              '\\\\n\\t'
-              ///\\\\n\\t///
-              
+            "\\\\\\\\n\\\\t"
+            '\\\\n\\t'
+            ///\\\\n\\t///
             """
           )
         );
+    }
 
+    @Test
+    void differentiateEscapeFromLiteral() {
+        rewriteRun(
+          groovy(
+            """
+            '\t'
+            '	'
+            """
+          )
+        );
+    }
+
+    @Test
+    void stringLiteralInParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              def a = (       "-"  )
+              """
+          ),
+          groovy(
+            """
+              def a = (("-"))
+              """
+          )
+        );
     }
 }

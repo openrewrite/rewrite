@@ -17,6 +17,7 @@ package org.openrewrite.gradle.plugins;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.DependencyVersionSelector;
 import org.openrewrite.gradle.GradleParser;
@@ -27,7 +28,6 @@ import org.openrewrite.gradle.marker.GradleSettings;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.J;
@@ -38,6 +38,7 @@ import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
+import org.openrewrite.style.Style;
 
 import java.nio.file.Paths;
 import java.util.Optional;
@@ -92,7 +93,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
     @Nullable
     Boolean uploadInBackground;
 
-    @Option(displayName = "Publish Criteria",
+    @Option(displayName = "Publish criteria",
             description = "When set to `Always` the plugin will publish build scans of every single build. " +
                           "When set to `Failure` the plugin will only publish build scans when the build fails. " +
                           "When omitted scans will be published only when the `--scan` option is passed to the build.",
@@ -144,7 +145,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
                     return cu;
                 }
                 // Don't modify an existing gradle enterprise DSL, only add one which is not already present
-                if (containsGradleEnterpriseDsl(cu)) {
+                if (containsGradleDevelocityDsl(cu)) {
                     return cu;
                 }
 
@@ -156,7 +157,24 @@ public class AddDevelocityGradlePlugin extends Recipe {
                         return cu;
                     }
                     GradleSettings gradleSettings = maybeGradleSettings.get();
-                    cu = withPlugin(cu, "com.gradle.enterprise", versionComparator, null, gradleSettings, ctx);
+
+                    try {
+                        String newVersion = findNewerVersion(new DependencyVersionSelector(null, null, gradleSettings), ctx);
+                        if (newVersion == null) {
+                            return cu;
+                        }
+
+                        String pluginId;
+                        if (versionComparator.compare(null, newVersion, "3.17") >= 0) {
+                            pluginId = "com.gradle.develocity";
+                        } else {
+                            pluginId = "com.gradle.enterprise";
+                        }
+
+                        cu = withPlugin(cu, pluginId, newVersion, versionComparator, ctx);
+                    } catch (MavenDownloadingException e) {
+                        return e.warn(cu);
+                    }
                 } else if (!gradleSixOrLater && cu.getSourcePath().toString().equals("build.gradle")) {
                     // Older than 6.0 goes in root build.gradle only, not in build.gradle of subprojects
                     Optional<GradleProject> maybeGradleProject = cu.getMarkers().findFirst(GradleProject.class);
@@ -165,38 +183,47 @@ public class AddDevelocityGradlePlugin extends Recipe {
                     }
                     GradleProject gradleProject = maybeGradleProject.get();
 
-                    cu = withPlugin(cu, "com.gradle.build-scan", versionComparator, gradleProject, null, ctx);
+                    try {
+                        String newVersion = findNewerVersion(new DependencyVersionSelector(null, gradleProject, null), ctx);
+                        if (newVersion == null) {
+                            return cu;
+                        }
+
+                        cu = withPlugin(cu, "com.gradle.build-scan", newVersion, versionComparator, ctx);
+                    } catch (MavenDownloadingException e) {
+                        return e.warn(cu);
+                    }
                 }
 
                 return cu;
             }
+
+            private @Nullable String findNewerVersion(DependencyVersionSelector versionSelector, ExecutionContext ctx) throws MavenDownloadingException {
+                String newVersion = versionSelector
+                        .select(new GroupArtifact("com.gradle.develocity", "com.gradle.develocity.gradle.plugin"), "classpath", version, null, ctx);
+                if (newVersion == null) {
+                    newVersion = versionSelector
+                            .select(new GroupArtifact("com.gradle.enterprise", "com.gradle.enterprise.gradle.plugin"), "classpath", version, null, ctx);
+                }
+                return newVersion;
+            }
         });
     }
 
-    private G.CompilationUnit withPlugin(G.CompilationUnit cu, String pluginId, VersionComparator versionComparator, @Nullable GradleProject gradleProject, @Nullable GradleSettings gradleSettings, ExecutionContext ctx) {
-        try {
-            String newVersion = new DependencyVersionSelector(null, gradleProject, gradleSettings)
-                    .select(new GroupArtifact("com.gradle.enterprise", "com.gradle.enterprise.gradle.plugin"), "classpath", version, null, ctx);
-            if (newVersion == null) {
-                return cu;
-            }
-
-            cu = (G.CompilationUnit) new AddPluginVisitor(pluginId, newVersion, null)
-                    .visitNonNull(cu, ctx);
-            cu = (G.CompilationUnit) new UpgradePluginVersion(pluginId, newVersion, null).getVisitor()
-                    .visitNonNull(cu, ctx);
-            J.MethodInvocation gradleEnterpriseInvocation = gradleEnterpriseDsl(
-                    newVersion,
-                    versionComparator,
-                    getIndent(cu),
-                    ctx);
-            return cu.withStatements(ListUtils.concat(cu.getStatements(), gradleEnterpriseInvocation));
-        } catch (MavenDownloadingException e) {
-            return e.warn(cu);
-        }
+    private G.CompilationUnit withPlugin(G.CompilationUnit cu, String pluginId, String newVersion, VersionComparator versionComparator, ExecutionContext ctx) {
+        cu = (G.CompilationUnit) new AddPluginVisitor(pluginId, newVersion, null, null, false)
+                .visitNonNull(cu, ctx);
+        cu = (G.CompilationUnit) new UpgradePluginVersion(pluginId, newVersion, null).getVisitor()
+                .visitNonNull(cu, ctx);
+        J.MethodInvocation gradleEnterpriseInvocation = gradleEnterpriseDsl(
+                newVersion,
+                versionComparator,
+                getIndent(cu),
+                ctx);
+        return cu.withStatements(ListUtils.concat(cu.getStatements(), gradleEnterpriseInvocation));
     }
 
-    private static boolean containsGradleEnterpriseDsl(JavaSourceFile cu) {
+    private static boolean containsGradleDevelocityDsl(JavaSourceFile cu) {
         AtomicBoolean found = new AtomicBoolean(false);
         new GroovyIsoVisitor<AtomicBoolean>() {
             @Override
@@ -209,7 +236,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
 
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean atomicBoolean) {
-                if (method.getSimpleName().equals("gradleEnterprise")) {
+                if (method.getSimpleName().equals("gradleEnterprise") || method.getSimpleName().equals("develocity")) {
                     atomicBoolean.set(true);
                 }
                 return super.visitMethodInvocation(method, atomicBoolean);
@@ -219,14 +246,19 @@ public class AddDevelocityGradlePlugin extends Recipe {
         return found.get();
     }
 
-    @Nullable
-    private J.MethodInvocation gradleEnterpriseDsl(String newVersion, VersionComparator versionComparator, String indent, ExecutionContext ctx) {
+    private J.@Nullable MethodInvocation gradleEnterpriseDsl(String newVersion, VersionComparator versionComparator, String indent, ExecutionContext ctx) {
         if (server == null && allowUntrustedServer == null && captureTaskInputFiles == null && uploadInBackground == null && publishCriteria == null) {
             return null;
         }
         boolean versionIsAtLeast3_2 = versionComparator.compare(null, newVersion, "3.2") >= 0;
         boolean versionIsAtLeast3_7 = versionComparator.compare(null, newVersion, "3.7") >= 0;
-        StringBuilder ge = new StringBuilder("\ngradleEnterprise {\n");
+        boolean versionIsAtLeast3_17 = versionComparator.compare(null, newVersion, "3.17") >= 0;
+        StringBuilder ge;
+        if (versionIsAtLeast3_17) {
+            ge = new StringBuilder("\ndevelocity {\n");
+        } else {
+            ge = new StringBuilder("\ngradleEnterprise {\n");
+        }
         if (server != null && !server.isEmpty()) {
             ge.append(indent).append("server = '").append(server).append("'\n");
         }
@@ -237,9 +269,17 @@ public class AddDevelocityGradlePlugin extends Recipe {
             ge.append(indent).append("buildScan {\n");
             if (publishCriteria != null) {
                 if (publishCriteria == PublishCriteria.Always) {
-                    ge.append(indent).append(indent).append("publishAlways()\n");
+                    if (versionIsAtLeast3_17) {
+                        ge.append(indent).append(indent).append("publishing.onlyIf { true }\n");
+                    } else {
+                        ge.append(indent).append(indent).append("publishAlways()\n");
+                    }
                 } else {
-                    ge.append(indent).append(indent).append("publishOnFailure()\n");
+                    if (versionIsAtLeast3_17) {
+                        ge.append(indent).append(indent).append("publishing.onlyIf { !it.buildResult.failures.empty }\n");
+                    } else {
+                        ge.append(indent).append(indent).append("publishOnFailure()\n");
+                    }
                 }
             }
             if (allowUntrustedServer != null && !versionIsAtLeast3_2) {
@@ -251,7 +291,11 @@ public class AddDevelocityGradlePlugin extends Recipe {
             if (captureTaskInputFiles != null) {
                 if (versionIsAtLeast3_7) {
                     ge.append(indent).append(indent).append("capture {\n");
-                    ge.append(indent).append(indent).append(indent).append("taskInputFiles = ").append(captureTaskInputFiles).append("\n");
+                    if (versionIsAtLeast3_17) {
+                        ge.append(indent).append(indent).append(indent).append("fileFingerprints = ").append(captureTaskInputFiles).append("\n");
+                    } else {
+                        ge.append(indent).append(indent).append(indent).append("taskInputFiles = ").append(captureTaskInputFiles).append("\n");
+                    }
                     ge.append(indent).append(indent).append("}\n");
                 } else {
                     ge.append(indent).append(indent).append("captureTaskInputFiles = ").append(captureTaskInputFiles).append("\n");
@@ -271,7 +315,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
     }
 
     private static String getIndent(G.CompilationUnit cu) {
-        TabsAndIndentsStyle style = cu.getStyle(TabsAndIndentsStyle.class, IntelliJ.tabsAndIndents());
+        TabsAndIndentsStyle style = Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents);
         if (style.getUseTabCharacter()) {
             return "\t";
         } else {

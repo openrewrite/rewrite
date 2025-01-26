@@ -24,6 +24,7 @@ import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.time.Duration;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -74,12 +75,16 @@ public interface HttpSender {
         private final byte[] entity;
         private final Method method;
         private final Map<String, String> requestHeaders;
+        private final Duration connectTimeout;
+        private final Duration readTimeout;
 
-        public Request(URL url, byte[] entity, Method method, Map<String, String> requestHeaders) {
+        public Request(URL url, byte[] entity, Method method, Map<String, String> requestHeaders, Duration connectTimeout, Duration readTimeout) {
             this.url = url;
             this.entity = entity;
             this.method = method;
             this.requestHeaders = requestHeaders;
+            this.connectTimeout = connectTimeout;
+            this.readTimeout = readTimeout;
         }
 
         public URL getUrl() {
@@ -96,6 +101,14 @@ public interface HttpSender {
 
         public Map<String, String> getRequestHeaders() {
             return requestHeaders;
+        }
+
+        public Duration getConnectTimeout() {
+            return connectTimeout;
+        }
+
+        public Duration getReadTimeout() {
+            return readTimeout;
         }
 
         public static Builder build(String uri, HttpSender sender) {
@@ -125,6 +138,8 @@ public interface HttpSender {
             private URL url;
             private byte[] entity = new byte[0];
             private Method method;
+            private Duration connectTimeout;
+            private Duration readTimeout;
 
             Builder(String url, HttpSender sender) {
                 try {
@@ -277,8 +292,9 @@ public interface HttpSender {
              * @throws IOException If compression fails.
              */
             public final Builder compressWhen(Supplier<Boolean> when) throws IOException {
-                if (when.get())
+                if (when.get()) {
                     return compress();
+                }
                 return this;
             }
 
@@ -331,7 +347,17 @@ public interface HttpSender {
             }
 
             public Request build() {
-                return new Request(url, entity, method, requestHeaders);
+                return new Request(url, entity, method, requestHeaders, connectTimeout, readTimeout);
+            }
+
+            public Builder withConnectTimeout(Duration connectTimeout) {
+                this.connectTimeout = connectTimeout;
+                return this;
+            }
+
+            public Builder withReadTimeout(Duration readTimeout) {
+                this.readTimeout = readTimeout;
+                return this;
             }
         }
     }

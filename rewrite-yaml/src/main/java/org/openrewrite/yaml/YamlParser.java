@@ -18,13 +18,13 @@ package org.openrewrite.yaml;
 import lombok.Getter;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
@@ -52,7 +52,7 @@ import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
 public class YamlParser implements org.openrewrite.Parser {
-    private static final Pattern VARIABLE_PATTERN = Pattern.compile(":\\s*(@[^\n\r@]+@)");
+    private static final Pattern VARIABLE_PATTERN = Pattern.compile(":\\s+(@[^\n\r@]+@)");
 
     @Override
     public Stream<SourceFile> parse(@Language("yml") String... sources) {
@@ -82,8 +82,9 @@ public class YamlParser implements org.openrewrite.Parser {
                         Yaml.Documents docs = (Yaml.Documents) sourceFile;
                         // ensure there is always at least one Document, even in an empty yaml file
                         if (docs.getDocuments().isEmpty()) {
-                            return docs.withDocuments(singletonList(new Yaml.Document(randomId(), "", Markers.EMPTY,
-                                    false, new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null), null)));
+                            Yaml.Document.End end = new Yaml.Document.End(randomId(), "", Markers.EMPTY, false);
+                            Yaml.Mapping mapping = new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null);
+                            return docs.withDocuments(singletonList(new Yaml.Document(randomId(), "", Markers.EMPTY, false, mapping, end)));
                         }
                         return docs;
                     }
@@ -129,7 +130,7 @@ public class YamlParser implements org.openrewrite.Parser {
                 switch (event.getEventId()) {
                     case DocumentEnd: {
                         assert document != null;
-                        if(blockStack.size() == 1 && blockStack.peek() instanceof ScalarBuilder) {
+                        if (blockStack.size() == 1 && blockStack.peek() instanceof ScalarBuilder) {
                             // The yaml document consists of a single scalar value not in a mapping or sequence
                             ScalarBuilder builder = (ScalarBuilder) blockStack.pop();
                             lastEnd = builder.getLastEnd();
@@ -157,7 +158,7 @@ public class YamlParser implements org.openrewrite.Parser {
                                 Markers.EMPTY,
                                 ((DocumentStartEvent) event).getExplicit(),
                                 new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null),
-                                null
+                                new Yaml.Document.End(randomId(), "", Markers.EMPTY, false)
                         );
                         lastEnd = event.getEndMark().getIndex();
                         break;
@@ -193,7 +194,6 @@ public class YamlParser implements org.openrewrite.Parser {
                     }
                     case Scalar: {
                         String fmt = newLine + reader.prefix(lastEnd, event);
-                        newLine = "";
 
                         ScalarEvent scalar = (ScalarEvent) event;
 
@@ -206,6 +206,9 @@ public class YamlParser implements org.openrewrite.Parser {
                         } else {
                             valueStart = lastEnd + fmt.length();
                         }
+                        valueStart = valueStart - newLine.length();
+                        newLine = "";
+
 
                         String scalarValue;
                         switch (scalar.getScalarStyle()) {
@@ -270,7 +273,7 @@ public class YamlParser implements org.openrewrite.Parser {
                             sequenceBuilder.push(finalScalar, commaPrefix);
 
                         } else if (builder == null) {
-                            if(!"".equals(finalScalar.getValue())) {
+                            if (!"".equals(finalScalar.getValue())) {
                                 // If the "scalar" is just a comment, allow it to accrue to the Document.End rather than create a phantom scalar
                                 blockStack.push(new ScalarBuilder(finalScalar, event.getEndMark().getIndex()));
                             }
@@ -333,7 +336,10 @@ public class YamlParser implements org.openrewrite.Parser {
                         if (openingBracketIndex != -1) {
                             int startIndex = commentAwareIndexOf(':', fullPrefix) + 1;
                             startBracketPrefix = fullPrefix.substring(startIndex, openingBracketIndex);
-                            lastEnd = event.getEndMark().getIndex();
+                        }
+                        lastEnd = event.getEndMark().getIndex();
+                        if (shouldUseYamlParserBugWorkaround(sse)) {
+                            lastEnd--;
                         }
                         blockStack.push(new SequenceBuilder(fmt, startBracketPrefix, anchor));
                         break;
@@ -375,6 +381,17 @@ public class YamlParser implements org.openrewrite.Parser {
         }
     }
 
+    /*
+    The yaml-parser library unfortunately returns inconsistent marks.
+    If the dashes of the sequence have an indentation, the end mark and the start mark point to the dash.
+    If the dashes of the sequence do not have an indentation, the end mark will point to the character AFTER the dash.
+    */
+    private boolean shouldUseYamlParserBugWorkaround(SequenceStartEvent event) {
+        int startChar = event.getStartMark().getBuffer()[event.getStartMark().getPointer()];
+        int endChar = event.getEndMark().getBuffer()[event.getEndMark().getPointer()];
+        return startChar == '-' && endChar != '-';
+    }
+
     private Yaml.Anchor buildYamlAnchor(FormatPreservingReader reader, int lastEnd, String eventPrefix, String anchorKey, int eventEndIndex, boolean isForScalar) {
         int anchorLength = isForScalar ? anchorKey.length() + 1 : anchorKey.length();
         String whitespaceAndScalar = reader.prefix(
@@ -397,9 +414,6 @@ public class YamlParser implements org.openrewrite.Parser {
         return new Yaml.Anchor(randomId(), prefix, postFix.toString(), Markers.EMPTY, anchorKey);
     }
 
-    /**
-     * Return the index of the target character if it appears in a non-comment portion of the String, or -1 if it does not appear.
-     */
     private static int commentAwareIndexOf(char target, String s) {
         boolean inComment = false;
         for (int i = 0; i < s.length(); i++) {
@@ -442,15 +456,15 @@ public class YamlParser implements org.openrewrite.Parser {
         @Nullable
         private final String startBracePrefix;
 
-        @Nullable
-        private final Yaml.Anchor anchor;
+
+        private final Yaml.@Nullable Anchor anchor;
 
         private final List<Yaml.Mapping.Entry> entries = new ArrayList<>();
 
         @Nullable
         private YamlKey key;
 
-        private MappingBuilder(String prefix, @Nullable String startBracePrefix, @Nullable Yaml.Anchor anchor) {
+        private MappingBuilder(String prefix, @Nullable String startBracePrefix, Yaml.@Nullable Anchor anchor) {
             this.prefix = prefix;
             this.startBracePrefix = startBracePrefix;
             this.anchor = anchor;
@@ -492,15 +506,16 @@ public class YamlParser implements org.openrewrite.Parser {
 
     private static class SequenceBuilder implements BlockBuilder {
         private final String prefix;
+
         @Nullable
         private final String startBracketPrefix;
 
-        @Nullable
-        private final Yaml.Anchor anchor;
+
+        private final Yaml.@Nullable Anchor anchor;
 
         private final List<Yaml.Sequence.Entry> entries = new ArrayList<>();
 
-        private SequenceBuilder(String prefix, @Nullable String startBracketPrefix, @Nullable Yaml.Anchor anchor) {
+        private SequenceBuilder(String prefix, @Nullable String startBracketPrefix, Yaml.@Nullable Anchor anchor) {
             this.prefix = prefix;
             this.startBracketPrefix = startBracketPrefix;
             this.anchor = anchor;
@@ -537,6 +552,7 @@ public class YamlParser implements org.openrewrite.Parser {
     private static class ScalarBuilder implements BlockBuilder {
         Yaml.Scalar scalar;
         int lastEnd;
+
         @Override
         public void push(Yaml.Block block) {
             throw new IllegalStateException("Unable to push on top of a scalar.");

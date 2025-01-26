@@ -69,7 +69,7 @@ public class ChangeAnnotationAttributeName extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new UsesType<>(annotationType, false), new JavaIsoVisitor<ExecutionContext>() {
-            private final AnnotationMatcher annotationMatcher = new AnnotationMatcher(annotationType);
+            private final AnnotationMatcher annotationMatcher = new AnnotationMatcher('@' + annotationType);
 
             @Override
             public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {

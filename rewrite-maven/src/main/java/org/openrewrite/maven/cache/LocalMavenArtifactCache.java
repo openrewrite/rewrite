@@ -17,7 +17,7 @@ package org.openrewrite.maven.cache;
 
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.tree.ResolvedDependency;
 
 import java.io.IOException;
@@ -42,15 +42,13 @@ public class LocalMavenArtifactCache implements MavenArtifactCache {
     }
 
     @Override
-    @Nullable
-    public Path getArtifact(ResolvedDependency dependency) {
+    public @Nullable Path getArtifact(ResolvedDependency dependency) {
         Path path = dependencyPath(dependency);
         return path.toFile().exists() ? path : null;
     }
 
     @Override
-    @Nullable
-    public Path putArtifact(ResolvedDependency dependency, InputStream artifactInputStream, Consumer<Throwable> onError) {
+    public @Nullable Path putArtifact(ResolvedDependency dependency, InputStream artifactInputStream, Consumer<Throwable> onError) {
         if (artifactInputStream == null) {
             return null;
         }

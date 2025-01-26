@@ -17,9 +17,9 @@ package org.openrewrite;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
@@ -78,13 +78,11 @@ public interface Parser {
 
     default Stream<SourceFile> parse(ExecutionContext ctx, String... sources) {
         return parseInputs(
-                Arrays.stream(sources).map(source ->
-                        new Input(
-                                sourcePathFromSourceText(Paths.get(Long.toString(System.nanoTime())), source), null,
-                                () -> new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)),
-                                true
-                        )
-                ).collect(toList()),
+                Arrays.stream(sources)
+                        .map(source ->
+                                Input.fromString(
+                                        sourcePathFromSourceText(Paths.get(Long.toString(System.nanoTime())), source), source)
+                        ).collect(toList()),
                 null,
                 ctx
         );
@@ -136,8 +134,10 @@ public interface Parser {
     class Input {
         @Getter
         private final boolean synthetic;
+
         @Getter
         private final Path path;
+
         private final Supplier<InputStream> source;
 
         @Getter
@@ -175,6 +175,16 @@ public interface Parser {
             return new Input(sourcePath, null, () -> new ByteArrayInputStream(source.getBytes(charset)), true);
         }
 
+        public static Input fromFile(Path sourcePath) {
+            return new Input(sourcePath, FileAttributes.fromPath(sourcePath), () -> {
+                try {
+                    return Files.newInputStream(sourcePath);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }, false);
+        }
+
         @SuppressWarnings("unused")
         public static Input fromResource(String resource) {
             return new Input(
@@ -192,11 +202,8 @@ public interface Parser {
         public static List<Input> fromResource(String resource, String delimiter, @Nullable Charset charset) {
             Charset resourceCharset = charset == null ? StandardCharsets.UTF_8 : charset;
             return Arrays.stream(StringUtils.readFully(Objects.requireNonNull(Input.class.getResourceAsStream(resource)), resourceCharset).split(delimiter))
-                    .map(source -> new Parser.Input(
-                            Paths.get(Long.toString(System.nanoTime())), null,
-                            () -> new ByteArrayInputStream(source.getBytes(resourceCharset)),
-                            true
-                    ))
+                    .map(source -> Parser.Input.fromString(
+                            Paths.get(Long.toString(System.nanoTime())), source))
                     .collect(toList());
         }
 

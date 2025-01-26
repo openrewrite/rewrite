@@ -18,22 +18,22 @@ package org.openrewrite.java;
 import lombok.Getter;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.grammar.MethodSignatureLexer;
 import org.openrewrite.java.internal.grammar.MethodSignatureParser;
 import org.openrewrite.java.internal.grammar.MethodSignatureParserBaseVisitor;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.trait.Reference;
 
 import java.util.regex.Pattern;
 
 import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
 
 @Getter
-public class TypeMatcher {
-    private static final String ASPECTJ_DOT_PATTERN = StringUtils.aspectjNameToPattern(".");
+public class TypeMatcher implements Reference.Matcher {
 
     @SuppressWarnings("NotNullFieldNotInitialized")
     @Getter
@@ -65,8 +65,9 @@ public class TypeMatcher {
                     CharStreams.fromString(fieldType))));
 
             new MethodSignatureParserBaseVisitor<Void>() {
+
                 @Override
-                public Void visitTargetTypePattern(MethodSignatureParser.TargetTypePatternContext ctx) {
+                public @Nullable Void visitTargetTypePattern(MethodSignatureParser.TargetTypePatternContext ctx) {
                     String pattern = new TypeVisitor().visitTargetTypePattern(ctx);
                     if (isPlainIdentifier(ctx)) {
                         targetType = pattern;
@@ -107,5 +108,15 @@ public class TypeMatcher {
                context.OR() == null &&
                context.classNameOrInterface().DOTDOT().isEmpty() &&
                context.classNameOrInterface().WILDCARD().isEmpty();
+    }
+
+    @Override
+    public boolean matchesReference(Reference reference) {
+        return reference.getKind() == Reference.Kind.TYPE && matchesTargetTypeName(reference.getValue());
+    }
+
+    @Override
+    public Reference.Renamer createRenamer(String newName) {
+        return reference -> newName;
     }
 }

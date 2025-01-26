@@ -15,25 +15,21 @@
  */
 package org.openrewrite.gradle;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
-import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static org.openrewrite.Tree.randomId;
 
@@ -52,12 +48,14 @@ public class DependencyUseStringNotation extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
         return Preconditions.check(new IsBuildGradle<>(), new GroovyVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                if (!dependencyDsl.matches(m)) {
+
+                GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
+
+                if (!gradleDependencyMatcher.get(getCursor()).isPresent()) {
                     return m;
                 }
 
@@ -122,8 +120,7 @@ public class DependencyUseStringNotation extends Recipe {
                 return m;
             }
 
-            @Nullable
-            private J.Literal toLiteral(Space prefix, Markers markers, Map<String, Expression> mapNotation) {
+            private J.@Nullable Literal toLiteral(Space prefix, Markers markers, Map<String, Expression> mapNotation) {
                 if (mapNotation.containsKey("group") && mapNotation.containsKey("name")) {
                     String stringNotation = "";
 
@@ -140,6 +137,10 @@ public class DependencyUseStringNotation extends Recipe {
                     String version = coerceToStringNotation(mapNotation.get("version"));
                     if (version != null) {
                         stringNotation += ":" + version;
+                        String classifier = coerceToStringNotation(mapNotation.get("classifier"));
+                        if (classifier != null) {
+                            stringNotation += ":" + classifier;
+                        }
                     }
 
                     return new J.Literal(randomId(), prefix, markers, stringNotation, "\"" + stringNotation + "\"", Collections.emptyList(), JavaType.Primitive.String);
@@ -148,8 +149,7 @@ public class DependencyUseStringNotation extends Recipe {
                 return null;
             }
 
-            @Nullable
-            private String coerceToStringNotation(Expression expression) {
+            private @Nullable String coerceToStringNotation(Expression expression) {
                 if (expression instanceof J.Literal) {
                     return (String) ((J.Literal) expression).getValue();
                 } else if (expression instanceof J.Identifier) {

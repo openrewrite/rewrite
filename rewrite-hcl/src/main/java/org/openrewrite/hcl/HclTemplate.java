@@ -22,9 +22,9 @@ import org.openrewrite.hcl.internal.template.HclTemplateParser;
 import org.openrewrite.hcl.internal.template.Substitutions;
 import org.openrewrite.hcl.style.SpacesStyle;
 import org.openrewrite.hcl.tree.*;
-import org.openrewrite.hcl.tree.Space.Location;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.style.Style;
 import org.openrewrite.template.SourceTemplate;
 
 import java.util.List;
@@ -63,14 +63,14 @@ public class HclTemplate implements SourceTemplate<Hcl, HclCoordinates> {
         onAfterVariableSubstitution.accept(substitutedTemplate);
 
         Tree insertionPoint = coordinates.getTree();
-        Location loc = coordinates.getSpaceLocation();
+        Space.Location loc = coordinates.getSpaceLocation();
 
         //noinspection unchecked
-        H h = (H) new HclVisitor<Integer>() {
+        return (H) new HclVisitor<Integer>() {
             @Override
             public Hcl visitConfigFile(Hcl.ConfigFile configFile, Integer p) {
                 Hcl.ConfigFile c = (Hcl.ConfigFile) super.visitConfigFile(configFile, p);
-                if (loc.equals(Location.CONFIG_FILE_EOF)) {
+                if (loc == Space.Location.CONFIG_FILE_EOF) {
                     List<BodyContent> gen = substitutions.unsubstitute(templateParser.parseBodyContent(substitutedTemplate));
 
                     if (coordinates.getComparator() != null) {
@@ -101,7 +101,7 @@ public class HclTemplate implements SourceTemplate<Hcl, HclCoordinates> {
                                 )
                         );
                     }
-                } else if (loc.equals(Location.CONFIG_FILE)) {
+                } else if (loc == Space.Location.CONFIG_FILE) {
                     List<BodyContent> gen = substitutions.unsubstitute(templateParser.parseBodyContent(substitutedTemplate));
                     c = c.withBody(
                             ListUtils.concatAll(
@@ -117,7 +117,7 @@ public class HclTemplate implements SourceTemplate<Hcl, HclCoordinates> {
             @Override
             public Hcl visitBlock(Hcl.Block block, Integer p) {
                 Hcl.Block b = (Hcl.Block) super.visitBlock(block, p);
-                if (loc.equals(Location.BLOCK_CLOSE)) {
+                if (loc == Space.Location.BLOCK_CLOSE) {
                     if (b.isScope(insertionPoint)) {
                         List<BodyContent> gen = substitutions.unsubstitute(templateParser.parseBodyContent(substitutedTemplate));
 
@@ -142,11 +142,11 @@ public class HclTemplate implements SourceTemplate<Hcl, HclCoordinates> {
                         );
 
                         Hcl.ConfigFile cf = getCursor().firstEnclosingOrThrow(Hcl.ConfigFile.class);
-                        b = (Hcl.Block) new AttributeSpaceVisitor<Integer>(Optional.ofNullable(cf.getStyle(SpacesStyle.class))
+                        b = (Hcl.Block) new AttributeSpaceVisitor<Integer>(Optional.ofNullable(Style.from(SpacesStyle.class, cf))
                                 .orElse(SpacesStyle.DEFAULT)).visit(b, p, getCursor().getParentOrThrow());
                         assert b != null;
                     }
-                } else if (loc.equals(Location.BLOCK)) {
+                } else if (loc == Space.Location.BLOCK) {
                     if (b.isScope(insertionPoint)) {
                         b = (Hcl.Block) autoFormat(templateParser.parseBodyContent(substitutedTemplate).get(0), p,
                                 getCursor().getParentOrThrow());
@@ -159,7 +159,7 @@ public class HclTemplate implements SourceTemplate<Hcl, HclCoordinates> {
             public Hcl visitExpression(Expression expression, Integer p) {
                 Hcl e = super.visitExpression(expression, p);
 
-                if (loc.equals(Location.EXPRESSION_PREFIX)) {
+                if (loc == Space.Location.EXPRESSION_PREFIX) {
                     if (e.isScope(insertionPoint)) {
                         e = templateParser.parseExpression(substitutedTemplate).withPrefix(expression.getPrefix());
                     }
@@ -167,10 +167,7 @@ public class HclTemplate implements SourceTemplate<Hcl, HclCoordinates> {
 
                 return e;
             }
-        }.visit(scope.getValue(), 0, scope.getParentOrThrow());
-
-        assert h != null;
-        return h;
+        }.visitNonNull(scope.getValue(), 0, scope.getParentOrThrow());
     }
 
     public static Builder builder(String code) {

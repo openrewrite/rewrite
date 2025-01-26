@@ -15,9 +15,8 @@
  */
 package org.openrewrite;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 
 import java.nio.charset.Charset;
@@ -25,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 public interface SourceFile extends Tree {
 
@@ -70,14 +70,20 @@ public interface SourceFile extends Tree {
 
     <T extends SourceFile> T withFileAttributes(@Nullable FileAttributes fileAttributes);
 
-    @Nullable
-    default <S extends Style> S getStyle(Class<S> style) {
-        return NamedStyles.merge(style, getMarkers().findAll(NamedStyles.class));
+    /**
+     * @deprecated Use {@link org.openrewrite.style.Style#from(Class, SourceFile)} instead.
+     */
+    @Deprecated
+    default <S extends Style> @Nullable S getStyle(Class<S> styleClass) {
+        return Style.from(styleClass, this);
     }
 
-    default <S extends Style> S getStyle(Class<S> style, S defaultStyle) {
-        S s = getStyle(style);
-        return s == null ? defaultStyle : s;
+    /**
+     * @deprecated Use {@link org.openrewrite.style.Style#from(Class, SourceFile, Supplier)} instead.
+     */
+    @Deprecated
+    default <S extends Style> S getStyle(Class<S> styleClass, S defaultStyle) {
+        return Style.from(styleClass, this, () -> defaultStyle);
     }
 
     default <P> byte[] printAllAsBytes(P p) {
@@ -108,6 +114,7 @@ public interface SourceFile extends Tree {
         return printAllTrimmed(0);
     }
 
+    @Override
     default <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
         throw new UnsupportedOperationException("SourceFile implementations should override this method");
     }

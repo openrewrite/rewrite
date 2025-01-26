@@ -15,6 +15,7 @@
  */
 package org.openrewrite.properties;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -92,6 +93,28 @@ class PropertiesParserTest implements RewriteTest {
         );
     }
 
+    @Disabled
+    @ParameterizedTest
+    @ValueSource(strings = {"#", "!"})
+    void entryValueThenComment(String commentStyle) {
+        rewriteRun(
+          properties(
+            """
+              key=value %s this is a comment
+              """.formatted(commentStyle),
+            spec -> spec.beforeRecipe(p -> {
+                assertThat(p.getContent().get(0))
+                  .isInstanceOf(Properties.Entry.class)
+                  .extracting(e -> ((Properties.Entry) e).getValue().getText())
+                  .isEqualTo("value");
+                assertThat(p.getContent().get(1))
+                  .isInstanceOf(Properties.Comment.class)
+                  .matches(comment -> ((Properties.Comment) comment).getMessage().equals(" this is a comment"));
+            })
+          )
+        );
+    }
+
     @Test
     void multipleEntries() {
         rewriteRun(
@@ -131,13 +154,13 @@ class PropertiesParserTest implements RewriteTest {
               ########################
               #
               ########################
-                          
+              
               key1=value1
-                          
+              
               !!!!!!!!!!!!!!!!!!!!!!!
               !
               !!!!!!!!!!!!!!!!!!!!!!!
-                          
+              
               key2=value2
               """,
             containsValues("value1", "value2")
@@ -208,10 +231,10 @@ class PropertiesParserTest implements RewriteTest {
         rewriteRun(
           properties(
             """
-                    ws.gson.debug.dump=true
-                    ws.gson.debug.mode=CONSOLE
-                    ws.gson.debug.path=C:\\\\Temp\\\\dump_foo\\\\
-                    """,
+              ws.gson.debug.dump=true
+              ws.gson.debug.mode=CONSOLE
+              ws.gson.debug.path=C:\\\\Temp\\\\dump_foo\\\\
+              """,
             containsValues("true", "CONSOLE", "C:\\\\Temp\\\\dump_foo\\\\")
           )
         );

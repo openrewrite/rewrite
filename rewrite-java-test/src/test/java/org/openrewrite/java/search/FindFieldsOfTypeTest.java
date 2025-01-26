@@ -18,6 +18,7 @@ package org.openrewrite.java.search;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -69,6 +70,7 @@ class FindFieldsOfTypeTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void findArrayOfType() {
         rewriteRun(

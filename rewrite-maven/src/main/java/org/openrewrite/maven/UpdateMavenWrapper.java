@@ -19,10 +19,10 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.BuildTool;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.maven.utilities.MavenWrapper;
@@ -150,7 +150,9 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
 
     static class MavenWrapperState {
         boolean needsWrapperUpdate = false;
+
         @Nullable BuildTool updatedMarker;
+
         boolean addMavenWrapperProperties = true;
         boolean addMavenWrapperDownloader = true;
         boolean addMavenWrapperJar = true;
@@ -197,7 +199,9 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
                             acc.needsWrapperUpdate = true;
                             acc.updatedMarker = buildTool.withVersion(mavenWrapper.getDistributionVersion());
                             return true;
-                        } else return compare == 0;
+                        } else {
+                            return compare == 0;
+                        }
                     }
 
                     @Override
@@ -352,8 +356,9 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
         }
 
         return new TreeVisitor<Tree, ExecutionContext>() {
+
             @Override
-            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (!(tree instanceof SourceFile)) {
                     return tree;
                 }
@@ -467,7 +472,7 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
         }
 
         @Override
-        public Properties.Entry visitEntry(Properties.Entry entry, ExecutionContext ctx) {
+        public  Properties.@Nullable Entry visitEntry(Properties.Entry entry, ExecutionContext ctx) {
             if (DISTRIBUTION_URL_KEY.equals(entry.getKey())) {
                 Properties.Value value = entry.getValue();
                 if (!mavenWrapper.getDistributionUrl().equals(value.getText())) {
@@ -490,8 +495,8 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
                     return null;
                 }
             } else if (WRAPPER_SHA_256_SUM_KEY.equals(entry.getKey())) {
-                if (mavenWrapper.getWrapperDistributionType() != DistributionType.OnlyScript
-                        && Boolean.TRUE.equals(enforceWrapperChecksumVerification)) {
+                if (mavenWrapper.getWrapperDistributionType() != DistributionType.OnlyScript &&
+                        Boolean.TRUE.equals(enforceWrapperChecksumVerification)) {
                     Properties.Value value = entry.getValue();
                     Checksum wrapperJarChecksum = mavenWrapper.getWrapperChecksum();
                     if (wrapperJarChecksum != null && !wrapperJarChecksum.getHexValue().equals(value.getText())) {

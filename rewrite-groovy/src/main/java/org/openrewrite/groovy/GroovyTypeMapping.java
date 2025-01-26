@@ -17,7 +17,7 @@ package org.openrewrite.groovy;
 
 import org.codehaus.groovy.GroovyBugError;
 import org.codehaus.groovy.ast.*;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
 import org.openrewrite.java.internal.JavaReflectionTypeMapping;
 import org.openrewrite.java.internal.JavaTypeCache;
@@ -30,7 +30,9 @@ import java.util.List;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
-import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
+import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.CONTRAVARIANT;
+import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.COVARIANT;
+import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.INVARIANT;
 
 class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
     private final GroovyAstTypeSignatureBuilder signatureBuilder = new GroovyAstTypeSignatureBuilder();
@@ -43,6 +45,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         this.reflectionTypeMapping = new JavaReflectionTypeMapping(typeCache);
     }
 
+    @Override
     public JavaType type(@Nullable ASTNode type) {
         if (type == null) {
             return JavaType.Class.Unknown.getInstance();
@@ -97,7 +100,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
             JavaType.FullyQualified owner = TypeUtils.asFullyQualified(type(node.getOuterClass()));
 
             List<JavaType.Variable> fields = null;
-            if(node.getFields().size() > 0) {
+            if(!node.getFields().isEmpty()) {
                 fields = new ArrayList<>(node.getFields().size());
                 for (FieldNode field : node.getFields()) {
                     if (!field.isSynthetic()) {
@@ -107,9 +110,9 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
             }
 
             List<JavaType.Method> methods = null;
-            if(node.getAllDeclaredMethods().size() > 0) {
-                methods = new ArrayList<>(node.getAllDeclaredMethods().size());
-                for (MethodNode method : node.getAllDeclaredMethods()) {
+            if(!node.getMethods().isEmpty()) {
+                methods = new ArrayList<>(node.getMethods().size());
+                for (MethodNode method : node.getMethods()) {
                     if (!method.isSynthetic()) {
                         methods.add(methodType(method));
                     }
@@ -202,8 +205,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         return gtv;
     }
 
-    @Nullable
-    public JavaType.Method methodType(@Nullable MethodNode node) {
+    public JavaType.@Nullable Method methodType(@Nullable MethodNode node) {
         if (node == null) {
             return null;
         }
@@ -242,7 +244,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
             }
         }
 
-        List<JavaType.FullyQualified> thrownExceptions = null;
+        List<JavaType> thrownExceptions = null;
         if(node.getExceptions() != null) {
             for (ClassNode e : node.getExceptions()) {
                 thrownExceptions = new ArrayList<>(node.getExceptions().length);
@@ -264,8 +266,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         return method;
     }
 
-    @Nullable
-    public JavaType.Variable variableType(@Nullable FieldNode node) {
+    public JavaType.@Nullable Variable variableType(@Nullable FieldNode node) {
         if (node == null) {
             return null;
         }
@@ -294,13 +295,11 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
     /**
      * With an undefined owner
      */
-    @Nullable
-    public JavaType.Variable variableType(String name, @Nullable ASTNode type) {
+    public JavaType.@Nullable Variable variableType(String name, @Nullable ASTNode type) {
         return variableType(name, type(type));
     }
 
-    @Nullable
-    public JavaType.Variable variableType(String name, @Nullable JavaType type) {
+    public JavaType.@Nullable Variable variableType(String name, @Nullable JavaType type) {
         if (type == null) {
             return null;
         }
@@ -324,8 +323,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         return variable;
     }
 
-    @Nullable
-    private List<JavaType.FullyQualified> getAnnotations(AnnotatedNode node) {
+    private @Nullable List<JavaType.FullyQualified> getAnnotations(AnnotatedNode node) {
         List<JavaType.FullyQualified> annotations = null;
         for (AnnotationNode a : node.getAnnotations()) {
             annotations = new ArrayList<>(node.getAnnotations().size());

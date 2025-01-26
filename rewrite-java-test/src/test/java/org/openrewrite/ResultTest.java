@@ -30,7 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.openrewrite.java.Assertions.java;
 
-public class ResultTest implements RewriteTest {
+class ResultTest implements RewriteTest {
 
     @Test
     void noChangesNewList() {

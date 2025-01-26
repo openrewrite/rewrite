@@ -33,4 +33,19 @@ class HclVariableExpressionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void legacyIndexOperator() {
+        rewriteRun(
+          hcl(
+            """
+              locals {
+                dns_record = aws_acm_certificate.google_dot_com.0.resource_record_name
+                with_space_before = a.b .0.d
+                with_space_after = a.b. 0.d
+              }
+              """
+          )
+        );
+    }
 }

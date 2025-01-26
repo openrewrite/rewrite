@@ -21,6 +21,14 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
 
+import java.util.function.Function;
+
+/**
+ * Controls the test framework's validation of invariants which are expected to hold true in an LST both before and
+ * after the recipe run. Originally this applied only to validating the well-formedness of type metadata in Java LSTs
+ * (hence the name TypeValidation), but has since expanded to include concepts relevant to other types of sources.
+ * "InvariantValidation" would be a more accurate name, but "TypeValidation" is kept for backwards compatibility.
+ */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -28,30 +36,99 @@ import lombok.experimental.Accessors;
 @Builder
 public class TypeValidation {
 
+    /**
+     * Controls whether class declarations are validated to have valid type metadata.
+     */
     @Builder.Default
     private boolean classDeclarations = true;
 
+    /**
+     * Controls whether identifiers declarations are validated to have valid type metadata.
+     * Within even a well-formed Java LST not all identifiers typically have type metadata, so even when enabled some
+     * identifiers are allowed to have null type.
+     */
     @Builder.Default
     private boolean identifiers = true;
 
+    /**
+     * Controls whether method declarations are validated to have valid type metadata.
+     */
     @Builder.Default
     private boolean methodDeclarations = true;
 
+    /**
+     * Controls whether field declarations are validated to have valid type metadata.
+     */
     @Builder.Default
     private boolean variableDeclarations = true;
 
+    /**
+     * Controls whether method invocations are validated to have valid type metadata.
+     */
     @Builder.Default
     private boolean methodInvocations = true;
 
+    /**
+     * Controls whether constructor invocations are validated to have valid type metadata.
+     */
     @Builder.Default
     private boolean constructorInvocations = true;
 
+    /**
+     * Controls whether sources expected to have dependency resolution metadata in a model marker are validated to have
+     * that model attached. For example, a Maven pom is expected to have a MavenResolutionResult model attached.
+     */
+    @Builder.Default
+    private boolean dependencyModel = true;
+
+    /**
+     * Controls whether the recipe's usage of cursoring is validated to be acyclic.
+     * The cursor indicates a position within a tree which has no cycles. So if a cursor ever shows that an element is
+     * its own parent the recipe author has made a mistake. In some circumstances this mistake causes problems, in others
+     * it is benign.
+     */
+    @Builder.Default
+    private boolean cursorAcyclic = true;
+
+    /**
+     * Given finer control to client when they need to allow missing type metadata for a specific node.
+     */
+    @Builder.Default
+    private Function<Object, Boolean> allowMissingType = o -> false;
+
+
+    /**
+     * Controls whether the LST is validated not to contain any `J.Erroneous` elements.
+     */
+    @Builder.Default
+    private boolean erroneous = true;
+
+    /**
+     * Controls whether the LST is validated not to contain any `J.Unknown` elements.
+     */
+    @Builder.Default
+    private boolean unknown = true;
+
+    /**
+     * Adding messages to execution context is a side effect which makes the recipe run itself stateful.
+     * Potentially allows recipes to interfere with each other in surprising and hard to debug ways.
+     * Problematic for all the same reasons mutable global variables or singletons are.
+     */
+    @Builder.Default
+    private boolean immutableExecutionContext = true;
+
+    /**
+     * Enable all invariant validation checks.
+     */
     public static TypeValidation all() {
         return new TypeValidation();
     }
 
+    /**
+     * Skip all invariant validation checks.
+     */
     public static TypeValidation none() {
-        return new TypeValidation(false,false,false,false,false,false);
+        return new TypeValidation(false, false, false, false, false, false, false, false, o -> false, false, false, false);
     }
 
     static TypeValidation before(RecipeSpec testMethodSpec, RecipeSpec testClassSpec) {

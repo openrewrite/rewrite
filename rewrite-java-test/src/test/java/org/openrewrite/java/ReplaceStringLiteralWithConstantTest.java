@@ -15,8 +15,12 @@
  */
 package org.openrewrite.java;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Tree;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -38,13 +42,14 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
     void doNothingIfStringLiteralNotFound() {
         rewriteRun(
           spec -> spec.recipe(new ReplaceStringLiteralWithConstant(EXAMPLE_STRING_CONSTANT, EXAMPLE_STRING_FQN)),
-          java("""
-            package org.openrewrite.java;
-                            
-            class Test {
-                String s = "FooBar";
-            }
+          java(
             """
+              package org.openrewrite.java;
+              
+              class Test {
+                  String s = "FooBar";
+              }
+              """
           )
         );
     }
@@ -56,7 +61,7 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
           java(
             """
               package org.openrewrite.java;
-                          
+              
               class ReplaceStringLiteralWithConstantTest {
                   static final String EXAMPLE_STRING_CONSTANT = "Hello World!";
               }
@@ -72,14 +77,14 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
           java(
             """
               package org.openrewrite.java;
-                              
+              
               class Test {
                   Object o = "Hello World!";
               }
               """,
-            """                
+            """
               package org.openrewrite.java;
-                          
+              
               class Test {
                   Object o = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT;
               }
@@ -98,9 +103,9 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
                   Object o = "Hello World!";
               }
               """,
-            """                
+            """
               import org.openrewrite.java.ReplaceStringLiteralWithConstantTest;
-                          
+              
               class Test {
                   Object o = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT;
               }
@@ -116,7 +121,7 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
           java(
             """
               package com.abc;
-                          
+              
               class A {
                   String v = "newValue";
                   private String method() {
@@ -126,9 +131,9 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
               """,
             """
               package com.abc;
-                          
+              
               import org.openrewrite.java.ReplaceStringLiteralWithConstantTest;
-                          
+              
               class A {
                   String v = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT;
                   private String method() {
@@ -152,7 +157,7 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
               """,
             """
               import org.openrewrite.java.ReplaceStringLiteralWithConstantTest;
-                          
+              
               class Test {
                   Object o = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT;
               }
@@ -173,7 +178,7 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
               """,
             """
               import org.openrewrite.java.ReplaceStringLiteralWithConstantTest;
-                          
+              
               class Test {
                   Object o = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT;
               }
@@ -188,6 +193,7 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
           spec -> spec.recipeFromYaml("""
               type: specs.openrewrite.org/v1beta/recipe
               name: org.openrewrite.ReplaceStringLiteralWithConstantList
+              description: Replace string literals with constants.
               recipeList:
                   - org.openrewrite.java.ReplaceStringLiteralWithConstant:
                       fullyQualifiedConstantName: %s
@@ -201,7 +207,7 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
               """,
             """
               import org.openrewrite.java.ReplaceStringLiteralWithConstantTest;
-                           
+              
               class Test {
                   Object o = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT;
               }
@@ -216,6 +222,7 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
           spec -> spec.recipeFromYaml("""
               type: specs.openrewrite.org/v1beta/recipe
               name: org.openrewrite.ReplaceStringLiteralWithConstantList
+              description: Replace string literals with constants.
               recipeList:
                   - org.openrewrite.java.ReplaceStringLiteralWithConstant:
                       literalValue: %s
@@ -230,9 +237,32 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
               """,
             """
               import org.openrewrite.java.ReplaceStringLiteralWithConstantTest;
-                          
+              
               class Test {
                   Object o = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void missingFieldNoError() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaVisitor<>(){
+              @Override
+              public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                  // Circumvent validation to match use in rewrite-spring's ReplaceStringLiteralsWithMediaTypeConstants
+                  doAfterVisit(new ReplaceStringLiteralWithConstant(EXAMPLE_STRING_FQN + "_xyz").getVisitor());
+                  return super.visit(tree, ctx);
+              }
+          })),
+          java(
+            """
+              package org.openrewrite.java;
+              
+              class Test {
+                  Object o = "Hello World!";
               }
               """
           )

@@ -25,13 +25,25 @@ import java.io.InputStream;
  */
 public class MockHttpSender implements HttpSender {
     final UncheckedSupplier<InputStream> is;
+    int responseCode = 200;
 
     public MockHttpSender(UncheckedSupplier<InputStream> is) {
         this.is = is;
     }
 
+    public MockHttpSender(int responseCode) {
+        this.is = null;
+        this.responseCode = responseCode;
+    }
+
     @Override
     public Response send(Request request) {
-        return new Response(200, is.get(), () -> {});
+        if (responseCode != 200) {
+            return new Response(responseCode, null, () -> {
+            });
+        } else {
+            return new Response(responseCode, is.get(), () -> {
+            });
+        }
     }
 }

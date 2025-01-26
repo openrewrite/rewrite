@@ -71,9 +71,153 @@ class HclCommentTest implements RewriteTest {
                   myvar = {
                     # below {attributes}
                     myattribute = "myvalue"
-
+              
                     # add more attributes {here}
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void inLineCommentsNextLineAttribute() {
+        rewriteRun(
+          hcl(
+            """
+              # test
+              /*
+               multiline
+              */
+              resource {
+                  # test
+                  // test
+                  a = 1
+                  // test 3
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4611")
+    @Test
+    void commentAsTheLastLine() {
+        rewriteRun(
+          hcl(
+            """
+              locals {
+                a = 3
+              }
+              # Nice code, right?
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4611")
+    @Test
+    void commentsAsTheFinalLines() {
+        rewriteRun(
+          hcl(
+            """
+              locals {
+                a = 3
+              }
+              # Nice code, right?
+              # Isn't it?
+              """
+          )
+        );
+    }
+
+    @Test
+    void singleLineWithinMultiLineHash() {
+        rewriteRun(
+          hcl(
+            """
+              /*
+              # It's important
+              */
+              locals {
+               Anwil = "Wloclawek"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void singleLineWithinMultiLineSlash() {
+        rewriteRun(
+          hcl(
+            """
+              /*
+              // It's important
+              */
+              locals {
+               Anwil = "Wloclawek"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void multilineNotStartingInTheFirstCharacter() {
+        rewriteRun(
+          hcl(
+            """
+                  /* An indented comment
+              */
+              """
+          )
+        );
+    }
+
+    @Test
+    void commentedOutLinesInListLiteral() {
+        rewriteRun(
+          hcl(
+            """
+              locals {
+                resources = [
+                   "arn:aws:s3:::${var.my_precious_bucket}",
+                   "arn:aws:s3:::${var.waste_bucket}",
+                   #      "arn:aws:s3:::just-some-bucket/*",
+                ]
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void emptyHashCommentJustBeforeCurlyBraceEnd() {
+        rewriteRun(
+          hcl(
+            """
+              locals {
+                #
+              }
+              module "something" {
+                source = "../else/"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void emptyDoubleSlashCommentJustBeforeCurlyBraceEnd() {
+        rewriteRun(
+          hcl(
+            """
+              locals {
+                //
+              }
+              module "something" {
+                source = "../else/"
               }
               """
           )

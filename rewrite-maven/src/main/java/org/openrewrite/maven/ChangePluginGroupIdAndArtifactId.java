@@ -17,11 +17,11 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
@@ -56,7 +56,14 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
             example = "my-new-maven-plugin",
             required = false)
     @Nullable
-    String newArtifact;
+    String newArtifactId;
+
+    @Option(displayName = "New version",
+            description = "An exact version number or node-style semver selector used to select the version number.",
+            example = "29.X",
+            required = false)
+    @Nullable
+    String newVersion;
 
     @Override
     public String getDisplayName() {
@@ -65,12 +72,12 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
 
     @Override
     public String getInstanceNameSuffix() {
-        return String.format("`%s:%s`", newGroupId, newArtifact);
+        return String.format("`%s:%s`", newGroupId, newArtifactId);
     }
 
     @Override
     public String getDescription() {
-        return "Change the groupId and/or the artifactId of a specified Maven plugin.";
+        return "Change the groupId and/or the artifactId of a specified Maven plugin. Optionally update the plugin version.";
     }
 
     @Override
@@ -84,8 +91,11 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
                     if (newGroupId != null) {
                         t = changeChildTagValue(t, "groupId", newGroupId, ctx);
                     }
-                    if (newArtifact != null) {
-                        t = changeChildTagValue(t, "artifactId", newArtifact, ctx);
+                    if (newArtifactId != null) {
+                        t = changeChildTagValue(t, "artifactId", newArtifactId, ctx);
+                    }
+                    if (newVersion != null) {
+                        t = changeChildTagValue(t, "version", newVersion, ctx);
                     }
                     if (t != tag) {
                         maybeUpdateModel();

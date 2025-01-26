@@ -16,9 +16,9 @@
 package org.openrewrite.java.format;
 
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.tree.*;
@@ -136,12 +136,12 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
                 if (returnTypeExpression instanceof J.AnnotatedType) {
                     J.AnnotatedType annotatedType = (J.AnnotatedType) returnTypeExpression;
                     List<J.Annotation> annotations = ListUtils.mapFirst(annotatedType.getAnnotations(), annotation ->
-                        annotation.withPrefix(annotation.getPrefix().withWhitespace(" "))
+                            annotation.withPrefix(annotation.getPrefix().withWhitespace(" "))
                     );
                     m = m.withReturnTypeExpression(annotatedType.withAnnotations(annotations));
                 } else {
                     m = m.withReturnTypeExpression(returnTypeExpression
-                        .withPrefix(returnTypeExpression.getPrefix().withWhitespace(" ")));
+                            .withPrefix(returnTypeExpression.getPrefix().withWhitespace(" ")));
                 }
             }
             first = false;
@@ -211,18 +211,16 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
         return v;
     }
 
-    @Nullable
     @Override
-    public J postVisit(J tree, P p) {
+    public @Nullable J postVisit(J tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
             getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, "stop", true);
         }
         return super.postVisit(tree, p);
     }
 
-    @Nullable
     @Override
-    public J visit(@Nullable Tree tree, P p) {
+    public @Nullable J visit(@Nullable Tree tree, P p) {
         if (getCursor().getNearestMessage("stop") != null) {
             return (J) tree;
         }

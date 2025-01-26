@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -30,6 +31,7 @@ class FindMissingTypesTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new FindMissingTypes())
+          .parser(JavaParser.fromJavaVersion())
           .typeValidationOptions(TypeValidation.none());
     }
 
@@ -40,7 +42,7 @@ class FindMissingTypesTest implements RewriteTest {
           java(
             """
               import org.junit.Test;
-                            
+
               class ATest {
                   @Test
                   void foo() {}
@@ -108,14 +110,14 @@ class FindMissingTypesTest implements RewriteTest {
           java(
             """
               import java.util.function.Consumer;
-              
+
               class A {
                   Consumer<String> r = System.out::printlns;
               }
               """,
             """
               import java.util.function.Consumer;
-              
+
               class A {
                   Consumer<String> r = /*~~(MemberReference type is missing or malformed)~~>*/System.out::printlns;
               }
@@ -130,7 +132,7 @@ class FindMissingTypesTest implements RewriteTest {
           java(
             """
               import some.org.Unknown;
-                            
+
               class A {
                   {
                       Object o = new Unknown();
@@ -139,11 +141,51 @@ class FindMissingTypesTest implements RewriteTest {
               """,
             """
               import some.org.Unknown;
-                            
+
               class A {
                   {
                       Object o = /*~~(NewClass type is missing or malformed)~~>*/new Unknown();
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4405")
+    @Test
+    void missingMethodReturnTypeNoMethodArguments() {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              import java.util.GenClass1;
+
+              abstract class Foo1 {
+                  public abstract GenClass1 noArg();
+              }
+              """,
+            """
+              import java.util.GenClass1;
+
+              abstract class Foo1 {
+                  /*~~(MethodDeclaration type is missing or malformed)~~>*/public abstract GenClass1 noArg();
+              }
+              """
+          ),
+          java(
+            """
+              import java.util.GenClass1;
+
+              abstract class Foo2 {
+                  public abstract GenClass1 withArg(String a);
+              }
+              """,
+            """
+              import java.util.GenClass1;
+
+              abstract class Foo2 {
+                  /*~~(MethodDeclaration type is missing or malformed)~~>*/public abstract GenClass1 withArg(String a);
               }
               """
           )

@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Cursor;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.marker.SearchResult;
@@ -27,6 +28,7 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class JavaTemplateTest8Test implements RewriteTest {
 
+    @DocumentExample
     @Test
     void parameterizedMatch() {
         JavaTemplate template = JavaTemplate.builder("#{any(java.util.List<String>)}")
@@ -84,7 +86,7 @@ class JavaTemplateTest8Test implements RewriteTest {
               @Override
               public <N extends NameTree> N visitTypeName(N nameTree, ExecutionContext ctx) {
                   // the cursor points at the parent when `visitTypeName()` is called
-                  if (template.matches(new Cursor(getCursor(), nameTree))) {
+                  if (getCursor().getValue() != nameTree && template.matches(new Cursor(getCursor(), nameTree))) {
                       return SearchResult.found(nameTree);
                   }
                   return super.visitTypeName(nameTree, ctx);
@@ -105,7 +107,7 @@ class JavaTemplateTest8Test implements RewriteTest {
               }
               """,
             """
-              import /*~~>*/java.util.List;
+              import java.util.List;
               class Test {
                   List<Object> o;
                   List<String> s;

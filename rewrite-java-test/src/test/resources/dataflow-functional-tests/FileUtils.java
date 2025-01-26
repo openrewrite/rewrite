@@ -18,6 +18,7 @@ package org.apache.commons.io;
 
 import org.apache.commons.io.filefilter.*;
 import org.apache.commons.io.output.NullOutputStream;
+import org.jspecify.annotations.Nullable;
 
 import java.io.*;
 import java.net.URL;
@@ -360,7 +361,7 @@ public class FileUtils {
         }
 
         //Find files
-        Collection<File> files = new java.util.LinkedList<File>();
+        Collection<File> files = new java.util.LinkedList<>();
         innerListFiles(files, directory,
                 FileFilterUtils.or(effFileFilter, effDirFilter));
         return files;
@@ -515,7 +516,7 @@ public class FileUtils {
      * @return the equivalent <code>File</code> object, or <code>null</code>
      *  if the URL's protocol is not <code>file</code>
      */
-    public static File toFile(URL url) {
+    public static @Nullable File toFile(URL url) {
         if (url == null || !"file".equalsIgnoreCase(url.getProtocol())) {
             return null;
         } else {
@@ -1030,7 +1031,7 @@ public class FileUtils {
         if (canonicalDestDir.startsWith(srcDir.getCanonicalPath())) {
             File[] srcFiles = filter == null ? srcDir.listFiles() : srcDir.listFiles(filter);
             if (srcFiles != null && srcFiles.length > 0) {
-                exclusionList = new ArrayList<String>(srcFiles.length);
+                exclusionList = new ArrayList<>(srcFiles.length);
                 for (File srcFile : srcFiles) {
                     File copiedFile = new File(destDir, srcFile.getName());
                     exclusionList.add(copiedFile.getCanonicalPath());
@@ -1719,10 +1720,10 @@ public class FileUtils {
         if (directory.exists()) {
             if (!directory.isDirectory()) {
                 String message =
-                        "File "
-                        + directory
-                        + " exists and is "
-                        + "not a directory. Unable to create directory.";
+                        "File " +
+                        directory +
+                        " exists and is " +
+                        "not a directory. Unable to create directory.";
                 throw new IOException(message);
             }
         } else {
@@ -1823,8 +1824,8 @@ public class FileUtils {
             throw new IllegalArgumentException("No specified reference file");
         }
         if (!reference.exists()) {
-            throw new IllegalArgumentException("The reference file '"
-                                               + reference + "' doesn't exist");
+            throw new IllegalArgumentException("The reference file '" +
+                                               reference + "' doesn't exist");
         }
         return isFileNewer(file, reference.lastModified());
     }
@@ -1890,8 +1891,8 @@ public class FileUtils {
             throw new IllegalArgumentException("No specified reference file");
         }
         if (!reference.exists()) {
-            throw new IllegalArgumentException("The reference file '"
-                                               + reference + "' doesn't exist");
+            throw new IllegalArgumentException("The reference file '" +
+                                               reference + "' doesn't exist");
         }
         return isFileOlder(file, reference.lastModified());
     }

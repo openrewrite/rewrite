@@ -72,6 +72,9 @@ public class MaybeUsesImport<P> extends JavaIsoVisitor<P> {
                         continue;
                     }
                     expr = fa.getTarget();
+                } else {
+                    // prevent endless loop; see https://github.com/openrewrite/rewrite-kotlin/issues/601
+                    break;
                 }
             }
         }

@@ -15,10 +15,17 @@
  */
 package org.openrewrite;
 
-import org.openrewrite.internal.lang.Nullable;
+import de.danielbechler.diff.ObjectDiffer;
+import de.danielbechler.diff.ObjectDifferBuilder;
+import de.danielbechler.diff.inclusion.Inclusion;
+import de.danielbechler.diff.inclusion.InclusionResolver;
+import de.danielbechler.diff.node.DiffNode;
+import org.jspecify.annotations.Nullable;
 
+import java.beans.Transient;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 
 @Incubating(since = "7.20.0")
@@ -35,8 +42,37 @@ public interface TreeObserver {
         private final TreeObserver observer;
         private final List<Predicate<Tree>> predicates = new ArrayList<>();
 
+        @Nullable
+        private final ObjectDiffer differ;
+
         public Subscription(TreeObserver observer) {
+            this(observer, false);
+        }
+
+        public Subscription(TreeObserver observer, boolean diffChanges) {
             this.observer = observer;
+            if (diffChanges) {
+                differ = ObjectDifferBuilder.startBuilding()
+                        .inclusion()
+                        .resolveUsing(new InclusionResolver() {
+                            @Override
+                            public Inclusion getInclusion(DiffNode node) {
+                                if (node.getPropertyAnnotation(Transient.class) != null) {
+                                    return Inclusion.EXCLUDED;
+                                }
+                                return Inclusion.DEFAULT;
+                            }
+
+                            @Override
+                            public boolean enablesStrictIncludeMode() {
+                                return false;
+                            }
+                        })
+                        .and()
+                        .build();
+            } else {
+                differ = null;
+            }
         }
 
         public Subscription subscribe(@Nullable Tree tree) {
@@ -87,8 +123,25 @@ public interface TreeObserver {
             return false;
         }
 
-        public TreeObserver getObserver() {
-            return observer;
+        public <T extends Tree> T treeChanged(Cursor cursor, T after, Tree before) {
+            observer.treeChanged(cursor, after);
+            if (differ != null) {
+                return diff(after, before, cursor);
+            }
+            return after;
+        }
+
+        private <T extends Tree> T diff(T after, Tree before, Cursor cursor) {
+            //noinspection DataFlowIssue
+            DiffNode diff = differ.compare(after, before);
+            AtomicReference<T> t2 = new AtomicReference<>(after);
+            diff.visit((node, visit) -> {
+                if (!node.hasChildren() && node.getPropertyName() != null) {
+                    //noinspection unchecked
+                    t2.set((T) observer.propertyChanged(node.getPropertyName(), cursor, t2.get(), node.canonicalGet(before), node.canonicalGet(t2.get())));
+                }
+            });
+            return t2.get();
         }
     }
 }

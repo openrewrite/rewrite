@@ -17,16 +17,15 @@ package org.openrewrite.java.marker;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
 
 @Value
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @With
 public class JavaProject implements Marker {
-    @EqualsAndHashCode.Include
+    @EqualsAndHashCode.Exclude
     UUID id;
 
     String projectName;
@@ -34,8 +33,8 @@ public class JavaProject implements Marker {
     @Nullable
     Publication publication;
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Data
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     public static class Publication {
         String groupId;
         String artifactId;

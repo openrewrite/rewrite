@@ -21,7 +21,7 @@ repositories {
 }
 
 //val rewriteVersion = rewriteRecipe.rewriteVersion.get()
-val rewriteVersion = if(project.hasProperty("releasing")) {
+val latest = if (project.hasProperty("releasing")) {
     "latest.release"
 } else {
     "latest.integration"
@@ -57,9 +57,10 @@ dependencies {
     testImplementation(project(":rewrite-test")) {
         // because gradle-api fatjars this implementation already
         exclude("ch.qos.logback", "logback-classic")
+        exclude("org.slf4j", "slf4j-nop")
     }
 
-    testImplementation("org.openrewrite.gradle.tooling:model:latest.release")
+    testImplementation("org.openrewrite.gradle.tooling:model:$latest")
 
     testImplementation("com.squareup.okhttp3:mockwebserver:4.+")
 
@@ -84,4 +85,12 @@ tasks.named<Copy>("processResources") {
     from(parserClasspath) {
         into("META-INF/rewrite/classpath")
     }
+}
+
+//Javadoc compiler will complain about the use of the internal types.
+tasks.withType<Javadoc> {
+    exclude(
+        "**/GradleProject**",
+        "**/GradleSettings**"
+    )
 }

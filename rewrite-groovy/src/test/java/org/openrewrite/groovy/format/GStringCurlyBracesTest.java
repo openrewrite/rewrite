@@ -16,6 +16,7 @@
 package org.openrewrite.groovy.format;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -28,10 +29,12 @@ class GStringCurlyBracesTest implements RewriteTest {
         spec.recipe(new GStringCurlyBraces());
     }
 
+    @DocumentExample
     @Test
     void basic() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
             def name = 'world'
             "Hello $name!"
             """,
@@ -45,7 +48,8 @@ class GStringCurlyBracesTest implements RewriteTest {
     @Test
     void fieldAccess() {
         rewriteRun(
-          groovy("""
+          groovy(
+                """
             def to = [ you : 'world']
             "Hello $to.you!"
             """,

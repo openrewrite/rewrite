@@ -18,13 +18,13 @@ package org.openrewrite.groovy.tree;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.groovy.GroovyPrinter;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.internal.GroovyWhitespaceValidationService;
 import org.openrewrite.groovy.service.GroovyAutoFormatService;
 import org.openrewrite.internal.WhitespaceValidationService;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.tree.*;
@@ -52,13 +52,14 @@ public interface G extends J {
         return v.isAdaptableTo(GroovyVisitor.class);
     }
 
-    @Nullable
-    default <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
+    default <P> @Nullable J acceptGroovy(GroovyVisitor<P> v, P p) {
         return v.defaultValue(this, p);
     }
 
+    @Override
     Space getPrefix();
 
+    @Override
     default List<Comment> getComments() {
         return getPrefix().getComments();
     }
@@ -131,11 +132,12 @@ public interface G extends J {
         @Nullable
         JRightPadded<Package> packageDeclaration;
 
-        @Nullable
-        public Package getPackageDeclaration() {
+        @Override
+        public @Nullable Package getPackageDeclaration() {
             return packageDeclaration == null ? null : packageDeclaration.getElement();
         }
 
+        @Override
         public G.CompilationUnit withPackageDeclaration(Package packageDeclaration) {
             return getPadding().withPackageDeclaration(JRightPadded.withElement(this.packageDeclaration, packageDeclaration));
         }
@@ -175,6 +177,7 @@ public interface G extends J {
         @Getter
         Space eof;
 
+        @Override
         @Transient
         public List<Import> getImports() {
             return statements.stream()
@@ -184,10 +187,12 @@ public interface G extends J {
                     .collect(Collectors.toList());
         }
 
+        @Override
         public G.CompilationUnit withImports(List<Import> imports) {
             return getPadding().withImports(JRightPadded.withElements(this.getPadding().getImports(), imports));
         }
 
+        @Override
         @Transient
         public List<ClassDeclaration> getClasses() {
             return statements.stream()
@@ -212,6 +217,7 @@ public interface G extends J {
             return new GroovyPrinter<>();
         }
 
+        @Override
         @Transient
         public TypesInUse getTypesInUse() {
             TypesInUse cache;
@@ -228,6 +234,7 @@ public interface G extends J {
             return cache;
         }
 
+        @Override
         public Padding getPadding() {
             Padding p;
             if (this.padding == null) {
@@ -247,8 +254,7 @@ public interface G extends J {
         public static class Padding implements JavaSourceFile.Padding {
             private final G.CompilationUnit t;
 
-            @Nullable
-            public JRightPadded<Package> getPackageDeclaration() {
+            public @Nullable JRightPadded<Package> getPackageDeclaration() {
                 return t.packageDeclaration;
             }
 
@@ -358,14 +364,13 @@ public interface G extends J {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor
+    @Getter
     final class ExpressionStatement implements G, Expression, Statement {
 
         @With
-        @Getter
         UUID id;
 
         @With
-        @Getter
         Expression expression;
 
         // For backwards compatibility with older ASTs before there was an id field
@@ -413,6 +418,13 @@ public interface G extends J {
 
         @Override
         public <T extends J> T withType(@Nullable JavaType type) {
+            if(expression instanceof J.MethodInvocation) {
+                if (!(type instanceof JavaType.Method)) {
+                    return (T) this;
+                }
+                JavaType.Method m = (JavaType.Method) type;
+                return (T) withExpression(((J.MethodInvocation) expression).withMethodType(m));
+            }
             return (T) withExpression(expression.withType(type));
         }
 
@@ -451,6 +463,7 @@ public interface G extends J {
             return key.getElement();
         }
 
+        @SuppressWarnings("unused")
         public MapEntry withKey(@Nullable Expression key) {
             return getPadding().withKey(JRightPadded.withElement(this.key, key));
         }
@@ -494,8 +507,7 @@ public interface G extends J {
         public static class Padding {
             private final MapEntry t;
 
-            @Nullable
-            public JRightPadded<Expression> getKey() {
+            public @Nullable JRightPadded<Expression> getKey() {
                 return t.key;
             }
 
@@ -533,6 +545,7 @@ public interface G extends J {
             return elements.getElements();
         }
 
+        @SuppressWarnings("unused")
         public MapLiteral withElements(List<G.MapEntry> elements) {
             return getPadding().withElements(JContainer.withElements(this.elements, elements));
         }
@@ -607,10 +620,12 @@ public interface G extends J {
 
         JContainer<Expression> elements;
 
+        @SuppressWarnings("unused")
         public List<Expression> getElements() {
             return elements.getElements();
         }
 
+        @SuppressWarnings("unused")
         public ListLiteral withElements(List<Expression> elements) {
             return getPadding().withElements(JContainer.withElements(this.elements, elements));
         }
@@ -748,6 +763,7 @@ public interface G extends J {
             return operator.getElement();
         }
 
+        @SuppressWarnings("unused")
         public G.Binary withOperator(G.Binary.Type operator) {
             return getPadding().withOperator(this.operator.withElement(operator));
         }
@@ -839,6 +855,7 @@ public interface G extends J {
             return inclusive.getElement();
         }
 
+        @SuppressWarnings("unused")
         public Range withInclusive(boolean inclusive) {
             return getPadding().withInclusive(this.inclusive.withElement(inclusive));
         }
@@ -851,8 +868,25 @@ public interface G extends J {
             return from.getType();
         }
 
+        @SuppressWarnings("unchecked")
         @Override
         public Range withType(@Nullable JavaType type) {
+            boolean fromIsMethod = from instanceof J.MethodInvocation;
+            boolean toIsMethod = to instanceof J.MethodInvocation;
+            if (fromIsMethod || toIsMethod) {
+                if (!(type instanceof JavaType.Method)) {
+                    return this;
+                }
+                JavaType.Method m = (JavaType.Method) type;
+                Range r = this;
+                if (fromIsMethod) {
+                    r = r.withFrom(((J.MethodInvocation) r.getFrom()).withMethodType(m));
+                }
+                if (toIsMethod) {
+                    r = r.withTo(((J.MethodInvocation) r.getTo()).withMethodType(m));
+                }
+                return r;
+            }
             return withFrom(from.withType(type)).withTo(to.withType(type));
         }
 

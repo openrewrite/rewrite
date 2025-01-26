@@ -46,6 +46,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.concurrent.ThreadSafe;
 import java.io.*;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -187,17 +188,7 @@ public class ArchiveAnalyzer extends AbstractFileTypeAnalyzer {
     public void prepareFileTypeAnalyzer(Engine engine) throws InitializationException {
         try {
             final File baseDir = getSettings().getTempDirectory();
-            tempFileLocation = File.createTempFile("check", "tmp", baseDir);
-            if (!tempFileLocation.delete()) {
-                setEnabled(false);
-                final String msg = String.format("Unable to delete temporary file '%s'.", tempFileLocation.getAbsolutePath());
-                throw new InitializationException(msg);
-            }
-            if (!tempFileLocation.mkdirs()) {
-                setEnabled(false);
-                final String msg = String.format("Unable to create directory '%s'.", tempFileLocation.getAbsolutePath());
-                throw new InitializationException(msg);
-            }
+            tempFileLocation = Files.createTempDirectory(baseDir.toPath(), "check" + "tmp").toFile();
         } catch (IOException ex) {
             setEnabled(false);
             throw new InitializationException("Unable to create a temporary file", ex);
@@ -219,8 +210,8 @@ public class ArchiveAnalyzer extends AbstractFileTypeAnalyzer {
             if (!success && tempFileLocation.exists()) {
                 final String[] l = tempFileLocation.list();
                 if (l != null && l.length > 0) {
-                    LOGGER.warn("Failed to delete the Archive Analyzer's temporary files from `{}`, "
-                                + "see the log for more details", tempFileLocation.toString());
+                    LOGGER.warn("Failed to delete the Archive Analyzer's temporary files from `{}`, " +
+                                "see the log for more details", tempFileLocation.toString());
                 }
             }
         }
@@ -520,14 +511,14 @@ public class ArchiveAnalyzer extends AbstractFileTypeAnalyzer {
             in.mark(7);
             final byte[] b = new byte[7];
             final int read = in.read(b);
-            if (read == 7
-                && b[0] == '#'
-                && b[1] == '!'
-                && b[2] == '/'
-                && b[3] == 'b'
-                && b[4] == 'i'
-                && b[5] == 'n'
-                && b[6] == '/') {
+            if (read == 7 &&
+                b[0] == '#' &&
+                b[1] == '!' &&
+                b[2] == '/' &&
+                b[3] == 'b' &&
+                b[4] == 'i' &&
+                b[5] == 'n' &&
+                b[6] == '/') {
                 boolean stillLooking = true;
                 int chr;
                 int nxtChr;
@@ -655,8 +646,8 @@ public class ArchiveAnalyzer extends AbstractFileTypeAnalyzer {
         ZipFile zip = null;
         try {
             zip = new ZipFile(dependency.getActualFilePath());
-            if (zip.getEntry("META-INF/MANIFEST.MF") != null
-                || zip.getEntry("META-INF/maven") != null) {
+            if (zip.getEntry("META-INF/MANIFEST.MF") != null ||
+                zip.getEntry("META-INF/maven") != null) {
                 final Enumeration<ZipArchiveEntry> entries = zip.getEntries();
                 while (entries.hasMoreElements()) {
                     final ZipArchiveEntry entry = entries.nextElement();

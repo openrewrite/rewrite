@@ -31,17 +31,42 @@ import static org.openrewrite.java.Assertions.java;
 class JavaTypeTest implements RewriteTest {
 
     @Test
+    void methodOverridesOfGenericParameters() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void test(java.util.List<Integer> l) {
+                      l.add(0);
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer integer) {
+                    MethodMatcher matcher = new MethodMatcher("java.util.List add(..)");
+                    JavaType.Method methodType = method.getMethodType();
+                    assertThat(matcher.matches(methodType)).isTrue();
+                    assertThat(methodType.getOverride()).isNotNull();
+                    return method;
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
     void resolvedSignatureOfGenericMethodDeclarations() {
         rewriteRun(
           java(
             """
               import java.util.ListIterator;
               import static java.util.Collections.singletonList;
-                              
+
               interface MyList<E> {
                   ListIterator<E> listIterator();
               }
-                              
+
               class Test {
                   ListIterator<Integer> s = singletonList(1).listIterator();
               }
@@ -134,7 +159,7 @@ class JavaTypeTest implements RewriteTest {
                   void method() {
                       Test a = test(null);
                   }
-                  
+
                   Test test(Test test) {
                       return test;
                   }

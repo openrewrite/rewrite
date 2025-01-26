@@ -17,8 +17,8 @@ package org.openrewrite.text;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -53,12 +53,12 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
     @Nullable Boolean appendNewline;
 
     @Option(displayName = "Existing file strategy",
-            description = "Determines behavior if a file exists at this location prior to Rewrite execution.\n\n"
-                          + "- `Continue`: append new content to existing file contents. If existing file is not plaintext, recipe does nothing.\n"
-                          + "- `Replace`: remove existing content from file.\n"
-                          + "- `Leave`: *(default)* do nothing. Existing file is fully preserved.\n\n"
-                          + "Note: this only affects the first interaction with the specified file per Rewrite execution.\n"
-                          + "Subsequent instances of this recipe in the same Rewrite execution will always append.",
+            description = "Determines behavior if a file exists at this location prior to Rewrite execution.\n\n" +
+                          "- `Continue`: append new content to existing file contents. If existing file is not plaintext, recipe does nothing.\n" +
+                          "- `Replace`: remove existing content from file.\n" +
+                          "- `Leave`: *(default)* do nothing. Existing file is fully preserved.\n\n" +
+                          "Note: this only affects the first interaction with the specified file per Rewrite execution.\n" +
+                          "Subsequent instances of this recipe in the same Rewrite execution will always append.",
             valid = {"Continue", "Replace", "Leave"},
             required = false)
     @Nullable Strategy existingFileStrategy;
@@ -72,7 +72,11 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
 
     @Override
     public String getDescription() {
-        return "Appends or replaces content of an existing plain text file, or creates a new one if it doesn't already exist.";
+        return "Appends or replaces content of an existing plain text file, or creates a new one if it doesn't already exist. " +
+               "Please note that this recipes requires existing plain text files' format to be successfully parsable by OpenRewrite. " +
+               "If a file is left unchanged, it might be parsed as a `Quark` rather than plain text. In such case, use the `plainTextMask` option. " +
+               "See the [Gradle](https://docs.openrewrite.org/reference/gradle-plugin-configuration#configuring-the-rewrite-dsl) or " +
+               "[Maven](https://openrewrite.github.io/rewrite-maven-plugin/run-mojo.html#plainTextMasks) plugin configuration page.";
     }
 
     @Override

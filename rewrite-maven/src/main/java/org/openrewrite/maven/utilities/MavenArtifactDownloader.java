@@ -18,7 +18,7 @@ package org.openrewrite.maven.utilities;
 import dev.failsafe.Failsafe;
 import dev.failsafe.FailsafeException;
 import dev.failsafe.RetryPolicy;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.maven.MavenDownloadingException;
@@ -86,20 +86,20 @@ public class MavenArtifactDownloader {
      * @param dependency The dependency to download.
      * @return The path on disk of the downloaded artifact or <code>null</code> if unable to download.
      */
-    @Nullable
-    public Path downloadArtifact(ResolvedDependency dependency) {
+    public @Nullable Path downloadArtifact(ResolvedDependency dependency) {
         if (dependency.getRequested().getType() != null && !"jar".equals(dependency.getRequested().getType())) {
             return null;
         }
         return mavenArtifactCache.computeArtifact(dependency, () -> {
-            String uri = requireNonNull(dependency.getRepository(),
-                    String.format("Repository for dependency '%s' was null.", dependency)).getUri() + "/" +
-                         dependency.getGroupId().replace('.', '/') + '/' +
-                         dependency.getArtifactId() + '/' +
-                         dependency.getVersion() + '/' +
-                         dependency.getArtifactId() + '-' +
-                         (dependency.getDatedSnapshotVersion() == null ? dependency.getVersion() : dependency.getDatedSnapshotVersion()) +
-                         ".jar";
+            String baseUri = requireNonNull(dependency.getRepository(),
+                    String.format("Repository for dependency '%s' was null.", dependency)).getUri();
+            String path = dependency.getGroupId().replace('.', '/') + '/' +
+                          dependency.getArtifactId() + '/' +
+                          dependency.getVersion() + '/' +
+                          dependency.getArtifactId() + '-' +
+                          (dependency.getDatedSnapshotVersion() == null ? dependency.getVersion() : dependency.getDatedSnapshotVersion()) +
+                          ".jar";
+            String uri = baseUri + (baseUri.endsWith("/") ? "" : "/") + path;
 
             InputStream bodyStream;
 
@@ -112,8 +112,8 @@ public class MavenArtifactDownloader {
                 try (HttpSender.Response response = Failsafe.with(retryPolicy).get(() -> httpSender.send(request.build()));
                      InputStream body = response.getBody()) {
                     if (!response.isSuccessful() || body == null) {
-                        onError.accept(new MavenDownloadingException(String.format("Unable to download dependency %s:%s:%s. Response was %d",
-                                dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), response.getCode()), null,
+                        onError.accept(new MavenDownloadingException(String.format("Unable to download dependency %s:%s:%s from %s. Response was %d",
+                                dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), uri, response.getCode()), null,
                                 dependency.getRequested().getGav()));
                         return null;
                     }

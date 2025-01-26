@@ -200,6 +200,9 @@ public class JavaTemplateParser {
         J.MethodInvocation method = cursor.getValue();
         String methodWithReplacementArgs = method.withArguments(Collections.emptyList()).printTrimmed(cursor.getParentOrThrow())
                 .replaceAll("\\)$", template + ")");
+        if (!(cursor.getParentTreeCursor().getValue() instanceof J.MethodInvocation)) {
+            methodWithReplacementArgs += ';';
+        }
         // TODO: The stub string includes the scoped elements of each original AST, and therefore is not a good
         //       cache key. There are virtual no cases where a stub key will result in re-use. If we can come up with
         //       a safe, reusable key, we can consider using the cache for block statements.

@@ -96,8 +96,8 @@ public final class GitCommandLineUtils
         }
         catch ( IOException ex )
         {
-            throw new IllegalArgumentException( "Could not get canonical paths for workingDirectory = "
-                                                + workingDirectory + " or files=" + files, ex );
+            throw new IllegalArgumentException( "Could not get canonical paths for workingDirectory = " +
+                                                workingDirectory + " or files=" + files, ex );
         }
     }
 

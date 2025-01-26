@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle.internal;
 
+import lombok.Getter;
 import org.openrewrite.gradle.util.Dependency;
 import org.openrewrite.gradle.util.DependencyStringNotationConverter;
 import org.openrewrite.groovy.tree.G;
@@ -28,7 +29,10 @@ import java.util.stream.Collectors;
 public class InsertDependencyComparator implements Comparator<Statement> {
     private final Map<Statement, Float> positions = new LinkedHashMap<>();
 
+    @Getter
     private Statement afterDependency;
+
+    @Getter
     private Statement beforeDependency;
 
     public InsertDependencyComparator(List<Statement> existingStatements, J.MethodInvocation dependencyToAdd) {
@@ -73,15 +77,7 @@ public class InsertDependencyComparator implements Comparator<Statement> {
         return positions.get(o1).compareTo(positions.get(o2));
     }
 
-    public Statement getAfterDependency() {
-        return afterDependency;
-    }
-
-    public Statement getBeforeDependency() {
-        return beforeDependency;
-    }
-
-    private static Comparator<Statement> dependenciesComparator = (s1, s2) -> {
+    private static final Comparator<Statement> dependenciesComparator = (s1, s2) -> {
         J.MethodInvocation d1;
         if (s1 instanceof J.Return) {
             d1 = (J.MethodInvocation) ((J.Return) s1).getExpression();
@@ -96,6 +92,7 @@ public class InsertDependencyComparator implements Comparator<Statement> {
             d2 = (J.MethodInvocation) s2;
         }
 
+        assert d1 != null && d2 != null;
         String configuration1 = d1.getSimpleName();
         String configuration2 = d2.getSimpleName();
         if (!configuration1.equals(configuration2)) {
@@ -135,7 +132,14 @@ public class InsertDependencyComparator implements Comparator<Statement> {
 
     private static Optional<String> getEntry(String entry, J.MethodInvocation invocation) {
         if (invocation.getArguments().get(0) instanceof J.Literal) {
-            Dependency dependency = DependencyStringNotationConverter.parse((String) ((J.Literal) invocation.getArguments().get(0)).getValue());
+            Object value = ((J.Literal) invocation.getArguments().get(0)).getValue();
+            if(value == null) {
+                return Optional.empty();
+            }
+            Dependency dependency = DependencyStringNotationConverter.parse((String) value);
+            if(dependency == null) {
+                return Optional.empty();
+            }
             switch (entry) {
                 case "group":
                     return Optional.ofNullable(dependency.getGroupId());

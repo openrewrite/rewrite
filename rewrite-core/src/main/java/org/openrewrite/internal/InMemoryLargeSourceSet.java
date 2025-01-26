@@ -16,8 +16,8 @@
 package org.openrewrite.internal;
 
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Generated;
 import org.openrewrite.marker.RecipesThatMadeChanges;
 
@@ -44,8 +44,8 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
     }
 
     protected InMemoryLargeSourceSet(@Nullable InMemoryLargeSourceSet initialState,
-                                   @Nullable Map<SourceFile, List<Recipe>> deletions,
-                                   List<SourceFile> ls) {
+                                     @Nullable Map<SourceFile, List<Recipe>> deletions,
+                                     List<SourceFile> ls) {
         this.initialState = initialState;
         this.ls = ls;
         this.deletions = deletions;
@@ -128,9 +128,8 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
         return new InMemoryChangeset(changes);
     }
 
-    @Nullable
     @Override
-    public SourceFile getBefore(Path sourcePath) {
+    public @Nullable SourceFile getBefore(Path sourcePath) {
         List<SourceFile> sourceFiles = getInitialState().ls;
         for (SourceFile s : sourceFiles) {
             if (s.getSourcePath().equals(sourcePath)) {

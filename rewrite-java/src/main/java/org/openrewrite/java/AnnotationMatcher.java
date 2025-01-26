@@ -17,8 +17,8 @@ package org.openrewrite.java;
 
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.grammar.AnnotationSignatureLexer;
 import org.openrewrite.java.internal.grammar.AnnotationSignatureParser;
 import org.openrewrite.java.tree.Expression;
@@ -47,7 +47,7 @@ import java.util.regex.Pattern;
  * {@literal @}java.lang.SuppressWarnings                                 - Matches java.lang.SuppressWarnings with no parameters.
  * {@literal @}myhttp.Get(serviceName="payments", path="recentPayments")  - Matches references to myhttp.Get where the parameters are also matched.
  * {@literal @}myhttp.Get(path="recentPayments", serviceName="payments")  - Exactly the same results from the previous example, order of parameters does not matter.
- * {@literal @}java.lang.SuppressWarnings("deprecation")                  - Matches java.langSuppressWarning with a single parameter.
+ * {@literal @}java.lang.SuppressWarnings("deprecation")                  - Matches java.langSuppressWarning with a parameter "deprecation", values in array initializer match as well.
  * {@literal @}org.junit.runner.RunWith(org.junit.runners.JUnit4.class)   - Matches JUnit4's @RunWith(JUnit4.class)
  * </PRE>
  */
@@ -63,36 +63,43 @@ public class AnnotationMatcher {
         this.matchMetaAnnotations = Boolean.TRUE.equals(matchesMetaAnnotations);
     }
 
+    public AnnotationMatcher(Class<?> annotationType) {
+        this("@" + annotationType.getName());
+        if (!annotationType.isAnnotation()) {
+            throw new IllegalArgumentException(annotationType.getName() + " is not an annotation.");
+        }
+    }
+
     public AnnotationMatcher(String signature) {
         this(signature, false);
     }
 
     public boolean matches(J.Annotation annotation) {
         return matchesAnnotationName(annotation) &&
-               matchesSingleParameter(annotation) &&
-               matchesNamedParameters(annotation);
+                matchesSingleParameter(annotation) &&
+                matchesNamedParameters(annotation);
     }
 
     private boolean matchesAnnotationName(J.Annotation annotation) {
         return matchesAnnotationOrMetaAnnotation(TypeUtils.asFullyQualified(annotation.getType()), null);
     }
 
-    public boolean matchesAnnotationOrMetaAnnotation(@Nullable JavaType.FullyQualified fqn) {
+    public boolean matchesAnnotationOrMetaAnnotation(JavaType.@Nullable FullyQualified fqn) {
         return matchesAnnotationOrMetaAnnotation(fqn, null);
     }
 
-    private boolean matchesAnnotationOrMetaAnnotation(@Nullable JavaType.FullyQualified fqn,
+    private boolean matchesAnnotationOrMetaAnnotation(JavaType.@Nullable FullyQualified fqn,
                                                       @Nullable Set<String> seenAnnotations) {
         if (fqn != null) {
             if (matcher.matcher(fqn.getFullyQualifiedName()).matches()) {
                 return true;
             } else if (matchMetaAnnotations) {
                 for (JavaType.FullyQualified annotation : fqn.getAnnotations()) {
-                    if(seenAnnotations == null) {
+                    if (seenAnnotations == null) {
                         seenAnnotations = new HashSet<>();
                     }
                     if (seenAnnotations.add(annotation.getFullyQualifiedName()) &&
-                        matchesAnnotationOrMetaAnnotation(annotation, seenAnnotations)) {
+                            matchesAnnotationOrMetaAnnotation(annotation, seenAnnotations)) {
                         return true;
                     }
                 }
@@ -161,10 +168,16 @@ public class AnnotationMatcher {
             }
             if (arg instanceof J.NewArray) {
                 J.NewArray na = (J.NewArray) arg;
-                if (na.getInitializer() == null || na.getInitializer().size() != 1) {
+                if (na.getInitializer() == null) {
                     return false;
                 }
-                return argumentValueMatches("value", na.getInitializer().get(0), matchText);
+                // recursively check each initializer of the array initializer
+                for (Expression expression : na.getInitializer()) {
+                    if (argumentValueMatches(matchOnArgumentName, expression, matchText)) {
+                        return true;
+                    }
+                }
+                return false;
             }
         }
 

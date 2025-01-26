@@ -16,12 +16,13 @@
 package org.openrewrite.gradle;
 
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Incubating;
+import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.marker.GradleSettings;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
@@ -52,7 +53,7 @@ public class DependencyVersionSelector {
     GradleSettings gradleSettings;
 
     /**
-     * Used to select a version for a new dependency that has no prior version.
+     * Used to select a version for a new dependency that has no prior version, or the caller is not sure what the prior version is.
      *
      * @param ga             The group and artifact of the new dependency.
      * @param configuration  The configuration to select the version for. The configuration influences
@@ -64,17 +65,26 @@ public class DependencyVersionSelector {
      * @return The selected version, if any.
      * @throws MavenDownloadingException If there is a problem downloading metadata for the dependency.
      */
-    @Nullable
-    public String select(GroupArtifact ga,
+    public @Nullable String select(GroupArtifact ga,
                          String configuration,
                          @Nullable String version,
                          @Nullable String versionPattern,
                          ExecutionContext ctx) throws MavenDownloadingException {
+        String currentVersion = "0";
+        if (gradleProject != null) {
+            GradleDependencyConfiguration gdc = gradleProject.getConfiguration(configuration);
+            if(gdc != null) {
+                Dependency requested = gdc.findRequestedDependency(ga.getGroupId(), ga.getArtifactId());
+                if(requested != null && requested.getVersion() != null) {
+                    currentVersion = requested.getVersion();
+                }
+            }
+        }
         return select(
-                new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), "0"),
+                new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), currentVersion),
                 configuration,
                 // we don't want to select the latest patch in the 0.x line...
-                "latest.patch".equalsIgnoreCase(version) ? "latest.release" : version,
+                "latest.patch".equalsIgnoreCase(version) && "0".equals(currentVersion) ? "latest.release" : version,
                 versionPattern,
                 ctx
         );
@@ -92,8 +102,7 @@ public class DependencyVersionSelector {
      * @return The selected version, if any.
      * @throws MavenDownloadingException If there is a problem downloading metadata for the dependency.
      */
-    @Nullable
-    public String select(ResolvedGroupArtifactVersion gav,
+    public @Nullable String select(ResolvedGroupArtifactVersion gav,
                          String configuration,
                          @Nullable String version,
                          @Nullable String versionPattern,
@@ -114,8 +123,7 @@ public class DependencyVersionSelector {
      * @return The selected version, if any.
      * @throws MavenDownloadingException If there is a problem downloading metadata for the dependency.
      */
-    @Nullable
-    public String select(GroupArtifactVersion gav,
+    public @Nullable String select(GroupArtifactVersion gav,
                          @Nullable String configuration,
                          @Nullable String version,
                          @Nullable String versionPattern,
@@ -126,19 +134,24 @@ public class DependencyVersionSelector {
                                                "current version.");
         }
 
-        VersionComparator versionComparator = StringUtils.isBlank(version) ?
-                new LatestRelease(versionPattern) :
-                requireNonNull(Semver.validate(version, versionPattern).getValue());
+        try {
+            VersionComparator versionComparator = StringUtils.isBlank(version) ?
+                    new LatestRelease(versionPattern) :
+                    requireNonNull(Semver.validate(version, versionPattern).getValue());
 
-        if (versionComparator instanceof ExactVersion) {
-            return versionComparator.upgrade(gav.getVersion(), singletonList(version)).orElse(null);
-        } else if (versionComparator instanceof LatestPatch &&
-                   !versionComparator.isValid(gav.getVersion(), gav.getVersion())) {
-            // in the case of "latest.patch", a new version can only be derived if the
-            // current version is a semantic version
+            if (versionComparator instanceof ExactVersion) {
+                return versionComparator.upgrade(gav.getVersion(), singletonList(version)).orElse(null);
+            } else if (versionComparator instanceof LatestPatch &&
+                    !versionComparator.isValid(gav.getVersion(), gav.getVersion())) {
+                // in the case of "latest.patch", a new version can only be derived if the
+                // current version is a semantic version
+                return null;
+            } else {
+                return findNewerVersion(gav, configuration, versionComparator, ctx).orElse(null);
+            }
+        } catch (IllegalStateException e) {
+            // this can happen when we encounter exotic versions
             return null;
-        } else {
-            return findNewerVersion(gav, configuration, versionComparator, ctx).orElse(null);
         }
     }
 
@@ -170,11 +183,13 @@ public class DependencyVersionSelector {
 
     private List<MavenRepository> determineRepos(@Nullable String configuration) {
         if (gradleSettings != null) {
-            return gradleSettings.getPluginRepositories();
+            return gradleSettings.getBuildscript().getMavenRepositories();
         }
-        Objects.requireNonNull(gradleProject);
+        if (gradleProject == null) {
+            throw new IllegalStateException("Gradle project must be set to determine repositories."); // Caught by caller
+        }
         return "classpath".equals(configuration) ?
-                gradleProject.getMavenPluginRepositories() :
+                gradleProject.getBuildscript().getMavenRepositories() :
                 gradleProject.getMavenRepositories();
     }
 }

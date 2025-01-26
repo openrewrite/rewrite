@@ -17,14 +17,15 @@ package org.openrewrite.java.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.table.MethodCalls;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.HashSet;
@@ -71,6 +72,31 @@ public class FindMethods extends Recipe {
             final MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides);
 
             @Override
+            public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
+                // In an annotation @Example(value = "") the identifier "value" may have a method type
+                J.Identifier i = super.visitIdentifier(identifier, ctx);
+                if(i.getType() instanceof JavaType.Method && methodMatcher.matches((JavaType.Method) i.getType()) &&
+                   !(getCursor().getParentTreeCursor().getValue() instanceof J.MethodInvocation)) {
+                    JavaType.Method m = (JavaType.Method) i.getType();
+                    JavaSourceFile javaSourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
+                    if(javaSourceFile != null) {
+                        methodCalls.insertRow(ctx, new MethodCalls.Row(
+                                javaSourceFile.getSourcePath().toString(),
+                                m.getName(),
+                                m.getDeclaringType().getFullyQualifiedName(),
+                                m.getName(),
+                                m.getParameterTypes().stream()
+                                        .map(String::valueOf)
+                                        .collect(Collectors.joining(", "))
+
+                        ));
+                    }
+                    i = SearchResult.found(i);
+                }
+                return i;
+            }
+
+            @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 if (methodMatcher.matches(method)) {
@@ -78,7 +104,7 @@ public class FindMethods extends Recipe {
                     if (javaSourceFile != null) {
                         methodCalls.insertRow(ctx, new MethodCalls.Row(
                                 javaSourceFile.getSourcePath().toString(),
-                                method.printTrimmed(getCursor()),
+                                method.printTrimmed(getCursor().getParentTreeCursor()),
                                 method.getMethodType().getDeclaringType().getFullyQualifiedName(),
                                 method.getSimpleName(),
                                 method.getArguments().stream()
@@ -100,7 +126,7 @@ public class FindMethods extends Recipe {
                     if (javaSourceFile != null) {
                         methodCalls.insertRow(ctx, new MethodCalls.Row(
                                 javaSourceFile.getSourcePath().toString(),
-                                memberRef.printTrimmed(getCursor()),
+                                memberRef.printTrimmed(getCursor().getParentTreeCursor()),
                                 memberRef.getMethodType().getDeclaringType().getFullyQualifiedName(),
                                 memberRef.getMethodType().getName(),
                                 memberRef.getArguments().stream()
@@ -122,7 +148,7 @@ public class FindMethods extends Recipe {
                     if (javaSourceFile != null) {
                         methodCalls.insertRow(ctx, new MethodCalls.Row(
                                 javaSourceFile.getSourcePath().toString(),
-                                newClass.printTrimmed(getCursor()),
+                                newClass.printTrimmed(getCursor().getParentTreeCursor()),
                                 newClass.getType().toString(),
                                 "<constructor>",
                                 newClass.getArguments().stream()

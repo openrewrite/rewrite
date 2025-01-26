@@ -15,11 +15,11 @@
  */
 package org.openrewrite.yaml;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.yaml.cleanup.RemoveUnusedVisitor;
 import org.openrewrite.yaml.format.AutoFormatVisitor;
 import org.openrewrite.yaml.tree.Yaml;
@@ -73,6 +73,10 @@ public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
     public Yaml visitDocument(Yaml.Document document, P p) {
         return document.withBlock((Yaml.Block) visit(document.getBlock(), p))
                 .withMarkers(visitMarkers(document.getMarkers(), p));
+    }
+
+    public Yaml visitDocumentEnd(Yaml.Document.End end, P p) {
+        return end.withMarkers(visitMarkers(end.getMarkers(), p));
     }
 
     public Yaml visitMapping(Yaml.Mapping mapping, P p) {

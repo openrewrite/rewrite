@@ -39,8 +39,18 @@ public class XmlIsoVisitor<P> extends XmlVisitor<P> {
     }
 
     @Override
+    public Xml.Tag.Closing visitTagClosing(Xml.Tag.Closing closing, P p) {
+        return (Xml.Tag.Closing) super.visitTagClosing(closing, p);
+    }
+
+    @Override
     public Xml.Attribute visitAttribute(Xml.Attribute attribute, P p) {
         return (Xml.Attribute) super.visitAttribute(attribute, p);
+    }
+
+    @Override
+    public Xml.Attribute.Value visitAttributeValue(Xml.Attribute.Value value, P p) {
+        return (Xml.Attribute.Value) super.visitAttributeValue(value, p);
     }
 
     @Override
@@ -56,6 +66,11 @@ public class XmlIsoVisitor<P> extends XmlVisitor<P> {
     @Override
     public Xml.DocTypeDecl visitDocTypeDecl(Xml.DocTypeDecl docTypeDecl, P p) {
         return (Xml.DocTypeDecl) super.visitDocTypeDecl(docTypeDecl, p);
+    }
+
+    @Override
+    public Xml.DocTypeDecl.ExternalSubsets visitDocTypeDeclExternalSubsets(Xml.DocTypeDecl.ExternalSubsets externalSubsets, P p) {
+        return (Xml.DocTypeDecl.ExternalSubsets) super.visitDocTypeDeclExternalSubsets(externalSubsets, p);
     }
 
     @Override

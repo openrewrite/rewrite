@@ -38,7 +38,8 @@ class DependencyInsightTest implements RewriteTest {
     @Test
     void findTransitiveDependency() {
         rewriteRun(
-          buildGradle("""
+          buildGradle(
+                """
               plugins {
                   id 'java-library'
               }
@@ -79,7 +80,8 @@ class DependencyInsightTest implements RewriteTest {
                 gradlePluginPortal()
             }
               """, spec -> spec.path("buildSrc/build.gradle")),
-          groovy("""
+          groovy(
+                """
             plugins{
                 id "java"
             }
@@ -87,7 +89,8 @@ class DependencyInsightTest implements RewriteTest {
                 implementation 'com.google.guava:guava:31.1-jre'
             }
             """, spec -> spec.path("buildSrc/src/main/groovy/convention-plugin.gradle")),
-          buildGradle("""
+          buildGradle(
+                """
               plugins {
                   id 'convention-plugin'
               }
@@ -128,7 +131,8 @@ class DependencyInsightTest implements RewriteTest {
                 gradlePluginPortal()
             }
               """, spec -> spec.path("buildSrc/build.gradle")),
-          groovy("""
+          groovy(
+                """
             plugins{
                 id "java"
             }
@@ -136,7 +140,8 @@ class DependencyInsightTest implements RewriteTest {
                 implementation 'com.google.guava:guava:31.1-jre'
             }
             """, spec -> spec.path("buildSrc/src/main/groovy/convention-plugin.gradle")),
-          buildGradle("""
+          buildGradle(
+                """
               plugins {
                   id 'convention-plugin'
               }
@@ -162,7 +167,8 @@ class DependencyInsightTest implements RewriteTest {
     void recursive() {
         rewriteRun(
           spec -> spec.recipe(new DependencyInsight("doesnotexist", "doesnotexist", null, null)),
-          buildGradle("""
+          buildGradle(
+                """
             plugins {
                 id 'java-library'
             }
@@ -190,7 +196,8 @@ class DependencyInsightTest implements RewriteTest {
                 assertThat(row.getArtifactId()).isEqualTo("jackson-core");
                 assertThat(row.getVersion()).isEqualTo("2.13.4");
             }),
-          buildGradle("""
+          buildGradle(
+                """
               plugins {
                   id 'java-library'
               }
@@ -224,7 +231,8 @@ class DependencyInsightTest implements RewriteTest {
     void versionSearch() {
         rewriteRun(
           spec -> spec.recipe(new DependencyInsight("org.openrewrite", "*", "7.0.0", null)),
-          buildGradle("""
+          buildGradle(
+                """
               plugins {
                   id 'java-library'
               }

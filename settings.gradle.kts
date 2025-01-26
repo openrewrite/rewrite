@@ -19,6 +19,7 @@ val allProjects = listOf(
         "rewrite-java",
         "rewrite-java-tck",
         "rewrite-java-test",
+        "rewrite-java-lombok",
         "rewrite-java-17", // remove this when rewrite recipe gradle plugin moves to 21
         "rewrite-java-21",
         "rewrite-json",
@@ -26,6 +27,7 @@ val allProjects = listOf(
         "rewrite-properties",
         "rewrite-protobuf",
         "rewrite-test",
+        "rewrite-toml",
         "rewrite-xml",
         "rewrite-yaml",
 )
@@ -48,18 +50,12 @@ if(!file("IDE.properties").exists() || includedProjects.contains("tools")) {
 
 include(*allProjects.toTypedArray())
 
-allProjects.minus(includedProjects).forEach {
-    // sinkhole this project to a directory that intentionally doesn't exist, so that it
-    // can be efficiently substituted for a module dependency below
-    project(":$it").projectDir = file("sinkhole-$it")
-}
-
 gradle.allprojects {
     configurations.all {
         resolutionStrategy.dependencySubstitution {
             allProjects
                     .minus(includedProjects)
-                    .minus(arrayOf("rewrite-benchmarks", "rewrite-bom"))
+                    .minus(arrayOf("rewrite-bom"))
                     .forEach {
                         substitute(project(":$it"))
                                 .using(module("org.openrewrite:$it:latest.integration"))
@@ -79,35 +75,36 @@ if (System.getProperty("idea.active") == null &&
 }
 
 // ---------------------------------------------------------------
-// ------ Gradle Enterprise Configuration ------------------------
+// ------ Gradle Develocity Configuration ------------------------
 // ---------------------------------------------------------------
 
 plugins {
-    id("com.gradle.enterprise") version "latest.release"
+    id("com.gradle.develocity") version "latest.release"
     id("com.gradle.common-custom-user-data-gradle-plugin") version "latest.release"
 }
 
-gradleEnterprise {
+develocity {
     val isCiServer = System.getenv("CI")?.equals("true") ?: false
     server = "https://ge.openrewrite.org/"
-
+    val accessKey = System.getenv("GRADLE_ENTERPRISE_ACCESS_KEY")
+    val authenticated = !accessKey.isNullOrBlank()
     buildCache {
-        remote(gradleEnterprise.buildCache) {
+        remote(develocity.buildCache) {
             isEnabled = true
-            val accessKey = System.getenv("GRADLE_ENTERPRISE_ACCESS_KEY")
-            isPush = isCiServer && !accessKey.isNullOrBlank()
+            isPush = isCiServer && authenticated
         }
     }
 
     buildScan {
         capture {
-            isTaskInputFiles = true
+            fileFingerprints = true
+        }
+        publishing {
+            onlyIf {
+                authenticated
+            }
         }
 
-        isUploadInBackground = !isCiServer
-
-        publishAlways()
-        this as com.gradle.enterprise.gradleplugin.internal.extension.BuildScanExtensionWithHiddenFeatures
-        publishIfAuthenticated()
+        uploadInBackground = !isCiServer
     }
 }

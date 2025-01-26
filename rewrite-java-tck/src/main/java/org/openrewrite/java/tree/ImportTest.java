@@ -31,10 +31,10 @@ class ImportTest implements RewriteTest {
             """
               import static java.util.Map.Entry;
               import java.util.Map.Entry;
-                            
+              
               import java.util.List;
               import java.util.*;
-                            
+              
               import static java.nio.charset.StandardCharsets.UTF_8;
               import static java.util.Collections.emptyList;
               """,
@@ -157,20 +157,31 @@ class ImportTest implements RewriteTest {
           ),
           java(
             """
-                  package org.openrewrite;
-                  
-                  import org.openrewrite.BadPackage.Foo;
-                  import org.openrewrite.BadPackage.Foo.Bar;
-                  
-                  public class Bar {
-                      private Foo foo;
-                  }
-                  
+              package org.openrewrite;
+              
+              import org.openrewrite.BadPackage.Foo;
+              import org.openrewrite.BadPackage.Foo.Bar;
+              
+              public class Bar {
+                  private Foo foo;
+              }
               """,
             spec -> spec.afterRecipe(cu -> {
                 assertThat(cu.getImports().get(0).getPackageName()).isEqualTo("org.openrewrite.BadPackage");
                 assertThat(cu.getImports().get(1).getPackageName()).isEqualTo("org.openrewrite.BadPackage");
             })
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4569")
+    @Test
+    void spaceBeforeSemiColon() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List ;
+              """
           )
         );
     }

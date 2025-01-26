@@ -17,17 +17,18 @@ package org.openrewrite.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.GitProvenance;
 import org.openrewrite.table.CommitsByDay;
 import org.openrewrite.table.DistinctCommitters;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.NavigableMap;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Objects.requireNonNull;
@@ -89,26 +90,34 @@ public class FindCommitters extends ScanningRecipe<AtomicReference<GitProvenance
     public Collection<? extends SourceFile> generate(AtomicReference<GitProvenance> acc, ExecutionContext ctx) {
         GitProvenance gitProvenance = acc.get();
         if (gitProvenance != null) {
-            LocalDate from = StringUtils.isBlank(fromDate) ? null : LocalDate.parse(fromDate).minusDays(1);
-            for (GitProvenance.Committer committer : requireNonNull(gitProvenance.getCommitters())) {
-                NavigableMap<LocalDate, Integer> committerCommits = committer.getCommitsByDay();
-                if (from == null || committerCommits.keySet().stream().anyMatch(day -> day.isAfter(from))) {
-                    committers.insertRow(ctx, new DistinctCommitters.Row(
-                            committer.getName(),
-                            committer.getEmail(),
-                            committerCommits.lastKey(),
-                            committerCommits.values().stream().mapToInt(Integer::intValue).sum()
-                    ));
-
-                    committerCommits.forEach((day, commits) -> commitsByDay.insertRow(ctx, new CommitsByDay.Row(
-                            committer.getName(),
-                            committer.getEmail(),
-                            day,
-                            commits
-                    )));
-                }
+            LocalDate from = StringUtils.isBlank(fromDate) ? null : LocalDate.parse(fromDate);
+            Collection<GitProvenance.Committer> committerList = findCommitters(gitProvenance, from);
+            for (GitProvenance.Committer committer : committerList) {
+                committers.insertRow(ctx, new DistinctCommitters.Row(
+                        committer.getName(),
+                        committer.getEmail(),
+                        committer.getCommitsByDay().lastKey(),
+                        committer.getCommitsByDay().values().stream().mapToInt(Integer::intValue).sum()
+                ));
+                committer.getCommitsByDay().forEach((day, commits) -> commitsByDay.insertRow(ctx, new CommitsByDay.Row(
+                        committer.getName(),
+                        committer.getEmail(),
+                        day,
+                        commits
+                )));
             }
         }
         return Collections.emptyList();
+    }
+
+    public static Collection<GitProvenance.Committer> findCommitters(GitProvenance gitProvenance, @Nullable LocalDate from) {
+        LocalDate cutOff = from == null ? null : from.minusDays(1);
+        List<GitProvenance.Committer> committerList = new ArrayList<>();
+        for (GitProvenance.Committer committer : requireNonNull(gitProvenance.getCommitters())) {
+            if (cutOff == null || committer.getCommitsByDay().keySet().stream().anyMatch(day -> day.isAfter(cutOff))) {
+                committerList.add(committer);
+            }
+        }
+        return committerList;
     }
 }

@@ -15,7 +15,7 @@
  */
 package org.openrewrite.maven.tree;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 

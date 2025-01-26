@@ -18,9 +18,10 @@ package org.openrewrite.config;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Contributor;
 import org.openrewrite.Maintainer;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.NlsRewrite;
 
 import java.net.URI;
 import java.time.Duration;
@@ -33,8 +34,10 @@ public class RecipeDescriptor {
     @EqualsAndHashCode.Include
     String name;
 
+    @NlsRewrite.DisplayName
     String displayName;
 
+    @NlsRewrite.Description
     String description;
 
     Set<String> tags;

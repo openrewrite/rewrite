@@ -17,6 +17,7 @@ package org.openrewrite.gradle;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
@@ -25,7 +26,6 @@ import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.format.BlankLinesVisitor;
 import org.openrewrite.java.search.FindMethods;
@@ -43,12 +43,10 @@ import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.semver.DependencyMatcher;
 import org.openrewrite.semver.Semver;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.singletonMap;
 import static java.util.Objects.requireNonNull;
@@ -101,6 +99,13 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
     @Nullable
     String because;
 
+    @Option(displayName = "Include configurations",
+            description = "A list of configurations to consider during the upgrade. For example, For example using `implementation, runtimeOnly`, we could be responding to a deployable asset vulnerability only (ignoring test scoped vulnerabilities).",
+            required = false,
+            example = "implementation, runtimeOnly")
+    @Nullable
+    List<String> onlyForConfigurations;
+
     @Override
     public String getDisplayName() {
         return "Upgrade transitive Gradle dependencies";
@@ -135,7 +140,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                 gradleProject = cu.getMarkers().findFirst(GradleProject.class)
                         .orElseThrow(() -> new IllegalStateException("Unable to find GradleProject marker."));
 
-                Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> toUpdate = new HashMap<>();
+                Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> toUpdate = new LinkedHashMap<>();
 
                 DependencyVersionSelector versionSelector = new DependencyVersionSelector(metadataFailures, gradleProject, null);
                 for (GradleDependencyConfiguration configuration : gradleProject.getConfigurations()) {
@@ -158,7 +163,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                                         new GroupArtifact(resolved.getGroupId(), resolved.getArtifactId()),
                                         singletonMap(constraintConfig, selected),
                                         (existing, update) -> {
-                                            Map<GradleDependencyConfiguration, String> all = new HashMap<>(existing);
+                                            Map<GradleDependencyConfiguration, String> all = new LinkedHashMap<>(existing);
                                             all.putAll(update);
                                             all.keySet().removeIf(c -> {
                                                 if (c == null) {
@@ -206,33 +211,104 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                                     update.getKey().getArtifactId(), config.getValue()), because).visitNonNull(cu, ctx);
                         }
                     }
+
+                    // Update dependency model so chained recipes will have correct information on what dependencies are present
+                    cu = cu.withMarkers(cu.getMarkers()
+                            .removeByType(GradleProject.class)
+                            .add(updatedModel(gradleProject, toUpdate, ctx)));
+
+                    // Spring dependency management plugin stomps on constraints. Use an alternative mechanism it does not override
+                    if (gradleProject.getPlugins().stream()
+                            .anyMatch(plugin -> "io.spring.dependency-management".equals(plugin.getId()))) {
+                        cu = (G.CompilationUnit) new DependencyConstraintToRule().getVisitor().visitNonNull(cu, ctx);
+                    }
                 }
 
                 return cu;
             }
 
-            @Nullable
-            private GradleDependencyConfiguration constraintConfiguration(GradleDependencyConfiguration config) {
-                String constraintConfigName = null;
-                switch (config.getName()) {
+            private GradleProject updatedModel(GradleProject gradleProject, Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> toUpdate, ExecutionContext ctx) {
+                GradleProject gp = gradleProject;
+                Set<String> configNames = gp.getConfigurations().stream()
+                        .map(GradleDependencyConfiguration::getName)
+                        .collect(Collectors.toSet());
+                Set<GroupArtifactVersion> gavs = new LinkedHashSet<>();
+                for (Map.Entry<GroupArtifact, Map<GradleDependencyConfiguration, String>> update : toUpdate.entrySet()) {
+                    Map<GradleDependencyConfiguration, String> configs = update.getValue();
+                    String groupId = update.getKey().getGroupId();
+                    String artifactId = update.getKey().getArtifactId();
+                    for (Map.Entry<GradleDependencyConfiguration, String> configToVersion : configs.entrySet()) {
+                        String newVersion = configToVersion.getValue();
+                        gavs.add(new GroupArtifactVersion(groupId, artifactId, newVersion));
+                    }
+                }
+                for (GroupArtifactVersion gav : gavs) {
+                    gp = UpgradeDependencyVersion.replaceVersion(gp, ctx, gav, configNames);
+                }
+                return gp;
+            }
+
+            /*
+             * It is typical in Gradle for there to be a number of unresolvable configurations that developers put
+             * dependencies into in their build files, like implementation. Other configurations like compileClasspath
+             * and runtimeClasspath are resolvable and will directly or transitively extend from those unresolvable
+             * configurations.
+             *
+             * It isn't impossible to manage the version of the dependency directly in the child configuration, but you
+             * might end up with the same dependency managed multiple times, something like this:
+             *
+             * constraints {
+             *     runtimeClasspath("g:a:v") { }
+             *     compileClasspath("g:a:v") { }
+             *     testRuntimeClasspath("g:a:v") { }
+             *     testCompileClasspath("g:a:v") { }
+             * }
+             *
+             * whereas if we find a common root configuration, the above can be simplified to:
+             *
+             * constraints {
+             *     implementation("g:a:v") { }
+             * }
+             */
+            private @Nullable GradleDependencyConfiguration constraintConfiguration(GradleDependencyConfiguration config) {
+                String constraintConfigName = config.getName();
+                switch (constraintConfigName) {
                     case "compileClasspath":
+                    case "compileOnly":
+                    case "compile":
                         constraintConfigName = "implementation";
                         break;
                     case "runtimeClasspath":
+                    case "runtime":
                         constraintConfigName = "runtimeOnly";
                         break;
                     case "testCompileClasspath":
+                    case "testCompile":
                         constraintConfigName = "testImplementation";
                         break;
                     case "testRuntimeClasspath":
+                    case "testRuntime":
                         constraintConfigName = "testRuntimeOnly";
                         break;
                 }
-                for (GradleDependencyConfiguration extended : config.getExtendsFrom()) {
-                    if (extended.getName().equals(constraintConfigName)) {
-                        return extended;
+
+                if (onlyForConfigurations != null) {
+                    if (!onlyForConfigurations.contains(constraintConfigName)) {
+                        return null;
+                    }
+                } else {
+                    for (GradleDependencyConfiguration extended : config.getExtendsFrom()) {
+                        if (extended.getName().equals(constraintConfigName)) {
+                            return extended;
+                        }
                     }
                 }
+
+                GradleDependencyConfiguration configuration = gradleProject.getConfiguration(constraintConfigName);
+                if (configuration != null && configuration.isTransitive()) {
+                    return configuration;
+                }
+
                 return null;
             }
         });
@@ -299,7 +375,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
             if(!CONSTRAINTS_MATCHER.matches(m)) {
                 return m;
             }
-            String ga = gav.getGroupId() + ":" + gav.getArtifactId() + ":";
+            String ga = gav.getGroupId() + ":" + gav.getArtifactId();
             AtomicReference<String> existingConstraintVersion = new AtomicReference<>();
             J.MethodInvocation existingConstraint = FindMethods.find(m, CONSTRAINT_MATCHER, true).stream()
                     .filter(J.MethodInvocation.class::isInstance)
@@ -338,29 +414,39 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
 
         String config;
         GroupArtifactVersion gav;
+
         @Nullable
         String because;
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+            if ("version".equals(method.getSimpleName())) {
+                return method;
+            }
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            J withConstraint = (J) GradleParser.builder().build().parse(String.format(
-                    "plugin { id 'java' }\n" +
-                    "dependencies { constraints {\n" +
-                    "    %s('%s')%s\n" +
-                    "}}",
-                    config,
+            Optional<G.CompilationUnit> withConstraint = GradleParser.builder().build().parse(String.format(
+                    "plugins {\n" +
+                    "    id 'java'\n" +
+                    "}\n" +
+                    "dependencies {\n" +
+                    "    constraints {\n" +
+                    "        implementation('%s')%s\n" +
+                    "    }\n" +
+                    "}",
                     gav,
-                    because == null ? "" : String.format(" {\n   because '%s'\n}", because)
-            )).findFirst().orElseThrow(() -> new IllegalStateException("Unable to parse constraint"));
+                    because == null ? "" : String.format(" {\n            because '%s'\n        }", because)
+            )).findFirst().map(G.CompilationUnit.class::cast);
 
-            Statement constraint = FindMethods.find(withConstraint, CONSTRAINT_MATCHER, true)
-                    .stream()
-                    .filter(J.MethodInvocation.class::isInstance)
-                    .map(J.MethodInvocation.class::cast)
-                    .filter(m2 -> m2.getSimpleName().equals(config))
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalStateException("Unable to find constraint"))
-                    .withMarkers(Markers.EMPTY);
+            J.MethodInvocation constraint = withConstraint.map(it -> (J.MethodInvocation) it.getStatements().get(1))
+                    .map(dependenciesMethod -> (J.Lambda) dependenciesMethod.getArguments().get(0))
+                    .map(dependenciesClosure -> (J.Block)dependenciesClosure.getBody())
+                    .map(dependenciesBody -> (J.Return) dependenciesBody.getStatements().get(0))
+                    .map(returnConstraints -> (J.MethodInvocation) returnConstraints.getExpression())
+                    .map(constraintsInvocation -> (J.Lambda) constraintsInvocation.getArguments().get(0))
+                    .map(constraintsLambda -> (J.Block) constraintsLambda.getBody())
+                    .map(constraintsBlock -> (J.Return) constraintsBlock.getStatements().get(0))
+                    .map(returnConfiguration -> (J.MethodInvocation) returnConfiguration.getExpression())
+                    .map(it -> it.withName(it.getName().withSimpleName(config)))
+                    .orElseThrow(() -> new IllegalStateException("Unable to find constraint"));
 
             m = autoFormat(m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
                 if(!(arg instanceof J.Lambda)) {
@@ -384,38 +470,68 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
     private static class UpdateConstraintVersionVisitor extends GroovyIsoVisitor<ExecutionContext> {
         GroupArtifactVersion gav;
         J.MethodInvocation existingConstraint;
+
         @Nullable
         String because;
 
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+            if ("version".equals(method.getSimpleName())) {
+                return method;
+            }
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
             if(existingConstraint.isScope(m)) {
-                AtomicBoolean updated = new AtomicBoolean(false);
+                AtomicBoolean updatedBecause = new AtomicBoolean(false);
                 m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
                     if(arg instanceof J.Literal) {
+                        String valueSource = ((J.Literal) arg).getValueSource();
                         char quote;
-                        if(((J.Literal) arg).getValueSource() == null) {
+                        if(valueSource == null) {
                             quote = '\'';
                         } else {
-                            quote = ((J.Literal) arg).getValueSource().charAt(0);
+                            quote = valueSource.charAt(0);
                         }
                         return ((J.Literal) arg).withValue(gav.toString())
                                 .withValueSource(quote + gav.toString() + quote);
+                    } else if (arg instanceof J.Lambda) {
+                        arg = (Expression) new RemoveVersionVisitor().visitNonNull(arg, ctx);
                     }
                     if(because != null) {
                         Expression arg2 = (Expression) new UpdateBecauseTextVisitor(because)
                                 .visitNonNull(arg, ctx, getCursor());
                         if(arg2 != arg) {
-                            updated.set(true);
+                            updatedBecause.set(true);
                         }
                         return arg2;
                     }
                     return arg;
                 }));
-                if(because != null && !updated.get()) {
+                if(because != null && !updatedBecause.get()) {
                     m = (J.MethodInvocation) new CreateBecauseVisitor(because).visitNonNull(m, ctx, requireNonNull(getCursor().getParent()));
                 }
+            }
+            return m;
+        }
+    }
+
+    private static class RemoveVersionVisitor extends GroovyIsoVisitor<ExecutionContext> {
+
+        @Override
+        public  J.@Nullable Return visitReturn(J.Return _return, ExecutionContext ctx) {
+            J.Return r = super.visitReturn(_return, ctx);
+            if(r.getExpression() == null) {
+                //noinspection DataFlowIssue
+                return null;
+            }
+            return r;
+        }
+
+        @Override
+        public  J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+            J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+            if("version".equals(m.getSimpleName()) && m.getArguments().size() == 1 && m.getArguments().get(0) instanceof J.Lambda) {
+                //noinspection DataFlowIssue
+                return null;
             }
             return m;
         }

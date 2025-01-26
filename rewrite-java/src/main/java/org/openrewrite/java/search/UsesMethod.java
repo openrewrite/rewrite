@@ -16,10 +16,11 @@
 package org.openrewrite.java.search;
 
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.Value;
 import lombok.With;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
@@ -34,6 +35,8 @@ import static org.openrewrite.Tree.randomId;
 
 public class UsesMethod<P> extends JavaIsoVisitor<P> {
     private final String methodPattern;
+
+    @Getter
     private final MethodMatcher methodMatcher;
 
     public UsesMethod(String methodPattern) {
@@ -106,6 +109,7 @@ public class UsesMethod<P> extends JavaIsoVisitor<P> {
     @EqualsAndHashCode(onlyExplicitlyIncluded = true)
     public static class MethodMatch implements Marker {
         UUID id;
+
         @EqualsAndHashCode.Include
         String methodMatcher;
     }

@@ -17,6 +17,7 @@ package org.openrewrite.config;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.openrewrite.NlsRewrite;
 
 import java.util.List;
 
@@ -27,8 +28,10 @@ public class DataTableDescriptor {
     @EqualsAndHashCode.Include
     String name;
 
+    @NlsRewrite.DisplayName
     String displayName;
 
+    @NlsRewrite.Description
     String description;
 
     @EqualsAndHashCode.Include

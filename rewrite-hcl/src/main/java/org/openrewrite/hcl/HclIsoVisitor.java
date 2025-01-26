@@ -103,6 +103,11 @@ public class HclIsoVisitor<P> extends HclVisitor<P> {
     }
 
     @Override
+    public Hcl.LegacyIndexAttributeAccess visitLegacyIndexAttribute(Hcl.LegacyIndexAttributeAccess legacyIndexAttributeAccess, P p) {
+        return (Hcl.LegacyIndexAttributeAccess) super.visitLegacyIndexAttribute(legacyIndexAttributeAccess, p);
+    }
+
+    @Override
     public Hcl.Literal visitLiteral(Hcl.Literal literal, P p) {
         return (Hcl.Literal) super.visitLiteral(literal, p);
     }

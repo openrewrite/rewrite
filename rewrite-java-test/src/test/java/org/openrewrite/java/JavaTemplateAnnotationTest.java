@@ -33,7 +33,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
 
     @DocumentExample
     @Test
-    void replaceAnnotation() {
+    void replaceClassAnnotation() {
         rewriteRun(
           spec -> spec.expectedCyclesThatMakeChanges(2)
             .recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -49,10 +49,41 @@ class JavaTemplateAnnotationTest implements RewriteTest {
               @Deprecated(since = "1.0", forRemoval = true)
               class A {
               }
-                """,
+              """,
             """
               @Deprecated(since = "2.0", forRemoval = true)
               class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceNestedClassAnnotation() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2)
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+                  @Override
+                  public J visitAnnotation(J.Annotation annotation, ExecutionContext executionContext) {
+                      return JavaTemplate.apply("@Deprecated(since = \"#{}\", forRemoval = true)",
+                        getCursor(), annotation.getCoordinates().replace(), "2.0");
+                  }
+              }
+            )),
+          java(
+            """
+              class A {
+                  @Deprecated(since = "1.0", forRemoval = true)
+                  class B {
+                  }
+              }
+              """,
+            """
+              class A {
+                  @Deprecated(since = "2.0", forRemoval = true)
+                  class B {
+                  }
               }
               """
           )

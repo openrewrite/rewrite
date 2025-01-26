@@ -19,7 +19,6 @@ import org.openrewrite.Cursor;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaTemplate;
-import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -56,11 +55,16 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
         return new JavaVisitor<Integer>() {
             @Override
             public J visitAnnotation(J.Annotation annotation, Integer integer) {
-                if (loc.equals(ANNOTATION_PREFIX) && mode.equals(JavaCoordinates.Mode.REPLACEMENT) &&
+                if (loc == ANNOTATION_PREFIX && mode == JavaCoordinates.Mode.REPLACEMENT &&
                     annotation.isScope(insertionPoint)) {
                     List<J.Annotation> gen = substitutions.unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate));
+                    if (gen.isEmpty()) {
+                        throw new IllegalStateException("Unable to parse annotation from template: \n" +
+                                                        substitutedTemplate +
+                                                        "\nUse JavaTemplate.Builder.doBeforeParseTemplate() to see what stub is being generated and include it in any bug report.");
+                    }
                     return gen.get(0).withPrefix(annotation.getPrefix());
-                } else if (loc.equals(ANNOTATION_ARGUMENTS) && mode.equals(JavaCoordinates.Mode.REPLACEMENT) &&
+                } else if (loc == ANNOTATION_ARGUMENTS && mode == JavaCoordinates.Mode.REPLACEMENT &&
                            annotation.isScope(insertionPoint)) {
                     List<J.Annotation> gen = substitutions.unsubstitute(templateParser.parseAnnotations(getCursor(), "@Example(" + substitutedTemplate + ")"));
                     return annotation.withArguments(gen.get(0).getArguments());
@@ -140,21 +144,20 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                         case ANNOTATIONS: {
                             List<J.Annotation> gen = substitutions.unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate));
                             J.ClassDeclaration c = classDecl;
-                            if (mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {
+                            if (mode == JavaCoordinates.Mode.REPLACEMENT) {
                                 c = c.withLeadingAnnotations(gen);
                                 if (c.getTypeParameters() != null) {
                                     c = c.withTypeParameters(ListUtils.map(c.getTypeParameters(), tp -> tp.withAnnotations(emptyList())));
                                 }
                                 c = c.withModifiers(ListUtils.map(c.getModifiers(), m -> m.withAnnotations(emptyList())));
-                                c = c.getAnnotations().withKind(c.getAnnotations().getKind().withAnnotations(emptyList()));
+                                c = c.getPadding().withKind(c.getPadding().getKind().withAnnotations(emptyList()));
                             } else {
                                 for (J.Annotation a : gen) {
                                     c = c.withLeadingAnnotations(ListUtils.insertInOrder(c.getLeadingAnnotations(), a,
                                             getComparatorOrThrow()));
                                 }
                             }
-                            return autoFormat(c, c.getLeadingAnnotations().get(c.getLeadingAnnotations().size() - 1), p,
-                                    getCursor().getParentOrThrow());
+                            return autoFormat(c, c.getName(), p, getCursor().getParentOrThrow());
                         }
                         case EXTENDS: {
                             TypeTree anExtends = substitutions.unsubstitute(templateParser.parseExtends(getCursor(), substitutedTemplate));
@@ -173,7 +176,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                     .collect(toList());
                             J.ClassDeclaration c = classDecl;
 
-                            if (mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {
+                            if (mode == JavaCoordinates.Mode.REPLACEMENT) {
                                 c = c.withImplements(implementings);
                                 //noinspection ConstantConditions
                                 c = c.getPadding().withImplements(c.getPadding().getImplements().withBefore(Space.EMPTY));
@@ -181,29 +184,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                 c = c.withImplements(ListUtils.concatAll(c.getImplements(), implementings));
                             }
                             if (c.getType() != null) {
-                                String fqn = c.getType().getFullyQualifiedName();
-                                c = c.withType(new JavaTypeVisitor<List<JavaType.FullyQualified>>() {
-                                    @Override
-                                    public JavaType visitClass(JavaType.Class aClass, List<JavaType.FullyQualified> fullyQualifiedTypes) {
-                                        JavaType.Class c = (JavaType.Class) super.visitClass(aClass, fullyQualifiedTypes);
-                                        if (fqn.equals(c.getFullyQualifiedName())) {
-                                            c = c.withInterfaces(ListUtils.concatAll(c.getInterfaces(), fullyQualifiedTypes));
-                                        }
-                                        return c;
-                                    }
-
-                                    @Override
-                                    public JavaType.Method visitMethod(JavaType.Method method, List<JavaType.FullyQualified> fullyQualifieds) {
-                                        // short-circuiting navigation to methods and variables.
-                                        return method;
-                                    }
-
-                                    @Override
-                                    public JavaType.Variable visitVariable(JavaType.Variable variable, List<JavaType.FullyQualified> fullyQualifieds) {
-                                        // short-circuiting navigation to methods and variables.
-                                        return variable;
-                                    }
-                                }.visitNonNull(c.getType(), implementsTypes));
+                                c = c.withType(((JavaType.Class) c.getType()).withInterfaces(ListUtils.concatAll(c.getType().getInterfaces(), implementsTypes)));
                             }
 
                             //noinspection ConstantConditions
@@ -221,8 +202,8 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
 
             @Override
             public J visitExpression(Expression expression, Integer p) {
-                if ((loc.equals(EXPRESSION_PREFIX) ||
-                     loc.equals(STATEMENT_PREFIX) && expression instanceof Statement) &&
+                if ((loc == EXPRESSION_PREFIX ||
+                     loc == STATEMENT_PREFIX && expression instanceof Statement) &&
                     expression.isScope(insertionPoint)) {
                     return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(
                                     getCursor(),
@@ -235,13 +216,13 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
 
             @Override
             public J visitFieldAccess(J.FieldAccess fa, Integer p) {
-                if (loc.equals(FIELD_ACCESS_PREFIX) && fa.isScope(insertionPoint)) {
+                if (loc == FIELD_ACCESS_PREFIX && fa.isScope(insertionPoint)) {
                     return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(
                                     getCursor(),
                                     substitutedTemplate,
                                     loc))
                             .withPrefix(fa.getPrefix()), p);
-                } else if (loc.equals(STATEMENT_PREFIX) && fa.isScope(insertionPoint)) {
+                } else if (loc == STATEMENT_PREFIX && fa.isScope(insertionPoint)) {
                     // NOTE: while `J.FieldAccess` inherits from `Statement` they can only ever be used as expressions
                     return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(
                                     getCursor(),
@@ -255,7 +236,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             @Override
             public J visitIdentifier(J.Identifier ident, Integer p) {
                 // ONLY for backwards compatibility, otherwise the same as expression replacement
-                if (loc.equals(IDENTIFIER_PREFIX) && ident.isScope(insertionPoint)) {
+                if (loc == IDENTIFIER_PREFIX && ident.isScope(insertionPoint)) {
                     return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(
                                     getCursor(),
                                     substitutedTemplate,
@@ -267,7 +248,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
 
             @Override
             public J visitLambda(J.Lambda lambda, Integer p) {
-                if (loc.equals(LAMBDA_PARAMETERS_PREFIX) && lambda.getParameters().isScope(insertionPoint)) {
+                if (loc == LAMBDA_PARAMETERS_PREFIX && lambda.getParameters().isScope(insertionPoint)) {
                     return lambda.withParameters(substitutions.unsubstitute(templateParser.parseLambdaParameters(getCursor(), substitutedTemplate)));
                 }
                 return maybeReplaceStatement(lambda, J.class, 0);
@@ -280,7 +261,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                         case ANNOTATIONS: {
                             List<J.Annotation> gen = substitutions.unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate));
                             J.MethodDeclaration m = method;
-                            if (mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {
+                            if (mode == JavaCoordinates.Mode.REPLACEMENT) {
                                 m = method.withLeadingAnnotations(gen);
                                 if (m.getTypeParameters() != null) {
                                     m = m.withTypeParameters(ListUtils.map(m.getTypeParameters(), tp -> tp.withAnnotations(emptyList())));
@@ -373,11 +354,11 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             // Update method type information to reflect the new checked exceptions
                             JavaType.Method type = m.getMethodType();
                             if (type != null) {
-                                List<JavaType.FullyQualified> newThrows = new ArrayList<>();
+                                List<JavaType> newThrows = new ArrayList<>();
                                 List<NameTree> throws_ = (m.getThrows() == null) ? emptyList() : m.getThrows();
                                 for (NameTree t : throws_) {
                                     J.Identifier exceptionIdent = (J.Identifier) t;
-                                    newThrows.add((JavaType.FullyQualified) exceptionIdent.getType());
+                                    newThrows.add(exceptionIdent.getType());
                                 }
                                 type = type.withThrownExceptions(newThrows);
                             }
@@ -403,9 +384,9 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
 
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, Integer integer) {
-                if ((loc.equals(METHOD_INVOCATION_ARGUMENTS) || loc.equals(METHOD_INVOCATION_NAME)) && method.isScope(insertionPoint)) {
+                if ((loc == METHOD_INVOCATION_ARGUMENTS || loc == METHOD_INVOCATION_NAME) && method.isScope(insertionPoint)) {
                     J.MethodInvocation m;
-                    if (loc.equals(METHOD_INVOCATION_ARGUMENTS)) {
+                    if (loc == METHOD_INVOCATION_ARGUMENTS) {
                         m = substitutions.unsubstitute(templateParser.parseMethodArguments(getCursor(), substitutedTemplate, loc));
                         m = autoFormat(m, 0);
                         m = method.withArguments(m.getArguments()).withMethodType(m.getMethodType());
@@ -452,7 +433,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
 
             @Override
             public J visitPackage(J.Package pkg, Integer integer) {
-                if (loc.equals(PACKAGE_PREFIX) && pkg.isScope(insertionPoint)) {
+                if (loc == PACKAGE_PREFIX && pkg.isScope(insertionPoint)) {
                     return pkg.withExpression(substitutions.unsubstitute(templateParser.parsePackage(getCursor(), substitutedTemplate)));
                 }
                 return super.visitPackage(pkg, integer);
@@ -464,8 +445,8 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             }
 
             private <J3 extends J> J3 maybeReplaceStatement(Statement statement, Class<J3> expected, Integer p) {
-                if (loc.equals(STATEMENT_PREFIX) && statement.isScope(insertionPoint)) {
-                    if (mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {
+                if (loc == STATEMENT_PREFIX && statement.isScope(insertionPoint)) {
+                    if (mode == JavaCoordinates.Mode.REPLACEMENT) {
                         List<J3> gen = substitutions.unsubstitute(templateParser.parseBlockStatements(getCursor(),
                                 expected, substitutedTemplate, loc, mode));
                         if (gen.size() != 1) {
@@ -500,7 +481,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     if (loc == ANNOTATIONS) {
                         J.VariableDeclarations v = multiVariable;
                         final List<J.Annotation> gen = substitutions.unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate));
-                        if (mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {
+                        if (mode == JavaCoordinates.Mode.REPLACEMENT) {
                             v = v.withLeadingAnnotations(gen);
                             if (v.getTypeExpression() instanceof J.AnnotatedType) {
                                 v = v.withTypeExpression(((J.AnnotatedType) v.getTypeExpression()).getTypeExpression());

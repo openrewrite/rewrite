@@ -42,14 +42,14 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
           java(
             """
               import java.util.List;
-                            
+              
               class T {
                   java.util.List<String> list;
               }
               """,
             """
               import java.util.List;
-                            
+              
               class T {
                   List<String> list;
               }
@@ -70,7 +70,7 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
               """,
             """
               import java.util.Map;
-                            
+              
               class T {
                   Map.Entry<String, String> mapEntry;
               }
@@ -86,7 +86,7 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
           java(
             """
               package a;
-
+              
               class String {
               }
               """
@@ -95,7 +95,7 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
           java(
             """
               package a;
-
+              
               class T {
                   String s1;
                   java.lang.String s2;
@@ -117,7 +117,7 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
               """,
             """
               import java.util.regex.Pattern;
-                            
+              
               class T {
                   int dotall = Pattern.DOTALL;
               }
@@ -133,14 +133,14 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
           java(
             """
               import java.util.List;
-                            
+              
               class T {
                   List<java.util.List<String>> list;
               }
               """,
             """
               import java.util.List;
-                            
+              
               class T {
                   List<List<String>> list;
               }
@@ -156,14 +156,14 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
             //language=java
             """
               import java.util.List;
-                            
+              
               class T {
                   java.util.List list;
               }
               """,
             """
               import java.util.List;
-                            
+              
               class T {
                   List list;
               }
@@ -190,7 +190,7 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
               """,
             """
               import java.util.List;
-                                
+              
               class T {
                   List<String> list;
               }
@@ -212,7 +212,7 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
               """,
             """
               import java.util.List;
-                                
+              
               class T {
                   List<String> list;
                   java.awt.List list2;
@@ -367,7 +367,7 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
           java(
             """
               import java.util.List;
-
+              
               class T<String> {
                   java.lang.String s;
                   List<String> list;
@@ -385,7 +385,7 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
           java(
             """
               import java.util.List;
-
+              
               class T {
                   <String> void m(java.lang.String s, List<String> list) {
                   }
@@ -403,7 +403,7 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
             """
               import java.util.Collection;
               import java.util.function.Function;
-
+              
               class T {
                   Function<Collection<?>, Integer> m() {
                       return java.util.Collection::size;
@@ -413,7 +413,7 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
             """
               import java.util.Collection;
               import java.util.function.Function;
-
+              
               class T {
                   Function<Collection<?>, Integer> m() {
                       return Collection::size;
@@ -440,7 +440,7 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
             """
               import java.util.Collection;
               import java.util.function.Function;
-
+              
               class T {
                   Function<Collection<?>, Integer> m() {
                       return java.util.Collection::size;
@@ -453,7 +453,7 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
             """
               import java.util.Collection;
               import java.util.function.Function;
-
+              
               class T {
                   Function<Collection<?>, Integer> m() {
                       return java.util.Collection::size;
@@ -478,9 +478,9 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
               }
               """),
           java(
-            """           
+            """
               import java.util.ArrayList;
-                        
+              
               class Test {
                   void test(List.A l1) {
                       java.util.List<Integer> l2 = new ArrayList<>();
@@ -503,9 +503,9 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
               }
               """),
           java(
-            """           
+            """
               import java.util.ArrayList;
-                        
+              
               class Test {
                   void test(List.A.B l1) {
                       java.util.List<Integer> l2 = new ArrayList<>();
@@ -521,21 +521,21 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
           java(
             """
               package foo;
-                            
+              
               /* comment */
               import java.util.List;
-                            
+              
               class Test {
                   List<String> l = new java.util.ArrayList<>();
               }
               """,
             """
               package foo;
-                            
+              
               /* comment */
               import java.util.ArrayList;
               import java.util.List;
-                            
+              
               class Test {
                   List<String> l = new ArrayList<>();
               }
@@ -552,7 +552,7 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
             """
               import java.lang.annotation.ElementType;
               import java.lang.annotation.Target;
-                            
+              
               class Test {
                   java.util. @Anno List<String> l;
               }
@@ -563,7 +563,7 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
               import java.lang.annotation.ElementType;
               import java.lang.annotation.Target;
               import java.util.List;
-                                
+              
               class Test {
                   @Anno List<String> l;
               }
@@ -583,10 +583,10 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
               import java.sql.DatabaseMetaData;
               import java.util.List;
               import java.lang.annotation.*;
-
+              
               class TypeAnnotationTest {
                   protected java.sql.@A DatabaseMetaData metadata;
-
+              
                   @Target({ElementType.FIELD, ElementType.TYPE_USE, ElementType.TYPE_PARAMETER})
                   private @interface A {
                   }
@@ -596,13 +596,35 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
               import java.sql.DatabaseMetaData;
               import java.util.List;
               import java.lang.annotation.*;
-
+              
               class TypeAnnotationTest {
                   protected @A DatabaseMetaData metadata;
-
+              
                   @Target({ElementType.FIELD, ElementType.TYPE_USE, ElementType.TYPE_PARAMETER})
                   private @interface A {
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotation() {
+        rewriteRun(
+          java(
+            """
+              class TypeAnnotationTest {
+                  @org.jetbrains.annotations.NotNull
+                  String test() {}
+              }
+              """,
+            """
+              import org.jetbrains.annotations.NotNull;
+              
+              class TypeAnnotationTest {
+                  @NotNull
+                  String test() {}
               }
               """
           )

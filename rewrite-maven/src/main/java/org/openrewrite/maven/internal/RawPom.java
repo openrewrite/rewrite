@@ -23,8 +23,10 @@ import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
-import org.openrewrite.internal.lang.NonNull;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.maven.tree.*;
 
 import javax.xml.bind.annotation.XmlRootElement;
@@ -39,6 +41,7 @@ import java.util.Objects;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static org.openrewrite.maven.tree.Plugin.PLUGIN_DEFAULT_GROUPID;
 
 /**
  * A value object deserialized directly from POM XML
@@ -48,7 +51,13 @@ import static java.util.Collections.emptyMap;
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Data
 @XmlRootElement(name = "project")
+@SuppressWarnings("unused")
 public class RawPom {
+
+    // Obsolete field supplanted by the "modelVersion" field in modern poms
+    @Nullable
+    String pomVersion;
+
     @Nullable
     Parent parent;
 
@@ -66,6 +75,10 @@ public class RawPom {
     @Nullable
     String version;
 
+    // Obsolete field supplanted by the "version" field in modern poms
+    @Nullable
+    String currentVersion;
+
     @EqualsAndHashCode.Include
     @ToString.Include
     @Nullable
@@ -78,6 +91,9 @@ public class RawPom {
 
     @Nullable
     String description;
+
+    @Nullable
+    Prerequisites prerequisites;
 
     @Nullable
     String packaging;
@@ -102,6 +118,12 @@ public class RawPom {
 
     @Nullable
     Profiles profiles;
+
+    @Nullable
+    Modules modules;
+
+    @Nullable
+    SubProjects subprojects;
 
     public static RawPom parse(InputStream inputStream, @Nullable String snapshotVersion) {
         try {
@@ -182,6 +204,14 @@ public class RawPom {
     }
 
     @Getter
+    public static class Prerequisites {
+
+        @JacksonXmlProperty(localName = "maven")
+        @Nullable
+        public String maven;
+    }
+
+    @Getter
     public static class Profiles {
         private final List<Profile> profiles;
 
@@ -194,12 +224,36 @@ public class RawPom {
         }
     }
 
+    @Getter
+    public static class Modules {
+        private final List<String> modules;
+
+        public Modules() {
+            this.modules = emptyList();
+        }
+
+        public Modules(@JacksonXmlProperty(localName = "module") List<String> modules) {
+            this.modules = modules;
+        }
+    }
+
+    @Getter
+    public static class SubProjects {
+        private final List<String> subprojects;
+
+        public SubProjects() {
+            this.subprojects = emptyList();
+        }
+
+        public SubProjects(@JacksonXmlProperty(localName = "subproject") List<String> subprojects) {
+            this.subprojects = subprojects;
+        }
+    }
+
     @FieldDefaults(level = AccessLevel.PRIVATE)
     @Data
-    @AllArgsConstructor
     public static class Build {
 
-        @NonFinal
         @Nullable
         @JacksonXmlElementWrapper(localName = "plugins")
         @JacksonXmlProperty(localName = "plugin")
@@ -208,16 +262,12 @@ public class RawPom {
         @Nullable
         @JacksonXmlProperty(localName = "pluginManagement")
         PluginManagement pluginManagement;
-
-        public Build() {
-            plugins = null;
-            pluginManagement = null;
-        }
     }
 
     @FieldDefaults(level = AccessLevel.PRIVATE)
     @Data
     public static class PluginManagement {
+
         @Nullable
         @JacksonXmlElementWrapper(localName = "plugins")
         @JacksonXmlProperty(localName = "plugin")
@@ -227,6 +277,7 @@ public class RawPom {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Data
     public static class Plugin {
+        @Nullable
         String groupId;
         String artifactId;
 
@@ -323,42 +374,57 @@ public class RawPom {
         RawRepositories repositories;
     }
 
-    @Nullable
-    public String getGroupId() {
+    public @Nullable String getGroupId() {
         return groupId == null && parent != null ? parent.getGroupId() : groupId;
     }
 
-    @Nullable
-    public String getVersion() {
-        return version == null && parent != null ? parent.getVersion() : version;
+    public @Nullable String getVersion() {
+        if (version == null) {
+            if (currentVersion == null) {
+                if (parent == null) {
+                    return null;
+                } else {
+                    return parent.getVersion();
+                }
+            } else {
+                return currentVersion;
+            }
+        }
+        return version;
     }
+
 
     public Pom toPom(@Nullable Path inputPath, @Nullable MavenRepository repo) {
         org.openrewrite.maven.tree.Parent parent = getParent() == null ? null : new org.openrewrite.maven.tree.Parent(new GroupArtifactVersion(
                 getParent().getGroupId(), getParent().getArtifactId(),
                 getParent().getVersion()), getParent().getRelativePath());
 
-        return new Pom(
-                inputPath,
-                repo,
-                parent,
-                new ResolvedGroupArtifactVersion(
+        Pom.PomBuilder builder = Pom.builder()
+                .sourcePath(inputPath)
+                .repository(repo)
+                .parent(parent)
+                .gav(new ResolvedGroupArtifactVersion(
                         repo == null ? null : repo.getUri(),
                         Objects.requireNonNull(getGroupId()),
                         artifactId,
                         Objects.requireNonNull(getVersion()),
-                        null),
-                name,
-                getPackaging(),
-                getProperties() == null ? emptyMap() : getProperties(),
-                mapDependencyManagement(getDependencyManagement()),
-                mapRequestedDependencies(getDependencies()),
-                mapRepositories(getRepositories()),
-                mapLicenses(getLicenses()),
-                mapProfiles(getProfiles()),
-                mapPlugins((build != null) ? build.getPlugins() : null),
-                mapPlugins((build != null && build.getPluginManagement() != null) ? build.getPluginManagement().getPlugins() : null)
-        );
+                        null))
+                .name(name)
+                .obsoletePomVersion(pomVersion)
+                .prerequisites(prerequisites == null ? null : new org.openrewrite.maven.tree.Prerequisites(prerequisites.getMaven()))
+                .packaging(packaging)
+                .properties(getProperties() == null ? emptyMap() : getProperties())
+                .licenses(mapLicenses(getLicenses()))
+                .profiles(mapProfiles(getProfiles()))
+                .subprojects(mapSubProjects(getModules(), getSubprojects()));
+        if (StringUtils.isBlank(pomVersion)) {
+            builder.dependencies(mapRequestedDependencies(getDependencies()))
+                    .dependencyManagement(mapDependencyManagement(getDependencyManagement()))
+                    .repositories(mapRepositories(getRepositories()))
+                    .plugins(mapPlugins((build != null) ? build.getPlugins() : null))
+                    .pluginManagement(mapPlugins((build != null && build.getPluginManagement() != null) ? build.getPluginManagement().getPlugins() : null));
+        }
+        return builder.build();
     }
 
     private List<org.openrewrite.maven.tree.License> mapLicenses(@Nullable Licenses rawLicenses) {
@@ -413,7 +479,7 @@ public class RawPom {
                     pomRepositories.add(new MavenRepository(r.getId(), r.getUrl(),
                             r.getReleases() == null ? null : r.getReleases().getEnabled(),
                             r.getSnapshots() == null ? null : r.getSnapshots().getEnabled(),
-                            false, null, null, null));
+                            false, null, null, null, null));
                 }
 
             }
@@ -474,9 +540,9 @@ public class RawPom {
         if (rawPlugins != null) {
             plugins = new ArrayList<>(rawPlugins.size());
             for (Plugin rawPlugin : rawPlugins) {
-
+                String pluginGroupId = rawPlugin.getGroupId();
                 plugins.add(new org.openrewrite.maven.tree.Plugin(
-                        rawPlugin.getGroupId(),
+                        pluginGroupId == null ? PLUGIN_DEFAULT_GROUPID : pluginGroupId,
                         rawPlugin.getArtifactId(),
                         rawPlugin.getVersion(),
                         rawPlugin.getExtensions(),
@@ -513,6 +579,19 @@ public class RawPom {
             }
         }
         return executions;
+    }
+
+    private List<String> mapSubProjects(@Nullable Modules modules, @Nullable SubProjects subprojects) {
+        if (modules == null && subprojects != null) {
+            return subprojects.getSubprojects();
+        }
+        if (subprojects == null && modules != null) {
+            return modules.getModules();
+        }
+        if (modules != null && subprojects != null) {
+            return ListUtils.concatAll(modules.getModules(), subprojects.getSubprojects());
+        }
+        return emptyList();
     }
 
 }

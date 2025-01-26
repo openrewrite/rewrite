@@ -15,19 +15,21 @@
  */
 package org.openrewrite;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.internal.RecipeRunException;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.openrewrite.java.Assertions.java;
 
-public class RepeatTest implements RewriteTest {
+class RepeatTest implements RewriteTest {
 
     /**
      * This visitor verifies that the cursor is well-formed.
@@ -43,8 +45,8 @@ public class RepeatTest implements RewriteTest {
 
     static class VerifyCursorWellFormedInRepeat extends JavaVisitor<ExecutionContext> {
         @Override
-        public J preVisit(J tree, ExecutionContext executionContext) {
-            return (J) Repeat.repeatUntilStable(new VerifyCursorWellFormed<>()).visitNonNull(tree, executionContext, getCursor().getParentTreeCursor());
+        public J preVisit(J tree, ExecutionContext ctx) {
+            return (J) Repeat.repeatUntilStable(new VerifyCursorWellFormed<>()).visitNonNull(tree, ctx, getCursor().getParentTreeCursor());
         }
     }
 
@@ -83,19 +85,18 @@ public class RepeatTest implements RewriteTest {
 
     static class VisitorThatFailsToSetCursor extends JavaVisitor<ExecutionContext> {
         @Override
-        public @Nullable J preVisit(J tree, ExecutionContext executionContext) {
-            return (J) Repeat.repeatUntilStable(new JavaVisitor<>()).visitNonNull(tree, executionContext);
+        public @Nullable J preVisit(J tree, ExecutionContext ctx) {
+            return (J) Repeat.repeatUntilStable(new JavaVisitor<>()).visitNonNull(tree, ctx);
         }
     }
 
     @Test
     void repeatValidatesCursorIsPassed() {
-        AssertionError assertionError = assertThrows(AssertionError.class, () -> {
+        AssertionError assertionError = assertThrows(AssertionError.class, () ->
             rewriteRun(
               spec -> spec.recipe(RewriteTest.toRecipe(VisitorThatFailsToSetCursor::new)),
               java("class A {}")
-            );
-        });
+            ));
         assertThat(assertionError).cause().isInstanceOf(RecipeRunException.class);
         RecipeRunException e = (RecipeRunException) assertionError.getCause();
         assertThat(e.getMessage())

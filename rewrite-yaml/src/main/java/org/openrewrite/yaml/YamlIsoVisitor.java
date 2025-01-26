@@ -29,6 +29,11 @@ public class YamlIsoVisitor<P> extends YamlVisitor<P> {
     }
 
     @Override
+    public Yaml.Document.End visitDocumentEnd(Yaml.Document.End end, P p) {
+        return (Yaml.Document.End) super.visitDocumentEnd(end, p);
+    }
+
+    @Override
     public Yaml.Mapping visitMapping(Yaml.Mapping mapping, P p) {
         return (Yaml.Mapping) super.visitMapping(mapping, p);
     }

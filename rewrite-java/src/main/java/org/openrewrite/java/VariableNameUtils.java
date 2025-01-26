@@ -16,9 +16,9 @@
 package org.openrewrite.java;
 
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 
 import java.text.Normalizer;
@@ -50,7 +50,7 @@ public class VariableNameUtils {
         Set<String> namesInScope = findNamesInScope(scope);
         // Generate a new name to prevent namespace shadowing.
         String newName = baseName;
-        if (GenerationStrategy.INCREMENT_NUMBER.equals(strategy)) {
+        if (GenerationStrategy.INCREMENT_NUMBER == strategy) {
             StringBuilder postFix = new StringBuilder();
             char[] charArray = baseName.toCharArray();
             for (int i = charArray.length - 1; i >= 0; i--) {
@@ -119,7 +119,7 @@ public class VariableNameUtils {
         return names;
     }
 
-    private static void addInheritedClassFields(J.ClassDeclaration classDeclaration, @Nullable JavaType.FullyQualified superClass, Set<String> names) {
+    private static void addInheritedClassFields(J.ClassDeclaration classDeclaration, JavaType.@Nullable FullyQualified superClass, Set<String> names) {
         if (superClass != null) {
             boolean isSamePackage = classDeclaration.getType() != null && classDeclaration.getType().getPackageName().equals(superClass.getPackageName());
             superClass.getMembers().forEach(m -> {
@@ -261,6 +261,16 @@ public class VariableNameUtils {
                 names.add(variable.getSimpleName());
             }
             return super.visitVariable(variable, strings);
+        }
+
+        @Override
+        public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> namesInScope) {
+            J.Identifier v = super.visitIdentifier(identifier, namesInScope);
+            if (v.getType() instanceof JavaType.Class &&
+                    ((JavaType.Class) v.getType()).getKind() == JavaType.FullyQualified.Kind.Enum) {
+                namesInScope.add(v.getSimpleName());
+            }
+            return v;
         }
 
         private void addImportedStaticFieldNames(@Nullable JavaSourceFile cu, Cursor classCursor) {

@@ -17,10 +17,10 @@ package org.openrewrite.properties;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.search.FindProperties;
 import org.openrewrite.properties.tree.Properties;
@@ -40,7 +40,7 @@ public class AddProperty extends Recipe {
             example = "management.metrics.enable.process.files")
     String property;
 
-    @Option(displayName = "Property value",
+    @Option(example = "newPropValue", displayName = "Property value",
             description = "The value of the new property key.")
     String value;
 

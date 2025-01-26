@@ -36,35 +36,35 @@ public class Protobuf2Parser extends Parser {
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		SEMI=1, COLON=2, BOOL=3, BYTES=4, DOUBLE=5, ENUM=6, EXTEND=7, FIXED32=8, 
-		FIXED64=9, FLOAT=10, IMPORT=11, INT32=12, INT64=13, MAP=14, MESSAGE=15, 
-		ONEOF=16, OPTION=17, PACKAGE=18, PUBLIC=19, REPEATED=20, REQUIRED=21, 
-		RESERVED=22, RETURNS=23, RPC=24, SERVICE=25, SFIXED32=26, SFIXED64=27, 
-		SINT32=28, SINT64=29, STREAM=30, STRING=31, SYNTAX=32, TO=33, UINT32=34, 
-		UINT64=35, WEAK=36, OPTIONAL=37, Ident=38, IntegerLiteral=39, NumericLiteral=40, 
-		FloatLiteral=41, BooleanLiteral=42, StringLiteral=43, Quote=44, LPAREN=45, 
-		RPAREN=46, LBRACE=47, RBRACE=48, LBRACK=49, RBRACK=50, LCHEVR=51, RCHEVR=52, 
-		COMMA=53, DOT=54, MINUS=55, PLUS=56, ASSIGN=57, WS=58, UTF_8_BOM=59, COMMENT=60, 
+		SEMI=1, COLON=2, BOOL=3, BYTES=4, DOUBLE=5, ENUM=6, EXTEND=7, FIXED32=8,
+		FIXED64=9, FLOAT=10, IMPORT=11, INT32=12, INT64=13, MAP=14, MESSAGE=15,
+		ONEOF=16, OPTION=17, PACKAGE=18, PUBLIC=19, REPEATED=20, REQUIRED=21,
+		RESERVED=22, RETURNS=23, RPC=24, SERVICE=25, SFIXED32=26, SFIXED64=27,
+		SINT32=28, SINT64=29, STREAM=30, STRING=31, SYNTAX=32, TO=33, UINT32=34,
+		UINT64=35, WEAK=36, OPTIONAL=37, Ident=38, IntegerLiteral=39, NumericLiteral=40,
+		FloatLiteral=41, BooleanLiteral=42, StringLiteral=43, Quote=44, LPAREN=45,
+		RPAREN=46, LBRACE=47, RBRACE=48, LBRACK=49, RBRACK=50, LCHEVR=51, RCHEVR=52,
+		COMMA=53, DOT=54, MINUS=55, PLUS=56, ASSIGN=57, WS=58, UTF_8_BOM=59, COMMENT=60,
 		LINE_COMMENT=61;
 	public static final int
-		RULE_proto = 0, RULE_stringLiteral = 1, RULE_identOrReserved = 2, RULE_syntax = 3, 
-		RULE_importStatement = 4, RULE_packageStatement = 5, RULE_optionName = 6, 
-		RULE_option = 7, RULE_optionDef = 8, RULE_optionList = 9, RULE_topLevelDef = 10, 
-		RULE_ident = 11, RULE_message = 12, RULE_messageField = 13, RULE_messageBody = 14, 
-		RULE_extend = 15, RULE_enumDefinition = 16, RULE_enumBody = 17, RULE_enumField = 18, 
-		RULE_service = 19, RULE_serviceBody = 20, RULE_rpc = 21, RULE_rpcInOut = 22, 
-		RULE_rpcBody = 23, RULE_reserved = 24, RULE_ranges = 25, RULE_range = 26, 
-		RULE_fieldNames = 27, RULE_type = 28, RULE_field = 29, RULE_oneOf = 30, 
-		RULE_mapField = 31, RULE_keyType = 32, RULE_reservedWord = 33, RULE_fullIdent = 34, 
+		RULE_proto = 0, RULE_stringLiteral = 1, RULE_identOrReserved = 2, RULE_syntax = 3,
+		RULE_importStatement = 4, RULE_packageStatement = 5, RULE_optionName = 6,
+		RULE_option = 7, RULE_optionDef = 8, RULE_optionList = 9, RULE_topLevelDef = 10,
+		RULE_ident = 11, RULE_message = 12, RULE_messageField = 13, RULE_messageBody = 14,
+		RULE_extend = 15, RULE_enumDefinition = 16, RULE_enumBody = 17, RULE_enumField = 18,
+		RULE_service = 19, RULE_serviceBody = 20, RULE_rpc = 21, RULE_rpcInOut = 22,
+		RULE_rpcBody = 23, RULE_reserved = 24, RULE_ranges = 25, RULE_range = 26,
+		RULE_fieldNames = 27, RULE_type = 28, RULE_field = 29, RULE_oneOf = 30,
+		RULE_mapField = 31, RULE_keyType = 32, RULE_reservedWord = 33, RULE_fullIdent = 34,
 		RULE_emptyStatement = 35, RULE_constant = 36;
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"proto", "stringLiteral", "identOrReserved", "syntax", "importStatement", 
-			"packageStatement", "optionName", "option", "optionDef", "optionList", 
-			"topLevelDef", "ident", "message", "messageField", "messageBody", "extend", 
-			"enumDefinition", "enumBody", "enumField", "service", "serviceBody", 
-			"rpc", "rpcInOut", "rpcBody", "reserved", "ranges", "range", "fieldNames", 
-			"type", "field", "oneOf", "mapField", "keyType", "reservedWord", "fullIdent", 
+			"proto", "stringLiteral", "identOrReserved", "syntax", "importStatement",
+			"packageStatement", "optionName", "option", "optionDef", "optionList",
+			"topLevelDef", "ident", "message", "messageField", "messageBody", "extend",
+			"enumDefinition", "enumBody", "enumField", "service", "serviceBody",
+			"rpc", "rpcInOut", "rpcBody", "reserved", "ranges", "range", "fieldNames",
+			"type", "field", "oneOf", "mapField", "keyType", "reservedWord", "fullIdent",
 			"emptyStatement", "constant"
 		};
 	}
@@ -72,27 +72,27 @@ public class Protobuf2Parser extends Parser {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, "';'", "':'", "'bool'", "'bytes'", "'double'", "'enum'", "'extend'", 
-			"'fixed32'", "'fixed64'", "'float'", "'import'", "'int32'", "'int64'", 
-			"'map'", "'message'", "'oneof'", "'option'", "'package'", "'public'", 
-			"'repeated'", "'required'", "'reserved'", "'returns'", "'rpc'", "'service'", 
-			"'sfixed32'", "'sfixed64'", "'sint32'", "'sint64'", "'stream'", "'string'", 
-			"'syntax'", "'to'", "'uint32'", "'uint64'", "'weak'", "'optional'", null, 
-			null, null, null, null, null, null, "'('", "')'", "'{'", "'}'", "'['", 
+			null, "';'", "':'", "'bool'", "'bytes'", "'double'", "'enum'", "'extend'",
+			"'fixed32'", "'fixed64'", "'float'", "'import'", "'int32'", "'int64'",
+			"'map'", "'message'", "'oneof'", "'option'", "'package'", "'public'",
+			"'repeated'", "'required'", "'reserved'", "'returns'", "'rpc'", "'service'",
+			"'sfixed32'", "'sfixed64'", "'sint32'", "'sint64'", "'stream'", "'string'",
+			"'syntax'", "'to'", "'uint32'", "'uint64'", "'weak'", "'optional'", null,
+			null, null, null, null, null, null, "'('", "')'", "'{'", "'}'", "'['",
 			"']'", "'<'", "'>'", "','", "'.'", "'-'", "'+'", "'='", null, "'\\uFEFF'"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "SEMI", "COLON", "BOOL", "BYTES", "DOUBLE", "ENUM", "EXTEND", "FIXED32", 
-			"FIXED64", "FLOAT", "IMPORT", "INT32", "INT64", "MAP", "MESSAGE", "ONEOF", 
-			"OPTION", "PACKAGE", "PUBLIC", "REPEATED", "REQUIRED", "RESERVED", "RETURNS", 
-			"RPC", "SERVICE", "SFIXED32", "SFIXED64", "SINT32", "SINT64", "STREAM", 
-			"STRING", "SYNTAX", "TO", "UINT32", "UINT64", "WEAK", "OPTIONAL", "Ident", 
-			"IntegerLiteral", "NumericLiteral", "FloatLiteral", "BooleanLiteral", 
-			"StringLiteral", "Quote", "LPAREN", "RPAREN", "LBRACE", "RBRACE", "LBRACK", 
-			"RBRACK", "LCHEVR", "RCHEVR", "COMMA", "DOT", "MINUS", "PLUS", "ASSIGN", 
+			null, "SEMI", "COLON", "BOOL", "BYTES", "DOUBLE", "ENUM", "EXTEND", "FIXED32",
+			"FIXED64", "FLOAT", "IMPORT", "INT32", "INT64", "MAP", "MESSAGE", "ONEOF",
+			"OPTION", "PACKAGE", "PUBLIC", "REPEATED", "REQUIRED", "RESERVED", "RETURNS",
+			"RPC", "SERVICE", "SFIXED32", "SFIXED64", "SINT32", "SINT64", "STREAM",
+			"STRING", "SYNTAX", "TO", "UINT32", "UINT64", "WEAK", "OPTIONAL", "Ident",
+			"IntegerLiteral", "NumericLiteral", "FloatLiteral", "BooleanLiteral",
+			"StringLiteral", "Quote", "LPAREN", "RPAREN", "LBRACE", "RBRACE", "LBRACK",
+			"RBRACK", "LCHEVR", "RCHEVR", "COMMA", "DOT", "MINUS", "PLUS", "ASSIGN",
 			"WS", "UTF_8_BOM", "COMMENT", "LINE_COMMENT"
 		};
 	}
@@ -2242,7 +2242,7 @@ public class Protobuf2Parser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_type; }
-	 
+
 		public TypeContext() { }
 		public void copyFrom(TypeContext ctx) {
 			super.copyFrom(ctx);
@@ -2813,7 +2813,7 @@ public class Protobuf2Parser extends Parser {
 					setState(328);
 					match(DOT);
 					}
-					} 
+					}
 				}
 				setState(334);
 				_errHandler.sync(this);
