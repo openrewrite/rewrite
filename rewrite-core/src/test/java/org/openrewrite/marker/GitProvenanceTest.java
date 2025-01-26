@@ -25,6 +25,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.openjdk.jol.info.GraphLayout;
 import org.openrewrite.GitRemote;
 import org.openrewrite.jgit.api.Git;
 import org.openrewrite.jgit.api.errors.GitAPIException;
@@ -42,6 +43,7 @@ import java.io.UncheckedIOException;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -411,6 +413,15 @@ class GitProvenanceTest {
         String json = mapper.writeValueAsString(gitProvenance);
         GitProvenance read = mapper.readValue(json, GitProvenance.class);
         assertThat(read).isEqualTo(gitProvenance);
+    }
+
+    @Test
+    void large() {
+        GitProvenance provenance = GitProvenance.fromProjectDirectory(Paths.get("/Users/knut/git-temp/dotnet/runtime"), null);
+        assertThat(provenance).isNotNull();
+        assertThat(provenance.getBranch()).isEqualTo("main");
+        long retainedSize = GraphLayout.parseInstance(provenance).totalSize();
+        System.out.println(retainedSize);
     }
 
     void runCommand(Path workingDir, String command) {

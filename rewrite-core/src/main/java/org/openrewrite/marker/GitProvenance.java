@@ -17,13 +17,8 @@ package org.openrewrite.marker;
 
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.RequiredArgsConstructor;
-import lombok.Value;
-import lombok.With;
+import lombok.*;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.GitRemote;
@@ -47,6 +42,7 @@ import java.time.LocalDate;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 @Value
@@ -190,7 +186,7 @@ public class GitProvenance implements Marker {
      */
     public static @Nullable GitProvenance fromProjectDirectory(Path projectDir,
                                                                @Nullable BuildEnvironment environment,
-            GitRemote.@Nullable Parser gitRemoteParser) {
+                                                               GitRemote.@Nullable Parser gitRemoteParser) {
         if (gitRemoteParser == null) {
             gitRemoteParser = new GitRemote.Parser();
         }
@@ -429,7 +425,7 @@ public class GitProvenance implements Marker {
 
     @Value
     @With
-    @RequiredArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)})
+    @RequiredArgsConstructor
     public static class Committer {
         String name;
         String email;
@@ -440,7 +436,26 @@ public class GitProvenance implements Marker {
         public static Committer from(
                 @JsonProperty("name") String name,
                 @JsonProperty("email") String email,
-                @JsonProperty("commitsByDay") NavigableMap<LocalDate, Integer> commitsByDay) {
+                @JsonProperty("dates")
+                int @Nullable [] dates,
+                @JsonProperty("commits")
+                int @Nullable [] commits,
+                @Nullable
+                @JsonProperty("commitsByDay")
+                NavigableMap<LocalDate, Integer> commitsByDay) {
+            if (commitsByDay != null) {
+                return new Committer(
+                        name,
+                        email,
+                        commitsByDay.keySet().stream().mapToInt(localDate -> (int) localDate.toEpochDay()).toArray(),
+                        commitsByDay.values().stream().mapToInt(Integer::intValue).toArray()
+                );
+            } else {
+                return new Committer(name, email, dates, commits);
+            }
+        }
+
+        public static Committer from(String name, String email, NavigableMap<LocalDate, Integer> commitsByDay) {
             return new Committer(
                     name,
                     email,
