@@ -538,7 +538,7 @@ public class GroovyParserVisitor {
                 See also: https://groovy-lang.org/differences.html#_creating_instances_of_non_static_inner_classes
                 */
                 isConstructorOfInnerNonStaticClass = method.getDeclaringClass() instanceof InnerClassNode && (method.getDeclaringClass().getModifiers() & Modifier.STATIC) == 0;
-                methodName = method.getDeclaringClass().getName().replaceFirst(".*\\$", "");
+                methodName = method.getDeclaringClass().getNameWithoutPackage().replaceFirst(".*\\$", "");
             } else if (source.startsWith(method.getName(), cursor)) {
                 methodName = method.getName();
             } else {
