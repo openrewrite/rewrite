@@ -433,16 +433,10 @@ public class GitProvenance implements Marker {
         int[] commits;
 
         @JsonCreator
-        public static Committer from(
-                @JsonProperty("name") String name,
-                @JsonProperty("email") String email,
-                @JsonProperty("dates")
-                int @Nullable [] dates,
-                @JsonProperty("commits")
-                int @Nullable [] commits,
-                @Nullable
-                @JsonProperty("commitsByDay")
-                NavigableMap<LocalDate, Integer> commitsByDay) {
+        static Committer from(
+                @JsonProperty("name") String name, @JsonProperty("email") String email,
+                @JsonProperty("dates") int @Nullable [] dates, @JsonProperty("commits") int @Nullable [] commits,
+                @Nullable @JsonProperty("commitsByDay") NavigableMap<LocalDate, Integer> commitsByDay) {
             if (commitsByDay != null) {
                 return new Committer(
                         name,
