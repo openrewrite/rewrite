@@ -260,6 +260,20 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/4705")
+    @Test
+    void constructorWithDef() {
+        rewriteRun(
+          groovy(
+            """
+              class A {
+                  def A() {}
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void constructorForClassInPackage() {
         rewriteRun(
