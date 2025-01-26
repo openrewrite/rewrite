@@ -729,10 +729,17 @@ public class GroovyParserVisitor {
             if (insideParenthesesLevel != null) {
                 Stack<Space> openingParens = new Stack<>();
                 for (int i = 0; i < insideParenthesesLevel; i++) {
-                    openingParens.push(sourceBefore("("));
+                    int saveCursor = cursor;
+                    Space prefix = whitespace();
+                    if (source.startsWith("(", cursor)) {
+                        openingParens.push(prefix);
+                        cursor++;
+                    } else {
+                        cursor = saveCursor;
+                    }
                 }
                 Expression parenthesized = parenthesizedTree.apply(whitespace());
-                for (int i = 0; i < insideParenthesesLevel; i++) {
+                for (int i = 0; i < insideParenthesesLevel && !openingParens.isEmpty(); i++) {
                     parenthesized = new J.Parentheses<>(randomId(), openingParens.pop(), Markers.EMPTY,
                             padRight(parenthesized, sourceBefore(")")));
                 }

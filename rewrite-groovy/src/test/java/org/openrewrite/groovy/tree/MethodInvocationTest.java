@@ -453,6 +453,23 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
+    void topLevelCallWithoutReceiver() {
+        rewriteRun(
+          groovy(
+            """
+              import java.util.concurrent.ThreadLocalRandom
+              
+              from('timer:groovy?period=1000')
+                  .setBody()
+                      .constant('Hello Camel K')
+                  .setBody()
+                      .simple('body - header.RandomValue')
+              """
+          )
+        );
+    }
+
+    @Test
     void insideParenthesesWithNewline() {
         rewriteRun(
           groovy(
