@@ -57,6 +57,24 @@ class ClassExpressionTest implements RewriteTest {
               """
           )
         );
+    }
 
+    @Test
+    void unqualified() {
+        rewriteRun(
+          groovy(
+            """
+              package foo
+              
+              interface MyEntity {
+              }
+              class Foo {
+                  void setUp() {
+                      e = MyEntity.class
+                  }
+              }
+              """
+          )
+        );
     }
 }

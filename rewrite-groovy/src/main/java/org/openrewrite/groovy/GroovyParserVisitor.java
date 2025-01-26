@@ -865,15 +865,19 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitClassExpression(ClassExpression clazz) {
-            String unresolvedName = clazz.getType().getUnresolvedName().replace('$', '.');
-            Space space = sourceBefore(unresolvedName);
-            if (source.substring(cursor).startsWith(".class")) {
-                unresolvedName += ".class";
+            Space prefix = whitespace();
+            String name = clazz.getType().getUnresolvedName().replace('$', '.');
+            if (!source.startsWith(name, cursor)) {
+                name = clazz.getType().getNameWithoutPackage().replace('$', '.');
+            }
+            skip(name);
+            if (source.startsWith(".class", cursor)) {
+                name += ".class";
                 skip(".class");
             }
-            queue.add(TypeTree.build(unresolvedName)
+            queue.add(TypeTree.build(name)
                     .withType(typeMapping.type(clazz.getType()))
-                    .withPrefix(space));
+                    .withPrefix(prefix));
         }
 
         @Override
@@ -1587,7 +1591,7 @@ public class GroovyParserVisitor {
             skip(delimiter); // Opening delim for GString
 
             NavigableMap<LineColumn, org.codehaus.groovy.ast.expr.Expression> sortedByPosition = new TreeMap<>();
-            for (org.codehaus.groovy.ast.expr.ConstantExpression e : gstring.getStrings()) {
+            for (ConstantExpression e : gstring.getStrings()) {
                 // There will always be constant expressions before and after any values
                 // No need to represent these empty strings
                 if (!e.getText().isEmpty()) {
@@ -1665,7 +1669,7 @@ public class GroovyParserVisitor {
                 skip("[");
                 JContainer<G.MapEntry> entries;
                 if (map.getMapEntryExpressions().isEmpty()) {
-                    entries = JContainer.build(Collections.singletonList(JRightPadded.build(
+                    entries = JContainer.build(singletonList(JRightPadded.build(
                             new G.MapEntry(randomId(), whitespace(), Markers.EMPTY,
                                     JRightPadded.build(new J.Empty(randomId(), sourceBefore(":"), Markers.EMPTY)),
                                     new J.Empty(randomId(), sourceBefore("]"), Markers.EMPTY), null))));
@@ -2263,7 +2267,7 @@ public class GroovyParserVisitor {
         int column;
 
         @Override
-        public int compareTo(GroovyParserVisitor.@NonNull LineColumn lc) {
+        public int compareTo(@NonNull LineColumn lc) {
             return line != lc.line ? line - lc.line : column - lc.column;
         }
     }
