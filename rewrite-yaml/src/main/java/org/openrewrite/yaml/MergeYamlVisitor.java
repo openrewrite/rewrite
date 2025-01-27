@@ -22,6 +22,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.style.GeneralFormatStyle;
+import org.openrewrite.style.Style;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.ArrayList;
@@ -73,7 +74,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     private String linebreak() {
         if (linebreak == null) {
             linebreak = Optional.ofNullable(getCursor().firstEnclosing(Yaml.Documents.class))
-                    .map(docs -> docs.getStyle(GeneralFormatStyle.class))
+                    .map(docs -> Style.from(GeneralFormatStyle.class, docs))
                     .map(format -> format.isUseCRLFNewLines() ? "\r\n" : "\n")
                     .orElse("\n");
         }

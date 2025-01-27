@@ -21,10 +21,10 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.json.Assertions.json;
 
-class AutoFormatTest implements RewriteTest {
+class WrappingAndBracesVisitorTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new AutoFormat());
+        spec.recipe(new WrappingAndBraces());
     }
 
     @Test
@@ -36,8 +36,8 @@ class AutoFormatTest implements RewriteTest {
             """,
             """
             {
-              "a": 3,
-              "b": 5
+            "a": 3,
+            "b": 5
             }
             """
           )
@@ -45,7 +45,7 @@ class AutoFormatTest implements RewriteTest {
     }
 
     @Test
-    void fixWrongIndents() {
+    void keepWrongIndentsIfTheLinesAreFine() {
         rewriteRun(
           json(
             """
@@ -53,14 +53,7 @@ class AutoFormatTest implements RewriteTest {
                "x": "x",
                    "key": {
                "a": "b"
-            }}
-            """,
-            """
-            {
-               "x": "x",
-               "key": {
-                  "a": "b"
-               }
+            }
             }
             """
           )
@@ -68,20 +61,61 @@ class AutoFormatTest implements RewriteTest {
     }
 
     @Test
-    void array() {
+    void splitBracesToNewLines() {
         rewriteRun(
           json(
             """
-            { "allowedValues": ["Four", "Three", 6]
+            {
+               "x": "x",
+               "key": {"a": "b"}}
+            """,
+            """
+            {
+               "x": "x",
+               "key": {
+            "a": "b"
+            }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void wrapArrays() {
+        rewriteRun(
+          json(
+            """
+            {
+               "one": [1,
+               11,
+               111
+               ],
+               "two": [2, 22, 222],
+               "three": [
+                3,
+                33,
+                333
+               ]
             }
             """,
             """
             {
-              "allowedValues": [
-                "Four",
-                "Three",
-                6
-              ]
+               "one": [
+            1,
+               11,
+               111
+               ],
+               "two": [
+            2,
+             22,
+             222
+            ],
+               "three": [
+                3,
+                33,
+                333
+               ]
             }
             """
           )

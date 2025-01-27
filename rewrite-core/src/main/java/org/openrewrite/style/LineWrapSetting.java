@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,15 +15,11 @@
  */
 package org.openrewrite.style;
 
-import lombok.Value;
+public enum LineWrapSetting {
+    DoNotWrap, WrapAlways;
+    // Eventually we would add values like WrapIfTooLong or ChopIfTooLong
 
-@Value
-public class GeneralFormatStyle implements Style{
-    public static final GeneralFormatStyle DEFAULT = new GeneralFormatStyle(false);
-
-    boolean useCRLFNewLines;
-
-    public String newLine() {
-        return useCRLFNewLines ? "\r\n" : "\n";
+    public String delimiter(GeneralFormatStyle generalFormatStyle) {
+        return this == DoNotWrap ? "" : generalFormatStyle.newLine();
     }
 }

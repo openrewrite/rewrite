@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,17 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.style;
+package org.openrewrite.json.style;
 
 import lombok.Value;
+import lombok.With;
+import org.openrewrite.style.LineWrapSetting;
+import org.openrewrite.style.Style;
+import org.openrewrite.style.StyleHelper;
 
 @Value
-public class GeneralFormatStyle implements Style{
-    public static final GeneralFormatStyle DEFAULT = new GeneralFormatStyle(false);
+@With
+public class WrappingAndBracesStyle implements JsonStyle {
+    public static final WrappingAndBracesStyle DEFAULT = new WrappingAndBracesStyle(LineWrapSetting.WrapAlways, LineWrapSetting.WrapAlways);
 
-    boolean useCRLFNewLines;
+    LineWrapSetting wrapObjects;
+    LineWrapSetting wrapArrays;
 
-    public String newLine() {
-        return useCRLFNewLines ? "\r\n" : "\n";
+    @Override
+    public Style applyDefaults() {
+        return StyleHelper.merge(DEFAULT, this);
     }
 }

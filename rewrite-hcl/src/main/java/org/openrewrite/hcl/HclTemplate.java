@@ -24,6 +24,7 @@ import org.openrewrite.hcl.style.SpacesStyle;
 import org.openrewrite.hcl.tree.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.style.Style;
 import org.openrewrite.template.SourceTemplate;
 
 import java.util.List;
@@ -141,7 +142,7 @@ public class HclTemplate implements SourceTemplate<Hcl, HclCoordinates> {
                         );
 
                         Hcl.ConfigFile cf = getCursor().firstEnclosingOrThrow(Hcl.ConfigFile.class);
-                        b = (Hcl.Block) new AttributeSpaceVisitor<Integer>(Optional.ofNullable(cf.getStyle(SpacesStyle.class))
+                        b = (Hcl.Block) new AttributeSpaceVisitor<Integer>(Optional.ofNullable(Style.from(SpacesStyle.class, cf))
                                 .orElse(SpacesStyle.DEFAULT)).visit(b, p, getCursor().getParentOrThrow());
                         assert b != null;
                     }

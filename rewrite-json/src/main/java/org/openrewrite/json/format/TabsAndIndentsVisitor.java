@@ -21,9 +21,11 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.json.JsonIsoVisitor;
 import org.openrewrite.json.style.TabsAndIndentsStyle;
+import org.openrewrite.json.style.WrappingAndBracesStyle;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonRightPadded;
 import org.openrewrite.json.tree.Space;
+import org.openrewrite.style.GeneralFormatStyle;
 
 import java.util.List;
 import java.util.Optional;
@@ -31,28 +33,31 @@ import java.util.Optional;
 import static java.util.Collections.emptyList;
 
 public class TabsAndIndentsVisitor<P> extends JsonIsoVisitor<P> {
-
-    private final TabsAndIndentsStyle style;
-
     private final String singleIndent;
+    private final String objectsWrappingDelimiter;
+    private final String arrayWrappingDelimiter;
 
     @Nullable
     private final Tree stopAfter;
 
-    public TabsAndIndentsVisitor(TabsAndIndentsStyle style, @Nullable Tree stopAfter) {
-        this.style = style;
+    public TabsAndIndentsVisitor(WrappingAndBracesStyle wrappingAndBracesStyle,
+                                 TabsAndIndentsStyle tabsAndIndentsStyle,
+                                 GeneralFormatStyle generalFormatStyle,
+                                 @Nullable Tree stopAfter) {
         this.stopAfter = stopAfter;
 
-        if (style.getUseTabCharacter()) {
+        if (tabsAndIndentsStyle.getUseTabCharacter()) {
             this.singleIndent = "\t";
         } else {
             StringBuilder sb = new StringBuilder();
-            for (int j = 0; j < style.getIndentSize(); j++) {
+            for (int j = 0; j < tabsAndIndentsStyle.getIndentSize(); j++) {
                 sb.append(" ");
             }
             singleIndent = sb.toString();
         }
 
+        this.objectsWrappingDelimiter = wrappingAndBracesStyle.getWrapObjects().delimiter(generalFormatStyle);
+        this.arrayWrappingDelimiter = wrappingAndBracesStyle.getWrapArrays().delimiter(generalFormatStyle);
     }
 
     @Override
@@ -93,11 +98,11 @@ public class TabsAndIndentsVisitor<P> extends JsonIsoVisitor<P> {
         }
         if (json instanceof Json.JsonObject) {
             Json.JsonObject obj = (Json.JsonObject) json;
-            json = obj.getPadding().withMembers(ensureCollectionHasIndents(obj.getPadding().getMembers(), relativeIndent));
+            json = obj.getPadding().withMembers(ensureCollectionHasIndents(obj.getPadding().getMembers(), this.objectsWrappingDelimiter + relativeIndent));
         }
         if (json instanceof Json.Array) {
             Json.Array array = (Json.Array) json;
-            json = array.getPadding().withValues(ensureCollectionHasIndents(array.getPadding().getValues(), relativeIndent));
+            json = array.getPadding().withValues(ensureCollectionHasIndents(array.getPadding().getValues(), this.arrayWrappingDelimiter + relativeIndent));
         }
         return json;
     }
@@ -105,9 +110,8 @@ public class TabsAndIndentsVisitor<P> extends JsonIsoVisitor<P> {
     private static @NotNull <J extends Json> List<JsonRightPadded<J>> ensureCollectionHasIndents(List<JsonRightPadded<J>> elements, String relativeIndent) {
         return ListUtils.mapLast(elements, last -> {
             String currentAfter = last.getAfter().getWhitespace();
-            String newAfter = "\n" + relativeIndent;
-            if (!newAfter.equals(currentAfter)) {
-                return last.withAfter(Space.build(newAfter, emptyList()));
+            if (!relativeIndent.equals(currentAfter)) {
+                return last.withAfter(Space.build(relativeIndent, emptyList()));
             } else {
                 return last;
             }

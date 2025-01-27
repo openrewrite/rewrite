@@ -50,7 +50,7 @@ public class AutodetectDebug extends ScanningRecipe<AutodetectDebug.Accumulator>
         private TabsAndIndentsStyle overallProjectStyle;
         TabsAndIndentsStyle overallProjectStyle() {
             if(overallProjectStyle == null) {
-                overallProjectStyle = requireNonNull(NamedStyles.merge(TabsAndIndentsStyle.class, Collections.singletonList(overallDetector.build())));
+                overallProjectStyle = requireNonNull(overallDetector.build().getStyle(TabsAndIndentsStyle.class));
             }
             return overallProjectStyle;
         }
@@ -109,7 +109,7 @@ public class AutodetectDebug extends ScanningRecipe<AutodetectDebug.Accumulator>
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
                 Autodetect.Detector detector = new Autodetect.Detector();
                 detector.sample(document);
-                currentDocumentStyle = requireNonNull(NamedStyles.merge(TabsAndIndentsStyle.class, Collections.singletonList(detector.build())));
+                currentDocumentStyle = requireNonNull(detector.build().getStyle(TabsAndIndentsStyle.class));
                 super.visitDocument(document, ctx);
 
                 report.insertRow(ctx, new XmlStyleReport.Row(

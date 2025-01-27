@@ -16,6 +16,8 @@
 package org.openrewrite.json.style;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.style.LineWrapSetting;
+import org.openrewrite.style.Style;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -27,6 +29,35 @@ import static org.openrewrite.json.Assertions.json;
 
 class AutodetectTest implements RewriteTest {
 
+    private static String sgml =
+      """
+      {
+        "glossary": {
+          "title": "example glossary",
+          "GlossDiv": {
+            "title": "S",
+            "GlossList": {
+              "GlossEntry": {
+                "ID": "SGML",
+                "SortAs": "SGML",
+                "GlossTerm": "Standard Generalized Markup Language",
+                "Acronym": "SGML",
+                "Abbrev": "ISO 8879:1986",
+                "GlossDef": {
+                  "para": "A meta-markup language, used to create markup languages such as DocBook.",
+                  "GlossSeeAlso": [
+                    "GML",
+                    "XML"
+                  ]
+                },
+                "GlossSee": "markup"
+              }
+            }
+          }
+        }
+      }
+      """;
+
     @Test
     void autodetectSimple() {
         rewriteRun(
@@ -36,35 +67,7 @@ class AutodetectTest implements RewriteTest {
             assertThat(tabsAndIndents.getUseTabCharacter()).isEqualTo(false);
             return null;
           }),
-          json(
-              """
-              {
-                "glossary": {
-                  "title": "example glossary",
-                  "GlossDiv": {
-                    "title": "S",
-                    "GlossList": {
-                      "GlossEntry": {
-                        "ID": "SGML",
-                        "SortAs": "SGML",
-                        "GlossTerm": "Standard Generalized Markup Language",
-                        "Acronym": "SGML",
-                        "Abbrev": "ISO 8879:1986",
-                        "GlossDef": {
-                          "para": "A meta-markup language, used to create markup languages such as DocBook.",
-                          "GlossSeeAlso": [
-                            "GML",
-                            "XML"
-                          ]
-                        },
-                        "GlossSee": "markup"
-                      }
-                    }
-                  }
-                }
-              }
-              """
-          )
+          json(sgml)
         );
     }
 
@@ -87,16 +90,74 @@ class AutodetectTest implements RewriteTest {
         );
     }
 
+    @Test
+    void noNewLines() {
+        rewriteRun(
+          withDetectedWrappingAndBraces(wrappingAndBraces -> {
+              assertThat(wrappingAndBraces.getWrapArrays()).isEqualTo(LineWrapSetting.DoNotWrap);
+              assertThat(wrappingAndBraces.getWrapObjects()).isEqualTo(LineWrapSetting.DoNotWrap);
+              return null;
+            }),
+          json(
+           """
+           {"pl":[{"pid":"2544","fn":"LeBron","ln":"James","val":"38","tid":1610612747,"ta":"LAL","tn":"Lakers","tc":"Los Angeles"}]}
+           """
+          )
+        );
+    }
+
+    @Test
+    void fullWrapping() {
+        rewriteRun(
+          withDetectedWrappingAndBraces(wrappingAndBraces -> {
+              assertThat(wrappingAndBraces.getWrapArrays()).isEqualTo(LineWrapSetting.WrapAlways);
+              assertThat(wrappingAndBraces.getWrapObjects()).isEqualTo(LineWrapSetting.WrapAlways);
+              return null;
+          }),
+          json(sgml)
+        );
+    }
+
+    @Test
+    void wrapObjectsButNotArrays() {
+        rewriteRun(
+            withDetectedWrappingAndBraces(wrappingAndBraces -> {
+                assertThat(wrappingAndBraces.getWrapArrays()).isEqualTo(LineWrapSetting.DoNotWrap);
+                assertThat(wrappingAndBraces.getWrapObjects()).isEqualTo(LineWrapSetting.WrapAlways);
+                return null;
+            }),
+            json(
+              """
+              {
+                  "x": "x",
+                  "l": [1, 2],
+                  "key": {
+                      "a": "b"
+                  }
+              }
+              """
+          )
+        );
+    }
 
     private static Consumer<RecipeSpec> withDetectedIndentation(Function<TabsAndIndentsStyle, Void> fn) {
+        return withDetectedStyle(TabsAndIndentsStyle.class, fn);
+    }
+
+    private static Consumer<RecipeSpec> withDetectedWrappingAndBraces(Function<WrappingAndBracesStyle, Void> fn) {
+        return withDetectedStyle(WrappingAndBracesStyle.class, fn);
+    }
+
+    private static <S extends Style> Consumer<RecipeSpec> withDetectedStyle(Class<S> styleClass, Function<S, Void> fn) {
         return spec -> spec.beforeRecipe(sources -> {
             Autodetect.Detector detector = Autodetect.detector();
             sources.forEach(detector::sample);
 
-            TabsAndIndentsStyle tabsAndIndents = (TabsAndIndentsStyle) detector.build().getStyles().stream()
-              .filter(TabsAndIndentsStyle.class::isInstance)
+            @SuppressWarnings("unchecked")
+            S foundStyle = (S) detector.build().getStyles().stream()
+              .filter(styleClass::isInstance)
               .findAny().orElseThrow();
-            fn.apply(tabsAndIndents);
+            fn.apply(foundStyle);
         });
     }
 }

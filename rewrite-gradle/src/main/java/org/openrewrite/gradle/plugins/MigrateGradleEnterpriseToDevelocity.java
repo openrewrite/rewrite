@@ -32,6 +32,7 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.style.Style;
 
 import java.nio.file.Paths;
 import java.util.Arrays;
@@ -275,7 +276,7 @@ public class MigrateGradleEnterpriseToDevelocity extends Recipe {
         }
 
         private String getIndent(G.CompilationUnit cu) {
-            TabsAndIndentsStyle style = cu.getStyle(TabsAndIndentsStyle.class, IntelliJ.tabsAndIndents());
+            TabsAndIndentsStyle style = Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents);
             if (style.getUseTabCharacter()) {
                 return "\t";
             } else {
