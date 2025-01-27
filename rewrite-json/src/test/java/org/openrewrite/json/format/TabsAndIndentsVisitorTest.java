@@ -132,4 +132,3 @@ class TabsAndIndentsVisitorTest implements RewriteTest {
         );
     }
 }
-
