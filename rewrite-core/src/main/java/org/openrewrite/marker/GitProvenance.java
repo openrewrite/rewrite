@@ -429,39 +429,34 @@ public class GitProvenance implements Marker {
     public static class Committer {
         String name;
         String email;
-        int[] dates;
-        int[] commits;
+        int[] data;
 
         @JsonCreator
         static Committer from(
                 @JsonProperty("name") String name, @JsonProperty("email") String email,
-                @JsonProperty("dates") int @Nullable [] dates, @JsonProperty("commits") int @Nullable [] commits,
+                @JsonProperty("dates") int @Nullable [] data,
                 @Nullable @JsonProperty("commitsByDay") NavigableMap<LocalDate, Integer> commitsByDay) {
             if (commitsByDay != null) {
-                return new Committer(
-                        name,
-                        email,
-                        commitsByDay.keySet().stream().mapToInt(localDate -> (int) localDate.toEpochDay()).toArray(),
-                        commitsByDay.values().stream().mapToInt(Integer::intValue).toArray()
-                );
+                return from(name, email, commitsByDay);
             } else {
-                return new Committer(name, email, dates, commits);
+                return new Committer(name, email, data);
             }
         }
 
         public static Committer from(String name, String email, NavigableMap<LocalDate, Integer> commitsByDay) {
-            return new Committer(
-                    name,
-                    email,
-                    commitsByDay.keySet().stream().mapToInt(localDate -> (int) localDate.toEpochDay()).toArray(),
-                    commitsByDay.values().stream().mapToInt(Integer::intValue).toArray()
-            );
+            int[] data = new int[commitsByDay.size() * 2];
+            int i = 0;
+            for (Map.Entry<LocalDate, Integer> entry : commitsByDay.entrySet()) {
+                data[i++] = (int) entry.getKey().toEpochDay();
+                data[i++] = entry.getValue();
+            }
+            return new Committer(name, email, data);
         }
 
         public NavigableMap<LocalDate, Integer> getCommitsByDay() {
             TreeMap<LocalDate, Integer> commitsByDay = new TreeMap<>();
-            for (int i = 0; i < dates.length; i++) {
-                commitsByDay.put(LocalDate.ofEpochDay(dates[i]), commits[i]);
+            for (int i = 0; i < data.length; ) {
+                commitsByDay.put(LocalDate.ofEpochDay(data[i++]), data[i++]);
             }
             return commitsByDay;
         }
