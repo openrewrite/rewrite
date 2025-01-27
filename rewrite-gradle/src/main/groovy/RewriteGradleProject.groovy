@@ -193,6 +193,8 @@ abstract class RewriteGradleProject extends groovy.lang.Script implements Projec
     abstract Task task(Map<String, ?> options)
     abstract Task task(Map<String, ?> options, Closure configureClosure)
     abstract Task task(String name, Closure configureClosure)
+
+    @Override
     abstract Task task(String name)
     abstract <T extends Task> T task(String name, Class<T> type)
     abstract <T extends Task> T task(String name, Class<T> type, Object... constructorArgs)
