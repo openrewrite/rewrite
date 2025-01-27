@@ -15,7 +15,6 @@
  */
 package org.openrewrite.json.format;
 
-import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
@@ -30,7 +29,6 @@ import org.openrewrite.style.GeneralFormatStyle;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.util.Collections.emptyList;
 
@@ -38,8 +36,6 @@ public class TabsAndIndentsVisitor<P> extends JsonIsoVisitor<P> {
     private final String singleIndent;
     private final GeneralFormatStyle generalFormatStyle;
     private final WrappingAndBracesStyle wrappingAndBracesStyle;
-    private final String objectsWrappingDelimiter;
-    private final String arrayWrappingDelimiter;
 
     @Nullable
     private final Tree stopAfter;
@@ -59,9 +55,6 @@ public class TabsAndIndentsVisitor<P> extends JsonIsoVisitor<P> {
             }
             singleIndent = sb.toString();
         }
-
-        this.objectsWrappingDelimiter = wrappingAndBracesStyle.getWrapObjects().delimiter(generalFormatStyle);
-        this.arrayWrappingDelimiter = wrappingAndBracesStyle.getWrapArrays().delimiter(generalFormatStyle);
         this.wrappingAndBracesStyle = wrappingAndBracesStyle;
         this.generalFormatStyle = generalFormatStyle;
     }

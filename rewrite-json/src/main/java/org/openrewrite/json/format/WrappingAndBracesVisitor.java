@@ -15,7 +15,6 @@
  */
 package org.openrewrite.json.format;
 
-import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
@@ -126,7 +125,7 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
     }
 
 
-    private @NotNull <J extends Json> List<JsonRightPadded<J>> ensureCollectionHasIndents(List<JsonRightPadded<J>> elements, LineWrapSetting wrapping) {
+    private <J extends Json> List<JsonRightPadded<J>> ensureCollectionHasIndents(List<JsonRightPadded<J>> elements, LineWrapSetting wrapping) {
         AtomicInteger i = new AtomicInteger(0);
         return ListUtils.map(elements, elem -> {
             boolean isFirst = i.get() == 0;
