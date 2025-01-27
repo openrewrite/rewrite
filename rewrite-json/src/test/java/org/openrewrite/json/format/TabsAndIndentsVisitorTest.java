@@ -70,4 +70,66 @@ class TabsAndIndentsVisitorTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void oneLineArraysAlreadyCompact() {
+        rewriteRun(
+          json(
+            """
+            {
+               "one": [1, 11, 111],
+               "two": [2, 22, 222],
+               "three": [3, 33, 333]
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void wrappedArray() {
+        rewriteRun(
+          json(
+            """
+            {
+               "one": [
+            1,
+               11,
+               111
+               ],
+               "two": [
+            2,
+             22,
+             222
+            ],
+               "three": [
+                3,
+                33,
+                333
+               ]
+            }
+            """,
+            """
+            {
+               "one": [
+                  1,
+                  11,
+                  111
+               ],
+               "two": [
+                  2,
+                  22,
+                  222
+               ],
+               "three": [
+                  3,
+                  33,
+                  333
+               ]
+            }
+            """
+          )
+        );
+    }
 }
+

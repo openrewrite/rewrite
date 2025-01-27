@@ -16,6 +16,7 @@
 package org.openrewrite.json.format;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -28,11 +29,47 @@ class AutoFormatTest implements RewriteTest {
     }
 
     @Test
+    @DocumentExample
     void simple() {
         rewriteRun(
           json(
             """
-            {"a": 3,"b": 5}
+            {   "a": 3,
+            "b": 5,
+                "c": 7}
+            """,
+            """
+            {
+                "a": 3,
+                "b": 5,
+                "c": 7
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void properlyFormattedNoChanges() {
+        rewriteRun(
+          json(
+            """
+            {
+                "a": 3,
+                "b": 5,
+                "c": 7
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void noWrapsObjects() {
+        rewriteRun(
+          json(
+            """
+            {"a": 3, "b": 5}
             """
           )
         );
@@ -61,4 +98,18 @@ class AutoFormatTest implements RewriteTest {
         );
     }
 
+    @Test
+    void noWrapsWithArray() {
+        rewriteRun(
+          json(
+            """
+            { "allowedValues": ["Four", "Three", 6]
+            }
+            """,
+            """
+            {"allowedValues": ["Four", "Three", 6]}
+            """
+          )
+        );
+    }
 }

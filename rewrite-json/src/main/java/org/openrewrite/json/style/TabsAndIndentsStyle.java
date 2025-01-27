@@ -48,6 +48,18 @@ public class TabsAndIndentsStyle implements JsonStyle {
     // Although IntelliJ settings panel does mention this notion.
     // Integer continuationIndentSize;
 
+    public String singleIndent() {
+        if (getUseTabCharacter()) {
+            return "\t";
+        } else {
+            StringBuilder sb = new StringBuilder();
+            for (int j = 0; j < getIndentSize(); j++) {
+                sb.append(" ");
+            }
+            return sb.toString();
+        }
+    }
+
     @Override
     public Style applyDefaults() {
         return StyleHelper.merge(DEFAULT, this);
