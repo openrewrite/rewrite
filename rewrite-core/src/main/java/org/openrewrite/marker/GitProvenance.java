@@ -42,6 +42,7 @@ import java.time.LocalDate;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
@@ -424,11 +425,16 @@ public class GitProvenance implements Marker {
     }
 
     @Value
-    @With
     @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
     public static class Committer {
+
+        @With
         String name;
+
+        @With
         String email;
+
+        @Getter(AccessLevel.PRIVATE)
         int[] data;
 
         @JsonCreator
@@ -439,7 +445,7 @@ public class GitProvenance implements Marker {
             if (commitsByDay != null) {
                 return new Committer(name, email, commitsByDay);
             } else {
-                return new Committer(name, email, data);
+                return new Committer(name, email, requireNonNull(data));
             }
         }
 
