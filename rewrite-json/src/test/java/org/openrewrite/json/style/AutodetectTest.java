@@ -16,7 +16,7 @@
 package org.openrewrite.json.style;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.style.LineWrapSetting;
+import org.openrewrite.json.format.LineWrapSetting;
 import org.openrewrite.style.Style;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;

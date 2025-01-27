@@ -32,13 +32,27 @@ class AutoFormatTest implements RewriteTest {
         rewriteRun(
           json(
             """
-            {"a": 3,"b": 5}
+            {   "a": 3,
+            "b": 5,
+                "c": 7}
             """,
             """
             {
-              "a": 3,
-              "b": 5
+                "a": 3,
+                "b": 5,
+                "c": 7
             }
+            """
+          )
+        );
+    }
+
+    @Test
+    void noWrapsObjects() {
+        rewriteRun(
+          json(
+            """
+            {"a": 3, "b": 5}
             """
           )
         );
@@ -68,7 +82,7 @@ class AutoFormatTest implements RewriteTest {
     }
 
     @Test
-    void array() {
+    void noWrapsWithArray() {
         rewriteRun(
           json(
             """
@@ -76,13 +90,7 @@ class AutoFormatTest implements RewriteTest {
             }
             """,
             """
-            {
-              "allowedValues": [
-                "Four",
-                "Three",
-                6
-              ]
-            }
+            {"allowedValues": ["Four", "Three", 6]}
             """
           )
         );

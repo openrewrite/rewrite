@@ -17,7 +17,7 @@ package org.openrewrite.json.style;
 
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.style.LineWrapSetting;
+import org.openrewrite.json.format.LineWrapSetting;
 import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
