@@ -457,8 +457,6 @@ class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              import java.util.concurrent.ThreadLocalRandom
-              
               from('timer:groovy?period=1000')
                   .setBody()
                       .constant('Hello Camel K')
