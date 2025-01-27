@@ -67,7 +67,6 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
         List<JsonRightPadded<Json>> members = ret.getPadding().getMembers();
         LineWrapSetting wrappingSetting = this.wrappingAndBracesStyle.getWrapObjects();
 
-        members = applyWrappingStyleToPrefixes(members, this.wrappingAndBracesStyle.getWrapObjects());
         members = ensureCollectionHasIndents(members, wrappingSetting);
         members = applyWrappingStyleToSuffixes(members, wrappingSetting, getCurrentIndent());
         return ret.getPadding().withMembers(members);
@@ -78,7 +77,7 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
         Json.Array ret = super.visitArray(array, p);
         List<JsonRightPadded<JsonValue>> members = ret.getPadding().getValues();
         LineWrapSetting wrappingSetting = this.wrappingAndBracesStyle.getWrapArrays();
-        members = applyWrappingStyleToPrefixes(members, this.wrappingAndBracesStyle.getWrapArrays());
+
         members = ensureCollectionHasIndents(members, wrappingSetting);
         members = applyWrappingStyleToSuffixes(members, wrappingSetting, getCurrentIndent());
         return ret.getPadding().withValues(members);
@@ -104,34 +103,6 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
         }
         return super.visit(tree, p);
     }
-
-    private <JS extends Json> List<JsonRightPadded<JS>> applyWrappingStyleToPrefixes(List<JsonRightPadded<JS>> elements, LineWrapSetting wrapping) {
-        AtomicInteger i = new AtomicInteger(0);
-        return ListUtils.map(elements, elem -> {
-            boolean isFirst = i.get() == 0;
-            i.incrementAndGet();
-
-            final String newPrefix;
-            if (isFirst && wrapping == LineWrapSetting.DoNotWrap) {
-                newPrefix = "";
-            } else {
-                String currentAfterNewLine = elem.getElement().getPrefix().getWhitespaceIndent();
-                if (wrapping == LineWrapSetting.DoNotWrap) {
-                    newPrefix = " ";
-                } else if (wrapping == LineWrapSetting.WrapAlways) {
-                    newPrefix = this.generalFormatStyle.newLine() + currentAfterNewLine;
-                } else {
-                    throw new UnsupportedOperationException("Unknown LineWrapSetting: " + wrapping);
-                }
-            }
-            if (!newPrefix.equals(elem.getElement().getPrefix().getWhitespace())) {
-                return elem.withElement(elem.getElement().withPrefix(Space.build(newPrefix, emptyList())));
-            } else {
-                return elem;
-            }
-        });
-    }
-
 
     private <J extends Json> List<JsonRightPadded<J>> ensureCollectionHasIndents(List<JsonRightPadded<J>> elements, LineWrapSetting wrapping) {
         AtomicInteger i = new AtomicInteger(0);
