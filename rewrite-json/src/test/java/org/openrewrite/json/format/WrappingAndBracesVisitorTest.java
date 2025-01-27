@@ -129,7 +129,6 @@ class WrappingAndBracesVisitorTest implements RewriteTest {
 
     @Test
     void oneLineArrays() {
-        // TODO nowrap
         rewriteRun(
           recipeSpec -> recipeSpec.recipe(new WrappingAndBraces(OBJECTS_WRAP_ARRAYS_DONT, TabsAndIndentsStyle.DEFAULT, GeneralFormatStyle.DEFAULT)),
           json(
