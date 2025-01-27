@@ -871,9 +871,10 @@ public class GroovyParserVisitor {
                 name = clazz.getType().getNameWithoutPackage().replace('$', '.');
             }
             skip(name);
-            if (source.startsWith(".class", cursor)) {
-                name += ".class";
-                skip(".class");
+            if (sourceStartsWith(".class")) {
+                String classSuffix = source.substring(cursor, indexOfNextNonWhitespace(cursor, source)) + ".class";
+                name += classSuffix;
+                skip(classSuffix);
             }
             queue.add(TypeTree.build(name)
                     .withType(typeMapping.type(clazz.getType()))

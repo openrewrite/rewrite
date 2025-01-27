@@ -192,7 +192,7 @@ class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              foo(String.class)
+              foo(String    .class)
               """
           )
         );
