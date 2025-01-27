@@ -30,6 +30,7 @@ import org.openrewrite.style.LineWrapSetting;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.util.Collections.emptyList;
@@ -97,10 +98,9 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
     }
 
     private <J extends Json> List<JsonRightPadded<J>> ensureCollectionHasIndents(List<JsonRightPadded<J>> elements, LineWrapSetting wrapping) {
-        AtomicInteger i = new AtomicInteger(0);
+        AtomicBoolean first = new AtomicBoolean(true);
         return ListUtils.map(elements, elem -> {
-            boolean isFirst = i.get() == 0;
-            i.incrementAndGet();
+            boolean isFirst = first.getAndSet(false);
             Space prefix = elem.getElement().getPrefix();
             final String newPrefixString;
             String currentAfterNewLine = prefix.getWhitespaceIndent();
@@ -124,7 +124,6 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
     private <JS extends Json> List<JsonRightPadded<JS>> applyWrappingStyleToSuffixes(List<JsonRightPadded<JS>> elements, LineWrapSetting wrapping, String relativeIndent) {
         AtomicInteger i = new AtomicInteger(0);
         return ListUtils.map(elements, elem -> {
-            // TODO Refactor the isLast logic into `mapLast`
             boolean isLast = i.get() == elements.size() - 1;
             i.incrementAndGet();
 
