@@ -96,6 +96,61 @@ class MavenPomDownloaderTest implements RewriteTest {
         assertThat(normalized.getUri()).isEqualTo(expectedUrl);
     }
 
+    /**
+     * Documented in <a href="https://maven.apache.org/guides/mini/guide-multiple-repositories.html">Maven's guide</a>.
+     * Effective Maven settings take precedence over the local effective build POM.
+     */
+    @Test
+    void repositoryOrder() {
+        var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+          //language=xml
+          """
+            <settings>
+              <profiles>
+                <profile>
+                    <id>customize-repos</id>
+                    <repositories>
+                        <repository>
+                            <id>settings-provided</id>
+                            <url>https://repo.clojars.org</url>
+                        </repository>
+                    </repositories>
+                </profile>
+              </profiles>
+              <activeProfiles>
+                <activeProfile>customize-repos</activeProfile>
+              </activeProfiles>
+            </settings>
+            """
+        ), ctx));
+
+        rewriteRun(
+          pomXml(
+            //language=xml
+            """
+              <project>
+                  <groupId>org.openrewrite.test</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>0.1.0-SNAPSHOT</version>
+                  <repositories>
+                      <repository>
+                          <id>local-provided</id>
+                          <url>https://oss.sonatype.org/content/repositories/releases</url>
+                      </repository>
+                  </repositories>
+              </project>
+              """,
+            spec -> spec.beforeRecipe(pom -> {
+                MavenResolutionResult result = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                assertThat(new MavenPomDownloader(ctx).distinctNormalizedRepositories(result.getPom().getRepositories(), result.getPom(), null)
+                  .stream()
+                  .map(MavenRepository::getId))
+                  .containsExactly("settings-provided", "local-provided");
+            }))
+        );
+    }
+
     @Nested
     class WithNativeHttpURLConnectionAndTLS {
         private final ExecutionContext ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
@@ -138,64 +193,6 @@ class MavenPomDownloaderTest implements RewriteTest {
               "id \"central\""));
             assertThat(repos).areExactly(1, new Condition<>(repo -> "https://internalartifactrepository.yourorg.com".equals(repo.getUri()),
               "URI https://internalartifactrepository.yourorg.com"));
-        }
-
-        @Test
-        void repositoriesOrdering() {
-            var ctx = MavenExecutionContextView.view(this.ctx);
-            ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
-              //language=xml
-              """
-                <settings>
-                  <profiles>
-                    <profile>
-                        <id>central</id>
-                        <repositories>
-                            <repository>
-                                <id>internal</id>
-                                <url>https://artifactory.moderne.ninja/artifactory/moderne-cache-3</url>
-                            </repository>
-                        </repositories>
-                    </profile>
-                  </profiles>
-                  <activeProfiles>
-                    <activeProfile>central</activeProfile>
-                  </activeProfiles>
-                </settings>
-                """
-            ), ctx));
-
-            // Avoid actually trying to reach the made-up https://internalartifactrepository.yourorg.com
-            for (MavenRepository repository : ctx.getRepositories()) {
-                repository.setKnownToExist(true);
-            }
-
-            // pom with repositories defined
-            rewriteRun(
-              pomXml(
-                //language=xml
-                """
-                  <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      <groupId>org.openrewrite.test</groupId>
-                      <artifactId>foo</artifactId>
-                      <version>0.1.0-SNAPSHOT</version>
-                      <repositories>
-                          <repository>
-                              <id>local</id>
-                              <url>https://artifactory.moderne.ninja/artifactory/moderne-cache</url>
-                          </repository>
-                      </repositories>
-                  </project>
-                  """,
-                spec -> spec.beforeRecipe(pom -> {
-                    MavenResolutionResult result = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                    assertThat(new MavenPomDownloader(ctx).distinctNormalizedRepositories(result.getPom().getRepositories(), result.getPom(), null)
-                      .stream()
-                      .map(MavenRepository::getId))
-                      .containsExactly("internal", "local");
-                }))
-            );
         }
 
         @Test
