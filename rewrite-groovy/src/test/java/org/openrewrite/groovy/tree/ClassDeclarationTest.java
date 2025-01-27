@@ -275,6 +275,21 @@ class ClassDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void constructorForClassInPackage() {
+        rewriteRun(
+          groovy(
+            """
+              package a
+              
+              class A {
+                  A() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void newParameterizedConstructor() {
         rewriteRun(
           groovy(
