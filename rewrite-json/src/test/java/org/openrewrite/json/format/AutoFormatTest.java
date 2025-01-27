@@ -16,6 +16,7 @@
 package org.openrewrite.json.format;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -28,6 +29,7 @@ class AutoFormatTest implements RewriteTest {
     }
 
     @Test
+    @DocumentExample
     void simple() {
         rewriteRun(
           json(
@@ -36,6 +38,21 @@ class AutoFormatTest implements RewriteTest {
             "b": 5,
                 "c": 7}
             """,
+            """
+            {
+                "a": 3,
+                "b": 5,
+                "c": 7
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void properlyFormattedNoChanges() {
+        rewriteRun(
+          json(
             """
             {
                 "a": 3,

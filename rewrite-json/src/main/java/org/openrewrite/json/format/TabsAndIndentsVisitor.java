@@ -106,65 +106,31 @@ public class TabsAndIndentsVisitor<P> extends JsonIsoVisitor<P> {
             Json.JsonObject obj = (Json.JsonObject) json;
             List<JsonRightPadded<Json>> members = obj.getPadding().getMembers();
             LineWrapSetting wrappingSetting = this.wrappingAndBracesStyle.getWrapObjects();
-            members = ensureCollectionHasIndents(members, wrappingSetting);
-            members = applyWrappingStyleToSuffixes(members, wrappingSetting, relativeIndent);
+            members = applyWrappingStyleToLastChildSuffix(members, wrappingSetting, relativeIndent);
             json = obj.getPadding().withMembers(members);
         }
+
         if (json instanceof Json.Array) {
             Json.Array array = (Json.Array) json;
             List<JsonRightPadded<JsonValue>> members = array.getPadding().getValues();
             LineWrapSetting wrappingSetting = this.wrappingAndBracesStyle.getWrapArrays();
-            members = ensureCollectionHasIndents(members, wrappingSetting);
-            members = applyWrappingStyleToSuffixes(members, wrappingSetting, relativeIndent);
+            members = applyWrappingStyleToLastChildSuffix(members, wrappingSetting, relativeIndent);
             json = array.getPadding().withValues(members);
         }
+
         return json;
     }
 
-    private @NotNull <J extends Json> List<JsonRightPadded<J>> ensureCollectionHasIndents(List<JsonRightPadded<J>> elements, LineWrapSetting wrapping) {
-        AtomicInteger i = new AtomicInteger(0);
-        return ListUtils.map(elements, elem -> {
-            boolean isFirst = i.get() == 0;
-            i.incrementAndGet();
-            Space prefix = elem.getElement().getPrefix();
-            final String newPrefixString;
-            String currentAfterNewLine = prefix.getWhitespaceIndent();
-            if (wrapping == LineWrapSetting.DoNotWrap && isFirst) {
-                newPrefixString = "";
-            } else if (wrapping == LineWrapSetting.DoNotWrap) {
-                newPrefixString = " ";
-            } else if (wrapping == LineWrapSetting.WrapAlways) {
-                newPrefixString = this.generalFormatStyle.newLine() + currentAfterNewLine;
-            } else {
-                throw new UnsupportedOperationException("Unknown LineWrapSetting: " + wrapping);
-            }
-            if (!newPrefixString.equals(prefix.getWhitespace())) {
-                return elem.withElement(elem.getElement().withPrefix(prefix.withWhitespace((newPrefixString))));
-            } else {
-                return elem;
-            }
-        });
-    }
-
-    private <JS extends Json> List<JsonRightPadded<JS>> applyWrappingStyleToSuffixes(List<JsonRightPadded<JS>> elements, LineWrapSetting wrapping, String relativeIndent) {
-        AtomicInteger i = new AtomicInteger(0);
-        return ListUtils.map(elements, elem -> {
-            // TODO Refactor the isLast logic into `mapLast`
-            boolean isLast = i.get() == elements.size() - 1;
-            i.incrementAndGet();
-
+    private <JS extends Json> List<JsonRightPadded<JS>> applyWrappingStyleToLastChildSuffix(List<JsonRightPadded<JS>> elements, LineWrapSetting wrapping, String relativeIndent) {
+        return ListUtils.mapLast(elements, elem -> {
             String currentAfter = elem.getAfter().getWhitespace();
             final String newAfter;
-            if (isLast) {
-                if (wrapping == LineWrapSetting.DoNotWrap) {
-                    newAfter = "";
-                } else if (wrapping == LineWrapSetting.WrapAlways) {
-                    newAfter = this.generalFormatStyle.newLine() + relativeIndent;
-                } else {
-                    throw new UnsupportedOperationException("Unknown LineWrapSetting: " + wrapping);
-                }
-            } else {
+            if (wrapping == LineWrapSetting.DoNotWrap) {
                 newAfter = "";
+            } else if (wrapping == LineWrapSetting.WrapAlways) {
+                newAfter = this.generalFormatStyle.newLine() + relativeIndent;
+            } else {
+                throw new UnsupportedOperationException("Unknown LineWrapSetting: " + wrapping);
             }
             if (!newAfter.equals(currentAfter)) {
                 return elem.withAfter(Space.build(newAfter, emptyList()));
@@ -173,7 +139,6 @@ public class TabsAndIndentsVisitor<P> extends JsonIsoVisitor<P> {
             }
         });
     }
-
 
     private String getCurrentIndent() {
         String ret = getCursor().getNearestMessage("indentToUse");

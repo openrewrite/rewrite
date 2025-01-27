@@ -25,6 +25,7 @@ import org.openrewrite.style.StyleHelper;
 @With
 public class WrappingAndBracesStyle implements JsonStyle {
     public static final WrappingAndBracesStyle DEFAULT = new WrappingAndBracesStyle(LineWrapSetting.WrapAlways, LineWrapSetting.WrapAlways);
+    public static final WrappingAndBracesStyle OBJECTS_WRAP_ARRAYS_DONT = new WrappingAndBracesStyle(LineWrapSetting.WrapAlways, LineWrapSetting.DoNotWrap);
 
     LineWrapSetting wrapObjects;
     LineWrapSetting wrapArrays;
