@@ -22,6 +22,7 @@ import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
 import org.jspecify.annotations.NonNull;
+import org.openrewrite.gradle.internal.GradleWrapper;
 import org.openrewrite.internal.StringUtils;
 
 import java.io.IOException;

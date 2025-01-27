@@ -17,6 +17,8 @@ package org.openrewrite.gradle.util;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Checksum;
+import org.openrewrite.gradle.internal.DistributionInfos;
+import org.openrewrite.gradle.internal.GradleWrapper;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 

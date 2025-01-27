@@ -21,7 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
-import org.openrewrite.gradle.util.DependencyStringNotationConverter;
+import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.MethodMatcher;
@@ -97,7 +97,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     return null;
                 }
 
-                org.openrewrite.gradle.util.Dependency dependency = null;
+                org.openrewrite.gradle.internal.Dependency dependency = null;
                 Expression argument = methodInvocation.getArguments().get(0);
                 if (argument instanceof J.Literal || argument instanceof G.GString || argument instanceof G.MapEntry || argument instanceof G.MapLiteral) {
                     dependency = parseDependency(methodInvocation.getArguments());
@@ -203,7 +203,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             return withinBlock(cursor, "constraints") && withinDependenciesBlock(cursor);
         }
 
-        private org.openrewrite.gradle.util.@Nullable Dependency parseDependency(List<Expression> arguments) {
+        private org.openrewrite.gradle.internal.@Nullable Dependency parseDependency(List<Expression> arguments) {
             Expression argument = arguments.get(0);
             if (argument instanceof J.Literal) {
                 return DependencyStringNotationConverter.parse((String) ((J.Literal) argument).getValue());
@@ -226,7 +226,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             return null;
         }
 
-        private static org.openrewrite.gradle.util.@Nullable Dependency getMapEntriesDependency(List<Expression> arguments) {
+        private static org.openrewrite.gradle.internal.@Nullable Dependency getMapEntriesDependency(List<Expression> arguments) {
             String group = null;
             String artifact = null;
 
@@ -255,7 +255,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 return null;
             }
 
-            return new org.openrewrite.gradle.util.Dependency(group, artifact, null, null, null);
+            return new org.openrewrite.gradle.internal.Dependency(group, artifact, null, null, null);
         }
     }
 }
