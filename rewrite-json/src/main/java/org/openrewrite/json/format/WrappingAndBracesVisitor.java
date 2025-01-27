@@ -46,19 +46,11 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
                                     TabsAndIndentsStyle tabsAndIndentsStyle,
                                     GeneralFormatStyle generalFormatStyle,
                                     @Nullable Tree stopAfter) {
-        this.wrappingAndBracesStyle = wrappingAndBracesStyle;
-        this.generalFormatStyle = generalFormatStyle;
         this.stopAfter = stopAfter;
 
-        if (tabsAndIndentsStyle.getUseTabCharacter()) {
-            this.singleIndent = "\t";
-        } else {
-            StringBuilder sb = new StringBuilder();
-            for (int j = 0; j < tabsAndIndentsStyle.getIndentSize(); j++) {
-                sb.append(" ");
-            }
-            singleIndent = sb.toString();
-        }
+        this.singleIndent = tabsAndIndentsStyle.singleIndent();
+        this.wrappingAndBracesStyle = wrappingAndBracesStyle;
+        this.generalFormatStyle = generalFormatStyle;
     }
 
     @Override
