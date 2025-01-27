@@ -413,14 +413,6 @@ class GitProvenanceTest {
         assertThat(read).isEqualTo(gitProvenance);
     }
 
-//    @Test
-//    void large() {
-//        GitProvenance provenance = GitProvenance.fromProjectDirectory(Paths.get("/Users/knut/git-temp/tensorflow/tensorflow"), null);
-//        assertThat(provenance).isNotNull();
-//        long retainedSize = GraphLayout.parseInstance(provenance).totalSize();
-//        System.out.println(retainedSize);
-//    }
-
     void runCommand(Path workingDir, String command) {
         //noinspection ResultOfMethodCallIgnored
         workingDir.toFile().mkdirs();

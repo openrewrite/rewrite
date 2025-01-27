@@ -23,5 +23,4 @@ dependencies {
 
     testImplementation("org.assertj:assertj-core:latest.release")
     testImplementation(project(":rewrite-test"))
-    testImplementation("org.openjdk.jol:jol-core:latest.release")
 }

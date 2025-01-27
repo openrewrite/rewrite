@@ -381,7 +381,7 @@ public class GitProvenance implements Marker {
                         (day, count) -> count == null ? 1 : count + 1);
             }
             return committerName.entrySet().stream()
-                    .map(c -> Committer.from(
+                    .map(c -> new Committer(
                             c.getValue(),
                             c.getKey(),
                             commitMap.get(c.getKey()))
@@ -425,7 +425,7 @@ public class GitProvenance implements Marker {
 
     @Value
     @With
-    @RequiredArgsConstructor
+    @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
     public static class Committer {
         String name;
         String email;
@@ -437,20 +437,21 @@ public class GitProvenance implements Marker {
                 @JsonProperty("dates") int @Nullable [] data,
                 @Nullable @JsonProperty("commitsByDay") NavigableMap<LocalDate, Integer> commitsByDay) {
             if (commitsByDay != null) {
-                return from(name, email, commitsByDay);
+                return new Committer(name, email, commitsByDay);
             } else {
                 return new Committer(name, email, data);
             }
         }
 
-        public static Committer from(String name, String email, NavigableMap<LocalDate, Integer> commitsByDay) {
-            int[] data = new int[commitsByDay.size() * 2];
+        public Committer(String name, String email, NavigableMap<LocalDate, Integer> commitsByDay) {
+            this.name = name;
+            this.email = email;
+            this.data = new int[commitsByDay.size() * 2];
             int i = 0;
             for (Map.Entry<LocalDate, Integer> entry : commitsByDay.entrySet()) {
                 data[i++] = (int) entry.getKey().toEpochDay();
                 data[i++] = entry.getValue();
             }
-            return new Committer(name, email, data);
         }
 
         public NavigableMap<LocalDate, Integer> getCommitsByDay() {
