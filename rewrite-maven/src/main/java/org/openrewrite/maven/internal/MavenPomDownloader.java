@@ -751,12 +751,14 @@ public class MavenPomDownloader {
                 normalizedRepositories.put(normalizedRepo.getId(), normalizedRepo);
             }
         }
+
         if (!normalizedRepositories.containsKey(MavenRepository.MAVEN_CENTRAL.getId()) && addCentralRepository) {
             MavenRepository normalizedRepo = normalizeRepository(MavenRepository.MAVEN_CENTRAL, ctx, containingPom);
             if (normalizedRepo != null) {
                 normalizedRepositories.put(normalizedRepo.getId(), normalizedRepo);
             }
         }
+
         return normalizedRepositories.values();
     }
 
