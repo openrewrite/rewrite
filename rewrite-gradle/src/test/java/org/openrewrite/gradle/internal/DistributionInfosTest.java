@@ -13,12 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.gradle.util;
+package org.openrewrite.gradle.internal;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Checksum;
-import org.openrewrite.gradle.internal.DistributionInfos;
-import org.openrewrite.gradle.internal.GradleWrapper;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 

@@ -91,13 +91,9 @@ public class GradleWrapper {
 
     private static final Pattern GRADLE_VERSION_PATTERN = Pattern.compile("gradle-([0-9.]+)");
 
-    // Supports org.openrewrite.gradle.toolingapi.Assertions.withToolingApi(URI)
-    // This method is provided to support recipe development at organizations which require gradle to come from
-    // internal repositories. This is not used in contexts where services.gradle.org is accessible
-
     /**
      * Construct a Gradle wrapper from a URI.
-     * Can be used in contexts where servcies.gradle.org, normally used for version lookups, is unavailable.
+     * Can be used in contexts where services.gradle.org, normally used for version lookups, is unavailable.
      */
     public static GradleWrapper create(URI fullDistributionUri, @SuppressWarnings("unused") ExecutionContext ctx) {
         String version = "";
