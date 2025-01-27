@@ -26,6 +26,7 @@ import org.openrewrite.json.tree.JsonRightPadded;
 import org.openrewrite.json.tree.JsonValue;
 import org.openrewrite.json.tree.Space;
 import org.openrewrite.style.GeneralFormatStyle;
+import org.openrewrite.style.LineWrapSetting;
 
 import java.util.List;
 import java.util.Optional;

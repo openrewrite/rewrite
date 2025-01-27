@@ -26,6 +26,7 @@ import org.openrewrite.json.tree.JsonRightPadded;
 import org.openrewrite.json.tree.JsonValue;
 import org.openrewrite.json.tree.Space;
 import org.openrewrite.style.GeneralFormatStyle;
+import org.openrewrite.style.LineWrapSetting;
 
 import java.util.List;
 import java.util.Optional;
@@ -114,7 +115,14 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
             if (isFirst && wrapping == LineWrapSetting.DoNotWrap) {
                 newPrefix = "";
             } else {
-                newPrefix = wrapping.prefix(this.generalFormatStyle, elem.getElement().getPrefix());
+                String currentAfterNewLine = elem.getElement().getPrefix().getWhitespaceIndent();
+                if (wrapping == LineWrapSetting.DoNotWrap) {
+                    newPrefix = " ";
+                } else if (wrapping == LineWrapSetting.WrapAlways) {
+                    newPrefix = this.generalFormatStyle.newLine() + currentAfterNewLine;
+                } else {
+                    throw new UnsupportedOperationException("Unknown LineWrapSetting: " + wrapping);
+                }
             }
             if (!newPrefix.equals(elem.getElement().getPrefix().getWhitespace())) {
                 return elem.withElement(elem.getElement().withPrefix(Space.build(newPrefix, emptyList())));

@@ -23,7 +23,7 @@ import org.openrewrite.json.JsonVisitor;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonValue;
 import org.openrewrite.style.GeneralFormatStyle;
-import org.openrewrite.json.format.LineWrapSetting;
+import org.openrewrite.style.LineWrapSetting;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 
