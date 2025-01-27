@@ -98,13 +98,11 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
     }
 
     private <J extends Json> List<JsonRightPadded<J>> ensureCollectionHasIndents(List<JsonRightPadded<J>> elements, LineWrapSetting wrapping) {
-        AtomicBoolean first = new AtomicBoolean(true);
-        return ListUtils.map(elements, elem -> {
-            boolean isFirst = first.getAndSet(false);
+        return ListUtils.map(elements, (Integer idx, JsonRightPadded<J> elem) -> {
             Space prefix = elem.getElement().getPrefix();
             final String newPrefixString;
             String currentAfterNewLine = prefix.getWhitespaceIndent();
-            if (wrapping == LineWrapSetting.DoNotWrap && isFirst) {
+            if (wrapping == LineWrapSetting.DoNotWrap && idx == 0) {
                 newPrefixString = "";
             } else if (wrapping == LineWrapSetting.DoNotWrap) {
                 newPrefixString = " ";
@@ -122,14 +120,10 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
     }
 
     private <JS extends Json> List<JsonRightPadded<JS>> applyWrappingStyleToSuffixes(List<JsonRightPadded<JS>> elements, LineWrapSetting wrapping, String relativeIndent) {
-        AtomicInteger i = new AtomicInteger(0);
-        return ListUtils.map(elements, elem -> {
-            boolean isLast = i.get() == elements.size() - 1;
-            i.incrementAndGet();
-
+        return ListUtils.map(elements, (Integer idx, JsonRightPadded<JS> elem) -> {
             String currentAfter = elem.getAfter().getWhitespace();
             final String newAfter;
-            if (isLast) {
+            if (idx == elements.size() - 1) {
                 if (wrapping == LineWrapSetting.DoNotWrap) {
                     newAfter = "";
                 } else if (wrapping == LineWrapSetting.WrapAlways) {
