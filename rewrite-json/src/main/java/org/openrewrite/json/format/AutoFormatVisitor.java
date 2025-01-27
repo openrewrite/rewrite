@@ -50,8 +50,8 @@ public class AutoFormatVisitor<P> extends JsonIsoVisitor<P> {
         GeneralFormatStyle generalStyle = Style.from(GeneralFormatStyle.class, doc, () -> autodetectedStyle.getStyle(GeneralFormatStyle.class));
         WrappingAndBracesStyle wrappingStyle = Style.from(WrappingAndBracesStyle.class, doc, () -> autodetectedStyle.getStyle(WrappingAndBracesStyle.class));
 
-        js = new WrappingAndBracesVisitor<>(wrappingStyle, stopAfter).visitNonNull(js, p, cursor.fork());
-        js = new TabsAndIndentsVisitor<>(wrappingStyle, tabsIndentsStyle, stopAfter).visitNonNull(js, p, cursor.fork());
+        js = new WrappingAndBracesVisitor<>(wrappingStyle, generalStyle, stopAfter).visitNonNull(js, p, cursor.fork());
+        js = new TabsAndIndentsVisitor<>(wrappingStyle, tabsIndentsStyle, generalStyle, stopAfter).visitNonNull(js, p, cursor.fork());
         js = new NormalizeLineBreaksVisitor<>(generalStyle, stopAfter).visitNonNull(js, p, cursor.fork());
         return js;
     }
@@ -64,8 +64,8 @@ public class AutoFormatVisitor<P> extends JsonIsoVisitor<P> {
         GeneralFormatStyle generalStyle = Style.from(GeneralFormatStyle.class, js, () -> autodetectedStyle.getStyle(GeneralFormatStyle.class));
         WrappingAndBracesStyle wrappingStyle = Style.from(WrappingAndBracesStyle.class, js, () -> autodetectedStyle.getStyle(WrappingAndBracesStyle.class));
 
-        js = (Json.Document) new WrappingAndBracesVisitor<>(wrappingStyle, stopAfter).visitNonNull(js, p);
-        js = (Json.Document) new TabsAndIndentsVisitor<>(wrappingStyle, tabsIndentsStyle, stopAfter).visitNonNull(js, p);
+        js = (Json.Document) new WrappingAndBracesVisitor<>(wrappingStyle, generalStyle, stopAfter).visitNonNull(js, p);
+        js = (Json.Document) new TabsAndIndentsVisitor<>(wrappingStyle, tabsIndentsStyle, generalStyle, stopAfter).visitNonNull(js, p);
         js = (Json.Document) new NormalizeLineBreaksVisitor<>(generalStyle, stopAfter).visitNonNull(js, p);
 
         return js;

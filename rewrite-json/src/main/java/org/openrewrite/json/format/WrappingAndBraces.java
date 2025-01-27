@@ -18,6 +18,7 @@ package org.openrewrite.json.format;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.json.style.WrappingAndBracesStyle;
+import org.openrewrite.style.GeneralFormatStyle;
 
 public class WrappingAndBraces extends Recipe {
     @Override
@@ -32,6 +33,6 @@ public class WrappingAndBraces extends Recipe {
 
     @Override
     public WrappingAndBracesVisitor<ExecutionContext> getVisitor() {
-        return new WrappingAndBracesVisitor<>(WrappingAndBracesStyle.DEFAULT, null);
+        return new WrappingAndBracesVisitor<>(WrappingAndBracesStyle.DEFAULT, GeneralFormatStyle.DEFAULT, null);
     }
 }

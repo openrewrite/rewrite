@@ -23,6 +23,7 @@ import org.openrewrite.json.style.Autodetect;
 import org.openrewrite.json.style.TabsAndIndentsStyle;
 import org.openrewrite.json.style.WrappingAndBracesStyle;
 import org.openrewrite.json.tree.Json;
+import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.Style;
 
 public class Indents extends Recipe {
@@ -47,7 +48,8 @@ public class Indents extends Recipe {
             Autodetect autodetected = Autodetect.detector().sample(docs).build();
             TabsAndIndentsStyle tabsAndIndentsStyle = Style.from(TabsAndIndentsStyle.class, docs, () -> autodetected.getStyle(TabsAndIndentsStyle.class));
             WrappingAndBracesStyle wrappingAndBracesStyle = Style.from(WrappingAndBracesStyle.class, docs, () -> autodetected.getStyle(WrappingAndBracesStyle.class));
-            doAfterVisit(new TabsAndIndentsVisitor<>(wrappingAndBracesStyle, tabsAndIndentsStyle, null));
+            GeneralFormatStyle generalFormatStyle = Style.from(GeneralFormatStyle.class, docs, () -> autodetected.getStyle(GeneralFormatStyle.class));
+            doAfterVisit(new TabsAndIndentsVisitor<>(wrappingAndBracesStyle, tabsAndIndentsStyle, generalFormatStyle,null));
             return docs;
         }
     }
