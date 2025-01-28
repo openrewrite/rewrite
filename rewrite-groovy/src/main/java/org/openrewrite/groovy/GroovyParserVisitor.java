@@ -2537,18 +2537,18 @@ public class GroovyParserVisitor {
         // Grab from the source the current part
         StringBuilder result = new StringBuilder();
         for (int i = startingLineNumber; i <= endingLineNumber; i++) {
-            String currLine = sourceByLineNumberOffsets.length == i
-                    ? source.substring(sourceByLineNumberOffsets[i - 1])
-                    : source.substring(sourceByLineNumberOffsets[i - 1], sourceByLineNumberOffsets[i]);
-
             if (i == startingLineNumber && i == endingLineNumber) {
-                result.append(currLine, startingColumn - 1, endingColumn - 1);
+                result.append(source, sourceByLineNumberOffsets[i - 1] + startingColumn - 1, sourceByLineNumberOffsets[i - 1] + endingColumn - 1);
             } else if (i == startingLineNumber) {
-                result.append(currLine.substring(startingColumn - 1));
+                result.append(source, sourceByLineNumberOffsets[i - 1] + startingColumn - 1,  sourceByLineNumberOffsets[i]);
             } else if (i == endingLineNumber) {
-                result.append(currLine, 0, endingColumn - 1);
+                result.append(source, sourceByLineNumberOffsets[i - 1], sourceByLineNumberOffsets[i - 1] + endingColumn - 1);
             } else {
-                result.append(currLine);
+                if (sourceByLineNumberOffsets.length == i) {
+                    result.append(source.substring(sourceByLineNumberOffsets[i - 1]));
+                } else {
+                    result.append(source, sourceByLineNumberOffsets[i - 1], sourceByLineNumberOffsets[i]);
+                }
             }
         }
 
