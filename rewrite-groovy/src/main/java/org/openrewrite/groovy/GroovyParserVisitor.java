@@ -1595,8 +1595,8 @@ public class GroovyParserVisitor {
         @Override
         public void visitGStringExpression(GStringExpression gstring) {
             Space fmt = whitespace();
-            String delimiter = getDelimiter(cursor).start;
-            skip(delimiter); // Opening delim for GString
+            Delimiter delimiter = getDelimiter(cursor);
+            skip(delimiter.start); // Opening delim for GString
 
             NavigableMap<LineColumn, org.codehaus.groovy.ast.expr.Expression> sortedByPosition = new TreeMap<>();
             for (ConstantExpression e : gstring.getStrings()) {
@@ -1627,7 +1627,7 @@ public class GroovyParserVisitor {
                     }
                 } else if (e instanceof ConstantExpression) {
                     // Get the string literal from the source, so escaping of newlines and the like works out of the box
-                    String value = sourceSubstring(cursor, ("~/".equals(delimiter) ? "/" : delimiter));
+                    String value = sourceSubstring(cursor, delimiter.end);
                     // There could be a closer GString before the end of the closing delimiter, so shorten the string if needs be
                     int indexNextSign = source.indexOf("$", cursor);
                     if (indexNextSign != -1 && indexNextSign < (cursor + value.length())) {
@@ -1641,8 +1641,8 @@ public class GroovyParserVisitor {
                 }
             }
 
-            queue.add(new G.GString(randomId(), fmt, Markers.EMPTY, delimiter, strings, typeMapping.type(gstring.getType())));
-            skip(delimiter); // Closing delim for GString
+            queue.add(new G.GString(randomId(), fmt, Markers.EMPTY, delimiter.start, strings, typeMapping.type(gstring.getType())));
+            skip(delimiter.end); // Closing delim for GString
         }
 
         @Override
