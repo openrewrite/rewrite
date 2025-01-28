@@ -61,7 +61,6 @@ import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
-import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 import static org.openrewrite.Tree.randomId;
@@ -79,7 +78,7 @@ public class GroovyParserVisitor {
     private final FileAttributes fileAttributes;
 
     private final String source;
-    private final int[] sourceByLineNumberOffsets;
+    private final int[] sourceLineNumberOffsets;
     private final Charset charset;
     private final boolean charsetBomMarked;
     private final GroovyTypeMapping typeMapping;
@@ -107,7 +106,7 @@ public class GroovyParserVisitor {
         this.source = source.readFully();
         AtomicInteger counter = new AtomicInteger(1);
         AtomicInteger offsetCursor = new AtomicInteger(0);
-        this.sourceByLineNumberOffsets = Arrays.stream(this.source.split("\n")).mapToInt(it -> {
+        this.sourceLineNumberOffsets = Arrays.stream(this.source.split("\n")).mapToInt(it -> {
             int saveCursor = offsetCursor.get();
             offsetCursor.set(saveCursor + it.length() + 1); // + 1 for the `\n` char
             return saveCursor;
@@ -2538,14 +2537,14 @@ public class GroovyParserVisitor {
         StringBuilder result = new StringBuilder();
         for (int i = startingLineNumber; i <= endingLineNumber; i++) {
             if (i == startingLineNumber && i == endingLineNumber) {
-                result.append(source, sourceByLineNumberOffsets[i - 1] + startingColumn - 1, sourceByLineNumberOffsets[i - 1] + endingColumn - 1);
+                result.append(source, sourceLineNumberOffsets[i - 1] + startingColumn - 1, sourceLineNumberOffsets[i - 1] + endingColumn - 1);
             } else if (i == startingLineNumber) {
-                result.append(source, sourceByLineNumberOffsets[i - 1] + startingColumn - 1, sourceByLineNumberOffsets[i]);
+                result.append(source, sourceLineNumberOffsets[i - 1] + startingColumn - 1, sourceLineNumberOffsets[i]);
             } else if (i == endingLineNumber) {
-                result.append(source, sourceByLineNumberOffsets[i - 1], sourceByLineNumberOffsets[i - 1] + endingColumn - 1);
+                result.append(source, sourceLineNumberOffsets[i - 1], sourceLineNumberOffsets[i - 1] + endingColumn - 1);
             } else {
-                int end = sourceByLineNumberOffsets.length == i ? source.length() : sourceByLineNumberOffsets[i];
-                result.append(source, sourceByLineNumberOffsets[i - 1], end);
+                int end = sourceLineNumberOffsets.length == i ? source.length() : sourceLineNumberOffsets[i];
+                result.append(source, sourceLineNumberOffsets[i - 1], end);
             }
         }
 
