@@ -92,12 +92,16 @@ public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
     }
 
     public Yaml visitScalar(Yaml.Scalar scalar, P p) {
-        return scalar.withAnchor(visitAndCast(scalar.getAnchor(), p))
+        return scalar
+                .withAnchor(visitAndCast(scalar.getAnchor(), p))
+                .withTag(visitAndCast(scalar.getTag(), p))
                 .withMarkers(visitMarkers(scalar.getMarkers(), p));
     }
 
     public Yaml visitSequence(Yaml.Sequence sequence, P p) {
-        return sequence.withEntries(ListUtils.map(sequence.getEntries(), e -> visitAndCast(e, p)))
+        return sequence
+                .withTag(visitAndCast(sequence.getTag(), p))
+                .withEntries(ListUtils.map(sequence.getEntries(), e -> visitAndCast(e, p)))
                 .withMarkers(visitMarkers(sequence.getMarkers(), p));
     }
 
@@ -113,6 +117,10 @@ public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
     public Yaml visitAlias(Yaml.Alias alias, P p) {
         return alias.withAnchor(visitAndCast(alias.getAnchor(), p))
                 .withMarkers(visitMarkers(alias.getMarkers(), p));
+    }
+
+    public Yaml visitTag(Yaml.Tag tag, P p) {
+        return tag.withMarkers(visitMarkers(tag.getMarkers(), p));
     }
 
     @Deprecated
