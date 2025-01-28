@@ -26,7 +26,6 @@ import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
 import com.sun.tools.javac.util.Context;
-import lombok.Generated;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
@@ -2025,7 +2024,10 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         //noinspection ConstantConditions
-        return sym != null && ("lombok.val".equals(sym.getQualifiedName().toString()) || sym.getAnnotation(Generated.class) != null);
+        return sym != null && (
+                "lombok.val".equals(sym.getQualifiedName().toString()) ||
+                sym.getDeclarationAttributes().stream().anyMatch(a -> "lombok.Generated".equals(a.type.toString()))
+        );
     }
 
     /**
