@@ -228,7 +228,7 @@ public class YamlResourceLoader implements ResourceLoader {
             }
 
             @Language("markdown")
-            String description = (String) r.get("description");
+            String description = ((String) r.get("description")).trim();
 
             Set<String> tags = Collections.emptySet();
             List<String> rawTags = (List<String>) r.get("tags");
@@ -433,7 +433,7 @@ public class YamlResourceLoader implements ResourceLoader {
                     if (displayName == null) {
                         displayName = name;
                     }
-                    String description = (String) s.get("description");
+                    String description = ((String) s.get("description")).trim();
                     Set<String> tags = Collections.emptySet();
                     List<String> rawTags = (List<String>) s.get("tags");
                     if (rawTags != null) {
