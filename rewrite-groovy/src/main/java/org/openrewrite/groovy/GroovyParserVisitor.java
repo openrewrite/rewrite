@@ -62,8 +62,8 @@ import java.util.stream.Stream;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
-import static java.util.stream.Collectors.toMap;
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.groovy.GroovyParserVisitor.Delimiter.*;
 import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
 import static org.openrewrite.java.tree.Space.EMPTY;
 import static org.openrewrite.java.tree.Space.format;
@@ -1337,13 +1337,11 @@ public class GroovyParserVisitor {
                         value = "@" + value;
                         text = "@" + text;
                     } else {
-                        String delimiter = getDelimiter();
+                        Delimiter delimiter = getDelimiter(cursor);
                         if (delimiter != null) {
-                            // handle the `pattern` operator
-                            String endDelimiter = "~/".equals(delimiter) ? "/" : delimiter;
                             // Get the string literal from the source, so escaping of newlines and the like works out of the box
-                            value = sourceSubstring(cursor + delimiter.length(), endDelimiter);
-                            text = delimiter + value + endDelimiter;
+                            value = sourceSubstring(cursor + delimiter.start.length(), delimiter.end);
+                            text = delimiter.start + value + delimiter.end;
                         }
                     }
                 } else if (expression.isNullExpression()) {
@@ -1597,7 +1595,7 @@ public class GroovyParserVisitor {
         @Override
         public void visitGStringExpression(GStringExpression gstring) {
             Space fmt = whitespace();
-            String delimiter = getDelimiter();
+            String delimiter = getDelimiter(cursor).start;
             skip(delimiter); // Opening delim for GString
 
             NavigableMap<LineColumn, org.codehaus.groovy.ast.expr.Expression> sortedByPosition = new TreeMap<>();
@@ -2537,53 +2535,65 @@ public class GroovyParserVisitor {
         int start = sourceLineNumberOffsets[startingLineNumber - 1] + startingColumn - 1;
         int end = sourceLineNumberOffsets[endingLineNumber - 1] + endingColumn - 1;
 
-        // Determine level of parentheses by going through the source, don't count parentheses in comments
+        // Determine level of parentheses by going through the source, don't count parentheses in comments, string literals and regexes
         int count = 0;
-        boolean inSingleLineComment = false;
-        boolean inMultilineComment = false;
+        Delimiter delimiter = null;
         for (int i = start; i < end; i++) {
-            if (source.charAt(i) == '/' && (end - 1) != i && source.charAt(i + 1) == '/') {
-                inSingleLineComment = true;
-            }
-            if (source.charAt(i) == '/' && (end - 1) != i && source.charAt(i + 1) == '*') {
-                inMultilineComment = true;
-            }
-            if (inSingleLineComment && source.charAt(i) == '\n') {
-                inSingleLineComment = false;
-            }
-            if (inMultilineComment && source.charAt(i) == '*' && (end - 1) != i && source.charAt(i + 1) == '/') {
-                inMultilineComment = false;
-            }
-
-            if (!inSingleLineComment && !inMultilineComment) {
-                if (source.charAt(i) == '(') {
-                    count++;
-                } else if (source.charAt(i) == ')') {
-                    count--;
+            if (delimiter == null) {
+                delimiter = getDelimiter(i);
+                if (delimiter == null) {
+                    if (source.charAt(i) == '(') {
+                        count++;
+                    } else if (source.charAt(i) == ')') {
+                        count--;
+                    }
                 }
+            } else if (delimiter.end.equals(source.substring(i, Math.min(i + delimiter.end.length(), source.length())))) {
+                i += delimiter.end.length() - 1; // skip the next chars for the rest of the delimiter
+                delimiter = null;
             }
         }
         return Math.max(count, 0);
     }
 
-    private @Nullable String getDelimiter() {
+    private @Nullable Delimiter getDelimiter(int cursor) {
         String maybeDelimiter = source.substring(cursor, Math.min(cursor + 3, source.length()));
         if (maybeDelimiter.startsWith("$/")) {
-            return "$/";
+            return DOLLAR_SLASHY_STRING;
         } else if (maybeDelimiter.startsWith("\"\"\"")) {
-            return "\"\"\"";
+            return TRIPLE_DOUBLE_QUOTE;
         } else if (maybeDelimiter.startsWith("'''")) {
-            return "'''";
+            return TRIPLE_SINGLE_QUOTE;
         } else if (maybeDelimiter.startsWith("~/")) {
-            return "~/";
+            return PATTERN_OPERATOR;
+        } else if (maybeDelimiter.startsWith("//")) {
+            return SINGLE_LINE_COMMENT;
+        } else if (maybeDelimiter.startsWith("/*")) {
+            return MULTILINE_COMMENT;
         } else if (maybeDelimiter.startsWith("/")) {
-            return "/";
+            return SLASHY;
         } else if (maybeDelimiter.startsWith("\"")) {
-            return "\"";
+            return DOUBLE_QUOTE;
         } else if (maybeDelimiter.startsWith("'")) {
-            return "'";
+            return SINGLE_QUOTE;
         }
         return null;
+    }
+
+    @RequiredArgsConstructor
+    enum Delimiter {
+        SINGLE_QUOTE("'", "'"),
+        DOUBLE_QUOTE("\"", "\""),
+        TRIPLE_SINGLE_QUOTE("'''", "'''"),
+        TRIPLE_DOUBLE_QUOTE("\"\"\"", "\"\"\""),
+        SLASHY("/", "/"),
+        DOLLAR_SLASHY_STRING("$/", "/$"),
+        PATTERN_OPERATOR("~/", "/"),
+        SINGLE_LINE_COMMENT("//", "\n"),
+        MULTILINE_COMMENT("/*", "*/");
+
+        private final String start;
+        private final String end;
     }
 
     private TypeTree visitTypeTree(ClassNode classNode) {
