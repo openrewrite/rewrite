@@ -373,4 +373,30 @@ class JavaParserTest implements RewriteTest {
         assertThat(JavaParser.filterArtifacts("rewrite-java", classpath))
           .containsOnly(Paths.get("/.m2/repository/org/openrewrite/rewrite-java/8.41.1/rewrite-java-8.41.1.jar"));
     }
+
+    @Test
+    void multipleSwitchStatements() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  void test(int i) {
+                      switch (i) {
+                          case 1:
+                              System.out.println("1");
+                          default:
+                              throw new IllegalStateException("Unexpected value: " + i);
+                      }
+                      switch (i) {
+                          case 1:
+                              System.out.println("1");
+                          default:
+                              throw new IllegalStateException("Unexpected value: " + i);
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
 }
