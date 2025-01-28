@@ -72,8 +72,9 @@ public class MavenDependency implements Trait<Xml.Tag> {
             MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
             MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> new MavenPomDownloader(
                     emptyMap(), ctx,
-                    Optional.ofNullable(mctx.getSettings())
-                            .orElse(mrr.getMavenSettings()),
+                    mctx.getSettings() == null ? mrr.getMavenSettings() :
+                            mrr.getMavenSettings() == null ? mctx.getSettings() :
+                                    mctx.getSettings().merge(mrr.getMavenSettings()),
                     Optional.ofNullable(mctx.getSettings())
                             .map(MavenSettings::getActiveProfiles)
                             .map(MavenSettings.ActiveProfiles::getActiveProfiles)

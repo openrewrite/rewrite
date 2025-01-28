@@ -39,6 +39,7 @@ import org.openrewrite.maven.MavenParser;
 import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.http.OkHttpSender;
 import org.openrewrite.maven.tree.*;
+import org.openrewrite.test.RewriteTest;
 
 import javax.net.ssl.SSLSocketFactory;
 import java.io.IOException;
@@ -57,10 +58,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.maven.tree.MavenRepository.MAVEN_CENTRAL;
 
 @SuppressWarnings({"HttpUrlsUsage"})
-class MavenPomDownloaderTest {
+class MavenPomDownloaderTest implements RewriteTest {
+
     @Test
     void ossSonatype() {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext();
@@ -93,6 +96,61 @@ class MavenPomDownloaderTest {
         assertThat(normalized.getUri()).isEqualTo(expectedUrl);
     }
 
+    /**
+     * Documented in <a href="https://maven.apache.org/guides/mini/guide-multiple-repositories.html">Maven's guide</a>.
+     * Effective Maven settings take precedence over the local effective build POM.
+     */
+    @Test
+    void repositoryOrder() {
+        var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+          //language=xml
+          """
+            <settings>
+              <profiles>
+                <profile>
+                    <id>customize-repos</id>
+                    <repositories>
+                        <repository>
+                            <id>settings-provided</id>
+                            <url>https://repo.clojars.org</url>
+                        </repository>
+                    </repositories>
+                </profile>
+              </profiles>
+              <activeProfiles>
+                <activeProfile>customize-repos</activeProfile>
+              </activeProfiles>
+            </settings>
+            """
+        ), ctx));
+
+        rewriteRun(
+          pomXml(
+            //language=xml
+            """
+              <project>
+                  <groupId>org.openrewrite.test</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>0.1.0-SNAPSHOT</version>
+                  <repositories>
+                      <repository>
+                          <id>local-provided</id>
+                          <url>https://oss.sonatype.org/content/repositories/releases</url>
+                      </repository>
+                  </repositories>
+              </project>
+              """,
+            spec -> spec.beforeRecipe(pom -> {
+                MavenResolutionResult result = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                assertThat(new MavenPomDownloader(ctx).distinctNormalizedRepositories(result.getPom().getRepositories(), result.getPom(), null)
+                  .stream()
+                  .map(MavenRepository::getId))
+                  .containsExactly("settings-provided", "local-provided");
+            }))
+        );
+    }
+
     @Nested
     class WithNativeHttpURLConnectionAndTLS {
         private final ExecutionContext ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
@@ -105,10 +163,7 @@ class MavenPomDownloaderTest {
             ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
               //language=xml
               """
-                <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                  xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
-                                      https://maven.apache.org/xsd/settings-1.0.0.xsd">
+                <settings>
                   <profiles>
                     <profile>
                         <id>central</id>
@@ -207,10 +262,7 @@ class MavenPomDownloaderTest {
             ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
               //language=xml
               """
-                <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                  xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
-                                      https://maven.apache.org/xsd/settings-1.0.0.xsd">
+                <settings>
                   <mirrors>
                     <mirror>
                       <id>mirror</id>
@@ -575,52 +627,52 @@ class MavenPomDownloaderTest {
         @Test
         void mergeMetadata() throws IOException {
             @Language("xml") String metadata1 = """
-                  <metadata>
-                      <groupId>org.springframework.boot</groupId>
-                      <artifactId>spring-boot</artifactId>
-                      <versioning>
-                          <versions>
-                              <version>2.3.3</version>
-                              <version>2.4.1</version>
-                              <version>2.4.2</version>
-                          </versions>
-                          <snapshot>
-                              <timestamp>20220927.033510</timestamp>
-                              <buildNumber>223</buildNumber>
-                          </snapshot>
-                          <snapshotVersions>
-                              <snapshotVersion>
-                                  <extension>pom.asc</extension>
-                                  <value>0.1.0-20220927.033510-223</value>
-                                  <updated>20220927033510</updated>
-                              </snapshotVersion>
-                          </snapshotVersions>
-                      </versioning>
-                  </metadata>
+              <metadata>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot</artifactId>
+                  <versioning>
+                      <versions>
+                          <version>2.3.3</version>
+                          <version>2.4.1</version>
+                          <version>2.4.2</version>
+                      </versions>
+                      <snapshot>
+                          <timestamp>20220927.033510</timestamp>
+                          <buildNumber>223</buildNumber>
+                      </snapshot>
+                      <snapshotVersions>
+                          <snapshotVersion>
+                              <extension>pom.asc</extension>
+                              <value>0.1.0-20220927.033510-223</value>
+                              <updated>20220927033510</updated>
+                          </snapshotVersion>
+                      </snapshotVersions>
+                  </versioning>
+              </metadata>
               """;
 
             @Language("xml") String metadata2 = """
-                  <metadata modelVersion="1.1.0">
-                      <groupId>org.springframework.boot</groupId>
-                      <artifactId>spring-boot</artifactId>
-                      <versioning>
-                          <versions>
-                              <version>2.3.2</version>
-                              <version>2.3.3</version>
-                          </versions>
-                          <snapshot>
-                              <timestamp>20210115.042754</timestamp>
-                              <buildNumber>180</buildNumber>
-                          </snapshot>
-                          <snapshotVersions>
-                              <snapshotVersion>
-                                  <extension>pom.asc</extension>
-                                  <value>0.1.0-20210115.042754-180</value>
-                                  <updated>20210115042754</updated>
-                              </snapshotVersion>
-                          </snapshotVersions>
-                      </versioning>
-                  </metadata>
+              <metadata modelVersion="1.1.0">
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot</artifactId>
+                  <versioning>
+                      <versions>
+                          <version>2.3.2</version>
+                          <version>2.3.3</version>
+                      </versions>
+                      <snapshot>
+                          <timestamp>20210115.042754</timestamp>
+                          <buildNumber>180</buildNumber>
+                      </snapshot>
+                      <snapshotVersions>
+                          <snapshotVersion>
+                              <extension>pom.asc</extension>
+                              <value>0.1.0-20210115.042754-180</value>
+                              <updated>20210115042754</updated>
+                          </snapshotVersion>
+                      </snapshotVersions>
+                  </versioning>
+              </metadata>
               """;
 
             var m1 = MavenMetadata.parse(metadata1.getBytes());
@@ -647,11 +699,11 @@ class MavenPomDownloaderTest {
             Files.writeString(localPom,
               //language=xml
               """
-                 <project>
-                   <groupId>com.bad</groupId>
-                   <artifactId>bad-artifact</artifactId>
-                   <version>1</version>
-                 </project>
+                <project>
+                  <groupId>com.bad</groupId>
+                  <artifactId>bad-artifact</artifactId>
+                  <version>1</version>
+                </project>
                 """
             );
 
@@ -678,11 +730,11 @@ class MavenPomDownloaderTest {
             Files.writeString(localPom,
               //language=xml
               """
-                 <project>
-                   <groupId>com.bad</groupId>
-                   <artifactId>bad-artifact</artifactId>
-                   <version>1</version>
-                 </project>
+                <project>
+                  <groupId>com.bad</groupId>
+                  <artifactId>bad-artifact</artifactId>
+                  <version>1</version>
+                </project>
                 """
             );
             Path localJar = localRepository.resolve("com/bad/bad-artifact/1/bad-artifact-1.jar");
@@ -702,7 +754,7 @@ class MavenPomDownloaderTest {
         }
 
         @Test
-        void dontAllowPomDowloadFailureWithoutJar(@TempDir Path localRepository) throws IOException, MavenDownloadingException {
+        void dontAllowPomDownloadFailureWithoutJar(@TempDir Path localRepository) {
             MavenRepository mavenLocal = MavenRepository.builder()
               .id("local")
               .uri(localRepository.toUri().toString())
@@ -716,7 +768,7 @@ class MavenPomDownloaderTest {
         }
 
         @Test
-        void allowPomDowloadFailureWithJar(@TempDir Path localRepository) throws IOException, MavenDownloadingException {
+        void allowPomDownloadFailureWithJar(@TempDir Path localRepository) throws IOException, MavenDownloadingException {
             MavenRepository mavenLocal = MavenRepository.builder()
               .id("local")
               .uri(localRepository.toUri().toString())
@@ -1217,7 +1269,7 @@ class MavenPomDownloaderTest {
         @Test
         @DisplayName("Don't throw exception if there is no pom and but there is a jar for the artifact")
         @Issue("https://github.com/openrewrite/rewrite/issues/4687")
-        void pomNotFoundWithJarFoundShouldntThrow() throws Exception {
+        void pomNotFoundWithJarFoundShouldNotThrow() throws Exception {
             try (MockWebServer mockRepo = getMockServer()) {
                 mockRepo.setDispatcher(new Dispatcher() {
                     @Override

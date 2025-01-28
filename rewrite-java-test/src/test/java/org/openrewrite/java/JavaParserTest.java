@@ -373,4 +373,5 @@ class JavaParserTest implements RewriteTest {
         assertThat(JavaParser.filterArtifacts("rewrite-java", classpath))
           .containsOnly(Paths.get("/.m2/repository/org/openrewrite/rewrite-java/8.41.1/rewrite-java-8.41.1.jar"));
     }
+
 }

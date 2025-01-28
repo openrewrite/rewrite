@@ -142,6 +142,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(DependencyVersionState acc) {
 
+        //noinspection BooleanMethodIsAlwaysInverted
         return new GroovyVisitor<ExecutionContext>() {
             @Nullable
             GradleProject gradleProject;
@@ -162,9 +163,9 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
                 if (gradleDependencyMatcher.get(getCursor()).isPresent()) {
                     if (m.getArguments().get(0) instanceof G.MapEntry) {
-                        String groupId = null;
-                        String artifactId = null;
-                        String version = null;
+                        String declaredGroupId = null;
+                        String declaredArtifactId = null;
+                        String declaredVersion = null;
 
                         for (Expression e : m.getArguments()) {
                             if (!(e instanceof G.MapEntry)) {
@@ -200,28 +201,28 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             String keyValue = (String) key.getValue();
                             switch (keyValue) {
                                 case "group":
-                                    groupId = valueValue;
+                                    declaredGroupId = valueValue;
                                     break;
                                 case "name":
-                                    artifactId = valueValue;
+                                    declaredArtifactId = valueValue;
                                     break;
                                 case "version":
-                                    version = valueValue;
+                                    declaredVersion = valueValue;
                                     break;
                             }
                         }
-                        if (groupId == null || artifactId == null || version == null) {
+                        if (declaredGroupId == null || declaredArtifactId == null || declaredVersion == null) {
                             return m;
                         }
 
-                        String versionVariableName = version;
-                        GroupArtifact ga = new GroupArtifact(groupId, artifactId);
-                        if (acc.gaToNewVersion.containsKey(ga)) {
+                        String versionVariableName = declaredVersion;
+                        GroupArtifact ga = new GroupArtifact(declaredGroupId, declaredArtifactId);
+                        if (acc.gaToNewVersion.containsKey(ga) || !shouldResolveVersion(declaredGroupId, declaredArtifactId)) {
                             return m;
                         }
                         try {
                             String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                                    .select(new GroupArtifact(groupId, artifactId), m.getSimpleName(), newVersion, versionPattern, ctx);
+                                    .select(new GroupArtifact(declaredGroupId, declaredArtifactId), m.getSimpleName(), newVersion, versionPattern, ctx);
                             acc.versionPropNameToGA.put(versionVariableName, ga);
                             // It is fine for this value to be null, record it in the map to avoid future lookups
                             //noinspection DataFlowIssue
@@ -249,7 +250,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                 }
                                 String versionVariableName = ((J.Identifier) versionValue.getTree()).getSimpleName();
                                 GroupArtifact ga = new GroupArtifact(dep.getGroupId(), dep.getArtifactId());
-                                if (acc.gaToNewVersion.containsKey(ga)) {
+                                if (acc.gaToNewVersion.containsKey(ga) || !shouldResolveVersion(dep.getGroupId(), dep.getArtifactId())) {
                                     continue;
                                 }
                                 try {
@@ -267,6 +268,16 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     }
                 }
                 return m;
+            }
+
+            // Some recipes make use of UpgradeDependencyVersion as an implementation detail.
+            // Those other recipes might not know up-front which dependency needs upgrading
+            // So they use the UpgradeDependencyVersion recipe with null groupId and artifactId to pre-populate all data they could possibly need
+            // This works around the lack of proper recipe pipelining which might allow us to have multiple scanning phases as necessary
+            private boolean shouldResolveVersion(String declaredGroupId, String declaredArtifactId) {
+                //noinspection ConstantValue
+                return (groupId == null || artifactId == null) ||
+                       new DependencyMatcher(groupId, artifactId, null).matches(declaredGroupId, declaredArtifactId);
             }
         };
     }
