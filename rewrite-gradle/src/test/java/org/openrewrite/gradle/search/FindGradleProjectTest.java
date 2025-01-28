@@ -23,7 +23,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.gradle.toolingapi.Assertions.withOfflineToolingApi;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.test.SourceSpecs.text;
 
@@ -38,7 +38,7 @@ class FindGradleProjectTest implements RewriteTest {
     @EnumSource(FindGradleProject.SearchCriteria.class)
     void isGradleGroovyProject(FindGradleProject.SearchCriteria criteria) {
         rewriteRun(
-          spec -> spec.beforeRecipe(withToolingApi())
+          spec -> spec.beforeRecipe(withOfflineToolingApi())
             .recipe(new FindGradleProject(criteria)),
           buildGradle(
             """

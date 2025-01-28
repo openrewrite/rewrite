@@ -28,12 +28,12 @@ import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
-import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.gradle.toolingapi.Assertions.withOfflineToolingApi;
 
 class AddSettingsPluginTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.beforeRecipe(withToolingApi())
+        spec.beforeRecipe(withOfflineToolingApi())
           .recipe(new AddSettingsPlugin("com.gradle.enterprise", "3.11.x", null, null, null));
     }
 
@@ -131,7 +131,7 @@ class AddSettingsPluginTest implements RewriteTest {
     @Test
     void addPluginApplyFalse() {
         rewriteRun(
-          spec -> spec.beforeRecipe(withToolingApi())
+          spec -> spec.beforeRecipe(withOfflineToolingApi())
             .recipe(new AddSettingsPlugin("com.gradle.enterprise", "3.11.x", null, false, null)),
           settingsGradle(
             "",

@@ -24,14 +24,14 @@ import org.openrewrite.test.RewriteTest;
 import java.util.List;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.gradle.toolingapi.Assertions.withOfflineToolingApi;
 
 class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
         spec
-          .beforeRecipe(withToolingApi())
+          .beforeRecipe(withOfflineToolingApi())
           .recipe(new UpgradeTransitiveDependencyVersion(
             "com.fasterxml*", "jackson-core", "2.12.5", null, "CVE-2024-BAD", null));
     }
