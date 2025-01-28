@@ -2537,13 +2537,30 @@ public class GroovyParserVisitor {
         int start = sourceLineNumberOffsets[startingLineNumber - 1] + startingColumn - 1;
         int end = sourceLineNumberOffsets[endingLineNumber - 1] + endingColumn - 1;
 
-        // Determine level of parentheses by going through the source
+        // Determine level of parentheses by going through the source, don't count parentheses in comments
         int count = 0;
+        boolean inSingleLineComment = false;
+        boolean inMultilineComment = false;
         for (int i = start; i < end; i++) {
-            if (source.charAt(i) == '(') {
-                count++;
-            } else if (source.charAt(i) == ')') {
-                count--;
+            if (source.charAt(i) == '/' && (end - 1) != i && source.charAt(i + 1) == '/') {
+                inSingleLineComment = true;
+            }
+            if (source.charAt(i) == '/' && (end - 1) != i && source.charAt(i + 1) == '*') {
+                inMultilineComment = true;
+            }
+            if (inSingleLineComment && source.charAt(i) == '\n') {
+                inSingleLineComment = false;
+            }
+            if (inMultilineComment && source.charAt(i) == '*' && (end - 1) != i && source.charAt(i + 1) == '/') {
+                inMultilineComment = false;
+            }
+
+            if (!inSingleLineComment && !inMultilineComment) {
+                if (source.charAt(i) == '(') {
+                    count++;
+                } else if (source.charAt(i) == ')') {
+                    count--;
+                }
             }
         }
         return Math.max(count, 0);
