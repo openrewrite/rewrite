@@ -2544,7 +2544,11 @@ public class GroovyParserVisitor {
             } else if (i == endingLineNumber) {
                 result.append(source, sourceByLineNumberOffsets[i - 1], sourceByLineNumberOffsets[i - 1] + endingColumn - 1);
             } else {
-                result.append(source, sourceByLineNumberOffsets[i - 1], source.length());
+                if (sourceByLineNumberOffsets.length == i) {
+                    result.append(source.substring(sourceByLineNumberOffsets[i - 1]));
+                } else {
+                    result.append(source, sourceByLineNumberOffsets[i - 1], sourceByLineNumberOffsets[i]);
+                }
             }
         }
 
