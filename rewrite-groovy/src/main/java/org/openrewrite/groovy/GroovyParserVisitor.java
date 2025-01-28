@@ -2547,6 +2547,8 @@ public class GroovyParserVisitor {
                     } else if (source.charAt(i) == ')') {
                         count--;
                     }
+                } else {
+                    i += delimiter.open.length() - 1; // skip the next chars for the rest of the delimiter
                 }
             } else if (delimiter.close.equals(source.substring(i, Math.min(i + delimiter.close.length(), source.length())))) {
                 i += delimiter.close.length() - 1; // skip the next chars for the rest of the delimiter
