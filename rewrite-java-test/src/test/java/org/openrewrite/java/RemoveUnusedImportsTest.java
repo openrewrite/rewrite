@@ -1818,6 +1818,33 @@ class RemoveUnusedImportsTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/4473")
+    @Test
+    void doesNotRemoveReferencedAnnotationFromRecordParameter() {
+        rewriteRun(
+          java(
+            """
+              package a;
+
+              import java.lang.annotation.*;
+
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target({ ElementType.PARAMETER, ElementType.RECORD_COMPONENT })
+              public @interface A {}
+              """
+          ),
+          java(
+            """
+              package b;
+
+              import a.A;
+
+              record B(@A String a) {}
+              """
+          )
+        );
+    }
+
     @Test
     void staticAmbiguousImport() {
         // language=java
