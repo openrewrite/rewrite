@@ -23,7 +23,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.gradle.toolingapi.Assertions.withOfflineToolingApi;
 import static org.openrewrite.java.Assertions.*;
 
 class AddJUnitPlatformLauncherTest implements RewriteTest {
@@ -31,7 +31,7 @@ class AddJUnitPlatformLauncherTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec
-          .beforeRecipe(withToolingApi())
+          .beforeRecipe(withOfflineToolingApi())
           .parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api"))
           .recipeFromResources("org.openrewrite.gradle.AddJUnitPlatformLauncher");
     }
