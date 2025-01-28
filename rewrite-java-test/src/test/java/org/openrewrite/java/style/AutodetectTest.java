@@ -49,9 +49,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
+        var tabsAndIndents = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(TabsAndIndentsStyle.class);
 
         assertThat(tabsAndIndents.getUseTabCharacter()).isTrue();
         assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
@@ -73,9 +73,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
+        var tabsAndIndents = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(TabsAndIndentsStyle.class);
 
         assertThat(tabsAndIndents.getContinuationIndent()).isEqualTo(5);
     }
@@ -94,9 +94,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
+        var tabsAndIndents = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(TabsAndIndentsStyle.class);
 
         assertThat(tabsAndIndents.getMethodDeclarationParameters().getAlignWhenMultiple()).isTrue();
     }
@@ -158,9 +158,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
+        var tabsAndIndents = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(TabsAndIndentsStyle.class);
 
         assertThat(tabsAndIndents.getUseTabCharacter()).isTrue();
         assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
@@ -200,9 +200,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
+        var tabsAndIndents = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(TabsAndIndentsStyle.class);
 
         assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
         assertThat(tabsAndIndents.getTabSize()).isEqualTo(2);
@@ -232,9 +232,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
+        var tabsAndIndents = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(TabsAndIndentsStyle.class);
 
         assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
         assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
@@ -258,9 +258,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
+        var tabsAndIndents = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(TabsAndIndentsStyle.class);
         assertThat(tabsAndIndents.getUseTabCharacter()).isTrue();
         assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
         assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
@@ -288,9 +288,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
+        var tabsAndIndents = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(TabsAndIndentsStyle.class);
         assertThat(tabsAndIndents.getUseTabCharacter()).isTrue();
         assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
         assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
@@ -319,9 +319,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
+        var tabsAndIndents = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(TabsAndIndentsStyle.class);
         assertThat(tabsAndIndents.getUseTabCharacter()).isTrue();
         assertThat(tabsAndIndents.getTabSize()).isEqualTo(3);
         assertThat(tabsAndIndents.getIndentSize()).isEqualTo(3);
@@ -349,9 +349,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
+        var tabsAndIndents = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(TabsAndIndentsStyle.class);
         assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
         assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
         assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
@@ -374,9 +374,9 @@ class AutodetectTest implements RewriteTest {
             }
             """
         );
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
+        var tabsAndIndents = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(TabsAndIndentsStyle.class);
         assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
         assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
         assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
@@ -404,9 +404,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
+        var tabsAndIndents = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(TabsAndIndentsStyle.class);
         assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
         assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
         assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
@@ -433,9 +433,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var importLayout = detector.build().getStyle(ImportLayoutStyle.class);
+        var importLayout = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(ImportLayoutStyle.class);
 
 
         assertThat(importLayout.getLayout().get(0)).isInstanceOf(ImportLayoutStyle.Block.AllOthers.class);
@@ -492,9 +492,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var importLayout = detector.build().getStyle(ImportLayoutStyle.class);
+        var importLayout = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(ImportLayoutStyle.class);
 
         assertThat(importLayout.getLayout().get(0))
           .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
@@ -531,9 +531,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var importLayout = detector.build().getStyle(ImportLayoutStyle.class);
+        var importLayout = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(ImportLayoutStyle.class);
 
         assertThat(importLayout.getClassCountToUseStarImport()).isEqualTo(6);
     }
@@ -567,9 +567,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var importLayout = detector.build().getStyle(ImportLayoutStyle.class);
+        var importLayout = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(ImportLayoutStyle.class);
 
         assertThat(importLayout.getClassCountToUseStarImport()).isEqualTo(2147483647);
         assertThat(importLayout.getNameCountToUseStarImport()).isEqualTo(2147483647);
@@ -587,9 +587,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+        var spacesStyle = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(SpacesStyle.class);
 
         assertThat(spacesStyle.getOther().getBeforeComma()).isTrue();
         assertThat(spacesStyle.getOther().getAfterComma()).isFalse();
@@ -607,9 +607,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+        var spacesStyle = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(SpacesStyle.class);
 
         assertThat(spacesStyle.getOther().getBeforeComma()).isFalse();
         assertThat(spacesStyle.getOther().getAfterComma()).isTrue();
@@ -628,9 +628,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+        var spacesStyle = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(SpacesStyle.class);
 
         assertThat(spacesStyle.getOther().getBeforeColonInForEach()).isTrue();
     }
@@ -647,9 +647,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+        var spacesStyle = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(SpacesStyle.class);
 
         assertThat(spacesStyle.getOther().getAfterTypeCast()).isTrue();
     }
@@ -667,9 +667,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+        var spacesStyle = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(SpacesStyle.class);
 
         assertThat(spacesStyle.getOther().getBeforeForSemicolon()).isFalse();
         assertThat(spacesStyle.getOther().getAfterForSemicolon()).isTrue();
@@ -687,9 +687,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+        var spacesStyle = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(SpacesStyle.class);
 
         assertThat(spacesStyle.getOther().getBeforeComma()).isFalse();
         assertThat(spacesStyle.getOther().getAfterComma()).isTrue();
@@ -707,9 +707,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+        var spacesStyle = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(SpacesStyle.class);
 
         assertThat(spacesStyle.getOther().getBeforeComma()).isFalse();
         assertThat(spacesStyle.getOther().getAfterComma()).isFalse();
@@ -727,9 +727,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+        var spacesStyle = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(SpacesStyle.class);
 
         assertThat(spacesStyle.getOther().getBeforeComma()).isTrue();
         assertThat(spacesStyle.getOther().getAfterComma()).isTrue();
@@ -747,9 +747,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+        var spacesStyle = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(SpacesStyle.class);
 
         assertThat(spacesStyle.getOther().getBeforeComma()).isFalse();
         assertThat(spacesStyle.getOther().getAfterComma()).isTrue();
@@ -771,9 +771,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+        var spacesStyle = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(SpacesStyle.class);
 
         assertThat(spacesStyle.getOther().getBeforeComma()).isFalse();
         assertThat(spacesStyle.getOther().getAfterComma()).isTrue();
@@ -799,9 +799,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+        var spacesStyle = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(SpacesStyle.class);
 
         assertThat(spacesStyle.getOther().getBeforeComma()).isFalse();
         assertThat(spacesStyle.getOther().getAfterComma()).isTrue();
@@ -822,9 +822,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+        var spacesStyle = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(SpacesStyle.class);
 
         assertThat(spacesStyle.getWithin().getEmptyMethodCallParentheses()).isFalse();
     }
@@ -842,9 +842,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var spacesStyle = detector.build().getStyle(SpacesStyle.class);
+        var spacesStyle = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(SpacesStyle.class);
 
         assertThat(spacesStyle.getWithin().getMethodCallParentheses()).isTrue();
     }
@@ -865,9 +865,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var wrappingAndBracesStyle = detector.build().getStyle(WrappingAndBracesStyle.class);
+        var wrappingAndBracesStyle = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(WrappingAndBracesStyle.class);
 
         assertThat(wrappingAndBracesStyle.getIfStatement().getElseOnNewLine()).isFalse();
     }
@@ -890,9 +890,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var wrappingAndBracesStyle = detector.build().getStyle(WrappingAndBracesStyle.class);
+        var wrappingAndBracesStyle = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(WrappingAndBracesStyle.class);
 
         assertThat(wrappingAndBracesStyle.getIfStatement().getElseOnNewLine()).isTrue();
     }
@@ -908,9 +908,9 @@ class AutodetectTest implements RewriteTest {
           "}\r\n"
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var lineFormatStyle = detector.build().getStyle(GeneralFormatStyle.class);
+        var lineFormatStyle = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(GeneralFormatStyle.class);
 
         assertThat(lineFormatStyle.isUseCRLFNewLines()).isTrue();
     }
@@ -926,9 +926,9 @@ class AutodetectTest implements RewriteTest {
           "}\r\n"
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var lineFormatStyle = detector.build().getStyle(GeneralFormatStyle.class);
+        var lineFormatStyle = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(GeneralFormatStyle.class);
 
         assertThat(lineFormatStyle.isUseCRLFNewLines()).isFalse();
     }
@@ -955,9 +955,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
+        var tabsAndIndents = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(TabsAndIndentsStyle.class);
 
         assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
         assertThat(tabsAndIndents.getTabSize()).isEqualTo(6);
@@ -1005,9 +1005,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detector();
-        cus.forEach(detector::sample);
-        var tabsAndIndents = detector.build().getStyle(TabsAndIndentsStyle.class);
+        var tabsAndIndents = Autodetect.detector()
+          .sample(cus).build()
+          .getStyle(TabsAndIndentsStyle.class);
 
         assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
         assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
