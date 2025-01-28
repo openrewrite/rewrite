@@ -1340,8 +1340,8 @@ public class GroovyParserVisitor {
                         Delimiter delimiter = getDelimiter(cursor);
                         if (delimiter != null) {
                             // Get the string literal from the source, so escaping of newlines and the like works out of the box
-                            value = sourceSubstring(cursor + delimiter.start.length(), delimiter.end);
-                            text = delimiter.start + value + delimiter.end;
+                            value = sourceSubstring(cursor + delimiter.open.length(), delimiter.close);
+                            text = delimiter.open + value + delimiter.close;
                         }
                     }
                 } else if (expression.isNullExpression()) {
@@ -1596,7 +1596,7 @@ public class GroovyParserVisitor {
         public void visitGStringExpression(GStringExpression gstring) {
             Space fmt = whitespace();
             Delimiter delimiter = getDelimiter(cursor);
-            skip(delimiter.start); // Opening delim for GString
+            skip(delimiter.open);
 
             NavigableMap<LineColumn, org.codehaus.groovy.ast.expr.Expression> sortedByPosition = new TreeMap<>();
             for (ConstantExpression e : gstring.getStrings()) {
@@ -1627,7 +1627,7 @@ public class GroovyParserVisitor {
                     }
                 } else if (e instanceof ConstantExpression) {
                     // Get the string literal from the source, so escaping of newlines and the like works out of the box
-                    String value = sourceSubstring(cursor, delimiter.end);
+                    String value = sourceSubstring(cursor, delimiter.close);
                     // There could be a closer GString before the end of the closing delimiter, so shorten the string if needs be
                     int indexNextSign = source.indexOf("$", cursor);
                     if (indexNextSign != -1 && indexNextSign < (cursor + value.length())) {
@@ -1641,8 +1641,8 @@ public class GroovyParserVisitor {
                 }
             }
 
-            queue.add(new G.GString(randomId(), fmt, Markers.EMPTY, delimiter.start, strings, typeMapping.type(gstring.getType())));
-            skip(delimiter.end); // Closing delim for GString
+            queue.add(new G.GString(randomId(), fmt, Markers.EMPTY, delimiter.open, strings, typeMapping.type(gstring.getType())));
+            skip(delimiter.close);
         }
 
         @Override
@@ -2548,8 +2548,8 @@ public class GroovyParserVisitor {
                         count--;
                     }
                 }
-            } else if (delimiter.end.equals(source.substring(i, Math.min(i + delimiter.end.length(), source.length())))) {
-                i += delimiter.end.length() - 1; // skip the next chars for the rest of the delimiter
+            } else if (delimiter.close.equals(source.substring(i, Math.min(i + delimiter.close.length(), source.length())))) {
+                i += delimiter.close.length() - 1; // skip the next chars for the rest of the delimiter
                 delimiter = null;
             }
         }
@@ -2592,8 +2592,8 @@ public class GroovyParserVisitor {
         SINGLE_LINE_COMMENT("//", "\n"),
         MULTILINE_COMMENT("/*", "*/");
 
-        private final String start;
-        private final String end;
+        private final String open;
+        private final String close;
     }
 
     private TypeTree visitTypeTree(ClassNode classNode) {
