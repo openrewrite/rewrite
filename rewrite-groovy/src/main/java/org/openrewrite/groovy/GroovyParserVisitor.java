@@ -79,7 +79,7 @@ public class GroovyParserVisitor {
     private final FileAttributes fileAttributes;
 
     private final String source;
-    private final Map<Integer, String> sourceByLineNumbers;
+    private final int[] sourceByLineNumberOffsets;
     private final Charset charset;
     private final boolean charsetBomMarked;
     private final GroovyTypeMapping typeMapping;
@@ -106,7 +106,12 @@ public class GroovyParserVisitor {
         this.fileAttributes = fileAttributes;
         this.source = source.readFully();
         AtomicInteger counter = new AtomicInteger(1);
-        this.sourceByLineNumbers = Arrays.stream(this.source.split("\n")).collect(toMap(s -> counter.getAndIncrement(), identity()));
+        AtomicInteger offsetCursor = new AtomicInteger(0);
+        this.sourceByLineNumberOffsets = Arrays.stream(this.source.split("\n")).mapToInt(it -> {
+            int saveCursor = offsetCursor.get();
+            offsetCursor.set(saveCursor + it.length() + 1); // + 1 for the `\n` char
+            return saveCursor;
+        }).toArray();
         this.charset = source.getCharset();
         this.charsetBomMarked = source.isCharsetBomMarked();
         this.typeMapping = new GroovyTypeMapping(typeCache);
@@ -2532,14 +2537,18 @@ public class GroovyParserVisitor {
         // Grab from the source the current part
         StringBuilder result = new StringBuilder();
         for (int i = startingLineNumber; i <= endingLineNumber; i++) {
+            String currLine = sourceByLineNumberOffsets.length == i
+                    ? source.substring(sourceByLineNumberOffsets[i - 1])
+                    : source.substring(sourceByLineNumberOffsets[i - 1], sourceByLineNumberOffsets[i]);
+
             if (i == startingLineNumber && i == endingLineNumber) {
-                result.append(sourceByLineNumbers.get(i), startingColumn - 1, endingColumn - 1);
+                result.append(currLine, startingColumn - 1, endingColumn - 1);
             } else if (i == startingLineNumber) {
-                result.append(sourceByLineNumbers.get(i).substring(startingColumn - 1));
+                result.append(currLine.substring(startingColumn - 1));
             } else if (i == endingLineNumber) {
-                result.append(sourceByLineNumbers.get(i), 0, endingColumn - 1);
+                result.append(currLine, 0, endingColumn - 1);
             } else {
-                result.append(sourceByLineNumbers.get(i));
+                result.append(currLine);
             }
         }
 
