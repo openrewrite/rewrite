@@ -2533,27 +2533,16 @@ public class GroovyParserVisitor {
             endingColumn = parentColumn;
         }
 
-        // Grab from the source the current part
-        StringBuilder result = new StringBuilder();
-        for (int i = startingLineNumber; i <= endingLineNumber; i++) {
-            if (i == startingLineNumber && i == endingLineNumber) {
-                result.append(source, sourceLineNumberOffsets[i - 1] + startingColumn - 1, sourceLineNumberOffsets[i - 1] + endingColumn - 1);
-            } else if (i == startingLineNumber) {
-                result.append(source, sourceLineNumberOffsets[i - 1] + startingColumn - 1, sourceLineNumberOffsets[i]);
-            } else if (i == endingLineNumber) {
-                result.append(source, sourceLineNumberOffsets[i - 1], sourceLineNumberOffsets[i - 1] + endingColumn - 1);
-            } else {
-                int end = sourceLineNumberOffsets.length == i ? source.length() : sourceLineNumberOffsets[i];
-                result.append(source, sourceLineNumberOffsets[i - 1], end);
-            }
-        }
+        // line numbers and columns are 1-based
+        int start = sourceLineNumberOffsets[startingLineNumber - 1] + startingColumn - 1;
+        int end = sourceLineNumberOffsets[endingLineNumber - 1] + endingColumn - 1;
 
-        // Determine level of parentheses
+        // Determine level of parentheses by going through the source
         int count = 0;
-        for (char ch : result.toString().toCharArray()) {
-            if (ch == '(') {
+        for (int i = start; i < end; i++) {
+            if (source.charAt(i) == '(') {
                 count++;
-            } else if (ch == ')') {
+            } else if (source.charAt(i) == ')') {
                 count--;
             }
         }
