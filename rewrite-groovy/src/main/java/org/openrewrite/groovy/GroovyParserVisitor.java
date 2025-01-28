@@ -2540,7 +2540,7 @@ public class GroovyParserVisitor {
             if (i == startingLineNumber && i == endingLineNumber) {
                 result.append(source, sourceByLineNumberOffsets[i - 1] + startingColumn - 1, sourceByLineNumberOffsets[i - 1] + endingColumn - 1);
             } else if (i == startingLineNumber) {
-                result.append(source, sourceByLineNumberOffsets[i - 1] + startingColumn - 1,  sourceByLineNumberOffsets[i]);
+                result.append(source, sourceByLineNumberOffsets[i - 1] + startingColumn - 1, sourceByLineNumberOffsets[i]);
             } else if (i == endingLineNumber) {
                 result.append(source, sourceByLineNumberOffsets[i - 1], sourceByLineNumberOffsets[i - 1] + endingColumn - 1);
             } else {
