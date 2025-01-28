@@ -61,7 +61,9 @@ import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
 import static org.openrewrite.java.tree.Space.EMPTY;
@@ -77,6 +79,7 @@ public class GroovyParserVisitor {
     private final FileAttributes fileAttributes;
 
     private final String source;
+    private final Map<Integer, String> sourceByLineNumbers;
     private final Charset charset;
     private final boolean charsetBomMarked;
     private final GroovyTypeMapping typeMapping;
@@ -102,6 +105,8 @@ public class GroovyParserVisitor {
         this.sourcePath = sourcePath;
         this.fileAttributes = fileAttributes;
         this.source = source.readFully();
+        AtomicInteger counter = new AtomicInteger(1);
+        this.sourceByLineNumbers = Arrays.stream(this.source.split("\n")).collect(toMap(s -> counter.getAndIncrement(), identity()));
         this.charset = source.getCharset();
         this.charsetBomMarked = source.isCharsetBomMarked();
         this.typeMapping = new GroovyTypeMapping(typeCache);
@@ -2525,17 +2530,16 @@ public class GroovyParserVisitor {
         }
 
         // Grab from the source the current part
-        String[] lines = source.split("\n");
         StringBuilder result = new StringBuilder();
-        for (int i = startingLineNumber - 1; i <= endingLineNumber - 1; i++) {
-            if (i == startingLineNumber - 1 && i == endingLineNumber - 1) {
-                result.append(lines[i], startingColumn - 1, endingColumn - 1);
-            } else if (i == startingLineNumber - 1) {
-                result.append(lines[i].substring(startingColumn - 1));
-            } else if (i == endingLineNumber - 1) {
-                result.append(lines[i], 0, endingColumn - 1);
+        for (int i = startingLineNumber; i <= endingLineNumber; i++) {
+            if (i == startingLineNumber && i == endingLineNumber) {
+                result.append(sourceByLineNumbers.get(i), startingColumn - 1, endingColumn - 1);
+            } else if (i == startingLineNumber) {
+                result.append(sourceByLineNumbers.get(i).substring(startingColumn - 1));
+            } else if (i == endingLineNumber) {
+                result.append(sourceByLineNumbers.get(i), 0, endingColumn - 1);
             } else {
-                result.append(lines[i]);
+                result.append(sourceByLineNumbers.get(i));
             }
         }
 
