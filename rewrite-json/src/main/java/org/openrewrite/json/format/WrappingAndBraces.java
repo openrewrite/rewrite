@@ -17,10 +17,27 @@ package org.openrewrite.json.format;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.json.style.TabsAndIndentsStyle;
 import org.openrewrite.json.style.WrappingAndBracesStyle;
 import org.openrewrite.style.GeneralFormatStyle;
 
 public class WrappingAndBraces extends Recipe {
+    private final WrappingAndBracesStyle wrappingAndBracesStyle;
+    private final TabsAndIndentsStyle tabsAndIndentsStyle;
+    private final GeneralFormatStyle generalFormatStyle;
+
+    public WrappingAndBraces() {
+        this.wrappingAndBracesStyle = WrappingAndBracesStyle.DEFAULT;
+        this.tabsAndIndentsStyle = TabsAndIndentsStyle.DEFAULT;
+        this.generalFormatStyle = GeneralFormatStyle.DEFAULT;
+    }
+
+    public WrappingAndBraces(WrappingAndBracesStyle wrappingAndBracesStyle, TabsAndIndentsStyle tabsAndIndentsStyle, GeneralFormatStyle generalFormatStyle) {
+        this.wrappingAndBracesStyle = wrappingAndBracesStyle;
+        this.tabsAndIndentsStyle = tabsAndIndentsStyle;
+        this.generalFormatStyle = generalFormatStyle;
+    }
+
     @Override
     public String getDisplayName() {
         return "JSON new lines";
@@ -33,6 +50,6 @@ public class WrappingAndBraces extends Recipe {
 
     @Override
     public WrappingAndBracesVisitor<ExecutionContext> getVisitor() {
-        return new WrappingAndBracesVisitor<>(WrappingAndBracesStyle.DEFAULT, GeneralFormatStyle.DEFAULT, null);
+        return new WrappingAndBracesVisitor<>(wrappingAndBracesStyle, tabsAndIndentsStyle, generalFormatStyle, null);
     }
 }

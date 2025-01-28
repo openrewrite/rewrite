@@ -23,8 +23,10 @@ import org.openrewrite.json.style.TabsAndIndentsStyle;
 import org.openrewrite.json.style.WrappingAndBracesStyle;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonRightPadded;
+import org.openrewrite.json.tree.JsonValue;
 import org.openrewrite.json.tree.Space;
 import org.openrewrite.style.GeneralFormatStyle;
+import org.openrewrite.style.LineWrapSetting;
 
 import java.util.List;
 import java.util.Optional;
@@ -33,7 +35,8 @@ import static java.util.Collections.emptyList;
 
 public class TabsAndIndentsVisitor<P> extends JsonIsoVisitor<P> {
     private final String singleIndent;
-    private final String objectsWrappingDelimiter;
+    private final GeneralFormatStyle generalFormatStyle;
+    private final WrappingAndBracesStyle wrappingAndBracesStyle;
 
     @Nullable
     private final Tree stopAfter;
@@ -44,22 +47,15 @@ public class TabsAndIndentsVisitor<P> extends JsonIsoVisitor<P> {
                                  @Nullable Tree stopAfter) {
         this.stopAfter = stopAfter;
 
-        if (tabsAndIndentsStyle.getUseTabCharacter()) {
-            this.singleIndent = "\t";
-        } else {
-            StringBuilder sb = new StringBuilder();
-            for (int j = 0; j < tabsAndIndentsStyle.getIndentSize(); j++) {
-                sb.append(" ");
-            }
-            singleIndent = sb.toString();
-        }
-        this.objectsWrappingDelimiter = wrappingAndBracesStyle.getWrapObjects().delimiter(generalFormatStyle);
+        this.singleIndent = tabsAndIndentsStyle.singleIndent();
+        this.wrappingAndBracesStyle = wrappingAndBracesStyle;
+        this.generalFormatStyle = generalFormatStyle;
     }
 
     @Override
     public Json preVisit(Json tree, P p) {
         Json json = super.preVisit(tree, p);
-        if (tree instanceof Json.JsonObject) {
+        if (tree instanceof Json.JsonObject || tree instanceof Json.Array) {
             String newIndent = getCurrentIndent() + this.singleIndent;
             getCursor().putMessage("indentToUse", newIndent);
         }
@@ -94,19 +90,40 @@ public class TabsAndIndentsVisitor<P> extends JsonIsoVisitor<P> {
         }
         if (json instanceof Json.JsonObject) {
             Json.JsonObject obj = (Json.JsonObject) json;
-            List<JsonRightPadded<Json>> children = obj.getPadding().getMembers();
-            children = ListUtils.mapLast(children, last -> {
-                String currentAfter = last.getAfter().getWhitespace();
-                String newAfter = objectsWrappingDelimiter + relativeIndent;
-                if (!newAfter.equals(currentAfter)) {
-                    return last.withAfter(Space.build(newAfter, emptyList()));
-                } else {
-                    return last;
-                }
-            });
-            json = obj.getPadding().withMembers(children);
+            List<JsonRightPadded<Json>> members = obj.getPadding().getMembers();
+            LineWrapSetting wrappingSetting = this.wrappingAndBracesStyle.getWrapObjects();
+            members = applyWrappingStyleToLastChildSuffix(members, wrappingSetting, relativeIndent);
+            json = obj.getPadding().withMembers(members);
         }
+
+        if (json instanceof Json.Array) {
+            Json.Array array = (Json.Array) json;
+            List<JsonRightPadded<JsonValue>> members = array.getPadding().getValues();
+            LineWrapSetting wrappingSetting = this.wrappingAndBracesStyle.getWrapArrays();
+            members = applyWrappingStyleToLastChildSuffix(members, wrappingSetting, relativeIndent);
+            json = array.getPadding().withValues(members);
+        }
+
         return json;
+    }
+
+    private <JS extends Json> List<JsonRightPadded<JS>> applyWrappingStyleToLastChildSuffix(List<JsonRightPadded<JS>> elements, LineWrapSetting wrapping, String relativeIndent) {
+        return ListUtils.mapLast(elements, elem -> {
+            String currentAfter = elem.getAfter().getWhitespace();
+            final String newAfter;
+            if (wrapping == LineWrapSetting.DoNotWrap) {
+                newAfter = "";
+            } else if (wrapping == LineWrapSetting.WrapAlways) {
+                newAfter = this.generalFormatStyle.newLine() + relativeIndent;
+            } else {
+                throw new UnsupportedOperationException("Unknown LineWrapSetting: " + wrapping);
+            }
+            if (!newAfter.equals(currentAfter)) {
+                return elem.withAfter(Space.build(newAfter, emptyList()));
+            } else {
+                return elem;
+            }
+        });
     }
 
     private String getCurrentIndent() {

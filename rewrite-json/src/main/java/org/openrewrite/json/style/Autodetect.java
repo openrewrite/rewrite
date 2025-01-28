@@ -21,6 +21,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.json.JsonVisitor;
 import org.openrewrite.json.tree.Json;
+import org.openrewrite.json.tree.JsonValue;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.LineWrapSetting;
 import org.openrewrite.style.NamedStyles;
@@ -261,10 +262,12 @@ public class Autodetect extends NamedStyles {
         }
     }
     private static class ClassifyWrappingJsonVisitor extends JsonVisitor<WrappingStatistics> {
+
+
         @Override
         public Json visitArray(Json.Array array, WrappingStatistics wrappingStatistics) {
-            if (!array.getValues().isEmpty()) {
-                boolean isWrapped = array.getValues().get(0).getPrefix().getWhitespace().contains("\n");
+            for (JsonValue value: array.getValues()) {
+                boolean isWrapped = value.getPrefix().getWhitespace().contains("\n");
                 wrappingStatistics.arraysWrapped.get(isWrapped).incrementAndGet();
             }
             return super.visitArray(array, wrappingStatistics);
@@ -272,8 +275,8 @@ public class Autodetect extends NamedStyles {
 
         @Override
         public Json visitObject(Json.JsonObject obj, WrappingStatistics wrappingStatistics) {
-            if (!obj.getMembers().isEmpty()) {
-                Boolean isWrapped = obj.getMembers().get(0).getPrefix().getWhitespace().contains("\n");
+            for (Json member: obj.getMembers()) {
+                boolean isWrapped = member.getPrefix().getWhitespace().contains("\n");
                 wrappingStatistics.objectsWrapped.get(isWrapped).incrementAndGet();
             }
             return super.visitObject(obj, wrappingStatistics);
