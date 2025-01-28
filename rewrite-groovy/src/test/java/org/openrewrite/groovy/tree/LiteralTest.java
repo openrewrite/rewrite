@@ -313,6 +313,11 @@ class LiteralTest implements RewriteTest {
             """
               def a = (("-"))
               """
+          ),
+          groovy(
+            """
+              from(":-)").via(''':-|(''').via(":-)").to(':-(')
+              """
           )
         );
     }

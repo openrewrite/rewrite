@@ -515,7 +515,7 @@ class MethodInvocationTest implements RewriteTest {
               ((/* comment :-) ((
               */((
                 // :-((
-                something(a)
+                /*)*/something(a)
               ))))
               """
           )
