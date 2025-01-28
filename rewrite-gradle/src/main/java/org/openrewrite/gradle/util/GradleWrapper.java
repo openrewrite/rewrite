@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.gradle.internal;
+package org.openrewrite.gradle.util;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -22,9 +22,12 @@ import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.gradle.internal.GradleWrapperScriptLoader;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.remote.Remote;
+import org.openrewrite.remote.RemoteArchive;
+import org.openrewrite.remote.RemoteResource;
 import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -66,24 +69,32 @@ public class GradleWrapper {
                 new LatestRelease(null) :
                 requireNonNull(Semver.validate(version, null).getValue());
 
-        HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getLargeFileHttpSender();
+        List<GradleVersion> allVersions = listAllVersions(repositoryUrl, ctx);
+        GradleVersion gradleVersion = allVersions.stream()
+                .filter(v -> versionComparator.isValid(null, v.version))
+                .max((v1, v2) -> versionComparator.compare(null, v1.version, v2.version))
+                .orElseThrow(() -> new IllegalStateException("Expected to find at least one Gradle wrapper version to select from."));
+
+        try {
+            DistributionInfos infos = DistributionInfos.fetch(distributionType, gradleVersion, ctx);
+            return new GradleWrapper(gradleVersion.version, infos);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    public static List<GradleVersion> listAllVersions(@Nullable String repositoryUrl, ExecutionContext ctx) {
+        HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
         String gradleVersionsUrl = StringUtils.isBlank(repositoryUrl) ? "https://services.gradle.org/versions/all" : repositoryUrl;
         try (HttpSender.Response resp = httpSender.send(httpSender.get(gradleVersionsUrl).build())) {
             if (resp.isSuccessful()) {
-                List<GradleVersion> allVersions = new ObjectMapper()
+                return new ObjectMapper()
                         .registerModule(new ParameterNamesModule())
                         .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
                         .readValue(resp.getBody(), new TypeReference<List<GradleVersion>>() {
                         });
-                GradleVersion gradleVersion = allVersions.stream()
-                        .filter(v -> versionComparator.isValid(null, v.version))
-                        .max((v1, v2) -> versionComparator.compare(null, v1.version, v2.version))
-                        .orElseThrow(() -> new IllegalStateException("Expected to find at least one Gradle wrapper version to select from."));
-
-                DistributionInfos infos = DistributionInfos.fetch(httpSender, distributionType, gradleVersion);
-                return new GradleWrapper(gradleVersion.version, infos);
             }
-            throw new IOException("Could not get Gradle versions at: " + gradleVersionsUrl);
+            throw new IOException("Could not get Gradle versions. HTTP " + resp.getCode());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -118,32 +129,22 @@ public class GradleWrapper {
 
     static final FileAttributes WRAPPER_JAR_FILE_ATTRIBUTES = new FileAttributes(null, null, null, true, true, false, 0);
 
-    public Remote wrapperJar() {
-        return Remote.builder(
-                WRAPPER_JAR_LOCATION,
-                URI.create(distributionInfos.getDownloadUrl())
-        ).build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-(plugins|wrapper)-(?!shared).*\\.jar", "gradle-wrapper.jar");
+    public RemoteArchive wrapperJar() {
+        return Remote.builder(WRAPPER_JAR_LOCATION)
+                .build(URI.create(distributionInfos.getDownloadUrl()), "gradle-[^\\/]+\\/(?:.*\\/)+gradle-(plugins|wrapper)-(?!shared).*\\.jar", "gradle-wrapper.jar");
     }
 
-    public Remote wrapperJar(SourceFile before) {
-        return Remote.builder(
-                before,
-                URI.create(distributionInfos.getDownloadUrl())
-        ).build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-(plugins|wrapper)-(?!shared).*\\.jar", "gradle-wrapper.jar");
+    public RemoteArchive wrapperJar(SourceFile before) {
+        return Remote.builder(before)
+                .build(URI.create(distributionInfos.getDownloadUrl()), "gradle-[^\\/]+\\/(?:.*\\/)+gradle-(plugins|wrapper)-(?!shared).*\\.jar", "gradle-wrapper.jar");
     }
 
-    public Remote gradlew() {
-        return Remote.builder(
-                WRAPPER_SCRIPT_LOCATION,
-                URI.create(distributionInfos.getDownloadUrl())
-        ).build("gradle-[^\\/]+/(?:.*/)+gradle-plugins-.*\\.jar", "org/gradle/api/internal/plugins/unixStartScript.txt");
+    public RemoteResource gradlew() {
+        return new GradleWrapperScriptLoader().findNearest(version).gradlew();
     }
 
-    public Remote gradlewBat() {
-        return Remote.builder(
-                WRAPPER_BATCH_LOCATION,
-                URI.create(distributionInfos.getDownloadUrl())
-        ).build("gradle-[^\\/]+/(?:.*/)+gradle-plugins-.*\\.jar", "org/gradle/api/internal/plugins/windowsStartScript.txt");
+    public RemoteResource gradlewBat() {
+        return new GradleWrapperScriptLoader().findNearest(version).gradlewBat();
     }
 
     public enum DistributionType {
@@ -152,10 +153,15 @@ public class GradleWrapper {
     }
 
     @Value
-    static class GradleVersion {
+    public static class GradleVersion {
         String version;
         String downloadUrl;
         String checksumUrl;
+
+        /**
+         * Is null for every non-release version (e.g. RCs and milestones).
+         */
+        @Nullable
         String wrapperChecksumUrl;
     }
 }

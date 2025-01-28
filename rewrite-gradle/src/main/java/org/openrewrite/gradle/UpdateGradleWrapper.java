@@ -21,8 +21,8 @@ import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.search.FindGradleProject;
-import org.openrewrite.gradle.internal.DistributionInfos;
-import org.openrewrite.gradle.internal.GradleWrapper;
+import org.openrewrite.gradle.util.DistributionInfos;
+import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.BuildTool;
@@ -44,7 +44,7 @@ import java.util.*;
 
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.PathUtils.equalIgnoringSeparators;
-import static org.openrewrite.gradle.internal.GradleWrapper.*;
+import static org.openrewrite.gradle.util.GradleWrapper.*;
 import static org.openrewrite.internal.StringUtils.isBlank;
 
 @RequiredArgsConstructor

@@ -34,7 +34,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.openrewrite.PathUtils.equalIgnoringSeparators;
-import static org.openrewrite.gradle.internal.GradleWrapper.WRAPPER_PROPERTIES_LOCATION;
+import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_PROPERTIES_LOCATION;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
