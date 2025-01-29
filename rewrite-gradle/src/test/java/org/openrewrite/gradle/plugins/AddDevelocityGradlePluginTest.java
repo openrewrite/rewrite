@@ -18,12 +18,13 @@ package org.openrewrite.gradle.plugins;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.gradle.RewriteGradleTest;
 import org.openrewrite.groovy.tree.G.CompilationUnit;
 import org.openrewrite.marker.BuildTool;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.test.RecipeSpec;
-import org.openrewrite.gradle.RewriteGradleTest;
+import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
 import java.util.function.Consumer;
@@ -38,7 +39,7 @@ import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withOfflineToolingApi;
 import static org.openrewrite.test.SourceSpecs.dir;
 
-class AddDevelocityGradlePluginTest extends RewriteGradleTest {
+class AddDevelocityGradlePluginTest extends RewriteGradleTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {

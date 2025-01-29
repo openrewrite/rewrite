@@ -17,11 +17,11 @@ package org.openrewrite.gradle.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
-import org.openrewrite.gradle.RewriteGradleTest;
+import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 
-class RepositoryTest extends RewriteGradleTest {
+class RepositoryTest implements RewriteTest {
 
     @Test
     void builtInFunctions() {

@@ -17,13 +17,13 @@ package org.openrewrite.gradle;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RecipeSpec;
-import org.openrewrite.gradle.RewriteGradleTest;
+import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.properties.Assertions.properties;
 import static org.openrewrite.test.SourceSpecs.dir;
 
-class AddPropertyTest extends RewriteGradleTest {
+class AddPropertyTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {

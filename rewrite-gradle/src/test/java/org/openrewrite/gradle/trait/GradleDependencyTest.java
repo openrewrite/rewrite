@@ -17,16 +17,16 @@ package org.openrewrite.gradle.trait;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.gradle.RewriteGradleTest;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RecipeSpec;
-import org.openrewrite.gradle.RewriteGradleTest;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withOfflineToolingApi;
 import static org.openrewrite.gradle.trait.Traits.gradleDependency;
 
-class GradleDependencyTest extends RewriteGradleTest {
+class GradleDependencyTest extends RewriteGradleTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec

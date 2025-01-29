@@ -19,14 +19,14 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
-import org.openrewrite.gradle.RewriteGradleTest;
+import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withOfflineToolingApi;
 import static org.openrewrite.java.Assertions.*;
 
-class AddJUnitPlatformLauncherTest extends RewriteGradleTest {
+class AddJUnitPlatformLauncherTest extends RewriteGradleTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {

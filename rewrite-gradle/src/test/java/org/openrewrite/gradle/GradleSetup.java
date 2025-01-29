@@ -20,7 +20,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
-public class GradleSetup extends RewriteGradleTest {
+public class GradleSetup extends RewriteGradleTest implements RewriteTest {
     private static Boolean alreadySetUp = false;
 
     // This is a one-time initialization of Gradle dependencies for the tests. It wouldn't be needed

@@ -25,7 +25,7 @@ import org.openrewrite.marker.BuildTool;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.remote.Remote;
 import org.openrewrite.test.RecipeSpec;
-import org.openrewrite.gradle.RewriteGradleTest;
+import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.text.PlainText;
 
@@ -43,17 +43,12 @@ import java.util.regex.Pattern;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withOfflineToolingApi;
-import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_BATCH_LOCATION;
-import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_JAR_LOCATION;
-import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_PROPERTIES_LOCATION;
-import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_SCRIPT_LOCATION;
+import static org.openrewrite.gradle.util.GradleWrapper.*;
 import static org.openrewrite.properties.Assertions.properties;
-import static org.openrewrite.test.SourceSpecs.dir;
-import static org.openrewrite.test.SourceSpecs.other;
-import static org.openrewrite.test.SourceSpecs.text;
+import static org.openrewrite.test.SourceSpecs.*;
 
 @SuppressWarnings("UnusedProperty")
-class UpdateGradleWrapperTest extends RewriteGradleTest {
+class UpdateGradleWrapperTest extends RewriteGradleTest implements RewriteTest {
     private final UnaryOperator<@Nullable String> notEmpty = actual -> {
         assertThat(actual).isNotNull();
         return actual + "\n";

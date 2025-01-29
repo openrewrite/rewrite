@@ -20,7 +20,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.style.NamedStyles;
-import org.openrewrite.gradle.RewriteGradleTest;
+import org.openrewrite.test.RewriteTest;
 
 import java.util.stream.Stream;
 
@@ -28,7 +28,7 @@ import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SuppressWarnings({"ConstantConditions"})
-class AutodetectTest extends RewriteGradleTest {
+class AutodetectTest implements RewriteTest {
     @Test
     void gradleTabsAndIndents() {
         Stream<SourceFile> parse = GroovyParser.builder().build()
