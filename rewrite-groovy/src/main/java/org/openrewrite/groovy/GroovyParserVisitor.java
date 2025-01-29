@@ -62,6 +62,7 @@ import java.util.stream.Stream;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
 import static org.openrewrite.java.tree.Space.EMPTY;
@@ -77,6 +78,7 @@ public class GroovyParserVisitor {
     private final FileAttributes fileAttributes;
 
     private final String source;
+    private final int[] sourceLineNumberOffsets;
     private final Charset charset;
     private final boolean charsetBomMarked;
     private final GroovyTypeMapping typeMapping;
@@ -102,6 +104,13 @@ public class GroovyParserVisitor {
         this.sourcePath = sourcePath;
         this.fileAttributes = fileAttributes;
         this.source = source.readFully();
+        AtomicInteger counter = new AtomicInteger(1);
+        AtomicInteger offsetCursor = new AtomicInteger(0);
+        this.sourceLineNumberOffsets = Arrays.stream(this.source.split("\n")).mapToInt(it -> {
+            int saveCursor = offsetCursor.get();
+            offsetCursor.set(saveCursor + it.length() + 1); // + 1 for the `\n` char
+            return saveCursor;
+        }).toArray();
         this.charset = source.getCharset();
         this.charsetBomMarked = source.isCharsetBomMarked();
         this.typeMapping = new GroovyTypeMapping(typeCache);
@@ -2502,27 +2511,41 @@ public class GroovyParserVisitor {
      * @return the level of parenthesis parsed from the source
      */
     private int determineParenthesisLevel(int childLineNumber, int parentLineNumber, int childColumn, int parentColumn) {
-        int saveCursor = cursor;
-        whitespace();
-        int untilCursor = cursor;
-        if (childLineNumber > parentLineNumber) {
-            for (int i = 0; i < (childLineNumber - parentLineNumber); i++) {
-                untilCursor = source.indexOf('\n', untilCursor) + 1; // +1; set cursor past `\n`
-            }
-            untilCursor += childColumn - 1; // -1; skip previous `\n`
+        // Map the coordinates
+        int startingLineNumber;
+        int startingColumn;
+        int endingLineNumber;
+        int endingColumn;
+        if (childLineNumber == parentLineNumber) {
+            startingLineNumber = childLineNumber;
+            endingLineNumber = childLineNumber;
+            startingColumn = Math.min(childColumn, parentColumn);
+            endingColumn = Math.max(childColumn, parentColumn);
+        } else if (childLineNumber > parentLineNumber) {
+            startingLineNumber = parentLineNumber;
+            endingLineNumber = childLineNumber;
+            startingColumn = parentColumn;
+            endingColumn = childColumn;
         } else {
-            untilCursor += childColumn - parentColumn;
+            startingLineNumber = childLineNumber;
+            endingLineNumber = parentLineNumber;
+            startingColumn = childColumn;
+            endingColumn = parentColumn;
         }
+
+        // line numbers and columns are 1-based
+        int start = sourceLineNumberOffsets[startingLineNumber - 1] + startingColumn - 1;
+        int end = sourceLineNumberOffsets[endingLineNumber - 1] + endingColumn - 1;
+
+        // Determine level of parentheses by going through the source
         int count = 0;
-        for (int i = cursor; i < untilCursor; i++) {
+        for (int i = start; i < end; i++) {
             if (source.charAt(i) == '(') {
                 count++;
-            }
-            if (source.charAt(i) == ')') {
+            } else if (source.charAt(i) == ')') {
                 count--;
             }
         }
-        cursor = saveCursor;
         return Math.max(count, 0);
     }
 

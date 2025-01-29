@@ -737,15 +737,15 @@ public class MavenPomDownloader {
             normalizedRepositories.put(ctx.getLocalRepository().getId(), ctx.getLocalRepository());
         }
 
-        for (MavenRepository repo : repositories) {
+        // repositories from maven settings
+        for (MavenRepository repo : ctx.getRepositories(mavenSettings, activeProfiles)) {
             MavenRepository normalizedRepo = normalizeRepository(repo, ctx, containingPom);
             if (normalizedRepo != null && (acceptsVersion == null || repositoryAcceptsVersion(normalizedRepo, acceptsVersion, containingPom))) {
                 normalizedRepositories.put(normalizedRepo.getId(), normalizedRepo);
             }
         }
 
-        // repositories from maven settings
-        for (MavenRepository repo : ctx.getRepositories(mavenSettings, activeProfiles)) {
+        for (MavenRepository repo : repositories) {
             MavenRepository normalizedRepo = normalizeRepository(repo, ctx, containingPom);
             if (normalizedRepo != null && (acceptsVersion == null || repositoryAcceptsVersion(normalizedRepo, acceptsVersion, containingPom))) {
                 normalizedRepositories.put(normalizedRepo.getId(), normalizedRepo);
