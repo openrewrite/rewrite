@@ -271,7 +271,6 @@ public class YamlParser implements org.openrewrite.Parser {
                             }
                             lastEnd = event.getEndMark().getIndex() + commaIndex + 1;
                             sequenceBuilder.push(finalScalar, commaPrefix);
-
                         } else if (builder == null) {
                             if (!"".equals(finalScalar.getValue())) {
                                 // If the "scalar" is just a comment, allow it to accrue to the Document.End rather than create a phantom scalar
@@ -286,16 +285,15 @@ public class YamlParser implements org.openrewrite.Parser {
                     case SequenceEnd:
                     case MappingEnd: {
                         Yaml.Block mappingOrSequence = blockStack.pop().build();
-                        if (mappingOrSequence instanceof Yaml.Sequence) {
-                            Yaml.Sequence seq = (Yaml.Sequence) mappingOrSequence;
+                        if (mappingOrSequence instanceof SequenceWithPrefix) {
+                            SequenceWithPrefix seq = (SequenceWithPrefix) mappingOrSequence;
                             if (seq.getOpeningBracketPrefix() != null) {
                                 String s = reader.readStringFromBuffer(lastEnd, event.getStartMark().getIndex());
                                 int closingBracketIndex = commentAwareIndexOf(']', s);
                                 lastEnd = lastEnd + closingBracketIndex + 1;
                                 mappingOrSequence = seq.withClosingBracketPrefix(s.substring(0, closingBracketIndex));
                             }
-                        }
-                        if (mappingOrSequence instanceof Yaml.Mapping) {
+                        } else if (mappingOrSequence instanceof Yaml.Mapping) {
                             Yaml.Mapping map = (Yaml.Mapping) mappingOrSequence;
                             if (map.getOpeningBracePrefix() != null) {
                                 String s = reader.readStringFromBuffer(lastEnd, event.getStartMark().getIndex());
@@ -303,6 +301,8 @@ public class YamlParser implements org.openrewrite.Parser {
                                 lastEnd = lastEnd + closingBraceIndex + 1;
                                 mappingOrSequence = map.withClosingBracePrefix(s.substring(0, closingBraceIndex));
                             }
+                        } else {
+                            throw new IllegalStateException("Unsupported element type: " + mappingOrSequence.getClass());
                         }
                         if (blockStack.isEmpty()) {
                             assert document != null;
@@ -334,7 +334,7 @@ public class YamlParser implements org.openrewrite.Parser {
                         String startBracketPrefix = null;
                         int openingBracketIndex = commentAwareIndexOf('[', fullPrefix);
                         if (openingBracketIndex != -1) {
-                            int startIndex = commentAwareIndexOf(':', fullPrefix) + 1;
+                            int startIndex = commentAwareIndexOf(Arrays.asList(':', '-'), fullPrefix) + 1;
                             startBracketPrefix = fullPrefix.substring(startIndex, openingBracketIndex);
                         }
                         lastEnd = event.getEndMark().getIndex();
@@ -415,6 +415,10 @@ public class YamlParser implements org.openrewrite.Parser {
     }
 
     private static int commentAwareIndexOf(char target, String s) {
+        return commentAwareIndexOf(Collections.singleton(target), s);
+    }
+
+    private static int commentAwareIndexOf(Collection<Character> anyOf, String s) {
         boolean inComment = false;
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
@@ -423,7 +427,7 @@ public class YamlParser implements org.openrewrite.Parser {
                     inComment = false;
                 }
             } else {
-                if (c == target) {
+                if (anyOf.contains(c)) {
                     return i;
                 } else if (c == '#') {
                     inComment = true;
@@ -589,10 +593,25 @@ public class YamlParser implements org.openrewrite.Parser {
             this.prefix = prefix;
         }
 
+        public SequenceWithPrefix(UUID id, Markers markers, @Nullable String openingBracketPrefix, List<Entry> entries, @Nullable String closingBracketPrefix, @Nullable Anchor anchor, String prefix) {
+            super(id, markers, openingBracketPrefix, entries, closingBracketPrefix, anchor);
+            this.prefix = prefix;
+        }
+
         @Override
         public Sequence withPrefix(String prefix) {
             this.prefix = prefix;
             return this;
+        }
+
+        @Override
+        public SequenceWithPrefix withClosingBracketPrefix(@Nullable String closingBracketPrefix) {
+            // Cannot use super as this returns Yaml.Sequence
+            return new SequenceWithPrefix(getId(), getMarkers(), getOpeningBracketPrefix(), getEntries(), closingBracketPrefix, getAnchor(), prefix);
+        }
+
+        public Sequence toSequence() {
+            return new Yaml.Sequence(getId(), getMarkers(), getOpeningBracketPrefix(), getEntries(), getClosingBracketPrefix(), getAnchor());
         }
     }
 
@@ -603,7 +622,12 @@ public class YamlParser implements org.openrewrite.Parser {
             public Yaml.Sequence visitSequence(Yaml.Sequence sequence, Integer p) {
                 if (sequence instanceof SequenceWithPrefix) {
                     SequenceWithPrefix sequenceWithPrefix = (SequenceWithPrefix) sequence;
-                    return super.visitSequence(
+                    if (sequenceWithPrefix.getOpeningBracketPrefix() != null) {
+                        // For inline sequence, the prefix got already transferred to the left-hand neighbor
+                        return sequenceWithPrefix.toSequence();
+                    } else {
+                        // For normal sequence with dashes, the prefix of the sequence gets transferred to the first entry
+                        return super.visitSequence(
                             new Yaml.Sequence(
                                     sequenceWithPrefix.getId(),
                                     sequenceWithPrefix.getMarkers(),
@@ -612,6 +636,7 @@ public class YamlParser implements org.openrewrite.Parser {
                                     sequenceWithPrefix.getClosingBracketPrefix(),
                                     sequenceWithPrefix.getAnchor()
                             ), p);
+                    }
                 }
                 return super.visitSequence(sequence, p);
             }
