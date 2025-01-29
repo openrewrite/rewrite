@@ -34,7 +34,6 @@ import org.openrewrite.style.Style;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static java.util.Collections.emptySet;
 
@@ -65,18 +64,12 @@ public class Autodetect extends NamedStyles {
         private final FindWrappingAndBracesStyle findWrappingAndBraces = new FindWrappingAndBracesStyle();
         private final FindLineFormatJavaVisitor findLineFormat = new FindLineFormatJavaVisitor();
 
-        public Detector sample(SourceFile cu) {
+        public void sample(SourceFile cu) {
             // only sample Java sources; extending languages need their own `Autodetect.Detector`
             // and can call `sampleJava()` from their `sample()` method if that helps
             if (cu instanceof J.CompilationUnit) {
                 sampleJava((JavaSourceFile) cu);
             }
-            return this;
-        }
-
-        public Detector sample(Stream<SourceFile> sourceFiles) {
-            sourceFiles.forEach(this::sample);
-            return this;
         }
 
         public void sampleJava(JavaSourceFile cu) {
