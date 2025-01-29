@@ -21,7 +21,7 @@ import org.openrewrite.test.RewriteTest;
 public class RewriteGradleTest implements RewriteTest {
 
     @BeforeAll
-    public static void makeSureArtifactsAreDownloaded() {
+    static void makeSureArtifactsAreDownloaded() {
         GradleSetup.makeSureArtifactsAreDownloaded();
     }
 }
