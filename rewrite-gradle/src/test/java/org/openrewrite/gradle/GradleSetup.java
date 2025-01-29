@@ -35,9 +35,9 @@ public class GradleSetup extends RewriteGradleTest {
               recipeSpec -> recipeSpec.beforeRecipe(withToolingApi()),
               buildGradle(
                 """
-                  repositories {
-                   mavenCentral()
-                  }
+                repositories {
+                 mavenCentral()
+                }
                 """
             ));
             alreadySetUp = true;
