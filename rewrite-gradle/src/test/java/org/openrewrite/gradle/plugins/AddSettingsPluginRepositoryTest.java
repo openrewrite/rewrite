@@ -17,11 +17,11 @@ package org.openrewrite.gradle.plugins;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.test.RewriteTest;
+import org.openrewrite.gradle.RewriteGradleTest;
 
 import static org.openrewrite.gradle.Assertions.settingsGradle;
 
-class AddSettingsPluginRepositoryTest implements RewriteTest {
+class AddSettingsPluginRepositoryTest extends RewriteGradleTest {
     @DocumentExample
     @Test
     void emptySettingsFile() {

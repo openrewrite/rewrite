@@ -19,13 +19,13 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.marker.BuildTool;
 import org.openrewrite.test.RecipeSpec;
-import org.openrewrite.test.RewriteTest;
+import org.openrewrite.gradle.RewriteGradleTest;
 
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withOfflineToolingApi;
 
-class AddBuildPluginTest implements RewriteTest {
+class AddBuildPluginTest extends RewriteGradleTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withOfflineToolingApi());

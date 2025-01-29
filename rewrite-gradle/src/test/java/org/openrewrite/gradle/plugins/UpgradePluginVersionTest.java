@@ -20,7 +20,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.test.RecipeSpec;
-import org.openrewrite.test.RewriteTest;
+import org.openrewrite.gradle.RewriteGradleTest;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -32,7 +32,7 @@ import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withOfflineToolingApi;
 import static org.openrewrite.properties.Assertions.properties;
 
-class UpgradePluginVersionTest implements RewriteTest {
+class UpgradePluginVersionTest extends RewriteGradleTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withOfflineToolingApi());

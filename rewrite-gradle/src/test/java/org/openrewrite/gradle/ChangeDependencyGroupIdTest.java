@@ -22,13 +22,13 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.test.RecipeSpec;
-import org.openrewrite.test.RewriteTest;
+import org.openrewrite.gradle.RewriteGradleTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withOfflineToolingApi;
 
-class ChangeDependencyGroupIdTest implements RewriteTest {
+class ChangeDependencyGroupIdTest extends RewriteGradleTest {
 
     @Override
     public void defaults(RecipeSpec spec) {

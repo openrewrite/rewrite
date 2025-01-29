@@ -17,12 +17,12 @@ package org.openrewrite.gradle.search;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.test.RewriteTest;
+import org.openrewrite.gradle.RewriteGradleTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
 
-class FindRepositoryTest implements RewriteTest {
+class FindRepositoryTest extends RewriteGradleTest {
     @DocumentExample
     @Test
     void repositoryByUrl() {

@@ -21,7 +21,7 @@ import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.properties.PropertiesParser;
 import org.openrewrite.test.RecipeSpec;
-import org.openrewrite.test.RewriteTest;
+import org.openrewrite.gradle.RewriteGradleTest;
 import org.openrewrite.text.PlainTextParser;
 
 import java.util.Optional;
@@ -34,7 +34,7 @@ import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withOfflineToolingApi;
 import static org.openrewrite.properties.Assertions.properties;
 
-class UpgradeDependencyVersionTest implements RewriteTest {
+class UpgradeDependencyVersionTest extends RewriteGradleTest {
 
     @Override
     public void defaults(RecipeSpec spec) {

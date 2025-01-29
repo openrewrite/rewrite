@@ -18,12 +18,12 @@ package org.openrewrite.gradle.plugins;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
-import org.openrewrite.test.RewriteTest;
+import org.openrewrite.gradle.RewriteGradleTest;
 
 import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withOfflineToolingApi;
 
-class RemoveDevelocityTest implements RewriteTest {
+class RemoveDevelocityTest extends RewriteGradleTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec

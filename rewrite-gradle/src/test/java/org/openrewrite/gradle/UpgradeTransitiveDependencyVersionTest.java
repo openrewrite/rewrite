@@ -19,14 +19,14 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
-import org.openrewrite.test.RewriteTest;
+import org.openrewrite.gradle.RewriteGradleTest;
 
 import java.util.List;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withOfflineToolingApi;
 
-class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
+class UpgradeTransitiveDependencyVersionTest extends RewriteGradleTest {
 
     @Override
     public void defaults(RecipeSpec spec) {

@@ -18,12 +18,12 @@ package org.openrewrite.gradle.security;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
-import org.openrewrite.test.RewriteTest;
+import org.openrewrite.gradle.RewriteGradleTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 
 @SuppressWarnings("HttpUrlsUsage")
-class UseHttpsForRepositoriesTest implements RewriteTest {
+class UseHttpsForRepositoriesTest extends RewriteGradleTest {
 
     @Override
     public void defaults(RecipeSpec spec) {

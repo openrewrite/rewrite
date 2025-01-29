@@ -17,11 +17,11 @@ package org.openrewrite.gradle.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
-import org.openrewrite.test.RewriteTest;
+import org.openrewrite.gradle.RewriteGradleTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 
-class ExtTest implements RewriteTest {
+class ExtTest extends RewriteGradleTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1236")
     @Test

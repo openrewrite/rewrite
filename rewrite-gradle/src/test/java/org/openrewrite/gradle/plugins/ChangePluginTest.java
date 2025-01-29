@@ -22,7 +22,7 @@ import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.test.RecipeSpec;
-import org.openrewrite.test.RewriteTest;
+import org.openrewrite.gradle.RewriteGradleTest;
 
 import java.util.Optional;
 import java.util.regex.Matcher;
@@ -33,7 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withOfflineToolingApi;
 
-class ChangePluginTest implements RewriteTest {
+class ChangePluginTest extends RewriteGradleTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withOfflineToolingApi())

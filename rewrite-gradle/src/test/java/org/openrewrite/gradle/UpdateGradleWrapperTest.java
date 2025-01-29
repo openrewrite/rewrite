@@ -25,7 +25,7 @@ import org.openrewrite.marker.BuildTool;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.remote.Remote;
 import org.openrewrite.test.RecipeSpec;
-import org.openrewrite.test.RewriteTest;
+import org.openrewrite.gradle.RewriteGradleTest;
 import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.text.PlainText;
 
@@ -53,7 +53,7 @@ import static org.openrewrite.test.SourceSpecs.other;
 import static org.openrewrite.test.SourceSpecs.text;
 
 @SuppressWarnings("UnusedProperty")
-class UpdateGradleWrapperTest implements RewriteTest {
+class UpdateGradleWrapperTest extends RewriteGradleTest {
     private final UnaryOperator<@Nullable String> notEmpty = actual -> {
         assertThat(actual).isNotNull();
         return actual + "\n";

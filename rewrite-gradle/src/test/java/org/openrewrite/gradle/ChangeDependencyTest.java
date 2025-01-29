@@ -18,12 +18,12 @@ package org.openrewrite.gradle;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
-import org.openrewrite.test.RewriteTest;
+import org.openrewrite.gradle.RewriteGradleTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withOfflineToolingApi;
 
-class ChangeDependencyTest implements RewriteTest {
+class ChangeDependencyTest extends RewriteGradleTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withOfflineToolingApi());

@@ -17,13 +17,13 @@ package org.openrewrite.gradle;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.test.RewriteTest;
+import org.openrewrite.gradle.RewriteGradleTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
 
-class GradleParserTest implements RewriteTest {
+class GradleParserTest extends RewriteGradleTest {
 
     @Test
     void buildGradleAndSettingsGradle() {

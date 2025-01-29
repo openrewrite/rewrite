@@ -23,7 +23,7 @@ import org.openrewrite.marker.BuildTool;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.test.RecipeSpec;
-import org.openrewrite.test.RewriteTest;
+import org.openrewrite.gradle.RewriteGradleTest;
 import org.openrewrite.test.SourceSpec;
 
 import java.util.function.Consumer;
@@ -38,7 +38,7 @@ import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withOfflineToolingApi;
 import static org.openrewrite.test.SourceSpecs.dir;
 
-class AddDevelocityGradlePluginTest implements RewriteTest {
+class AddDevelocityGradlePluginTest extends RewriteGradleTest {
 
     @Override
     public void defaults(RecipeSpec spec) {

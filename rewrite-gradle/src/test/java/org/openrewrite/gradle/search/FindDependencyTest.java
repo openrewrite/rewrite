@@ -17,11 +17,11 @@ package org.openrewrite.gradle.search;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.test.RewriteTest;
+import org.openrewrite.gradle.RewriteGradleTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 
-class FindDependencyTest implements RewriteTest {
+class FindDependencyTest extends RewriteGradleTest {
 
     @DocumentExample
     @Test

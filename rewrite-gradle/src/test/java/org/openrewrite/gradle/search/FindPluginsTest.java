@@ -20,7 +20,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.gradle.marker.GradlePluginDescriptor;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.test.RecipeSpec;
-import org.openrewrite.test.RewriteTest;
+import org.openrewrite.gradle.RewriteGradleTest;
 
 import java.util.Collections;
 
@@ -31,7 +31,7 @@ import static org.openrewrite.gradle.toolingapi.Assertions.withOfflineToolingApi
 import static org.openrewrite.properties.Assertions.properties;
 import static org.openrewrite.test.SourceSpecs.text;
 
-class FindPluginsTest implements RewriteTest {
+class FindPluginsTest extends RewriteGradleTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new FindPlugins("org.openrewrite.rewrite"));

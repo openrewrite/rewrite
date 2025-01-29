@@ -25,7 +25,7 @@ import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
-import org.openrewrite.test.RewriteTest;
+import org.openrewrite.gradle.RewriteGradleTest;
 import org.openrewrite.test.TypeValidation;
 
 import java.util.Optional;
@@ -45,7 +45,7 @@ import static org.openrewrite.java.Assertions.srcTestJava;
 import static org.openrewrite.properties.Assertions.properties;
 
 @SuppressWarnings("GroovyUnusedAssignment")
-class AddDependencyTest implements RewriteTest {
+class AddDependencyTest extends RewriteGradleTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withOfflineToolingApi())

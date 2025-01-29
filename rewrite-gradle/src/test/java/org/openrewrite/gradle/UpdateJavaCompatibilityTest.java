@@ -20,12 +20,12 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
-import org.openrewrite.test.RewriteTest;
+import org.openrewrite.gradle.RewriteGradleTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 
 @SuppressWarnings("GroovyUnusedAssignment")
-class UpdateJavaCompatibilityTest implements RewriteTest {
+class UpdateJavaCompatibilityTest extends RewriteGradleTest {
     @ParameterizedTest
     @CsvSource(textBlock = """
       1.8,1.8,11,11

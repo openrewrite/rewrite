@@ -21,7 +21,7 @@ import org.openrewrite.Issue;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.test.RecipeSpec;
-import org.openrewrite.test.RewriteTest;
+import org.openrewrite.gradle.RewriteGradleTest;
 
 import java.util.Optional;
 
@@ -31,7 +31,7 @@ import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withOfflineToolingApi;
 import static org.openrewrite.java.Assertions.mavenProject;
 
-class RemoveDependencyTest implements RewriteTest {
+class RemoveDependencyTest extends RewriteGradleTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
