@@ -17,6 +17,7 @@ package org.openrewrite.maven;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.assertj.core.api.Condition;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.assertj.core.api.ThrowingConsumer;
@@ -868,9 +869,8 @@ class MavenSettingsTest {
     void failingDeserialization() throws JsonProcessingException {
         //language=xml
         String xml = """
-          <settings>
-          </settings>
+          <settings></settings>
           """;
-        MavenSettings settings = MavenXmlMapper.writeMapper().readValue(xml, MavenSettings.class);
+        MavenSettings settings = MavenXmlMapper.writeMapper().registerModule(new ParameterNamesModule()).readValue(xml, MavenSettings.class);
     }
 }
