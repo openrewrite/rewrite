@@ -16,6 +16,7 @@
 package org.openrewrite.maven;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import org.assertj.core.api.Condition;
 import org.assertj.core.api.InstanceOfAssertFactories;
 import org.assertj.core.api.ThrowingConsumer;
@@ -825,23 +826,23 @@ class MavenSettingsTest {
     @Test
     void canDeserializeSettingsCorrectly() throws IOException {
         Xml.Document parsed = (Xml.Document) XmlParser.builder().build().parse("""
-            <settings>
-              <servers>
-                <server>
-                  <id>maven-snapshots</id>
-                  <configuration>
-                    <timeout>10000</timeout>
-                    <httpHeaders>
-                      <property>
-                        <name>X-JFrog-Art-Api</name>
-                        <value>myApiToken</value>
-                      </property>
-                    </httpHeaders>
-                  </configuration>
-                </server>
-              </servers>
-            </settings>
-            """).findFirst().get();
+          <settings>
+            <servers>
+              <server>
+                <id>maven-snapshots</id>
+                <configuration>
+                  <timeout>10000</timeout>
+                  <httpHeaders>
+                    <property>
+                      <name>X-JFrog-Art-Api</name>
+                      <value>myApiToken</value>
+                    </property>
+                  </httpHeaders>
+                </configuration>
+              </server>
+            </servers>
+          </settings>
+          """).findFirst().get();
 
         MavenSettings.HttpHeader httpHeader = new MavenSettings.HttpHeader("X-JFrog-Art-Api", "myApiToken");
         MavenSettings.ServerConfiguration configuration = new MavenSettings.ServerConfiguration(java.util.Collections.singletonList(httpHeader), 10000L);
@@ -859,7 +860,17 @@ class MavenSettingsTest {
           .isPresent()
           .get(InstanceOfAssertFactories.type(Xml.Document.class))
           .isNotNull()
-            .satisfies(serialized -> assertThat(SemanticallyEqual.areEqual(parsed, serialized)).isTrue())
-            .satisfies(serialized -> assertThat(serialized.printAll().replace("\r", "")).isEqualTo(parsed.printAll()));
+          .satisfies(serialized -> assertThat(SemanticallyEqual.areEqual(parsed, serialized)).isTrue())
+          .satisfies(serialized -> assertThat(serialized.printAll().replace("\r", "")).isEqualTo(parsed.printAll()));
+    }
+
+    @Test
+    void failingDeserialization() throws JsonProcessingException {
+        //language=xml
+        String xml = """
+          <settings>
+          </settings>
+          """;
+        MavenSettings settings = MavenXmlMapper.writeMapper().readValue(xml, MavenSettings.class);
     }
 }
