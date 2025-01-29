@@ -247,12 +247,16 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                             }
 
                             boolean shouldRemoveRedundantConstraint(String dependencyNotation, String configurationName) {
-                                GradleDependencyConfiguration c = gp.getConfiguration(configurationName);
-                                if (c == null) {
+                                return shouldRemoveRedundantConstraint(
+                                        DependencyStringNotationConverter.parse(dependencyNotation),
+                                        gp.getConfiguration(configurationName));
+                            }
+
+                            boolean shouldRemoveRedundantConstraint(@Nullable Dependency constraint, @Nullable GradleDependencyConfiguration c) {
+                                if (c == null || constraint == null || constraint.getVersion() == null) {
                                     return false;
                                 }
-                                Dependency constraint = DependencyStringNotationConverter.parse(dependencyNotation);
-                                if (constraint == null || constraint.getVersion() == null || constraint.getVersion().contains("[") || constraint.getVersion().contains("!!")) {
+                                if(constraint.getVersion().contains("[") || constraint.getVersion().contains("!!")) {
                                     // https://docs.gradle.org/current/userguide/dependency_versions.html#sec:strict-version
                                     return false;
                                 }
@@ -260,22 +264,15 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                     || (artifactPattern != null && !StringUtils.matchesGlob(constraint.getArtifactId(), artifactPattern))) {
                                     return false;
                                 }
-                                return shouldRemoveRedundantConstraint(constraint, c);
-                            }
-
-                            boolean shouldRemoveRedundantConstraint(Dependency constraint, GradleDependencyConfiguration c) {
-                                if (c.isCanBeResolved()) {
-                                    ResolvedDependency resolvedDependency = c.findResolvedDependency(requireNonNull(constraint.getGroupId()), constraint.getArtifactId());
-                                    if (resolvedDependency == null || constraint.getVersion() == null) {
-                                        return false;
-                                    }
-                                    return VERSION_COMPARATOR.compare(null, resolvedDependency.getVersion(), constraint.getVersion()) > 0;
-                                }
-                                return gp.configurationsExtendingFrom(c, true)
-                                        .stream()
+                                return Stream.concat(
+                                                Stream.of(c),
+                                                gp.configurationsExtendingFrom(c, true).stream()
+                                        )
                                         .filter(GradleDependencyConfiguration::isCanBeResolved)
                                         .distinct()
-                                        .anyMatch(conf -> shouldRemoveRedundantConstraint(constraint, conf));
+                                        .map(conf -> conf.findResolvedDependency(requireNonNull(constraint.getGroupId()), constraint.getArtifactId()))
+                                        .filter(Objects::nonNull)
+                                        .anyMatch(resolvedDependency -> VERSION_COMPARATOR.compare(null, resolvedDependency.getVersion(), constraint.getVersion()) > 0);
                             }
                         }.visitNonNull(cu, ctx);
 
