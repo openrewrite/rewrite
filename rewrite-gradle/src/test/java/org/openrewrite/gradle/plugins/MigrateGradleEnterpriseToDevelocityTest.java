@@ -19,16 +19,16 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
-import org.openrewrite.gradle.RewriteGradleTest;
+import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.settingsGradle;
-import static org.openrewrite.gradle.toolingapi.Assertions.withOfflineToolingApi;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
-class MigrateGradleEnterpriseToDevelocityTest extends RewriteGradleTest {
+class MigrateGradleEnterpriseToDevelocityTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new MigrateGradleEnterpriseToDevelocity("3.17.x"))
-          .beforeRecipe(withOfflineToolingApi());
+          .beforeRecipe(withToolingApi());
     }
 
     @Test

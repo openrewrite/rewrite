@@ -20,18 +20,18 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.gradle.marker.GradlePluginDescriptor;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.test.RecipeSpec;
-import org.openrewrite.gradle.RewriteGradleTest;
+import org.openrewrite.test.RewriteTest;
 
 import java.util.Collections;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
-import static org.openrewrite.gradle.toolingapi.Assertions.withOfflineToolingApi;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.properties.Assertions.properties;
 import static org.openrewrite.test.SourceSpecs.text;
 
-class FindPluginsTest extends RewriteGradleTest {
+class FindPluginsTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new FindPlugins("org.openrewrite.rewrite"));
@@ -41,7 +41,7 @@ class FindPluginsTest extends RewriteGradleTest {
     @Test
     void findPlugin() {
         rewriteRun(
-          spec -> spec.beforeRecipe(withOfflineToolingApi()),
+          spec -> spec.beforeRecipe(withToolingApi()),
           buildGradle(
             """
               plugins {
@@ -68,7 +68,7 @@ class FindPluginsTest extends RewriteGradleTest {
     @Test
     void settingsResolutionStrategy() {
         rewriteRun(
-          spec -> spec.beforeRecipe(withOfflineToolingApi()),
+          spec -> spec.beforeRecipe(withToolingApi()),
           settingsGradle(
               """
             pluginManagement {
@@ -107,7 +107,7 @@ class FindPluginsTest extends RewriteGradleTest {
     @Test
     void property() {
         rewriteRun(
-          spec -> spec.beforeRecipe(withOfflineToolingApi()),
+          spec -> spec.beforeRecipe(withToolingApi()),
           properties("rewritePluginVersion=6.22.0", spec -> spec.path("gradle.properties")),
           buildGradle(
             """

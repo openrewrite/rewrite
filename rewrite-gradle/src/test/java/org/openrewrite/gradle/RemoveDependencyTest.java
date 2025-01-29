@@ -21,21 +21,21 @@ import org.openrewrite.Issue;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.test.RecipeSpec;
-import org.openrewrite.gradle.RewriteGradleTest;
+import org.openrewrite.test.RewriteTest;
 
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
-import static org.openrewrite.gradle.toolingapi.Assertions.withOfflineToolingApi;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.java.Assertions.mavenProject;
 
-class RemoveDependencyTest extends RewriteGradleTest {
+class RemoveDependencyTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.beforeRecipe(withOfflineToolingApi())
+        spec.beforeRecipe(withToolingApi())
           .recipe(new RemoveDependency("org.springframework.boot", "spring-boot*", null));
     }
 

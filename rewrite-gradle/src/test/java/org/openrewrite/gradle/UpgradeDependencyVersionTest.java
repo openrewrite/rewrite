@@ -21,7 +21,7 @@ import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.properties.PropertiesParser;
 import org.openrewrite.test.RecipeSpec;
-import org.openrewrite.gradle.RewriteGradleTest;
+import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainTextParser;
 
 import java.util.Optional;
@@ -31,14 +31,14 @@ import java.util.regex.Pattern;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
-import static org.openrewrite.gradle.toolingapi.Assertions.withOfflineToolingApi;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.properties.Assertions.properties;
 
-class UpgradeDependencyVersionTest extends RewriteGradleTest {
+class UpgradeDependencyVersionTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.beforeRecipe(withOfflineToolingApi())
+        spec.beforeRecipe(withToolingApi())
           .recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.x", "-jre"));
     }
 
@@ -102,7 +102,7 @@ class UpgradeDependencyVersionTest extends RewriteGradleTest {
     @Test
     void mockitoTestImplementation() {
         rewriteRun(recipeSpec -> {
-              recipeSpec.beforeRecipe(withOfflineToolingApi())
+              recipeSpec.beforeRecipe(withToolingApi())
                 .recipe(new UpgradeDependencyVersion("org.mockito", "*", "4.11.0", null));
           },
           buildGradle(

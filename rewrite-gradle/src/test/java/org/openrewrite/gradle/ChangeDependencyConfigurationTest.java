@@ -20,18 +20,18 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
-import org.openrewrite.gradle.RewriteGradleTest;
+import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
-import static org.openrewrite.gradle.toolingapi.Assertions.withOfflineToolingApi;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.java.Assertions.mavenProject;
 
-class ChangeDependencyConfigurationTest extends RewriteGradleTest {
+class ChangeDependencyConfigurationTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.beforeRecipe(withOfflineToolingApi());
+        spec.beforeRecipe(withToolingApi());
     }
 
     @DocumentExample

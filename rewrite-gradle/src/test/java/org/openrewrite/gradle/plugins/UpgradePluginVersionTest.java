@@ -20,7 +20,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.test.RecipeSpec;
-import org.openrewrite.gradle.RewriteGradleTest;
+import org.openrewrite.test.RewriteTest;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -29,13 +29,13 @@ import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
-import static org.openrewrite.gradle.toolingapi.Assertions.withOfflineToolingApi;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.properties.Assertions.properties;
 
-class UpgradePluginVersionTest extends RewriteGradleTest {
+class UpgradePluginVersionTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.beforeRecipe(withOfflineToolingApi());
+        spec.beforeRecipe(withToolingApi());
     }
 
     @DocumentExample("Upgrading a build plugin")

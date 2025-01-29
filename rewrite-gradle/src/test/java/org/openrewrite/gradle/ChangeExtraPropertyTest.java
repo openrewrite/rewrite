@@ -18,12 +18,12 @@ package org.openrewrite.gradle;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
-import org.openrewrite.gradle.RewriteGradleTest;
+import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 
 @SuppressWarnings("GroovyAssignabilityCheck")
-class ChangeExtraPropertyTest extends RewriteGradleTest {
+class ChangeExtraPropertyTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {

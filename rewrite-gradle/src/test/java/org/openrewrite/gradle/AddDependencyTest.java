@@ -25,7 +25,7 @@ import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
-import org.openrewrite.gradle.RewriteGradleTest;
+import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
 import java.util.Optional;
@@ -33,7 +33,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
-import static org.openrewrite.gradle.toolingapi.Assertions.withOfflineToolingApi;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.groovy.Assertions.groovy;
 import static org.openrewrite.groovy.Assertions.srcMainGroovy;
 import static org.openrewrite.java.Assertions.java;
@@ -45,10 +45,10 @@ import static org.openrewrite.java.Assertions.srcTestJava;
 import static org.openrewrite.properties.Assertions.properties;
 
 @SuppressWarnings("GroovyUnusedAssignment")
-class AddDependencyTest extends RewriteGradleTest {
+class AddDependencyTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.beforeRecipe(withOfflineToolingApi())
+        spec.beforeRecipe(withToolingApi())
           .parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api", "guava", "jackson-databind", "jackson-core", "lombok"));
     }
 
@@ -1124,7 +1124,7 @@ class AddDependencyTest extends RewriteGradleTest {
     void addDynamicVersionDependency() {
         rewriteRun(
           spec -> spec
-            .beforeRecipe(withOfflineToolingApi())
+            .beforeRecipe(withToolingApi())
             .recipe(addDependency("org.openrewrite:rewrite-core:7.39.X", "java.util.Date", "implementation")),
           mavenProject("project",
             srcMainGroovy(

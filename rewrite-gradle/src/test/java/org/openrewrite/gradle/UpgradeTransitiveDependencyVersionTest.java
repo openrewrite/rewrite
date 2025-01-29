@@ -19,19 +19,19 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
-import org.openrewrite.gradle.RewriteGradleTest;
+import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.gradle.toolingapi.Assertions.withOfflineToolingApi;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
-class UpgradeTransitiveDependencyVersionTest extends RewriteGradleTest {
+class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
         spec
-          .beforeRecipe(withOfflineToolingApi())
+          .beforeRecipe(withToolingApi())
           .recipe(new UpgradeTransitiveDependencyVersion(
             "com.fasterxml*", "jackson-core", "2.12.5", null, "CVE-2024-BAD", null));
     }

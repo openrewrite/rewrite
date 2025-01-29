@@ -22,12 +22,12 @@ import org.openrewrite.Recipe;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.gradle.RewriteGradleTest;
+import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-class GradleJavaTemplateTest extends RewriteGradleTest {
+class GradleJavaTemplateTest implements RewriteTest {
 
     @Test
     @Disabled("work in progress")
