@@ -249,23 +249,19 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                 if (c == null) {
                                     return false;
                                 }
-                                String[] split = dependencyNotation.split(":");
-                                if (split.length != 3) {
+                                Dependency constraint = DependencyStringNotationConverter.parse(dependencyNotation);
+                                if (constraint == null || constraint.getVersion() == null || constraint.getVersion().contains("[") || constraint.getVersion().contains("!!")) {
+                                    // https://docs.gradle.org/current/userguide/dependency_versions.html#sec:strict-version
                                     return false;
                                 }
-                                String groupId = split[0];
-                                if (groupPattern != null && !StringUtils.matchesGlob(groupId, groupPattern)) {
+                                if ((groupPattern != null && !StringUtils.matchesGlob(constraint.getGroupId(), groupPattern))
+                                    || (artifactPattern != null && !StringUtils.matchesGlob(constraint.getArtifactId(), artifactPattern))) {
                                     return false;
                                 }
-                                String artifactId = split[1];
-                                if (artifactPattern != null && !StringUtils.matchesGlob(artifactId, artifactPattern)) {
-                                    return false;
-                                }
-                                String version = split[2];
-                                return shouldRemoveRedundantConstraint(new GroupArtifactVersion(groupId, artifactId, version), c);
+                                return shouldRemoveRedundantConstraint(constraint, c);
                             }
 
-                            boolean shouldRemoveRedundantConstraint(GroupArtifactVersion constraint, GradleDependencyConfiguration c) {
+                            boolean shouldRemoveRedundantConstraint(Dependency constraint, GradleDependencyConfiguration c) {
                                 if (c.isCanBeResolved()) {
                                     ResolvedDependency resolvedDependency = c.findResolvedDependency(requireNonNull(constraint.getGroupId()), constraint.getArtifactId());
                                     if (resolvedDependency == null || constraint.getVersion() == null) {
