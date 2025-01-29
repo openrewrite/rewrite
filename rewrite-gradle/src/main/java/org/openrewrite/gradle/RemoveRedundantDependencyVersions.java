@@ -45,6 +45,8 @@ import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.util.Objects.requireNonNull;
 
@@ -268,15 +270,12 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                         return false;
                                     }
                                     return VERSION_COMPARATOR.compare(null, resolvedDependency.getVersion(), constraint.getVersion()) > 0;
-                                } else {
-                                    List<GradleDependencyConfiguration> gradleDependencyConfigurations = gp.configurationsExtendingFrom(c, true);
-                                    for (GradleDependencyConfiguration extendingConf : gradleDependencyConfigurations) {
-                                        if (shouldRemoveRedundantConstraint(constraint, extendingConf)) {
-                                            return true;
-                                        }
-                                    }
                                 }
-                                return false;
+                                return gp.configurationsExtendingFrom(c, true)
+                                        .stream()
+                                        .filter(GradleDependencyConfiguration::isCanBeResolved)
+                                        .distinct()
+                                        .anyMatch(conf -> shouldRemoveRedundantConstraint(constraint, conf));
                             }
                         }.visitNonNull(cu, ctx);
 
