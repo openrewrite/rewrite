@@ -627,7 +627,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
           .setLargeFileHttpSender(customDistributionHost);
         rewriteRun(
           spec -> spec
-            .recipe(new UpdateGradleWrapper(null, null, null, "https://company.com/repo/gradle-8.0.2-bin.zip", null))
+            .recipe(new UpdateGradleWrapper(null, null, null, "https://company.com/repo/gradle-8.10-bin.zip", null))
             .expectedCyclesThatMakeChanges(1)
             .executionContext(ctx)
             .afterRecipe(run -> {
@@ -648,7 +648,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
 
                 var gradleWrapperJar = result(run, RemoteArchive.class, "gradle-wrapper.jar");
                 assertThat(gradleWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
-                assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create("https://company.com/repo/gradle-8.0.2-bin.zip"));
+                assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create("https://company.com/repo/gradle-8.10-bin.zip"));
                 assertThat(isValidWrapperJar(gradleWrapperJar)).as("Wrapper jar is not valid").isTrue();
             }),
           buildGradle(
@@ -675,7 +675,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
           .setLargeFileHttpSender(customDistributionHost);
         rewriteRun(
           spec -> spec
-            .recipe(new UpdateGradleWrapper(null, null, null, "https://company.com/repo/gradle-8.0.2-bin.zip", wrapperJarChecksum))
+            .recipe(new UpdateGradleWrapper(null, null, null, "https://company.com/repo/gradle-8.10-bin.zip", wrapperJarChecksum))
             .expectedCyclesThatMakeChanges(1)
             .executionContext(ctx)
             .afterRecipe(run -> {
