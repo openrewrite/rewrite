@@ -32,6 +32,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
+import org.openrewrite.groovy.internal.Delimiter;
 import org.openrewrite.groovy.marker.*;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.EncodingDetectingInputStream;
@@ -63,7 +64,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.groovy.GroovyParserVisitor.Delimiter.*;
+import static org.openrewrite.groovy.internal.Delimiter.*;
 import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
 import static org.openrewrite.java.tree.Space.EMPTY;
 import static org.openrewrite.java.tree.Space.format;
@@ -2562,9 +2563,9 @@ public class GroovyParserVisitor {
         if (source.startsWith("$/", cursor)) {
             return DOLLAR_SLASHY_STRING;
         } else if (source.startsWith("\"\"\"", cursor)) {
-            return TRIPLE_DOUBLE_QUOTE;
+            return TRIPLE_DOUBLE_QUOTE_STRING;
         } else if (source.startsWith("'''", cursor)) {
-            return TRIPLE_SINGLE_QUOTE;
+            return TRIPLE_SINGLE_QUOTE_STRING;
         } else if (source.startsWith("~/", cursor)) {
             return PATTERN_OPERATOR;
         } else if (source.startsWith("//", cursor)) {
@@ -2572,29 +2573,13 @@ public class GroovyParserVisitor {
         } else if (source.startsWith("/*", cursor)) {
             return MULTILINE_COMMENT;
         } else if (source.startsWith("/", cursor)) {
-            return SLASHY;
+            return SLASHY_STRING;
         } else if (source.startsWith("\"", cursor)) {
-            return DOUBLE_QUOTE;
+            return DOUBLE_QUOTE_STRING;
         } else if (source.startsWith("'", cursor)) {
-            return SINGLE_QUOTE;
+            return SINGLE_QUOTE_STRING;
         }
         return null;
-    }
-
-    @RequiredArgsConstructor
-    enum Delimiter {
-        SINGLE_QUOTE("'", "'"),
-        DOUBLE_QUOTE("\"", "\""),
-        TRIPLE_SINGLE_QUOTE("'''", "'''"),
-        TRIPLE_DOUBLE_QUOTE("\"\"\"", "\"\"\""),
-        SLASHY("/", "/"),
-        DOLLAR_SLASHY_STRING("$/", "/$"),
-        PATTERN_OPERATOR("~/", "/"),
-        SINGLE_LINE_COMMENT("//", "\n"),
-        MULTILINE_COMMENT("/*", "*/");
-
-        private final String open;
-        private final String close;
     }
 
     private TypeTree visitTypeTree(ClassNode classNode) {
