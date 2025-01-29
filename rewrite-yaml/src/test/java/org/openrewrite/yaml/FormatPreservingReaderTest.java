@@ -59,4 +59,16 @@ class FormatPreservingReaderTest {
 
         assertThat(formatPreservingReader.prefix(0, 3)).isEqualTo("012");
     }
+
+    @Test
+    void inTheNextBuffer() throws IOException {
+        var text = "0123456789";
+        var formatPreservingReader = new FormatPreservingReader(text);
+
+        char[] charArray = new char[10];
+
+        formatPreservingReader.read(charArray, 0, 5);
+
+        assertThat(formatPreservingReader.prefix(6, 8)).isEqualTo("67");
+    }
 }
