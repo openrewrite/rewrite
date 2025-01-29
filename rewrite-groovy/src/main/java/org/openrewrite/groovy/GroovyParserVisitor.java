@@ -2550,7 +2550,7 @@ public class GroovyParserVisitor {
                 } else {
                     i += delimiter.open.length() - 1; // skip the next chars for the rest of the delimiter
                 }
-            } else if (delimiter.close.equals(source.substring(i, Math.min(i + delimiter.close.length(), source.length())))) {
+            } else if (source.startsWith(delimiter.close, i)) {
                 i += delimiter.close.length() - 1; // skip the next chars for the rest of the delimiter
                 delimiter = null;
             }
@@ -2559,24 +2559,23 @@ public class GroovyParserVisitor {
     }
 
     private @Nullable Delimiter getDelimiter(int cursor) {
-        String maybeDelimiter = source.substring(cursor, Math.min(cursor + 3, source.length()));
-        if (maybeDelimiter.startsWith("$/")) {
+        if (source.startsWith("$/", cursor)) {
             return DOLLAR_SLASHY_STRING;
-        } else if (maybeDelimiter.startsWith("\"\"\"")) {
+        } else if (source.startsWith("\"\"\"", cursor)) {
             return TRIPLE_DOUBLE_QUOTE;
-        } else if (maybeDelimiter.startsWith("'''")) {
+        } else if (source.startsWith("'''", cursor)) {
             return TRIPLE_SINGLE_QUOTE;
-        } else if (maybeDelimiter.startsWith("~/")) {
+        } else if (source.startsWith("~/", cursor)) {
             return PATTERN_OPERATOR;
-        } else if (maybeDelimiter.startsWith("//")) {
+        } else if (source.startsWith("//", cursor)) {
             return SINGLE_LINE_COMMENT;
-        } else if (maybeDelimiter.startsWith("/*")) {
+        } else if (source.startsWith("/*", cursor)) {
             return MULTILINE_COMMENT;
-        } else if (maybeDelimiter.startsWith("/")) {
+        } else if (source.startsWith("/", cursor)) {
             return SLASHY;
-        } else if (maybeDelimiter.startsWith("\"")) {
+        } else if (source.startsWith("\"", cursor)) {
             return DOUBLE_QUOTE;
-        } else if (maybeDelimiter.startsWith("'")) {
+        } else if (source.startsWith("'", cursor)) {
             return SINGLE_QUOTE;
         }
         return null;
