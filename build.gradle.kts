@@ -18,6 +18,7 @@ val kotlinVersion = "1.9.25"
 dependencies {
     annotationProcessor("org.projectlombok:lombok:latest.release")
 
+    compileOnly(platform("org.openrewrite:rewrite-bom:${latest}"))
     compileOnly("org.openrewrite:rewrite-core")
     compileOnly("org.openrewrite:rewrite-test")
     compileOnly("org.projectlombok:lombok:latest.release")
