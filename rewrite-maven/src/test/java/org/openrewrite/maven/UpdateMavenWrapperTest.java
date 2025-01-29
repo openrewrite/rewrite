@@ -24,6 +24,7 @@ import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.marker.BuildTool;
 import org.openrewrite.maven.utilities.MavenWrapper;
 import org.openrewrite.remote.Remote;
+import org.openrewrite.remote.RemoteArchive;
 import org.openrewrite.remote.RemoteFile;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -326,7 +327,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
                   .isInstanceOf(NoSuchElementException.class)
                   .hasMessage("No value present");
 
-                var mvnwDownloaderJava = result(run, RemoteFile.class, "MavenWrapperDownloader.java");
+                var mvnwDownloaderJava = result(run, RemoteArchive.class, "MavenWrapperDownloader.java");
                 assertThat(mvnwDownloaderJava.getSourcePath()).isEqualTo(WRAPPER_DOWNLOADER_LOCATION);
                 assertThat(mvnwDownloaderJava.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper-distribution/3.1.1/maven-wrapper-distribution-3.1.1-source.zip"));
             }),
