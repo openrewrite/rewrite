@@ -16,10 +16,13 @@
 package org.openrewrite.json.format;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.json.style.TabsAndIndentsStyle;
+import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.json.Assertions.json;
+import static org.openrewrite.json.style.WrappingAndBracesStyle.OBJECTS_WRAP_ARRAYS_DONT;
 
 class WrappingAndBracesVisitorTest implements RewriteTest {
     @Override
@@ -53,7 +56,7 @@ class WrappingAndBracesVisitorTest implements RewriteTest {
                "x": "x",
                    "key": {
                "a": "b"
-            }
+                   }
             }
             """
           )
@@ -74,7 +77,7 @@ class WrappingAndBracesVisitorTest implements RewriteTest {
                "x": "x",
                "key": {
             "a": "b"
-            }
+               }
             }
             """
           )
@@ -110,7 +113,7 @@ class WrappingAndBracesVisitorTest implements RewriteTest {
             2,
              22,
              222
-            ],
+               ],
                "three": [
                 3,
                 33,
@@ -121,4 +124,30 @@ class WrappingAndBracesVisitorTest implements RewriteTest {
           )
         );
     }
+
+
+
+    @Test
+    void oneLineArrays() {
+        rewriteRun(
+          recipeSpec -> recipeSpec.recipe(new WrappingAndBraces(OBJECTS_WRAP_ARRAYS_DONT, TabsAndIndentsStyle.DEFAULT, GeneralFormatStyle.DEFAULT)),
+          json(
+            """
+            {
+               "one": [1, 11, 111        ],
+               "two": [2, 22         , 222],
+               "three": [3         , 33, 333]
+            }
+            """,
+            """
+            {
+               "one": [1, 11, 111],
+               "two": [2, 22, 222],
+               "three": [3, 33, 333]
+            }
+            """
+          )
+        );
+    }
+
 }
