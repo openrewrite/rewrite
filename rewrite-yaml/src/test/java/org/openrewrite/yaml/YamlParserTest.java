@@ -247,6 +247,17 @@ class YamlParserTest implements RewriteTest {
     }
 
     @Test
+    void spaceBeforeColon() {
+        rewriteRun(
+          yaml(
+            """
+            index_patterns : []
+            """
+          )
+        );
+    }  
+  
+    @Test
     void tagsAsInCloudFormation() {
         rewriteRun(
           yaml(

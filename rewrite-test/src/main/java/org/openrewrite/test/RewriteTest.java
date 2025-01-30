@@ -139,6 +139,15 @@ public interface RewriteTest extends SourceSpecs {
         RecipeSpec testMethodSpec = RecipeSpec.defaults();
         spec.accept(testMethodSpec);
 
+        ExecutionContext ctx;
+        if (testMethodSpec.getExecutionContext() != null) {
+            ctx = testMethodSpec.getExecutionContext();
+        } else if (testClassSpec.getExecutionContext() != null) {
+            ctx = testClassSpec.getExecutionContext();
+        } else {
+            ctx = defaultExecutionContext(sourceSpecs);
+        }
+
         PrintOutputCapture.MarkerPrinter markerPrinter;
         if (testMethodSpec.getMarkerPrinter() != null) {
             markerPrinter = testMethodSpec.getMarkerPrinter();
@@ -148,7 +157,7 @@ public interface RewriteTest extends SourceSpecs {
             markerPrinter = PrintOutputCapture.MarkerPrinter.DEFAULT;
         }
 
-        PrintOutputCapture<Integer> out = new PrintOutputCapture<>(0, markerPrinter);
+        PrintOutputCapture<ExecutionContext> out = new PrintOutputCapture<>(ctx, markerPrinter);
 
         Recipe recipe = testMethodSpec.recipe == null ?
                 testClassSpec.recipe == null ? Recipe.noop() : testClassSpec.recipe :
@@ -202,14 +211,6 @@ public interface RewriteTest extends SourceSpecs {
             }
         }
 
-        ExecutionContext ctx;
-        if (testMethodSpec.getExecutionContext() != null) {
-            ctx = testMethodSpec.getExecutionContext();
-        } else if (testClassSpec.getExecutionContext() != null) {
-            ctx = testClassSpec.getExecutionContext();
-        } else {
-            ctx = defaultExecutionContext(sourceSpecs);
-        }
         for (SourceSpec<?> s : sourceSpecs) {
             s.customizeExecutionContext.accept(ctx);
         }

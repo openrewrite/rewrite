@@ -26,7 +26,6 @@ import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
 import com.sun.tools.javac.util.Context;
-import lombok.Generated;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
@@ -350,7 +349,8 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 null,
                 null,
                 JContainer.build(
-                        node.getLabels().isEmpty() ? EMPTY : sourceBefore("case"),
+                        node.getLabels().isEmpty() || node.getLabels().getFirst() instanceof DefaultCaseLabelTree ?
+                                EMPTY : sourceBefore("case"),
                         node.getLabels().isEmpty() || node.getLabels().getFirst() instanceof DefaultCaseLabelTree ?
                                 List.of(JRightPadded.build(new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), skip("default"), null, null))) :
                                 convertAll(node.getLabels(), commaDelim, ignored -> node.getGuard() != null ? sourceBefore("when", '-') : EMPTY),
@@ -785,10 +785,23 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 type);
     }
 
+    @Override
+    public J visitDeconstructionPattern(DeconstructionPatternTree node, Space fmt) {
+        JavaType type = typeMapping.type(node);
+        return new J.DeconstructionPattern(randomId(),
+                fmt,
+                Markers.EMPTY,
+                convert(node.getDeconstructor()),
+                JContainer.build(sourceBefore("("), convertAll(node.getNestedPatterns(), commaDelim, t -> sourceBefore(")")), Markers.EMPTY),
+                type);
+    }
+
     private @Nullable J getNodePattern(@Nullable PatternTree pattern, JavaType type) {
         if (pattern instanceof JCBindingPattern b) {
             return new J.Identifier(randomId(), sourceBefore(b.getVariable().getName().toString()), Markers.EMPTY, emptyList(), b.getVariable().getName().toString(),
                     type, typeMapping.variableType(b.var.sym));
+        } else if (pattern instanceof DeconstructionPatternTree r) {
+            return visitDeconstructionPattern(r, whitespace());
         } else {
             if (pattern == null) {
                 return null;
@@ -2012,7 +2025,10 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         //noinspection ConstantConditions
-        return sym != null && ("lombok.val".equals(sym.getQualifiedName().toString()) || sym.getAnnotation(Generated.class) != null);
+        return sym != null && (
+                "lombok.val".equals(sym.getQualifiedName().toString()) ||
+                sym.getDeclarationAttributes().stream().anyMatch(a -> "lombok.Generated".equals(a.type.toString()))
+        );
     }
 
     /**

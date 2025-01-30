@@ -1,3 +1,5 @@
+import nl.javadude.gradle.plugins.license.LicenseExtension
+
 plugins {
     id("org.openrewrite.build.language-library")
     id("groovy")
@@ -93,4 +95,8 @@ tasks.withType<Javadoc> {
         "**/GradleProject**",
         "**/GradleSettings**"
     )
+}
+
+configure<LicenseExtension> {
+    excludePatterns.add("**/gradle-wrapper/*")
 }

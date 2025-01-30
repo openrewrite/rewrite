@@ -192,7 +192,7 @@ class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              foo(String.class)
+              foo(String    .class)
               """
           )
         );
@@ -447,6 +447,21 @@ class MethodInvocationTest implements RewriteTest {
                   ((map.containsKey("foo"))
                       && ((map.get("foo")).equals("bar")))
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void topLevelCallWithoutReceiver() {
+        rewriteRun(
+          groovy(
+            """
+              from('timer:groovy?period=1000')
+                  .setBody()
+                      .constant('Hello Camel K')
+                  .setBody()
+                      .simple('body - header.RandomValue')
               """
           )
         );

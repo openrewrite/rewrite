@@ -817,6 +817,25 @@ public class SemanticallyEqual {
         }
 
         @Override
+        public J.DeconstructionPattern visitDeconstructionPattern(J.DeconstructionPattern deconstructionPattern, J j) {
+            if (isEqual.get()) {
+                if (!(j instanceof J.DeconstructionPattern)) {
+                    isEqual.set(false);
+                    return deconstructionPattern;
+                }
+
+                J.DeconstructionPattern compareTo = (J.DeconstructionPattern) j;
+                if (!TypeUtils.isOfType(deconstructionPattern.getType(), compareTo.getType())) {
+                    isEqual.set(false);
+                    return deconstructionPattern;
+                }
+                visit(deconstructionPattern.getDeconstructor(), compareTo.getDeconstructor());
+                this.visitList(deconstructionPattern.getNested(), compareTo.getNested());
+            }
+            return deconstructionPattern;
+        }
+
+        @Override
         public J.Label visitLabel(J.Label label, J j) {
             if (isEqual.get()) {
                 if (!(j instanceof J.Label)) {

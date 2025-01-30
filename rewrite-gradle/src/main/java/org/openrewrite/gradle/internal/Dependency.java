@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.gradle.util;
+package org.openrewrite.gradle.internal;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
