@@ -624,8 +624,8 @@ public class YamlParser implements org.openrewrite.Parser {
             this.prefix = prefix;
         }
 
-        public SequenceWithPrefix(UUID id, Markers markers, @Nullable String openingBracketPrefix, List<Entry> entries, @Nullable String closingBracketPrefix, @Nullable Anchor anchor, String prefix) {
-            super(id, markers, openingBracketPrefix, entries, closingBracketPrefix, anchor);
+        public SequenceWithPrefix(UUID id, Markers markers, @Nullable String openingBracketPrefix, List<Entry> entries, @Nullable String closingBracketPrefix, @Nullable Anchor anchor, @Nullable Tag tag, String prefix) {
+            super(id, markers, openingBracketPrefix, entries, closingBracketPrefix, anchor, tag);
             this.prefix = prefix;
         }
 
@@ -638,11 +638,11 @@ public class YamlParser implements org.openrewrite.Parser {
         @Override
         public SequenceWithPrefix withClosingBracketPrefix(@Nullable String closingBracketPrefix) {
             // Cannot use super as this returns Yaml.Sequence
-            return new SequenceWithPrefix(getId(), getMarkers(), getOpeningBracketPrefix(), getEntries(), closingBracketPrefix, getAnchor(), prefix);
+            return new SequenceWithPrefix(getId(), getMarkers(), getOpeningBracketPrefix(), getEntries(), closingBracketPrefix, getAnchor(), getTag(), prefix);
         }
 
         public Sequence toSequence() {
-            return new Yaml.Sequence(getId(), getMarkers(), getOpeningBracketPrefix(), getEntries(), getClosingBracketPrefix(), getAnchor());
+            return new Yaml.Sequence(getId(), getMarkers(), getOpeningBracketPrefix(), getEntries(), getClosingBracketPrefix(), getAnchor(), getTag());
         }
     }
 
