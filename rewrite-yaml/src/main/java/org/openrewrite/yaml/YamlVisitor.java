@@ -80,7 +80,9 @@ public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
     }
 
     public Yaml visitMapping(Yaml.Mapping mapping, P p) {
-        return mapping.withEntries(ListUtils.map(mapping.getEntries(), e -> visitAndCast(e, p)))
+        return mapping
+                .withTag(visitAndCast(mapping.getTag(), p))
+                .withEntries(ListUtils.map(mapping.getEntries(), e -> visitAndCast(e, p)))
                 .withMarkers(visitMarkers(mapping.getMarkers(), p));
     }
 

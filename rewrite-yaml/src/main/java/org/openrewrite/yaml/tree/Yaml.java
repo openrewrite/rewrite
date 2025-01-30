@@ -280,6 +280,9 @@ public interface Yaml extends Tree {
         @Nullable
         Anchor anchor;
 
+        @Nullable
+        Tag tag;
+
         @Override
         public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
             return v.visitMapping(this, p);
@@ -288,7 +291,7 @@ public interface Yaml extends Tree {
         @Override
         public Mapping copyPaste() {
             return new Mapping(randomId(), Markers.EMPTY, openingBracePrefix, entries.stream().map(Entry::copyPaste)
-                    .collect(toList()), closingBracePrefix, anchor);
+                    .collect(toList()), closingBracePrefix, anchor, tag);
         }
 
         /**

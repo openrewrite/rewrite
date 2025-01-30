@@ -83,7 +83,7 @@ public class YamlParser implements org.openrewrite.Parser {
                         // ensure there is always at least one Document, even in an empty yaml file
                         if (docs.getDocuments().isEmpty()) {
                             Yaml.Document.End end = new Yaml.Document.End(randomId(), "", Markers.EMPTY, false);
-                            Yaml.Mapping mapping = new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null);
+                            Yaml.Mapping mapping = new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null, null);
                             return docs.withDocuments(singletonList(new Yaml.Document(randomId(), "", Markers.EMPTY, false, mapping, end)));
                         }
                         return docs;
@@ -157,7 +157,7 @@ public class YamlParser implements org.openrewrite.Parser {
                                 fmt,
                                 Markers.EMPTY,
                                 ((DocumentStartEvent) event).getExplicit(),
-                                new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null),
+                                new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null, null),
                                 new Yaml.Document.End(randomId(), "", Markers.EMPTY, false)
                         );
                         lastEnd = event.getEndMark().getIndex();
@@ -182,14 +182,30 @@ public class YamlParser implements org.openrewrite.Parser {
                         }
 
                         String fullPrefix = reader.readStringFromBuffer(lastEnd, event.getEndMark().getIndex() - 1);
+                        int startIndex = commentAwareIndexOf(':', fullPrefix) + 1;
+                        Yaml.Tag tag = null;
+                        if (mappingStartEvent.getTag() != null) {
+                            String prefixAfterColon = fullPrefix.substring(startIndex);
+                            final int tagStartIndex = prefixAfterColon.indexOf('!');
+                            String tagPrefix = prefixAfterColon.substring(0, tagStartIndex);
+                            int i = tagStartIndex;
+                            while (i < prefixAfterColon.length() && !Character.isWhitespace(prefixAfterColon.charAt(i))) {
+                                i++;
+                            }
+                            // Cannot use sse.getTag() here, because it is sometimes expanded, e.g. `!!seq` becomes `tag:yaml.org,2002:seq`
+                            String tagName = prefixAfterColon.substring(tagStartIndex, i);
+                            String tagSuffix = prefixAfterColon.substring(i, prefixAfterColon.length() - 2);
+                            tag = new Yaml.Tag(randomId(), tagPrefix, tagSuffix, Markers.EMPTY, tagName);
+                            lastEnd = lastEnd + startIndex + i + 1;
+                        }
+
                         String startBracePrefix = null;
                         int openingBraceIndex = commentAwareIndexOf('{', fullPrefix);
                         if (openingBraceIndex != -1) {
-                            int startIndex = commentAwareIndexOf(':', fullPrefix) + 1;
                             startBracePrefix = fullPrefix.substring(startIndex, openingBraceIndex);
                             lastEnd = event.getEndMark().getIndex();
                         }
-                        blockStack.push(new MappingBuilder(fmt, startBracePrefix, anchor));
+                        blockStack.push(new MappingBuilder(fmt, startBracePrefix, anchor, tag));
                         break;
                     }
                     case Scalar: {
@@ -393,7 +409,7 @@ public class YamlParser implements org.openrewrite.Parser {
                             documents.add(
                                     new Yaml.Document(
                                             randomId(), fmt, Markers.EMPTY, false,
-                                            new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null),
+                                            new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null, null),
                                             new Yaml.Document.End(randomId(), "", Markers.EMPTY, false)
                                     ));
                         }
@@ -491,16 +507,18 @@ public class YamlParser implements org.openrewrite.Parser {
 
 
         private final Yaml.@Nullable Anchor anchor;
+        private final Yaml.@Nullable Tag tag;
 
         private final List<Yaml.Mapping.Entry> entries = new ArrayList<>();
 
         @Nullable
         private YamlKey key;
 
-        private MappingBuilder(String prefix, @Nullable String startBracePrefix, Yaml.@Nullable Anchor anchor) {
+        private MappingBuilder(String prefix, @Nullable String startBracePrefix, Yaml.@Nullable Anchor anchor, Yaml.@Nullable Tag tag) {
             this.prefix = prefix;
             this.startBracePrefix = startBracePrefix;
             this.anchor = anchor;
+            this.tag = tag;
         }
 
         @Override
@@ -533,7 +551,7 @@ public class YamlParser implements org.openrewrite.Parser {
 
         @Override
         public MappingWithPrefix build() {
-            return new MappingWithPrefix(prefix, startBracePrefix, entries, null, anchor);
+            return new MappingWithPrefix(prefix, startBracePrefix, entries, null, anchor, tag);
         }
     }
 
@@ -603,8 +621,8 @@ public class YamlParser implements org.openrewrite.Parser {
     private static class MappingWithPrefix extends Yaml.Mapping {
         private String prefix;
 
-        public MappingWithPrefix(String prefix, @Nullable String startBracePrefix, List<Yaml.Mapping.Entry> entries, @Nullable String endBracePrefix, @Nullable Anchor anchor) {
-            super(randomId(), Markers.EMPTY, startBracePrefix, entries, endBracePrefix, anchor);
+        public MappingWithPrefix(String prefix, @Nullable String startBracePrefix, List<Yaml.Mapping.Entry> entries, @Nullable String endBracePrefix, @Nullable Anchor anchor, @Nullable Tag tag) {
+            super(randomId(), Markers.EMPTY, startBracePrefix, entries, endBracePrefix, anchor, tag);
             this.prefix = prefix;
         }
 
@@ -678,7 +696,7 @@ public class YamlParser implements org.openrewrite.Parser {
                 if (mapping instanceof MappingWithPrefix) {
                     MappingWithPrefix mappingWithPrefix = (MappingWithPrefix) mapping;
                     return super.visitMapping(new Yaml.Mapping(mappingWithPrefix.getId(),
-                            mappingWithPrefix.getMarkers(), mappingWithPrefix.getOpeningBracePrefix(), mappingWithPrefix.getEntries(), null, mappingWithPrefix.getAnchor()), p);
+                            mappingWithPrefix.getMarkers(), mappingWithPrefix.getOpeningBracePrefix(), mappingWithPrefix.getEntries(), null, mappingWithPrefix.getAnchor(), mappingWithPrefix.getTag()), p);
                 }
                 return super.visitMapping(mapping, p);
             }

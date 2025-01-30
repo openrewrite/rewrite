@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.openrewrite.yaml.Assertions.yaml;
 
 class YamlParserTest implements RewriteTest {
@@ -298,5 +299,26 @@ class YamlParserTest implements RewriteTest {
             """
           )
         );
+    }
+
+    @Test
+    void parseTagInMapping() {
+        // given
+        @Language("yml") String code =
+          """
+          person: !!map
+            name: Jonah Mathews
+          """;
+
+        // when
+        Yaml.Documents parsed = (Yaml.Documents) YamlParser.builder().build().parse(code).toList().get(0);
+
+        // test
+        Yaml.Document document = parsed.getDocuments().get(0);
+        Yaml.Mapping topMapping = (Yaml.Mapping) document.getBlock();
+        Yaml.Mapping.Entry person = topMapping.getEntries().get(0);
+        assertEquals("person", person.getKey().getValue());
+        Yaml.Mapping withinPerson = (Yaml.Mapping) person.getValue();
+        assertEquals("!!map", withinPerson.getTag().getName());
     }
 }
