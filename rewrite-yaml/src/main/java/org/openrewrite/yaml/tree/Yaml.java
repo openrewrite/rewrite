@@ -533,7 +533,7 @@ public interface Yaml extends Tree {
         Markers markers;
 
         @With
-        String name;
+        String text;
 
         @Override
         public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
@@ -542,12 +542,12 @@ public interface Yaml extends Tree {
 
         @Override
         public Tag copyPaste() {
-            return new Tag(randomId(), prefix, suffix, Markers.EMPTY, name);
+            return new Tag(randomId(), prefix, suffix, Markers.EMPTY, text);
         }
 
         @Override
         public String toString() {
-            return "Yaml.Tag(" + name + ")";
+            return "Yaml.Tag(" + text + ")";
         }
     }
 }
