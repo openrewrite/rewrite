@@ -192,6 +192,17 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
+    void gStringWithStringLiteralsWithParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              "Hello ${from(":-)").via(''':-|(''').via(":-)").to(':-(')}!"
+              """
+          )
+        );
+    }
+
+    @Test
     void mapLiteral() {
         rewriteRun(
           groovy(
@@ -312,6 +323,11 @@ class LiteralTest implements RewriteTest {
           groovy(
             """
               def a = (("-"))
+              """
+          ),
+          groovy(
+            """
+              from(":-)").via(''':-|(''').via(":-)").to(':-(')
               """
           )
         );

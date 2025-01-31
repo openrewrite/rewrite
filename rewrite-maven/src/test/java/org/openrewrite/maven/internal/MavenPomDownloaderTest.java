@@ -1275,8 +1275,9 @@ class MavenPomDownloaderTest implements RewriteTest {
                     @Override
                     public MockResponse dispatch(RecordedRequest recordedRequest) {
                         assert recordedRequest.getPath() != null;
-                        if (recordedRequest.getPath().endsWith("fred/fred/1/fred-1.pom"))
+                        if (recordedRequest.getPath().endsWith("fred/fred/1/fred-1.pom")) {
                             return new MockResponse().setResponseCode(404).setBody("");
+                        }
                         return new MockResponse().setResponseCode(200).setBody("some bytes so the jar isn't empty");
                     }
                 });
