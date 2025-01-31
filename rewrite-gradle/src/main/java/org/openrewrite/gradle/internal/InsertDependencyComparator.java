@@ -16,6 +16,8 @@
 package org.openrewrite.gradle.internal;
 
 import lombok.Getter;
+import org.openrewrite.gradle.util.Dependency;
+import org.openrewrite.gradle.util.DependencyStringNotationConverter;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;

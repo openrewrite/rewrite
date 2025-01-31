@@ -18,8 +18,6 @@ package org.openrewrite.gradle.util;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Checksum;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.ipc.http.HttpSender;
 
 import java.io.IOException;
@@ -35,15 +33,11 @@ public class DistributionInfos {
     @Nullable
     Checksum wrapperJarChecksum;
 
-    public static DistributionInfos fetch(GradleWrapper.DistributionType distributionType,
-                                   GradleWrapper.GradleVersion gradleVersion, ExecutionContext ctx) throws IOException {
-        HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
+    static DistributionInfos fetch(HttpSender httpSender, GradleWrapper.DistributionType distributionType,
+                                   GradleWrapper.GradleVersion gradleVersion) throws IOException {
         String downloadUrl = toDistTypeUrl(distributionType, gradleVersion.getDownloadUrl());
         Checksum checksum = fetchChecksum(httpSender, toDistTypeUrl(distributionType, gradleVersion.getChecksumUrl()));
-        Checksum jarChecksum = gradleVersion.getWrapperChecksumUrl() == null ?
-                null :
-                fetchChecksum(httpSender, gradleVersion.getWrapperChecksumUrl());
-
+        Checksum jarChecksum = fetchChecksum(httpSender, gradleVersion.getWrapperChecksumUrl());
         return new DistributionInfos(downloadUrl, checksum, jarChecksum);
     }
 

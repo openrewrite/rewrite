@@ -50,7 +50,7 @@ public class MavenWrapper {
                                                     "# \"License\"); you may not use this file except in compliance\n" +
                                                     "# with the License.  You may obtain a copy of the License at\n" +
                                                     "# \n" +
-                                                    "#   https://www.apache.org/licenses/LICENSE-2.0\n" +
+                                                    "#   http://www.apache.org/licenses/LICENSE-2.0\n" +
                                                     "# \n" +
                                                     "# Unless required by applicable law or agreed to in writing,\n" +
                                                     "# software distributed under the License is distributed on an\n" +
@@ -131,21 +131,25 @@ public class MavenWrapper {
                     .orElseThrow(() -> new IllegalStateException("Expected to find at least one Maven distribution version to select from."));
             String resolvedDistributionUri = getDownloadUriFor(repository, distributionGroupArtifact, resolvedDistributionVersion, "bin", "zip");
 
-            Remote wrapperJar = (Remote) Checksum.sha256(
-                    Remote.builder(WRAPPER_JAR_LOCATION).build(URI.create(resolvedWrapperUri)), ctx);
+            Remote wrapperJar = (Remote) Checksum.sha256(Remote.builder(
+                    WRAPPER_JAR_LOCATION,
+                    URI.create(resolvedWrapperUri)
+            ).build(), ctx);
 
-            Remote mavenDistribution = (Remote) Checksum.sha256(Remote.builder(Paths.get(""))
-                    .build(URI.create(resolvedDistributionUri)), ctx);
+            Remote mavenDistribution = (Remote) Checksum.sha256(Remote.builder(
+                    Paths.get(""),
+                    URI.create(resolvedDistributionUri)
+            ).build(), ctx);
 
             return new MavenWrapper(
                     resolvedWrapperVersion,
                     resolvedWrapperUri,
-                    requireNonNull(wrapperJar.getChecksum()),
+                    wrapperJar.getChecksum(),
                     resolvedWrapperDistributionUri,
                     wrapperDistributionType,
                     resolvedDistributionVersion,
                     resolvedDistributionUri,
-                    requireNonNull(mavenDistribution.getChecksum())
+                    mavenDistribution.getChecksum()
             );
         } catch (MavenDownloadingException e) {
             throw new RuntimeException("Could not get Maven versions at: " + repository.getUri(), e);
@@ -161,33 +165,45 @@ public class MavenWrapper {
     }
 
     public Remote wrapperJar() {
-        return Remote.builder(WRAPPER_JAR_LOCATION)
-                .build(URI.create(wrapperUri));
+        return Remote.builder(
+                WRAPPER_JAR_LOCATION,
+                URI.create(wrapperUri)
+        ).build();
     }
 
     public Remote wrapperJar(SourceFile previous) {
-        return Remote.builder(previous)
-                .build(URI.create(wrapperUri));
+        return Remote.builder(
+                previous,
+                URI.create(wrapperUri)
+        ).build();
     }
 
     public Remote wrapperDownloader() {
-        return Remote.builder(WRAPPER_DOWNLOADER_LOCATION)
-                .build(URI.create(wrapperDistributionUri), ".mvn/wrapper/MavenWrapperDownloader.java");
+        return Remote.builder(
+                WRAPPER_DOWNLOADER_LOCATION,
+                URI.create(wrapperDistributionUri)
+        ).build(".mvn/wrapper/MavenWrapperDownloader.java");
     }
 
     public Remote wrapperDownloader(SourceFile previous) {
-        return Remote.builder(previous)
-                .build(URI.create(wrapperDistributionUri), ".mvn/wrapper/MavenWrapperDownloader.java");
+        return Remote.builder(
+                previous,
+                URI.create(wrapperDistributionUri)
+        ).build(".mvn/wrapper/MavenWrapperDownloader.java");
     }
 
     public Remote mvnw() {
-        return Remote.builder(WRAPPER_SCRIPT_LOCATION)
-                .build(URI.create(wrapperDistributionUri), "mvnw");
+        return Remote.builder(
+                WRAPPER_SCRIPT_LOCATION,
+                URI.create(wrapperDistributionUri)
+        ).build("mvnw");
     }
 
     public Remote mvnwCmd() {
-        return Remote.builder(WRAPPER_BATCH_LOCATION)
-                .build(URI.create(wrapperDistributionUri), "mvnw.cmd");
+        return Remote.builder(
+                WRAPPER_BATCH_LOCATION,
+                URI.create(wrapperDistributionUri)
+        ).build("mvnw.cmd");
     }
 
     private static String getDownloadUriFor(MavenRepository repository, GroupArtifact ga, String version, @Nullable String classifier, String extension) {

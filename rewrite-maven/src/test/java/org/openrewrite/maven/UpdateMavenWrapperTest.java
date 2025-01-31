@@ -24,8 +24,6 @@ import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.marker.BuildTool;
 import org.openrewrite.maven.utilities.MavenWrapper;
 import org.openrewrite.remote.Remote;
-import org.openrewrite.remote.RemoteArchive;
-import org.openrewrite.remote.RemoteFile;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
@@ -87,7 +85,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
                 assertThat(mvnwCmd.getSourcePath()).isEqualTo(WRAPPER_BATCH_LOCATION);
                 assertThat(mvnwCmd.getText()).isEqualTo(MVNW_CMD_TEXT);
 
-                var mavenWrapperJar = result(run, RemoteFile.class, "maven-wrapper.jar");
+                var mavenWrapperJar = result(run, Remote.class, "maven-wrapper.jar");
                 assertThat(mavenWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
                 assertThat(mavenWrapperJar.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar"));
                 assertThat(isValidWrapperJar(mavenWrapperJar)).as("Wrapper jar is not valid").isTrue();
@@ -122,7 +120,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
               assertThat(mvnwCmd.getSourcePath()).isEqualTo(WRAPPER_BATCH_LOCATION);
               assertThat(mvnwCmd.getText()).isEqualTo(MVNW_CMD_TEXT);
 
-              var mavenWrapperJar = result(run, RemoteFile.class, "maven-wrapper.jar");
+              var mavenWrapperJar = result(run, Remote.class, "maven-wrapper.jar");
               assertThat(mavenWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
               assertThat(mavenWrapperJar.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar"));
               assertThat(isValidWrapperJar(mavenWrapperJar)).as("Wrapper jar is not valid").isTrue();
@@ -158,7 +156,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
                 assertThat(mvnwCmd.getSourcePath()).isEqualTo(WRAPPER_BATCH_LOCATION);
                 assertThat(mvnwCmd.getText()).isEqualTo(MVNW_CMD_TEXT);
 
-                var mavenWrapperJar = result(run, RemoteFile.class, "maven-wrapper.jar");
+                var mavenWrapperJar = result(run, Remote.class, "maven-wrapper.jar");
                 assertThat(mavenWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
                 assertThat(mavenWrapperJar.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar"));
                 assertThat(isValidWrapperJar(mavenWrapperJar)).as("Wrapper jar is not valid").isTrue();
@@ -235,7 +233,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
                 assertThat(mvnwCmd.getSourcePath()).isEqualTo(WRAPPER_BATCH_LOCATION);
                 assertThat(mvnwCmd.getText()).isEqualTo(MVNW_CMD_TEXT);
 
-                var mavenWrapperJar = result(run, RemoteFile.class, "maven-wrapper.jar");
+                var mavenWrapperJar = result(run, Remote.class, "maven-wrapper.jar");
                 assertThat(mavenWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
                 assertThat(mavenWrapperJar.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar"));
                 assertThat(isValidWrapperJar(mavenWrapperJar)).as("Wrapper jar is not valid").isTrue();
@@ -282,7 +280,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
                 assertThat(mvnwCmd.getSourcePath()).isEqualTo(WRAPPER_BATCH_LOCATION);
                 assertThat(mvnwCmd.getText()).isEqualTo(MVNW_CMD_TEXT);
 
-                var mavenWrapperJar = result(run, RemoteFile.class, "maven-wrapper.jar");
+                var mavenWrapperJar = result(run, Remote.class, "maven-wrapper.jar");
                 assertThat(mavenWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
                 assertThat(mavenWrapperJar.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar"));
                 assertThat(isValidWrapperJar(mavenWrapperJar)).as("Wrapper jar is not valid").isTrue();
@@ -327,7 +325,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
                   .isInstanceOf(NoSuchElementException.class)
                   .hasMessage("No value present");
 
-                var mvnwDownloaderJava = result(run, RemoteArchive.class, "MavenWrapperDownloader.java");
+                var mvnwDownloaderJava = result(run, Remote.class, "MavenWrapperDownloader.java");
                 assertThat(mvnwDownloaderJava.getSourcePath()).isEqualTo(WRAPPER_DOWNLOADER_LOCATION);
                 assertThat(mvnwDownloaderJava.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper-distribution/3.1.1/maven-wrapper-distribution-3.1.1-source.zip"));
             }),
@@ -568,7 +566,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
                 assertThat(mvnwCmd.getSourcePath()).isEqualTo(WRAPPER_BATCH_LOCATION);
                 assertThat(mvnwCmd.getText()).isNotBlank();
 
-                var mavenWrapperJar = result(run, RemoteFile.class, "maven-wrapper.jar");
+                var mavenWrapperJar = result(run, Remote.class, "maven-wrapper.jar");
                 assertThat(mavenWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
                 Matcher wrapperVersionMatcher = Pattern.compile("maven-wrapper-(.*?)\\.jar").matcher(mavenWrapperJar.getUri().toString());
                 assertThat(wrapperVersionMatcher.find()).isTrue();
@@ -656,7 +654,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
                 var mvnwCmd = result(run, PlainText.class, "mvnw.cmd");
                 assertThat(mvnwCmd.getSourcePath()).isEqualTo(WRAPPER_BATCH_LOCATION);
 
-                var mavenWrapperJar = result(run, RemoteFile.class, "maven-wrapper.jar");
+                var mavenWrapperJar = result(run, Remote.class, "maven-wrapper.jar");
                 assertThat(mavenWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
                 assertThat(mavenWrapperJar.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.2.0/maven-wrapper-3.2.0.jar"));
                 assertThat(isValidWrapperJar(mavenWrapperJar)).as("Wrapper jar is not valid").isTrue();

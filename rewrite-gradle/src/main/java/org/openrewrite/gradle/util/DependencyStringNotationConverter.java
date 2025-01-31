@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.gradle.internal;
+package org.openrewrite.gradle.util;
 
 import org.jspecify.annotations.Nullable;
 
