@@ -21,13 +21,13 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.settingsGradle;
-import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApiUsingModulesCaching;
 
 class RemoveDevelocityTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec
-          .beforeRecipe(withToolingApi())
+          .beforeRecipe(withToolingApiUsingModulesCaching())
           .recipeFromResource("/META-INF/rewrite/gradle.yml", "org.openrewrite.gradle.plugins.RemoveDevelocity");
     }
 

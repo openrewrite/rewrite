@@ -23,14 +23,14 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApiUsingModulesCaching;
 import static org.openrewrite.groovy.Assertions.groovy;
 
 class DependencyInsightTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.beforeRecipe(withToolingApi())
+        spec.beforeRecipe(withToolingApiUsingModulesCaching())
           .recipe(new DependencyInsight("com.google.guava", "failureaccess", null, null));
     }
 

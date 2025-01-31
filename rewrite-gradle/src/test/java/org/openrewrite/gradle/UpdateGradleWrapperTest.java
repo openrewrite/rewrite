@@ -47,6 +47,7 @@ import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_BATCH_LOCATION;
 import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_JAR_LOCATION;
 import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_PROPERTIES_LOCATION;
 import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_SCRIPT_LOCATION;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApiUsingModulesCaching;
 import static org.openrewrite.properties.Assertions.properties;
 import static org.openrewrite.test.SourceSpecs.dir;
 import static org.openrewrite.test.SourceSpecs.other;
@@ -71,7 +72,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new UpdateGradleWrapper("7.4.2", null, null, null, null))
-          .beforeRecipe(withToolingApi());
+          .beforeRecipe(withToolingApiUsingModulesCaching());
     }
 
     @Test

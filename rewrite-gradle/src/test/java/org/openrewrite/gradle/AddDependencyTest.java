@@ -33,7 +33,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
-import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApiUsingModulesCaching;
 import static org.openrewrite.groovy.Assertions.groovy;
 import static org.openrewrite.groovy.Assertions.srcMainGroovy;
 import static org.openrewrite.java.Assertions.java;
@@ -48,7 +48,7 @@ import static org.openrewrite.properties.Assertions.properties;
 class AddDependencyTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.beforeRecipe(withToolingApi())
+        spec.beforeRecipe(withToolingApiUsingModulesCaching())
           .parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api", "guava", "jackson-databind", "jackson-core", "lombok"));
     }
 
@@ -1124,7 +1124,7 @@ class AddDependencyTest implements RewriteTest {
     void addDynamicVersionDependency() {
         rewriteRun(
           spec -> spec
-            .beforeRecipe(withToolingApi())
+            .beforeRecipe(withToolingApiUsingModulesCaching())
             .recipe(addDependency("org.openrewrite:rewrite-core:7.39.X", "java.util.Date", "implementation")),
           mavenProject("project",
             srcMainGroovy(
