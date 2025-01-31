@@ -319,6 +319,6 @@ class YamlParserTest implements RewriteTest {
         Yaml.Mapping.Entry person = topMapping.getEntries().get(0);
         assertEquals("person", person.getKey().getValue());
         Yaml.Mapping withinPerson = (Yaml.Mapping) person.getValue();
-        assertEquals("!!map", withinPerson.getTag().getText());
+        assertEquals("!!map", withinPerson.getTag().getName());
     }
 }

@@ -178,7 +178,7 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
         visitMarkers(tag.getMarkers(), p);
         p
                 .append(tag.getPrefix())
-                .append(tag.getText())
+                .append(tag.getName())
                 .append(tag.getSuffix());
         afterSyntax(tag, p);
         return tag;
