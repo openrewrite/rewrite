@@ -31,14 +31,14 @@ import java.util.regex.Pattern;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
-import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApiUsingModulesCaching;
 import static org.openrewrite.properties.Assertions.properties;
 
 class UpgradeDependencyVersionTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.beforeRecipe(withToolingApi())
+        spec.beforeRecipe(withToolingApiUsingModulesCaching())
           .recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.x", "-jre"));
     }
 
@@ -102,7 +102,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void mockitoTestImplementation() {
         rewriteRun(recipeSpec -> {
-              recipeSpec.beforeRecipe(withToolingApi())
+              recipeSpec.beforeRecipe(withToolingApiUsingModulesCaching())
                 .recipe(new UpgradeDependencyVersion("org.mockito", "*", "4.11.0", null));
           },
           buildGradle(

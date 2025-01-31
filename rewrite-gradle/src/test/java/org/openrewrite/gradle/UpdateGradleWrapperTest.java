@@ -43,7 +43,7 @@ import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApiUsingModulesCaching;
 import static org.openrewrite.gradle.util.GradleWrapper.*;
 import static org.openrewrite.properties.Assertions.properties;
 import static org.openrewrite.test.SourceSpecs.*;
@@ -67,7 +67,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new UpdateGradleWrapper("7.4.2", null, null, null, null))
-          .beforeRecipe(withToolingApi());
+          .beforeRecipe(withToolingApiUsingModulesCaching());
     }
 
     @Test

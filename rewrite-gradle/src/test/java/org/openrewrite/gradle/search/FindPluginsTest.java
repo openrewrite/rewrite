@@ -27,7 +27,7 @@ import java.util.Collections;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
-import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApiUsingModulesCaching;
 import static org.openrewrite.properties.Assertions.properties;
 import static org.openrewrite.test.SourceSpecs.text;
 
@@ -41,7 +41,7 @@ class FindPluginsTest implements RewriteTest {
     @Test
     void findPlugin() {
         rewriteRun(
-          spec -> spec.beforeRecipe(withToolingApi()),
+          spec -> spec.beforeRecipe(withToolingApiUsingModulesCaching()),
           buildGradle(
             """
               plugins {
@@ -68,7 +68,7 @@ class FindPluginsTest implements RewriteTest {
     @Test
     void settingsResolutionStrategy() {
         rewriteRun(
-          spec -> spec.beforeRecipe(withToolingApi()),
+          spec -> spec.beforeRecipe(withToolingApiUsingModulesCaching()),
           settingsGradle(
               """
             pluginManagement {
@@ -107,7 +107,7 @@ class FindPluginsTest implements RewriteTest {
     @Test
     void property() {
         rewriteRun(
-          spec -> spec.beforeRecipe(withToolingApi()),
+          spec -> spec.beforeRecipe(withToolingApiUsingModulesCaching()),
           properties("rewritePluginVersion=6.22.0", spec -> spec.path("gradle.properties")),
           buildGradle(
             """
