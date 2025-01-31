@@ -520,6 +520,29 @@ public interface Yaml extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
     class Tag implements Yaml {
+        public enum Kind {
+            LOCAL {
+                @Override
+                public String print(String name) {
+                    return "!" + name;
+                }
+            },
+            IMPLICIT_GLOBAL {
+                @Override
+                public String print(String name) {
+                    return "!!" + name;
+                }
+            },
+            EXPLICIT_GLOBAL {
+                @Override
+                public String print(String name) {
+                    return "!<" + name + ">";
+                }
+            };
+
+            public abstract String print(String name);
+        }
+
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -534,6 +557,38 @@ public interface Yaml extends Tree {
 
         @With
         String name;
+
+        @Getter
+        Kind kind;
+
+        public Tag(UUID id, String prefix, String suffix, Markers markers, String name, Kind kind) {
+            this.id = id;
+            this.prefix = prefix;
+            this.suffix = suffix;
+            this.markers = markers;
+            this.name = name;
+            this.kind = kind;
+        }
+
+        public Tag(UUID id, String prefix, String suffix, Markers markers, String text) {
+            this.id = id;
+            this.prefix = prefix;
+            this.suffix = suffix;
+            this.markers = markers;
+
+            if (text.startsWith("!<") && text.endsWith(">")) {
+                this.name = text.substring(2, text.length() - 1);
+                this.kind = Kind.EXPLICIT_GLOBAL;
+            } else if (text.startsWith("!!")) {
+                this.name = text.substring(2);
+                this.kind = Kind.IMPLICIT_GLOBAL;
+            } else if (text.startsWith("!")) {
+                this.name = text.substring(1);
+                this.kind = Kind.LOCAL;
+            } else {
+                throw new IllegalArgumentException("Invalid tag format: " + text);
+            }
+        }
 
         @Override
         public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {

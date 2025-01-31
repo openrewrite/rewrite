@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.openrewrite.yaml.Assertions.yaml;
 
@@ -319,6 +320,7 @@ class YamlParserTest implements RewriteTest {
         Yaml.Mapping.Entry person = topMapping.getEntries().get(0);
         assertEquals("person", person.getKey().getValue());
         Yaml.Mapping withinPerson = (Yaml.Mapping) person.getValue();
-        assertEquals("!!map", withinPerson.getTag().getName());
+        assertEquals("map", withinPerson.getTag().getName());
+        assertEquals(Yaml.Tag.Kind.IMPLICIT_GLOBAL, withinPerson.getTag().getKind());
     }
 }
