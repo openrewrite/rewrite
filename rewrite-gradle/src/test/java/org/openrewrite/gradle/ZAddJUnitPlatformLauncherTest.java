@@ -26,7 +26,7 @@ import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.java.Assertions.*;
 
-class AddJUnitPlatformLauncherTest implements RewriteTest {
+class ZAddJUnitPlatformLauncherTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
