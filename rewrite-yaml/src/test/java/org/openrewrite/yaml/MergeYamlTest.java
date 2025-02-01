@@ -1688,4 +1688,101 @@ class MergeYamlTest implements RewriteTest {
               """)
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4958")
+    @Test
+    void preserveSpacingWhenMergingFlowStyle() {
+        rewriteRun(spec -> spec
+            .recipe(new MergeYaml(//language=jsonpath
+              "$.jobs[?(@.name=='test')].plan[?(@.task=='sonar')]",
+              // language=yaml
+              "vars: { version: 10.3 }",
+              false,
+              null,
+              null
+            )),
+
+          yaml(// language=yaml
+            """
+              jobs:
+              - name: test
+                plan:
+                - task: sonar
+              """,
+            // language=yaml
+            """
+              jobs:
+              - name: test
+                plan:
+                - task: sonar
+                  vars: { version: 10.3 }
+              """
+          ));
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4958")
+    @Test
+    void preserveSpacingWhenMergingFlowStyleAttempt2() {
+        rewriteRun(spec -> spec
+            .recipe(new MergeYaml(//language=jsonpath
+              "$.jobs[?(@.name=='test')].plan[?(@.task=='sonar')]",
+              // language=yaml
+              "vars: { mapping: { version: 10.3 } }",
+              false,
+              null,
+              null
+            )),
+
+          yaml(// language=yaml
+            """
+              jobs:
+              - name: test
+                plan:
+                - task: sonar
+              """,
+            // language=yaml
+            """
+              jobs:
+              - name: test
+                plan:
+                - task: sonar
+                  vars: { mapping: { version: 10.3 } }
+              """
+          ));
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4958")
+    @Test
+    void preserveSpacingWhenMergingFlowStyleAttempt3() {
+        rewriteRun(spec -> spec
+            .recipe(new MergeYaml(//language=jsonpath
+              "$.jobs[?(@.name=='test')].plan[?(@.task=='sonar')]",
+              // language=yaml
+              """
+                vars: {
+                  version: 10.3 }
+                """,
+              false,
+              null,
+              null
+            )),
+
+          yaml(// language=yaml
+            """
+              jobs:
+              - name: test
+                plan:
+                - task: sonar
+              """,
+            // language=yaml
+            """
+              jobs:
+              - name: test
+                plan:
+                - task: sonar
+                  vars: {
+                    version: 10.3 }
+              """
+          ));
+    }
 }
