@@ -2245,11 +2245,11 @@ public class GroovyParserVisitor {
         } else if (node instanceof ImportNode) {
             ImportNode importNode = (ImportNode) node;
             Space prefix = sourceBefore("import");
-            JLeftPadded<Boolean> static_;
+            JLeftPadded<Boolean> statik;
             if (importNode.isStatic()) {
-                static_ = padLeft(sourceBefore("static"), true);
+                statik = padLeft(sourceBefore("static"), true);
             } else {
-                static_ = padLeft(EMPTY, false);
+                statik = padLeft(EMPTY, false);
             }
             String packageName = importNode.getPackageName();
             J.FieldAccess qualid;
@@ -2276,7 +2276,7 @@ public class GroovyParserVisitor {
                 alias = padLeft(sourceBefore("as"), new J.Identifier(randomId(), sourceBefore(simpleName), Markers.EMPTY, emptyList(), simpleName, null, null));
             }
 
-            J.Import anImport = new J.Import(randomId(), prefix, Markers.EMPTY, static_, qualid, alias);
+            J.Import anImport = new J.Import(randomId(), prefix, Markers.EMPTY, statik, qualid, alias);
             return maybeSemicolon(anImport);
         }
 
