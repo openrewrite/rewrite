@@ -35,10 +35,33 @@ class ImportTest implements RewriteTest {
     }
 
     @Test
+    void multipleImportsOnOneLine() {
+        rewriteRun(
+          groovy(
+            """
+              import java.util.List;import java.util.Set
+              """
+          )
+        );
+    }
+
+    @Test
     void starImport() {
         rewriteRun(
           groovy(
             """
+              import java.util.*
+              """
+          )
+        );
+    }
+
+    @Test
+    void duplicateStarImport() {
+        rewriteRun(
+          groovy(
+            """
+              import java.util.*
               import java.util.*
               """
           )
@@ -57,10 +80,36 @@ class ImportTest implements RewriteTest {
     }
 
     @Test
+    void duplicateStaticImport() {
+        rewriteRun(
+          groovy(
+            """
+              import static java.util.Collections.singletonList
+              import static java.util.Collections.singletonList
+              """
+          )
+        );
+    }
+
+    @Test
     void staticStarImport() {
         rewriteRun(
           groovy(
             """
+              import static java.util.Collections.*
+              """
+          )
+        );
+    }
+
+    @Test
+    void duplicateStaticStarImport() {
+        rewriteRun(
+          groovy(
+            """
+              import static java.util.Collections.*
+              import java.util.*
+              import java.util.*
               import static java.util.Collections.*
               """
           )

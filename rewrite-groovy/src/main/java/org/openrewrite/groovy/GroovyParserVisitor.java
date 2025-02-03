@@ -160,7 +160,19 @@ public class GroovyParserVisitor {
             sortedByPosition.computeIfAbsent(pos(anImport), i -> new ArrayList<>()).add(anImport);
         }
         for (ImportNode anImport : ast.getStaticStarImports().values()) {
+            // Duplicate imports do work out of the box for import/star-import/static-import.
+            // For static-star-import the groovy compiler does only save the last duplicate import instead of all,
+            // so restore the other nodes by hand.
+            ImportNode anImportCopy = new ImportNode(anImport.getType());
+            //anImportCopy.setColumnNumber(1);
+            //anImportCopy.setLineNumber(1);
             sortedByPosition.computeIfAbsent(pos(anImport), i -> new ArrayList<>()).add(anImport);
+
+
+            String staticStarImport = anImportCopy.getType().getName();
+            String staticStarImport2 = anImportCopy.getText();
+
+            sortedByPosition.computeIfAbsent(pos(anImportCopy), i -> new ArrayList<>()).add(anImportCopy);
         }
 
         for (ClassNode aClass : ast.getClasses()) {
@@ -2222,11 +2234,11 @@ public class GroovyParserVisitor {
         } else if (node instanceof ImportNode) {
             ImportNode importNode = (ImportNode) node;
             Space prefix = sourceBefore("import");
-            JLeftPadded<Boolean> statik;
+            JLeftPadded<Boolean> static_;
             if (importNode.isStatic()) {
-                statik = padLeft(sourceBefore("static"), true);
+                static_ = padLeft(sourceBefore("static"), true);
             } else {
-                statik = padLeft(EMPTY, false);
+                static_ = padLeft(EMPTY, false);
             }
             String packageName = importNode.getPackageName();
             J.FieldAccess qualid;
@@ -2253,7 +2265,7 @@ public class GroovyParserVisitor {
                 alias = padLeft(sourceBefore("as"), new J.Identifier(randomId(), sourceBefore(simpleName), Markers.EMPTY, emptyList(), simpleName, null, null));
             }
 
-            J.Import anImport = new J.Import(randomId(), prefix, Markers.EMPTY, statik, qualid, alias);
+            J.Import anImport = new J.Import(randomId(), prefix, Markers.EMPTY, static_, qualid, alias);
             return maybeSemicolon(anImport);
         }
 
