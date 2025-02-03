@@ -174,14 +174,14 @@ public class GroovyParserVisitor {
 
             // Create a node for each `import static`
             String[] lines = importSource.split("\n");
-            Pattern pattern = Pattern.compile("\\bimport\\s+static\\s+([a-zA-Z_][\\w.]*)\\.\\*");
+            Pattern pattern = Pattern.compile("import\\s+static\\s+([\\w.]*)\\.\\*");
             for (int i = 0; i < lines.length; i++) {
                 Matcher matcher = pattern.matcher(lines[i]);
                 while (matcher.find()) {
-                    ImportNode anImportCopy = new ImportNode(staticStarImports.get(matcher.group(1)).getType());
-                    anImportCopy.setLineNumber(i + 1);
-                    anImportCopy.setColumnNumber(matcher.start() + 1);
-                    sortedByPosition.computeIfAbsent(pos(anImportCopy), ii -> new ArrayList<>()).add(anImportCopy);
+                    ImportNode node = new ImportNode(staticStarImports.get(matcher.group(1)).getType());
+                    node.setLineNumber(i + 1);
+                    node.setColumnNumber(matcher.start() + 1);
+                    sortedByPosition.computeIfAbsent(pos(node), ii -> new ArrayList<>()).add(node);
                 }
             }
         }
