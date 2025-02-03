@@ -159,20 +159,31 @@ public class GroovyParserVisitor {
         for (ImportNode anImport : ast.getStaticImports().values()) {
             sortedByPosition.computeIfAbsent(pos(anImport), i -> new ArrayList<>()).add(anImport);
         }
-        for (ImportNode anImport : ast.getStaticStarImports().values()) {
-            // Duplicate imports do work out of the box for import/star-import/static-import.
-            // For static-star-import the groovy compiler does only save the last duplicate import instead of all,
-            // so restore the other nodes by hand.
-            ImportNode anImportCopy = new ImportNode(anImport.getType());
-            //anImportCopy.setColumnNumber(1);
-            //anImportCopy.setLineNumber(1);
-            sortedByPosition.computeIfAbsent(pos(anImport), i -> new ArrayList<>()).add(anImport);
 
+        // Duplicate imports do work out of the box for import/star-import/static-import.
+        // For static-star-import, the groovy compiler does only save the last duplicate import instead of all,
+        // so restore all static star imports by hand.
+        Map<String, ImportNode> staticStarImports = ast.getStaticStarImports();
+        if (!staticStarImports.isEmpty()) {
+            // Take source code until last static star import for performance reasons
+            int lastLineNumber = -1;
+            for (ImportNode anImport : ast.getStaticStarImports().values()) {
+                lastLineNumber = Math.max(lastLineNumber, anImport.getLastLineNumber());
+            }
+            String importSource = sourceLineNumberOffsets.length <= lastLineNumber ? source : source.substring(0, sourceLineNumberOffsets[lastLineNumber]);
 
-            String staticStarImport = anImportCopy.getType().getName();
-            String staticStarImport2 = anImportCopy.getText();
-
-            sortedByPosition.computeIfAbsent(pos(anImportCopy), i -> new ArrayList<>()).add(anImportCopy);
+            // Create a node for each `import static`
+            String[] lines = importSource.split("\n");
+            Pattern pattern = Pattern.compile("\\bimport\\s+static\\s+([a-zA-Z_][\\w.]*)\\.\\*");
+            for (int i = 0; i < lines.length; i++) {
+                Matcher matcher = pattern.matcher(lines[i]);
+                while (matcher.find()) {
+                    ImportNode anImportCopy = new ImportNode(staticStarImports.get(matcher.group(1)).getType());
+                    anImportCopy.setLineNumber(i + 1);
+                    anImportCopy.setColumnNumber(matcher.start() + 1);
+                    sortedByPosition.computeIfAbsent(pos(anImportCopy), ii -> new ArrayList<>()).add(anImportCopy);
+                }
+            }
         }
 
         for (ClassNode aClass : ast.getClasses()) {
