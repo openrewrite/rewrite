@@ -18,7 +18,7 @@
 # Any differences produced by this recipe will result in code suggestion comments on pull requests.
 ---
 type: specs.openrewrite.org/v1beta/recipe
-name: org.openrewrite.recipes.OpenRewriteBestPracticesSubset
+name: org.openrewrite.recipes.rewrite.OpenRewriteRecipeBestPracticesSubset
 displayName: OpenRewrite best practices
 description: Best practices for OpenRewrite recipe development.
 recipeList:
