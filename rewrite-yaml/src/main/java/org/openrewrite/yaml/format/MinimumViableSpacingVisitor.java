@@ -45,9 +45,9 @@ public class MinimumViableSpacingVisitor<P> extends YamlIsoVisitor<P> {
                 }
             }
 
-        if (" ".equals(e.getPrefix())) {
-            return e;
-        }
+            if (" ".equals(e.getPrefix())) {
+                return e;
+            }
             return e.withPrefix("\n");
         }
         return e;

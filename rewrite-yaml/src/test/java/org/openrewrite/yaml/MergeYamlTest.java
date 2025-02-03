@@ -1685,7 +1685,8 @@ class MergeYamlTest implements RewriteTest {
                   script: >-
                     #!/bin/bash
                     echo "hello"
-              """)
+              """
+          )
         );
     }
 
@@ -1717,12 +1718,13 @@ class MergeYamlTest implements RewriteTest {
                 - task: sonar
                   vars: { version: 10.3 }
               """
-          ));
+          )
+        );
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/4958")
     @Test
-    void preserveSpacingWhenMergingFlowStyleAttempt2() {
+    void preserveSpacingWhenMergingFlowStyleNested() {
         rewriteRun(spec -> spec
             .recipe(new MergeYaml(//language=jsonpath
               "$.jobs[?(@.name=='test')].plan[?(@.task=='sonar')]",
@@ -1748,12 +1750,13 @@ class MergeYamlTest implements RewriteTest {
                 - task: sonar
                   vars: { mapping: { version: 10.3 } }
               """
-          ));
+          )
+        );
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/4958")
     @Test
-    void preserveSpacingWhenMergingFlowStyleAttempt3() {
+    void preserveSpacingWhenMergingFlowStyleWithNewline() {
         rewriteRun(spec -> spec
             .recipe(new MergeYaml(//language=jsonpath
               "$.jobs[?(@.name=='test')].plan[?(@.task=='sonar')]",
@@ -1783,6 +1786,7 @@ class MergeYamlTest implements RewriteTest {
                   vars: {
                     version: 10.3 }
               """
-          ));
+          )
+        );
     }
 }
