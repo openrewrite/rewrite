@@ -57,34 +57,10 @@ class ImportTest implements RewriteTest {
     }
 
     @Test
-    void duplicateStarImport() {
-        rewriteRun(
-          groovy(
-            """
-              import java.util.*
-              import java.util.*
-              """
-          )
-        );
-    }
-
-    @Test
     void staticImport() {
         rewriteRun(
           groovy(
             """
-              import static java.util.Collections.singletonList
-              """
-          )
-        );
-    }
-
-    @Test
-    void duplicateStaticImport() {
-        rewriteRun(
-          groovy(
-            """
-              import static java.util.Collections.singletonList
               import static java.util.Collections.singletonList
               """
           )
@@ -97,21 +73,6 @@ class ImportTest implements RewriteTest {
           groovy(
             """
               import static java.util.Collections.*
-              """
-          )
-        );
-    }
-
-    @Test
-    void duplicateStaticStarImport() {
-        rewriteRun(
-          groovy(
-            """
-                    import static      java.util.Collections.*    ;     import               static      java.util.Collections.*
-              import java.util.Collections.*  ; import static java.util.Collections.*
-              import java.util.Collections.*
-              import static java.util.Collections.*;import static java.util.Collections.*
-              import java.util.Collections.*
               """
           )
         );
@@ -137,6 +98,23 @@ class ImportTest implements RewriteTest {
               import static java.util.Collections.singletonList as listOf
               """,
             spec -> spec.afterRecipe(cu -> assertThat(cu.getEof()).isEqualTo(Space.EMPTY))
+          )
+        );
+    }
+
+    @Test
+    void duplicateImports() {
+        rewriteRun(
+          groovy(
+            """
+                    import static      java.util.Collections.*    ;     import               static      java.util.Collections.*
+              import java.util.Collections.*  ; import static java.util.Collections.*
+              import java.util.Collections.*
+              import static java.util.Collections.singletonList as listOf
+              import static java.util.Collections.singletonList as listOf
+              import static java.util.Collections.singletonList;import static java.util.Collections.*
+              import java.util.Collections.*
+              """
           )
         );
     }
