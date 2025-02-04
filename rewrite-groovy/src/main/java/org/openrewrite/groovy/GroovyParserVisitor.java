@@ -160,48 +160,8 @@ public class GroovyParserVisitor {
         for (ImportNode anImport : ast.getStaticImports().values()) {
             sortedByPosition.computeIfAbsent(pos(anImport), i -> new ArrayList<>()).add(anImport);
         }
-        // The groovy compiler does not memoize duplicate static star imports, thus walk through the source code and create all ImportNodes by hand
-        Map<String, ImportNode> staticStarImports = ast.getStaticStarImports();
-        if (!staticStarImports.isEmpty()) {
-            // Take source code until last static star import for performance reasons
-            int lastLineNumber = -1;
-            for (ImportNode anImport : ast.getStaticStarImports().values()) {
-                lastLineNumber = Math.max(lastLineNumber, anImport.getLastLineNumber());
-            }
-            String importSource = sourceLineNumberOffsets.length <= lastLineNumber ? source : source.substring(0, sourceLineNumberOffsets[lastLineNumber]);
-
-            // Create a node for each `import static`
-            String[] lines = importSource.split("\n");
-            for (int i = 0; i < lines.length; i++) {
-                String line = lines[i];
-                int index = 0;
-
-                while (index < line.length()) {
-                    int importIndex = line.indexOf("import", index);
-                    if (importIndex == -1) break;
-
-                    int maybeStaticIndex = indexOfNextNonWhitespace(importIndex + 6, line);
-                    if (!line.startsWith("static", maybeStaticIndex)) {
-                        index = importIndex + 6;
-                        continue;
-                    }
-
-                    int packageBegin = indexOfNextNonWhitespace( maybeStaticIndex + 6, line);
-                    int packageEnd = packageBegin;
-                    while (packageEnd < line.length() && (isJavaIdentifierPart(line.charAt(packageEnd)) || line.charAt(packageEnd) == '.')) {
-                        packageEnd++;
-                    }
-
-                    if (packageEnd < line.length() && line.charAt(packageEnd) == '*') {
-                        ImportNode node = new ImportNode(staticStarImports.get(line.substring(packageBegin, packageEnd - 1)).getType());
-                        node.setLineNumber(i + 1);
-                        node.setColumnNumber(importIndex + 1);
-                        sortedByPosition.computeIfAbsent(pos(node), ii -> new ArrayList<>()).add(node);
-                    }
-
-                    index = packageEnd;
-                }
-            }
+        for (ImportNode anImport : getStaticStarImports(ast)) {
+            sortedByPosition.computeIfAbsent(pos(anImport), i -> new ArrayList<>()).add(anImport);
         }
 
         for (ClassNode aClass : ast.getClasses()) {
@@ -2821,6 +2781,59 @@ public class GroovyParserVisitor {
         }
 
         return node.getColumnNumber() >= 0 && node.getLineNumber() >= 0 && node.getLastColumnNumber() >= 0 && node.getLastLineNumber() >= 0;
+    }
+
+    /**
+     * Duplicate imports do work out of the box for import, star-import and static-import.
+     * For static-star-import, this does work though.
+     * The groovy compiler does only save the last duplicate import instead of all, so parse all static star imports by hand.
+     */
+    private List<ImportNode> getStaticStarImports(ModuleNode ast) {
+        List<ImportNode> completeStaticStarImports = new ArrayList<>();
+        Map<String, ImportNode> staticStarImports = ast.getStaticStarImports();
+        if (!staticStarImports.isEmpty()) {
+            // Take source code until last static star import for performance reasons
+            int lastLineNumber = -1;
+            for (ImportNode anImport : ast.getStaticStarImports().values()) {
+                lastLineNumber = Math.max(lastLineNumber, anImport.getLastLineNumber());
+            }
+            String importSource = sourceLineNumberOffsets.length <= lastLineNumber ? source : source.substring(0, sourceLineNumberOffsets[lastLineNumber]);
+
+            // Create a node for each `import static`
+            String[] lines = importSource.split("\n");
+            for (int i = 0; i < lines.length; i++) {
+                String line = lines[i];
+                int index = 0;
+
+                while (index < line.length()) {
+                    int importIndex = line.indexOf("import", index);
+                    if (importIndex == -1) break;
+
+                    int maybeStaticIndex = indexOfNextNonWhitespace(importIndex + 6, line);
+                    if (!line.startsWith("static", maybeStaticIndex)) {
+                        index = importIndex + 6;
+                        continue;
+                    }
+
+                    int packageBegin = indexOfNextNonWhitespace( maybeStaticIndex + 6, line);
+                    int packageEnd = packageBegin;
+                    while (packageEnd < line.length() && (isJavaIdentifierPart(line.charAt(packageEnd)) || line.charAt(packageEnd) == '.')) {
+                        packageEnd++;
+                    }
+
+                    if (packageEnd < line.length() && line.charAt(packageEnd) == '*') {
+                        ImportNode orginalImportNode = staticStarImports.get(line.substring(packageBegin, packageEnd - 1));
+                        ImportNode node = new ImportNode(orginalImportNode.getType());
+                        node.setLineNumber(i + 1);
+                        node.setColumnNumber(importIndex + 1);
+                        completeStaticStarImports.add(node);
+                    }
+
+                    index = packageEnd;
+                }
+            }
+        }
+        return completeStaticStarImports;
     }
 
     /**
