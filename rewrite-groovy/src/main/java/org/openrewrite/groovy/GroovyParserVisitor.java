@@ -60,6 +60,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
+import static java.lang.Character.isJavaIdentifierPart;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
@@ -174,14 +175,34 @@ public class GroovyParserVisitor {
 
             // Create a node for each `import static`
             String[] lines = importSource.split("\n");
-            Pattern pattern = Pattern.compile("import\\s+static\\s+([\\w.]*)\\.\\*");
             for (int i = 0; i < lines.length; i++) {
-                Matcher matcher = pattern.matcher(lines[i]);
-                while (matcher.find()) {
-                    ImportNode node = new ImportNode(staticStarImports.get(matcher.group(1)).getType());
-                    node.setLineNumber(i + 1);
-                    node.setColumnNumber(matcher.start() + 1);
-                    sortedByPosition.computeIfAbsent(pos(node), ii -> new ArrayList<>()).add(node);
+                String line = lines[i];
+                int index = 0;
+
+                while (index < line.length()) {
+                    int importIndex = line.indexOf("import", index);
+                    if (importIndex == -1) break;
+
+                    int maybeStaticIndex = indexOfNextNonWhitespace(importIndex + 6, line);
+                    if (!line.startsWith("static", maybeStaticIndex)) {
+                        index = importIndex + 6;
+                        continue;
+                    }
+
+                    int packageBegin = indexOfNextNonWhitespace( maybeStaticIndex + 6, line);
+                    int packageEnd = packageBegin;
+                    while (packageEnd < line.length() && (isJavaIdentifierPart(line.charAt(packageEnd)) || line.charAt(packageEnd) == '.')) {
+                        packageEnd++;
+                    }
+
+                    if (packageEnd < line.length() && line.charAt(packageEnd) == '*') {
+                        ImportNode node = new ImportNode(staticStarImports.get(line.substring(packageBegin, packageEnd - 1)).getType());
+                        node.setLineNumber(i + 1);
+                        node.setColumnNumber(importIndex + 1);
+                        sortedByPosition.computeIfAbsent(pos(node), ii -> new ArrayList<>()).add(node);
+                    }
+
+                    index = packageEnd;
                 }
             }
         }
@@ -2695,7 +2716,7 @@ public class GroovyParserVisitor {
         for (; i < source.length(); i++) {
             char c = source.charAt(i);
             boolean isVarargs = source.length() > (i + 2) && c == '.' && source.charAt(i + 1) == '.' && source.charAt(i + 2) == '.';
-            if (!(Character.isJavaIdentifierPart(c) || c == '.' || c == '*') || isVarargs) {
+            if (!(isJavaIdentifierPart(c) || c == '.' || c == '*') || isVarargs) {
                 break;
             }
         }

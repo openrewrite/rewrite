@@ -108,7 +108,7 @@ class ImportTest implements RewriteTest {
           groovy(
             """
                     import static      java.util.Collections.*    ;     import               static      java.util.Collections.*
-              import java.util.Collections.*
+              import java.util.Collections.*  ; import static java.util.Collections.*
               import java.util.Collections.*
               import static java.util.Collections.*;import static java.util.Collections.*
               import java.util.Collections.*
