@@ -2786,7 +2786,7 @@ public class GroovyParserVisitor {
     /**
      * Duplicate imports do work out of the box for import, star-import and static-import.
      * For static-star-import, this does work though.
-     * The groovy compiler does only save the last duplicate import instead of all, so parse all static star imports by hand.
+     * The groovy compiler does only memoize the last duplicate import instead of all, so retrieve all static star imports by hand.
      */
     private List<ImportNode> getStaticStarImports(ModuleNode ast) {
         List<ImportNode> completeStaticStarImports = new ArrayList<>();
@@ -2822,8 +2822,7 @@ public class GroovyParserVisitor {
                     }
 
                     if (packageEnd < line.length() && line.charAt(packageEnd) == '*') {
-                        ImportNode orginalImportNode = staticStarImports.get(line.substring(packageBegin, packageEnd - 1));
-                        ImportNode node = new ImportNode(orginalImportNode.getType());
+                        ImportNode node = new ImportNode(staticStarImports.get(line.substring(packageBegin, packageEnd - 1)).getType());
                         node.setLineNumber(i + 1);
                         node.setColumnNumber(importIndex + 1);
                         completeStaticStarImports.add(node);
