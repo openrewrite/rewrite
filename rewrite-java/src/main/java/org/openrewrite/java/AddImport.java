@@ -29,6 +29,7 @@ import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.GeneralFormatStyle;
+import org.openrewrite.style.Style;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -105,9 +106,13 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                 return cu;
             }
 
-            // No need to add imports if the class to import is in java.lang, or if the classes are within the same package
-            if (("java.lang".equals(packageName) && StringUtils.isBlank(member)) || (cu.getPackageDeclaration() != null &&
-                    packageName.equals(cu.getPackageDeclaration().getExpression().printTrimmed(getCursor())))) {
+            // No need to add imports if the class to import is in java.lang
+            if ("java.lang".equals(packageName) && StringUtils.isBlank(member)) {
+                return cu;
+            }
+            // Nor if the classes are within the same package
+            if (!"Record".equals(typeName) && cu.getPackageDeclaration() != null &&
+                    packageName.equals(cu.getPackageDeclaration().getExpression().printTrimmed(getCursor()))) {
                 return cu;
             }
 
@@ -115,7 +120,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                 return cu;
             }
 
-            if (cu.getImports().stream().anyMatch(i -> {
+            if (!"Record".equals(typeName) && cu.getImports().stream().anyMatch(i -> {
                 String ending = i.getQualid().getSimpleName();
                 if (member == null) {
                     return !i.isStatic() && i.getPackageName().equals(packageName) &&
@@ -138,22 +143,20 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
 
             List<JRightPadded<J.Import>> imports = new ArrayList<>(cu.getPadding().getImports());
 
-            if (imports.isEmpty() && !cu.getClasses().isEmpty()) {
-                if (cu.getPackageDeclaration() == null) {
-                    // leave javadocs on the class and move other comments up to the import
-                    // (which could include license headers and the like)
-                    Space firstClassPrefix = cu.getClasses().get(0).getPrefix();
-                    importToAdd = importToAdd.withPrefix(firstClassPrefix
-                            .withComments(ListUtils.map(firstClassPrefix.getComments(), comment -> comment instanceof Javadoc ? null : comment))
-                            .withWhitespace(""));
+            if (imports.isEmpty() && !cu.getClasses().isEmpty() && cu.getPackageDeclaration() == null) {
+                // leave javadocs on the class and move other comments up to the import
+                // (which could include license headers and the like)
+                Space firstClassPrefix = cu.getClasses().get(0).getPrefix();
+                importToAdd = importToAdd.withPrefix(firstClassPrefix
+                        .withComments(ListUtils.map(firstClassPrefix.getComments(), comment -> comment instanceof Javadoc ? null : comment))
+                        .withWhitespace(""));
 
-                    cu = cu.withClasses(ListUtils.mapFirst(cu.getClasses(), clazz ->
-                            clazz.withComments(ListUtils.map(clazz.getComments(), comment -> comment instanceof Javadoc ? comment : null))
-                    ));
-                }
+                cu = cu.withClasses(ListUtils.mapFirst(cu.getClasses(), clazz ->
+                        clazz.withComments(ListUtils.map(clazz.getComments(), comment -> comment instanceof Javadoc ? comment : null))
+                ));
             }
 
-            ImportLayoutStyle layoutStyle = Optional.ofNullable(((SourceFile) cu).getStyle(ImportLayoutStyle.class))
+            ImportLayoutStyle layoutStyle = Optional.ofNullable(Style.from(ImportLayoutStyle.class, ((SourceFile) cu)))
                     .orElse(IntelliJ.importLayout());
 
             List<JavaType.FullyQualified> classpath = cu.getMarkers().findFirst(JavaSourceSet.class)
@@ -179,7 +182,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
     }
 
     private List<JRightPadded<J.Import>> checkCRLF(JavaSourceFile cu, List<JRightPadded<J.Import>> newImports) {
-        GeneralFormatStyle generalFormatStyle = Optional.ofNullable(((SourceFile) cu).getStyle(GeneralFormatStyle.class))
+        GeneralFormatStyle generalFormatStyle = Optional.ofNullable(Style.from(GeneralFormatStyle.class, ((SourceFile) cu)))
                 .orElse(autodetectGeneralFormatStyle(cu));
         if (generalFormatStyle.isUseCRLFNewLines()) {
             return ListUtils.map(newImports, rp -> rp.map(

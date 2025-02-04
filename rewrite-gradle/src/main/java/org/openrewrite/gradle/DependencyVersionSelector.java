@@ -185,7 +185,9 @@ public class DependencyVersionSelector {
         if (gradleSettings != null) {
             return gradleSettings.getBuildscript().getMavenRepositories();
         }
-        Objects.requireNonNull(gradleProject);
+        if (gradleProject == null) {
+            throw new IllegalStateException("Gradle project must be set to determine repositories."); // Caught by caller
+        }
         return "classpath".equals(configuration) ?
                 gradleProject.getBuildscript().getMavenRepositories() :
                 gradleProject.getMavenRepositories();

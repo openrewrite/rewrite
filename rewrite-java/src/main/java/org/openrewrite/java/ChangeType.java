@@ -114,7 +114,7 @@ public class ChangeType extends Recipe {
                     SourceFileWithReferences.References references = sourceFile.getReferences();
                     TypeMatcher matcher = new TypeMatcher(oldFullyQualifiedTypeName);
                     Map<Tree, Reference> matches = new HashMap<>();
-                    for (Reference ref : references.findMatches(matcher, Reference.Kind.TYPE)) {
+                    for (Reference ref : references.findMatches(matcher)) {
                         matches.put(ref.getTree(), ref);
                     }
                     return new ReferenceChangeTypeVisitor(matches, matcher.createRenamer(newFullyQualifiedTypeName)).visit(tree, ctx, requireNonNull(getCursor().getParent()));

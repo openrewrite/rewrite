@@ -17,6 +17,7 @@ package org.openrewrite.text;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.apache.commons.lang3.BooleanUtils;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.binary.Binary;
@@ -26,7 +27,8 @@ import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
 import org.openrewrite.table.TextMatches;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -83,27 +85,17 @@ public class Find extends Recipe {
             description = "A glob expression that can be used to constrain which directories or source files should be searched. " +
                           "Multiple patterns may be specified, separated by a semicolon `;`. " +
                           "If multiple patterns are supplied any of the patterns matching will be interpreted as a match. " +
-                          "When not set, all source files are searched. ",
+                          "When not set, all source files are searched.",
             required = false,
             example = "**/*.java")
     @Nullable
     String filePattern;
 
-    private static Deque<Integer> findAllNewLineIndexes(String input, int offset) {
-        ArrayDeque<Integer> indexes = new ArrayDeque<>();
-        int index = input.lastIndexOf('\n', offset); // Find the first occurrence
-        if (index != -1) {
-            indexes.add(index);
-        }
-
-        index = input.indexOf('\n', offset); // Find occurrence after the offset
-        while (index != -1) {
-            indexes.add(index); // Add the index to the list
-            index = input.indexOf('\n', index + 1); // Find the next occurrence
-        }
-
-        return indexes;
-    }
+    @Option(displayName = "Description",
+            description = "Add the matched value(s) as description on the search result marker.  Default `false`.",
+            required = false)
+    @Nullable
+    Boolean description;
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -136,58 +128,58 @@ public class Find extends Recipe {
                 if (!matcher.find()) {
                     return sourceFile;
                 }
-                matcher.reset();
 
                 String sourceFilePath = sourceFile.getSourcePath().toString();
 
                 List<PlainText.Snippet> snippets = new ArrayList<>();
                 int previousEnd = 0;
 
-                Deque<Integer> newlineIndexes = null;
                 int lastNewLineIndex = -1;
+                int nextNewLineIndex = -1;
+                boolean isFirstMatch = true;
 
-                while (matcher.find()) {
-                    if (newlineIndexes == null) {
-                        newlineIndexes = findAllNewLineIndexes(rawText, matcher.start());
-                    }
-
+                do {
                     int matchStart = matcher.start();
                     snippets.add(snippet(rawText.substring(previousEnd, matchStart)));
-                    snippets.add(SearchResult.found(snippet(rawText.substring(matchStart, matcher.end()))));
+                    String text = rawText.substring(matchStart, matcher.end());
+                    snippets.add(SearchResult.found(snippet(text), BooleanUtils.isTrue(description) ? text : null));
                     previousEnd = matcher.end();
 
-                    while (!newlineIndexes.isEmpty() && newlineIndexes.peek() < matchStart) {
-                        lastNewLineIndex = newlineIndexes.pop();
+                    // For the first match, search backwards
+                    if (isFirstMatch) {
+                        lastNewLineIndex = rawText.lastIndexOf('\n', matchStart);
+                        nextNewLineIndex = rawText.indexOf('\n', lastNewLineIndex + 1);
+                        isFirstMatch = false;
+                    } else if (nextNewLineIndex != -1 && nextNewLineIndex < matchStart) {
+                        // Advance lastNewLineIndex while before match start
+                        while (nextNewLineIndex != -1 && nextNewLineIndex < matchStart) {
+                            lastNewLineIndex = nextNewLineIndex;
+                            nextNewLineIndex = rawText.indexOf('\n', lastNewLineIndex + 1);
+                        }
                     }
-                    int startLine = Math.max(0, lastNewLineIndex + 1);
 
+                    int startLine = lastNewLineIndex + 1;
                     int endLine = rawText.indexOf('\n', matcher.end());
                     if (endLine == -1) {
                         endLine = rawText.length();
                     }
 
+                    //noinspection StringBufferReplaceableByString
                     textMatches.insertRow(ctx, new TextMatches.Row(
                             sourceFilePath,
                             new StringBuilder(endLine - startLine + 3)
-                                    .append(rawText, startLine, matcher.start())
+                                    .append(rawText, startLine, matchStart)
                                     .append("~~>")
-                                    .append(rawText, matcher.start(), endLine)
+                                    .append(rawText, matchStart, endLine)
                                     .toString()
                     ));
-                }
+                } while (matcher.find());
                 snippets.add(snippet(rawText.substring(previousEnd)));
                 return plainText.withText("").withSnippets(snippets);
             }
         };
-        //noinspection DuplicatedCode
         if (filePattern != null) {
-            //noinspection unchecked
-            TreeVisitor<?, ExecutionContext> check = Preconditions.or(Arrays.stream(filePattern.split(";"))
-                    .map(FindSourceFiles::new)
-                    .map(Recipe::getVisitor)
-                    .toArray(TreeVisitor[]::new));
-
-            visitor = Preconditions.check(check, visitor);
+            visitor = Preconditions.check(new FindSourceFiles(filePattern), visitor);
         }
         return visitor;
     }

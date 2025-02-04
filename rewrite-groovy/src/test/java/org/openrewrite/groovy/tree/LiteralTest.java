@@ -85,6 +85,17 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
+    void escapedString() {
+        rewriteRun(
+          groovy(
+            """
+              "f\\"o\\\\\\"o"
+              """
+          )
+        );
+    }
+
+    @Test
     void gString() {
         rewriteRun(
           groovy(
@@ -170,6 +181,28 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
+    void gStringWithEscapedDelimiter() {
+        rewriteRun(
+          groovy(
+            """
+              String s = "<a href=\\"$url\\">${displayName}</a>"
+              """
+          )
+        );
+    }
+
+    @Test
+    void gStringWithStringLiteralsWithParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              "Hello ${from(":-)").via(''':-|(''').via(":-)").to(':-(')}!"
+              """
+          )
+        );
+    }
+
+    @Test
     void mapLiteral() {
         rewriteRun(
           groovy(
@@ -217,18 +250,6 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
-    void emptyListLiteral() {
-        rewriteRun(
-          groovy(
-            """
-              def a = []
-              def b = [   ]
-              """
-          )
-        );
-    }
-
-    @Test
     void multilineStringWithApostrophes() {
         rewriteRun(
           groovy(
@@ -255,17 +276,6 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
-    void listLiteralTrailingComma() {
-        rewriteRun(
-          groovy(
-            """
-              def a = [ "foo" /* "foo" suffix */ , /* "]" prefix */ ]
-              """
-          )
-        );
-    }
-
-    @Test
     void gStringThatHasEmptyValueExpressionForUnknownReason() {
         rewriteRun(
           groovy(
@@ -282,7 +292,7 @@ class LiteralTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-            "\\\\n\\t"
+            "\\\\\\\\n\\\\t"
             '\\\\n\\t'
             ///\\\\n\\t///
             """
@@ -307,12 +317,17 @@ class LiteralTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              def a = ("-")
+              def a = (       "-"  )
               """
           ),
           groovy(
             """
               def a = (("-"))
+              """
+          ),
+          groovy(
+            """
+              from(":-)").via(''':-|(''').via(":-)").to(':-(')
               """
           )
         );

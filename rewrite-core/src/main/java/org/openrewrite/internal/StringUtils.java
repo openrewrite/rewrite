@@ -692,16 +692,18 @@ public class StringUtils {
                 continue;
             } else if (length > cursor + 1) {
                 char next = source.charAt(cursor + 1);
-                if (current == '/' && next == '/') {
+                if (inMultiLineComment) {
+                    if (current == '*' && next == '/') {
+                        inMultiLineComment = false;
+                        cursor++;
+                        continue;
+                    }
+                } else if (current == '/' && next == '/') {
                     inSingleLineComment = true;
                     cursor++;
                     continue;
                 } else if (current == '/' && next == '*') {
                     inMultiLineComment = true;
-                    cursor++;
-                    continue;
-                } else if (current == '*' && next == '/') {
-                    inMultiLineComment = false;
                     cursor++;
                     continue;
                 }
@@ -719,5 +721,15 @@ public class StringUtils {
 
     public static boolean hasLineBreak(@Nullable String s) {
         return s != null && LINE_BREAK.matcher(s).find();
+    }
+
+    public static boolean containsWhitespace(String s) {
+        for (int i = 0; i < s.length(); ++i) {
+            if (Character.isWhitespace(s.charAt(i))) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

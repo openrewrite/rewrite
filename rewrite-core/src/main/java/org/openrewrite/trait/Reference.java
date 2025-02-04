@@ -17,6 +17,7 @@ package org.openrewrite.trait;
 
 import org.openrewrite.*;
 
+import java.util.HashSet;
 import java.util.Set;
 
 @Incubating(since = "8.39.0")
@@ -24,7 +25,8 @@ public interface Reference extends Trait<Tree> {
 
     enum Kind {
         TYPE,
-        PACKAGE
+        PACKAGE,
+        IMAGE
     }
 
     Kind getKind();
@@ -55,6 +57,20 @@ public interface Reference extends Trait<Tree> {
         Set<Reference> getReferences(SourceFile sourceFile);
 
         boolean isAcceptable(SourceFile sourceFile);
+    }
+
+    abstract class AbstractProvider<U extends Reference> implements Provider {
+        protected abstract SimpleTraitMatcher<U> getMatcher();
+
+        @Override
+        public Set<Reference> getReferences(SourceFile sourceFile) {
+            Set<Reference> references = new HashSet<>();
+            getMatcher().asVisitor(reference -> {
+                references.add(reference);
+                return reference.getTree();
+            }).visit(sourceFile, 0);
+            return references;
+        }
     }
 
     interface Matcher {

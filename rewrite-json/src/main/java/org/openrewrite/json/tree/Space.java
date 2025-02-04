@@ -80,7 +80,11 @@ public class Space {
         return whitespace == null ? "" : whitespace;
     }
 
-    private String getWhitespaceIndent(@Nullable String whitespace) {
+    public String getWhitespaceIndent() {
+        return getWhitespaceIndent(this.whitespace);
+    }
+
+    private static String getWhitespaceIndent(@Nullable String whitespace) {
         if (whitespace == null) {
             return "";
         }

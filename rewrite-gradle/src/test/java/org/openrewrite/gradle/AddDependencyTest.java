@@ -1317,9 +1317,6 @@ class AddDependencyTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(addDependency("org.apache.logging.log4j:log4j-core:2.22.1")),
           mavenProject("project",
-            srcMainJava(
-              java(usingGuavaIntMath)
-            ),
             buildGradle("""
                 plugins {
                    id "java-library"

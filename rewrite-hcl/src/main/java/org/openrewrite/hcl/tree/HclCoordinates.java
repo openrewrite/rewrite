@@ -34,7 +34,7 @@ public class HclCoordinates implements Coordinates {
     Comparator<? extends Hcl> comparator;
 
     public boolean isReplacement() {
-        return Mode.REPLACEMENT.equals(mode);
+        return Mode.REPLACEMENT == mode;
     }
 
     public enum Mode {

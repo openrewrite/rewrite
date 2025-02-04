@@ -19,7 +19,6 @@ package org.openrewrite.java.isolated;
 import com.sun.source.doctree.DocCommentTree;
 import com.sun.source.tree.*;
 import com.sun.source.util.TreePathScanner;
-import com.sun.tools.javac.code.Attribute;
 import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.tree.DocCommentTable;
@@ -31,12 +30,15 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
+import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaParsingException;
+import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.CompactConstructor;
 import org.openrewrite.java.marker.OmitParentheses;
+import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
@@ -49,7 +51,6 @@ import java.lang.reflect.Method;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.regex.Matcher;
@@ -200,6 +201,16 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     @Override
+    public J visitErroneous(ErroneousTree node, Space fmt) {
+        String erroneousNode = source.substring(((JCTree) node).getStartPosition(), ((JCTree) node).getEndPosition(endPosTable));
+        return new J.Erroneous(
+                randomId(),
+                fmt,
+                Markers.EMPTY,
+                erroneousNode);
+    }
+
+    @Override
     public J visitBinary(BinaryTree node, Space fmt) {
         Expression left = convert(node.getLeftOperand());
 
@@ -322,7 +333,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
         J.Identifier label = node.getLabel() == null ? null : new J.Identifier(randomId(),
                 sourceBefore(node.getLabel().toString()), Markers.EMPTY,
-                emptyList(), skip(node.getLabel().toString()), null, null);
+                emptyList(), node.getLabel().toString(), null, null);
 
         return new J.Break(randomId(), fmt, Markers.EMPTY, label);
     }
@@ -343,6 +354,8 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                                 convertAll(node.getExpressions(), commaDelim, t -> EMPTY),
                         Markers.EMPTY
                 ),
+                null,
+                null,
                 JContainer.build(
                         sourceBefore(type == J.Case.Type.Rule ? "->" : ":"),
                         convertStatements(node.getStatements()),
@@ -464,13 +477,31 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
         JRightPadded<Statement> enumSet = null;
         if (!jcEnums.isEmpty()) {
-            AtomicBoolean semicolonPresent = new AtomicBoolean(false);
-
+            Tree lastConstant = jcEnums.get(jcEnums.size() - 1);
             List<JRightPadded<J.EnumValue>> enumValues = convertAll(jcEnums, commaDelim, t -> {
-                // this semicolon is required when there are non-value members, but can still
-                // be present when there are not
-                semicolonPresent.set(positionOfNext(";", '}') > 0);
-                return semicolonPresent.get() ? sourceBefore(";", '}') : EMPTY;
+                if (t != lastConstant) {
+                    return whitespace();
+                }
+                int savedCursor = cursor;
+                Space suffix = whitespace();
+                if (source.charAt(cursor) == ',' || source.charAt(cursor) == ';') {
+                    return suffix;
+                }
+                // Whitespace should be assigned to prefix of next statement or `J.Block#end`
+                cursor = savedCursor;
+                return EMPTY;
+            }, t -> {
+                if (t == lastConstant && skip(",") != null) {
+                    int savedCursor = cursor;
+                    Space suffix = whitespace();
+                    if (source.charAt(cursor) == ';') {
+                        return Markers.build(singletonList(new TrailingComma(randomId(), suffix)));
+                    }
+                    // Whitespace should be assigned to prefix of next statement or `J.Block#end`
+                    cursor = savedCursor;
+                    return Markers.build(singletonList(new TrailingComma(randomId(), EMPTY)));
+                }
+                return Markers.EMPTY;
             });
 
             enumSet = padRight(
@@ -479,7 +510,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                             EMPTY,
                             Markers.EMPTY,
                             enumValues,
-                            semicolonPresent.get()
+                            skip(";") != null
                     ),
                     EMPTY
             );
@@ -532,7 +563,6 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
         Map<Integer, JCAnnotation> annotationPosTable = mapAnnotations(node.getPackageAnnotations(),
                 new HashMap<>(node.getPackageAnnotations().size()));
-
         List<J.Annotation> packageAnnotations = collectAnnotations(annotationPosTable);
 
         J.Package packageDecl = null;
@@ -814,7 +844,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                         singletonList(new J.Literal.UnicodeEscape(1,
                                 valueSource.substring(3, valueSource.length() - 1))), type);
             }
-        } else if (JavaType.Primitive.String.equals(type)) {
+        } else if (JavaType.Primitive.String == type) {
             StringBuilder valueSourceWithoutSurrogates = new StringBuilder();
             List<J.Literal.UnicodeEscape> unicodeEscapes = null;
 
@@ -933,11 +963,15 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
                 convertAll(node.getArguments(), commaDelim, t -> sourceBefore(")")), Markers.EMPTY);
 
-        Symbol methodSymbol = (jcSelect instanceof JCFieldAccess) ? ((JCFieldAccess) jcSelect).sym :
-                ((JCIdent) jcSelect).sym;
+        JavaType.Method methodType;
+        if (name.getType() instanceof JavaType.Method) {
+            methodType = (JavaType.Method) name.getType();
+        } else {
+            Symbol methodSymbol = (jcSelect instanceof JCFieldAccess) ? ((JCFieldAccess) jcSelect).sym : ((JCIdent) jcSelect).sym;
+            methodType = typeMapping.methodInvocationType(jcSelect.type, methodSymbol);
+        }
 
-        return new J.MethodInvocation(randomId(), fmt, Markers.EMPTY, select, typeParams, name, args,
-                typeMapping.methodInvocationType(jcSelect.type, methodSymbol));
+        return new J.MethodInvocation(randomId(), fmt, Markers.EMPTY, select, typeParams, name, args, methodType);
     }
 
     @Override
@@ -1068,7 +1102,14 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         JContainer<Expression> initializer = node.getInitializers() == null ? null :
                 JContainer.build(sourceBefore("{"), node.getInitializers().isEmpty() ?
                         singletonList(padRight(new J.Empty(randomId(), sourceBefore("}"), Markers.EMPTY), EMPTY)) :
-                        convertAll(node.getInitializers(), commaDelim, t -> sourceBefore("}")), Markers.EMPTY);
+                        convertAll(node.getInitializers(), commaDelim, t -> whitespace(), t -> {
+                            if (t == node.getInitializers().get(node.getInitializers().size() - 1) && source.charAt(cursor) == ',') {
+                                cursor++;
+                                return Markers.build(singletonList(new TrailingComma(randomId(), whitespace())));
+                            }
+                            return Markers.EMPTY;
+                        }), Markers.EMPTY);
+        skip("}");
 
         return new J.NewArray(randomId(), fmt, Markers.EMPTY, typeExpr, dimensions,
                 initializer, typeMapping.type(node));
@@ -1215,7 +1256,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         return new J.SwitchExpression(randomId(), fmt, Markers.EMPTY,
                 convert(node.getExpression()),
                 new J.Block(randomId(), sourceBefore("{"), Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
-                        convertAll(node.getCases(), noDelim, noDelim), sourceBefore("}")));
+                        convertAll(node.getCases(), noDelim, noDelim), sourceBefore("}")), typeMapping.type(node));
     }
 
     @Override
@@ -1517,6 +1558,22 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitVariable(VariableTree node, Space fmt) {
+        JCTree.JCVariableDecl jcVariableDecl = (JCTree.JCVariableDecl) node;
+        if ("<error>".equals(jcVariableDecl.getName().toString())) {
+            int startPos = jcVariableDecl.getStartPosition();
+            int endPos = jcVariableDecl.getEndPosition(endPosTable);
+
+            if (startPos == endPos) {
+                endPos = startPos + 1; // For cases where the error node is a single character like "/"
+            }
+            String erroneousNode = source.substring(startPos, endPos);
+            return new J.Erroneous(
+                    randomId(),
+                    fmt,
+                    Markers.EMPTY,
+                    erroneousNode
+            );
+        }
         return hasFlag(node.getModifiers(), Flags.ENUM) ?
                 visitEnumVariable(node, fmt) :
                 visitVariables(singletonList(node), fmt); // method arguments cannot be multi-declarations
@@ -1541,9 +1598,11 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 // this is a lambda parameter with an inferred type expression
                 typeExpr = null;
             } else {
-                boolean lombokVal = isLombokVal(node);
+                Space space = whitespace();
+                boolean lombokVal = source.startsWith("val", cursor);
+                cursor += 3; // skip `val` or `var`
                 typeExpr = new J.Identifier(randomId(),
-                        sourceBefore(lombokVal ? "val" : "var"),
+                        space,
                         Markers.build(singletonList(JavaVarKeyword.build())),
                         emptyList(),
                         lombokVal ? "val" : "var",
@@ -1692,8 +1751,8 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     private static int getActualStartPosition(JCTree t) {
-        // not sure if this is a bug in Lombok, but the variable's start position is after the `val` annotation
-        if (t instanceof JCVariableDecl && isLombokVal((JCVariableDecl) t)) {
+        // The variable's start position in the source is wrongly after lombok's `@val` annotation
+        if (t instanceof JCVariableDecl && isLombokGenerated(t)) {
             return ((JCVariableDecl) t).mods.annotations.get(0).getStartPosition();
         }
         return t.getStartPosition();
@@ -1724,13 +1783,51 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     private <J2 extends @Nullable J> @Nullable JRightPadded<J2> convert(@Nullable Tree t, Function<Tree, Space> suffix) {
+        return convert(t, suffix, j -> Markers.EMPTY);
+    }
+
+    private <J2 extends @Nullable J> @Nullable JRightPadded<J2> convert(@Nullable Tree t, Function<Tree, Space> suffix, Function<Tree, Markers> markers) {
         if (t == null) {
             return null;
         }
         J2 j = convert(t);
-        JRightPadded<J2> rightPadded = new JRightPadded<>(j, suffix.apply(t), Markers.EMPTY);
-        cursor(max(endPos(t), cursor)); // if there is a non-empty suffix, the cursor may have already moved past it
+        @SuppressWarnings("ConstantConditions") JRightPadded<J2> rightPadded = j == null ? null :
+                new JRightPadded<>(j, suffix.apply(t), markers.apply(t));
+        int idx = findFirstNonWhitespaceChar(rightPadded.getAfter().getWhitespace());
+        if (idx >= 0) {
+            rightPadded = (JRightPadded<J2>) JRightPadded.build(getErroneous(List.of(rightPadded)));
+        }
+        // Cursor hasn't been updated but points at the end of erroneous node already
+        // This means that error node start position == end position
+        // Therefore ensure that cursor has moved to the end of erroneous node but adding its length to the cursor
+        // Example `/pet` results in 2 erroneous nodes: `/` and `pet`. The `/` node would have start and end position the
+        // same from the JC compiler.
+        if (endPos(t) == cursor && rightPadded.getElement() instanceof J.Erroneous) {
+            cursor += ((J.Erroneous) rightPadded.getElement()).getText().length();
+        } else {
+            cursor(max(endPos(t), cursor)); // if there is a non-empty suffix or a lombok generated method, the cursor can be already moved past it
+        }
         return rightPadded;
+    }
+
+    private <J2 extends J> J.Erroneous getErroneous(List<JRightPadded<J2>> converted) {
+        PrintOutputCapture<Integer> p = new PrintOutputCapture<>(0);
+        new JavaPrinter<Integer>().visitContainer(JContainer.build(EMPTY, converted, Markers.EMPTY), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, p);
+        return new J.Erroneous(
+                org.openrewrite.Tree.randomId(),
+                EMPTY,
+                Markers.EMPTY,
+                p.getOut()
+        );
+    }
+
+    private static int findFirstNonWhitespaceChar(String s) {
+        for (int i = 0; i < s.length(); i++) {
+            if (!Character.isWhitespace(s.charAt(i))) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private long lineNumber(Tree tree) {
@@ -1748,13 +1845,20 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
     private <J2 extends J> List<JRightPadded<J2>> convertAll(List<? extends Tree> trees,
                                                              Function<Tree, Space> innerSuffix,
                                                              Function<Tree, Space> suffix) {
+        return convertAll(trees, innerSuffix, suffix, t -> Markers.EMPTY);
+    }
+
+    private <J2 extends J> List<JRightPadded<J2>> convertAll(List<? extends Tree> trees,
+                                                             Function<Tree, Space> innerSuffix,
+                                                             Function<Tree, Space> suffix,
+                                                             Function<Tree, Markers> markers) {
         int size = trees.size();
         if (size == 0) {
             return emptyList();
         }
         List<JRightPadded<J2>> converted = new ArrayList<>(size);
         for (int i = 0; i < size; i++) {
-            converted.add(convert(trees.get(i), i == size - 1 ? suffix : innerSuffix));
+            converted.add(convert(trees.get(i), i == size - 1 ? suffix : innerSuffix, markers));
         }
         return converted;
     }
@@ -1779,25 +1883,50 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
     private Space statementDelim(@Nullable Tree t) {
         switch (t.getKind()) {
+            case CONTINUE:
+            case RETURN:
+            case BREAK:
             case ASSERT:
             case ASSIGNMENT:
-            case BREAK:
-            case CONTINUE:
             case DO_WHILE_LOOP:
             case IMPORT:
             case METHOD_INVOCATION:
             case NEW_CLASS:
-            case RETURN:
             case THROW:
+                return sourceBefore(";");
             case EXPRESSION_STATEMENT:
+                ExpressionTree expTree = ((ExpressionStatementTree) t).getExpression();
+                if (expTree instanceof ErroneousTree) {
+                    return Space.build(source.substring(((JCTree) expTree).getEndPosition(endPosTable), ((JCTree) t).getEndPosition(endPosTable)), Collections.emptyList());
+                } else {
+                    return sourceBefore(";");
+                }
             case VARIABLE:
+                JCTree.JCVariableDecl varTree = (JCTree.JCVariableDecl) t;
+                if ("<error>".contentEquals(varTree.getName())) {
+                    int start = varTree.vartype.getEndPosition(endPosTable);
+                    int end = varTree.getEndPosition(endPosTable);
+                    String whitespace = source.substring(start, end);
+                    if (whitespace.contains("\n")) {
+                        return EMPTY;
+                    } else {
+                        return Space.build(source.substring(start, end), Collections.emptyList());
+                    }
+                }
+                return sourceBefore(";");
             case YIELD:
                 return sourceBefore(";");
             case LABELED_STATEMENT:
                 return statementDelim(((JCLabeledStatement) t).getStatement());
             case METHOD:
                 JCMethodDecl m = (JCMethodDecl) t;
-                return sourceBefore(m.body == null || m.defaultValue != null ? ";" : "");
+                if (m.body == null || m.defaultValue != null) {
+                    String suffix = source.substring(cursor, positionOfNext(";", null));
+                    int idx = findFirstNonWhitespaceChar(suffix);
+                    return sourceBefore(idx >= 0 ? "" : ";");
+                } else {
+                    return sourceBefore("");
+                }
             default:
                 return t instanceof JCAssignOp || t instanceof JCUnary ? sourceBefore(";") : EMPTY;
         }
@@ -1816,7 +1945,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
         Map<Integer, List<Tree>> treesGroupedByStartPosition = new LinkedHashMap<>();
         for (Tree t : trees) {
-            if (isLombokGenerated(t)) {
+            if (!(t instanceof JCVariableDecl) && isLombokGenerated(t)) {
                 continue;
             }
             treesGroupedByStartPosition.computeIfAbsent(((JCTree) t).getStartPosition(), k -> new ArrayList<>(1)).add(t);
@@ -1825,6 +1954,10 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         List<JRightPadded<Statement>> converted = new ArrayList<>(treesGroupedByStartPosition.size());
         for (List<? extends Tree> treeGroup : treesGroupedByStartPosition.values()) {
             if (treeGroup.size() == 1) {
+                Tree t = treeGroup.get(0);
+                int startPosition = ((JCTree) t).getStartPosition();
+                if (cursor > startPosition)
+                    continue;
                 converted.add(convert(treeGroup.get(0), suffix));
             } else {
                 // multi-variable declarations are split into independent overlapping JCVariableDecl's by the OpenJDK AST
@@ -1844,51 +1977,26 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         return converted;
     }
 
-    private static boolean isLombokVal(JCTree.JCVariableDecl t) {
-        if (t.sym != null && t.sym.getMetadata() != null) {
-            for (Attribute.Compound a : t.sym.getDeclarationAttributes()) {
-                if ("lombok.val".equals(a.type.toString())) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
     private static boolean isLombokGenerated(Tree t) {
-        Symbol sym = null;
-        if (t instanceof JCAnnotation) {
-            t = ((JCAnnotation) t).getAnnotationType();
-        }
-        if (t instanceof JCIdent) {
-            sym = ((JCIdent) t).sym;
-        } else if (t instanceof JCTree.JCMethodDecl) {
-            sym = ((JCMethodDecl) t).sym;
-        } else if (t instanceof JCTree.JCClassDecl) {
-            sym = ((JCClassDecl) t).sym;
-        } else if (t instanceof JCTree.JCVariableDecl) {
-            sym = ((JCVariableDecl) t).sym;
-        }
-        return isLombokGenerated(sym);
-    }
+        Tree tree = (t instanceof JCAnnotation) ? ((JCAnnotation) t).getAnnotationType() : t;
 
-    private static boolean isLombokGenerated(@Nullable Symbol sym) {
-        if (sym == null) {
-            return false;
+        Symbol sym = null;
+        if (tree instanceof JCIdent) {
+            sym = ((JCIdent) tree).sym;
+        } else if (tree instanceof JCTree.JCMethodDecl) {
+            sym = ((JCMethodDecl) tree).sym;
+        } else if (tree instanceof JCTree.JCClassDecl) {
+            sym = ((JCClassDecl) tree).sym;
+        } else if (tree instanceof JCTree.JCVariableDecl) {
+            sym = ((JCVariableDecl) tree).sym;
+            return sym != null && sym.getDeclarationAttributes().stream().anyMatch(a -> "lombok.val".equals(a.type.toString()));
         }
-        // Lombok val is represented as a @lombok.val on a "final" modifier, neither which appear in source
-        if ("lombok.val".equals(sym.getQualifiedName().toString())) {
-            return true;
-        }
-        if (sym.getMetadata() == null) {
-            return false;
-        }
-        for (Attribute.Compound a : sym.getDeclarationAttributes()) {
-            if ("lombok.Generated".equals(a.type.toString())) {
-                return true;
-            }
-        }
-        return false;
+
+        //noinspection ConstantConditions
+        return sym != null && (
+                "lombok.val".equals(sym.getQualifiedName().toString()) ||
+                sym.getDeclarationAttributes().stream().anyMatch(a -> "lombok.Generated".equals(a.type.toString()))
+        );
     }
 
     /**
@@ -1999,15 +2107,16 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         return space;
     }
 
-    private String skip(@Nullable String token) {
+    private @Nullable String skip(@Nullable String token) {
         if (token == null) {
             //noinspection ConstantConditions
             return null;
         }
         if (source.startsWith(token, cursor)) {
             cursor += token.length();
+            return token;
         }
-        return token;
+        return null;
     }
 
     // Only exists as a function to make it easier to debug unexpected cursor shifts
@@ -2068,7 +2177,6 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         for (int i = cursor; i < source.length(); i++) {
             if (annotationPosTable.containsKey(i)) {
                 JCAnnotation jcAnnotation = annotationPosTable.get(i);
-                // Skip over lombok's "@val" annotation which does not actually appear in source
                 if (isLombokGenerated(jcAnnotation.getAnnotationType())) {
                     continue;
                 }

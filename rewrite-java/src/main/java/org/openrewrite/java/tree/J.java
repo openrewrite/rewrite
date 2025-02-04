@@ -42,7 +42,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 
 import static java.util.Collections.emptyList;
@@ -1027,14 +1026,36 @@ public interface J extends Tree {
             return withExpressions(ListUtils.mapFirst(getExpressions(), first -> pattern));
         }
 
-        JContainer<Expression> expressions;
-
+        /**
+         * @deprecated As of Java 21 this is referred to as case labels and can be broader than just Expressions.
+         * Use {@link #getCaseLabels} and {@link #withCaseLabels(List)} instead.
+         */
+        @Deprecated
         public List<Expression> getExpressions() {
-            return expressions.getElements();
+            return caseLabels.getElements().stream().filter(Expression.class::isInstance).map(Expression.class::cast).collect(toList());
         }
 
+        /**
+         * @deprecated As of Java 21 this is referred to as case labels and can be broader than just Expressions.
+         * Use {@link #getCaseLabels} and {@link #withCaseLabels(List)} instead.
+         */
         public Case withExpressions(List<Expression> expressions) {
-            return getPadding().withExpressions(requireNonNull(JContainer.withElementsNullable(this.expressions, expressions)));
+            if (caseLabels.getElements().stream().allMatch(Expression.class::isInstance)) {
+                //noinspection unchecked
+                return getPadding().withCaseLabels(requireNonNull(JContainer.withElementsNullable(this.caseLabels, (List<J>) (List<?>) expressions)));
+            } else {
+                throw new IllegalStateException("caseLabels contains an entry that is not an Expression, use withCaseLabels instead.");
+            }
+        }
+
+        JContainer<J> caseLabels;
+
+        public List<J> getCaseLabels() {
+            return caseLabels.getElements();
+        }
+
+        public Case withCaseLabels(List<J> caseLabels) {
+            return getPadding().withCaseLabels(requireNonNull(JContainer.withElementsNullable(this.caseLabels, caseLabels)));
         }
 
         /**
@@ -1067,17 +1088,27 @@ public interface J extends Tree {
             return getPadding().withBody(JRightPadded.withElement(this.body, body));
         }
 
+        @Nullable
+        @Getter
+        @With
+        Expression guard;
+
         @JsonCreator
-        public Case(UUID id, Space prefix, Markers markers, Type type, @Deprecated @Nullable Expression pattern, JContainer<Expression> expressions, JContainer<Statement> statements, @Nullable JRightPadded<J> body) {
+        public Case(UUID id, Space prefix, Markers markers, Type type, @Deprecated @Nullable Expression pattern, @Nullable JContainer<Expression> expressions, @Nullable JContainer<J> caseLabels, @Nullable Expression guard, JContainer<Statement> statements, @Nullable JRightPadded<J> body) {
             this.id = id;
             this.prefix = prefix;
             this.markers = markers;
             this.type = type;
             if (pattern != null) {
-                this.expressions = requireNonNull(JContainer.withElementsNullable(null, singletonList(pattern)));
+                this.caseLabels = requireNonNull(JContainer.withElementsNullable(null, singletonList(pattern)));
+            } else if (expressions != null) {
+                this.caseLabels = JContainer.build(expressions.getBefore(), expressions.getElements().stream().map(J.class::cast).map(JRightPadded::build).collect(toList()), expressions.getMarkers());
+            } else if (caseLabels != null) {
+                this.caseLabels = caseLabels;
             } else {
-                this.expressions = expressions;
+                this.caseLabels = JContainer.empty();
             }
+            this.guard = guard;
             this.statements = statements;
             this.body = body;
         }
@@ -1127,7 +1158,7 @@ public interface J extends Tree {
             }
 
             public Case withBody(@Nullable JRightPadded<J> body) {
-                return t.body == body ? t : new Case(t.id, t.prefix, t.markers, t.type, null, t.expressions, t.statements, body);
+                return t.body == body ? t : new Case(t.id, t.prefix, t.markers, t.type, null, null, t.caseLabels, t.guard, t.statements, body);
             }
 
             public JContainer<Statement> getStatements() {
@@ -1135,15 +1166,38 @@ public interface J extends Tree {
             }
 
             public Case withStatements(JContainer<Statement> statements) {
-                return t.statements == statements ? t : new Case(t.id, t.prefix, t.markers, t.type, null, t.expressions, statements, t.body);
+                return t.statements == statements ? t : new Case(t.id, t.prefix, t.markers, t.type, null, null, t.caseLabels, t.guard, statements, t.body);
             }
 
+            /**
+             * @deprecated As of Java 21 this is referred to as case labels and can be broader than just Expressions.
+             * Use {@link #getCaseLabels} and {@link #withCaseLabels(JContainer)} instead.
+             */
+            @Deprecated
             public JContainer<Expression> getExpressions() {
-                return t.expressions;
+                return JContainer.build(t.caseLabels.getBefore(), t.caseLabels.getElements().stream().filter(Expression.class::isInstance).map(Expression.class::cast).map(JRightPadded::build).collect(toList()), t.caseLabels.getMarkers());
             }
 
+            /**
+             * @deprecated As of Java 21 this is referred to as case labels and can be broader than just Expressions.
+             * Use {@link #getCaseLabels} and {@link #withCaseLabels(JContainer)} instead.
+             */
+            @Deprecated
             public Case withExpressions(JContainer<Expression> expressions) {
-                return t.expressions == expressions ? t : new Case(t.id, t.prefix, t.markers, t.type, null, expressions, t.statements, t.body);
+                if (t.getExpressions() == expressions) {
+                    return t;
+                } else if (t.caseLabels.getElements().stream().allMatch(Expression.class::isInstance)) {
+                    return new Case(t.id, t.prefix, t.markers, t.type, null, expressions, null, t.guard, t.statements, t.body);
+                }
+                throw new IllegalStateException("caseLabels contains an entry that is not an Expression, use withCaseLabels instead.");
+            }
+
+            public JContainer<J> getCaseLabels() {
+                return t.caseLabels;
+            }
+
+            public Case withCaseLabels(JContainer<J> caseLabels) {
+                return t.caseLabels == caseLabels ? t : new Case(t.id, t.prefix, t.markers, t.type, null, null, caseLabels, t.guard, t.statements, t.body);
             }
         }
     }
@@ -1979,10 +2033,14 @@ public interface J extends Tree {
         }
 
         public boolean isFullyQualifiedClassReference(String className) {
-            if (!className.contains(".")) {
+            if (getName().getFieldType() == null && getName().getType() instanceof JavaType.FullyQualified &&
+                !(getName().getType() instanceof JavaType.Unknown) &&
+                TypeUtils.fullyQualifiedNamesAreEqual(((JavaType.FullyQualified) getName().getType()).getFullyQualifiedName(), className)) {
+                return true;
+            } else if (!className.contains(".")) {
                 return false;
             }
-            return isFullyQualifiedClassReference(this, className, className.length());
+            return isFullyQualifiedClassReference(this, TypeUtils.toFullyQualifiedName(className), className.length());
         }
 
         private boolean isFullyQualifiedClassReference(J.FieldAccess fieldAccess, String className, int prevDotIndex) {
@@ -1991,7 +2049,7 @@ public interface J extends Tree {
                 return false;
             }
             String simpleName = fieldAccess.getName().getSimpleName();
-            if (!simpleName.regionMatches(0, className, dotIndex + 1, simpleName.length())) {
+            if (!simpleName.regionMatches(0, className, dotIndex + 1, Math.max(simpleName.length(), prevDotIndex - dotIndex - 1))) {
                 return false;
             }
             if (fieldAccess.getTarget() instanceof J.FieldAccess) {
@@ -2987,6 +3045,87 @@ public interface J extends Tree {
                 return t.expression == expression ? t : new InstanceOf(t.id, t.prefix, t.markers, expression, t.clazz, t.pattern, t.type);
             }
         }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class DeconstructionPattern implements J, TypedTree {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        Expression deconstructor;
+
+        JContainer<J> nested;
+
+        public List<J> getNested() {
+            return nested.getElements();
+        }
+
+        public DeconstructionPattern withNested(List<J> nested) {
+            return getPadding().withNested(JContainer.withElements(this.nested, nested));
+        }
+
+        @Getter
+        @With
+        JavaType type;
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitDeconstructionPattern(this, p);
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final DeconstructionPattern t;
+
+            public JContainer<J> getNested() {
+                return t.nested;
+            }
+
+            public DeconstructionPattern withNested(JContainer<J> nested) {
+                return t.nested == nested ? t : new DeconstructionPattern(t.id, t.prefix, t.markers, t.deconstructor, nested, t.type);
+            }
+        }
+
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -4058,7 +4197,7 @@ public interface J extends Tree {
 
         /**
          * These types are sorted in order of their recommended appearance in a list of modifiers, as defined in the
-         * <a href="https://rules.sonarsource.com/java/tag/convention/RSPEC-S1124">JLS</a>.
+         * <a href="https://rules.sonarsource.com/java/tag/convention/RSPEC-1124">JLS</a>.
          */
         public enum Type {
             Default,
@@ -5038,6 +5177,7 @@ public interface J extends Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
+    @RequiredArgsConstructor
     final class SwitchExpression implements J, Expression, TypedTree {
         @With
         @EqualsAndHashCode.Include
@@ -5055,27 +5195,10 @@ public interface J extends Tree {
         @With
         Block cases;
 
-        @Override
-        @Transient
-        public @Nullable JavaType getType() {
-            return new JavaVisitor<AtomicReference<JavaType>>() {
-                @Override
-                public J visitBlock(Block block, AtomicReference<JavaType> javaType) {
-                    if (!block.getStatements().isEmpty()) {
-                        Case caze = (Case) block.getStatements().get(0);
-                        javaType.set(caze.getExpressions().get(0).getType());
-                    }
-                    return block;
-                }
-            }.reduce(this, new AtomicReference<>()).get();
-        }
-
-        @Override
-        public <T extends J> T withType(@Nullable JavaType type) {
-            // a switch expression's type is driven by its case statements
-            //noinspection unchecked
-            return (T) this;
-        }
+        @With
+        @Nullable
+        @Getter
+        JavaType type;
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -6262,6 +6385,54 @@ public interface J extends Tree {
             public <P> J acceptJava(JavaVisitor<P> v, P p) {
                 return v.visitUnknownSource(this, p);
             }
+        }
+    }
+
+    /**
+     * A node that represents an erroneous element.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    @With
+    final class Erroneous implements Statement, Expression {
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
+        String text;
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitErroneous(this, p);
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return JavaType.Unknown.getInstance();
+        }
+
+        @Override
+        public <T extends J> T withType(@Nullable JavaType type) {
+            return (T) this;
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
         }
     }
 }

@@ -23,8 +23,7 @@ import org.openrewrite.hcl.style.BracketsStyle;
 import org.openrewrite.hcl.style.SpacesStyle;
 import org.openrewrite.hcl.style.TabsAndIndentsStyle;
 import org.openrewrite.hcl.tree.Hcl;
-
-import java.util.Optional;
+import org.openrewrite.style.Style;
 
 public class AutoFormatVisitor<P> extends HclVisitor<P> {
     @Nullable
@@ -46,20 +45,16 @@ public class AutoFormatVisitor<P> extends HclVisitor<P> {
 
         Hcl t = new NormalizeFormatVisitor<>().visit(tree, p, cursor.fork());
 
-        t = new BracketsVisitor<>(Optional.ofNullable(cf.getStyle(BracketsStyle.class))
-                .orElse(BracketsStyle.DEFAULT), stopAfter)
+        t = new BracketsVisitor<>(Style.from(BracketsStyle.class, cf, () -> BracketsStyle.DEFAULT), stopAfter)
                 .visit(t, p, cursor.fork());
 
-        t = new TabsAndIndentsVisitor<>(Optional.ofNullable(cf.getStyle(TabsAndIndentsStyle.class))
-                .orElse(TabsAndIndentsStyle.DEFAULT), stopAfter)
+        t = new TabsAndIndentsVisitor<>(Style.from(TabsAndIndentsStyle.class, cf, () -> TabsAndIndentsStyle.DEFAULT), stopAfter)
                 .visit(t, p, cursor.fork());
 
-        t = new SpacesVisitor<>(Optional.ofNullable(cf.getStyle(SpacesStyle.class))
-                .orElse(SpacesStyle.DEFAULT), stopAfter)
+        t = new SpacesVisitor<>(Style.from(SpacesStyle.class, cf, () -> SpacesStyle.DEFAULT), stopAfter)
                 .visit(t, p, cursor.fork());
 
-        t = new BlankLinesVisitor<>(Optional.ofNullable(cf.getStyle(BlankLinesStyle.class))
-                .orElse(BlankLinesStyle.DEFAULT), stopAfter)
+        t = new BlankLinesVisitor<>(Style.from(BlankLinesStyle.class, cf, () -> BlankLinesStyle.DEFAULT), stopAfter)
                 .visit(t, p, cursor.fork());
 
         if (t instanceof Hcl.ConfigFile) {
@@ -75,20 +70,16 @@ public class AutoFormatVisitor<P> extends HclVisitor<P> {
 
         t = (Hcl.ConfigFile) new NormalizeFormatVisitor<>().visit(t, p);
 
-        t = (Hcl.ConfigFile) new BracketsVisitor<>(Optional.ofNullable(cf.getStyle(BracketsStyle.class))
-                .orElse(BracketsStyle.DEFAULT), stopAfter)
+        t = (Hcl.ConfigFile) new BracketsVisitor<>(Style.from(BracketsStyle.class, cf, () -> BracketsStyle.DEFAULT), stopAfter)
                 .visit(t, p);
 
-        t = (Hcl.ConfigFile) new TabsAndIndentsVisitor<>(Optional.ofNullable(cf.getStyle(TabsAndIndentsStyle.class))
-                .orElse(TabsAndIndentsStyle.DEFAULT), stopAfter)
+        t = (Hcl.ConfigFile) new TabsAndIndentsVisitor<>(Style.from(TabsAndIndentsStyle.class, cf, () -> TabsAndIndentsStyle.DEFAULT), stopAfter)
                 .visit(t, p);
 
-        t = (Hcl.ConfigFile) new SpacesVisitor<>(Optional.ofNullable(cf.getStyle(SpacesStyle.class))
-                .orElse(SpacesStyle.DEFAULT), stopAfter)
+        t = (Hcl.ConfigFile) new SpacesVisitor<>(Style.from(SpacesStyle.class, cf, () -> SpacesStyle.DEFAULT), stopAfter)
                 .visit(t, p);
 
-        t = (Hcl.ConfigFile) new BlankLinesVisitor<>(Optional.ofNullable(cf.getStyle(BlankLinesStyle.class))
-                .orElse(BlankLinesStyle.DEFAULT), stopAfter)
+        t = (Hcl.ConfigFile) new BlankLinesVisitor<>(Style.from(BlankLinesStyle.class, cf, () -> BlankLinesStyle.DEFAULT), stopAfter)
                 .visit(t, p);
 
         assert t != null;

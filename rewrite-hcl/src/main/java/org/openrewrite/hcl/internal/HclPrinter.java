@@ -23,6 +23,7 @@ import org.openrewrite.hcl.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.function.UnaryOperator;
 
@@ -90,7 +91,7 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
         beforeSyntax(attribute, Space.Location.ATTRIBUTE, p);
         visit(attribute.getName(), p);
         visitSpace(attribute.getPadding().getType().getBefore(), Space.Location.ATTRIBUTE_ASSIGNMENT, p);
-        p.append(attribute.getType().equals(Hcl.Attribute.Type.Assignment) ? "=" : ":");
+        p.append(attribute.getType() == Hcl.Attribute.Type.Assignment ? "=" : ":");
         visit(attribute.getValue(), p);
         if (attribute.getComma() != null) {
             visitSpace(attribute.getComma().getPrefix(), Space.Location.OBJECT_VALUE_ATTRIBUTE_COMMA, p);
@@ -286,6 +287,18 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
         p.append("]");
         afterSyntax(indexPosition, p);
         return indexPosition;
+    }
+
+    @Override
+    public Hcl visitLegacyIndexAttribute(Hcl.LegacyIndexAttributeAccess laccess, PrintOutputCapture<P> p) {
+        beforeSyntax(laccess, Space.Location.LEGACY_INDEX_ATTRIBUTE_ACCESS, p);
+        visitRightPadded(
+                Collections.singletonList(laccess.getPadding().getBase()),
+                HclRightPadded.Location.LEGACY_INDEX_ATTRIBUTE_ACCESS_BASE, "", p);
+        p.append(".");
+        visitLiteral(laccess.getIndex(), p);
+        afterSyntax(laccess, p);
+        return laccess;
     }
 
     @Override

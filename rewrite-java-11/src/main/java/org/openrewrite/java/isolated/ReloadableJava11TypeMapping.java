@@ -18,24 +18,23 @@ package org.openrewrite.java.isolated;
 import com.sun.source.tree.Tree;
 import com.sun.tools.javac.code.*;
 import com.sun.tools.javac.tree.JCTree;
+import com.sun.tools.javac.util.Pair;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
 import org.openrewrite.java.internal.JavaTypeCache;
-import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 import javax.lang.model.type.NullType;
 import javax.lang.model.type.TypeMirror;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.singletonList;
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 
 @RequiredArgsConstructor
@@ -232,8 +231,9 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
     private JavaType.FullyQualified classType(Type.ClassType classType, String signature) {
         Symbol.ClassSymbol sym = (Symbol.ClassSymbol) classType.tsym;
         Type.ClassType symType = (Type.ClassType) sym.type;
+        String fqn = sym.flatName().toString();
 
-        JavaType.FullyQualified fq = typeCache.get(sym.flatName().toString());
+        JavaType.FullyQualified fq = typeCache.get(fqn);
         JavaType.Class clazz = (JavaType.Class) (fq instanceof JavaType.Parameterized ? ((JavaType.Parameterized) fq).getType() : fq);
         if (clazz == null) {
             if (!sym.completer.isTerminal()) {
@@ -243,12 +243,12 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
             clazz = new JavaType.Class(
                     null,
                     sym.flags_field,
-                    sym.flatName().toString(),
+                    fqn,
                     getKind(sym),
                     null, null, null, null, null, null, null
             );
 
-            typeCache.put(sym.flatName().toString(), clazz);
+            typeCache.put(fqn, clazz);
 
             JavaType.FullyQualified supertype = TypeUtils.asFullyQualified(type(symType.supertype_field));
 
@@ -276,7 +276,7 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
                     if (elem instanceof Symbol.VarSymbol &&
                             (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
                                     Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
-                        if (sym.flatName().toString().equals("java.lang.String") && elem.name.toString().equals("serialPersistentFields")) {
+                        if (fqn.equals("java.lang.String") && elem.name.toString().equals("serialPersistentFields")) {
                             // there is a "serialPersistentFields" member within the String class which is used in normal Java
                             // serialization to customize how the String field is serialized. This field is tripping up Jackson
                             // serialization and is intentionally filtered to prevent errors.
@@ -358,12 +358,19 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
             return variableType(((JCTree.JCVariableDecl) tree).sym);
         } else if (tree instanceof JCTree.JCAnnotatedType && ((JCTree.JCAnnotatedType) tree).getUnderlyingType() instanceof JCTree.JCArrayTypeTree) {
             return annotatedArray((JCTree.JCAnnotatedType) tree);
+        } else if (tree instanceof JCTree.JCClassDecl) {
+            symbol = ((JCTree.JCClassDecl) tree).sym;
+        } else if (tree instanceof JCTree.JCFieldAccess) {
+            symbol = ((JCTree.JCFieldAccess) tree).sym;
         }
 
         return type(((JCTree) tree).type, symbol);
     }
 
-    private @Nullable JavaType type(Type type, Symbol symbol) {
+    private @Nullable JavaType type(@Nullable Type type, @Nullable Symbol symbol) {
+        if (type == null && symbol != null) {
+            type = symbol.type;
+        }
         if (type instanceof Type.MethodType || type instanceof Type.ForAll) {
             return methodInvocationType(type, symbol);
         }
@@ -453,6 +460,10 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
      * @return Method type attribution.
      */
     public JavaType.@Nullable Method methodInvocationType(com.sun.tools.javac.code.@Nullable Type selectType, @Nullable Symbol symbol) {
+        /*
+         TODO: AttrRecover class does not exist for java 11; there is JCNoType
+          in the Type.class, so maybe it is possible to retrieve this information...
+         */
         if (selectType == null || selectType instanceof Type.ErrorType || symbol == null || symbol.kind == Kinds.Kind.ERR || symbol.type instanceof Type.UnknownType) {
             return null;
         }
@@ -470,12 +481,14 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
             return existing;
         }
 
-        List<String> paramNames = null;
+        String[] paramNames = null;
         if (!methodSymbol.params().isEmpty()) {
-            paramNames = new ArrayList<>(methodSymbol.params().size());
-            for (Symbol.VarSymbol p : methodSymbol.params()) {
+            paramNames = new String[methodSymbol.params().size()];
+            com.sun.tools.javac.util.List<Symbol.VarSymbol> params = methodSymbol.params();
+            for (int i = 0; i < params.size(); i++) {
+                Symbol.VarSymbol p = params.get(i);
                 String s = p.name.toString();
-                paramNames.add(s);
+                paramNames[i] = s;
             }
         }
 
@@ -486,13 +499,13 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
                 methodSymbol.isConstructor() ? "<constructor>" : methodSymbol.getSimpleName().toString(),
                 null,
                 paramNames,
-                null, null, null, null
+                null, null, null, null, null
         );
         typeCache.put(signature, method);
 
         JavaType returnType = null;
         List<JavaType> parameterTypes = null;
-        List<JavaType.FullyQualified> exceptionTypes = null;
+        List<JavaType> exceptionTypes = null;
 
         if (selectType instanceof Type.MethodType) {
             Type.MethodType methodType = (Type.MethodType) selectType;
@@ -512,20 +525,8 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
             if (!methodType.thrown.isEmpty()) {
                 exceptionTypes = new ArrayList<>(methodType.thrown.size());
                 for (Type exceptionType : methodType.thrown) {
-                    JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(exceptionType));
-                    if (javaType == null) {
-                        // if the type cannot be resolved to a class (it might not be on the classpath, or it might have
-                        // been mapped to cyclic)
-                        if (exceptionType instanceof Type.ClassType) {
-                            Symbol.ClassSymbol sym = (Symbol.ClassSymbol) exceptionType.tsym;
-                            javaType = new JavaType.Class(null, Flag.Public.getBitMask(), sym.flatName().toString(), JavaType.Class.Kind.Class,
-                                    null, null, null, null, null, null, null);
-                        }
-                    }
-                    if (javaType != null) {
-                        // if the exception type is not resolved, it is not added to the list of exceptions
-                        exceptionTypes.add(javaType);
-                    }
+                    JavaType javaType = type(exceptionType);
+                    exceptionTypes.add(javaType);
                 }
             }
         } else if (selectType instanceof Type.UnknownType) {
@@ -563,12 +564,14 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
                 return existing;
             }
 
-            List<String> paramNames = null;
+            String[] paramNames = null;
             if (!methodSymbol.params().isEmpty()) {
-                paramNames = new ArrayList<>(methodSymbol.params().size());
-                for (Symbol.VarSymbol p : methodSymbol.params()) {
+                paramNames = new String[methodSymbol.params().size()];
+                com.sun.tools.javac.util.List<Symbol.VarSymbol> params = methodSymbol.params();
+                for (int i = 0; i < params.size(); i++) {
+                    Symbol.VarSymbol p = params.get(i);
                     String s = p.name.toString();
-                    paramNames.add(s);
+                    paramNames[i] = s;
                 }
             }
 
@@ -586,6 +589,17 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
                     }
                 }
             }
+
+            List<String> declaredFormalTypeNames = null;
+            for (Symbol.TypeVariableSymbol typeParam : methodSymbol.getTypeParameters()) {
+                if(typeParam.owner == methodSymbol) {
+                    if (declaredFormalTypeNames == null) {
+                        declaredFormalTypeNames = new ArrayList<>();
+                    }
+                    declaredFormalTypeNames.add(typeParam.name.toString());
+                }
+            }
+
             JavaType.Method method = new JavaType.Method(
                     null,
                     methodSymbol.flags_field,
@@ -594,8 +608,8 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
                     null,
                     paramNames,
                     null, null, null,
-                    // TODO: Figure out the correct thing to put here based on methodSymbol.defaultValue.getValue()
-                    defaultValues
+                    defaultValues,
+                    declaredFormalTypeNames == null ? null : declaredFormalTypeNames.toArray(new String[0])
             );
             typeCache.put(signature, method);
 
@@ -603,7 +617,7 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
                     ((Type.ForAll) methodSymbol.type).qtype :
                     methodSymbol.type;
 
-            List<JavaType.FullyQualified> exceptionTypes = null;
+            List<JavaType> exceptionTypes = null;
 
             Type selectType = methodSymbol.type;
             if (selectType instanceof Type.ForAll) {
@@ -615,20 +629,8 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
                 if (!methodType.thrown.isEmpty()) {
                     exceptionTypes = new ArrayList<>(methodType.thrown.size());
                     for (Type exceptionType : methodType.thrown) {
-                        JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(exceptionType));
-                        if (javaType == null) {
-                            // if the type cannot be resolved to a class (it might not be on the classpath, or it might have
-                            // been mapped to cyclic)
-                            if (exceptionType instanceof Type.ClassType) {
-                                Symbol.ClassSymbol sym = (Symbol.ClassSymbol) exceptionType.tsym;
-                                javaType = new JavaType.Class(null, Flag.Public.getBitMask(), sym.flatName().toString(), JavaType.Class.Kind.Class,
-                                        null, null, null, null, null, null, null);
-                            }
-                        }
-                        if (javaType != null) {
-                            // if the exception type is not resolved, it is not added to the list of exceptions
-                            exceptionTypes.add(javaType);
-                        }
+                        JavaType javaType = type(exceptionType);
+                        exceptionTypes.add(javaType);
                     }
                 }
             }
@@ -684,22 +686,66 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
         }
     }
 
-    private @Nullable List<JavaType.FullyQualified> listAnnotations(Symbol symb) {
+    private @Nullable List<JavaType.FullyQualified> listAnnotations(Symbol sym) {
         List<JavaType.FullyQualified> annotations = null;
-        if (!symb.getDeclarationAttributes().isEmpty()) {
-            annotations = new ArrayList<>(symb.getDeclarationAttributes().size());
-            for (Attribute.Compound a : symb.getDeclarationAttributes()) {
-                JavaType.FullyQualified annotType = TypeUtils.asFullyQualified(type(a.type));
-                if (annotType == null) {
-                    continue;
-                }
-                Retention retention = a.getAnnotationType().asElement().getAnnotation(Retention.class);
-                if (retention != null && retention.value() == RetentionPolicy.SOURCE) {
-                    continue;
-                }
-                annotations.add(annotType);
+        if (!sym.getDeclarationAttributes().isEmpty()) {
+            annotations = new ArrayList<>(sym.getDeclarationAttributes().size());
+            for (Attribute.Compound a : sym.getDeclarationAttributes()) {
+                JavaType.Annotation annotation = annotationType(a);
+                if (annotation == null) continue;
+                annotations.add(annotation);
             }
         }
         return annotations;
+    }
+
+    private JavaType.@Nullable Annotation annotationType(Attribute.Compound compound) {
+        JavaType.FullyQualified annotType = TypeUtils.asFullyQualified(type(compound.type));
+        if (annotType == null) {
+            return null;
+        }
+        List<JavaType.Annotation.ElementValue> elementValues = new ArrayList<>();
+        for (Pair<Symbol.MethodSymbol, Attribute> attr : compound.values) {
+            Object value = annotationElementValue(attr.snd.getValue());
+            JavaType.Method element = requireNonNull(methodDeclarationType(attr.fst, annotType));
+            JavaType.Annotation.ElementValue elementValue = value instanceof Object[] ?
+                    JavaType.Annotation.ArrayElementValue.from(element, ((Object[]) value)) :
+                    JavaType.Annotation.SingleElementValue.from(element, value);
+            elementValues.add(elementValue);
+        }
+        return new JavaType.Annotation(annotType, elementValues);
+    }
+
+    private Object annotationElementValue(Object value) {
+        if (value instanceof Symbol.VarSymbol) {
+            JavaType.Variable mapped = variableType((Symbol.VarSymbol) value);
+            return mapped != null ? mapped : JavaType.Unknown.getInstance();
+        } else if (value instanceof Type.ClassType) {
+            return type((Type.ClassType) value);
+        } else if (value instanceof Attribute.Array) {
+            List<@Nullable Object> list = new ArrayList<>();
+            for (Attribute attribute : ((Attribute.Array) value).values) {
+                list.add(annotationElementValue(attribute));
+            }
+            return list.toArray(!list.isEmpty() && list.get(0) instanceof JavaType ? JavaType.EMPTY_JAVA_TYPE_ARRAY : new Object[0]);
+        } else if (value instanceof List<?>) {
+            List<@Nullable Object> list = new ArrayList<>();
+            for (Object o : ((List<?>) value)) {
+                list.add(annotationElementValue(o));
+            }
+            return list.toArray(!list.isEmpty() && list.get(0) instanceof JavaType ? JavaType.EMPTY_JAVA_TYPE_ARRAY : new Object[0]);
+        } else if (value instanceof Attribute.Class) {
+            return type(((Attribute.Class) value).classType);
+        } else if (value instanceof Attribute.Compound) {
+            JavaType.Annotation mapped = annotationType((Attribute.Compound) value);
+            return mapped != null ? mapped : JavaType.Unknown.getInstance();
+        } else if (value instanceof Attribute.Constant) {
+            return annotationElementValue(((Attribute.Constant) value).value);
+        } else if (value instanceof Attribute.Enum) {
+            return annotationElementValue(((Attribute.Enum) value).value);
+        } else if (value instanceof Attribute.Error) {
+            return JavaType.Unknown.getInstance();
+        }
+        return value;
     }
 }

@@ -27,6 +27,7 @@ import org.openrewrite.test.SourceSpec;
 import java.util.EnumSet;
 import java.util.function.Consumer;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -227,6 +228,29 @@ class TypeUtilsTest implements RewriteTest {
                 public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Object o) {
                     assertThat(variable.getVariableType().getType()).isInstanceOf(JavaType.Class.class);
                     return super.visitVariable(variable, o);
+                }
+            }.visit(cu, new InMemoryExecutionContext()))
+          )
+        );
+    }
+
+    @Test
+    void methodWithAnnotationsIsOfType() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  @Deprecated
+                  void foo() {}
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                @Override
+                public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Object o) {
+                    assertThat(TypeUtils.isOfType(method.getMethodType(), method.getMethodType())).isTrue();
+                    assertThat(TypeUtils.isOfType(method.getMethodType().withAnnotations(emptyList()), method.getMethodType())).isTrue();
+                    assertThat(TypeUtils.isOfType(method.getMethodType(), method.getMethodType().withAnnotations(emptyList()))).isTrue();
+                    return method;
                 }
             }.visit(cu, new InMemoryExecutionContext()))
           )

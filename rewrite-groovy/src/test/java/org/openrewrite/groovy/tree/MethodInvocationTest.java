@@ -16,7 +16,6 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -31,11 +30,11 @@ class MethodInvocationTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-
+              
               repositories {
                   mavenCentral()
               }
-
+              
               dependencies {
                   implementation 'org.hibernate:hibernate-core:3.6.7.Final'
                   api 'com.google.guava:guava:23.0'
@@ -46,7 +45,6 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("Parentheses with method invocation is not yet supported")
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/4615")
     void gradleWithParentheses() {
@@ -179,6 +177,28 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
+    void useClassAsArgument() {
+        rewriteRun(
+          groovy(
+            """
+              foo(String)
+              """
+          )
+        );
+    }
+
+    @Test
+    void useClassAsArgumentJavaStyle() {
+        rewriteRun(
+          groovy(
+            """
+              foo(String    .class)
+              """
+          )
+        );
+    }
+
+    @Test
     @SuppressWarnings("GroovyAssignabilityCheck")
     void closureWithImplicitParameter() {
         rewriteRun(
@@ -188,6 +208,22 @@ class MethodInvocationTest implements RewriteTest {
               acceptsClosure {
                   println(it)
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void closureInObjectInObject() {
+        rewriteRun(
+          groovy(
+            """
+              class Test {
+                Test child = new Test()
+                def acceptsClosure(Closure cl) {}
+              }
+              
+              new Test().child.acceptsClosure {}
               """
           )
         );
@@ -326,6 +362,25 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/4055")
+    @Test
+    void chainOfMethodInvocations() {
+        rewriteRun(
+          groovy(
+            """
+              Micronaut.build(args)
+                      .banner(false)
+                      .propertySources(PropertySource.of("my-config", [name: "MyApp"]))
+                      .environments("prod") // Only prod
+                      .overrideConfig("custom-config.yml") // Load custom config
+                      .packages("com.company")
+                      .mainClass(Application)
+                      .start()
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2552")
     @Test
     void closureInvocation() {
@@ -349,7 +404,7 @@ class MethodInvocationTest implements RewriteTest {
                 static boolean isEmpty(String value) {
                   return value == null || value.isEmpty()
                 }
-
+              
                 static void main(String[] args) {
                   isEmpty("")
                 }
@@ -359,7 +414,29 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("Parentheses with method invocation is not yet supported")
+    @Issue("https://github.com/openrewrite/rewrite/issues/4703")
+    @Test
+    void insideParenthesesSimple() {
+        rewriteRun(
+          groovy(
+            """
+              ((a.invoke "b" ))
+              """
+          )
+        );
+    }
+
+    @Test
+    void lotOfSpacesAroundConstantWithParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              (  ( (    "x"         )        ).toString()       )
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4703")
     @Test
     void insideParentheses() {
@@ -375,7 +452,36 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("Parentheses with method invocation is not yet supported")
+    @Test
+    void topLevelCallWithoutReceiver() {
+        rewriteRun(
+          groovy(
+            """
+              from('timer:groovy?period=1000')
+                  .setBody()
+                      .constant('Hello Camel K')
+                  .setBody()
+                      .simple('body - header.RandomValue')
+              """
+          )
+        );
+    }
+
+    @Test
+    void insideParenthesesWithNewline() {
+        rewriteRun(
+          groovy(
+            """              
+              static def foo(Map map) {
+                  ((
+                  map.containsKey("foo"))
+                      && ((map.get("foo")).equals("bar")))
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4703")
     @Test
     void insideParenthesesWithoutNewLineAndEscapedMethodName() {
@@ -383,6 +489,34 @@ class MethodInvocationTest implements RewriteTest {
           groovy(
             """
               static def foo(Map someMap) {((((((someMap.get("(bar")))) ).'equals' "baz" )   )      }
+              """
+          )
+        );
+    }
+
+    @Test
+    void insideFourParenthesesAndEnters() {
+        rewriteRun(
+          groovy(
+            """
+              ((((
+                something(a)
+              ))))
+              """
+          )
+        );
+    }
+
+    @Test
+    void insideFourParenthesesAndEntersWithCommentWithParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              ((/* comment :-) ((
+              */((
+                // :-((
+                /*)*/something(a)
+              ))))
               """
           )
         );

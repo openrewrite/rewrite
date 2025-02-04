@@ -366,7 +366,13 @@ public class SemanticallyEqual {
                 J.Case compareTo = (J.Case) j;
                 this.visitList(_case.getStatements(), compareTo.getStatements());
                 visit(_case.getBody(), compareTo.getBody());
-                this.visitList(_case.getExpressions(), compareTo.getExpressions());
+                this.visitList(_case.getCaseLabels(), compareTo.getCaseLabels());
+                if (_case.getGuard() != null && compareTo.getGuard() != null) {
+                    visit(_case.getGuard(), compareTo.getGuard());
+                } else if (nullMissMatch(_case.getGuard(), compareTo.getGuard())) {
+                    isEqual.set(false);
+                    return _case;
+                }
             }
             return _case;
         }
@@ -808,6 +814,25 @@ public class SemanticallyEqual {
                 visit(instanceOf.getExpression(), compareTo.getExpression());
             }
             return instanceOf;
+        }
+
+        @Override
+        public J.DeconstructionPattern visitDeconstructionPattern(J.DeconstructionPattern deconstructionPattern, J j) {
+            if (isEqual.get()) {
+                if (!(j instanceof J.DeconstructionPattern)) {
+                    isEqual.set(false);
+                    return deconstructionPattern;
+                }
+
+                J.DeconstructionPattern compareTo = (J.DeconstructionPattern) j;
+                if (!TypeUtils.isOfType(deconstructionPattern.getType(), compareTo.getType())) {
+                    isEqual.set(false);
+                    return deconstructionPattern;
+                }
+                visit(deconstructionPattern.getDeconstructor(), compareTo.getDeconstructor());
+                this.visitList(deconstructionPattern.getNested(), compareTo.getNested());
+            }
+            return deconstructionPattern;
         }
 
         @Override
