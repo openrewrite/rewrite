@@ -28,7 +28,6 @@ import static org.openrewrite.groovy.Assertions.groovy;
 class RealWorldGroovyTest implements RewriteTest {
 
     @Test
-    @ExpectedToFail("Pattern operator is not yet supported") // https://groovy-lang.org/operators.html#_pattern_operator
     @Issue("https://github.com/spring-projects/spring-boot/blob/v3.4.1/settings.gradle")
     void springBootSettingsGradle() {
         rewriteRun(
@@ -135,7 +134,6 @@ class RealWorldGroovyTest implements RewriteTest {
     }
 
     @Test
-    @ExpectedToFail("Anonymous inner class is not yet supported") // https://groovy-lang.org/objectorientation.html#_anonymous_inner_class
     @Issue("https://github.com/spring-projects/spring-ldap/blob/v3.4.1/buildSrc/src/test/resources/samples/integrationtest/withgroovy/src/integration-test/groovy/sample/TheTest.groovy")
     void springLdapTheTest() {
         rewriteRun(

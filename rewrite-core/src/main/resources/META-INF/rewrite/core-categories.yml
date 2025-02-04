@@ -31,3 +31,7 @@ type: specs.openrewrite.org/v1beta/category
 packageName: org
 root: true
 ---
+type: specs.openrewrite.org/v1beta/category
+packageName: ai
+root: true
+---

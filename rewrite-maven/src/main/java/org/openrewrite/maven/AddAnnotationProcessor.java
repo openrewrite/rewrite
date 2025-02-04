@@ -22,6 +22,7 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.XmlIsoVisitor;
@@ -75,6 +76,7 @@ public class AddAnnotationProcessor extends Recipe {
                 plugins = (Xml.Tag) mavenPlugin().asVisitor(plugin -> {
                     if (MAVEN_COMPILER_PLUGIN_GROUP_ID.equals(plugin.getGroupId()) &&
                             MAVEN_COMPILER_PLUGIN_ARTIFACT_ID.equals(plugin.getArtifactId())) {
+                        MavenResolutionResult mrr = getResolutionResult();
                         AtomicReference<TreeVisitor<?, ExecutionContext>> afterVisitor = new AtomicReference<>();
                         Xml.Tag modifiedPlugin = new XmlIsoVisitor<ExecutionContext>() {
                             @Override
@@ -89,7 +91,7 @@ public class AddAnnotationProcessor extends Recipe {
                                                 String oldVersion = child.getChildValue("version").orElse("");
                                                 boolean oldVersionUsesProperty = oldVersion.startsWith("${");
                                                 String lookupVersion = oldVersionUsesProperty ?
-                                                        getResolutionResult().getPom().getValue(oldVersion.trim()) :
+                                                        mrr.getPom().getValue(oldVersion.trim()) :
                                                         oldVersion;
                                                 VersionComparator comparator = Semver.validate(lookupVersion, null).getValue();
                                                 if (comparator.compare(version, lookupVersion) > 0) {

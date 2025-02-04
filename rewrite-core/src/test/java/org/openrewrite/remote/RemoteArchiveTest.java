@@ -44,11 +44,8 @@ class RemoteArchiveTest {
         ExecutionContext ctx = new InMemoryExecutionContext();
 
         RemoteArchive remoteArchive = Remote
-          .builder(
-            Paths.get("gradle/wrapper/gradle-wrapper.jar"),
-            distributionUrl.toURI()
-          )
-          .build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar");
+          .builder(Paths.get("gradle/wrapper/gradle-wrapper.jar"))
+          .build(distributionUrl.toURI(), "gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar");
 
         long actual = getInputStreamSize(remoteArchive.getInputStream(ctx));
         assertThat(actual).isGreaterThan(50_000);
@@ -63,11 +60,8 @@ class RemoteArchiveTest {
           .setLargeFileHttpSender(new MockHttpSender(408));
 
         RemoteArchive remoteArchive = Remote
-          .builder(
-            Paths.get("gradle/wrapper/gradle-wrapper.jar"),
-            distributionUrl.toURI()
-          )
-          .build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar");
+          .builder(Paths.get("gradle/wrapper/gradle-wrapper.jar"))
+          .build(distributionUrl.toURI(), "gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar");
 
         assertThatThrownBy(() -> getInputStreamSize(remoteArchive.getInputStream(ctx)))
           .isInstanceOf(IllegalStateException.class)
@@ -94,11 +88,8 @@ class RemoteArchiveTest {
                   .setLargeFileHttpSender(new MockHttpSender(distributionUrl::openStream));
 
                 RemoteArchive remoteArchive = Remote
-                  .builder(
-                    Paths.get("gradle/wrapper/gradle-wrapper.jar"),
-                    distributionUrl.toURI()
-                  )
-                  .build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar");
+                  .builder(Paths.get("gradle/wrapper/gradle-wrapper.jar"))
+                  .build(distributionUrl.toURI(), "gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar");
 
                 return getInputStreamSize(remoteArchive.getInputStream(ctx));
             });
@@ -118,11 +109,8 @@ class RemoteArchiveTest {
         URL zipUrl = requireNonNull(RemoteArchiveTest.class.getClassLoader().getResource("zipfile.zip"));
 
         RemoteArchive remoteArchive = Remote
-          .builder(
-            Paths.get("content.txt"),
-            zipUrl.toURI()
-          )
-          .build("content.txt");
+          .builder(Paths.get("content.txt"))
+          .build(zipUrl.toURI(), "content.txt");
 
         String printed = remoteArchive.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.DEFAULT));
         assertThat(printed).isEqualTo("this is a zipped file");

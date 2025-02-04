@@ -109,4 +109,10 @@ public class NamedStyles implements Marker {
     public Validated<Object> validate() {
         return Validated.none();
     }
+
+    public <S extends Style> S getStyle(Class<S> styleClass) {
+        S ret = merge(styleClass, Collections.singletonList(this));
+        assert(ret != null);
+        return ret;
+    }
 }

@@ -261,6 +261,7 @@ public final class ListUtils {
     /**
      * For backwards compatibility; prefer {@link #map(List, Function)}.
      */
+    @Contract("null, _ -> null; !null, _ -> !null")
     public static <T> @Nullable List<T> map(@Nullable List<T> ls, UnaryOperator<@Nullable T> map) {
         return map(ls, (Function<T, T>) map);
     }

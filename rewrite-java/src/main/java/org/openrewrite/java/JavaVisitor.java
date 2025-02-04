@@ -423,7 +423,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         } else {
             c = (J.Case) temp;
         }
-        c = c.getPadding().withExpressions(visitContainer(c.getPadding().getExpressions(), JContainer.Location.CASE_EXPRESSION, p));
+        c = c.getPadding().withCaseLabels(visitContainer(c.getPadding().getCaseLabels(), JContainer.Location.CASE_LABEL, p));
+        c = c.withGuard(visitAndCast(c.getGuard(), p));
         c = c.getPadding().withBody(visitRightPadded(c.getPadding().getBody(), JRightPadded.Location.CASE_BODY, p));
         c = c.getPadding().withStatements(visitContainer(c.getPadding().getStatements(), JContainer.Location.CASE, p));
         return c;
@@ -742,6 +743,17 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         i = i.withPattern(visitAndCast(i.getPattern(), p));
         i = i.withType(visitType(i.getType(), p));
         return i;
+    }
+
+    public J visitDeconstructionPattern(J.DeconstructionPattern deconstructionPattern, P p) {
+        J.DeconstructionPattern d = deconstructionPattern;
+        d = d.withPrefix(visitSpace(d.getPrefix(), Space.Location.DECONSTRUCTION_PATTERN_PREFIX, p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        d = d.withDeconstructor(visitAndCast(d.getDeconstructor(), p));
+        d = d.getPadding().withNested(visitContainer(d.getPadding().getNested(), JContainer.Location.DECONSTRUCTION_PATTERN_NESTED, p));
+        d = d.withType(visitType(d.getType(), p));
+        return d;
+
     }
 
     public J visitIntersectionType(J.IntersectionType intersectionType, P p) {
@@ -1406,7 +1418,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     public <J2 extends J> @Nullable JContainer<J2> visitContainer(@Nullable JContainer<J2> container,
-                                                        JContainer.Location loc, P p) {
+                                                                  JContainer.Location loc, P p) {
         if (container == null) {
             //noinspection ConstantConditions
             return null;

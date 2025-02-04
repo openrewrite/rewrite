@@ -1,3 +1,5 @@
+import nl.javadude.gradle.plugins.license.LicenseExtension
+
 plugins {
     id("org.openrewrite.build.language-library")
     id("groovy")
@@ -57,6 +59,7 @@ dependencies {
     testImplementation(project(":rewrite-test")) {
         // because gradle-api fatjars this implementation already
         exclude("ch.qos.logback", "logback-classic")
+        exclude("org.slf4j", "slf4j-nop")
     }
 
     testImplementation("org.openrewrite.gradle.tooling:model:$latest")
@@ -92,4 +95,8 @@ tasks.withType<Javadoc> {
         "**/GradleProject**",
         "**/GradleSettings**"
     )
+}
+
+configure<LicenseExtension> {
+    excludePatterns.add("**/gradle-wrapper/*")
 }

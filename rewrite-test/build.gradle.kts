@@ -13,6 +13,7 @@ dependencies {
     implementation("org.assertj:assertj-core:latest.release")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-csv")
     implementation("org.slf4j:slf4j-api:1.7.36")
+    implementation("org.slf4j:slf4j-nop:1.7.36")
 
     testImplementation(project(":rewrite-groovy"))
 }

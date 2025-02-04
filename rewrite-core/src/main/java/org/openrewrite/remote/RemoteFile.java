@@ -56,6 +56,7 @@ public class RemoteFile implements Remote {
     FileAttributes fileAttributes;
 
     @Language("markdown")
+    @Nullable
     String description;
 
     @Nullable

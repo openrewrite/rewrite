@@ -15,8 +15,8 @@
  */
 package org.openrewrite.gradle;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
+import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -24,9 +24,9 @@ import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindGradleProject;
 import org.openrewrite.gradle.trait.GradleDependency;
-import org.openrewrite.gradle.util.ChangeStringLiteral;
-import org.openrewrite.gradle.util.Dependency;
-import org.openrewrite.gradle.util.DependencyStringNotationConverter;
+import org.openrewrite.gradle.internal.ChangeStringLiteral;
+import org.openrewrite.gradle.internal.Dependency;
+import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
@@ -46,6 +46,7 @@ import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
+@RequiredArgsConstructor
 public class ChangeDependency extends Recipe {
     @Option(displayName = "Old groupId",
             description = "The old groupId to replace. The groupId is the first part of a dependency coordinate 'com.google.guava:guava:VERSION'. Supports glob expressions.",
@@ -97,26 +98,10 @@ public class ChangeDependency extends Recipe {
     @Nullable
     Boolean overrideManagedVersion;
 
-    /**
-     * Keeping this constructor just for compatibility purposes
-     *
-     * @deprecated Use {@link ChangeDependency#ChangeDependency(String, String, String, String, String, String, Boolean)}
-     */
-    @Deprecated
-    public ChangeDependency(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern) {
-        this(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern, null);
-    }
-
-    @JsonCreator
-    public ChangeDependency(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern, @Nullable Boolean overrideManagedVersion) {
-        this.oldGroupId = oldGroupId;
-        this.oldArtifactId = oldArtifactId;
-        this.newGroupId = newGroupId;
-        this.newArtifactId = newArtifactId;
-        this.newVersion = newVersion;
-        this.versionPattern = versionPattern;
-        this.overrideManagedVersion = overrideManagedVersion;
-    }
+    // Individual dependencies tend to appear in several places within a given dependency graph.
+    // Minimize the number of allocations by caching the updated dependencies.
+    transient Map<org.openrewrite.maven.tree.Dependency, org.openrewrite.maven.tree.Dependency> updatedRequested = new HashMap<>();
+    transient Map<org.openrewrite.maven.tree.ResolvedDependency, org.openrewrite.maven.tree.ResolvedDependency> updatedResolved = new HashMap<>();
 
     @Override
     public String getDisplayName() {
@@ -452,32 +437,40 @@ public class ChangeDependency extends Recipe {
                 for (GradleDependencyConfiguration gdc : nameToConfiguration.values()) {
                     GradleDependencyConfiguration newGdc = gdc;
                     newGdc = newGdc.withRequested(ListUtils.map(gdc.getRequested(), requested -> {
+                        assert requested != null;
                         if (depMatcher.matches(requested.getGroupId(), requested.getArtifactId())) {
-                            GroupArtifactVersion gav = requested.getGav();
-                            if (newGroupId != null) {
-                                gav = gav.withGroupId(newGroupId);
-                            }
-                            if (newArtifactId != null) {
-                                gav = gav.withArtifactId(newArtifactId);
-                            }
-                            if (gav != requested.getGav()) {
-                                return requested.withGav(gav);
-                            }
+                            requested = updatedRequested.computeIfAbsent(requested, r -> {
+                                GroupArtifactVersion gav = r .getGav();
+                                if (newGroupId != null) {
+                                    gav = gav.withGroupId(newGroupId);
+                                }
+                                if (newArtifactId != null) {
+                                    gav = gav.withArtifactId(newArtifactId);
+                                }
+                                if (gav != r .getGav()) {
+                                    r = r.withGav(gav);
+                                }
+                                return r;
+                            });
                         }
                         return requested;
                     }));
                     newGdc = newGdc.withDirectResolved(ListUtils.map(gdc.getDirectResolved(), resolved -> {
+                        assert resolved != null;
                         if (depMatcher.matches(resolved.getGroupId(), resolved.getArtifactId())) {
-                            ResolvedGroupArtifactVersion gav = resolved.getGav();
-                            if (newGroupId != null) {
-                                gav = gav.withGroupId(newGroupId);
-                            }
-                            if (newArtifactId != null) {
-                                gav = gav.withArtifactId(newArtifactId);
-                            }
-                            if (gav != resolved.getGav()) {
-                                return resolved.withGav(gav);
-                            }
+                            resolved = updatedResolved.computeIfAbsent(resolved, r -> {
+                                ResolvedGroupArtifactVersion gav = r.getGav();
+                                if (newGroupId != null) {
+                                    gav = gav.withGroupId(newGroupId);
+                                }
+                                if (newArtifactId != null) {
+                                    gav = gav.withArtifactId(newArtifactId);
+                                }
+                                if (gav != r.getGav()) {
+                                    r = r.withGav(gav);
+                                }
+                                return r;
+                            });
                         }
                         return resolved;
                     }));

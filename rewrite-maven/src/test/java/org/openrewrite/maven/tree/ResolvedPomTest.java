@@ -367,19 +367,135 @@ class ResolvedPomTest implements RewriteTest {
             assertThat(downloadErrorArgs).hasSize(1);
         }
 
-        private static void createJarFile(Path localRepository1) throws IOException {
-            Path localJar = localRepository1.resolve("com/some/some-artifact/1/some-artifact-1.jar");
-            assertThat(localJar.getParent().toFile().mkdirs()).isTrue();
-            Files.writeString(localJar, "some content not to be empty");
-        }
+    }
 
-        private static MavenRepository createMavenRepository(Path localRepository, String name) {
-            return MavenRepository.builder()
-              .id(name)
-              .uri(localRepository.toUri().toString())
-              .snapshots(false)
-              .knownToExist(true)
-              .build();
+    @Nested
+    class DependencyManagement {
+
+        @Issue("https://github.com/openrewrite/rewrite-maven-plugin/issues/862")
+        @Test
+        void resolveVersionFromParentDependencyManagement(@TempDir Path localRepository) throws IOException {
+            MavenRepository mavenLocal = createMavenRepository(localRepository, "local");
+            createJarFile(localRepository);
+            createJarFile(localRepository, "org.openrewrite.test", "lib", "1.0");
+
+            List<List<@Nullable Object>> downloadErrorArgs = new ArrayList<>();
+            MavenExecutionContextView ctx = MavenExecutionContextView.view(new InMemoryExecutionContext(Throwable::printStackTrace));
+            ctx.setRepositories(List.of(mavenLocal));
+            ctx.setResolutionListener(new ResolutionEventListener() {
+                @Override
+                public void downloadError(GroupArtifactVersion gav, List<String> attemptedUris, @Nullable Pom containing) {
+                    List<Object> list = new ArrayList<>();
+                    list.add(gav);
+                    list.add(attemptedUris);
+                    list.add(containing);
+                    downloadErrorArgs.add(list);
+                }
+            });
+
+            String father = """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.example</groupId>
+                <artifactId>father</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+                <packaging>pom</packaging>
+                <modules>
+                  <module>childA</module>
+                  <module>childB</module>
+                </modules>
+                <dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.some</groupId>
+                          <artifactId>some-artifact</artifactId>
+                          <version>1</version>
+                      </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """;
+            String childA = """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.example</groupId>
+                  <artifactId>father</artifactId>
+                  <version>1.0.0-SNAPSHOT</version>
+                </parent>
+                <artifactId>childA</artifactId>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.openrewrite.test</groupId>
+                            <artifactId>lib</artifactId>
+                            <version>1.0</version>
+                            <type>pom</type>
+                            <scope>import</scope>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                    <dependency>
+                      <groupId>com.some</groupId>
+                      <artifactId>some-artifact</artifactId>
+                    </dependency>
+                </dependencies>
+              </project>
+              """;
+            String childB = """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.example</groupId>
+                  <artifactId>father</artifactId>
+                  <version>1.0.0-SNAPSHOT</version>
+                </parent>
+                <artifactId>childB</artifactId>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.some</groupId>
+                            <artifactId>some-artifact</artifactId>
+                            <scope>compile</scope>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+              </project>
+              """;
+
+            rewriteRun(
+              spec -> spec.executionContext(ctx),
+              pomXml(father, spec -> spec.path("pom.xml")),
+              pomXml(childA, spec -> spec.path("childA/pom.xml")),
+              pomXml(childB, spec -> spec.path("childB/pom.xml").afterRecipe(doc -> {
+                    ResolvedPom pom = doc.getMarkers().findFirst(MavenResolutionResult.class).get().getPom();
+                    String version = pom.getManagedVersion("com.some", "some-artifact", null, null);
+                    // Assert that version is not null!
+                    assertThat(version).isEqualTo("1");
+                })
+              )
+            );
         }
+    }
+
+    private static void createJarFile(Path localRepository1) throws IOException {
+        createJarFile(localRepository1, "com/some", "some-artifact", "1");
+    }
+
+    private static void createJarFile(Path localRepository, String groupId, String artifactId, String version) throws IOException {
+        Path localJar = localRepository.resolve("%s/%s/%s/%s-%s.jar".formatted(
+          groupId.replace('.', '/'), artifactId, version, artifactId, version));
+        assertThat(localJar.getParent().toFile().mkdirs()).isTrue();
+        Files.writeString(localJar, "some content not to be empty");
+    }
+
+    private static MavenRepository createMavenRepository(Path localRepository, String name) {
+        return MavenRepository.builder()
+          .id(name)
+          .uri(localRepository.toUri().toString())
+          .snapshots(false)
+          .knownToExist(true)
+          .build();
     }
 }

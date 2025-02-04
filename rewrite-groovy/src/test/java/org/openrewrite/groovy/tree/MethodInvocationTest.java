@@ -192,7 +192,7 @@ class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              foo(String.class)
+              foo(String    .class)
               """
           )
         );
@@ -362,6 +362,25 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/4055")
+    @Test
+    void chainOfMethodInvocations() {
+        rewriteRun(
+          groovy(
+            """
+              Micronaut.build(args)
+                      .banner(false)
+                      .propertySources(PropertySource.of("my-config", [name: "MyApp"]))
+                      .environments("prod") // Only prod
+                      .overrideConfig("custom-config.yml") // Load custom config
+                      .packages("com.company")
+                      .mainClass(Application)
+                      .start()
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2552")
     @Test
     void closureInvocation() {
@@ -434,6 +453,21 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
+    void topLevelCallWithoutReceiver() {
+        rewriteRun(
+          groovy(
+            """
+              from('timer:groovy?period=1000')
+                  .setBody()
+                      .constant('Hello Camel K')
+                  .setBody()
+                      .simple('body - header.RandomValue')
+              """
+          )
+        );
+    }
+
+    @Test
     void insideParenthesesWithNewline() {
         rewriteRun(
           groovy(
@@ -467,6 +501,21 @@ class MethodInvocationTest implements RewriteTest {
             """
               ((((
                 something(a)
+              ))))
+              """
+          )
+        );
+    }
+
+    @Test
+    void insideFourParenthesesAndEntersWithCommentWithParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              ((/* comment :-) ((
+              */((
+                // :-((
+                /*)*/something(a)
               ))))
               """
           )

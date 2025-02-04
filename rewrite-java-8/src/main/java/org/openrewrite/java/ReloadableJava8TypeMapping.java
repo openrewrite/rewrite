@@ -18,23 +18,22 @@ package org.openrewrite.java;
 import com.sun.source.tree.Tree;
 import com.sun.tools.javac.code.*;
 import com.sun.tools.javac.tree.JCTree;
+import com.sun.tools.javac.util.Pair;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
-import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 import javax.lang.model.type.NullType;
 import javax.lang.model.type.TypeMirror;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.singletonList;
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.CONTRAVARIANT;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.COVARIANT;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.INVARIANT;
@@ -455,6 +454,10 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
      * @return Method type attribution.
      */
     public JavaType.@Nullable Method methodInvocationType(com.sun.tools.javac.code.@Nullable Type selectType, @Nullable Symbol symbol) {
+        /*
+         TODO: AttrRecover class does not exist for java 8; there is JCNoType
+          in the Type.class, so maybe it is possible to retrieve this information...
+         */
         if (selectType == null || selectType instanceof Type.ErrorType || symbol == null || symbol.kind == Kinds.ERR || symbol.type instanceof Type.UnknownType) {
             return null;
         }
@@ -678,22 +681,66 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
         }
     }
 
-    private @Nullable List<JavaType.FullyQualified> listAnnotations(Symbol symb) {
+    private @Nullable List<JavaType.FullyQualified> listAnnotations(Symbol sym) {
         List<JavaType.FullyQualified> annotations = null;
-        if (!symb.getDeclarationAttributes().isEmpty()) {
-            annotations = new ArrayList<>(symb.getDeclarationAttributes().size());
-            for (Attribute.Compound a : symb.getDeclarationAttributes()) {
-                JavaType.FullyQualified annotType = TypeUtils.asFullyQualified(type(a.type));
-                if (annotType == null) {
-                    continue;
-                }
-                Retention retention = a.getAnnotationType().asElement().getAnnotation(Retention.class);
-                if (retention != null && retention.value() == RetentionPolicy.SOURCE) {
-                    continue;
-                }
-                annotations.add(annotType);
+        if (!sym.getDeclarationAttributes().isEmpty()) {
+            annotations = new ArrayList<>(sym.getDeclarationAttributes().size());
+            for (Attribute.Compound a : sym.getDeclarationAttributes()) {
+                JavaType.Annotation annotation = annotationType(a);
+                if (annotation == null) continue;
+                annotations.add(annotation);
             }
         }
         return annotations;
+    }
+
+    private JavaType.@Nullable Annotation annotationType(Attribute.Compound compound) {
+        JavaType.FullyQualified annotType = TypeUtils.asFullyQualified(type(compound.type));
+        if (annotType == null) {
+            return null;
+        }
+        List<JavaType.Annotation.ElementValue> elementValues = new ArrayList<>();
+        for (Pair<Symbol.MethodSymbol, Attribute> attr : compound.values) {
+            Object value = annotationElementValue(attr.snd.getValue());
+            JavaType.Method element = requireNonNull(methodDeclarationType(attr.fst, annotType));
+            JavaType.Annotation.ElementValue elementValue = value instanceof Object[] ?
+                    JavaType.Annotation.ArrayElementValue.from(element, ((Object[]) value)) :
+                    JavaType.Annotation.SingleElementValue.from(element, value);
+            elementValues.add(elementValue);
+        }
+        return new JavaType.Annotation(annotType, elementValues);
+    }
+
+    private Object annotationElementValue(Object value) {
+        if (value instanceof Symbol.VarSymbol) {
+            JavaType.Variable mapped = variableType((Symbol.VarSymbol) value);
+            return mapped != null ? mapped : JavaType.Unknown.getInstance();
+        } else if (value instanceof Type.ClassType) {
+            return type((Type.ClassType) value);
+        } else if (value instanceof Attribute.Array) {
+            List<@Nullable Object> list = new ArrayList<>();
+            for (Attribute attribute : ((Attribute.Array) value).values) {
+                list.add(annotationElementValue(attribute));
+            }
+            return list.toArray(!list.isEmpty() && list.get(0) instanceof JavaType ? JavaType.EMPTY_JAVA_TYPE_ARRAY : new Object[0]);
+        } else if (value instanceof List<?>) {
+            List<@Nullable Object> list = new ArrayList<>();
+            for (Object o : ((List<?>) value)) {
+                list.add(annotationElementValue(o));
+            }
+            return list.toArray(!list.isEmpty() && list.get(0) instanceof JavaType ? JavaType.EMPTY_JAVA_TYPE_ARRAY : new Object[0]);
+        } else if (value instanceof Attribute.Class) {
+            return type(((Attribute.Class) value).classType);
+        } else if (value instanceof Attribute.Compound) {
+            JavaType.Annotation mapped = annotationType((Attribute.Compound) value);
+            return mapped != null ? mapped : JavaType.Unknown.getInstance();
+        } else if (value instanceof Attribute.Constant) {
+            return annotationElementValue(((Attribute.Constant) value).value);
+        } else if (value instanceof Attribute.Enum) {
+            return annotationElementValue(((Attribute.Enum) value).value);
+        } else if (value instanceof Attribute.Error) {
+            return JavaType.Unknown.getInstance();
+        }
+        return value;
     }
 }

@@ -1016,7 +1016,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/4333")
     void exactVersionWithRegexPattern() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "32.1.1", ".*droid")),
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "32.1.1", "-.*?droid")),
           buildGradle(
             """
               plugins {

@@ -3697,4 +3697,33 @@ class MavenParserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void systemPropertyTakesPrecedence() {
+        System.setProperty("hatversion", "2.3.0");
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>parent</artifactId>
+                <version>1.0-SNAPSHOT</version>
+                <packaging>pom</packaging>
+                <name>parent</name>
+                <url>http://www.example.com</url>
+                <properties>
+                  <hatversion>SYSTEM_PROPERTY_SHOULD_OVERRIDE_THIS</hatversion>
+                </properties>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.springframework.hateoas</groupId>
+                        <artifactId>spring-hateoas</artifactId>
+                        <version>${hatversion}</version>
+                    </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
 }
