@@ -30,7 +30,6 @@ import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.*;
 
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 
 import static java.util.Collections.singletonList;
@@ -96,7 +95,9 @@ public class DependencyVersionSelector {
      * @param gav            The group, artifact, and version of the existing dependency.
      * @param configuration  The configuration to select the version for. The configuration influences
      *                       which set of Maven repositories (either plugin repositories or regular repositories)
-     *                       are used to resolve Maven metadata from.     * @param version        The version to select, in node-semver format.
+     *                       are used to resolve Maven metadata from. No value means it tries to pull from regular
+     *                       repositories unless these are empty.
+     * @param version        The version to select, in node-semver format.
      * @param versionPattern The version pattern to select, if any.
      * @param ctx            The execution context, which can influence dependency resolution.
      * @return The selected version, if any.
@@ -117,7 +118,9 @@ public class DependencyVersionSelector {
      * @param gav            The group, artifact, and version of the existing dependency.
      * @param configuration  The configuration to select the version for. The configuration influences
      *                       which set of Maven repositories (either plugin repositories or regular repositories)
-     *                       are used to resolve Maven metadata from.     * @param version        The version to select, in node-semver format.
+     *                       are used to resolve Maven metadata from. No value means it tries to pull from regular
+     *                       repositories unless these are empty.
+     * @param version        The version to select, in node-semver format.
      * @param versionPattern The version pattern to select, if any.
      * @param ctx            The execution context, which can influence dependency resolution.
      * @return The selected version, if any.
@@ -188,8 +191,10 @@ public class DependencyVersionSelector {
         if (gradleProject == null) {
             throw new IllegalStateException("Gradle project must be set to determine repositories."); // Caught by caller
         }
-        return "classpath".equals(configuration) ?
-                gradleProject.getBuildscript().getMavenRepositories() :
-                gradleProject.getMavenRepositories();
+        if ("classpath".equals(configuration)) {
+            return gradleProject.getBuildscript().getMavenRepositories();
+        }
+        List<MavenRepository> repos = gradleProject.getMavenRepositories();
+        return repos.isEmpty() ? gradleProject.getBuildscript().getMavenRepositories() : repos;
     }
 }
