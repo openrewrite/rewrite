@@ -45,8 +45,8 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
+import static java.util.stream.Collectors.groupingBy;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -1263,10 +1263,6 @@ class MavenParserTest implements RewriteTest {
         @Test
         void activeByDefaultWithoutPomLocalActiveProfile() {
             rewriteRun(
-              recipeSpec -> recipeSpec
-                .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext()))
-                // Trying to mimic settings.xml activeProfile or `mvn -Pfoobar`
-                .parser(MavenParser.builder().activeProfiles("foobar")),
               mavenProject("c",
                 pomXml(
                   """
@@ -1350,17 +1346,13 @@ class MavenParserTest implements RewriteTest {
                               .getDependencies()
                               .get(Scope.Compile)
                               .stream()
-                              .collect(Collectors.groupingBy(ResolvedDependency::getArtifactId));
+                              .collect(groupingBy(ResolvedDependency::getArtifactId));
 
-                          assertThat(deps).hasEntrySatisfying("d", rds -> {
-                              assertThat(rds).hasSize(1);
-                              assertThat(rds.get(0).getVersion()).isEqualTo("0.1.0-SNAPSHOT");
-                          });
-
-                          assertThat(deps).hasEntrySatisfying("e", rds -> {
-                              assertThat(rds).hasSize(1);
-                              assertThat(rds.get(0).getVersion()).isEqualTo("0.2.0-SNAPSHOT");
-                          });
+                          assertThat(deps)
+                            .hasEntrySatisfying("d", rds -> assertThat(rds)
+                              .singleElement().extracting(ResolvedDependency::getVersion).isEqualTo("0.1.0-SNAPSHOT"))
+                            .hasEntrySatisfying("e", rds -> assertThat(rds)
+                              .singleElement().extracting(ResolvedDependency::getVersion).isEqualTo("0.2.0-SNAPSHOT"));
                       });
                   }
                 )
