@@ -116,6 +116,9 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
     @Override
     public Yaml visitScalar(Yaml.Scalar scalar, PrintOutputCapture<P> p) {
         beforeSyntax(scalar, p);
+        if (scalar.getTag() != null) {
+            visit(scalar.getTag(), p);
+        }
         if (scalar.getAnchor() != null) {
             visit(scalar.getAnchor(), p);
         }
@@ -168,6 +171,17 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
         }
         afterSyntax(alias, p);
         return alias;
+    }
+
+    @Override
+    public Yaml visitTag(Yaml.Tag tag, PrintOutputCapture<P> p) {
+        visitMarkers(tag.getMarkers(), p);
+        p
+                .append(tag.getPrefix())
+                .append(tag.getKind().print(tag.getName()))
+                .append(tag.getSuffix());
+        afterSyntax(tag, p);
+        return tag;
     }
 
     private static final UnaryOperator<String> YAML_MARKER_WRAPPER =

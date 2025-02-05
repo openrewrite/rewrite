@@ -251,7 +251,7 @@ public class ChangePropertyKey extends Recipe {
                         newEntryPrefix,
                         Markers.EMPTY,
                         new Yaml.Scalar(randomId(), "", Markers.EMPTY,
-                                Yaml.Scalar.Style.PLAIN, null, subproperty),
+                                Yaml.Scalar.Style.PLAIN, null, null, subproperty),
                         scope.getBeforeMappingValueIndicator(),
                         removeExclusions(entryToReplace.getValue().copyPaste()));
 
