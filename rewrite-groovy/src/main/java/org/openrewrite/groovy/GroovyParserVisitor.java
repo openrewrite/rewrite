@@ -60,6 +60,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
+import static java.lang.Character.isJavaIdentifierPart;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
@@ -159,7 +160,7 @@ public class GroovyParserVisitor {
         for (ImportNode anImport : ast.getStaticImports().values()) {
             sortedByPosition.computeIfAbsent(pos(anImport), i -> new ArrayList<>()).add(anImport);
         }
-        for (ImportNode anImport : ast.getStaticStarImports().values()) {
+        for (ImportNode anImport : getStaticStarImports(ast)) {
             sortedByPosition.computeIfAbsent(pos(anImport), i -> new ArrayList<>()).add(anImport);
         }
 
@@ -2221,40 +2222,15 @@ public class GroovyParserVisitor {
             return JRightPadded.build(classVisitor.pollQueue());
         } else if (node instanceof ImportNode) {
             ImportNode importNode = (ImportNode) node;
-            Space prefix = sourceBefore("import");
-            JLeftPadded<Boolean> statik;
-            if (importNode.isStatic()) {
-                statik = padLeft(sourceBefore("static"), true);
-            } else {
-                statik = padLeft(EMPTY, false);
-            }
-            String packageName = importNode.getPackageName();
-            J.FieldAccess qualid;
-            if (packageName == null) {
-                String type = importNode.getType().getName().replace('$', '.');
-                if (importNode.isStar()) {
-                    type += ".*";
-                } else if (importNode.getFieldName() != null) {
-                    type += "." + importNode.getFieldName();
-                }
-                Space space = sourceBefore(type);
-                qualid = TypeTree.build(type).withPrefix(space);
-            } else {
-                if (importNode.isStar()) {
-                    packageName += "*";
-                }
-                qualid = TypeTree.build(packageName).withPrefix(sourceBefore(packageName));
-            }
-
+            Space importPrefix = sourceBefore("import");
+            JLeftPadded<Boolean> statik = importNode.isStatic() ? padLeft(sourceBefore("static"), true) : padLeft(EMPTY, false);
+            Space space = whitespace();
+            J.FieldAccess qualid = TypeTree.build(name()).withPrefix(space);
             JLeftPadded<J.Identifier> alias = null;
-            int endOfWhitespace = indexOfNextNonWhitespace(cursor, source);
-            if (endOfWhitespace + 2 <= source.length() && "as".equals(source.substring(endOfWhitespace, endOfWhitespace + 2))) {
-                String simpleName = importNode.getAlias();
-                alias = padLeft(sourceBefore("as"), new J.Identifier(randomId(), sourceBefore(simpleName), Markers.EMPTY, emptyList(), simpleName, null, null));
+            if (sourceStartsWith("as")) {
+                alias = padLeft(sourceBefore("as"), new J.Identifier(randomId(), whitespace(), Markers.EMPTY, emptyList(), name(), null, null));
             }
-
-            J.Import anImport = new J.Import(randomId(), prefix, Markers.EMPTY, statik, qualid, alias);
-            return maybeSemicolon(anImport);
+            return maybeSemicolon(new J.Import(randomId(), importPrefix, Markers.EMPTY, statik, qualid, alias));
         }
 
         RewriteGroovyVisitor groovyVisitor = new RewriteGroovyVisitor(node, new RewriteGroovyClassVisitor(unit));
@@ -2672,7 +2648,7 @@ public class GroovyParserVisitor {
         for (; i < source.length(); i++) {
             char c = source.charAt(i);
             boolean isVarargs = source.length() > (i + 2) && c == '.' && source.charAt(i + 1) == '.' && source.charAt(i + 2) == '.';
-            if (!(Character.isJavaIdentifierPart(c) || c == '.' || c == '*') || isVarargs) {
+            if (!(isJavaIdentifierPart(c) || c == '.' || c == '*') || isVarargs) {
                 break;
             }
         }
@@ -2803,6 +2779,58 @@ public class GroovyParserVisitor {
         }
 
         return node.getColumnNumber() >= 0 && node.getLineNumber() >= 0 && node.getLastColumnNumber() >= 0 && node.getLastLineNumber() >= 0;
+    }
+
+    /**
+     * Duplicate imports do work out of the box for import, star-import and static-import.
+     * For static-star-import, this does work though.
+     * The groovy compiler does only memoize the last duplicate import instead of all, so retrieve all static star imports by hand.
+     */
+    private List<ImportNode> getStaticStarImports(ModuleNode ast) {
+        List<ImportNode> completeStaticStarImports = new ArrayList<>();
+        Map<String, ImportNode> staticStarImports = ast.getStaticStarImports();
+        if (!staticStarImports.isEmpty()) {
+            // Take source code until last static star import for performance reasons
+            int lastLineNumber = -1;
+            for (ImportNode anImport : ast.getStaticStarImports().values()) {
+                lastLineNumber = Math.max(lastLineNumber, anImport.getLastLineNumber());
+            }
+            String importSource = sourceLineNumberOffsets.length <= lastLineNumber ? source : source.substring(0, sourceLineNumberOffsets[lastLineNumber]);
+
+            // Create a node for each `import static`
+            String[] lines = importSource.split("\n");
+            for (int i = 0; i < lines.length; i++) {
+                String line = lines[i];
+                int index = 0;
+
+                while (index < line.length()) {
+                    int importIndex = line.indexOf("import", index);
+                    if (importIndex == -1) break;
+
+                    int maybeStaticIndex = indexOfNextNonWhitespace(importIndex + 6, line);
+                    if (!line.startsWith("static", maybeStaticIndex)) {
+                        index = importIndex + 6;
+                        continue;
+                    }
+
+                    int packageBegin = indexOfNextNonWhitespace( maybeStaticIndex + 6, line);
+                    int packageEnd = packageBegin;
+                    while (packageEnd < line.length() && (isJavaIdentifierPart(line.charAt(packageEnd)) || line.charAt(packageEnd) == '.')) {
+                        packageEnd++;
+                    }
+
+                    if (packageEnd < line.length() && line.charAt(packageEnd) == '*') {
+                        ImportNode node = new ImportNode(staticStarImports.get(line.substring(packageBegin, packageEnd - 1)).getType());
+                        node.setLineNumber(i + 1);
+                        node.setColumnNumber(importIndex + 1);
+                        completeStaticStarImports.add(node);
+                    }
+
+                    index = packageEnd;
+                }
+            }
+        }
+        return completeStaticStarImports;
     }
 
     /**
