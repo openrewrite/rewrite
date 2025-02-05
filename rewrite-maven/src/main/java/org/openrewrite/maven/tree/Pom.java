@@ -26,12 +26,15 @@ import org.openrewrite.maven.internal.MavenPomDownloader;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.internal.ListUtils.concatAll;
 
 /**
@@ -157,23 +160,19 @@ public class Pom {
                     return r;
                 })
                 .distinct()
-                .collect(Collectors.toList());
+                .collect(toList());
     }
 
-    List<Profile> activeProfiles(final Iterable<String> explicitActiveProfiles) {
-        final List<Profile> pomActivatedProfiles =
-                profiles.stream()
-                        .filter(p -> p.isActive(explicitActiveProfiles))
-                        .collect(Collectors.toList());
-
+    List<Profile> activeProfiles(Iterable<String> explicitActiveProfiles) {
+        List<Profile> pomActivatedProfiles = profiles.stream()
+                .filter(p -> p.isActive(explicitActiveProfiles))
+                .collect(toList());
         if (!pomActivatedProfiles.isEmpty()) {
             return pomActivatedProfiles;
         }
-
-        return profiles
-                .stream()
+        return profiles.stream()
                 .filter(p -> p.getActivation() != null && Boolean.TRUE.equals(p.getActivation().getActiveByDefault()))
-                .collect(Collectors.toList());
+                .collect(toList());
     }
 
     /**
