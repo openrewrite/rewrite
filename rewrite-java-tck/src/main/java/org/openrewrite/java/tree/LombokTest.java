@@ -15,8 +15,6 @@
  */
 package org.openrewrite.java.tree;
 
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.JavaParser;
@@ -35,16 +33,6 @@ import static org.openrewrite.java.Assertions.java;
 
 @SuppressWarnings({"CaughtExceptionImmediatelyRethrown", "LombokGetterMayBeUsed", "LombokSetterMayBeUsed", "DefaultAnnotationParam", "NotNullFieldNotInitialized", "ProtectedMemberInFinalClass", "WriteOnlyObject", "ConcatenationWithEmptyString"})
 class LombokTest implements RewriteTest {
-
-    @BeforeAll
-    static void setUp() {
-        System.setProperty("rewrite.lombok", "true");
-    }
-
-    @AfterAll
-    static void tearDown() {
-        System.clearProperty("rewrite.lombok");
-    }
 
     @Override
     public void defaults(RecipeSpec spec) {
