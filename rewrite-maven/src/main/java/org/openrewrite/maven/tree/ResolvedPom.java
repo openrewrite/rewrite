@@ -401,16 +401,16 @@ public class ResolvedPom {
         private void resolveParentPropertiesAndRepositoriesRecursively(List<Pom> pomAncestry) throws MavenDownloadingException {
             Pom pom = pomAncestry.get(0);
 
-            List<Profile> reallyActiveProfiles = pom.activeProfiles(activeProfiles);
+            List<Profile> effectiveProfiles = pom.effectiveProfiles(activeProfiles);
 
             //Resolve properties
-            for (Profile profile : reallyActiveProfiles) {
+            for (Profile profile : effectiveProfiles) {
                 mergeProperties(profile.getProperties(), pom);
             }
             mergeProperties(pom.getProperties(), pom);
 
             //Resolve repositories (which may rely on properties ^^^)
-            for (Profile profile : reallyActiveProfiles) {
+            for (Profile profile : effectiveProfiles) {
                 mergeRepositories(profile.getRepositories());
             }
             mergeRepositories(pom.getRepositories());
@@ -433,9 +433,9 @@ public class ResolvedPom {
         private void resolveParentDependenciesRecursively(List<Pom> pomAncestry) throws MavenDownloadingException {
             Pom pom = pomAncestry.get(0);
 
-            List<Profile> reallyActiveProfiles = pom.activeProfiles(activeProfiles);
+            List<Profile> effectiveProfiles = pom.effectiveProfiles(activeProfiles);
 
-            for (Profile profile : reallyActiveProfiles) {
+            for (Profile profile : effectiveProfiles) {
                 mergeDependencyManagement(profile.getDependencyManagement(), pomAncestry);
                 mergeRequestedDependencies(profile.getDependencies());
             }

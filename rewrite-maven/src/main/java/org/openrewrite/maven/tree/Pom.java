@@ -163,7 +163,15 @@ public class Pom {
                 .collect(toList());
     }
 
-    List<Profile> activeProfiles(Iterable<String> explicitActiveProfiles) {
+    /**
+     * "[activeByDefault] profile will automatically be active for all builds unless another profile in the same POM is
+     * activated using one of the previously described methods. All profiles that are active by default are automatically
+     * deactivated when a profile in the POM is activated on the command line or through its activation config."
+     *
+     * @param explicitActiveProfiles Any profiles explicitly activated on the command line.
+     * @return the effective profiles, given the explicitly active profiles, or failing that those active by default.
+     */
+    List<Profile> effectiveProfiles(Iterable<String> explicitActiveProfiles) {
         List<Profile> pomActivatedProfiles = profiles.stream()
                 .filter(p -> p.isActive(explicitActiveProfiles))
                 .collect(toList());
