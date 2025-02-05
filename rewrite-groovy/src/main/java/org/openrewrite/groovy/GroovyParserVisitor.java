@@ -237,24 +237,22 @@ public class GroovyParserVisitor {
 
             Space kindPrefix = whitespace();
             J.ClassDeclaration.Kind.Type kindType = null;
-            if (source.startsWith("class", cursor)) {
+            if (sourceStartsWith("class")) {
                 kindType = J.ClassDeclaration.Kind.Type.Class;
                 skip("class");
-            } else if (source.startsWith("interface", cursor)) {
+            } else if (sourceStartsWith("interface")) {
                 kindType = J.ClassDeclaration.Kind.Type.Interface;
                 skip("interface");
-            } else if (source.startsWith("@interface", cursor)) {
+            } else if (sourceStartsWith("@interface")) {
                 kindType = J.ClassDeclaration.Kind.Type.Annotation;
                 skip("@interface");
-            } else if (source.startsWith("enum", cursor)) {
+            } else if (sourceStartsWith("enum")) {
                 kindType = J.ClassDeclaration.Kind.Type.Enum;
                 skip("enum");
             }
             assert kindType != null;
             J.ClassDeclaration.Kind kind = new J.ClassDeclaration.Kind(randomId(), kindPrefix, Markers.EMPTY, emptyList(), kindType);
-            Space namePrefix = whitespace();
-            String simpleName = name();
-            J.Identifier name = new J.Identifier(randomId(), namePrefix, Markers.EMPTY, emptyList(), simpleName, typeMapping.type(clazz), null);
+            J.Identifier name = new J.Identifier(randomId(), whitespace(), Markers.EMPTY, emptyList(), name(), typeMapping.type(clazz), null);
             JContainer<J.TypeParameter> typeParameterContainer = null;
             if (clazz.isUsingGenerics() && clazz.getGenericsTypes() != null) {
                 typeParameterContainer = visitTypeParameters(clazz.getGenericsTypes());
@@ -262,13 +260,8 @@ public class GroovyParserVisitor {
 
             JLeftPadded<TypeTree> extendings = null;
             if (kindType == J.ClassDeclaration.Kind.Type.Class) {
-                int saveCursor = cursor;
-                Space extendsPrefix = whitespace();
-                if (source.startsWith("extends", cursor)) {
-                    skip("extends");
-                    extendings = padLeft(extendsPrefix, visitTypeTree(clazz.getSuperClass()));
-                } else {
-                    cursor = saveCursor;
+                if (sourceStartsWith("extends")) {
+                    extendings = padLeft(sourceBefore("extends"), visitTypeTree(clazz.getSuperClass()));
                 }
             }
 
