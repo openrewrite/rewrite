@@ -2811,7 +2811,7 @@ public class GroovyParserVisitor {
 
                     if (packageEnd < line.length() && line.charAt(packageEnd) == '*') {
                         ImportNode node = new ImportNode(staticStarImports.get(line.substring(packageBegin, packageEnd - 1)).getType());
-                        // The line numbers can be wrong, because we filter away all the multiline comments.
+                        // The line numbers can be off, because we filter away all the multiline comments.
                         // This does not really do any harm, because we only use the line numbers to order the nodes in the `sortedByPosition` var.
                         node.setLineNumber(i + 1);
                         node.setColumnNumber(importIndex + 1);
