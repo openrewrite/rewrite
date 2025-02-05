@@ -128,10 +128,10 @@ public class GroovyParserVisitor {
     }
 
     public G.CompilationUnit visit(SourceUnit unit, ModuleNode ast) throws GroovyParsingException {
-        NavigableMap<LineColumn, List<ASTNode>> sortedByPosition = new TreeMap<>();
+        NavigableMap<LineColumn, ASTNode> sortedByPosition = new TreeMap<>();
         for (org.codehaus.groovy.ast.stmt.Statement s : ast.getStatementBlock().getStatements()) {
             if (!isSynthetic(s)) {
-                sortedByPosition.computeIfAbsent(pos(s), i -> new ArrayList<>()).add(s);
+                sortedByPosition.put(pos(s), s);
             }
         }
         String shebang = null;
@@ -152,49 +152,47 @@ public class GroovyParserVisitor {
         }
 
         for (ImportNode anImport : ast.getImports()) {
-            sortedByPosition.computeIfAbsent(pos(anImport), i -> new ArrayList<>()).add(anImport);
+            sortedByPosition.put(pos(anImport), anImport);
         }
         for (ImportNode anImport : ast.getStarImports()) {
-            sortedByPosition.computeIfAbsent(pos(anImport), i -> new ArrayList<>()).add(anImport);
+            sortedByPosition.put(pos(anImport), anImport);
         }
         for (ImportNode anImport : ast.getStaticImports().values()) {
-            sortedByPosition.computeIfAbsent(pos(anImport), i -> new ArrayList<>()).add(anImport);
+            sortedByPosition.put(pos(anImport), anImport);
         }
         for (ImportNode anImport : getStaticStarImports(ast)) {
-            sortedByPosition.computeIfAbsent(pos(anImport), i -> new ArrayList<>()).add(anImport);
+            sortedByPosition.put(pos(anImport), anImport);
         }
 
         for (ClassNode aClass : ast.getClasses()) {
             // skip over the synthetic script class
             if (!aClass.getName().equals(ast.getMainClassName()) || !aClass.getName().endsWith("doesntmatter")) {
-                sortedByPosition.computeIfAbsent(pos(aClass), i -> new ArrayList<>()).add(aClass);
+                sortedByPosition.put(pos(aClass), aClass);
             }
         }
 
         for (MethodNode method : ast.getMethods()) {
-            sortedByPosition.computeIfAbsent(pos(method), i -> new ArrayList<>()).add(method);
+            sortedByPosition.put(pos(method), method);
         }
 
         List<JRightPadded<Statement>> statements = new ArrayList<>(sortedByPosition.size());
-        for (Map.Entry<LineColumn, List<ASTNode>> entry : sortedByPosition.entrySet()) {
+        for (Map.Entry<LineColumn, ASTNode> entry : sortedByPosition.entrySet()) {
             if (entry.getKey().getLine() == -1) {
                 // default import
                 continue;
             }
 
             try {
-                for (ASTNode value : entry.getValue()) {
-                    if (value instanceof InnerClassNode) {
-                        // Inner classes will be visited as part of visiting their containing class
-                        continue;
-                    }
-                    JRightPadded<Statement> statement = convertTopLevelStatement(unit, value);
-                    if (statements.isEmpty() && pkg == null && statement.getElement() instanceof J.Import) {
-                        prefix = statement.getElement().getPrefix();
-                        statement = statement.withElement(statement.getElement().withPrefix(EMPTY));
-                    }
-                    statements.add(statement);
+                if (entry.getValue() instanceof InnerClassNode) {
+                    // Inner classes will be visited as part of visiting their containing class
+                    continue;
                 }
+                JRightPadded<Statement> statement = convertTopLevelStatement(unit, entry.getValue());
+                if (statements.isEmpty() && pkg == null && statement.getElement() instanceof J.Import) {
+                    prefix = statement.getElement().getPrefix();
+                    statement = statement.withElement(statement.getElement().withPrefix(EMPTY));
+                }
+                statements.add(statement);
             } catch (Throwable t) {
                 if (t instanceof StringIndexOutOfBoundsException) {
                     throw new GroovyParsingException("Failed to parse " + sourcePath + ", cursor position likely inaccurate.", t);
@@ -312,7 +310,7 @@ public class GroovyParserVisitor {
         }
 
         J.Block visitClassBlock(ClassNode clazz) {
-            NavigableMap<LineColumn, List<ASTNode>> sortedByPosition = new TreeMap<>();
+            NavigableMap<LineColumn, ASTNode> sortedByPosition = new TreeMap<>();
             for (MethodNode method : clazz.getMethods()) {
                 // Most synthetic methods do not appear in source code and should be skipped entirely.
                 if (method.isSynthetic()) {
@@ -320,10 +318,10 @@ public class GroovyParserVisitor {
                     // The part that actually appears in source code is a block statement inside the method declaration
                     if ("<clinit>".equals(method.getName()) && method.getCode() instanceof BlockStatement && ((BlockStatement) method.getCode()).getStatements().size() == 1) {
                         org.codehaus.groovy.ast.stmt.Statement statement = ((BlockStatement) method.getCode()).getStatements().get(0);
-                        sortedByPosition.computeIfAbsent(pos(statement), i -> new ArrayList<>()).add(statement);
+                        sortedByPosition.put(pos(statement), statement);
                     }
                 } else if (method.getAnnotations(new ClassNode(Generated.class)).isEmpty()) {
-                    sortedByPosition.computeIfAbsent(pos(method), i -> new ArrayList<>()).add(method);
+                    sortedByPosition.put(pos(method), method);
                 }
             }
             for (org.codehaus.groovy.ast.stmt.Statement objectInitializer : clazz.getObjectInitializerStatements()) {
@@ -336,8 +334,7 @@ public class GroovyParserVisitor {
                 if (s.getStatements().size() == 1 && pos(s).equals(pos(s.getStatements().get(0)))) {
                     s = (BlockStatement) s.getStatements().get(0);
                 }
-                sortedByPosition.computeIfAbsent(pos(s), i -> new ArrayList<>())
-                        .add(s);
+                sortedByPosition.put(pos(s), s);
             }
             /*
               In certain circumstances the same AST node may appear in multiple places.
@@ -360,13 +357,13 @@ public class GroovyParserVisitor {
                         fieldInitializers.add((InnerClassNode) cce.getType());
                     }
                 }
-                sortedByPosition.computeIfAbsent(pos(field), i -> new ArrayList<>()).add(field);
+                sortedByPosition.put(pos(field), field);
             }
             for (ConstructorNode ctor : clazz.getDeclaredConstructors()) {
                 if (!appearsInSource(ctor)) {
                     continue;
                 }
-                sortedByPosition.computeIfAbsent(pos(ctor), i -> new ArrayList<>()).add(ctor);
+                sortedByPosition.put(pos(ctor), ctor);
             }
             Iterator<InnerClassNode> innerClassIterator = clazz.getInnerClasses();
             while (innerClassIterator.hasNext()) {
@@ -374,28 +371,27 @@ public class GroovyParserVisitor {
                 if (icn.isSynthetic() || fieldInitializers.contains(icn)) {
                     continue;
                 }
-                sortedByPosition.computeIfAbsent(pos(icn), i -> new ArrayList<>()).add(icn);
+                sortedByPosition.put(pos(icn), icn);
             }
 
             return new J.Block(randomId(), sourceBefore("{"), Markers.EMPTY,
                     JRightPadded.build(false),
                     sortedByPosition.values().stream()
-                            .flatMap(asts -> asts.stream()
-                                    // anonymous classes will be visited as part of visiting the ConstructorCallExpression
-                                    .filter(ast -> !(ast instanceof InnerClassNode && ((InnerClassNode) ast).isAnonymous()))
-                                    .map(ast -> {
-                                        if (ast instanceof FieldNode) {
-                                            visitField((FieldNode) ast);
-                                        } else if (ast instanceof MethodNode) {
-                                            visitMethod((MethodNode) ast);
-                                        } else if (ast instanceof ClassNode) {
-                                            visitClass((ClassNode) ast);
-                                        } else if (ast instanceof BlockStatement) {
-                                            visitBlockStatement((BlockStatement) ast);
-                                        }
-                                        Statement stat = pollQueue();
-                                        return maybeSemicolon(stat);
-                                    }))
+                            // anonymous classes will be visited as part of visiting the ConstructorCallExpression
+                            .filter(ast -> !(ast instanceof InnerClassNode && ((InnerClassNode) ast).isAnonymous()))
+                            .map(ast -> {
+                                if (ast instanceof FieldNode) {
+                                    visitField((FieldNode) ast);
+                                } else if (ast instanceof MethodNode) {
+                                    visitMethod((MethodNode) ast);
+                                } else if (ast instanceof ClassNode) {
+                                    visitClass((ClassNode) ast);
+                                } else if (ast instanceof BlockStatement) {
+                                    visitBlockStatement((BlockStatement) ast);
+                                }
+                                Statement stat = pollQueue();
+                                return maybeSemicolon(stat);
+                            })
                             .collect(toList()),
                     sourceBefore("}"));
         }
