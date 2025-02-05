@@ -24,24 +24,17 @@ import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
 import okhttp3.tls.HandshakeCertificates;
 import okhttp3.tls.HeldCertificate;
-import org.junit.Assert;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.HttpSenderExecutionContextView;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.Issue;
-import org.openrewrite.ParseExceptionResult;
-import org.openrewrite.Parser;
+import org.openrewrite.*;
 import org.openrewrite.maven.http.OkHttpSender;
 import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
-import org.openrewrite.test.SourceSpec;
 import org.openrewrite.tree.ParseError;
 import org.opentest4j.AssertionFailedError;
 
@@ -49,14 +42,13 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.file.Paths;
 import java.util.Base64;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
@@ -1024,7 +1016,7 @@ class MavenParserTest implements RewriteTest {
             assertThat(maven.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getDependencies().get(Scope.Compile))
               .hasSize(1)
               .matches(deps -> deps.get(0).getGroupId().equals("com.foo") &&
-                               deps.get(0).getArtifactId().equals("bar"));
+                deps.get(0).getArtifactId().equals("bar"));
             mockRepo.shutdown();
         }
     }
@@ -1270,14 +1262,12 @@ class MavenParserTest implements RewriteTest {
           "unless there is another active profile _from the same POM file_")
         @Test
         void activeByDefaultWithoutPomLocalActiveProfile() {
-            // Trying to mimic settings.xml activeProfile or `mvn -Pfoobar`
-            final String activeProfile = "foobar";
-            rewriteRun(recipeSpec -> {
-                  final ExecutionContext context = new InMemoryExecutionContext();
-                  recipeSpec.executionContext(MavenExecutionContextView.view(context));
-                  recipeSpec.parser(MavenParser.builder().activeProfiles(activeProfile));
-
-              }, mavenProject("c",
+            rewriteRun(
+              recipeSpec -> recipeSpec
+                .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext()))
+                // Trying to mimic settings.xml activeProfile or `mvn -Pfoobar`
+                .parser(MavenParser.builder().activeProfiles("foobar")),
+              mavenProject("c",
                 pomXml(
                   """
                     <project>
@@ -1353,7 +1343,7 @@ class MavenParserTest implements RewriteTest {
                     </project>
                     """, spec -> {
                       spec.afterRecipe(pomXml -> {
-                          final Map<String, List<ResolvedDependency>> deps =
+                          Map<String, List<ResolvedDependency>> deps =
                             pomXml.getMarkers()
                               .findFirst(MavenResolutionResult.class)
                               .orElseThrow()
@@ -1421,13 +1411,14 @@ class MavenParserTest implements RewriteTest {
         }
 
         private void expectMavenDownloadingException(final String activeProfile) {
-            Executable fn = () -> rewriteRun(recipeSpec -> {
-                  final ExecutionContext context = new InMemoryExecutionContext();
+            Executable fn = () -> rewriteRun(
+              recipeSpec -> {
                   // I don't think this is having the effect I want:(
-                  recipeSpec.executionContext(MavenExecutionContextView.view(context));
-                  recipeSpec.parser(MavenParser.builder().activeProfiles(activeProfile));
-
-              }, mavenProject("c",
+                  recipeSpec
+                    .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext()))
+                    .parser(MavenParser.builder().activeProfiles(activeProfile));
+              },
+              mavenProject("c",
                 pomXml(
                   """
                     <project>
@@ -1530,18 +1521,18 @@ class MavenParserTest implements RewriteTest {
               )
             );
 
-            final AssertionFailedError err = assertThrows(AssertionFailedError.class, fn);
+            AssertionFailedError err = assertThrows(AssertionFailedError.class, fn);
             assertThat(err.getMessage()).contains("Problem parsing a/pom.xml");  // brittle:(, but class above is broad
         }
 
-        @Issue("TODO: create issue")
         @Test
-        @Disabled
-        void settingsActiveProfiles() throws IOException {
+        @Disabled("Not yet implemented")
+        void settingsActiveProfiles() {
             var mavenCtx = MavenExecutionContextView.view(new InMemoryExecutionContext(t -> {
                 throw new RuntimeException(t);
             }));
             var settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+              //language=xml
               """
                 <settings>
                   <activeProfiles>
@@ -1550,41 +1541,41 @@ class MavenParserTest implements RewriteTest {
                 </settings>
                 """
             ), mavenCtx);
-
             mavenCtx.setMavenSettings(settings);
 
-            rewriteRun(recipeSpec -> recipeSpec.executionContext(mavenCtx),
+            rewriteRun(
+              recipeSpec -> recipeSpec.executionContext(mavenCtx),
               pomXml(
-                    """
-                <project>
-                    <groupId>some.group</groupId>
-                    <artifactId>some.artifact</artifactId>
-                    <version>1-SNAPSHOT</version>
-                    <dependencies>
-                        <dependency>
-                            <groupId>commons-io</groupId>
-                            <artifactId>commons-io</artifactId>
-                        </dependency>
-                    </dependencies>
-                    <profiles>
-                        <profile>
-                            <id>foo</id>
-                            <properties>
-                                <commons-io.version>2.11.0</commons-io.version>
-                            </properties>
-                            <dependencyManagement>
-                                <dependencies>
-                                    <dependency>
-                                        <groupId>commons-io</groupId>
-                                        <artifactId>commons-io</artifactId>
-                                        <version>${commons-io.version}</version>
-                                    </dependency>
-                                </dependencies>
-                            </dependencyManagement>
-                        </profile>
-                    </profiles>
-                </project>
                 """
+                  <project>
+                      <groupId>some.group</groupId>
+                      <artifactId>some.artifact</artifactId>
+                      <version>1-SNAPSHOT</version>
+                      <dependencies>
+                          <dependency>
+                              <groupId>commons-io</groupId>
+                              <artifactId>commons-io</artifactId>
+                          </dependency>
+                      </dependencies>
+                      <profiles>
+                          <profile>
+                              <id>foo</id>
+                              <properties>
+                                  <commons-io.version>2.11.0</commons-io.version>
+                              </properties>
+                              <dependencyManagement>
+                                  <dependencies>
+                                      <dependency>
+                                          <groupId>commons-io</groupId>
+                                          <artifactId>commons-io</artifactId>
+                                          <version>${commons-io.version}</version>
+                                      </dependency>
+                                  </dependencies>
+                              </dependencyManagement>
+                          </profile>
+                      </profiles>
+                  </project>
+                  """
               )
             );
         }
@@ -1763,7 +1754,7 @@ class MavenParserTest implements RewriteTest {
                 assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getDependencies().get(Scope.Compile))
                   .hasSize(7)
                   .matches(deps -> deps.get(0).getArtifactId().equals("guava") &&
-                                   deps.get(0).getVersion().equals("29.0-jre"))
+                    deps.get(0).getVersion().equals("29.0-jre"))
               )
             )
           )
@@ -1837,9 +1828,9 @@ class MavenParserTest implements RewriteTest {
                       .getDependencies().get(Scope.Compile);
                     assertThat(compileDependencies).hasSize(2);
                     assertThat(compileDependencies).anyMatch(it -> it.getArtifactId().equals("b") &&
-                                                                   it.getVersion().equals("0.1.0-SNAPSHOT"));
+                      it.getVersion().equals("0.1.0-SNAPSHOT"));
                     assertThat(compileDependencies).anyMatch(it -> it.getArtifactId().equals("d") &&
-                                                                   it.getVersion().equals("0.1.0-SNAPSHOT"));
+                      it.getVersion().equals("0.1.0-SNAPSHOT"));
                 })
               ),
               mavenProject("b-parent",
@@ -1980,7 +1971,7 @@ class MavenParserTest implements RewriteTest {
                   var compileDependencies = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
                     .getDependencies().get(Scope.Compile);
                   assertThat(compileDependencies).anyMatch(it -> it.getArtifactId().equals("junit") &&
-                                                                 it.getVersion().equals("4.11"));
+                    it.getVersion().equals("4.11"));
                   assertThat(compileDependencies).noneMatch(it -> it.getArtifactId().equals("hamcrest-core"));
               })
             )
