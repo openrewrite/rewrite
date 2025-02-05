@@ -22,3 +22,13 @@ dependencies {
     testRuntimeOnly("org.codehaus.groovy:groovy-all:latest.release")
     testRuntimeOnly(project(":rewrite-java-17"))
 }
+
+val testJava8 = tasks.register<Test>("testJava8") {
+    javaLauncher.set(javaToolchains.launcherFor {
+        languageVersion.set(JavaLanguageVersion.of(8))
+    })
+}
+tasks.named("check").configure {
+    // Enable once the java8 tests are passing
+    // dependsOn(testJava8)
+}
