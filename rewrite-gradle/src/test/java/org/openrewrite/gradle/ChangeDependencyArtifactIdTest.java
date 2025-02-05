@@ -26,13 +26,13 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApiUsingModulesCaching;
 
 class ChangeDependencyArtifactIdTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.beforeRecipe(withToolingApi());
+        spec.beforeRecipe(withToolingApiUsingModulesCaching());
     }
 
     @DocumentExample
