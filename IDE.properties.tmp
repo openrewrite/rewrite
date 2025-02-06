@@ -33,6 +33,7 @@ rewrite-json
 rewrite-maven
 rewrite-properties
 rewrite-protobuf
+rewrite-toml
 rewrite-xml
 rewrite-yaml
 
