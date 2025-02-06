@@ -553,14 +553,13 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     ((J.Literal) v.getInitializer()).getType() != JavaType.Primitive.String) {
                 return v;
             }
-            Map.Entry<GroupArtifact, Set<String>> gaWithConfigurations = getGroupArtifactsToConfig((v.getSimpleName()));
-            if (gaWithConfigurations == null) {
+            Map.Entry<GroupArtifact, Set<String>> gaWithConfigs = getGroupArtifactWithConfigs((v.getSimpleName()));
+            if (gaWithConfigs == null) {
                 return v;
             }
 
             try {
-                J.Literal curVersion = (J.Literal) v.getInitializer();
-                J.Literal newVersion = getNewVersion(curVersion, gaWithConfigurations, (String) curVersion.getValue(), ctx);
+                J.Literal newVersion = getNewVersion((J.Literal) v.getInitializer(), gaWithConfigs, ctx);
                 return newVersion == null ? v : v.withInitializer(newVersion);
             } catch (MavenDownloadingException e) {
                 return e.warn(v);
@@ -576,21 +575,20 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     ((J.Literal) a.getAssignment()).getType() != JavaType.Primitive.String) {
                 return a;
             }
-            Map.Entry<GroupArtifact, Set<String>> gaWithConfigurations = getGroupArtifactsToConfig(((J.Identifier) a.getVariable()).getSimpleName());
-            if (gaWithConfigurations == null) {
+            Map.Entry<GroupArtifact, Set<String>> gaWithConfigs = getGroupArtifactWithConfigs(((J.Identifier) a.getVariable()).getSimpleName());
+            if (gaWithConfigs == null) {
                 return a;
             }
 
             try {
-                J.Literal curVersion = (J.Literal) a.getAssignment();
-                J.Literal newVersion = getNewVersion(curVersion, gaWithConfigurations, (String) curVersion.getValue(), ctx);
+                J.Literal newVersion = getNewVersion((J.Literal) a.getAssignment(), gaWithConfigs, ctx);
                 return newVersion == null ? a : a.withAssignment(newVersion);
             } catch (MavenDownloadingException e) {
                 return e.warn(a);
             }
         }
 
-        private Map.@Nullable Entry<GroupArtifact, Set<String>> getGroupArtifactsToConfig(String identifier) {
+        private Map.@Nullable Entry<GroupArtifact, Set<String>> getGroupArtifactWithConfigs(String identifier) {
             for (Map.Entry<String, Map<GroupArtifact, Set<String>>> versionVariableNameEntry : versionVariableNames.entrySet()) {
                 if (versionVariableNameEntry.getKey().equals(identifier)) {
                     // take first matching group artifact with its configurations
@@ -600,10 +598,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             return null;
         }
 
-        private J.@Nullable Literal getNewVersion(J.Literal literal, Map.Entry<GroupArtifact, Set<String>> gaWithConfigurations, String version, ExecutionContext ctx) throws MavenDownloadingException {
+        private J.@Nullable Literal getNewVersion(J.Literal literal, Map.Entry<GroupArtifact, Set<String>> gaWithConfigurations, ExecutionContext ctx) throws MavenDownloadingException {
             GroupArtifact ga = gaWithConfigurations.getKey();
             DependencyVersionSelector dependencyVersionSelector = new DependencyVersionSelector(metadataFailures, gradleProject, null);
-            GroupArtifactVersion gav = new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), version);
+            GroupArtifactVersion gav = new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), (String) literal.getValue());
 
             String selectedVersion;
             try {
