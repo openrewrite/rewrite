@@ -247,7 +247,10 @@ public class GitProvenance implements Marker {
         }
     }
 
-    private static GitProvenance fromGitConfig(Repository repository, @Nullable String branch, @Nullable String changeset, GitRemote.Parser gitRemoteParser) {
+    private static @Nullable GitProvenance fromGitConfig(Repository repository, @Nullable String branch, @Nullable String changeset, GitRemote.Parser gitRemoteParser) {
+        if (repository.isBare()) {
+            return null;
+        }
         if (branch == null) {
             branch = resolveBranchFromGitConfig(repository);
         }
@@ -311,7 +314,7 @@ public class GitProvenance implements Marker {
             List<RemoteConfig> remotes = git.remoteList().call();
             for (RemoteConfig remote : remotes) {
                 if (remoteBranch.startsWith(remote.getName()) &&
-                    (branch == null || branch.length() > remoteBranch.length() - remote.getName().length() - 1)) {
+                        (branch == null || branch.length() > remoteBranch.length() - remote.getName().length() - 1)) {
                     branch = remoteBranch.substring(remote.getName().length() + 1); // +1 for the forward slash
                 }
             }
