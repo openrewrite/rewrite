@@ -41,7 +41,6 @@ public class JavaCompilationUnitState {
     JavaParser.Builder<? extends JavaParser, ?> javaParser;
     List<SourceFile> sourceFiles;
     List<Path> inputs;
-    JavaTypeCache snappyTypeCache;
     AdaptiveRadixJavaTypeCache radixMapTypeCache;
     MapJavaTypeCache typeCache;
 
@@ -103,18 +102,13 @@ public class JavaCompilationUnitState {
         for (Map.Entry<String, Object> entry : typeCache.map().entrySet()) {
             radixMapTypeCache.put(entry.getKey(), entry.getValue());
         }
-
-        snappyTypeCache = new JavaTypeCache();
-        for (Map.Entry<String, Object> entry : typeCache.map().entrySet()) {
-            snappyTypeCache.put(entry.getKey(), entry.getValue());
-        }
     }
 
     void printMemory() {
         long retainedSize = GraphLayout.parseInstance(radixMapTypeCache).totalSize();
         System.out.printf("Retained AdaptiveRadixTree size: %10d bytes\n", retainedSize);
-        retainedSize = GraphLayout.parseInstance(snappyTypeCache).totalSize();
-        System.out.printf("Retained Snappy size:            %10d bytes\n", retainedSize);
+        retainedSize = GraphLayout.parseInstance(typeCache).totalSize();
+        System.out.printf("Retained HashMap size:           %10d bytes\n", retainedSize);
     }
 
     @TearDown(Level.Trial)
@@ -152,11 +146,6 @@ public class JavaCompilationUnitState {
         @Override
         public void clear() {
             typeCache.clear();
-        }
-
-        @Override
-        public int size() {
-            return typeCache.size();
         }
 
         @Override
