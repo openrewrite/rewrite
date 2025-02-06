@@ -30,6 +30,7 @@ import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.*;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 import static java.util.Collections.singletonList;
@@ -65,10 +66,10 @@ public class DependencyVersionSelector {
      * @throws MavenDownloadingException If there is a problem downloading metadata for the dependency.
      */
     public @Nullable String select(GroupArtifact ga,
-                         String configuration,
-                         @Nullable String version,
-                         @Nullable String versionPattern,
-                         ExecutionContext ctx) throws MavenDownloadingException {
+                                   String configuration,
+                                   @Nullable String version,
+                                   @Nullable String versionPattern,
+                                   ExecutionContext ctx) throws MavenDownloadingException {
         String currentVersion = "0";
         if (gradleProject != null) {
             GradleDependencyConfiguration gdc = gradleProject.getConfiguration(configuration);
@@ -95,19 +96,17 @@ public class DependencyVersionSelector {
      * @param gav            The group, artifact, and version of the existing dependency.
      * @param configuration  The configuration to select the version for. The configuration influences
      *                       which set of Maven repositories (either plugin repositories or regular repositories)
-     *                       are used to resolve Maven metadata from. No value means it tries to pull from regular
-     *                       repositories unless these are empty.
-     * @param version        The version to select, in node-semver format.
+     *                       are used to resolve Maven metadata from.     * @param version        The version to select, in node-semver format.
      * @param versionPattern The version pattern to select, if any.
      * @param ctx            The execution context, which can influence dependency resolution.
      * @return The selected version, if any.
      * @throws MavenDownloadingException If there is a problem downloading metadata for the dependency.
      */
     public @Nullable String select(ResolvedGroupArtifactVersion gav,
-                         String configuration,
-                         @Nullable String version,
-                         @Nullable String versionPattern,
-                         ExecutionContext ctx) throws MavenDownloadingException {
+                                   String configuration,
+                                   @Nullable String version,
+                                   @Nullable String versionPattern,
+                                   ExecutionContext ctx) throws MavenDownloadingException {
         return select(new GroupArtifactVersion(gav.getGroupId(), gav.getArtifactId(), gav.getVersion()),
                 configuration, version, versionPattern, ctx);
     }
@@ -118,23 +117,21 @@ public class DependencyVersionSelector {
      * @param gav            The group, artifact, and version of the existing dependency.
      * @param configuration  The configuration to select the version for. The configuration influences
      *                       which set of Maven repositories (either plugin repositories or regular repositories)
-     *                       are used to resolve Maven metadata from. No value means it tries to pull from regular
-     *                       repositories unless these are empty.
-     * @param version        The version to select, in node-semver format.
+     *                       are used to resolve Maven metadata from.     * @param version        The version to select, in node-semver format.
      * @param versionPattern The version pattern to select, if any.
      * @param ctx            The execution context, which can influence dependency resolution.
      * @return The selected version, if any.
      * @throws MavenDownloadingException If there is a problem downloading metadata for the dependency.
      */
     public @Nullable String select(GroupArtifactVersion gav,
-                         @Nullable String configuration,
-                         @Nullable String version,
-                         @Nullable String versionPattern,
-                         ExecutionContext ctx) throws MavenDownloadingException {
+                                   @Nullable String configuration,
+                                   @Nullable String version,
+                                   @Nullable String versionPattern,
+                                   ExecutionContext ctx) throws MavenDownloadingException {
         if (gav.getVersion() == null) {
             throw new IllegalArgumentException("Version must be specified. Call the select method " +
-                                               "that accepts a GroupArtifact instead if there is no " +
-                                               "current version.");
+                    "that accepts a GroupArtifact instead if there is no " +
+                    "current version.");
         }
 
         try {
@@ -191,10 +188,8 @@ public class DependencyVersionSelector {
         if (gradleProject == null) {
             throw new IllegalStateException("Gradle project must be set to determine repositories."); // Caught by caller
         }
-        if ("classpath".equals(configuration)) {
-            return gradleProject.getBuildscript().getMavenRepositories();
-        }
-        List<MavenRepository> repos = gradleProject.getMavenRepositories();
-        return repos.isEmpty() ? gradleProject.getBuildscript().getMavenRepositories() : repos;
+        return "classpath".equals(configuration) ?
+                gradleProject.getBuildscript().getMavenRepositories() :
+                gradleProject.getMavenRepositories();
     }
 }
