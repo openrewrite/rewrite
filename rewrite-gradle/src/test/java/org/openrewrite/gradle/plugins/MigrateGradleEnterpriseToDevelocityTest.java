@@ -22,13 +22,13 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.settingsGradle;
-import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApiUsingModulesCaching;
 
 class MigrateGradleEnterpriseToDevelocityTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new MigrateGradleEnterpriseToDevelocity("3.17.x"))
-          .beforeRecipe(withToolingApi());
+          .beforeRecipe(withToolingApiUsingModulesCaching());
     }
 
     @Test

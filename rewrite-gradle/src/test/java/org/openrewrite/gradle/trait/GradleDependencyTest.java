@@ -22,14 +22,14 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApiUsingModulesCaching;
 import static org.openrewrite.gradle.trait.Traits.gradleDependency;
 
 class GradleDependencyTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec
-          .beforeRecipe(withToolingApi())
+          .beforeRecipe(withToolingApiUsingModulesCaching())
           .recipe(RewriteTest.toRecipe(() -> gradleDependency().asVisitor(dep ->
             SearchResult.found(dep.getTree(), dep.getResolvedDependency().getGav().toString()))));
     }

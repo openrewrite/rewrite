@@ -31,12 +31,12 @@ import java.util.regex.Pattern;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApiUsingModulesCaching;
 
 class ChangePluginTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.beforeRecipe(withToolingApi())
+        spec.beforeRecipe(withToolingApiUsingModulesCaching())
           .recipe(new ChangePlugin("org.openrewrite.rewrite", "io.moderne.rewrite", "0.x"));
     }
 
