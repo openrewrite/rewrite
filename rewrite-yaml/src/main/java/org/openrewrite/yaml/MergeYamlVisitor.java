@@ -61,10 +61,13 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     @Nullable
     private final String objectIdentifyingProperty;
 
+    @Nullable
+    private final String insertBefore;
+
     private boolean shouldAutoFormat = true;
 
     public MergeYamlVisitor(Yaml.Block block, Yaml incoming, boolean acceptTheirs, @Nullable String objectIdentifyingProperty, boolean shouldAutoFormat) {
-        this(block, incoming, acceptTheirs, objectIdentifyingProperty);
+        this(block, incoming, acceptTheirs, objectIdentifyingProperty, null);
         this.shouldAutoFormat = shouldAutoFormat;
     }
 
@@ -81,7 +84,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         return linebreak;
     }
 
-    public MergeYamlVisitor(Yaml scope, @Language("yml") String yamlString, boolean acceptTheirs, @Nullable String objectIdentifyingProperty) {
+    public MergeYamlVisitor(Yaml scope, @Language("yml") String yamlString, boolean acceptTheirs, @Nullable String objectIdentifyingProperty, @Nullable String insertBefore) {
         this(scope,
                 new YamlParser().parse(yamlString)
                         .findFirst()
@@ -100,7 +103,8 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                         })
                         .orElseThrow(() -> new IllegalArgumentException("Could not parse as YAML")),
                 acceptTheirs,
-                objectIdentifyingProperty);
+                objectIdentifyingProperty,
+                insertBefore);
     }
 
     @Override
@@ -180,8 +184,8 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
             return existingEntry;
         });
 
-        // Merge existing and new entries together
-        List<Yaml.Mapping.Entry> mutatedEntries = concatAll(mergedEntries, map(m2.getEntries(), it -> {
+        // Transform new entries with spacing, remove entries already existing in original mapping
+        List<Yaml.Mapping.Entry> newEntries = map(m2.getEntries(), it -> {
             for (Yaml.Mapping.Entry existingEntry : m1.getEntries()) {
                 if (keyMatches(existingEntry, it)) {
                     return null;
@@ -192,7 +196,21 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 it = it.withValue(it.getValue().withMarkers(it.getValue().getMarkers().add(marker)));
             }
             return shouldAutoFormat ? autoFormat(it, p, cursor) : it;
-        }));
+        });
+
+        // Merge existing and new entries together
+        List<Yaml.Mapping.Entry> mutatedEntries;
+        if (StringUtils.isBlank(insertBefore) || newEntries.isEmpty()) {
+            mutatedEntries = concatAll(mergedEntries, newEntries);
+        } else {
+            mutatedEntries = new ArrayList<>();
+            for (Yaml.Mapping.Entry existingEntry : mergedEntries) {
+                if (insertBefore.equals(existingEntry.getKey().getValue())) {
+                    mutatedEntries.addAll(newEntries);
+                }
+                mutatedEntries.add(existingEntry);
+            }
+        }
 
         // copy comment to previous element if needed
         if (m1.getEntries().size() < mutatedEntries.size() && !getCursor().isRoot()) {

@@ -58,6 +58,13 @@ public class MergeYaml extends Recipe {
     @Nullable
     String filePattern;
 
+    @Option(displayName = "Insert before property",
+            description = "Choose an insertion point when multiple mappings exist. Takes the `key` JsonPath into account.",
+            required = false,
+            example = "some-key")
+    @Nullable
+    String insertBefore;
+
     @Override
     public Validated<Object> validate() {
         return super.validate()
@@ -112,7 +119,7 @@ public class MergeYaml extends Recipe {
             public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
                 if ("$".equals(key)) {
                     Yaml.Document d = document.withBlock((Yaml.Block)
-                            new MergeYamlVisitor<>(document.getBlock(), yaml, Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty)
+                            new MergeYamlVisitor<>(document.getBlock(), yaml, Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty, insertBefore)
                                     .visitNonNull(document.getBlock(), ctx, getCursor())
                     );
                     return getCursor().getMessage(REMOVE_PREFIX, false) ? d.withEnd(d.getEnd().withPrefix("")) : d;
@@ -134,13 +141,13 @@ public class MergeYaml extends Recipe {
                     // No matching element already exists, so it must be constructed
                     //noinspection LanguageMismatch
                     return d.withBlock((Yaml.Block) new MergeYamlVisitor<>(d.getBlock(), snippet,
-                            Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty).visitNonNull(d.getBlock(),
+                            Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty, insertBefore).visitNonNull(d.getBlock(),
                             ctx, getCursor()));
                 }
                 return d;
             }
 
-            public String indent(String text) {
+            private String indent(String text) {
                 int index = text.indexOf('\n');
                 if (index == -1 || index == text.length() - 1) {
                     return text;
@@ -179,7 +186,7 @@ public class MergeYaml extends Recipe {
                 if (matcher.matches(getCursor())) {
                     getCursor().putMessageOnFirstEnclosing(Yaml.Document.class, FOUND_MATCHING_ELEMENT, true);
                     m = (Yaml.Mapping) new MergeYamlVisitor<>(mapping, incoming, Boolean.TRUE.equals(acceptTheirs),
-                            objectIdentifyingProperty).visitNonNull(mapping, ctx, getCursor().getParentOrThrow());
+                            objectIdentifyingProperty, insertBefore).visitNonNull(mapping, ctx, getCursor().getParentOrThrow());
                 }
                 return m;
             }
@@ -189,7 +196,7 @@ public class MergeYaml extends Recipe {
                 if (matcher.matches(getCursor())) {
                     getCursor().putMessageOnFirstEnclosing(Yaml.Document.class, FOUND_MATCHING_ELEMENT, true);
                     Yaml.Block value = (Yaml.Block) new MergeYamlVisitor<>(entry.getValue(), incoming,
-                            Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty).visitNonNull(entry.getValue(),
+                            Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty, insertBefore).visitNonNull(entry.getValue(),
                             ctx, getCursor());
                     if (value instanceof Yaml.Scalar && value.getPrefix().isEmpty()) {
                         value = value.withPrefix(" ");
@@ -205,7 +212,7 @@ public class MergeYaml extends Recipe {
                     getCursor().putMessageOnFirstEnclosing(Yaml.Document.class, FOUND_MATCHING_ELEMENT, true);
                     return sequence.withEntries(ListUtils.map(sequence.getEntries(),
                             entry -> entry.withBlock((Yaml.Block) new MergeYamlVisitor<>(entry.getBlock(), incoming,
-                                    Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty)
+                                    Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty, insertBefore)
                                     .visitNonNull(entry.getBlock(), ctx, new Cursor(getCursor(), entry)))));
                 }
                 return super.visitSequence(sequence, ctx);
