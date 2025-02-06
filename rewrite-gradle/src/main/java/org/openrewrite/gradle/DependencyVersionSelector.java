@@ -66,10 +66,10 @@ public class DependencyVersionSelector {
      * @throws MavenDownloadingException If there is a problem downloading metadata for the dependency.
      */
     public @Nullable String select(GroupArtifact ga,
-                                   String configuration,
-                                   @Nullable String version,
-                                   @Nullable String versionPattern,
-                                   ExecutionContext ctx) throws MavenDownloadingException {
+                         String configuration,
+                         @Nullable String version,
+                         @Nullable String versionPattern,
+                         ExecutionContext ctx) throws MavenDownloadingException {
         String currentVersion = "0";
         if (gradleProject != null) {
             GradleDependencyConfiguration gdc = gradleProject.getConfiguration(configuration);
@@ -103,10 +103,10 @@ public class DependencyVersionSelector {
      * @throws MavenDownloadingException If there is a problem downloading metadata for the dependency.
      */
     public @Nullable String select(ResolvedGroupArtifactVersion gav,
-                                   String configuration,
-                                   @Nullable String version,
-                                   @Nullable String versionPattern,
-                                   ExecutionContext ctx) throws MavenDownloadingException {
+                         String configuration,
+                         @Nullable String version,
+                         @Nullable String versionPattern,
+                         ExecutionContext ctx) throws MavenDownloadingException {
         return select(new GroupArtifactVersion(gav.getGroupId(), gav.getArtifactId(), gav.getVersion()),
                 configuration, version, versionPattern, ctx);
     }
@@ -124,14 +124,14 @@ public class DependencyVersionSelector {
      * @throws MavenDownloadingException If there is a problem downloading metadata for the dependency.
      */
     public @Nullable String select(GroupArtifactVersion gav,
-                                   @Nullable String configuration,
-                                   @Nullable String version,
-                                   @Nullable String versionPattern,
-                                   ExecutionContext ctx) throws MavenDownloadingException {
+                         @Nullable String configuration,
+                         @Nullable String version,
+                         @Nullable String versionPattern,
+                         ExecutionContext ctx) throws MavenDownloadingException {
         if (gav.getVersion() == null) {
             throw new IllegalArgumentException("Version must be specified. Call the select method " +
-                    "that accepts a GroupArtifact instead if there is no " +
-                    "current version.");
+                                               "that accepts a GroupArtifact instead if there is no " +
+                                               "current version.");
         }
 
         try {
