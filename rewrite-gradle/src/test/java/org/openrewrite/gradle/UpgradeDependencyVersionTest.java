@@ -373,18 +373,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         rewriteRun(
           buildGradle(
             """
-              buildscript {
-                  ext {
-                      guavaVersion = "29.0-jre"
-                  }
-                  repositories {
-                      mavenCentral()
-                  }
-                  dependencies {
-                      classpath("com.google.guava:guava:${guavaVersion}")
-                  }
-              }
-
               plugins {
                   id "java"
               }
@@ -402,18 +390,6 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               }
               """,
             """
-              buildscript {
-                  ext {
-                      guavaVersion = "30.1.1-jre"
-                  }
-                  repositories {
-                      mavenCentral()
-                  }
-                  dependencies {
-                      classpath("com.google.guava:guava:${guavaVersion}")
-                  }
-              }
-
               plugins {
                   id "java"
               }
@@ -428,6 +404,40 @@ class UpgradeDependencyVersionTest implements RewriteTest {
 
               dependencies {
                   implementation "com.google.guava:guava:${guavaVersion2}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradesVariablesDefinedInExtraPropertiesWithBuildscript() {
+        rewriteRun(
+          buildGradle(
+            """
+              buildscript {
+                  ext {
+                      guavaVersion = "29.0-jre"
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                      classpath("com.google.guava:guava:${guavaVersion}")
+                  }
+              }
+              """,
+            """
+              buildscript {
+                  ext {
+                      guavaVersion = "30.1.1-jre"
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                      classpath("com.google.guava:guava:${guavaVersion}")
+                  }
               }
               """
           )
@@ -1155,6 +1165,32 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               version='ORC-246-1-SNAPSHOT'
               dependencies {
                 implementation "com.veon.eurasia.oraculum:jira-api:$version"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void cannotDownloadMetaDataWhenNoRepositoriesAreDefined() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              dependencies {
+                implementation "com.google.guava:guava:29.0-jre"
+              }
+              """,
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              dependencies {
+                /*~~(com.google.guava:guava failed. Unable to download metadata.)~~>*/implementation "com.google.guava:guava:29.0-jre"
               }
               """
           )
