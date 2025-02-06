@@ -2458,7 +2458,8 @@ public class GroovyParserVisitor {
         } else if (rawIpl instanceof Integer) {
             // On Java 8 _INSIDE_PARENTHESES_LEVEL is a regular Integer
             return (Integer) rawIpl;
-        } else if (node instanceof MethodCallExpression) {
+        } else if (node instanceof MethodCallExpression && !isOlderThanGroovy3()) {
+            // Only for groovy 3+, because lower versions do always return `-1` for objectExpression.lineNumber / objectExpression.columnNumber
             MethodCallExpression expr = (MethodCallExpression) node;
             return determineParenthesisLevel(expr.getObjectExpression().getLineNumber(), expr.getLineNumber(), expr.getObjectExpression().getColumnNumber(), expr.getColumnNumber());
         } else if (node instanceof BinaryExpression) {
