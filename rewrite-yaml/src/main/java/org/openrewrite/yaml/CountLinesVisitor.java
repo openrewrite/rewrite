@@ -86,6 +86,15 @@ public class CountLinesVisitor extends YamlVisitor<AtomicInteger> {
     }
 
     @Override
+    public Yaml visitTag(Yaml.Tag tag, AtomicInteger count) {
+        if(tag.getPrefix().contains("\n")) {
+            count.incrementAndGet();
+        }
+        return super.visitTag(tag, count);
+    }
+
+
+    @Override
     public Yaml visitAlias(Yaml.Alias alias, AtomicInteger count) {
         if(alias.getPrefix().contains("\n")) {
             count.incrementAndGet();
