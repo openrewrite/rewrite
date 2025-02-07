@@ -603,7 +603,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             DependencyVersionSelector dependencyVersionSelector = new DependencyVersionSelector(metadataFailures, gradleProject, null);
             GroupArtifactVersion gav = new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), (String) literal.getValue());
 
-            System.out.println(gaWithConfigurations);
             String selectedVersion;
             try {
                 selectedVersion = dependencyVersionSelector.select(gav, null, newVersion, versionPattern, ctx);
