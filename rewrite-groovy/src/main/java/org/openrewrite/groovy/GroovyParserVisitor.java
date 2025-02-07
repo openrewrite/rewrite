@@ -16,6 +16,7 @@
 package org.openrewrite.groovy;
 
 import groovy.lang.GroovySystem;
+import groovy.transform.Field;
 import groovy.transform.Generated;
 import groovy.transform.Immutable;
 import groovyjarjarasm.asm.Opcodes;
@@ -222,7 +223,7 @@ public class GroovyParserVisitor {
     }
 
     @RequiredArgsConstructor
-    private class RewriteGroovyClassVisitor extends ClassCodeVisitorSupport {
+    class RewriteGroovyClassVisitor extends ClassCodeVisitorSupport {
         @Getter
         private final SourceUnit sourceUnit;
 
@@ -231,7 +232,7 @@ public class GroovyParserVisitor {
         @Override
         public void visitClass(ClassNode clazz) {
             Space fmt = whitespace();
-            List<J.Annotation> leadingAnnotations = visitAndGetAnnotations(clazz);
+            List<J.Annotation> leadingAnnotations = visitAndGetAnnotations(clazz, this);
             List<J.Modifier> modifiers = visitModifiers(clazz.getModifiers());
 
             Space kindPrefix = whitespace();
@@ -414,7 +415,7 @@ public class GroovyParserVisitor {
         private void visitVariableField(FieldNode field) {
             RewriteGroovyVisitor visitor = new RewriteGroovyVisitor(field, this);
 
-            List<J.Annotation> annotations = visitAndGetAnnotations(field);
+            List<J.Annotation> annotations = visitAndGetAnnotations(field, this);
             List<J.Modifier> modifiers = visitModifiers(field.getModifiers());
             TypeTree typeExpr = visitTypeTree(field.getOriginType());
 
@@ -454,57 +455,14 @@ public class GroovyParserVisitor {
 
         @Override
         protected void visitAnnotation(AnnotationNode annotation) {
-            RewriteGroovyVisitor bodyVisitor = new RewriteGroovyVisitor(annotation, this);
-            String lastArgKey = annotation.getMembers().keySet().stream().reduce("", (k1, k2) -> k2);
-            Space prefix = sourceBefore("@");
-            NameTree annotationType = visitTypeTree(annotation.getClassNode());
-            JContainer<Expression> arguments = null;
-            if (!annotation.getMembers().isEmpty()) {
-                arguments = JContainer.build(
-                        sourceBefore("("),
-                        annotation.getMembers().entrySet().stream()
-                                // Non-value implicit properties should not be represented in our LST.
-                                .filter(it -> sourceStartsWith(it.getKey()) || "value".equals(it.getKey()))
-                                .map(arg -> {
-                                    boolean isImplicitValue = "value".equals(arg.getKey()) && !sourceStartsWith("value");
-                                    Space argPrefix = isImplicitValue ? whitespace() : sourceBefore(arg.getKey());
-                                    Space isSign = isImplicitValue ? null : sourceBefore("=");
-                                    Expression expression;
-                                    if (arg.getValue() instanceof AnnotationConstantExpression) {
-                                        visitAnnotation((AnnotationNode) ((AnnotationConstantExpression) arg.getValue()).getValue());
-                                        expression = (J.Annotation) queue.poll();
-                                    } else {
-                                        expression = bodyVisitor.visit(arg.getValue());
-                                    }
-                                    Expression element = isImplicitValue ? expression
-                                            : (new J.Assignment(randomId(), argPrefix, Markers.EMPTY,
-                                            new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), arg.getKey(), null, null),
-                                            padLeft(isSign, expression), null));
-                                    return JRightPadded.build(element)
-                                            .withAfter(arg.getKey().equals(lastArgKey) ? sourceBefore(")") : sourceBefore(","));
-                                })
-                                .collect(toList()),
-                        Markers.EMPTY
-                );
-                // Rare scenario where annotation does only have non-value implicit properties
-                if (arguments.getElements().isEmpty()) {
-                    arguments = null;
-                }
-            } else if (sourceStartsWith("(")) {
-                // Annotation with empty arguments like @Foo()
-                arguments = JContainer.build(sourceBefore("("),
-                        singletonList(JRightPadded.build(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY))),
-                        Markers.EMPTY);
-            }
-
-            queue.add(new J.Annotation(randomId(), prefix, Markers.EMPTY, annotationType, arguments));
+            GroovyParserVisitor.this.visitAnnotation(annotation, this);
         }
 
         @Override
         public void visitMethod(MethodNode method) {
             Space fmt = whitespace();
 
-            List<J.Annotation> annotations = visitAndGetAnnotations(method);
+            List<J.Annotation> annotations = visitAndGetAnnotations(method, this);
             List<J.Modifier> modifiers = visitModifiers(method.getModifiers());
             boolean isConstructorOfInnerNonStaticClass = false;
             RedundantDef redundantDef = getRedundantDefMarker(method);
@@ -564,7 +522,7 @@ public class GroovyParserVisitor {
             for (int i = (isConstructorOfInnerNonStaticClass ? 1 : 0); i < unparsedParams.length; i++) {
                 Parameter param = unparsedParams[i];
 
-                List<J.Annotation> paramAnnotations = visitAndGetAnnotations(param);
+                List<J.Annotation> paramAnnotations = visitAndGetAnnotations(param, this);
 
                 TypeTree paramType;
                 if (param.isDynamicTyped()) {
@@ -656,28 +614,6 @@ public class GroovyParserVisitor {
 
             cursor = saveCursor;
             return null;
-        }
-
-        public List<J.Annotation> visitAndGetAnnotations(AnnotatedNode node) {
-            if (node.getAnnotations().isEmpty()) {
-                return emptyList();
-            }
-
-            List<J.Annotation> paramAnnotations = new ArrayList<>(node.getAnnotations().size());
-            for (AnnotationNode annotationNode : node.getAnnotations()) {
-                // The groovy compiler can add or remove annotations for AST transformations.
-                // Because @groovy.transform.Immutable is discarded in favour of other transform annotations, the removed annotation must be parsed by hand.
-                if (sourceStartsWith("@" + Immutable.class.getSimpleName()) || sourceStartsWith("@" + Immutable.class.getCanonicalName())) {
-                    visitAnnotation(new AnnotationNode(new ClassNode(Immutable.class)));
-                    paramAnnotations.add(pollQueue());
-                }
-
-                if (appearsInSource(annotationNode)) {
-                    visitAnnotation(annotationNode);
-                    paramAnnotations.add(pollQueue());
-                }
-            }
-            return paramAnnotations;
         }
 
         @SuppressWarnings({"ConstantConditions", "unchecked"})
@@ -1406,6 +1342,7 @@ public class GroovyParserVisitor {
         @Override
         public void visitDeclarationExpression(DeclarationExpression expression) {
             Space prefix = whitespace();
+            List<J.Annotation> leadingAnnotations = visitAndGetAnnotations(expression, classVisitor);
             Optional<MultiVariable> multiVariable = maybeMultiVariable();
             List<J.Modifier> modifiers = getModifiers(expression.getVariableExpression());
             TypeTree typeExpr = visitVariableExpressionType(expression.getVariableExpression());
@@ -1437,7 +1374,7 @@ public class GroovyParserVisitor {
                     randomId(),
                     prefix,
                     Markers.EMPTY,
-                    emptyList(),
+                    leadingAnnotations,
                     modifiers,
                     typeExpr,
                     null,
@@ -2226,6 +2163,75 @@ public class GroovyParserVisitor {
         RewriteGroovyVisitor groovyVisitor = new RewriteGroovyVisitor(node, new RewriteGroovyClassVisitor(unit));
         node.visit(groovyVisitor);
         return maybeSemicolon(groovyVisitor.pollQueue());
+    }
+
+    public List<J.Annotation> visitAndGetAnnotations(AnnotatedNode node, RewriteGroovyClassVisitor classVisitor) {
+        if (node.getAnnotations().isEmpty()) {
+            return emptyList();
+        }
+
+        List<J.Annotation> paramAnnotations = new ArrayList<>(node.getAnnotations().size());
+        for (AnnotationNode annotationNode : node.getAnnotations()) {
+            // The groovy compiler can add or remove annotations for AST transformations.
+            // Because @groovy.transform.Immutable is discarded in favour of other transform annotations, the removed annotation must be parsed by hand.
+            if (sourceStartsWith("@" + Immutable.class.getSimpleName()) || sourceStartsWith("@" + Immutable.class.getCanonicalName())) {
+                paramAnnotations.add(visitAnnotation(new AnnotationNode(new ClassNode(Immutable.class)), classVisitor));
+            }
+            if (sourceStartsWith("@" + Field.class.getSimpleName()) || sourceStartsWith("@" + Field.class.getCanonicalName())) {
+                paramAnnotations.add(visitAnnotation(new AnnotationNode(new ClassNode(Field.class)), classVisitor));
+            }
+
+            if (appearsInSource(annotationNode)) {
+                paramAnnotations.add(visitAnnotation(annotationNode, classVisitor));
+            }
+        }
+        return paramAnnotations;
+    }
+
+    public J.Annotation visitAnnotation(AnnotationNode annotation, RewriteGroovyClassVisitor classVisitor) {
+        RewriteGroovyVisitor bodyVisitor = new RewriteGroovyVisitor(annotation, classVisitor);
+        String lastArgKey = annotation.getMembers().keySet().stream().reduce("", (k1, k2) -> k2);
+        Space prefix = sourceBefore("@");
+        NameTree annotationType = visitTypeTree(annotation.getClassNode());
+        JContainer<Expression> arguments = null;
+        if (!annotation.getMembers().isEmpty()) {
+            arguments = JContainer.build(
+                    sourceBefore("("),
+                    annotation.getMembers().entrySet().stream()
+                            // Non-value implicit properties should not be represented in our LST.
+                            .filter(it -> sourceStartsWith(it.getKey()) || "value".equals(it.getKey()))
+                            .map(arg -> {
+                                boolean isImplicitValue = "value".equals(arg.getKey()) && !sourceStartsWith("value");
+                                Space argPrefix = isImplicitValue ? whitespace() : sourceBefore(arg.getKey());
+                                Space isSign = isImplicitValue ? null : sourceBefore("=");
+                                Expression expression;
+                                if (arg.getValue() instanceof AnnotationConstantExpression) {
+                                    expression = visitAnnotation((AnnotationNode) ((AnnotationConstantExpression) arg.getValue()).getValue(), classVisitor);
+                                } else {
+                                    expression = bodyVisitor.visit(arg.getValue());
+                                }
+                                Expression element = isImplicitValue ? expression
+                                        : (new J.Assignment(randomId(), argPrefix, Markers.EMPTY,
+                                        new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), arg.getKey(), null, null),
+                                        padLeft(isSign, expression), null));
+                                return JRightPadded.build(element)
+                                        .withAfter(arg.getKey().equals(lastArgKey) ? sourceBefore(")") : sourceBefore(","));
+                            })
+                            .collect(toList()),
+                    Markers.EMPTY
+            );
+            // Rare scenario where annotation does only have non-value implicit properties
+            if (arguments.getElements().isEmpty()) {
+                arguments = null;
+            }
+        } else if (sourceStartsWith("(")) {
+            // Annotation with empty arguments like @Foo()
+            arguments = JContainer.build(sourceBefore("("),
+                    singletonList(JRightPadded.build(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY))),
+                    Markers.EMPTY);
+        }
+
+        return new J.Annotation(randomId(), prefix, Markers.EMPTY, annotationType, arguments);
     }
 
     private static LineColumn pos(ASTNode node) {
