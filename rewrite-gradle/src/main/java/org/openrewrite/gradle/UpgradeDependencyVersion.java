@@ -611,7 +611,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 if (!gaWithConfigurations.getValue().contains("classpath")) {
                     throw e;
                 }
-                // try again with "classpath" configuration; if this one fails as well, bubble error up so it can be handled
+                // try again with "classpath" configuration; if this one fails as well, the MavenDownloadingException is bubbled up so it can be handled
                 selectedVersion = dependencyVersionSelector.select(gav, "classpath", newVersion, versionPattern, ctx);
             }
             if (selectedVersion == null) {
