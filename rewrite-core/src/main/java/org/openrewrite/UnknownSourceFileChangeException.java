@@ -24,9 +24,9 @@ public class UnknownSourceFileChangeException extends RecipeException {
     SourceFile sourceFile;
     String diff;
 
-    @Override
-    public String getMessage() {
-        return "Source file changed but no recipe " +
-               "reported making a change.";
+    public UnknownSourceFileChangeException(SourceFile sourceFile, String diff) {
+        super("Source file changed but no recipe reported making a change.");
+        this.sourceFile = sourceFile;
+        this.diff = diff;
     }
 }
