@@ -59,43 +59,6 @@ class AddDependencyTest implements RewriteTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"com.google.common.math.*", "com.google.common.math.IntMath"})
-    void onlyIfUsingTestScope(String onlyIfUsing) {
-        rewriteRun(
-          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", onlyIfUsing)),
-          mavenProject("project",
-            srcTestJava(
-              java(usingGuavaIntMath)
-            ),
-            buildGradle(
-              """
-                plugins {
-                    id "java-library"
-                }
-                
-                repositories {
-                    mavenCentral()
-                }
-                """,
-              """
-                plugins {
-                    id "java-library"
-                }
-                
-                repositories {
-                    mavenCentral()
-                }
-                
-                dependencies {
-                    testImplementation "com.google.guava:guava:29.0-jre"
-                }
-                """
-            )
-          )
-        );
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = {"com.google.common.math.*", "com.google.common.math.IntMath"})
     void onlyIfUsingSmokeTestScope(String onlyIfUsing) {
         AddDependency addDep = new AddDependency("com.google.guava", "guava", "29.0-jre", null, null, onlyIfUsing, null, null, null, null);
         rewriteRun(
@@ -1344,21 +1307,8 @@ class AddDependencyTest implements RewriteTest {
     @Issue("https://github.com/moderneinc/customer-requests/issues/792")
     void addScoped() {
         rewriteRun(
-          spec -> spec.recipe(addDependency("commons-lang:commons-lang:2.6", "org.apache.commons.lang3.*")),
-
-          java(
-            //language=java
-            """
-              import org.apache.commons.lang3.StringUtils;
-              
-              class Test {
-                  void tst() {
-                      StringUtils.isEmpty(" ");
-                  }
-              }
-              """,
-            sourceSpecs -> sourceSet(sourceSpecs, "integrationTest")
-          ),
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.*")),
+          java(usingGuavaIntMath, sourceSpecs -> sourceSet(sourceSpecs, "integrationTest")),
           buildGradle(
             //language=groovy
               """
@@ -1394,7 +1344,7 @@ class AddDependencyTest implements RewriteTest {
                   suites {
                       integrationTest(JvmTestSuite) {
                           dependencies {
-                              implementation "commons-lang:commons-lang:2.6"
+                              implementation "com.google.guava:guava:29.0-jre"
                           }
                       }
                   }
@@ -1418,6 +1368,43 @@ class AddDependencyTest implements RewriteTest {
         return new AddDependency(
           gavParts[0], gavParts[1], (gavParts.length < 3) ? null : gavParts[2], null, configuration, onlyIfUsing,
           (gavParts.length < 4) ? null : gavParts[3], null, null, null
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"com.google.common.math.*", "com.google.common.math.IntMath"})
+    void onlyIfUsingTestScope(String onlyIfUsing) {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", onlyIfUsing)),
+          mavenProject("project",
+            srcTestJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id "java-library"
+                }
+                
+                repositories {
+                    mavenCentral()
+                }
+                """,
+              """
+                plugins {
+                    id "java-library"
+                }
+                
+                repositories {
+                    mavenCentral()
+                }
+                
+                dependencies {
+                    testImplementation "com.google.guava:guava:29.0-jre"
+                }
+                """
+            )
+          )
         );
     }
 }
