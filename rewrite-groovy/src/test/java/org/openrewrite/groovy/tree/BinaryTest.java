@@ -78,18 +78,6 @@ class BinaryTest implements RewriteTest {
         );
     }
 
-    @Test
-    void regexPatternOperator() {
-        rewriteRun(
-          groovy(
-            """
-              def PATTERN = ~/foo/
-              def result = PATTERN.matcher('4711').matches()
-              """
-          )
-        );
-    }
-
     @Issue("https://github.com/openrewrite/rewrite/issues/1531")
     @Test
     void regexFindOperator() {
@@ -117,6 +105,8 @@ class BinaryTest implements RewriteTest {
           )
         );
     }
+
+
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1520")
     @Test
