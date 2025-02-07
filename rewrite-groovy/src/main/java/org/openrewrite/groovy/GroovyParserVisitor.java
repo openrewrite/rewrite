@@ -226,7 +226,7 @@ public class GroovyParserVisitor {
     }
 
     @RequiredArgsConstructor
-    class RewriteGroovyClassVisitor extends ClassCodeVisitorSupport {
+    private class RewriteGroovyClassVisitor extends ClassCodeVisitorSupport {
         @Getter
         private final SourceUnit sourceUnit;
 
