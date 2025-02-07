@@ -2526,25 +2526,33 @@ public class GroovyParserVisitor {
         return Math.max(count, 0);
     }
 
+    /**
+     * Grabs a {@link Delimiter} from source if cursor is right in front of a delimiter.
+     * Whitespace characters are NOT excluded, the cursor will not be moved.
+     */
     private @Nullable Delimiter getDelimiter(int cursor) {
-        if (source.startsWith("$/", cursor)) {
-            return DOLLAR_SLASHY_STRING;
-        } else if (source.startsWith("\"\"\"", cursor)) {
-            return TRIPLE_DOUBLE_QUOTE_STRING;
-        } else if (source.startsWith("'''", cursor)) {
-            return TRIPLE_SINGLE_QUOTE_STRING;
-        } else if (source.startsWith("~/", cursor)) {
-            return PATTERN_OPERATOR;
-        } else if (source.startsWith("//", cursor)) {
+        boolean isPatternOperator = source.startsWith("~", cursor);
+        int c = cursor;
+        if (isPatternOperator) {
+            c = cursor + 1;
+        }
+
+        if (source.startsWith("$/", c)) {
+            return isPatternOperator ? PATTERN_DOLLAR_SLASHY_STRING : DOLLAR_SLASHY_STRING;
+        } else if (source.startsWith("\"\"\"", c)) {
+            return isPatternOperator ? PATTERN_TRIPLE_DOUBLE_QUOTE_STRING : TRIPLE_DOUBLE_QUOTE_STRING;
+        } else if (source.startsWith("'''", c)) {
+            return isPatternOperator ? PATTERN_TRIPLE_SINGLE_QUOTE_STRING : TRIPLE_SINGLE_QUOTE_STRING;
+        } else if (source.startsWith("//", c)) {
             return SINGLE_LINE_COMMENT;
-        } else if (source.startsWith("/*", cursor)) {
+        } else if (source.startsWith("/*", c)) {
             return MULTILINE_COMMENT;
-        } else if (source.startsWith("/", cursor)) {
-            return SLASHY_STRING;
-        } else if (source.startsWith("\"", cursor)) {
-            return DOUBLE_QUOTE_STRING;
-        } else if (source.startsWith("'", cursor)) {
-            return SINGLE_QUOTE_STRING;
+        } else if (source.startsWith("/", c)) {
+            return isPatternOperator ? PATTERN_SLASHY_STRING : SLASHY_STRING;
+        } else if (source.startsWith("\"", c)) {
+            return isPatternOperator ? PATTERN_DOUBLE_QUOTE_STRING : DOUBLE_QUOTE_STRING;
+        } else if (source.startsWith("'", c)) {
+            return isPatternOperator ? PATTERN_SINGLE_QUOTE_STRING : SINGLE_QUOTE_STRING;
         }
         return null;
     }

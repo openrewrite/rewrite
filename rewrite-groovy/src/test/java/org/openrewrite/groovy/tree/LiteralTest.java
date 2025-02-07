@@ -40,9 +40,46 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
-    void string() {
+    void singleQuoteString() {
         rewriteRun(
-          groovy("'hello'")
+          groovy(
+            """
+              'hello'
+              """
+          )
+        );
+    }
+
+    @Test
+    void regexPatternSingleQuoteString() {
+        rewriteRun(
+          groovy(
+            """
+              ~"hello"
+              """
+          )
+        );
+    }
+
+    @Test
+    void doubleQuoteString() {
+        rewriteRun(
+          groovy(
+            """
+              "hello"
+              """
+          )
+        );
+    }
+
+    @Test
+    void regexPatternDoubleQuoteString() {
+        rewriteRun(
+          groovy(
+            """
+              ~"hello"
+              """
+          )
         );
     }
 
@@ -74,11 +111,35 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
+    void regexPatternQuotedString() {
+        rewriteRun(
+          groovy(
+            """
+              ~\"""
+                  " Hi "
+              \"""
+              """
+          )
+        );
+    }
+
+    @Test
     void slashString() {
         rewriteRun(
           groovy(
             """
               /.*"foo".*/
+              """
+          )
+        );
+    }
+
+    @Test
+    void regexPatternSlashString() {
+        rewriteRun(
+          groovy(
+            """
+              ~/foo/
               """
           )
         );
@@ -101,6 +162,17 @@ class LiteralTest implements RewriteTest {
           groovy(
             """
               " uid: ${ UUID.randomUUID() } "
+              """
+          )
+        );
+    }
+
+    @Test
+    void regexPatternGString() {
+        rewriteRun(
+          groovy(
+            """
+              ~"${ UUID.randomUUID() }"
               """
           )
         );

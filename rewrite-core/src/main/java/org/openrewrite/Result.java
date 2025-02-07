@@ -76,12 +76,9 @@ public class Result {
     public Result(@Nullable SourceFile before, SourceFile after) {
         this(before, after, after.getMarkers()
                 .findFirst(RecipesThatMadeChanges.class)
-                .orElseThrow(() -> new IllegalStateException(
-                        String.format(
-                                "Source file changed but no recipe " +
-                                "reported making a change. %s",
-                                explainWhatChanged(before, after)
-                        )
+                .orElseThrow(() -> new UnknownSourceFileChangeException(
+                        after,
+                        explainWhatChanged(before, after)
                 ))
                 .getRecipes());
     }
