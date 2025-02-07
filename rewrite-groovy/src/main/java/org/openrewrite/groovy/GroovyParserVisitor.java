@@ -1237,9 +1237,24 @@ public class GroovyParserVisitor {
                 while (start >= 0 && !isWhitespace(str.charAt(start))) {
                     start--;
                 }
+
+                int startX = indexOfNextNonWhitespace( equalsIndex + 1, str);
+                int endX = startX;
+                if (str.charAt(endX) == '[') {
+                    endX = str.indexOf(']');
+                } else if (getDelimiter(endX) != null) {
+                    Delimiter delim = getDelimiter(endX);
+                    endX = str.indexOf(delim.close, endX + delim.open.length());
+                } else {
+                    while (isJavaIdentifierPart(str.charAt(endX)) || str.charAt(endX) == ',') {
+                        endX++;
+                    }
+                }
+
+
                 VariableExpression left = new VariableExpression(str.substring(start + 1, end + 1));
                 Token operation = new Token(Types.EQUAL, "=", -1, -1);
-                ConstantExpression right = new ConstantExpression("[1, 2, 3]");
+                ConstantExpression right = new ConstantExpression(str.substring(startX, endX + 1));
                 DeclarationExpression declarationExpression = new DeclarationExpression(left, operation, right);
                 declarationExpression.addAnnotations(singletonList(new AnnotationNode(new ClassNode(Field.class))));
 
