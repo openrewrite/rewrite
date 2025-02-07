@@ -1226,39 +1226,7 @@ public class GroovyParserVisitor {
             // The groovy compiler can add or remove annotations for AST transformations.
             // Because @groovy.transform.Field is transformed to a ConstantExpression, we need to restore the original DeclarationExpression
             if (sourceStartsWith("@" + Field.class.getSimpleName()) || sourceStartsWith("@" + Field.class.getCanonicalName())) {
-                String str = source.substring(cursor);
-                int equalsIndex = str.indexOf("=");
-
-                int end = equalsIndex - 1;
-                while (end >= 0 && isWhitespace(str.charAt(end))) {
-                    end--;
-                }
-                int start = end;
-                while (start >= 0 && !isWhitespace(str.charAt(start))) {
-                    start--;
-                }
-
-                int startX = indexOfNextNonWhitespace( equalsIndex + 1, str);
-                int endX = startX;
-                if (str.charAt(endX) == '[') {
-                    endX = str.indexOf(']');
-                } else if (getDelimiter(endX) != null) {
-                    Delimiter delim = getDelimiter(endX);
-                    endX = str.indexOf(delim.close, endX + delim.open.length());
-                } else {
-                    while (isJavaIdentifierPart(str.charAt(endX)) || str.charAt(endX) == ',') {
-                        endX++;
-                    }
-                }
-
-
-                VariableExpression left = new VariableExpression(str.substring(start + 1, end + 1));
-                Token operation = new Token(Types.EQUAL, "=", -1, -1);
-                ConstantExpression right = new ConstantExpression(str.substring(startX, endX + 1));
-                DeclarationExpression declarationExpression = new DeclarationExpression(left, operation, right);
-                declarationExpression.addAnnotations(singletonList(new AnnotationNode(new ClassNode(Field.class))));
-
-                visitDeclarationExpression(declarationExpression);
+                visitDeclarationExpression(transformBackToDeclarationExpression(expression));
                 return;
             }
 
@@ -2598,7 +2566,10 @@ public class GroovyParserVisitor {
             return isPatternOperator ? PATTERN_DOUBLE_QUOTE_STRING : DOUBLE_QUOTE_STRING;
         } else if (source.startsWith("'", c)) {
             return isPatternOperator ? PATTERN_SINGLE_QUOTE_STRING : SINGLE_QUOTE_STRING;
+        } else if (source.startsWith("[", c)) {
+            return ARRAY;
         }
+
         return null;
     }
 
@@ -2819,7 +2790,9 @@ public class GroovyParserVisitor {
      */
     private boolean appearsInSource(ASTNode node) {
         if (node instanceof AnnotationNode) {
-            return sourceStartsWith("@" + ((AnnotationNode) node).getClassNode().getUnresolvedName());
+            String name = ((AnnotationNode) node).getClassNode().getUnresolvedName();
+            String[] parts = name.split("\\.");
+            return sourceStartsWith("@" + name) || sourceStartsWith("@" + parts[parts.length - 1]);
         }
 
         return node.getColumnNumber() >= 0 && node.getLineNumber() >= 0 && node.getLastColumnNumber() >= 0 && node.getLastLineNumber() >= 0;
@@ -2877,6 +2850,41 @@ public class GroovyParserVisitor {
             }
         }
         return completeStaticStarImports;
+    }
+
+    private DeclarationExpression transformBackToDeclarationExpression(ConstantExpression expression) {
+        // We don't use `expression` but the raw source
+        String str = source.substring(cursor);
+        int equalsIndex = str.indexOf("=");
+
+        int end = equalsIndex - 1;
+        while (end >= 0 && isWhitespace(str.charAt(end))) {
+            end--;
+        }
+        int start = end;
+        while (start >= 0 && !isWhitespace(str.charAt(start))) {
+            start--;
+        }
+
+        int startX = indexOfNextNonWhitespace( equalsIndex + 1, str);
+        int endX = startX;
+        Delimiter delim = getDelimiter(endX);
+        if (delim != null) {
+            endX = str.indexOf(delim.close, endX + delim.open.length()) + 1;
+        } else {
+            while (endX < str.length() && (isJavaIdentifierPart(str.charAt(endX)) || str.charAt(endX) == ',' || str.charAt(endX) == '(' || str.charAt(endX) == ')')) {
+                endX++;
+            }
+        }
+
+        VariableExpression left = new VariableExpression(str.substring(start + 1, end + 1));
+        Token operation = new Token(Types.EQUAL, "=", -1, -1);
+        // Notice this give wrong type information if a non-variable is used, but at least we can parse the `right` side of the @Field declaration
+        ConstantExpression right = new ConstantExpression(str.substring(startX, endX));
+        DeclarationExpression declarationExpression = new DeclarationExpression(left, operation, right);
+        declarationExpression.addAnnotations(singletonList(new AnnotationNode(new ClassNode(Field.class))));
+
+        return declarationExpression;
     }
 
     /**
