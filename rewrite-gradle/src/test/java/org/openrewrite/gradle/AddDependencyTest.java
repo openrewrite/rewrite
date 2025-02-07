@@ -36,12 +36,7 @@ import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.groovy.Assertions.groovy;
 import static org.openrewrite.groovy.Assertions.srcMainGroovy;
-import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.java.Assertions.mavenProject;
-import static org.openrewrite.java.Assertions.srcMainJava;
-import static org.openrewrite.java.Assertions.srcMainResources;
-import static org.openrewrite.java.Assertions.srcSmokeTestJava;
-import static org.openrewrite.java.Assertions.srcTestJava;
+import static org.openrewrite.java.Assertions.*;
 import static org.openrewrite.properties.Assertions.properties;
 
 @SuppressWarnings("GroovyUnusedAssignment")
@@ -687,7 +682,7 @@ class AddDependencyTest implements RewriteTest {
                 
                 dependencies {
                     implementation "commons-lang:commons-lang:2.6"
-
+                
                     testImplementation "junit:junit:4.13"
                 }
                 """,
@@ -733,7 +728,7 @@ class AddDependencyTest implements RewriteTest {
                 
                 dependencies {
                     implementation group: "commons-lang", name: "commons-lang", version: "1.0"
-
+                
                     def junitVersion = "4.12"
                     testImplementation group: "junit", name: "junit", version: junitVersion
                 }
@@ -935,7 +930,7 @@ class AddDependencyTest implements RewriteTest {
                 
                 dependencies {
                     implementation group: "commons-lang", name: "commons-lang", version: "1.0"
-
+                
                     testImplementation group: "com.google.guava", name: "guava", version: "29.0-jre"
                 }
                 """
@@ -1342,6 +1337,71 @@ class AddDependencyTest implements RewriteTest {
                 """,
               spec -> spec.path("build.gradle")
             ))
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/moderneinc/customer-requests/issues/792")
+    void addScoped() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("commons-lang:commons-lang:2.6", "org.apache.commons.lang3.*")),
+
+          java(
+            //language=java
+            """
+              import org.apache.commons.lang3.StringUtils;
+              
+              class Test {
+                  void tst() {
+                      StringUtils.isEmpty(" ");
+                  }
+              }
+              """,
+            sourceSpecs -> sourceSet(sourceSpecs, "integrationTest")
+          ),
+          buildGradle(
+            //language=groovy
+              """
+              plugins {
+                  id "java-library"
+                  id 'jvm-test-suite'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              testing {
+                  suites {
+                      integrationTest(JvmTestSuite) {
+                          dependencies {
+                          }
+                      }
+                  }
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+                  id 'jvm-test-suite'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              testing {
+                  suites {
+                      integrationTest(JvmTestSuite) {
+                          dependencies {
+                              implementation "commons-lang:commons-lang:2.6"
+                          }
+                      }
+                  }
+              }
+              """,
+            spec -> spec.path("build.gradle")
+          )
         );
     }
 
