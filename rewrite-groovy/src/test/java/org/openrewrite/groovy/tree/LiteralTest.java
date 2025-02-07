@@ -111,7 +111,7 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
-    void regexPatterQuotedString() {
+    void regexPatternQuotedString() {
         rewriteRun(
           groovy(
             """
