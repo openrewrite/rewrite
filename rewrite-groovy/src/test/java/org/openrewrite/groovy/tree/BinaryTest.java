@@ -106,8 +106,6 @@ class BinaryTest implements RewriteTest {
         );
     }
 
-
-
     @Issue("https://github.com/openrewrite/rewrite/issues/1520")
     @Test
     void minusEquals() {
