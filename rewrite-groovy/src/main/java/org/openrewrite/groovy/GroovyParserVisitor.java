@@ -64,6 +64,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static java.lang.Character.isJavaIdentifierPart;
+import static java.lang.Character.isWhitespace;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
@@ -1225,9 +1226,20 @@ public class GroovyParserVisitor {
             // The groovy compiler can add or remove annotations for AST transformations.
             // Because @groovy.transform.Field is transformed to a ConstantExpression, we need to restore the original DeclarationExpression
             if (sourceStartsWith("@" + Field.class.getSimpleName()) || sourceStartsWith("@" + Field.class.getCanonicalName())) {
-                VariableExpression left = new VariableExpression("a");
+                String str = source.substring(cursor);
+                int equalsIndex = str.indexOf("=");
+
+                int end = equalsIndex - 1;
+                while (end >= 0 && isWhitespace(str.charAt(end))) {
+                    end--;
+                }
+                int start = end;
+                while (start >= 0 && !isWhitespace(str.charAt(start))) {
+                    start--;
+                }
+                VariableExpression left = new VariableExpression(str.substring(start + 1, end + 1));
                 Token operation = new Token(Types.EQUAL, "=", -1, -1);
-                VariableExpression right = new VariableExpression("a");
+                ConstantExpression right = new ConstantExpression("[1, 2, 3]");
                 DeclarationExpression declarationExpression = new DeclarationExpression(left, operation, right);
                 declarationExpression.addAnnotations(singletonList(new AnnotationNode(new ClassNode(Field.class))));
 

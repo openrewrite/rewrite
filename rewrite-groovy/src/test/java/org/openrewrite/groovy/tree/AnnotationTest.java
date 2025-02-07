@@ -181,7 +181,19 @@ class AnnotationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              @groovy.transform.Field def a = "a"
+              @groovy.transform.Field def a = [1, 2, 3]
+              """
+          )
+        );
+    }
+
+    @Test
+    void groovyTransformFieldAnnotationOnVariableWithReference() {
+        rewriteRun(
+          groovy(
+            """
+              def z = 1 + 2
+              @groovy.transform.Field def a = z
               """
           )
         );
