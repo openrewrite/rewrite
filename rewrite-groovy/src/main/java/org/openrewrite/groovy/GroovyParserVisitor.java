@@ -27,6 +27,8 @@ import org.codehaus.groovy.ast.*;
 import org.codehaus.groovy.ast.expr.*;
 import org.codehaus.groovy.ast.stmt.*;
 import org.codehaus.groovy.control.SourceUnit;
+import org.codehaus.groovy.syntax.Token;
+import org.codehaus.groovy.syntax.Types;
 import org.codehaus.groovy.transform.stc.StaticTypesMarker;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -1220,6 +1222,19 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitConstantExpression(ConstantExpression expression) {
+            // The groovy compiler can add or remove annotations for AST transformations.
+            // Because @groovy.transform.Field is transformed to a ConstantExpression, we need to restore the original DeclarationExpression
+            if (sourceStartsWith("@" + Field.class.getSimpleName()) || sourceStartsWith("@" + Field.class.getCanonicalName())) {
+                VariableExpression left = new VariableExpression("a");
+                Token operation = new Token(Types.EQUAL, "=", -1, -1);
+                VariableExpression right = new VariableExpression("a");
+                DeclarationExpression declarationExpression = new DeclarationExpression(left, operation, right);
+                declarationExpression.addAnnotations(singletonList(new AnnotationNode(new ClassNode(Field.class))));
+
+                visitDeclarationExpression(declarationExpression);
+                return;
+            }
+
             queue.add(insideParentheses(expression, fmt -> {
                 JavaType.Primitive jType;
                 // The unaryPlus is not included in the expression and must be handled through the source.
@@ -2176,9 +2191,6 @@ public class GroovyParserVisitor {
             // Because @groovy.transform.Immutable is discarded in favour of other transform annotations, the removed annotation must be parsed by hand.
             if (sourceStartsWith("@" + Immutable.class.getSimpleName()) || sourceStartsWith("@" + Immutable.class.getCanonicalName())) {
                 paramAnnotations.add(visitAnnotation(new AnnotationNode(new ClassNode(Immutable.class)), classVisitor));
-            }
-            if (sourceStartsWith("@" + Field.class.getSimpleName()) || sourceStartsWith("@" + Field.class.getCanonicalName())) {
-                paramAnnotations.add(visitAnnotation(new AnnotationNode(new ClassNode(Field.class)), classVisitor));
             }
 
             if (appearsInSource(annotationNode)) {

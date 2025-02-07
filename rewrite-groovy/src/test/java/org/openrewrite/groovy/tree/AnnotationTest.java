@@ -181,8 +181,7 @@ class AnnotationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              @groovy.transform.Field
-              def a = "a"
+              @groovy.transform.Field def a = "a"
               """
           )
         );
