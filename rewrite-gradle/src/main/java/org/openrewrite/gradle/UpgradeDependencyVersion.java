@@ -603,7 +603,17 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             DependencyVersionSelector dependencyVersionSelector = new DependencyVersionSelector(metadataFailures, gradleProject, null);
             GroupArtifactVersion gav = new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), (String) literal.getValue());
 
-            String selectedVersion = dependencyVersionSelector.select(gav, gaWithConfigurations.getValue().contains("classpath") ? "classpath" : null, newVersion, versionPattern, ctx);
+            System.out.println(gaWithConfigurations);
+            String selectedVersion;
+            try {
+                selectedVersion = dependencyVersionSelector.select(gav, null, newVersion, versionPattern, ctx);
+            } catch (MavenDownloadingException e) {
+                if (!gaWithConfigurations.getValue().contains("classpath")) {
+                    throw e;
+                }
+                // try again with "classpath" configuration; if this one fails as well, bubble error up so it can be handled
+                selectedVersion = dependencyVersionSelector.select(gav, "classpath", newVersion, versionPattern, ctx);
+            }
             if (selectedVersion == null) {
                 return null;
             }
