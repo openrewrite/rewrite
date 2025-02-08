@@ -12,7 +12,7 @@ class SortYamlTest implements RewriteTest {
 
     @Test
     @DocumentExample
-    public void sortYaml() {
+    void sortYaml() {
         rewriteRun(
           spec -> spec.recipe(new SortYaml(List.of("stages", "include", "*.stage", "*.image"), null)),
           yaml(
@@ -73,7 +73,7 @@ class SortYamlTest implements RewriteTest {
     }
 
     @Test
-    public void sortValueBased() {
+    void sortValueBased() {
         rewriteRun(
           spec -> spec.recipe(new SortYaml(List.of("*[subkey]"), null)),
           yaml(
@@ -98,7 +98,7 @@ class SortYamlTest implements RewriteTest {
     }
 
     @Test
-    public void nestedSortValueBased() {
+    void nestedSortValueBased() {
         rewriteRun(
           spec -> spec.recipe(new SortYaml(List.of("*.*[subkey]"), null)),
           yaml(
@@ -121,7 +121,7 @@ class SortYamlTest implements RewriteTest {
     }
 
     @Test
-    public void deeplyNestedSort() {
+    void deeplyNestedSort() {
         rewriteRun(
           spec -> spec.recipe(new SortYaml(List.of("*", "*.*", "*.*.*", "*.*.*.*"), null)),
           yaml(
@@ -170,7 +170,7 @@ class SortYamlTest implements RewriteTest {
     }
 
     @Test
-    public void deeplyNestedSortNotFullySorted() {
+    void deeplyNestedSortNotFullySorted() {
         rewriteRun(
           spec -> spec.recipe(new SortYaml(List.of("*", "*.*"), null)),
           yaml(
@@ -219,7 +219,7 @@ class SortYamlTest implements RewriteTest {
     }
 
     @Test
-    public void multiWildCard() {
+    void multiWildCard() {
         rewriteRun(
           spec -> spec.recipe(new SortYaml(List.of("**"), null)),
           yaml(
@@ -268,7 +268,7 @@ class SortYamlTest implements RewriteTest {
     }
 
     @Test
-    public void multiWildCardAtEnd() {
+    void multiWildCardAtEnd() {
         rewriteRun(
           spec -> spec.recipe(new SortYaml(List.of("1.**", "0.0.**"), null)),
           yaml(
@@ -317,7 +317,7 @@ class SortYamlTest implements RewriteTest {
     }
 
     @Test
-    public void sortValueBasedWithMultipleWildcards() {
+    void sortValueBasedWithMultipleWildcards() {
         rewriteRun(
           spec -> spec.recipe(new SortYaml(List.of("**[subkey]"), null)),
           yaml(
