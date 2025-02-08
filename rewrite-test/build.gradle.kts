@@ -3,7 +3,7 @@ plugins {
 }
 
 dependencies {
-    api(platform("org.junit:junit-bom:latest.release"))
+    api(platform("org.junit:junit-bom:5.11.+")) // Avoid 5.12.0-M1
     api(project(":rewrite-core"))
     compileOnly("io.micrometer:micrometer-core:latest.release")
     api("org.junit.jupiter:junit-jupiter-api")
@@ -16,4 +16,5 @@ dependencies {
     implementation("org.slf4j:slf4j-nop:1.7.36")
 
     testImplementation(project(":rewrite-groovy"))
+    testRuntimeOnly("org.antlr:antlr4-runtime:4.11.1")
 }
