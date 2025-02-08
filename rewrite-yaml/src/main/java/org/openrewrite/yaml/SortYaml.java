@@ -206,26 +206,6 @@ public class SortYaml extends Recipe {
             // a.b.c      a.**        true
             // a.b.c      a.**.c      true
             // a.b.c      a.**.d      false
-//            private boolean matches(String key, String sortBy) {
-//                String[] keyParts = key.split("\\.");
-//                String[] sortByParts = sortBy.split("\\.");
-//
-//                int keyLength = keyParts.length;
-//                int sortByLength = sortByParts.length;
-//
-//                for (int j = 0; j < sortByLength; j++) {
-//                    if (j >= keyLength) {
-//                        return false;
-//                    }
-//                    if (sortByParts[j].equals("*")) {
-//                        continue;
-//                    }
-//                    if (!sortByParts[j].equals(keyParts[j])) {
-//                        return false;
-//                    }
-//                }
-//                return true;
-//            }
             private boolean matches(String key, String sortBy) {
                 String[] keyParts = key.split("\\.");
                 String[] sortByParts = sortBy.split("\\.");
@@ -262,24 +242,6 @@ public class SortYaml extends Recipe {
             // a.b.c      a.**        true
             // a.b.c      a.**.c      true
             // a.b.c      **.c        true
-//            private boolean exactMatch(String key, String sortBy) {
-//                String[] keyParts = key.split("\\.");
-//                String[] sortByParts = sortBy.split("\\.");
-//
-//                int keyLength = keyParts.length;
-//                int sortByLength = sortByParts.length;
-//
-//                if (keyLength != sortByLength) {
-//                    return false;
-//                }
-//
-//                for (int j = 0; j < sortByLength; j++) {
-//                    if (!sortByParts[j].equals(keyParts[j]) && !sortByParts[j].equals("*")) {
-//                        return false;
-//                    }
-//                }
-//                return true;
-//            }
             private boolean exactMatch(String key, String sortBy) {
                 String[] keyParts = key.split("\\.");
                 String[] sortByParts = sortBy.split("\\.");
