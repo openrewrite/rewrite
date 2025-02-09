@@ -912,6 +912,25 @@ class LombokTest implements RewriteTest {
         );
     }
 
+    @Test
+    void npeSeenOnMultipleAnnotations() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath())),
+          java(
+            """
+              import lombok.Value;
+              import org.jspecify.annotations.Nullable;
+              
+              @Value
+              public class Foo {
+                  @Nullable
+                  String bar;
+              }
+              """
+          )
+        );
+    }
+
     /**
      * These test lombok features that we do not fully support.
      * Code should still parse and print back to its original source code but type information may be missing.
