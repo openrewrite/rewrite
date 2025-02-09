@@ -103,15 +103,25 @@ class ImportTest implements RewriteTest {
     }
 
     @Test
-    void duplicateImports() {
+    void duplicateImportsAndComments() {
         rewriteRun(
           groovy(
             """
                     import static      java.util.Collections.*    ;     import               static      java.util.Collections.*
+                    //import static      java.util.Collections.*    ;     import               static      java.util.Collections.*
               import java.util.Collections.*  ; import static java.util.Collections.*
               import java.util.Collections.*
               import static java.util.Collections.singletonList as listOf
               import static java.util.Collections.singletonList as listOf
+              import /*static java.util.Collections.singletonList;import static*/ java.util.Collections.*
+              import /*static java.util.Collections.singletonList;
+              
+              
+              import static java.util.Collections.**/java.util.Collections.*
+              import /*static java.util.Collections.singletonList;
+              
+              
+              import static java.util.Collections.**/static          java.util.Collections.*
               import static java.util.Collections.singletonList;import static java.util.Collections.*
               import java.util.Collections.*
               """

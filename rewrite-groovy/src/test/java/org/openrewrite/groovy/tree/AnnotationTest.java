@@ -163,4 +163,63 @@ class AnnotationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4853")
+    @Test
+    void annotationOnVariable() {
+        rewriteRun(
+          groovy(
+            """
+              @Foo def a = "a"
+              """
+          )
+        );
+    }
+
+    @Test
+    void groovyTransformFieldAnnotationOnVariable() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.transform.Field
+              
+              @Field def a = [1, 2, 3]
+              """
+          )
+        );
+    }
+
+    @Test
+    void groovyTransformFieldFQNAnnotationOnVariable() {
+        rewriteRun(
+          groovy(
+            """
+              @groovy.transform.Field def a = [1, 2, 3]
+              """
+          )
+        );
+    }
+
+    @Test
+    void groovyTransformFieldFQNAnnotationOnVariableWithReference() {
+        rewriteRun(
+          groovy(
+            """
+              def z = 1 + 2
+              @groovy.transform.Field def a = z
+              """
+          )
+        );
+    }
+
+    @Test
+    void groovyTransformFieldFQNAnnotationOnVariableWithMethodInvocation() {
+        rewriteRun(
+          groovy(
+            """
+              @groovy.transform.Field def a = callSomething()
+              """
+          )
+        );
+    }
 }
