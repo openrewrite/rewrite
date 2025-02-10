@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 // Generated from java-escape by ANTLR 4.11.1
-package org.openrewrite.json.internal.grammar;
+package org.openrewrite.hcl.internal.grammar;
 import org.antlr.v4.runtime.tree.ParseTreeVisitor;
 
 /**
