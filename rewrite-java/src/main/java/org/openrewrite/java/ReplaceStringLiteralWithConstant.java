@@ -70,7 +70,7 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
     }
 
     public @Nullable String getLiteralValue() {
-        if (this.literalValue == null && this.fullyQualifiedConstantName != null) {
+        if (StringUtils.isBlank(this.literalValue)) {
             try {
                 this.literalValue = (String) getConstantValueByFullyQualifiedName(this.fullyQualifiedConstantName);
             } catch (ClassNotFoundException | IllegalAccessException | NoSuchFieldException e) {
@@ -82,28 +82,31 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
     }
 
     @Override
-    public Validated validate() {
-        Validated result = super.validate();
+    public Validated<Object> validate() {
+        Validated<Object> result = super.validate();
         if (StringUtils.isBlank(fullyQualifiedConstantName)) {
             return result.and(invalid(CONSTANT_FQN_PARAM, fullyQualifiedConstantName, "The constant's fully qualified name may not be empty or blank."));
         }
-        try {
-            Object constantValue = getConstantValueByFullyQualifiedName(fullyQualifiedConstantName);
-            if (constantValue == null) {
-                return result.and(invalid(CONSTANT_FQN_PARAM, fullyQualifiedConstantName, "Provided constant should not be null."));
+        if (StringUtils.isBlank(literalValue)) {
+            try {
+                Object constantValue = getConstantValueByFullyQualifiedName(fullyQualifiedConstantName);
+                if (constantValue == null) {
+                    return result.and(invalid(CONSTANT_FQN_PARAM, fullyQualifiedConstantName, "Provided constant should not be null."));
+                }
+                if (!(constantValue instanceof String)) {
+                    // currently, we only support string literals, also see visitor implementation
+                    return result.and(invalid(CONSTANT_FQN_PARAM, fullyQualifiedConstantName, "Unsupported type of constant provided. Only literals can be replaced."));
+                }
+                return result;
+            } catch (ClassNotFoundException e) {
+                return result.and(invalid(CONSTANT_FQN_PARAM, fullyQualifiedConstantName, "No class for specified name was found."));
+            } catch (NoSuchFieldException e) {
+                return result.and(invalid(CONSTANT_FQN_PARAM, fullyQualifiedConstantName, "No field with specified name was found."));
+            } catch (IllegalAccessException e) {
+                return result.and(invalid(CONSTANT_FQN_PARAM, fullyQualifiedConstantName, "Unable to access specified field."));
             }
-            if (!(constantValue instanceof String)) {
-                // currently, we only support string literals, also see visitor implementation
-                return result.and(invalid(CONSTANT_FQN_PARAM, fullyQualifiedConstantName, "Unsupported type of constant provided. Only literals can be replaced."));
-            }
-            return result;
-        } catch (ClassNotFoundException e) {
-            return result.and(invalid(CONSTANT_FQN_PARAM, fullyQualifiedConstantName, "No class for specified name was found."));
-        } catch (NoSuchFieldException e) {
-            return result.and(invalid(CONSTANT_FQN_PARAM, fullyQualifiedConstantName, "No field with specified name was found."));
-        } catch (IllegalAccessException e) {
-            return result.and(invalid(CONSTANT_FQN_PARAM, fullyQualifiedConstantName, "Unable to access specified field."));
         }
+        return result;
     }
 
     @Override

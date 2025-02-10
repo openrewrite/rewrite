@@ -6023,7 +6023,7 @@ public interface J extends Tree {
             JavaType.@Nullable Variable variableType;
 
             @Override
-            public JavaType getType() {
+            public @Nullable JavaType getType() {
                 return variableType != null ? variableType.getType() : null;
             }
 
