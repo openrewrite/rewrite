@@ -1641,7 +1641,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         try {
             String prefix = source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
             cursor += prefix.length();
-            @SuppressWarnings("unchecked") J2 j = (J2) scan(t, format(prefix));
+            @SuppressWarnings("unchecked") J2 j = (J2) scan(t, formatWithCommentTree(prefix, (JCTree) t, docCommentTable.getCommentTree((JCTree) t)));
             return j;
         } catch (Throwable ex) {
             // this SHOULD never happen, but is here simply as a diagnostic measure in the event of unexpected exceptions
@@ -2234,5 +2234,43 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
             }
         }
         return annotations;
+    }
+
+    Space formatWithCommentTree(String prefix, JCTree tree, DCTree.@Nullable DCDocComment commentTree) {
+        Space fmt = format(prefix);
+        if (commentTree != null) {
+            List<Comment> comments = fmt.getComments();
+            int i;
+            for (i = comments.size() - 1; i >= 0; i--) {
+                Comment comment = comments.get(i);
+                if (comment.isMultiline() && ((TextComment) comment).getText().startsWith("*")) {
+                    break;
+                }
+            }
+
+            AtomicReference<Javadoc.DocComment> javadoc = new AtomicReference<>();
+            int commentCursor = cursor - prefix.length() + fmt.getWhitespace().length();
+            for (int j = 0; j < comments.size(); j++) {
+                Comment comment = comments.get(j);
+                if (i == j) {
+                    javadoc.set((Javadoc.DocComment) new ReloadableJava8JavadocVisitor(
+                            context,
+                            getCurrentPath(),
+                            typeMapping,
+                            source.substring(commentCursor, source.indexOf("*/", commentCursor + 1)),
+                            tree
+                    ).scan(commentTree, new ArrayList<>(1)));
+                    break;
+                } else {
+                    commentCursor += comment.printComment(new Cursor(null, "root")).length() + comment.getSuffix().length();
+                }
+            }
+
+            int javadocIndex = i;
+            return fmt.withComments(ListUtils.map(fmt.getComments(), (j, c) ->
+                    j == javadocIndex ? javadoc.get().withSuffix(c.getSuffix()) : c));
+        }
+
+        return fmt;
     }
 }
