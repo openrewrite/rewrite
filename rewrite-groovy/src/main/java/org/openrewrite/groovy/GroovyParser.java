@@ -123,9 +123,12 @@ public class GroovyParser implements Parser {
 
                         pctx.getParsingListener().startedParsing(input);
                         CompilationUnit compUnit = new CompilationUnit(configuration, null, classLoader, classLoader);
+
+                        // Override the standard `ResolveVisitor` which otherwise inlines any annotation property values
                         Field resolveVisitor = CompilationUnit.class.getDeclaredField("resolveVisitor");
                         resolveVisitor.setAccessible(true);
                         resolveVisitor.set(compUnit, new CustomResolveVisitor(compUnit));
+
                         compUnit.addSource(unit);
                         compUnit.compile(Phases.CANONICALIZATION);
                         ModuleNode ast = unit.getAST();
