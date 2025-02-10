@@ -202,6 +202,7 @@ class CustomResolveVisitor extends ResolveVisitor {
         }
     }
 
+    @Override
     public void setClassNodeResolver(final ClassNodeResolver classNodeResolver) {
         this.classNodeResolver = classNodeResolver;
     }
@@ -1302,7 +1303,7 @@ class CustomResolveVisitor extends ResolveVisitor {
             if (annType.isResolved()) {
                 Class<?> annTypeClass = annType.getTypeClass();
                 Retention retAnn = annTypeClass.getAnnotation(Retention.class);
-                if (retAnn != null && !retAnn.value().equals(RetentionPolicy.SOURCE) && !isRepeatable(annTypeClass)) {
+                if (retAnn != null && retAnn.value() != RetentionPolicy.SOURCE && !isRepeatable(annTypeClass)) {
                     // remember non-source/non-repeatable annos (auto collecting of Repeatable annotations is handled elsewhere)
                     AnnotationNode anyPrevAnnNode = tmpAnnotations.put(annTypeClass.getName(), an);
                     if (anyPrevAnnNode != null) {
@@ -1503,6 +1504,7 @@ class CustomResolveVisitor extends ResolveVisitor {
         }
     }
 
+    @Override
     public void visitCatchStatement(final CatchStatement cs) {
         resolveOrFail(cs.getExceptionType(), cs);
         if (cs.getExceptionType() == ClassHelper.DYNAMIC_TYPE) {
