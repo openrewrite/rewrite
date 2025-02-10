@@ -917,12 +917,17 @@ class LombokTest implements RewriteTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
+      "lombok.AllArgsConstructor",
       "lombok.Builder",
       "lombok.Data",
       "lombok.EqualsAndHashCode",
+      "lombok.NoArgsConstructor",
+      "lombok.RequiredArgsConstructor",
       "lombok.ToString",
-      "lombok.Value"
+      "lombok.Value",
+      "lombok.With"
     })
+    @MinimumJava11
     void npeSeenOnMultipleAnnotations(String annotation) {
         rewriteRun(
           spec -> spec.parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath())),
