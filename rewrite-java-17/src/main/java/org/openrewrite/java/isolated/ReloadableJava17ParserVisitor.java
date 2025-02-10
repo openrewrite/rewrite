@@ -1738,12 +1738,8 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             return null;
         }
         try {
-            String prefix;
-            if (t instanceof JCNewClass && (((JCNewClass) t).type.tsym.flags() & Flags.ENUM) != 0L) {
-                prefix = "";
-            } else {
-                prefix = source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
-            }
+            String prefix = t instanceof JCNewClass && hasFlag(((JCNewClass) t).type.tsym.flags(), Flags.ENUM) ? ""
+                    : source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
             cursor += prefix.length();
             Space p = formatWithCommentTree(prefix, (JCTree) t, docCommentTable.getCommentTree((JCTree) t));
             @SuppressWarnings("unchecked") J2 j = (J2) scan(t, p);
@@ -2121,7 +2117,11 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     private boolean hasFlag(ModifiersTree modifiers, long flag) {
-        return (((JCModifiers) modifiers).flags & flag) != 0L;
+        return hasFlag(((JCModifiers) modifiers).flags, flag);
+    }
+
+    private boolean hasFlag(long flags, long flag) {
+        return (flags & flag) != 0L;
     }
 
     @SuppressWarnings("unused")
