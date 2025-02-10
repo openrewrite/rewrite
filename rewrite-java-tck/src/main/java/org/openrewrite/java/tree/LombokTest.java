@@ -933,7 +933,7 @@ class LombokTest implements RewriteTest {
           spec -> spec.parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath())),
           java(
             //language=java
-            """
+            String.format("""
               import lombok.%s;
               import org.jspecify.annotations.Nullable;
               
@@ -942,7 +942,7 @@ class LombokTest implements RewriteTest {
                   @Nullable
                   String bar;
               }
-              """.formatted(annotation)
+              """, annotation)
           )
         );
     }
