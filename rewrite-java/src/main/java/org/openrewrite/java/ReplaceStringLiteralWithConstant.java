@@ -30,7 +30,6 @@ import java.util.Objects;
 
 import static org.openrewrite.Validated.invalid;
 
-
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class ReplaceStringLiteralWithConstant extends Recipe {
@@ -46,15 +45,16 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
     String literalValue;
 
     @Option(displayName = "Fully qualified name of the constant to use in place of String literal", example = "org.springframework.http.MediaType.APPLICATION_JSON_VALUE")
+    @Nullable
     String fullyQualifiedConstantName;
 
-    public ReplaceStringLiteralWithConstant(String fullyQualifiedConstantName) {
+    public ReplaceStringLiteralWithConstant(@Nullable String fullyQualifiedConstantName) {
         this.literalValue = null;
         this.fullyQualifiedConstantName = fullyQualifiedConstantName;
     }
 
     @JsonCreator
-    public ReplaceStringLiteralWithConstant(String literalValue, String fullyQualifiedConstantName) {
+    public ReplaceStringLiteralWithConstant(String literalValue, @Nullable String fullyQualifiedConstantName) {
         this.literalValue = literalValue;
         this.fullyQualifiedConstantName = fullyQualifiedConstantName;
     }
@@ -70,7 +70,7 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
     }
 
     public @Nullable String getLiteralValue() {
-        if (StringUtils.isBlank(this.literalValue)) {
+        if (this.literalValue == null && this.fullyQualifiedConstantName != null) {
             try {
                 this.literalValue = (String) getConstantValueByFullyQualifiedName(this.fullyQualifiedConstantName);
             } catch (ClassNotFoundException | IllegalAccessException | NoSuchFieldException e) {
