@@ -1738,9 +1738,15 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             return null;
         }
         try {
-            String prefix = source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
+            String prefix;
+            if (t instanceof JCNewClass && (((JCNewClass) t).type.tsym.flags() & Flags.ENUM) != 0L) {
+                prefix = "";
+            } else {
+                prefix = source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
+            }
             cursor += prefix.length();
-            @SuppressWarnings("unchecked") J2 j = (J2) scan(t, formatWithCommentTree(prefix, (JCTree) t, docCommentTable.getCommentTree((JCTree) t)));
+            Space p = formatWithCommentTree(prefix, (JCTree) t, docCommentTable.getCommentTree((JCTree) t));
+            @SuppressWarnings("unchecked") J2 j = (J2) scan(t, p);
             return j;
         } catch (Throwable ex) {
             reportJavaParsingException(ex);
