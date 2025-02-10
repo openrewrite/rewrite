@@ -1952,6 +1952,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         );
     }
 
+    @Disabled("Service Unavailable")
     @Test
     void exactVersionMissingInMavenMetadata() {
         rewriteRun(
