@@ -1655,6 +1655,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
             return null;
         }
         try {
+            // The spacing of initialized enums such as `ONE   (1)` is handled in the `visitNewClass` method, so set it explicitly to “” here.
             String prefix = t instanceof JCNewClass && hasFlag(((JCNewClass) t).type.tsym.flags(), Flags.ENUM) ? ""
                     : source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
             cursor += prefix.length();
