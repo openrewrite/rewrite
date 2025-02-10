@@ -1305,7 +1305,7 @@ class AddDependencyTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/moderneinc/customer-requests/issues/792")
-    void addScoped() {
+    void addToJVMTestSuite() {
         rewriteRun(
           spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.*")),
           java(usingGuavaIntMath, sourceSpecs -> sourceSet(sourceSpecs, "integrationTest")),
