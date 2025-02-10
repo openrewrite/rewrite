@@ -19,6 +19,8 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.MinimumJava11;
 import org.openrewrite.java.MinimumJava17;
@@ -913,21 +915,29 @@ class LombokTest implements RewriteTest {
         );
     }
 
-    @Test
-    void npeSeenOnMultipleAnnotations() {
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "lombok.Builder",
+      "lombok.Data",
+      "lombok.EqualsAndHashCode",
+      "lombok.ToString",
+      "lombok.Value"
+    })
+    void npeSeenOnMultipleAnnotations(String annotation) {
         rewriteRun(
           spec -> spec.parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath())),
           java(
+            //language=java
             """
-              import lombok.Value;
+              import lombok.%s;
               import org.jspecify.annotations.Nullable;
               
-              @Value
+              @%1$s
               public class Foo {
                   @Nullable
                   String bar;
               }
-              """
+              """.formatted(annotation)
           )
         );
     }
