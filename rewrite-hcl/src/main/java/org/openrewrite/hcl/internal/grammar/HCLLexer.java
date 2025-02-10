@@ -128,8 +128,8 @@ public class HCLLexer extends Lexer {
 	        OBJECT
 	    }
 
-	    private Stack<CurlyType> leftCurlyStack = new Stack<>();
-	    private Stack<String> heredocIdentifier = new Stack<>();
+	    private Stack<CurlyType> leftCurlyStack = new Stack<CurlyType>();
+	    private Stack<String> heredocIdentifier = new Stack<String>();
 
 
 	public HCLLexer(CharStream input) {
