@@ -151,7 +151,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             int saveCursor = cursor;
             Space prefix = whitespace();
             if (source.charAt(cursor) == '(') {
-                cursor++;
+                skip("(");
                 args = JContainer.build(
                         prefix,
                         singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)),
@@ -1738,28 +1738,14 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             return null;
         }
         try {
-            String prefix = source.substring(cursor, Math.max(cursor, getActualStartPosition((JCTree) t)));
+            String prefix = source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
             cursor += prefix.length();
-            // Java 21 and 23 have a different return type from getCommentTree; with reflection we can support both
-            Method getCommentTreeMethod = DocCommentTable.class.getMethod("getCommentTree", JCTree.class);
-            DocCommentTree commentTree = (DocCommentTree) getCommentTreeMethod.invoke(docCommentTable, t);
-            @SuppressWarnings("unchecked") J2 j = (J2) scan(t, formatWithCommentTree(prefix, (JCTree) t, commentTree));
+            @SuppressWarnings("unchecked") J2 j = (J2) scan(t, format(prefix));
             return j;
-        } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException ex) {
-            reportJavaParsingException(ex);
-            throw new IllegalStateException("Failed to invoke getCommentTree method", ex);
         } catch (Throwable ex) {
             reportJavaParsingException(ex);
             throw ex;
         }
-    }
-
-    private static int getActualStartPosition(JCTree t) {
-        // The variable's start position in the source is wrongly after lombok's `@val` annotation
-        if (t instanceof JCVariableDecl && isLombokGenerated(t)) {
-            return ((JCVariableDecl) t).mods.annotations.get(0).getStartPosition();
-        }
-        return t.getStartPosition();
     }
 
     private void reportJavaParsingException(Throwable ex) {
@@ -2333,43 +2319,5 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             }
         }
         return annotations;
-    }
-
-    Space formatWithCommentTree(String prefix, JCTree tree, @Nullable DocCommentTree commentTree) {
-        Space fmt = format(prefix);
-        if (commentTree != null) {
-            List<Comment> comments = fmt.getComments();
-            int i;
-            for (i = comments.size() - 1; i >= 0; i--) {
-                Comment comment = comments.get(i);
-                if (comment.isMultiline() && ((TextComment) comment).getText().startsWith("*")) {
-                    break;
-                }
-            }
-
-            AtomicReference<Javadoc.DocComment> javadoc = new AtomicReference<>();
-            int commentCursor = cursor - prefix.length() + fmt.getWhitespace().length();
-            for (int j = 0; j < comments.size(); j++) {
-                Comment comment = comments.get(j);
-                if (i == j) {
-                    javadoc.set((Javadoc.DocComment) new ReloadableJava17JavadocVisitor(
-                            context,
-                            getCurrentPath(),
-                            typeMapping,
-                            source.substring(commentCursor, source.indexOf("*/", commentCursor + 1)),
-                            tree
-                    ).scan(commentTree, new ArrayList<>(1)));
-                    break;
-                } else {
-                    commentCursor += comment.printComment(new Cursor(null, "root")).length() + comment.getSuffix().length();
-                }
-            }
-
-            int javadocIndex = i;
-            return fmt.withComments(ListUtils.map(fmt.getComments(), (j, c) ->
-                    j == javadocIndex ? javadoc.get().withSuffix(c.getSuffix()) : c));
-        }
-
-        return fmt;
     }
 }
