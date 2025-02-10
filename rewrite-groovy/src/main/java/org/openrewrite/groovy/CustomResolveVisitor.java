@@ -45,6 +45,7 @@ import static groovy.lang.Tuple.tuple;
 import static org.codehaus.groovy.ast.tools.ClosureUtils.getParametersSafe;
 
 // Copy of ResolveVisitor except for `transformInlineConstants()` which doesn't call `ExpressionUtils.transformInlineConstants()`
+@SuppressWarnings({"NotNullFieldNotInitialized", "LombokSetterMayBeUsed", "deprecation", "ConstantValue", "DataFlowIssue"})
 class CustomResolveVisitor extends ResolveVisitor {
     // note: BigInteger and BigDecimal are also imported by default
     // `java.util` is used much frequently than other two java packages(`java.io` and `java.net`), so place java.util before the two packages

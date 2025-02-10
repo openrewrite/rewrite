@@ -103,6 +103,20 @@ class AnnotationTest implements RewriteTest {
     }
 
     @Test
+    void withStaticallyImportedConstantProperty() {
+        rewriteRun(
+          groovy(
+            """
+              import static java.io.File.separator
+              @Deprecated(since = separator)
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void withImplicitValueProperty() {
         rewriteRun(
           groovy(
