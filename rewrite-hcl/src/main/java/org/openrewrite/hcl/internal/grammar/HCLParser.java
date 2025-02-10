@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from java-escape by ANTLR 4.11.1
+// Generated from ~/git/rewrite/rewrite-hcl/src/main/antlr/HCLParser.g4 by ANTLR 4.13.2
 package org.openrewrite.hcl.internal.grammar;
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
@@ -24,9 +24,9 @@ import java.util.List;
 import java.util.Iterator;
 import java.util.ArrayList;
 
-@SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue"})
+@SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue", "this-escape"})
 public class HCLParser extends Parser {
-	static { RuntimeMetaData.checkVersion("4.11.1", RuntimeMetaData.VERSION); }
+	static { RuntimeMetaData.checkVersion("4.13.2", RuntimeMetaData.VERSION); }
 
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
@@ -123,7 +123,7 @@ public class HCLParser extends Parser {
 	}
 
 	@Override
-	public String getGrammarFileName() { return "java-escape"; }
+	public String getGrammarFileName() { return "HCLParser.g4"; }
 
 	@Override
 	public String[] getRuleNames() { return ruleNames; }
@@ -1143,7 +1143,7 @@ public class HCLParser extends Parser {
 			{
 			setState(160);
 			_la = _input.LA(1);
-			if ( !(((_la) & ~0x3f) == 0 && ((1L << _la) & 90112L) != 0) ) {
+			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 90112L) != 0)) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
@@ -1273,7 +1273,7 @@ public class HCLParser extends Parser {
 			setState(178);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			if (((_la) & ~0x3f) == 0 && ((1L << _la) & 8648909094L) != 0) {
+			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & 8648909094L) != 0)) {
 				{
 				setState(167);
 				expression(0);
@@ -1364,7 +1364,7 @@ public class HCLParser extends Parser {
 			setState(186);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			while (((_la) & ~0x3f) == 0 && ((1L << _la) & 8648909094L) != 0) {
+			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 8648909094L) != 0)) {
 				{
 				{
 				setState(183);
@@ -1951,7 +1951,7 @@ public class HCLParser extends Parser {
 			setState(254);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			if (((_la) & ~0x3f) == 0 && ((1L << _la) & 8648909094L) != 0) {
+			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & 8648909094L) != 0)) {
 				{
 				setState(253);
 				arguments();
@@ -2771,7 +2771,7 @@ public class HCLParser extends Parser {
 			{
 			setState(322);
 			_la = _input.LA(1);
-			if ( !(((_la) & ~0x3f) == 0 && ((1L << _la) & 155024621568L) != 0) ) {
+			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 155024621568L) != 0)) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
@@ -2827,7 +2827,7 @@ public class HCLParser extends Parser {
 			{
 			setState(324);
 			_la = _input.LA(1);
-			if ( !(((_la) & ~0x3f) == 0 && ((1L << _la) & 1172559888384L) != 0) ) {
+			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 1172559888384L) != 0)) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {

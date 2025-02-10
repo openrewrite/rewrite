@@ -1,49 +1,31 @@
-/*
- * Copyright 2024 the original author or authors.
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-// Generated from java-escape by ANTLR 4.11.1
+// Generated from ~/git/rewrite/rewrite-java/src/main/antlr/TemplateParameterParser.g4 by ANTLR 4.13.2
 package org.openrewrite.java.internal.grammar;
-import org.antlr.v4.runtime.*;
-import org.antlr.v4.runtime.atn.ATN;
-import org.antlr.v4.runtime.atn.ATNDeserializer;
-import org.antlr.v4.runtime.atn.ParserATNSimulator;
-import org.antlr.v4.runtime.atn.PredictionContextCache;
+import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
-import org.antlr.v4.runtime.tree.ParseTreeListener;
-import org.antlr.v4.runtime.tree.ParseTreeVisitor;
-import org.antlr.v4.runtime.tree.TerminalNode;
-
+import org.antlr.v4.runtime.*;
+import org.antlr.v4.runtime.misc.*;
+import org.antlr.v4.runtime.tree.*;
 import java.util.List;
+import java.util.Iterator;
+import java.util.ArrayList;
 
-@SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue"})
+@SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue", "this-escape"})
 public class TemplateParameterParser extends Parser {
-	static { RuntimeMetaData.checkVersion("4.11.1", RuntimeMetaData.VERSION); }
+	static { RuntimeMetaData.checkVersion("4.13.2", RuntimeMetaData.VERSION); }
 
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		LPAREN=1, RPAREN=2, DOT=3, COLON=4, COMMA=5, LBRACK=6, RBRACK=7, WILDCARD=8,
+		LPAREN=1, RPAREN=2, DOT=3, COLON=4, COMMA=5, LBRACK=6, RBRACK=7, WILDCARD=8, 
 		Variance=9, FullyQualifiedName=10, Number=11, Identifier=12, S=13;
 	public static final int
-		RULE_matcherPattern = 0, RULE_typedPattern = 1, RULE_patternType = 2,
-		RULE_type = 3, RULE_typeParameter = 4, RULE_variance = 5, RULE_parameterName = 6,
+		RULE_matcherPattern = 0, RULE_typedPattern = 1, RULE_patternType = 2, 
+		RULE_type = 3, RULE_typeParameter = 4, RULE_variance = 5, RULE_parameterName = 6, 
 		RULE_typeName = 7, RULE_matcherName = 8;
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"matcherPattern", "typedPattern", "patternType", "type", "typeParameter",
+			"matcherPattern", "typedPattern", "patternType", "type", "typeParameter", 
 			"variance", "parameterName", "typeName", "matcherName"
 		};
 	}
@@ -57,8 +39,8 @@ public class TemplateParameterParser extends Parser {
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "LPAREN", "RPAREN", "DOT", "COLON", "COMMA", "LBRACK", "RBRACK",
-			"WILDCARD", "Variance", "FullyQualifiedName", "Number", "Identifier",
+			null, "LPAREN", "RPAREN", "DOT", "COLON", "COMMA", "LBRACK", "RBRACK", 
+			"WILDCARD", "Variance", "FullyQualifiedName", "Number", "Identifier", 
 			"S"
 		};
 	}
@@ -97,7 +79,7 @@ public class TemplateParameterParser extends Parser {
 	}
 
 	@Override
-	public String getGrammarFileName() { return "java-escape"; }
+	public String getGrammarFileName() { return "TemplateParameterParser.g4"; }
 
 	@Override
 	public String[] getRuleNames() { return ruleNames; }
@@ -365,7 +347,7 @@ public class TemplateParameterParser extends Parser {
 						setState(39);
 						match(COMMA);
 						}
-						}
+						} 
 					}
 					setState(45);
 					_errHandler.sync(this);
