@@ -33,7 +33,8 @@ public enum Delimiter {
     PATTERN_SLASHY_STRING("~/", "/"),
     PATTERN_DOLLAR_SLASHY_STRING("~$/", "$/"),
     SINGLE_LINE_COMMENT("//", "\n"),
-    MULTILINE_COMMENT("/*", "*/");
+    MULTILINE_COMMENT("/*", "*/"),
+    ARRAY("[", "]");
 
     public final String open;
     public final String close;
