@@ -185,7 +185,7 @@ public class TypeTable implements JavaParserClasspathLoader {
 
                 ClassWriter cw = new ClassWriter(0);
                 ClassVisitor classWriter = ctx.getMessage(VERIFY_CLASS_WRITING, false) ?
-                        cw : new CheckClassAdapter(cw);
+                        new CheckClassAdapter(cw) : cw;
 
                 classWriter.visit(
                         V1_8,
@@ -204,11 +204,12 @@ public class TypeTable implements JavaParserClasspathLoader {
                 }
 
                 for (ClassDefinition innerClass : innerClasses) {
+                    int lastIndexOf$ = innerClass.getName().lastIndexOf('$');
                     classWriter.visitInnerClass(
                             innerClass.getName(),
-                            classDef.getName(),
-                            innerClass.getName().substring(innerClass.getName().lastIndexOf('$') + 1),
-                            innerClass.getAccess()
+                            innerClass.getName().substring(0, lastIndexOf$),
+                            innerClass.getName().substring(lastIndexOf$ + 1),
+                            innerClass.getAccess() & 30239
                     );
                 }
 

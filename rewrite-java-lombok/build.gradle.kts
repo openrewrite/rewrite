@@ -57,7 +57,8 @@ dependencies {
     runtimeOnly("org.projectlombok:lombok:latest.release")
 
     // Add lombok dependency to the newly created lombok configuration
-    lombok("org.projectlombok:lombok:latest.release")
+    //lombok("org.projectlombok:lombok:latest.release")
+    lombok(files("libs/lombok-1.18.37.jar")) // Temporary pending the next stable release of lombok
     compileOnly(files(tools))
     compileOnly(files(unpackedAndRenamedLombokDir))
 }

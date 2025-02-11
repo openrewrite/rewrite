@@ -56,10 +56,8 @@ class ResultTest implements RewriteTest {
                     }
                 }.visitNonNull(before, 0);
 
-                assertThat(
-                  assertThrows(IllegalStateException.class, () -> new Result(before, after))
-                    .getMessage()
-                ).contains("+class Test /*~~>*/{");
+                var unknownSourceFileChangeException = assertThrows(UnknownSourceFileChangeException.class, () -> new Result(before, after));
+                assertThat(unknownSourceFileChangeException.getDiff()).contains("+class Test /*~~>*/{");
             })
           )
         );

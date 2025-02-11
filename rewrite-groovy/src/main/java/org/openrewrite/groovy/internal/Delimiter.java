@@ -26,9 +26,15 @@ public enum Delimiter {
     TRIPLE_DOUBLE_QUOTE_STRING("\"\"\"", "\"\"\""),
     SLASHY_STRING("/", "/"),
     DOLLAR_SLASHY_STRING("$/", "/$"),
-    PATTERN_OPERATOR("~/", "/"),
+    PATTERN_SINGLE_QUOTE_STRING("~'", "'"),
+    PATTERN_DOUBLE_QUOTE_STRING("~\"", "\""),
+    PATTERN_TRIPLE_SINGLE_QUOTE_STRING("~'''", "'''"),
+    PATTERN_TRIPLE_DOUBLE_QUOTE_STRING("~\"\"\"", "\"\"\""),
+    PATTERN_SLASHY_STRING("~/", "/"),
+    PATTERN_DOLLAR_SLASHY_STRING("~$/", "$/"),
     SINGLE_LINE_COMMENT("//", "\n"),
-    MULTILINE_COMMENT("/*", "*/");
+    MULTILINE_COMMENT("/*", "*/"),
+    ARRAY("[", "]");
 
     public final String open;
     public final String close;
