@@ -16,6 +16,9 @@
 package org.openrewrite.java.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledForJreRange;
+import org.junit.jupiter.api.condition.JRE;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
@@ -120,6 +123,28 @@ class SwitchTest implements RewriteTest {
                           default:
                               throw new IllegalStateException("Unexpected value: " + i);
                       }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @EnabledForJreRange(min = JRE.JAVA_21)
+    @Issue("https://github.com/openrewrite/rewrite-static-analysis/issues/461")
+    @Test
+    void objectSwitch(){
+        //language=java
+        rewriteRun(
+          java(
+            """
+              class ObjectSwitch {
+                  int coverage(Object obj) {
+                      return switch (obj) {
+                          case String s -> s.length();
+                          case Integer i -> i;
+                          default -> 0;
+                      };
                   }
               }
               """
