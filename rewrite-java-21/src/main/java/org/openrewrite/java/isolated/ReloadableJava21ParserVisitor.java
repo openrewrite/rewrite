@@ -1767,8 +1767,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         }
         try {
             // The spacing of initialized enums such as `ONE   (1)` is handled in the `visitNewClass` method, so set it explicitly to “” here.
-            String prefix = t instanceof JCNewClass && hasFlag(((JCNewClass) t).type.tsym.flags(), Flags.ENUM) ? ""
-                    : source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
+            String prefix = isEnum(t) ? "" : source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
             cursor += prefix.length();
             // Java 21 and 23 have a different return type from getCommentTree; with reflection we can support both
             Method getCommentTreeMethod = DocCommentTable.class.getMethod("getCommentTree", JCTree.class);
@@ -1782,6 +1781,13 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
             reportJavaParsingException(ex);
             throw ex;
         }
+    }
+
+    private boolean isEnum(Tree t) {
+        if (t instanceof JCNewClass newClass) {
+            return newClass.type != null && newClass.type.tsym != null && hasFlag(newClass.type.tsym.flags(), Flags.ENUM);
+        }
+        return false;
     }
 
     private void reportJavaParsingException(Throwable ex) {
