@@ -52,7 +52,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
                   void test(int n) {
                       value();
                   }
-
+              
                   int value() {
                       return 0;
                   }
@@ -63,7 +63,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
                   void test(int n) {
                       test(value());
                   }
-
+              
                   int value() {
                       return 0;
                   }
@@ -96,7 +96,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
                   void test(int[][] n) {
                       array();
                   }
-
+              
                   int[][] array() {
                       return new int[0][0];
                   }
@@ -107,7 +107,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
                   void test(int[][] n) {
                       test(array());
                   }
-
+              
                   int[][] array() {
                       return new int[0][0];
                   }
@@ -404,7 +404,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
             """
               abstract class Test {
                   abstract String[] array();
-
+              
                   void test(boolean condition) {
                       Object any = condition ? array() : new String[]{"Hello!"};
                   }
@@ -493,21 +493,23 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(BigDecimalSetScaleVisitor::new)),
           java(
-          """
-            import java.math.BigDecimal;
-
-            class A {
-                static String s = String.valueOf("Value: " + BigDecimal.ONE.setScale(0, BigDecimal.ROUND_DOWN));
-            }
-          """,
-          """
-          import java.math.BigDecimal;
-          import java.math.RoundingMode;
-
-          class A {
-              static String s = String.valueOf("Value: " + BigDecimal.ONE.setScale(0, RoundingMode.DOWN));
-          }
-          """));
+            """
+              import java.math.BigDecimal;
+              
+              class A {
+                  static String s = String.valueOf("Value: " + BigDecimal.ONE.setScale(0, BigDecimal.ROUND_DOWN));
+              }
+              """,
+            """
+              import java.math.BigDecimal;
+              import java.math.RoundingMode;
+              
+              class A {
+                  static String s = String.valueOf("Value: " + BigDecimal.ONE.setScale(0, RoundingMode.DOWN));
+              }
+              """
+          )
+        );
     }
 
     @Test
@@ -517,23 +519,25 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
           java(
             """
               import java.math.BigDecimal;
-
+              
               class A {
                   public static void b() {
                       BigDecimal.ONE.setScale(0, BigDecimal.ROUND_DOWN);
                   }
               }
-            """,
+              """,
             """
-            import java.math.BigDecimal;
-            import java.math.RoundingMode;
-
-            class A {
-                public static void b() {
-                    BigDecimal.ONE.setScale(0, RoundingMode.DOWN);
-                }
-            }
-            """));
+              import java.math.BigDecimal;
+              import java.math.RoundingMode;
+              
+              class A {
+                  public static void b() {
+                      BigDecimal.ONE.setScale(0, RoundingMode.DOWN);
+                  }
+              }
+              """
+          )
+        );
     }
 
     private static class BigDecimalSetScaleVisitor extends JavaVisitor<ExecutionContext> {
@@ -541,7 +545,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
         @Override
         public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-            if ("setScale".equals(m.getName().getSimpleName()) ) {
+            if ("setScale".equals(m.getName().getSimpleName())) {
                 J.FieldAccess secondArgument = (J.FieldAccess) m.getArguments().get(1);
                 if (secondArgument.getName().getSimpleName().equals("ROUND_DOWN")) {
                     maybeAddImport("java.math.RoundingMode");
