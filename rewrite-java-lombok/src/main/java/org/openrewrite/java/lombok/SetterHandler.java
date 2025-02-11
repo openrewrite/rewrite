@@ -29,7 +29,7 @@ public class SetterHandler extends JavacAnnotationHandler<Setter> {
     public void handle(AnnotationValues<Setter> annotationValues, JCTree.JCAnnotation jcAnnotation, JavacNode javacNode) {
         // "lazy" or "onMethod" can significantly complicate the resulting AST
         // Simplify the AST -> LST translation omitting these arguments from consideration
-        if(jcAnnotation.getArguments().isEmpty()) {
+        if (jcAnnotation.getArguments().isEmpty()) {
             new HandleSetter().handle(annotationValues, jcAnnotation, javacNode);
         } else {
             List<JCTree.JCExpression> originalArgs = jcAnnotation.args;
