@@ -330,7 +330,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                                         classDefinition = new ClassDefinition(Jar.this, access, name, signature, superName, interfaces);
                                         wroteFieldOrMethod = false;
                                         super.visit(version, access, name, signature, superName, interfaces);
-                                        if (!wroteFieldOrMethod) {
+                                        if (!wroteFieldOrMethod && !"module-info".equals(name)) {
                                             // No fields or methods, which can happen for marker annotations for example
                                             classDefinition.writeClass();
                                         }
