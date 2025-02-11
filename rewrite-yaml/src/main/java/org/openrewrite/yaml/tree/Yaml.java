@@ -550,13 +550,13 @@ public interface Yaml extends Tree {
         String prefix;
 
         @With
-        String suffix;
-
-        @With
         Markers markers;
 
         @With
         String name;
+
+        @With
+        String suffix;
 
         @Getter
         Kind kind;
