@@ -83,7 +83,7 @@ class LombokTest implements RewriteTest {
     void setterWithAdditionalAnnotations() {
         rewriteRun(
           // TODO: use different annotations or add Jackson to classpath
-          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).build()),
+          spec -> spec.typeValidationOptions(TypeValidation.none()),
           java(
             """
               import com.fasterxml.jackson.dataformat.xml.annotation.*;
