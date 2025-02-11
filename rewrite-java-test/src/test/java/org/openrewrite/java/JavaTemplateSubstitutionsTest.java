@@ -16,18 +16,12 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.*;
-import org.openrewrite.config.Environment;
-import org.openrewrite.java.tree.Expression;
+import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.test.TypeValidation;
 
-import java.util.Collections;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
