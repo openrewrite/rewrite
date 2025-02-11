@@ -137,7 +137,7 @@ public class ReloadableJava11Parser implements JavaParser {
                 // make sure the rewrite-java-lombok dependency comes first
                 boolean found = false;
                 for (int i = 0; i < overrideClasspath.size(); i++) {
-                    if (overrideClasspath.get(i).contains("rewrite-java-lombok")) {
+                    if (overrideClasspath.get(i).contains("rewrite-java-lombok-")) {
                         overrideClasspath.add(0, overrideClasspath.remove(i));
                         found = true;
                     }
