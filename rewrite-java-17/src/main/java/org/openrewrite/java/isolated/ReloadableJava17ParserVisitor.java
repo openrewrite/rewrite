@@ -1739,8 +1739,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         }
         try {
             // The spacing of initialized enums such as `ONE   (1)` is handled in the `visitNewClass` method, so set it explicitly to “” here.
-            String prefix = t instanceof JCNewClass && hasFlag(((JCNewClass) t).type.tsym.flags(), Flags.ENUM) ? ""
-                    : source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
+            String prefix = isEnum(t) ? "" : source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
             cursor += prefix.length();
             Space p = formatWithCommentTree(prefix, (JCTree) t, docCommentTable.getCommentTree((JCTree) t));
             @SuppressWarnings("unchecked") J2 j = (J2) scan(t, p);
@@ -1749,6 +1748,13 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             reportJavaParsingException(ex);
             throw ex;
         }
+    }
+
+    private boolean isEnum(Tree t) {
+        if (t instanceof JCNewClass newClass) {
+            return newClass.type != null && newClass.type.tsym != null && hasFlag(newClass.type.tsym.flags(), Flags.ENUM);
+        }
+        return false;
     }
 
     private void reportJavaParsingException(Throwable ex) {
