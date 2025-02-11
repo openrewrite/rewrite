@@ -561,33 +561,13 @@ public interface Yaml extends Tree {
         @Getter
         Kind kind;
 
-        public Tag(UUID id, String prefix, String suffix, Markers markers, String name, Kind kind) {
+        public Tag(UUID id, String prefix, Markers markers, String name, String suffix, Kind kind) {
             this.id = id;
             this.prefix = prefix;
             this.suffix = suffix;
             this.markers = markers;
             this.name = name;
             this.kind = kind;
-        }
-
-        public Tag(UUID id, String prefix, String suffix, Markers markers, String text) {
-            this.id = id;
-            this.prefix = prefix;
-            this.suffix = suffix;
-            this.markers = markers;
-
-            if (text.startsWith("!<") && text.endsWith(">")) {
-                this.name = text.substring(2, text.length() - 1);
-                this.kind = Kind.EXPLICIT_GLOBAL;
-            } else if (text.startsWith("!!")) {
-                this.name = text.substring(2);
-                this.kind = Kind.IMPLICIT_GLOBAL;
-            } else if (text.startsWith("!")) {
-                this.name = text.substring(1);
-                this.kind = Kind.LOCAL;
-            } else {
-                throw new IllegalArgumentException("Invalid tag format: " + text);
-            }
         }
 
         @Override
@@ -597,7 +577,7 @@ public interface Yaml extends Tree {
 
         @Override
         public Tag copyPaste() {
-            return new Tag(randomId(), prefix, suffix, Markers.EMPTY, name);
+            return new Tag(randomId(), prefix, Markers.EMPTY, name, suffix, kind);
         }
 
         @Override

@@ -195,7 +195,7 @@ public class YamlParser implements org.openrewrite.Parser {
                             // Cannot use sse.getTag() here, because it is sometimes expanded, e.g. `!!seq` becomes `tag:yaml.org,2002:seq`
                             String tagName = prefixAfterColon.substring(tagStartIndex, i);
                             String tagSuffix = prefixAfterColon.substring(i, prefixAfterColon.length() - 2);
-                            tag = new Yaml.Tag(randomId(), tagPrefix, tagSuffix, Markers.EMPTY, tagName);
+                            tag = createTag(tagPrefix, Markers.EMPTY, tagName, tagSuffix);
                             lastEnd = lastEnd + startIndex + i + 1;
                         }
 
@@ -242,7 +242,7 @@ public class YamlParser implements org.openrewrite.Parser {
                             }
                             String tagSuffix = potentialScalarValue.substring(indexOfTagName, indexOfSpaceAfterTag);
                             valueStart = valueStart + indexOfSpaceAfterTag;
-                            tag = new Yaml.Tag(randomId(), tagPrefix, tagSuffix, Markers.EMPTY, tagName);
+                            tag = createTag(tagPrefix, Markers.EMPTY, tagName, tagSuffix);
                         }
 
                         String scalarValue;
@@ -380,7 +380,7 @@ public class YamlParser implements org.openrewrite.Parser {
                             // Cannot use sse.getTag() here, because it is sometimes expanded, e.g. `!!seq` becomes `tag:yaml.org,2002:seq`
                             String tagName = prefixAfterColon.substring(tagStartIndex, i);
                             String tagSuffix = prefixAfterColon.substring(i, prefixAfterColon.length() - 2);
-                            tag = new Yaml.Tag(randomId(), tagPrefix, tagSuffix, Markers.EMPTY, tagName);
+                            tag = createTag(tagPrefix, Markers.EMPTY, tagName, tagSuffix);
                         }
                         lastEnd = event.getEndMark().getIndex();
                         if (shouldUseYamlParserBugWorkaround(sse)) {
@@ -723,4 +723,24 @@ public class YamlParser implements org.openrewrite.Parser {
             return "yaml";
         }
     }
+
+    private Yaml.Tag createTag(String prefix, Markers markers, String text, String suffix) {
+        final String name;
+        final Yaml.Tag.Kind kind;
+        if (text.startsWith("!<") && text.endsWith(">")) {
+            name = text.substring(2, text.length() - 1);
+            kind = Yaml.Tag.Kind.EXPLICIT_GLOBAL;
+        } else if (text.startsWith("!!")) {
+            name = text.substring(2);
+            kind = Yaml.Tag.Kind.IMPLICIT_GLOBAL;
+        } else if (text.startsWith("!")) {
+            name = text.substring(1);
+            kind = Yaml.Tag.Kind.LOCAL;
+        } else {
+            throw new IllegalArgumentException("Invalid tag format: " + text);
+        }
+        return new Yaml.Tag(randomId(),prefix, markers, name, suffix, kind);
+    }
+
+
 }
