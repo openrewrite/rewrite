@@ -21,7 +21,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.kotlin.marker.*;
+import org.openrewrite.kotlin.marker.TypeReferencePrefix;
 import org.openrewrite.kotlin.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
