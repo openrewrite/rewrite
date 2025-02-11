@@ -90,6 +90,9 @@ public class CountLinesVisitor extends YamlVisitor<AtomicInteger> {
         if(tag.getPrefix().contains("\n")) {
             count.incrementAndGet();
         }
+        if(tag.getSuffix().contains("\n")) {
+            count.incrementAndGet();
+        }
         return super.visitTag(tag, count);
     }
 
