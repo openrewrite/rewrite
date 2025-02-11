@@ -82,12 +82,14 @@ class LombokTest implements RewriteTest {
     @Test
     void setterWithAdditionalAnnotations() {
         rewriteRun(
-          // TODO: use different annotations or add Jackson to classpath
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          // I was unable to reproduce this problem only using built-in annotations like `@SuppressWarnings` or `@Deprecated`
+          // This is a parsing test, so we don't really need to check for type attribution
+          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).classDeclarations(false).build()),
           java(
             """
-              import com.fasterxml.jackson.dataformat.xml.annotation.*;
-              import lombok.*;
+              import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
+              import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
+              import lombok.Setter;
               
               class Profiles {
                   @Setter

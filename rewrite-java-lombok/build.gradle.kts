@@ -54,7 +54,8 @@ val tools = compiler.get().metadata.installationPath.file("lib/tools.jar")
 
 dependencies {
     implementation("org.jspecify:jspecify:latest.release")
-    runtimeOnly(files("libs/lombok-1.18.37.jar"))
+    //runtimeOnly("org.projectlombok:lombok:latest.release")
+    runtimeOnly(files("libs/lombok-1.18.37.jar")) // Temporary pending the next stable release of lombok
 
     // Add lombok dependency to the newly created lombok configuration
     //lombok("org.projectlombok:lombok:latest.release")
