@@ -80,6 +80,27 @@ class LombokTest implements RewriteTest {
     }
 
     @Test
+    void setterWithAdditionalAnnotations() {
+        rewriteRun(
+          // TODO: use different annotations or add Jackson to classpath
+          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).build()),
+          java(
+            """
+              import com.fasterxml.jackson.dataformat.xml.annotation.*;
+              import lombok.*;
+              
+              class Profiles {
+                  @Setter
+                  @JacksonXmlProperty(localName = "profile")
+                  @JacksonXmlElementWrapper(useWrapping = false)
+                  String profile;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void getter() {
         rewriteRun(
           java(
