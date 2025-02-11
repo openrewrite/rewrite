@@ -15,14 +15,20 @@
  */
 package org.openrewrite.maven;
 
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.Recipe;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
+import org.openrewrite.test.SourceSpecs;
+import org.openrewrite.xml.tree.Xml;
 
 import java.util.Collections;
 
@@ -2005,48 +2011,237 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         );
     }
 
-    @Test
-    @Issue("https://github.com/openrewrite/rewrite/discussions/4386")
-    void dontOverrideDependencyConfigurations() {
-        rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
-          pomXml(
-            """
-                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-                    <modelVersion>4.0.0</modelVersion>
-                    <parent>
-                        <groupId>org.springframework.boot</groupId>
-                        <artifactId>spring-boot-starter-parent</artifactId>
-                        <version>2.3.12.RELEASE</version>
-                    </parent>
-                    <groupId>com.example</groupId>
-                    <artifactId>acme</artifactId>
-                    <version>0.0.1-SNAPSHOT</version>
-                    <dependencyManagement>
-                        <dependencies>
-                            <dependency>
-                                <groupId>org.springframework.boot</groupId>
-                                <artifactId>spring-boot-starter-web</artifactId>
-                                <version>2.2.13.RELEASE</version>
-                                <!-- This exclusion should be kept -->
-                                <exclusions>
-                                    <exclusion>
-                                        <groupId>org.slf4j</groupId>
-                                        <artifactId>slf4j-api</artifactId>
-                                    </exclusion>
-                                </exclusions>
-                            </dependency>
-                        </dependencies>
-                    </dependencyManagement>
-                    <dependencies>
-                        <dependency>
-                            <groupId>org.springframework.boot</groupId>
-                            <artifactId>spring-boot-starter-web</artifactId>
-                        </dependency>
-                    </dependencies>
-                </project>
-                """
-          )
-        );
+
+
+
+
+    @Nested
+    @DisplayName("Tests that surround behavior when removing managed dependencies")
+    class ManagedDependencyOptionBehavior {
+
+        private static final SourceSpecs PARENT_POM = pomXml("""
+                  <project>
+                      <groupId>org.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0-SNAPSHOT</version>
+                      <modules>
+                          <module>child</module>
+                      </modules>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>com.google.guava</groupId>
+                                  <artifactId>guava</artifactId>
+                                  <version>30.0-jre</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                  </project>
+            """);
+
+        @Test
+        @DisplayName("Default behavior is to not change anything if an exclusion is present")
+        @Issue("https://github.com/openrewrite/rewrite/discussions/4386")
+        void dontOverrideDependencyIfHasExclusions() {
+            rewriteRun(
+              spec -> spec.recipe(mkRecipe(null)),
+              PARENT_POM,
+              mavenProject("child",
+                  pomXml(
+                    """
+                        <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+                            <modelVersion>4.0.0</modelVersion>
+                            <parent>
+                                <groupId>org.example</groupId>
+                                <artifactId>parent</artifactId>
+                                <version>1.0-SNAPSHOT</version>
+                            </parent>
+                            <groupId>hello</groupId>
+                            <artifactId>child</artifactId>
+                            <version>0.0.1-SNAPSHOT</version>
+                            <dependencyManagement>
+                                <dependencies>
+                                    <dependency>
+                                        <groupId>com.google.guava</groupId>
+                                        <artifactId>guava</artifactId>
+                                        <version>30.0-jre</version>
+                                        <!-- This exclusion should be kept -->
+                                        <exclusions>
+                                            <exclusion>
+                                                <groupId>org.slf4j</groupId>
+                                                <artifactId>slf4j-api</artifactId>
+                                            </exclusion>
+                                        </exclusions>
+                                    </dependency>
+                                </dependencies>
+                            </dependencyManagement>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>com.google.guava</groupId>
+                                    <artifactId>guava</artifactId>
+                                </dependency>
+                            </dependencies>
+                        </project>
+                        """
+                  )
+              )
+            );
+        }
+
+        @ParameterizedTest
+        @Issue("https://github.com/openrewrite/rewrite/issues/4387")
+        @ValueSource(strings = {
+          "<scope>test</scope>",
+          "<type>pom</type>",
+          "<exclusions><exclusion><groupId>group</groupId><artifactId>artifact</artifactId></exclusion></exclusions>"
+        })
+        void dontRemoveifAnythingOtherThanGavIsSpecified(final String dependencyElem) {
+            rewriteRun(
+              spec -> spec.recipe(mkRecipe(
+                RemoveRedundantDependencyVersions.ManagedDependencyOption.DO_NOT_REMOVE_IF_HAS_NON_GAV_CONFIG)),
+              PARENT_POM,
+              mavenProject("child",
+                pomXml(
+                  """
+                        <project>
+                            <parent>
+                                <groupId>org.example</groupId>
+                                <artifactId>parent</artifactId>
+                                <version>1.0-SNAPSHOT</version>
+                            </parent>
+                            <artifactId>child</artifactId>
+                            <dependencyManagement>
+                                <dependencies>
+                                    <dependency>
+                                        <groupId>com.google.guava</groupId>
+                                        <artifactId>guava</artifactId>
+                                        <version>30.0-jre</version>
+                                        %s
+                                    </dependency>
+                                </dependencies>
+                            </dependencyManagement>
+                        </project>
+                    """.formatted(dependencyElem)
+                )
+              )
+            );
+        }
+
+        @ParameterizedTest
+        @Issue("https://github.com/openrewrite/rewrite/issues/4387")
+        @ValueSource(strings = {
+          "<scope>test</scope>",
+          "<type>pom</type>",
+          "<exclusions><exclusion><groupId>group</groupId><artifactId>artifact</artifactId></exclusion></exclusions>"
+        })
+        void alwaysRemove(final String dependencyElem) {
+            rewriteRun(
+              spec -> spec.recipe(mkRecipe(
+                RemoveRedundantDependencyVersions.ManagedDependencyOption.ALWAYS_REMOVE)),
+              PARENT_POM,
+              mavenProject("child",
+                pomXml(
+                  """
+                        <project>
+                            <parent>
+                                <groupId>org.example</groupId>
+                                <artifactId>parent</artifactId>
+                                <version>1.0-SNAPSHOT</version>
+                            </parent>
+                            <artifactId>child</artifactId>
+                            <dependencyManagement>
+                                <dependencies>
+                                    <dependency>
+                                        <groupId>com.google.guava</groupId>
+                                        <artifactId>guava</artifactId>
+                                        <version>30.0-jre</version>
+                                        %s
+                                    </dependency>
+                                </dependencies>
+                            </dependencyManagement>
+                        </project>
+                    """.formatted(dependencyElem),
+                  """
+                  <project>
+                      <parent>
+                          <groupId>org.example</groupId>
+                          <artifactId>parent</artifactId>
+                          <version>1.0-SNAPSHOT</version>
+                      </parent>
+                      <artifactId>child</artifactId>
+                  </project>
+                  """
+                )
+              )
+            );
+}
+
+@Test
+@Issue("https://github.com/openrewrite/rewrite/issues/4387")
+// TODO
+void synchronizeManagedVersionsWithTheParent() {
+final Recipe removeVersions = new RemoveRedundantDependencyVersions(
+null,
+null,
+RemoveRedundantDependencyVersions.Comparator.GTE,
+null
+);
+
+rewriteRun(
+spec -> spec.recipe(removeVersions),
+PARENT_POM,
+mavenProject("child",
+pomXml(
+"""
+                        <project>
+                            <parent>
+                                <groupId>org.example</groupId>
+                                <artifactId>parent</artifactId>
+                                <version>1.0-SNAPSHOT</version>
+                            </parent>
+                            <artifactId>child</artifactId>
+                            <dependencyManagement>
+                                <dependencies>
+                                    <dependency>
+                                        <groupId>com.google.guava</groupId>
+                                        <artifactId>guava</artifactId>
+                                        <version>28.0-jre</version>
+                                        <scope>compile</scope>
+                                    </dependency>
+                                </dependencies>
+                            </dependencyManagement>
+                        </project>
+                    """,
+                  """
+                        <project>
+                            <parent>
+                                <groupId>org.example</groupId>
+                                <artifactId>parent</artifactId>
+                                <version>1.0-SNAPSHOT</version>
+                            </parent>
+                            <artifactId>child</artifactId>
+                            <dependencyManagement>
+                                <dependencies>
+                                    <dependency>
+                                        <groupId>com.google.guava</groupId>
+                                        <artifactId>guava</artifactId>
+                                        <version>30.0-jre</version>
+                                        <scope>compile</scope>
+                                    </dependency>
+                                </dependencies>
+                            </dependencyManagement>
+                        </project>
+                    """
+                )
+              )
+            );
+        }
+
+        private RemoveRedundantDependencyVersions mkRecipe(
+          final RemoveRedundantDependencyVersions.ManagedDependencyOption opt
+        ) {
+            return new RemoveRedundantDependencyVersions(null, null,
+              RemoveRedundantDependencyVersions.Comparator.GTE, opt, null);
+        }
     }
 }

@@ -81,15 +81,38 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     @Nullable
     List<String> except;
 
+    @Option(displayName = "Replacement Options.  This option is only applicable if `onlyIfManagedVersionIs` " +
+            "relationship suggests a removal.",
+            description = "Specifies what should be done with a managed dependency that is managed by a parent. " +
+                "This option is only applicable if `onlyIfManagedVersionIs` relationship suggests a removal.",
+            required = false)
+    @Nullable
+    ManagedDependencyOption managedDependencyOption;
+
+    public enum ManagedDependencyOption {
+        ALWAYS_REMOVE,
+        SYNCHRONIZE_VERSIONS_IF_HAS_NON_GAV_CONFIG,
+        DO_NOT_REMOVE_IF_HAS_EXCLUSIONS,
+        DO_NOT_REMOVE_IF_HAS_NON_GAV_CONFIG;
+    }
+
     @Deprecated
     public RemoveRedundantDependencyVersions(@Nullable String groupPattern, @Nullable String artifactPattern,
                                              @Nullable Boolean onlyIfVersionsMatch, @Nullable List<String> except) {
-        this(groupPattern, artifactPattern, onlyIfVersionsMatch, null, except);
+        this(groupPattern, artifactPattern, onlyIfVersionsMatch, null, null, except);
+    }
+
+    @Deprecated
+    public RemoveRedundantDependencyVersions(@Nullable String groupPattern, @Nullable String artifactPattern,
+                                             @Nullable Comparator onlyIfManagedVersionIs, @Nullable List<String> except) {
+        this(groupPattern, artifactPattern, null, onlyIfManagedVersionIs, null, except);
     }
 
     public RemoveRedundantDependencyVersions(@Nullable String groupPattern, @Nullable String artifactPattern,
-                                             @Nullable Comparator onlyIfManagedVersionIs, @Nullable List<String> except) {
-        this(groupPattern, artifactPattern, null, onlyIfManagedVersionIs, except);
+                                             @Nullable Comparator onlyIfManagedVersionIs,
+                                             @Nullable ManagedDependencyOption managedDependencyOption,
+                                             @Nullable List<String> except) {
+        this(groupPattern, artifactPattern, null, onlyIfManagedVersionIs, managedDependencyOption, except);
     }
 
     @JsonCreator
@@ -97,11 +120,13 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     @SuppressWarnings("DeprecatedIsStillUsed")
     public RemoveRedundantDependencyVersions(@Nullable String groupPattern, @Nullable String artifactPattern,
                                              @Nullable Boolean onlyIfVersionsMatch, @Nullable Comparator onlyIfManagedVersionIs,
-                                             @Nullable List<String> except) {
+                                             @Nullable ManagedDependencyOption managedDependencyOption, @Nullable List<String> except) {
         this.groupPattern = groupPattern;
         this.artifactPattern = artifactPattern;
         this.onlyIfVersionsMatch = onlyIfVersionsMatch;
         this.onlyIfManagedVersionIs = onlyIfManagedVersionIs;
+        this.managedDependencyOption =
+                managedDependencyOption == null ? ManagedDependencyOption.DO_NOT_REMOVE_IF_HAS_EXCLUSIONS : managedDependencyOption;
         this.except = except;
     }
 
@@ -159,6 +184,10 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+        final Set<String> removeIfOnlyContains = new HashSet<>(Arrays.asList("groupId", "artifactId", "version"));
+        if (managedDependencyOption == ManagedDependencyOption.DO_NOT_REMOVE_IF_HAS_EXCLUSIONS) {
+            removeIfOnlyContains.add("exclusions");
+        }
         Comparator comparator = determineComparator();
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
@@ -185,7 +214,15 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                 } else if (isManagedDependencyTag()) {
                     ResolvedManagedDependency managed = findManagedDependency(tag);
                     if (managed != null && matchesGroup(managed) && matchesArtifact(managed) && matchesVersion(managed, ctx)) {
-                        if (tag.getChild("exclusions").isPresent()) {
+                        if (managedDependencyOption == ManagedDependencyOption.ALWAYS_REMOVE) {
+                            return null;
+                        }
+                        if (managedDependencyOption == ManagedDependencyOption.DO_NOT_REMOVE_IF_HAS_EXCLUSIONS &&
+                                tag.getChild("exclusions").isPresent()) {
+                            return tag;
+                        }
+                        if (managedDependencyOption == ManagedDependencyOption.DO_NOT_REMOVE_IF_HAS_NON_GAV_CONFIG &&
+                                tag.getChildren().stream().anyMatch(t -> !removeIfOnlyContains.contains(t.getName()))) {
                             return tag;
                         }
                         //noinspection DataFlowIssue
