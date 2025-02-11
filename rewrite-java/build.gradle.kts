@@ -74,7 +74,6 @@ dependencies {
     testRuntimeOnly("org.slf4j:jul-to-slf4j:1.7.+")
 
     // For use in ReplaceAnnotationTest
-//    testRuntimeOnly("org.projectlombok:lombok:latest.release")
 }
 
 tasks.withType<Javadoc> {
