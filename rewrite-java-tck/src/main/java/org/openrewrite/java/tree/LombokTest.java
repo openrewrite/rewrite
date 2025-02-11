@@ -40,6 +40,7 @@ class LombokTest implements RewriteTest {
 
     @BeforeAll
     static void setUp() {
+        // Only needed for Java 8, until enabled by default there
         System.setProperty("rewrite.lombok", "true");
     }
 
