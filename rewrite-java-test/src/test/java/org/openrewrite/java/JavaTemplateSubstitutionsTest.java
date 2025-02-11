@@ -16,12 +16,18 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.DocumentExample;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Issue;
+import org.openrewrite.*;
+import org.openrewrite.config.Environment;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
+import java.util.Collections;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -489,23 +495,9 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
     }
 
     @Test
-    void methodArgumentsReplacementNextToPlus() {
+    void methodArgumentsReplacementWhenMethodInvocationIsNotAStatement() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              @Override
-              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                  if ("setScale".equals(m.getName().getSimpleName())) {
-                      maybeAddImport("java.math.RoundingMode");
-                      return JavaTemplate.builder("#{any(int)}, #{}")
-                        .contextSensitive()
-                        .build()
-                        .apply(updateCursor(m), m.getCoordinates().replaceArguments(), m.getArguments().get(0), "TODOA");
-                  } else {
-                      return m;
-                  }
-              }
-          })),
+          spec -> spec.recipe(toRecipe(BigDecimalSetScaleVisitor::new)),
           java(
           """
             import java.math.BigDecimal;
@@ -522,5 +514,51 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
               static String s = String.valueOf("Value: " + BigDecimal.ONE.setScale(0, RoundingMode.DOWN));
           }
           """));
+    }
+
+    @Test
+    void methodArgumentsReplacementInAStatement() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(BigDecimalSetScaleVisitor::new)),
+          java(
+            """
+              import java.math.BigDecimal;
+
+              class A {
+                  public static void b() {
+                      BigDecimal.ONE.setScale(0, BigDecimal.ROUND_DOWN);
+                  }
+              }
+            """,
+            """
+            import java.math.BigDecimal;
+            import java.math.RoundingMode;
+
+            class A {
+                public static void b() {
+                    BigDecimal.ONE.setScale(0, RoundingMode.DOWN);
+                }
+            }
+            """));
+    }
+
+    private static class BigDecimalSetScaleVisitor extends JavaVisitor<ExecutionContext> {
+        // Modelled after org.openrewrite.staticanalysis.BigDecimalRoundingConstantsToEnums.BIG_DECIMAL_SET_SCALE
+        @Override
+        public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+            J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+            if ("setScale".equals(m.getName().getSimpleName()) ) {
+                J.FieldAccess secondArgument = (J.FieldAccess) m.getArguments().get(1);
+                if (secondArgument.getName().getSimpleName().equals("ROUND_DOWN")) {
+                    maybeAddImport("java.math.RoundingMode");
+                    return JavaTemplate.builder("#{any(int)}, #{}")
+                      .contextSensitive()
+                      .imports("java.math.RoundingMode")
+                      .build()
+                      .apply(updateCursor(m), m.getCoordinates().replaceArguments(), m.getArguments().get(0), "RoundingMode.DOWN");
+                }
+            }
+            return m;
+        }
     }
 }
