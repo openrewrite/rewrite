@@ -487,4 +487,40 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void methodArgumentsReplacementNextToPlus() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+                  if ("setScale".equals(m.getName().getSimpleName())) {
+                      maybeAddImport("java.math.RoundingMode");
+                      return JavaTemplate.builder("#{any(int)}, #{}")
+                        .contextSensitive()
+                        .build()
+                        .apply(updateCursor(m), m.getCoordinates().replaceArguments(), m.getArguments().get(0), "TODOA");
+                  } else {
+                      return m;
+                  }
+              }
+          })),
+          java(
+          """
+            import java.math.BigDecimal;
+
+            class A {
+                static String s = String.valueOf("Value: " + BigDecimal.ONE.setScale(0, BigDecimal.ROUND_DOWN));
+            }
+          """,
+          """
+          import java.math.BigDecimal;
+          import java.math.RoundingMode;
+
+          class A {
+              static String s = String.valueOf("Value: " + BigDecimal.ONE.setScale(0, RoundingMode.DOWN));
+          }
+          """));
+    }
 }
