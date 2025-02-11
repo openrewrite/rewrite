@@ -1521,6 +1521,58 @@ class AddDependencyTest implements RewriteTest {
                   spec -> spec.path("build.gradle")
                 )));
         }
+
+        @Test
+        void actNormalForSuiteWithoutDependencyBlock() {
+            rewriteRun(
+              spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre")),
+              mavenProject("project",
+                srcMainJava(
+                  java(usingGuavaIntMath, sourceSpecs -> sourceSet(sourceSpecs, "integrationTest"))),
+                buildGradle(
+                  //language=groovy
+                  """
+                    plugins {
+                        id "java-library"
+                        id 'jvm-test-suite'
+                    }
+                    
+                    repositories {
+                        mavenCentral()
+                    }
+                    
+                    testing {
+                        suites {
+                            integrationTest(JvmTestSuite) {
+                            }
+                        }
+                    }
+                    """,
+                  """
+                    plugins {
+                        id "java-library"
+                        id 'jvm-test-suite'
+                    }
+                    
+                    repositories {
+                        mavenCentral()
+                    }
+                    
+                    testing {
+                        suites {
+                            integrationTest(JvmTestSuite) {
+                            }
+                        }
+                    }
+                    
+                    dependencies {
+                        integrationTestImplementation "com.google.guava:guava:29.0-jre"
+                    }
+                    """,
+                  spec -> spec.path("build.gradle")
+                )));
+        }
+
     }
 
     private AddDependency addDependency(@SuppressWarnings("SameParameterValue") String gav) {

@@ -37,7 +37,7 @@ import org.openrewrite.semver.Semver;
 import java.util.*;
 import java.util.function.Predicate;
 
-import static java.util.Collections.*;
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 
 @Value
@@ -146,7 +146,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     public static class Scanned {
         boolean usingType;
         Map<JavaProject, Set<String>> configurationsByProject = new HashMap<>();
-        Map<JavaProject, Set<String>> customJvmTestSuites = new HashMap<>();
+        Map<JavaProject, Set<String>> customJvmTestSuitesWithDependencies = new HashMap<>();
     }
 
     @Override
@@ -185,16 +185,37 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         return false;
                     }
 
+                    boolean definesDependencies(J.MethodInvocation suite) {
+                        for (Expression suiteDefinition : suite.getArguments()) {
+                            if (suiteDefinition instanceof J.Lambda) {
+                                for (Statement statement : ((J.Block) ((J.Lambda) suiteDefinition).getBody()).getStatements()) {
+                                    if (statement instanceof J.Return) {
+                                        Expression expression = ((J.Return) statement).getExpression();
+                                        if (expression instanceof J.MethodInvocation) {
+                                            if ("dependencies".equals(((J.MethodInvocation) expression).getSimpleName())) {
+                                                return true;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        return false;
+                    }
+
                     @Override
                     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                         if (isJVMTestSuitesBlock(method)) {
-                            for (Expression suite : method.getArguments()) {
-                                if (suite instanceof J.Lambda) {
-                                    for (Statement statement : ((J.Block) ((J.Lambda) suite).getBody()).getStatements()) {
+                            for (Expression suiteDefinition : method.getArguments()) {
+                                if (suiteDefinition instanceof J.Lambda) {
+                                    for (Statement statement : ((J.Block) ((J.Lambda) suiteDefinition).getBody()).getStatements()) {
                                         if (statement instanceof J.Return) {
                                             Expression expression = ((J.Return) statement).getExpression();
                                             if (expression instanceof J.MethodInvocation) {
-                                                customJVMSuits.add(((J.MethodInvocation) expression).getSimpleName());
+                                                J.MethodInvocation suite = (J.MethodInvocation) expression;
+                                                if (definesDependencies(suite)) {
+                                                    customJVMSuits.add(suite.getSimpleName());
+                                                }
                                             }
                                         }
                                     }
@@ -219,7 +240,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         acc.usingType = true;
                     }
 
-                    acc.customJvmTestSuites.computeIfAbsent(javaProject, k -> jvmTestSuits(sourceFile, ctx));
+                    acc.customJvmTestSuitesWithDependencies.computeIfAbsent(javaProject, k -> jvmTestSuits(sourceFile, ctx));
 
                     Set<String> configurations = acc.configurationsByProject.computeIfAbsent(javaProject, ignored -> new HashSet<>());
                     sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet ->
@@ -293,7 +314,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
                         G.CompilationUnit g = (G.CompilationUnit) s;
                         for (String resolvedConfiguration : resolvedConfigurations) {
-                            if (!targetsCustomJVMTestSuite(resolvedConfiguration, acc.customJvmTestSuites.get(jp))) {
+                            if (!targetsCustomJVMTestSuite(resolvedConfiguration, acc.customJvmTestSuitesWithDependencies.get(jp))) {
                                 g = (G.CompilationUnit) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, resolvedConfiguration,
                                         classifier, extension, metadataFailures, this::isTopLevel).visitNonNull(g, ctx);
                             } else {
