@@ -3,8 +3,7 @@ plugins {
 }
 
 dependencies {
-    api(platform("org.junit:junit-bom:5.11.+")) // Avoid 5.12.0-M1
-    runtimeOnly("org.junit.vintage:junit-vintage-engine") // enable IntelliJ execution of tests, broke with fixing org.junit:junit-bom:5.11.+
+    api(platform("org.junit:junit-bom:latest.release"))
     api(project(":rewrite-core"))
     compileOnly("io.micrometer:micrometer-core:latest.release")
     api("org.junit.jupiter:junit-jupiter-api")
