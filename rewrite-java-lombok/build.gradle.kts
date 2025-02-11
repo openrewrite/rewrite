@@ -6,7 +6,7 @@ plugins {
 
 // Create the lombok configuration and ensure it extends compileOnly
 val lombok = configurations.create("lombok")
-configurations.named("compileOnly").configure {
+configurations.named("implementation").configure {
     extendsFrom(lombok)
 }
 
@@ -54,7 +54,7 @@ val tools = compiler.get().metadata.installationPath.file("lib/tools.jar")
 
 dependencies {
     implementation("org.jspecify:jspecify:latest.release")
-    runtimeOnly("org.projectlombok:lombok:latest.release")
+//    runtimeOnly("org.projectlombok:lombok:latest.release")
 
     // Add lombok dependency to the newly created lombok configuration
     //lombok("org.projectlombok:lombok:latest.release")

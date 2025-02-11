@@ -469,6 +469,25 @@ class AnnotationTest implements RewriteTest {
     }
 
     @Test
+    void lombokBug() {
+        rewriteRun(
+          java(
+            """
+              import com.fasterxml.jackson.dataformat.xml.annotation.*;
+              import lombok.*;
+              
+              class Profiles {
+                  @Setter
+                  @JacksonXmlProperty(localName = "profile")
+                  @JacksonXmlElementWrapper(useWrapping = false)
+                  String profile;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     @MinimumJava21 // Because of `@Deprecated#forRemoval`
     void annotationElementValues() {
         JavaParser p = JavaParser.fromJavaVersion().build();
