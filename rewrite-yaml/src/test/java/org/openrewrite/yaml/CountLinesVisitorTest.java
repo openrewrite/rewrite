@@ -37,7 +37,7 @@ public class CountLinesVisitorTest implements RewriteTest {
               - hiking
               - coding
             """,
-            // As a human I can see that there are 6 lines in the above YAML snippets, but we seem not
+            // As a human I can see that there are 6 lines in the above YAML snippets, but we seem
             // to count the line breaks only, so the first one doesn't count. Inline with other langauges.
             spec -> spec.afterRecipe(cu ->
               assertThat(CountLinesVisitor.countLines(cu)).isEqualTo(5))
