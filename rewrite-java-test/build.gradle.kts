@@ -15,7 +15,6 @@ dependencies {
     testRuntimeOnly("com.google.guava:guava:latest.release")
     testRuntimeOnly("org.mapstruct:mapstruct:latest.release")
     testRuntimeOnly(project(":rewrite-yaml"))
-    testImplementation(project(":rewrite-maven"))
     testImplementation(project(":rewrite-properties"))
     testImplementation(project(":rewrite-xml"))
 }
