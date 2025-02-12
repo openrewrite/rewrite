@@ -171,8 +171,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                 return usesType.isAcceptable(sourceFile, ctx) && usesType.visit(sourceFile, ctx) != sourceFile;
             }
 
-            private Set<String> jvmTestSuits(SourceFile sourceFile, ExecutionContext ctx) {
-                HashSet<String> customJVMSuits = new HashSet<>();
+            private Set<String> jvmTestSuites(SourceFile sourceFile, ExecutionContext ctx) {
+                HashSet<String> customJVMSuites = new HashSet<>();
                 new GroovyIsoVisitor<ExecutionContext>() {
 
                     private boolean isJVMTestSuitesBlock(J.MethodInvocation methodInvocation) {
@@ -214,7 +214,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                                             if (expression instanceof J.MethodInvocation) {
                                                 J.MethodInvocation suite = (J.MethodInvocation) expression;
                                                 if (definesDependencies(suite)) {
-                                                    customJVMSuits.add(suite.getSimpleName());
+                                                    customJVMSuites.add(suite.getSimpleName());
                                                 }
                                             }
                                         }
@@ -226,7 +226,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         return super.visitMethodInvocation(method, executionContext);
                     }
                 }.visit(sourceFile, ctx);
-                return customJVMSuits;
+                return customJVMSuites;
             }
 
             @Override
@@ -240,7 +240,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         acc.usingType = true;
                     }
 
-                    acc.customJvmTestSuitesWithDependencies.computeIfAbsent(javaProject, k -> jvmTestSuits(sourceFile, ctx));
+                    acc.customJvmTestSuitesWithDependencies.computeIfAbsent(javaProject, k -> jvmTestSuites(sourceFile, ctx));
 
                     Set<String> configurations = acc.configurationsByProject.computeIfAbsent(javaProject, ignored -> new HashSet<>());
                     sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet ->
