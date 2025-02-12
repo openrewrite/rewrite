@@ -50,14 +50,14 @@ public class CursorValidatingExecutionContextView extends DelegatingExecutionCon
 
     @Override
     public void putMessage(String key, @Nullable Object value) {
-        boolean mutationAllowed = !getMessage(VALIDATE_CTX_MUTATION, false)
-                || key.equals(VALIDATE_CURSOR_ACYCLIC)
-                || key.equals(VALIDATE_CTX_MUTATION)
-                || key.equals(ExecutionContext.CURRENT_CYCLE)
-                || key.equals(ExecutionContext.CURRENT_RECIPE)
-                || key.equals(ExecutionContext.DATA_TABLES)
-                || key.equals(WorkingDirectoryExecutionContextView.WORKING_DIRECTORY_ROOT)
-                || key.startsWith("org.openrewrite.maven") // MavenExecutionContextView stores metrics
+        boolean mutationAllowed = !getMessage(VALIDATE_CTX_MUTATION, false) ||
+                key.equals(VALIDATE_CURSOR_ACYCLIC) ||
+                key.equals(VALIDATE_CTX_MUTATION) ||
+                key.equals(ExecutionContext.CURRENT_CYCLE) ||
+                key.equals(ExecutionContext.CURRENT_RECIPE) ||
+                key.equals(ExecutionContext.DATA_TABLES) ||
+                key.equals(WorkingDirectoryExecutionContextView.WORKING_DIRECTORY_ROOT) ||
+                key.startsWith("org.openrewrite.maven") // MavenExecutionContextView stores metrics
                 || key.startsWith("io.moderne"); // We ought to know what we're doing
         assert mutationAllowed : "Recipe mutated execution context key \"" + key + "\". " +
                 "Recipes should not mutate the contents of the ExecutionContext as it allows mutable state to leak between " +

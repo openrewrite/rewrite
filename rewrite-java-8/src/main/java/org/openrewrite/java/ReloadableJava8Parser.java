@@ -15,7 +15,9 @@
  */
 package org.openrewrite.java;
 
-import com.sun.tools.javac.comp.*;
+import com.sun.tools.javac.comp.Check;
+import com.sun.tools.javac.comp.Enter;
+import com.sun.tools.javac.comp.Todo;
 import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javac.main.JavaCompiler;
 import com.sun.tools.javac.main.Option;
