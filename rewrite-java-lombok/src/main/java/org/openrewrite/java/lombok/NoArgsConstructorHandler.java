@@ -24,12 +24,12 @@ import lombok.javac.JavacNode;
 import lombok.javac.handlers.HandleConstructor;
 import lombok.javac.handlers.JavacHandlerUtil;
 
-public class NoArgsConstructorHandler  extends JavacAnnotationHandler<NoArgsConstructor> {
+public class NoArgsConstructorHandler extends JavacAnnotationHandler<NoArgsConstructor> {
     @Override
     public void handle(AnnotationValues<NoArgsConstructor> annotationValues, JCTree.JCAnnotation jcAnnotation, JavacNode javacNode) {
         // "staticName" and "access" should be retained, but onConstructor is not supported
         // Omit onConstructor to simplify AST -> LST translation
-        if(jcAnnotation.getArguments().isEmpty()) {
+        if (jcAnnotation.getArguments().isEmpty()) {
             new HandleConstructor.HandleNoArgsConstructor().handle(annotationValues, jcAnnotation, javacNode);
         } else {
             List<JCTree.JCExpression> originalArgs = jcAnnotation.getArguments();
