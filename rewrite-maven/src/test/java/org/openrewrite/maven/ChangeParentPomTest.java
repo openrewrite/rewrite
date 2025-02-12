@@ -128,6 +128,11 @@ class ChangeParentPomTest implements RewriteTest {
                  </dependencies>
                   <repositories>
                       <repository>
+                        <id>central</id>
+                        <name>Central Repository</name>
+                        <url>https://repo.maven.apache.org/maven2</url>
+                      </repository>
+                      <repository>
                           <id>repo.jenkins-ci.org</id>
                           <url>https://repo.jenkins-ci.org/public/</url>
                       </repository>
@@ -166,6 +171,11 @@ class ChangeParentPomTest implements RewriteTest {
                      </dependency>
                  </dependencies>
                   <repositories>
+                      <repository>
+                        <id>central</id>
+                        <name>Central Repository</name>
+                        <url>https://repo.maven.apache.org/maven2</url>
+                      </repository>
                       <repository>
                           <id>repo.jenkins-ci.org</id>
                           <url>https://repo.jenkins-ci.org/public/</url>
@@ -1553,6 +1563,11 @@ class ChangeParentPomTest implements RewriteTest {
                       <jenkins.version>2.387.3</jenkins.version>
                   </properties>
                   <repositories>
+                    <repository>
+                        <id>central</id>
+                        <name>Central Repository</name>
+                        <url>https://repo.maven.apache.org/maven2</url>
+                    </repository>
                       <repository>
                           <id>repo.jenkins-ci.org</id>
                           <url>https://repo.jenkins-ci.org/public/</url>
@@ -1597,6 +1612,11 @@ class ChangeParentPomTest implements RewriteTest {
                       <jenkins.version>2.387.3</jenkins.version>
                   </properties>
                   <repositories>
+                    <repository>
+                        <id>central</id>
+                        <name>Central Repository</name>
+                        <url>https://repo.maven.apache.org/maven2</url>
+                    </repository>
                       <repository>
                           <id>repo.jenkins-ci.org</id>
                           <url>https://repo.jenkins-ci.org/public/</url>
