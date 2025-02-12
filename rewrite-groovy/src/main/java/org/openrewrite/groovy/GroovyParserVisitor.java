@@ -1313,6 +1313,27 @@ public class GroovyParserVisitor {
         @Override
         public void visitConstructorCallExpression(ConstructorCallExpression ctor) {
             queue.add(insideParentheses(ctor, fmt -> {
+                if (ctor.getType() == ClassNode.SUPER || ctor.getType() == ClassNode.THIS) {
+                    MethodNode methodNode = (MethodNode) ctor.getNodeMetaData().get(StaticTypesMarker.DIRECT_METHOD_CALL_TARGET);
+                    return new J.MethodInvocation(
+                            randomId(),
+                            fmt,
+                            Markers.EMPTY,
+                            null,
+                            null,
+                            new J.Identifier(randomId(),
+                                    EMPTY,
+                                    Markers.EMPTY,
+                                    emptyList(),
+                                    skip(ctor.getType() == ClassNode.SUPER ? "super" : "this"),
+                                    null,
+                                    null
+                            ),
+                            visit(ctor.getArguments()),
+                            typeMapping.methodType(methodNode)
+                    );
+                }
+
                 skip("new");
                 TypeTree clazz = visitTypeTree(ctor.getType(), ctor.getNodeMetaData().containsKey(StaticTypesMarker.INFERRED_TYPE));
                 JContainer<Expression> args = visit(ctor.getArguments());
@@ -2830,7 +2851,7 @@ public class GroovyParserVisitor {
                         continue;
                     }
 
-                    int packageBegin = indexOfNextNonWhitespace( maybeStaticIndex + 6, line);
+                    int packageBegin = indexOfNextNonWhitespace(maybeStaticIndex + 6, line);
                     int packageEnd = packageBegin;
                     while (packageEnd < line.length() && (isJavaIdentifierPart(line.charAt(packageEnd)) || line.charAt(packageEnd) == '.')) {
                         packageEnd++;

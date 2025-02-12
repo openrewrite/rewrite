@@ -83,6 +83,39 @@ class ConstructorTest implements RewriteTest {
     }
 
     @Test
+    void superCall() {
+        rewriteRun(
+          groovy(
+            """
+              class T {
+                  T() {
+                      super ( )
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void thisCall() {
+        rewriteRun(
+          groovy(
+            """
+              class T {
+                  T() {
+                      this ( 3 )
+                  }
+                  T(int foo) {
+                      super ( )
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void defaultConstructorArguments() {
         rewriteRun(
           groovy(
