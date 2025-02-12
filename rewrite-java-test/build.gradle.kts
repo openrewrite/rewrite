@@ -16,7 +16,6 @@ dependencies {
     testRuntimeOnly("org.mapstruct:mapstruct:latest.release")
     testRuntimeOnly("org.projectlombok:lombok:latest.release")
     testRuntimeOnly(project(":rewrite-yaml"))
-    testImplementation(project(":rewrite-maven"))
     testImplementation(project(":rewrite-properties"))
     testImplementation(project(":rewrite-xml"))
 }
