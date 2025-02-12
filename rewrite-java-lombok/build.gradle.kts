@@ -55,11 +55,11 @@ val tools = compiler.get().metadata.installationPath.file("lib/tools.jar")
 dependencies {
     implementation("org.jspecify:jspecify:latest.release")
     //runtimeOnly("org.projectlombok:lombok:latest.release")
-    runtimeOnly(files("libs/lombok-1.18.37.jar")) // Temporary pending the next stable release of lombok
+    runtimeOnly("org.openrewrite.tools:lombok:latest.release") // Temporary pending the next stable release of lombok
 
     // Add lombok dependency to the newly created lombok configuration
     //lombok("org.projectlombok:lombok:latest.release")
-    lombok(files("libs/lombok-1.18.37.jar")) // Temporary pending the next stable release of lombok
+    lombok("org.openrewrite.tools:lombok:latest.release") // Temporary pending the next stable release of lombok
     compileOnly(files(tools))
     compileOnly(files(unpackedAndRenamedLombokDir))
 }
