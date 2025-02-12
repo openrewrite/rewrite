@@ -15,7 +15,9 @@
  */
 package org.openrewrite.java;
 
-import com.sun.tools.javac.comp.*;
+import com.sun.tools.javac.comp.Check;
+import com.sun.tools.javac.comp.Enter;
+import com.sun.tools.javac.comp.Todo;
 import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javac.main.JavaCompiler;
 import com.sun.tools.javac.main.Option;
@@ -113,13 +115,13 @@ class ReloadableJava8Parser implements JavaParser {
 
         LOMBOK:
         if (System.getenv().getOrDefault("REWRITE_LOMBOK", System.getProperty("rewrite.lombok")) != null &&
-                classpath != null && classpath.stream().anyMatch(it -> it.toString().contains("lombok"))) {
+                classpath != null && classpath.stream().anyMatch(it -> it.toString().contains("lombok-1.18.37"))) {
             Processor lombokProcessor = null;
             try {
                 // https://projectlombok.org/contributing/lombok-execution-path
                 List<String> overrideClasspath = new ArrayList<>();
                 for (Path part : classpath) {
-                    if (part.toString().contains("lombok")) {
+                    if (part.toString().contains("lombok-1.18.37") || part.toString().contains("rewrite-java-lombok")) {
                         overrideClasspath.add(part.toString());
                     }
                 }

@@ -238,6 +238,21 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         return getMessage(MAVEN_SETTINGS, null);
     }
 
+    /**
+     * The maven settings in effect are a combination of the settings defined in the context and the settings that
+     * were in effect when a given pom was parsed.
+     *
+     */
+    public @Nullable MavenSettings effectiveSettings(MavenResolutionResult mrr) {
+        MavenSettings effectiveSettings = getMessage(MAVEN_SETTINGS);
+        if (effectiveSettings == null) {
+            effectiveSettings = mrr.getMavenSettings();
+        } else {
+            effectiveSettings = effectiveSettings.merge(mrr.getMavenSettings());
+        }
+        return effectiveSettings;
+    }
+
     private static List<String> mapActiveProfiles(MavenSettings settings, String... activeProfiles) {
         if (settings.getActiveProfiles() == null) {
             return Arrays.asList(activeProfiles);
