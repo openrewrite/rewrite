@@ -25,7 +25,7 @@ import java.util.regex.Pattern;
  * Any of X, x, or * may be used to "stand in" for one of the numeric values in the [major, minor, patch] tuple.
  * <a href="https://github.com/npm/node-semver#x-ranges-12x-1x-12-">X-Ranges</a>.
  */
-public class XRange extends LatestRelease {
+public class XRange extends VersionComparator {
     private static final Pattern X_RANGE_PATTERN = Pattern.compile("([*xX]|\\d+)(?:\\.([*xX]|\\d+)(?:\\.([*xX]|\\d+))?(?:\\.([*xX]|\\d+))?)?");
 
     private final String major;

@@ -24,7 +24,7 @@ import org.openrewrite.Validated;
  * or implicit default when no other version selectors match.
  */
 @Getter
-public class ExactVersion extends LatestRelease {
+public class ExactVersion extends VersionComparator {
     String version;
 
     public ExactVersion(String pattern) {

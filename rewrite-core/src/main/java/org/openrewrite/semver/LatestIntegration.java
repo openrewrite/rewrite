@@ -21,7 +21,7 @@ import org.openrewrite.internal.StringUtils;
 
 import java.util.regex.Matcher;
 
-public class LatestIntegration extends LatestRelease {
+public class LatestIntegration extends VersionComparator {
 
     @Nullable
     String metadataPattern;

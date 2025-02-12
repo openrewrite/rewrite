@@ -20,9 +20,10 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
 
 @Value
-public class LatestMinor implements VersionComparator {
-    @Nullable
-    String metadataPattern;
+public class LatestMinor extends VersionComparator {
+    public LatestMinor(@Nullable String metadataPattern) {
+        super(metadataPattern);
+    }
 
     @Override
     public boolean isValid(@Nullable String currentVersion, String version) {

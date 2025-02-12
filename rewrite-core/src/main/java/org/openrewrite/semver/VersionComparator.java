@@ -16,28 +16,125 @@
 package org.openrewrite.semver;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.internal.StringUtils;
 
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Optional;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public interface VersionComparator extends Comparator<String> {
-    Pattern RELEASE_PATTERN = Pattern.compile("(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.(\\d+))?([-.+].*)?");
-    String[] RELEASE_SUFFIXES = new String[]{".final", ".ga", ".release"};
-    Pattern PRE_RELEASE_ENDING = Pattern.compile("[.-](alpha|a|beta|b|milestone|m|rc|cr|snapshot)[.-]?\\d*$", Pattern.CASE_INSENSITIVE);
+public abstract class VersionComparator implements Comparator<String> {
+    static Pattern RELEASE_PATTERN = Pattern.compile("(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.(\\d+))?([-.+].*)?");
+    static String[] RELEASE_SUFFIXES = new String[]{".final", ".ga", ".release"};
+    static Pattern PRE_RELEASE_ENDING = Pattern.compile("[.-](alpha|a|beta|b|milestone|m|rc|cr|snapshot)[.-]?\\d*$", Pattern.CASE_INSENSITIVE);
 
-    boolean isValid(@Nullable String currentVersion, String version);
+    @Nullable
+    protected final String metadataPattern;
+
+    public VersionComparator(@Nullable String metadataPattern) {
+        this.metadataPattern = metadataPattern;
+    }
+
+    public boolean isValid(@Nullable String currentVersion, String version) {
+        Matcher matcher = VersionComparator.RELEASE_PATTERN.matcher(version);
+        if (!matcher.matches() || PRE_RELEASE_ENDING.matcher(version).find()) {
+            return false;
+        }
+        boolean requireMeta = !StringUtils.isNullOrEmpty(metadataPattern);
+        String versionMeta = matcher.group(6);
+        if (requireMeta) {
+            return versionMeta != null && versionMeta.matches(metadataPattern);
+        } else if (versionMeta == null) {
+            return true;
+        }
+        String lowercaseVersionMeta = versionMeta.toLowerCase();
+        for (String suffix : RELEASE_SUFFIXES) {
+            if (suffix.equals(lowercaseVersionMeta)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     @Deprecated
     @Override
-    default int compare(String v1, String v2) {
+    public int compare(String v1, String v2) {
         return compare(null, v1, v2);
     }
 
-    int compare(@Nullable String currentVersion, String v1, String v2);
+    @SuppressWarnings("ResultOfMethodCallIgnored")
+    public int compare(@Nullable String currentVersion, String v1, String v2) {
+        if (v1.equalsIgnoreCase(v2)) {
+            return 0;
+        } else if (v1.equalsIgnoreCase("LATEST")) {
+            return 1;
+        } else if (v2.equalsIgnoreCase("LATEST")) {
+            return -1;
+        } else if (v1.equalsIgnoreCase("RELEASE")) {
+            return 1;
+        } else if (v2.equalsIgnoreCase("RELEASE")) {
+            return -1;
+        }
 
-    default Optional<String> upgrade(String currentVersion, Collection<String> availableVersions) {
+        String nv1 = normalizeVersion(v1);
+        String nv2 = normalizeVersion(v2);
+
+        int vp1 = countVersionParts(nv1);
+        int vp2 = countVersionParts(nv2);
+
+        if (vp1 > vp2) {
+            StringBuilder nv2Builder = new StringBuilder(nv2);
+            for (int i = vp2; i < vp1; i++) {
+                nv2Builder.append(".0");
+            }
+            nv2 = nv2Builder.toString();
+        } else if (vp2 > vp1) {
+            StringBuilder nv1Builder = new StringBuilder(nv1);
+            for (int i = vp1; i < vp2; i++) {
+                nv1Builder.append(".0");
+            }
+            nv1 = nv1Builder.toString();
+        }
+
+        Matcher v1Gav = VersionComparator.RELEASE_PATTERN.matcher(nv1);
+        Matcher v2Gav = VersionComparator.RELEASE_PATTERN.matcher(nv2);
+
+        v1Gav.matches();
+        v2Gav.matches();
+
+        // Remove the metadata pattern from the normalized versions, this only impacts the comparison when all version
+        // parts are the same:
+        //
+        // HyphenRange [25-28] should include "28-jre" and "28-android" as possible candidates.
+        String normalized1 = metadataPattern == null ? nv1 : nv1.replaceAll(metadataPattern, "");
+        String normalized2 = metadataPattern == null ? nv2 : nv2.replaceAll(metadataPattern, "");
+        try {
+            for (int i = 1; i <= Math.max(vp1, vp2); i++) {
+                String v1Part = v1Gav.group(i);
+                String v2Part = v2Gav.group(i);
+                if (v1Part == null) {
+                    return v2Part == null ? normalized1.compareTo(normalized2) : -1;
+                } else if (v2Part == null) {
+                    return 1;
+                }
+
+                long diff = Long.parseLong(v1Part) - Long.parseLong(v2Part);
+                if (diff != 0) {
+                    // squish the long to fit into an int; all that matters is whether the return value is pos/neg/zero
+                    return (int) (diff / Math.abs(diff));
+                }
+            }
+        } catch (IllegalStateException exception) {
+            // Provide a better error message if an error is thrown while getting groups from the regular expression.
+            throw new IllegalStateException("Illegal state while comparing versions : [" + nv1 + "] and [" + nv2 + "]. Metadata = [" + metadataPattern + "]", exception);
+        }
+
+        return normalized1.compareTo(normalized2);
+    }
+
+
+    public Optional<String> upgrade(String currentVersion, Collection<String> availableVersions) {
         boolean seen = false;
         String best = null;
         for (String availableVersion : availableVersions) {
@@ -52,5 +149,49 @@ public interface VersionComparator extends Comparator<String> {
         }
         return (seen ? Optional.of(best) : Optional.<String>empty())
                 .filter(v -> !v.equals(currentVersion));
+    }
+
+    static String normalizeVersion(String version) {
+        int lastDotIdx = version.lastIndexOf('.');
+        for (String suffix : RELEASE_SUFFIXES) {
+            if (version.regionMatches(true, lastDotIdx, suffix, 0, suffix.length())) {
+                version = version.substring(0, lastDotIdx);
+                break;
+            }
+        }
+
+        int versionParts = countVersionParts(version);
+
+        if (versionParts <= 2) {
+            String[] versionAndMetadata = version.split("(?=[-+])");
+            for (; versionParts <= 2; versionParts++) {
+                versionAndMetadata[0] += ".0";
+            }
+            version = versionAndMetadata.length > 1 ? versionAndMetadata[0] + versionAndMetadata[1] :
+                    versionAndMetadata[0];
+        }
+
+        return version;
+    }
+
+    static int countVersionParts(String version) {
+        int count = 0;
+        int len = version.length();
+        int lastSepIdx = -1;
+        for (int i = 0; i < len; i++) {
+            char c = version.charAt(i);
+            if (c == '.' || c == '-' || c == '$') {
+                if (lastSepIdx == i - 1) {
+                    return count;
+                }
+                lastSepIdx = i;
+            } else if (lastSepIdx == i - 1) {
+                if (!Character.isDigit(c)) {
+                    break;
+                }
+                count++;
+            }
+        }
+        return count;
     }
 }

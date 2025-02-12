@@ -21,7 +21,7 @@ import org.openrewrite.Validated;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class SetRange extends LatestRelease {
+public class SetRange extends VersionComparator {
     private static final Pattern SET_RANGE_PATTERN = Pattern.compile("([\\[(])(\\d+(\\.\\d+)?(\\.\\d+)?(\\.\\d+)?)?\\s*,\\s*(\\d+(\\.\\d+)?(\\.\\d+)?(\\.\\d+)?)?([\\])])");
 
     private final String upper;

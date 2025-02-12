@@ -31,7 +31,7 @@ public class Semver {
         if (version == null) {
             return false;
         }
-        return LatestRelease.RELEASE_PATTERN.matcher(version).matches();
+        return VersionComparator.RELEASE_PATTERN.matcher(version).matches();
     }
 
     /**

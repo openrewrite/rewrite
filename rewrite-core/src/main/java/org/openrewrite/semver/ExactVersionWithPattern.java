@@ -19,7 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.StringUtils;
 
-public class ExactVersionWithPattern extends LatestRelease {
+public class ExactVersionWithPattern extends VersionComparator {
     private final String version;
 
     public ExactVersionWithPattern(String version, String metadataPattern) {
