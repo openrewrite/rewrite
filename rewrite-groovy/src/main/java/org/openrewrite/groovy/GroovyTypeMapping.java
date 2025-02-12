@@ -30,9 +30,7 @@ import java.util.List;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
-import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.CONTRAVARIANT;
-import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.COVARIANT;
-import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.INVARIANT;
+import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 
 class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
     private final GroovyAstTypeSignatureBuilder signatureBuilder = new GroovyAstTypeSignatureBuilder();

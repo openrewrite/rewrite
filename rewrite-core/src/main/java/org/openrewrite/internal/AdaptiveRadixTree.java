@@ -23,7 +23,6 @@ import java.util.Arrays;
 
 @Incubating(since = "8.38.0")
 public class AdaptiveRadixTree<V> {
-    private transient int size = 0;
 
     @Nullable
     private Node<V> root;
@@ -412,7 +411,7 @@ public class AdaptiveRadixTree<V> {
     private static class Node16<V> extends InternalNode<V> {
         private static final int LINEAR_SEARCH_THRESHOLD = 8;
         private byte[] keys;
-        private @Nullable Node<V>[] children;
+        private Node<V> @Nullable[] children;
         private int size;
 
         @SuppressWarnings("unchecked")
@@ -523,7 +522,7 @@ public class AdaptiveRadixTree<V> {
 
     private static class Node48<V> extends InternalNode<V> {
         private byte[] index;
-        private @Nullable Node<V>[] children;
+        private Node<V> @Nullable[] children;
         private int size;
 
         @SuppressWarnings("unchecked")
@@ -597,7 +596,7 @@ public class AdaptiveRadixTree<V> {
     }
 
     private static class Node256<V> extends InternalNode<V> {
-        private final @Nullable Node<V> [] children;
+        private final Node<V> @Nullable [] children;
 
         @SuppressWarnings("unchecked")
         Node256(byte[] partialKey) {

@@ -580,8 +580,8 @@ public class GroovyParserVisitor {
                         new BlockStatement(
                                 ((BlockStatement) method.getCode()).getStatements().subList(2, ((BlockStatement) method.getCode()).getStatements().size()),
                                 ((BlockStatement) method.getCode()).getVariableScope()
-                        )
-                        : method.getCode();
+                        ) :
+                        method.getCode();
                 body = bodyVisitor.visit(code);
             }
 
@@ -2238,8 +2238,8 @@ public class GroovyParserVisitor {
                                 } else {
                                     expression = bodyVisitor.visit(arg.getValue());
                                 }
-                                Expression element = isImplicitValue ? expression
-                                        : (new J.Assignment(randomId(), argPrefix, Markers.EMPTY,
+                                Expression element = isImplicitValue ? expression :
+                                        (new J.Assignment(randomId(), argPrefix, Markers.EMPTY,
                                         new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), arg.getKey(), null, null),
                                         padLeft(isSign, expression), null));
                                 return JRightPadded.build(element)
