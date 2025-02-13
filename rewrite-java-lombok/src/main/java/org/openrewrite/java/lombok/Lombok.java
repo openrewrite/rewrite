@@ -34,6 +34,7 @@ public class Lombok {
         // https://projectlombok.org/contributing/lombok-execution-path
         List<String> overrideClasspath = new ArrayList<>();
         for (Path entry : ReflectionUtils.findClassPathEntriesFor("lombok/Getter.class", classLoader)) {
+            // FIXME remove hardcoded version once Lombok proper 1.18.37 is released
             if (entry.getFileName().toString().contains("lombok-1.18.37") && !overrideClasspath.contains(entry.toString())) {
                 overrideClasspath.add(entry.toString());
             }
@@ -46,6 +47,7 @@ public class Lombok {
                 overrideClasspath.add(0, entry.toString());
             }
         }
+        // for IDE support, where the `rewrite-java-lombok` classes and resources could be in separate folders
         for (Path entry : ReflectionUtils.findClassPathEntriesFor("META-INF/services/lombok.core.configuration.ConfigurationKeysLoader", classLoader)) {
             if (!overrideClasspath.contains(entry.toString())) {
                 // make sure the rewrite-java-lombok dependency comes first
@@ -57,24 +59,31 @@ public class Lombok {
             return null;
         }
 
-        System.setProperty("shadow.override.lombok", String.join(File.pathSeparator, overrideClasspath));
+        String oldValue = System.setProperty("shadow.override.lombok", String.join(File.pathSeparator, overrideClasspath));
+        try {
+            Class<?> shadowLoaderClass = Class.forName("lombok.launch.ShadowClassLoader", true, classLoader);
+            Constructor<?> shadowLoaderConstructor = shadowLoaderClass.getDeclaredConstructor(
+                    Class.forName("java.lang.ClassLoader"),
+                    Class.forName("java.lang.String"),
+                    Class.forName("java.lang.String"),
+                    Class.forName("java.util.List"),
+                    Class.forName("java.util.List"));
+            shadowLoaderConstructor.setAccessible(true);
 
-        Class<?> shadowLoaderClass = Class.forName("lombok.launch.ShadowClassLoader", true, classLoader);
-        Constructor<?> shadowLoaderConstructor = shadowLoaderClass.getDeclaredConstructor(
-                Class.forName("java.lang.ClassLoader"),
-                Class.forName("java.lang.String"),
-                Class.forName("java.lang.String"),
-                Class.forName("java.util.List"),
-                Class.forName("java.util.List"));
-        shadowLoaderConstructor.setAccessible(true);
-
-        ClassLoader lombokShadowLoader = (ClassLoader) shadowLoaderConstructor.newInstance(
-                classLoader,
-                "lombok",
-                null,
-                emptyList(),
-                singletonList("lombok.patcher.Symbols")
-        );
-        return (Processor) lombokShadowLoader.loadClass("lombok.core.AnnotationProcessor").getDeclaredConstructor().newInstance();
+            ClassLoader lombokShadowLoader = (ClassLoader) shadowLoaderConstructor.newInstance(
+                    classLoader,
+                    "lombok",
+                    null,
+                    emptyList(),
+                    singletonList("lombok.patcher.Symbols")
+            );
+            return (Processor) lombokShadowLoader.loadClass("lombok.core.AnnotationProcessor").getDeclaredConstructor().newInstance();
+        } finally {
+            if (oldValue != null) {
+                System.setProperty("shadow.override.lombok", oldValue);
+            } else {
+                System.clearProperty("shadow.override.lombok");
+            }
+        }
     }
 }

@@ -64,7 +64,6 @@ import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 
 /**
@@ -121,22 +120,17 @@ public class ReloadableJava11Parser implements JavaParser {
         // for all other source files and unaffected nodes within the same file.
         Options.instance(context).put("should-stop.ifError", "GENERATE");
 
+        annotationProcessors = new ArrayList<>(1);
         if (classpath != null && classpath.stream().anyMatch(it -> it.toString().contains("lombok"))) {
-            Processor lombokProcessor = null;
             try {
-                lombokProcessor = Lombok.createLombokProcessor(getClass().getClassLoader());
-            } catch (ReflectiveOperationException ignore) {
-                // Lombok was not found or could not be initialized
-            } finally {
+                Processor lombokProcessor = Lombok.createLombokProcessor(getClass().getClassLoader());
                 if (lombokProcessor != null) {
                     Options.instance(context).put(Option.PROCESSOR, "lombok.launch.AnnotationProcessorHider$AnnotationProcessor");
-                    annotationProcessors = singletonList(lombokProcessor);
-                } else {
-                    annotationProcessors = emptyList();
+                    annotationProcessors.add(lombokProcessor);
                 }
+            } catch (ReflectiveOperationException ignore) {
+                // Lombok was not found or could not be initialized
             }
-        } else {
-            annotationProcessors = emptyList();
         }
 
         // MUST be created ahead of compiler construction
