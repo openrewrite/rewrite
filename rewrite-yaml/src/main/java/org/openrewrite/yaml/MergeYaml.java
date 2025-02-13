@@ -23,6 +23,8 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.yaml.tree.Yaml;
 
+import static org.openrewrite.internal.StringUtils.isBlank;
+
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class MergeYaml extends Recipe {
@@ -91,7 +93,6 @@ public class MergeYaml extends Recipe {
     }
 
     final static String FOUND_MATCHING_ELEMENT = "FOUND_MATCHING_ELEMENT";
-    final static String REMOVE_DOCUMENT_PREFIX = "REMOVE_DOCUMENT_PREFIX";
     final static String REMOVE_PREFIX = "REMOVE_PREFIX";
 
     @Override
@@ -123,11 +124,8 @@ public class MergeYaml extends Recipe {
                             new MergeYamlVisitor<>(document.getBlock(), yaml, Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty, insertBefore)
                                     .visitNonNull(document.getBlock(), ctx, getCursor())
                     );
-                    if (getCursor().getMessage(REMOVE_DOCUMENT_PREFIX, false)) {
-                        d = d.withPrefix("");
-                    }
                     if (getCursor().getMessage(REMOVE_PREFIX, false)) {
-                        d = d.withEnd(d.getEnd().withPrefix(""));
+                        d = isBlank(insertBefore) ? d.withEnd(d.getEnd().withPrefix("")) : d.withPrefix("");
                     }
                     return d;
                 }
