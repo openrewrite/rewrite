@@ -527,7 +527,19 @@ class AnnotationTest implements RewriteTest {
               @interface Annotation {
                   Class<?> type();
               }
-              """
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.ClassDeclaration c = cu.getClasses().get(0);
+                JavaType.Class type = (JavaType.Class) c.getType();
+                JavaType.Annotation a = (JavaType.Annotation) type.getAnnotations().get(0);
+                assertThat(a.getValues()).hasSize(1);
+                JavaType.Annotation.SingleElementValue v = (JavaType.Annotation.SingleElementValue) a.getValues().get(0);
+                assertThat(v.getElement()).isSameAs(a.getMethods().get(0));
+                assertThat(v.getValue()).isInstanceOf(JavaType.Array.class);
+                JavaType.Array array = (JavaType.Array) v.getValue();
+                assertThat(array.getElemType()).isInstanceOf(JavaType.Primitive.class);
+                assertThat(((JavaType.Primitive) array.getElemType()).getKeyword()).isEqualTo("int");
+            })
           )
         );
     }
