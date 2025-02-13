@@ -69,7 +69,7 @@ public class ChangeDependencyExtension extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Finds dependencies declared in `build.gradle` files.";
+        return "Changes extension of an existing dependency declared in `build.gradle` files.";
     }
 
     @Override
