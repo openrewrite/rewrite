@@ -204,7 +204,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     }
 
                     @Override
-                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                         if (isJVMTestSuitesBlock(method)) {
                             for (Expression suiteDefinition : method.getArguments()) {
                                 if (suiteDefinition instanceof J.Lambda) {
