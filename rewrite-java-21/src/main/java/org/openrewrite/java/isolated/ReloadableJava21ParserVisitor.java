@@ -1953,9 +1953,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
             case METHOD:
                 JCMethodDecl m = (JCMethodDecl) t;
                 if (m.body == null || m.defaultValue != null) {
-                    String suffix = source.substring(cursor, positionOfNext(";", null));
-                    int idx = findFirstNonWhitespaceChar(suffix);
-                    return sourceBefore(idx >= 0 ? "" : ";");
+                    return sourceBefore(";");
                 } else {
                     return sourceBefore("");
                 }
