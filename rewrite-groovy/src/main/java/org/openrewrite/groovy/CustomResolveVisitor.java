@@ -207,6 +207,7 @@ class CustomResolveVisitor extends ResolveVisitor {
         this.classNodeResolver = classNodeResolver;
     }
 
+    @Override
     public void startResolving(final ClassNode node, final SourceUnit source) {
         this.source = source;
         visitClass(node);
