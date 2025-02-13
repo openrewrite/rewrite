@@ -727,9 +727,13 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
     }
 
     private Object annotationElementValue(Object value) {
-        if (value instanceof Symbol.VarSymbol) {
+        if (value instanceof String || value instanceof Number || value instanceof Boolean || value instanceof Character) {
+            return value;
+        } else if (value instanceof Symbol.VarSymbol) {
             JavaType.Variable mapped = variableType((Symbol.VarSymbol) value);
-            return mapped != null ? mapped : JavaType.Unknown.getInstance();
+            if (mapped != null) {
+                return mapped;
+            }
         } else if (value instanceof Type.ClassType) {
             return type((Type.ClassType) value);
         } else if (value instanceof Attribute.Array) {
@@ -748,14 +752,14 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
             return type(((Attribute.Class) value).classType);
         } else if (value instanceof Attribute.Compound) {
             JavaType.Annotation mapped = annotationType((Attribute.Compound) value);
-            return mapped != null ? mapped : JavaType.Unknown.getInstance();
+            if (mapped != null) {
+                return mapped;
+            }
         } else if (value instanceof Attribute.Constant) {
             return annotationElementValue(((Attribute.Constant) value).value);
         } else if (value instanceof Attribute.Enum) {
             return annotationElementValue(((Attribute.Enum) value).value);
-        } else if (value instanceof Attribute.Error) {
-            return JavaType.Unknown.getInstance();
         }
-        return value;
+        return JavaType.Unknown.getInstance();
     }
 }
