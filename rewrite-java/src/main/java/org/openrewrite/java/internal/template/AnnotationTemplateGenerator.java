@@ -155,8 +155,7 @@ public class AnnotationTemplateGenerator {
                     }
                 }
 
-                if (m.getReturnTypeExpression() != null && !JavaType.Primitive.Void
-                        .equals(m.getReturnTypeExpression().getType())) {
+                if (m.getReturnTypeExpression() != null && JavaType.Primitive.Void != m.getReturnTypeExpression().getType()) {
                     after.append("return ")
                             .append(valueOfType(m.getReturnTypeExpression().getType()))
                             .append(";\n");

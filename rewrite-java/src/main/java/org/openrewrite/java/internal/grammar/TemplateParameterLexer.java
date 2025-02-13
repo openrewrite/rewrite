@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,24 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from java-escape by ANTLR 4.11.1
+// Generated from ~/git/rewrite/rewrite-java/src/main/antlr/TemplateParameterLexer.g4 by ANTLR 4.13.2
 package org.openrewrite.java.internal.grammar;
+import org.antlr.v4.runtime.Lexer;
+import org.antlr.v4.runtime.CharStream;
+import org.antlr.v4.runtime.Token;
+import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.*;
-import org.antlr.v4.runtime.atn.ATN;
-import org.antlr.v4.runtime.atn.ATNDeserializer;
-import org.antlr.v4.runtime.atn.LexerATNSimulator;
-import org.antlr.v4.runtime.atn.PredictionContextCache;
+import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
+import org.antlr.v4.runtime.misc.*;
 
-@SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue"})
+@SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue", "this-escape"})
 public class TemplateParameterLexer extends Lexer {
-	static { RuntimeMetaData.checkVersion("4.11.1", RuntimeMetaData.VERSION); }
+	static { RuntimeMetaData.checkVersion("4.13.2", RuntimeMetaData.VERSION); }
 
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		LPAREN=1, RPAREN=2, DOT=3, COLON=4, COMMA=5, LBRACK=6, RBRACK=7, WILDCARD=8,
+		LPAREN=1, RPAREN=2, DOT=3, COLON=4, COMMA=5, LBRACK=6, RBRACK=7, WILDCARD=8, 
 		Variance=9, FullyQualifiedName=10, Number=11, Identifier=12, S=13;
 	public static String[] channelNames = {
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN"
@@ -42,8 +44,8 @@ public class TemplateParameterLexer extends Lexer {
 
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"LPAREN", "RPAREN", "DOT", "COLON", "COMMA", "LBRACK", "RBRACK", "WILDCARD",
-			"Variance", "FullyQualifiedName", "Number", "Identifier", "JavaLetter",
+			"LPAREN", "RPAREN", "DOT", "COLON", "COMMA", "LBRACK", "RBRACK", "WILDCARD", 
+			"Variance", "FullyQualifiedName", "Number", "Identifier", "JavaLetter", 
 			"JavaLetterOrDigit", "S"
 		};
 	}
@@ -57,8 +59,8 @@ public class TemplateParameterLexer extends Lexer {
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "LPAREN", "RPAREN", "DOT", "COLON", "COMMA", "LBRACK", "RBRACK",
-			"WILDCARD", "Variance", "FullyQualifiedName", "Number", "Identifier",
+			null, "LPAREN", "RPAREN", "DOT", "COLON", "COMMA", "LBRACK", "RBRACK", 
+			"WILDCARD", "Variance", "FullyQualifiedName", "Number", "Identifier", 
 			"S"
 		};
 	}

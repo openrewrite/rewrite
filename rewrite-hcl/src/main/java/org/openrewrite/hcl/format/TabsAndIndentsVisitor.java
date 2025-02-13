@@ -252,8 +252,8 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
         } else {
             if (!StringUtils.isNullOrEmpty(space.getWhitespace()) &&
                 // Preserve whitespace of trailing line comments.
-                (Comment.Style.INLINE.equals(space.getComments().get(0).getStyle()) ||
-                 (!Comment.Style.INLINE.equals(space.getComments().get(0).getStyle()) &&
+                (Comment.Style.INLINE == space.getComments().get(0).getStyle() ||
+                 (Comment.Style.INLINE != space.getComments().get(0).getStyle() &&
                   (space.getWhitespace().contains("\n") || space.getWhitespace().contains("\r"))))) {
                 if (style.getUseTabCharacter()) {
                     space = space.withWhitespace(space.getWhitespace().replaceAll(" ", ""));

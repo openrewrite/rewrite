@@ -54,7 +54,7 @@ public class FindEmptyClasses extends Recipe {
         return new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
-                if (classDecl.getType() != null && JavaType.Class.Kind.Class.equals(classDecl.getType().getKind()) &&
+                if (classDecl.getType() != null && JavaType.Class.Kind.Class == classDecl.getType().getKind() &&
                     (classDecl.getBody() == null || classDecl.getBody().getStatements().isEmpty()) &&
                     classDecl.getLeadingAnnotations().isEmpty() && classDecl.getExtends() == null && classDecl.getImplements() == null) {
                     return SearchResult.found(classDecl);

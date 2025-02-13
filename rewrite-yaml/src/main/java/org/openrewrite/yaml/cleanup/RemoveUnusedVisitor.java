@@ -73,7 +73,7 @@ public class RemoveUnusedVisitor<P> extends YamlIsoVisitor<P> {
     private boolean isEmptyScalar(Yaml.Block y) {
         if (y instanceof Yaml.Scalar) {
             Yaml.Scalar scalar = (Yaml.Scalar) y;
-            return scalar.getValue().isEmpty() && Yaml.Scalar.Style.PLAIN.equals(scalar.getStyle());
+            return scalar.getValue().isEmpty() && Yaml.Scalar.Style.PLAIN == scalar.getStyle();
         }
         return false;
     }
