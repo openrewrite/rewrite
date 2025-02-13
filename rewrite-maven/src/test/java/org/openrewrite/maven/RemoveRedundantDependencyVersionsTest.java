@@ -2019,24 +2019,25 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     @DisplayName("Tests that surround behavior when removing managed dependencies")
     class ManagedDependencyOptionBehavior {
 
-        private static final SourceSpecs PARENT_POM = pomXml("""
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>parent</artifactId>
-                      <version>1.0-SNAPSHOT</version>
-                      <modules>
-                          <module>child</module>
-                      </modules>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>com.google.guava</groupId>
-                                  <artifactId>guava</artifactId>
-                                  <version>30.0-jre</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+        private static final SourceSpecs PARENT_POM = pomXml(
+                """
+            <project>
+                <groupId>org.example</groupId>
+                <artifactId>parent</artifactId>
+                <version>1.0-SNAPSHOT</version>
+                <modules>
+                    <module>child</module>
+                </modules>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>30.0-jre</version>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
             """);
 
         @Test
