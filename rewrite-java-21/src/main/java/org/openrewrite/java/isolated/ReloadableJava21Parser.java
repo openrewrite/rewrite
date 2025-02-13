@@ -38,6 +38,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaParsingException;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.lombok.Lombok;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.style.NamedStyles;
@@ -52,12 +53,9 @@ import javax.tools.JavaFileObject;
 import javax.tools.SimpleJavaFileObject;
 import javax.tools.StandardLocation;
 import java.io.*;
-import java.lang.reflect.Constructor;
 import java.net.URI;
-import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
@@ -121,59 +119,19 @@ public class ReloadableJava21Parser implements JavaParser {
         // for all other source files and unaffected nodes within the same file.
         Options.instance(context).put("should-stop.ifError", "GENERATE");
 
-        LOMBOK:
-        if (classpath != null && classpath.stream().anyMatch(it -> it.toString().contains("lombok-1.18.37"))) {
+        if (classpath != null && classpath.stream().anyMatch(it -> it.toString().contains("lombok"))) {
             Processor lombokProcessor = null;
             try {
-                // https://projectlombok.org/contributing/lombok-execution-path
-                List<String> overrideClasspath = new ArrayList<>();
-                for (Path part : classpath) {
-                    if (part.toString().contains("lombok-1.18.37") || part.toString().contains("rewrite-java-lombok")) {
-                        overrideClasspath.add(part.toString());
-                    }
-                }
-                // make sure the rewrite-java-lombok dependency comes first
-                boolean found = false;
-                for (int i = 0; i < overrideClasspath.size(); i++) {
-                    if (overrideClasspath.get(i).contains("rewrite-java-lombok")) {
-                        overrideClasspath.add(0, overrideClasspath.remove(i));
-                        found = true;
-                    }
-                }
-                if (!found) {
-                    // try to find `rewrite-java-lombok` using class loader
-                    URL resource = getClass().getClassLoader().getResource("org/openrewrite/java/lombok/OpenRewriteConfigurationKeysLoader.class");
-                    if (resource != null && resource.getProtocol().equals("jar") && resource.getPath().startsWith("file:")) {
-                        String path = Paths.get(URI.create(resource.getPath().substring(0, resource.getPath().indexOf("!")))).toString();
-                        overrideClasspath.add(0, path);
-                    } else {
-                        break LOMBOK;
-                    }
-                }
-                System.setProperty("shadow.override.lombok", String.join(File.pathSeparator, overrideClasspath));
-
-                Class<?> shadowLoaderClass = Class.forName("lombok.launch.ShadowClassLoader", true, getClass().getClassLoader());
-                Constructor<?> shadowLoaderConstructor = shadowLoaderClass.getDeclaredConstructor(
-                        Class.forName("java.lang.ClassLoader"),
-                        Class.forName("java.lang.String"),
-                        Class.forName("java.lang.String"),
-                        Class.forName("java.util.List"),
-                        Class.forName("java.util.List"));
-                shadowLoaderConstructor.setAccessible(true);
-
-                ClassLoader lombokShadowLoader = (ClassLoader) shadowLoaderConstructor.newInstance(
-                        getClass().getClassLoader(),
-                        "lombok",
-                        null,
-                        emptyList(),
-                        singletonList("lombok.patcher.Symbols")
-                );
-                lombokProcessor = (Processor) lombokShadowLoader.loadClass("lombok.core.AnnotationProcessor").getDeclaredConstructor().newInstance();
-                Options.instance(context).put(Option.PROCESSOR, "lombok.launch.AnnotationProcessorHider$AnnotationProcessor");
+                lombokProcessor = Lombok.createLombokProcessor(getClass().getClassLoader());
             } catch (ReflectiveOperationException ignore) {
                 // Lombok was not found or could not be initialized
             } finally {
-                annotationProcessors = lombokProcessor != null ? singletonList(lombokProcessor) : emptyList();
+                if (lombokProcessor != null) {
+                    Options.instance(context).put(Option.PROCESSOR, "lombok.launch.AnnotationProcessorHider$AnnotationProcessor");
+                    annotationProcessors = singletonList(lombokProcessor);
+                } else {
+                    annotationProcessors = emptyList();
+                }
             }
         } else {
             annotationProcessors = emptyList();
