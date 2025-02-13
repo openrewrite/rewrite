@@ -16,6 +16,7 @@
 package org.openrewrite.json.format;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.json.style.TabsAndIndentsStyle;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.test.RecipeSpec;
@@ -30,6 +31,7 @@ class WrappingAndBracesVisitorTest implements RewriteTest {
         spec.recipe(new WrappingAndBraces());
     }
 
+    @DocumentExample
     @Test
     void simple() {
         rewriteRun(

@@ -20,12 +20,9 @@ import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaParser;
-import org.openrewrite.java.tree.J;
 import org.openrewrite.style.GeneralFormatStyle;
-import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RewriteTest;
 
-import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SuppressWarnings({"ConstantConditions", "ResultOfMethodCallIgnored", "PointlessBooleanExpression"})

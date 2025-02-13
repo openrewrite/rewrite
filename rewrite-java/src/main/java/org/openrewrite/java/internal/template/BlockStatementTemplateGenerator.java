@@ -471,7 +471,7 @@ public class BlockStatementTemplateGenerator {
             J firstEnclosing = cursor.getParentOrThrow().firstEnclosing(J.class);
             if (m.getArguments().stream().anyMatch(arg -> referToSameElement(prior, arg))) {
                 before.insert(0, "__M__.any(");
-                if (firstEnclosing instanceof J.Block || firstEnclosing instanceof J.Case || 
+                if (firstEnclosing instanceof J.Block || firstEnclosing instanceof J.Case ||
                     firstEnclosing instanceof J.If || firstEnclosing instanceof J.If.Else) {
                     after.append(");");
                 } else {
