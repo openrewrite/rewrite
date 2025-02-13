@@ -121,7 +121,7 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
             }
         } else if (tree instanceof SourceFileWithReferences) {
             SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
-            SourceFileWithReferences.References references = sourceFile.getReferences();
+            SourceFileWithReferences.References references = sourceFile.getReferences(getClass().getClassLoader());
             TypeMatcher matcher = typeMatcher != null ? typeMatcher : new TypeMatcher(fullyQualifiedType);
             for (Reference ignored : references.findMatches(matcher)) {
                 return SearchResult.found(sourceFile);

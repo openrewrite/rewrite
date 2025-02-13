@@ -118,8 +118,8 @@ public interface Properties extends Tree {
         transient SoftReference<References> references;
 
         @Override
-        public References getReferences() {
-            this.references = build(this.references);
+        public References getReferences(ClassLoader classLoader) {
+            this.references = build(this.references, getClass().getClassLoader());
             return Objects.requireNonNull(this.references.get());
         }
     }

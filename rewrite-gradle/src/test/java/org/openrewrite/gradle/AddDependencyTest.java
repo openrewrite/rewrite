@@ -17,17 +17,22 @@ package org.openrewrite.gradle;
 
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.openrewrite.Issue;
+import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -61,6 +66,46 @@ class AddDependencyTest implements RewriteTest {
                 }
             }
       """;
+
+   public static class TSTRecipe extends Recipe {
+        @Override
+        public String getDisplayName() {
+            return "A";
+        }
+
+        @Override
+        public String getDescription() {
+            return "B.";
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getVisitor() {
+            return new JavaVisitor<>(){
+
+                @Override
+                public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
+                    return super.visitMethodDeclaration(method, executionContext);
+                }
+            };
+        }
+    }
+
+    @Disabled
+    @Test
+    void tsts() {
+        rewriteRun(
+          spec -> spec.recipe(new TSTRecipe()),
+          java("""
+            import java.util.List;
+            class A {
+                void tst() {
+                    List.of("A", "B");
+                }
+            }
+            """
+          )
+        );
+    }
 
     @ParameterizedTest
     @ValueSource(strings = {"com.google.common.math.*", "com.google.common.math.IntMath"})
