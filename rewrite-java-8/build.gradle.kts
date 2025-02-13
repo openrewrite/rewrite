@@ -17,7 +17,7 @@ dependencies {
     compileOnly("org.slf4j:slf4j-api:1.7.+")
 
     implementation(project(":rewrite-java"))
-    runtimeOnly(project(":rewrite-java-lombok"))
+    implementation(project(":rewrite-java-lombok"))
     implementation("org.ow2.asm:asm:latest.release")
 
     implementation("io.micrometer:micrometer-core:1.9.+")
