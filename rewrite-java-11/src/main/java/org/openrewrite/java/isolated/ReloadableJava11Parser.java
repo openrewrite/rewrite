@@ -35,11 +35,10 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.MetricsHelper;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaParsingException;
 import org.openrewrite.java.internal.JavaTypeCache;
-import org.openrewrite.java.lombok.Lombok;
+import org.openrewrite.java.lombok.LombokSupport;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.style.NamedStyles;
@@ -123,7 +122,7 @@ public class ReloadableJava11Parser implements JavaParser {
         annotationProcessors = new ArrayList<>(1);
         if (classpath != null && classpath.stream().anyMatch(it -> it.toString().contains("lombok"))) {
             try {
-                Processor lombokProcessor = Lombok.createLombokProcessor(getClass().getClassLoader());
+                Processor lombokProcessor = LombokSupport.createLombokProcessor(getClass().getClassLoader());
                 if (lombokProcessor != null) {
                     Options.instance(context).put(Option.PROCESSOR, "lombok.launch.AnnotationProcessorHider$AnnotationProcessor");
                     annotationProcessors.add(lombokProcessor);

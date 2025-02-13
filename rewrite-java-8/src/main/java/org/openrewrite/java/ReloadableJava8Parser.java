@@ -17,7 +17,6 @@ package org.openrewrite.java;
 
 import com.sun.tools.javac.comp.Check;
 import com.sun.tools.javac.comp.Enter;
-import com.sun.tools.javac.comp.Todo;
 import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javac.main.JavaCompiler;
 import com.sun.tools.javac.main.Option;
@@ -35,7 +34,7 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.internal.JavaTypeCache;
-import org.openrewrite.java.lombok.Lombok;
+import org.openrewrite.java.lombok.LombokSupport;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.style.NamedStyles;
@@ -56,7 +55,6 @@ import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import static com.sun.tools.javac.util.List.nil;
-import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 
 class ReloadableJava8Parser implements JavaParser {
@@ -113,7 +111,7 @@ class ReloadableJava8Parser implements JavaParser {
         annotationProcessors = new ArrayList<>(1);
         if (classpath != null && classpath.stream().anyMatch(it -> it.toString().contains("lombok"))) {
             try {
-                Processor lombokProcessor = Lombok.createLombokProcessor(getClass().getClassLoader());
+                Processor lombokProcessor = LombokSupport.createLombokProcessor(getClass().getClassLoader());
                 if (lombokProcessor != null) {
                     Options.instance(context).put(Option.PROCESSOR, "lombok.launch.AnnotationProcessorHider$AnnotationProcessor");
                     annotationProcessors.add(lombokProcessor);
