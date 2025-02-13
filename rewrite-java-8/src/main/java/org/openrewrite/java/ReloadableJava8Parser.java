@@ -109,7 +109,8 @@ class ReloadableJava8Parser implements JavaParser {
         Options.instance(context).put("should-stop.ifError", "GENERATE");
 
         annotationProcessors = new ArrayList<>(1);
-        if (classpath != null && classpath.stream().anyMatch(it -> it.toString().contains("lombok"))) {
+        if (System.getenv().getOrDefault("REWRITE_LOMBOK", System.getProperty("rewrite.lombok")) != null &&
+            classpath != null && classpath.stream().anyMatch(it -> it.toString().contains("lombok"))) {
             try {
                 Processor lombokProcessor = LombokSupport.createLombokProcessor(getClass().getClassLoader());
                 if (lombokProcessor != null) {
