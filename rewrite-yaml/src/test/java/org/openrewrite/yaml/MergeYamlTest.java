@@ -778,8 +778,6 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
-
-
     @Issue("https://github.com/openrewrite/rewrite/issues/2157")
     @Test
     void mergeSequenceMapAddAdditionalDifferentObject() {
