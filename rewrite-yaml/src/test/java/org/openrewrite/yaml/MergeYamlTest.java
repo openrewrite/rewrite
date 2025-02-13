@@ -1246,6 +1246,39 @@ class MergeYamlTest implements RewriteTest {
     }
 
     @Test
+    void existingEntryBlockWithCommentOnNextBlock() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              first:
+                new: value
+              """,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              first:
+                existing: value
+              # Some comment
+              second: value
+              """,
+            """
+              first:
+                existing: value
+                new: value
+              # Some comment
+              second: value
+              """
+          )
+        );
+    }
+
+    @Test
     void mergeScalar() {
         rewriteRun(
           spec -> spec
@@ -1892,6 +1925,130 @@ class MergeYamlTest implements RewriteTest {
                 A: b
               second: 2
               third: 3
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertBeforeElementFirstLine() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              A: a
+              """,
+            null,
+            null,
+            null,
+            "first"
+          )),
+          yaml(
+            """
+              first: value
+              """,
+            """
+              A: a
+              first: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertBeforeElementWithCommentOnFirstLine() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              A: a
+              """,
+            null,
+            null,
+            null,
+            "first"
+          )),
+          yaml(
+            """
+              # Comment moved from root prefix to first
+              first: value
+              second: value
+              """,
+            """
+              A: a
+              # Comment moved from root prefix to first
+              first: value
+              second: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertBeforeElementWithCommentOnFirstLineWithNesting() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.level",
+            //language=yaml
+            """
+              A: a
+              """,
+            null,
+            null,
+            null,
+            "first"
+          )),
+          yaml(
+            """
+              # Comment untouched 1
+              level:
+                  # Comment untouched 2
+                  first: value
+                  second: value
+              """,
+            """
+              # Comment untouched 1
+              level:
+                  A: a
+                  # Comment untouched 2
+                  first: value
+                  second: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertBeforeElementWithComments() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              A: a
+              """,
+            null,
+            null,
+            null,
+            "second"
+          )),
+          yaml(
+            """
+              # Some comment
+              first: value
+              # Some comment
+              # with multilines
+              second: value # Comment should not be moved from root to previous element
+              """,
+            """
+              # Some comment
+              first: value
+              A: a
+              # Some comment
+              # with multilines
+              second: value # Comment should not be moved from root to previous element
               """
           )
         );

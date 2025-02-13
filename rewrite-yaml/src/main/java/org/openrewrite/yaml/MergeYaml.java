@@ -91,6 +91,7 @@ public class MergeYaml extends Recipe {
     }
 
     final static String FOUND_MATCHING_ELEMENT = "FOUND_MATCHING_ELEMENT";
+    final static String REMOVE_DOCUMENT_PREFIX = "REMOVE_DOCUMENT_PREFIX";
     final static String REMOVE_PREFIX = "REMOVE_PREFIX";
 
     @Override
@@ -122,7 +123,13 @@ public class MergeYaml extends Recipe {
                             new MergeYamlVisitor<>(document.getBlock(), yaml, Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty, insertBefore)
                                     .visitNonNull(document.getBlock(), ctx, getCursor())
                     );
-                    return getCursor().getMessage(REMOVE_PREFIX, false) ? d.withEnd(d.getEnd().withPrefix("")) : d;
+                    if (getCursor().getMessage(REMOVE_DOCUMENT_PREFIX, false)) {
+                        d = d.withPrefix("");
+                    }
+                    if (getCursor().getMessage(REMOVE_PREFIX, false)) {
+                        d = d.withEnd(d.getEnd().withPrefix(""));
+                    }
+                    return d;
                 }
                 Yaml.Document d = super.visitDocument(document, ctx);
                 if (d == document && !getCursor().getMessage(FOUND_MATCHING_ELEMENT, false)) {
