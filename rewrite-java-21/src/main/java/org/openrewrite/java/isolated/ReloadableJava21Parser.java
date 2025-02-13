@@ -48,10 +48,7 @@ import org.openrewrite.tree.ParsingExecutionContextView;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.processing.Processor;
-import javax.tools.JavaFileManager;
-import javax.tools.JavaFileObject;
-import javax.tools.SimpleJavaFileObject;
-import javax.tools.StandardLocation;
+import javax.tools.*;
 import java.io.*;
 import java.net.URI;
 import java.nio.charset.Charset;
@@ -202,7 +199,8 @@ public class ReloadableJava21Parser implements JavaParser {
 
     LinkedHashMap<Input, JCTree.JCCompilationUnit> parseInputsToCompilerAst(Iterable<Input> sourceFiles, ExecutionContext ctx) {
         if (classpath != null) { // override classpath
-            if (context.get(JavaFileManager.class) != pfm) {
+            // Lombok is expected to replace the file manager with its own, so we need to check for that
+            if (context.get(JavaFileManager.class) != pfm && (annotationProcessors.isEmpty() || !(context.get(JavaFileManager.class) instanceof ForwardingJavaFileManager))) {
                 throw new IllegalStateException("JavaFileManager has been forked unexpectedly");
             }
 
