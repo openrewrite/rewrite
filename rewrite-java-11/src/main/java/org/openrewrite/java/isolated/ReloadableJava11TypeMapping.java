@@ -724,8 +724,8 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
             if (mapped != null) {
                 return mapped;
             }
-        } else if (value instanceof Type.ClassType) {
-            return type((Type.ClassType) value);
+        } else if (value instanceof Type) {
+            return type((Type) value);
         } else if (value instanceof Attribute.Array) {
             List<@Nullable Object> list = new ArrayList<>();
             for (Attribute attribute : ((Attribute.Array) value).values) {

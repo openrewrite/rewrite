@@ -103,7 +103,7 @@ class AnnotationTest implements RewriteTest {
             """
               import java.lang.annotation.Target;
               import static java.lang.annotation.ElementType.*;
-
+              
               @Target({ FIELD, PARAMETER , })
               public @interface Annotation {}
               """
@@ -498,7 +498,7 @@ class AnnotationTest implements RewriteTest {
         JavaType.Annotation annotation = (JavaType.Annotation) mi.getMethodType().getAnnotations().get(0);
 
         // Thread.currentThread().stop();
-        assertEquals("java.lang.Deprecated" ,annotation.getType().getFullyQualifiedName());
+        assertEquals("java.lang.Deprecated", annotation.getType().getFullyQualifiedName());
         assertEquals("since", ((JavaType.Method) annotation.getValues().get(0).getElement()).getName());
         assertEquals("1.2", annotation.getValues().get(0).getValue());
         assertEquals("forRemoval", ((JavaType.Method) annotation.getValues().get(1).getElement()).getName());
@@ -507,7 +507,40 @@ class AnnotationTest implements RewriteTest {
         // Thread.currentThread().getContextClassLoader();
         mi = (J.MethodInvocation) md.getBody().getStatements().get(1);
         annotation = (JavaType.Annotation) mi.getMethodType().getAnnotations().get(0);
-        assertEquals("jdk.internal.reflect.CallerSensitive" ,annotation.getType().getFullyQualifiedName());
+        assertEquals("jdk.internal.reflect.CallerSensitive", annotation.getType().getFullyQualifiedName());
         assertTrue(annotation.getValues().isEmpty());
+    }
+
+    @Test
+    void arrayTypeAnnotationElementValues() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Target;
+              
+              @Annotation(type = int[].class)
+              class Test {
+              }
+              
+              @Target(ElementType.TYPE)
+              @interface Annotation {
+                  Class<?> type();
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.ClassDeclaration c = cu.getClasses().get(0);
+                JavaType.Class type = (JavaType.Class) c.getType();
+                JavaType.Annotation a = (JavaType.Annotation) type.getAnnotations().get(0);
+                assertThat(a.getValues()).hasSize(1);
+                JavaType.Annotation.SingleElementValue v = (JavaType.Annotation.SingleElementValue) a.getValues().get(0);
+                assertThat(v.getElement()).isSameAs(a.getMethods().get(0));
+                assertThat(v.getValue()).isInstanceOf(JavaType.Array.class);
+                JavaType.Array array = (JavaType.Array) v.getValue();
+                assertThat(array.getElemType()).isInstanceOf(JavaType.Primitive.class);
+                assertThat(((JavaType.Primitive) array.getElemType()).getKeyword()).isEqualTo("int");
+            })
+          )
+        );
     }
 }
