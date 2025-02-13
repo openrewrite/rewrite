@@ -81,8 +81,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     @Nullable
     List<String> except;
 
-    @Option(displayName = "Replacement Options.  This option is only applicable if `onlyIfManagedVersionIs` " +
-            "relationship suggests a removal.",
+    @Option(example = "TODO Provide a usage example for the docs", displayName = "Replacement Options.  This option is only applicable if `onlyIfManagedVersionIs` " +
+                    "This option is only applicable if `onlyIfManagedVersionIs` relationship suggests a removal.",
             description = "Specifies what should be done with a managed dependency that is managed by a parent. " +
                 "This option is only applicable if `onlyIfManagedVersionIs` relationship suggests a removal.",
             required = false)
