@@ -83,8 +83,8 @@ class AddDependencyTest implements RewriteTest {
             return new JavaVisitor<>(){
 
                 @Override
-                public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
-                    return super.visitMethodDeclaration(method, executionContext);
+                public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                    return super.visitMethodDeclaration(method, ctx);
                 }
             };
         }
@@ -95,7 +95,8 @@ class AddDependencyTest implements RewriteTest {
     void tsts() {
         rewriteRun(
           spec -> spec.recipe(new TSTRecipe()),
-          java("""
+          java(
+                """
             import java.util.List;
             class A {
                 void tst() {
