@@ -66,7 +66,7 @@ public class GroovyParser implements Parser {
         Pattern packagePattern = Pattern.compile("^package\\s+([^;]+);");
         Pattern classPattern = Pattern.compile("(class|interface|enum)\\s*(<[^>]*>)?\\s+(\\w+)");
 
-        Function<String, String> simpleName = sourceStr -> {
+        Function<String, @Nullable String> simpleName = sourceStr -> {
             Matcher classMatcher = classPattern.matcher(sourceStr);
             return classMatcher.find() ? classMatcher.group(3) : null;
         };
@@ -152,7 +152,7 @@ public class GroovyParser implements Parser {
                                 ctx
                         );
                         G.CompilationUnit gcu = mappingVisitor.visit(compiled.getSourceUnit(), compiled.getModule());
-                        if (warnings.size() > 0) {
+                        if (!warnings.isEmpty()) {
                             Markers m = gcu.getMarkers();
                             for (ParseWarning warning : warnings) {
                                 m = m.add(warning);
@@ -241,7 +241,7 @@ public class GroovyParser implements Parser {
             return this;
         }
 
-        public Builder classpath(@Nullable String... artifactNames) {
+        public Builder classpath(String... artifactNames) {
             this.artifactNames = Arrays.asList(artifactNames);
             this.classpath = null;
             return this;

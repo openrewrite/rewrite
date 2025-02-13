@@ -17,12 +17,15 @@ package org.openrewrite.internal;
 
 import org.jspecify.annotations.Nullable;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.net.URI;
+import java.net.URL;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -62,6 +65,24 @@ public class ReflectionUtils {
             searchType = searchType.getSuperclass();
         }
         return null;
+    }
+
+    public static List<Path> findClassPathEntriesFor(String resourceName, ClassLoader classLoader) {
+        List<Path> classPathEntries = new ArrayList<>();
+        try {
+            Enumeration<URL> resources = classLoader.getResources(resourceName);
+            while (resources.hasMoreElements()) {
+                URL resource = resources.nextElement();
+                if (resource.getProtocol().equals("jar") && resource.getPath().startsWith("file:")) {
+                    classPathEntries.add(Paths.get(URI.create(resource.getPath().substring(0, resource.getPath().indexOf("!")))));
+                } else if (resource.getProtocol().equals("file")) {
+                    classPathEntries.add(Paths.get(resource.getPath().substring(0, resource.getPath().indexOf(resourceName))));
+                }
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return classPathEntries;
     }
 
     private static Method[] getDeclaredMethods(Class<?> clazz) {

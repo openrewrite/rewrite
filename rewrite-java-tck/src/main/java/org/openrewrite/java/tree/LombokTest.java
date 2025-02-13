@@ -19,6 +19,8 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.MinimumJava11;
 import org.openrewrite.java.MinimumJava17;
@@ -71,6 +73,29 @@ class LombokTest implements RewriteTest {
                     out.write(b, 0, r);
                   }
                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void setterWithAdditionalAnnotations() {
+        rewriteRun(
+          // I was unable to reproduce this problem only using built-in annotations like `@SuppressWarnings` or `@Deprecated`
+          // This is a parsing test, so we don't really need to check for type attribution
+          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).classDeclarations(false).build()),
+          java(
+            """
+              import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
+              import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
+              import lombok.Setter;
+              
+              class Profiles {
+                  @Setter
+                  @JacksonXmlProperty(localName = "profile")
+                  @JacksonXmlElementWrapper(useWrapping = false)
+                  String profile;
               }
               """
           )
@@ -909,6 +934,38 @@ class LombokTest implements RewriteTest {
                   }
               }
               """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "AllArgsConstructor",
+      "Builder",
+      "Data",
+      "EqualsAndHashCode",
+      "NoArgsConstructor",
+      "RequiredArgsConstructor",
+      "ToString",
+      "Value",
+      "With"
+    })
+    @MinimumJava11
+    void npeSeenOnMultipleAnnotations(String annotation) {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath())),
+          java(
+            //language=java
+            String.format("""
+              import lombok.%s;
+              import org.jspecify.annotations.Nullable;
+              
+              @%1$s
+              public class Foo {
+                  @Nullable
+                  String bar;
+              }
+              """, annotation)
           )
         );
     }
