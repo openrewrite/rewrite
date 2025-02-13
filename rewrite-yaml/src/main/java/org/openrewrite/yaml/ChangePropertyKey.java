@@ -268,7 +268,7 @@ public class ChangePropertyKey extends Recipe {
                     } else {
                         m = (Yaml.Mapping) new DeletePropertyVisitor<>(entryToReplace).visitNonNull(m, p);
                         Yaml.Mapping newMapping = m.withEntries(Collections.singletonList(newEntry));
-                        Yaml.Mapping mergedMapping = (Yaml.Mapping) new MergeYamlVisitor<>(m, newMapping, true, null, false).visitMapping(m, p);
+                        Yaml.Mapping mergedMapping = (Yaml.Mapping) new MergeYamlVisitor<>(m, newMapping, true, null, false, null).visitMapping(m, p);
                         m = maybeAutoFormat(m, mergedMapping, p, getCursor().getParentOrThrow());
                     }
                 }

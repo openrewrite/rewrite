@@ -780,6 +780,43 @@ class MergeYamlTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2157")
     @Test
+    void mergeSequenceMapAddAdditionalDifferentObject() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml(
+              "$.testing",
+              //language=yaml
+              """
+                table:
+                  - name2: jdk_version
+                    value: 18
+                """,
+              false,
+              "name2",
+              null,
+              null
+            )),
+          yaml(
+            """
+              testing:
+                table:
+                  - name: build_tool
+                    row2key2: maven
+              """,
+            """
+              testing:
+                table:
+                  - name: build_tool
+                    row2key2: maven
+                  - name2: jdk_version
+                    value: 18
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2157")
+    @Test
     void mergeSequenceMapAddObject() {
         rewriteRun(
           spec -> spec
@@ -1240,6 +1277,39 @@ class MergeYamlTest implements RewriteTest {
                   name: main # Some comment
                   name2: main
                   description: a description
+              """
+          )
+        );
+    }
+
+    @Test
+    void existingEntryBlockWithCommentOnNextBlock() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              first:
+                new: value
+              """,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              first:
+                existing: value
+              # Some comment
+              second: value
+              """,
+            """
+              first:
+                existing: value
+                new: value
+              # Some comment
+              second: value
               """
           )
         );
@@ -1898,6 +1968,192 @@ class MergeYamlTest implements RewriteTest {
     }
 
     @Test
+    void insertBeforeMultiple() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              first:
+                key: one
+              second:
+                key: two
+              """,
+            null,
+            null,
+            null,
+            "level"
+          )),
+          yaml(
+            """
+              first:
+                level: one
+              second:
+                level: two
+              """,
+            """
+              first:
+                key: one
+                level: one
+              second:
+                key: two
+                level: two
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertBeforeWithNoMatch() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              A: a
+              """,
+            null,
+            null,
+            null,
+            "no-key"
+          )),
+          yaml(
+            """
+              first:
+              """,
+            """
+              first:
+              A: a
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertBeforeElementFirstLine() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              A: a
+              """,
+            null,
+            null,
+            null,
+            "first"
+          )),
+          yaml(
+            """
+              first: value
+              """,
+            """
+              A: a
+              first: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertBeforeElementWithCommentOnFirstLine() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              A: a
+              """,
+            null,
+            null,
+            null,
+            "first"
+          )),
+          yaml(
+            """
+              # Comment moved from root prefix to first
+              first: value
+              second: value
+              """,
+            """
+              A: a
+              # Comment moved from root prefix to first
+              first: value
+              second: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertBeforeElementWithCommentOnFirstLineWithNesting() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.level",
+            //language=yaml
+            """
+              A: a
+              """,
+            null,
+            null,
+            null,
+            "first"
+          )),
+          yaml(
+            """
+              # Comment untouched 1
+              level:
+                  # Comment untouched 2
+                  first: value
+                  second: value
+              """,
+            """
+              # Comment untouched 1
+              level:
+                  A: a
+                  # Comment untouched 2
+                  first: value
+                  second: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertBeforeElementWithComments() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              A: a
+              """,
+            null,
+            null,
+            null,
+            "second"
+          )),
+          yaml(
+            """
+              # Some comment
+              first: value
+              # Some comment
+              # with multilines
+              second: value # Comment should not be moved from root to previous element
+              """,
+            """
+              # Some comment
+              first: value
+              A: a
+              # Some comment
+              # with multilines
+              second: value # Comment should not be moved from root to previous element
+              """
+          )
+        );
+    }
+
+    @Test
     void insertBeforeEmpty() {
         rewriteRun(
           spec -> spec.recipe(new MergeYaml(
@@ -1965,6 +2221,81 @@ class MergeYamlTest implements RewriteTest {
                      some: C
              yet: another
              """
+          )
+        );
+    }
+
+    @Test
+    void insertBeforeMergeList() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              widget:
+                list:
+                  - item 2
+                another:
+                  prop: value
+              """,
+            null,
+            null,
+            null,
+            "item 3"
+          )),
+          yaml(
+            """
+              widget:
+                list:
+                  - item 1
+                  # Comment untouched
+                  - item 3
+              """,
+            """
+              widget:
+                list:
+                  - item 1
+                  - item 2
+                  # Comment untouched
+                  - item 3
+                another:
+                  prop: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertBeforeMergeSequenceMapAddAdditionalObject() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml(
+              "$.testing",
+              //language=yaml
+              """
+                - name: y
+                  value: 1
+                """,
+              false,
+              "name",
+              null,
+              "name: x"
+            )),
+          yaml(
+            """
+              testing:
+                # Comment untouched
+                - name: x
+                  value: 1
+              """,
+            """
+              testing:
+                - name: y
+                  value: 1
+                # Comment untouched
+                - name: x
+                  value: 1
+              """
           )
         );
     }
