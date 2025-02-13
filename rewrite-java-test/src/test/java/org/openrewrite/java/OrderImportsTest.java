@@ -26,10 +26,7 @@ import org.openrewrite.test.RewriteTest;
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.java.Assertions.addTypesToSourceSet;
-import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.java.Assertions.srcMainJava;
-import static org.openrewrite.java.Assertions.version;
+import static org.openrewrite.java.Assertions.*;
 
 class OrderImportsTest implements RewriteTest {
 

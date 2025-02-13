@@ -40,6 +40,7 @@ class LombokTest implements RewriteTest {
 
     @BeforeAll
     static void setUp() {
+        // Only needed for Java 8, until enabled by default there
         System.setProperty("rewrite.lombok", "true");
     }
 
@@ -72,6 +73,29 @@ class LombokTest implements RewriteTest {
                     out.write(b, 0, r);
                   }
                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void setterWithAdditionalAnnotations() {
+        rewriteRun(
+          // I was unable to reproduce this problem only using built-in annotations like `@SuppressWarnings` or `@Deprecated`
+          // This is a parsing test, so we don't really need to check for type attribution
+          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).classDeclarations(false).build()),
+          java(
+            """
+              import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
+              import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
+              import lombok.Setter;
+              
+              class Profiles {
+                  @Setter
+                  @JacksonXmlProperty(localName = "profile")
+                  @JacksonXmlElementWrapper(useWrapping = false)
+                  String profile;
               }
               """
           )
