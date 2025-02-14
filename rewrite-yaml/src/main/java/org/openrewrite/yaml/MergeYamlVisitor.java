@@ -353,7 +353,17 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
     private String substringOfAfterFirstLineBreak(String s) {
         String[] lines = LINE_BREAK.split(s);
-        return lines.length > 1 ? String.join(linebreak(), Arrays.copyOfRange(lines, 1, lines.length)) : "";
+        int index = s.length() - 1;
+        final StringBuilder trailingLineBreaks = new StringBuilder();
+        char currentTrailingLineBreak = s.charAt(index);
+        while (index > 0 && (currentTrailingLineBreak == '\n' || currentTrailingLineBreak == '\r')) {
+            if (currentTrailingLineBreak == '\n') {
+                trailingLineBreaks.append(linebreak());
+            }
+            index--;
+            currentTrailingLineBreak = s.charAt(index);
+        }
+        return lines.length > 1 ? (String.join(linebreak(), Arrays.copyOfRange(lines, 1, lines.length)) + trailingLineBreaks) : "";
     }
 
     private int calculateMultilineIndent(Yaml.Mapping.Entry entry) {
