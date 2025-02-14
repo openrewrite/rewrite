@@ -30,8 +30,10 @@ public class HttpUrlConnectionSenderTest {
     @Test
     void withMultipartContentWithApplicationJsonType() {
         HttpSender.Request request =
-          new HttpUrlConnectionSender().newRequest("http://github.com").withMultipartContent(HttpSender.Request.Builder.APPLICATION_JSON,
-            "json", "{\"foo\":\"bar\"}").build();
+          new HttpUrlConnectionSender().newRequest("http://github.com")
+            .withMultipartContent(HttpSender.Request.Builder.APPLICATION_JSON,
+              "json", "{\"foo\":\"bar\"}")
+            .build();
         assertThat(new String(request.getEntity())).matches(Pattern.compile("""
           \r
           --.*\r
