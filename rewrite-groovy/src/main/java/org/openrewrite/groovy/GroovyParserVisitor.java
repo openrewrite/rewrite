@@ -91,7 +91,7 @@ public class GroovyParserVisitor {
 
     private int cursor = 0;
 
-    private static final String MULTILINE_COMMENT_REGEX = "(?s)/\\*.*?\\*/";
+    private static final Pattern MULTILINE_COMMENT_REGEX = Pattern.compile("(?s)/\\*.*?\\*/");
     private static final Pattern whitespacePrefixPattern = Pattern.compile("^\\s*");
 
     @SuppressWarnings("RegExpSimplifiable")
@@ -2836,7 +2836,7 @@ public class GroovyParserVisitor {
             String importSource = sourceLineNumberOffsets.length <= lastLineNumber ? source : source.substring(0, sourceLineNumberOffsets[lastLineNumber]);
 
             // Create a node for each `import static`, don't parse comments
-            String[] lines = importSource.replaceAll(MULTILINE_COMMENT_REGEX, "").split("\n");
+            String[] lines = eraseMultiLineComments(importSource).split("\n");
             for (int i = 0; i < lines.length; i++) {
                 String line = lines[i].split(SINGLE_LINE_COMMENT.open)[0];
                 int index = 0;
@@ -2859,8 +2859,6 @@ public class GroovyParserVisitor {
 
                     if (packageEnd < line.length() && line.charAt(packageEnd) == '*') {
                         ImportNode node = new ImportNode(staticStarImports.get(line.substring(packageBegin, packageEnd - 1)).getType());
-                        // The line numbers can be off, because we filter away all the multiline comments.
-                        // This does not really do any harm, because we only use the line numbers to order the nodes in the `sortedByPosition` var.
                         node.setLineNumber(i + 1);
                         node.setColumnNumber(importIndex + 1);
                         completeStaticStarImports.add(node);
@@ -2871,6 +2869,19 @@ public class GroovyParserVisitor {
             }
         }
         return completeStaticStarImports;
+    }
+
+    // VisibleForTesting
+    static String eraseMultiLineComments(String importSource) {
+        Matcher matcher = MULTILINE_COMMENT_REGEX.matcher(importSource);
+        StringBuffer sb = new StringBuffer(); // appendReplacement requires Java 9+ for StringBuilder
+        while (matcher.find()) {
+            String match = matcher.group();
+            String replacement = match.replaceAll("[^\\n]", " ");
+            matcher.appendReplacement(sb, replacement);
+        }
+        matcher.appendTail(sb);
+        return sb.toString();
     }
 
     private DeclarationExpression transformBackToDeclarationExpression(ConstantExpression expression) {
