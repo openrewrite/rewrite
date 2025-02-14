@@ -17,7 +17,6 @@ package org.openrewrite.yaml;
 
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
-import lombok.val;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
@@ -37,7 +36,7 @@ import static org.openrewrite.Cursor.ROOT_VALUE;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.ListUtils.*;
 import static org.openrewrite.internal.StringUtils.*;
-import static org.openrewrite.yaml.MergeYaml.*;
+import static org.openrewrite.yaml.MergeYaml.InsertMode;
 import static org.openrewrite.yaml.MergeYaml.InsertMode.*;
 import static org.openrewrite.yaml.MergeYaml.REMOVE_PREFIX;
 
@@ -206,63 +205,52 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         });
 
         // Merge existing and new entries together
-        val concat = concatAlll(mergedEntries, newEntries, it -> it.getKey().getValue());
-        val mutatedEntries = concat.ls;
+        ListConcat<Yaml.Mapping.Entry> mutatedEntries = concatAll(mergedEntries, newEntries, it -> it.getKey().getValue());
 
         // copy comment to previous element if needed
-        if (m1.getEntries().size() < mutatedEntries.size() && !getCursor().isRoot()) {
-            // Insert somewhere in the middle, so no changes to the rest of the tree
-            if (concat.insertIndex > 0 && concat.closeIndex < mutatedEntries.size() -1) {
-                val openingEntry = mutatedEntries.get(concat.insertIndex);
-                val closingEntry = mutatedEntries.get(concat.closeIndex);
+        if (m1.getEntries().size() < mutatedEntries.ls.size() && !getCursor().isRoot()) {
+            // If newly entries are inserted somewhere, but not the last entry nor at the document root, we can be sure no changes to the rest of the tree are needed
+            if (mutatedEntries.lastNewlyAddedItemIndex != -1 && mutatedEntries.lastNewlyAddedItemIndex < mutatedEntries.ls.size() - 1) {
+                Yaml.Mapping.Entry afterInsertEntry = mutatedEntries.ls.get(mutatedEntries.lastNewlyAddedItemIndex + 1);
 
-                String partOne = substringOfBeforeFirstLineBreak(closingEntry.getPrefix());
-                String partTwo = substringOfAfterFirstLineBreak(closingEntry.getPrefix());
-                mutatedEntries.set(concat.insertIndex, openingEntry.withPrefix(partOne + openingEntry.getPrefix()));
-                mutatedEntries.set(concat.closeIndex, closingEntry.withPrefix(linebreak() + partTwo));
+                // Check if merge is done on the very first key of the yaml file
+                if (mutatedEntries.firstNewlyAddedItemIndex == 0 && getCursor().getParentOrThrow().getValue() instanceof Yaml.Document &&
+                        ((Yaml.Mapping) ((Yaml.Document) getCursor().getParentOrThrow().getValue()).getBlock()).getEntries().equals(((Yaml.Mapping) existing).getEntries())) {
+                    mutatedEntries.ls.set(mutatedEntries.firstNewlyAddedItemIndex, mutatedEntries.ls.get(0).withPrefix("")); // Remove linebreak from first entry
+                    mutatedEntries.ls.set(mutatedEntries.lastNewlyAddedItemIndex + 1, afterInsertEntry.withPrefix(linebreak() + ((Yaml.Document) getCursor().getParentOrThrow().getValue()).getPrefix() + afterInsertEntry.getPrefix()));
+                    getCursor().getParentOrThrow().putMessage(REMOVE_PREFIX, true);
+                } else {
+                    Yaml.Mapping.Entry firstNewlyAddedEntry = mutatedEntries.ls.get(mutatedEntries.firstNewlyAddedItemIndex);
+                    String partOne = substringOfBeforeFirstLineBreak(afterInsertEntry.getPrefix());
+                    String partTwo = substringOfAfterFirstLineBreak(afterInsertEntry.getPrefix());
 
-                System.out.println(concat.insertIndex);
-                System.out.println(concat.closeIndex);
-                System.out.println(partTwo);
+                    mutatedEntries.ls.set(mutatedEntries.firstNewlyAddedItemIndex, firstNewlyAddedEntry.withPrefix(partOne + firstNewlyAddedEntry.getPrefix()));
+                    mutatedEntries.ls.set(mutatedEntries.lastNewlyAddedItemIndex + 1, afterInsertEntry.withPrefix(linebreak() + partTwo));
+                }
             } else {
-                Cursor c = getCursor().dropParentUntil(it -> {
-                    if (ROOT_VALUE.equals(it) || it instanceof Yaml.Document) {
-                        return true;
-                    }
+               Cursor c = getCursor().dropParentUntil(it -> {
+                   if (ROOT_VALUE.equals(it) || it instanceof Yaml.Document) {
+                       return true;
+                   }
 
-                    if (it instanceof Yaml.Mapping) {
-                        List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) it).getEntries();
-                        // last member should search further upwards until two entries are found
-                        if (entries.get(entries.size() - 1).equals(getCursor().getParentOrThrow().getValue())) {
-                            return false;
-                        }
-                        return entries.size() > 1;
-                    }
+                   if (it instanceof Yaml.Mapping) {
+                       List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) it).getEntries();
+                       // last member should search further upwards until two entries are found
+                       if (entries.get(entries.size() - 1).equals(getCursor().getParentOrThrow().getValue())) {
+                           return false;
+                       }
+                       return entries.size() > 1;
+                   }
 
-                    return false;
-                });
+                   return false;
+               });
 
-                COPY_COMMENTS:
                 if (c.getValue() instanceof Yaml.Document || c.getValue() instanceof Yaml.Mapping) {
                     String comment = null;
 
                     if (c.getValue() instanceof Yaml.Document) {
-                        Yaml.Document document = c.getValue();
-                        if (insertMode == Before) {
-                            List<Yaml.Mapping.Entry> documentEntries = ((Yaml.Mapping) document.getBlock()).getEntries();
-                            // Check if merge is done on the very first key of the yaml file
-                            if (documentEntries.equals(((Yaml.Mapping) existing).getEntries()) && !documentEntries.get(0).equals((mutatedEntries.get(0)))) {
-                                // Remove linebreak from first entry
-                                mutatedEntries.set(0, mutatedEntries.get(0).withPrefix(""));
-                                // Copy prefix of document to second mutated element (originally the first) AND put message on cursor to remove comment from document
-                                Yaml.Mapping.Entry second = mutatedEntries.get(1);
-                                mutatedEntries.set(1, second.withPrefix(linebreak() + document.getPrefix() + second.getPrefix()));
-                                c.putMessage(REMOVE_PREFIX, true);
-                            }
-                            break COPY_COMMENTS;
-                        }
-                        comment = document.getEnd().getPrefix();
-                    } else /*if (insertMode != Before)*/ {
+                        comment = c.<Yaml.Document>getValue().getEnd().getPrefix();
+                    } else {
                         List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) c.getValue()).getEntries();
 
                         // Get comment from next element in same mapping block
@@ -280,8 +268,8 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
                     if (isNotEmpty(comment)) {
                         // Copy comment to last mutated element AND put message on cursor to remove comment from original element
-                        Yaml.Mapping.Entry last = mutatedEntries.get(mutatedEntries.size() - 1);
-                        mutatedEntries.set(mutatedEntries.size() - 1, last.withPrefix(comment + last.getPrefix()));
+                        Yaml.Mapping.Entry last = mutatedEntries.ls.get(mutatedEntries.ls.size() - 1);
+                        mutatedEntries.ls.set(mutatedEntries.ls.size() - 1, last.withPrefix(comment + last.getPrefix()));
                         c.putMessage(REMOVE_PREFIX, true);
                     }
                 }
@@ -289,10 +277,10 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         }
 
         if (insertMode != Before) {
-            removePrefixForDirectChildren(m1.getEntries(), mutatedEntries);
+            removePrefixForDirectChildren(m1.getEntries(), mutatedEntries.ls);
         }
 
-        return m1.withEntries(mutatedEntries);
+        return m1.withEntries(mutatedEntries.ls);
     }
 
     private void removePrefixForDirectChildren(List<Yaml.Mapping.Entry> m1Entries, List<Yaml.Mapping.Entry> mutatedEntries) {
@@ -327,16 +315,16 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
             }
 
             List<Yaml.Sequence.Entry> newEntries = map(incomingEntries, it -> autoFormat(it, p, cursor));
-            List<Yaml.Sequence.Entry> mutatedEntries = concatAll(s1.getEntries(), newEntries, it -> ((Yaml.Scalar) it.getBlock()).getValue());
+            List<Yaml.Sequence.Entry> mutatedEntries = concatAll(s1.getEntries(), newEntries, it -> ((Yaml.Scalar) it.getBlock()).getValue()).ls;
 
             return s1.withEntries(mutatedEntries);
         }
-        
+
         if (objectIdentifyingProperty == null) {
             // No identifier set to match entries on, so cannot continue
             return s1;
         }
-        
+
         List<Yaml.Sequence.Entry> mutatedEntries = map(s2.getEntries(), entry -> {
             Yaml.Mapping incomingMapping = (Yaml.Mapping) entry.getBlock();
             for (Yaml.Sequence.Entry existingEntry : s1.getEntries()) {
@@ -359,7 +347,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 it -> {
                     Yaml.Mapping.Entry entry = ((Yaml.Mapping) it.getBlock()).getEntries().get(0);
                     return entry.getKey().getValue() + ": " + ((Yaml.Scalar) entry.getValue()).getValue();
-                });
+                }).ls;
 
         return s1.withEntries(entries);
     }
@@ -373,68 +361,41 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     /**
      * Specialized concatAll function which takes the `insertPlace` property into account.
      */
-    private <T> List<T> concatAll(List<T> ls, List<T> t, Function<T, String> getValue) {
+    private <T> ListConcat<T> concatAll(List<T> ls, List<T> t, Function<T, String> getValue) {
         if (insertMode == null || insertMode == Last || t.isEmpty()) {
-            return ListUtils.concatAll(ls, t);
+            return new ListConcat<>(ListUtils.concatAll(ls, t), -1,-1);
         }
 
         List<T> mutatedEntries = new ArrayList<>();
         boolean hasInsertedBeforeOrAfterElements = false;
-        for (T existingEntry : ls) {
-            if (!hasInsertedBeforeOrAfterElements && insertMode == Before && insertProperty.equals(getValue.apply(existingEntry))) {
-                hasInsertedBeforeOrAfterElements = true;
-                mutatedEntries.addAll(t);
-            }
-            mutatedEntries.add(existingEntry);
-            if (!hasInsertedBeforeOrAfterElements && insertMode == After && insertProperty.equals(getValue.apply(existingEntry))) {
-                hasInsertedBeforeOrAfterElements = true;
-                mutatedEntries.addAll(t);
-            }
-        }
-        if (!hasInsertedBeforeOrAfterElements) {
-            mutatedEntries.addAll(t);
-        }
-        return mutatedEntries;
-    }
-
-    /**
-     * Specialized concatAll function which takes the `insertPlace` property into account.
-     */
-    private <T> Concat<T> concatAlll(List<T> ls, List<T> t, Function<T, String> getValue) {
-        if (insertMode == null || insertMode == Last || t.isEmpty()) {
-            return new Concat<>(ListUtils.concatAll(ls, t), -1, -1);
-        }
-
-        List<T> mutatedEntries = new ArrayList<>();
-        boolean hasInsertedBeforeOrAfterElements = false;
-        int insertIndex = 0, closeIndex = 0;
+        int insertIndex = -1, closeIndex = -1;
         for (int i = 0; i < ls.size(); i++) {
             T existingEntry = ls.get(i);
             if (!hasInsertedBeforeOrAfterElements && insertMode == Before && insertProperty.equals(getValue.apply(existingEntry))) {
                 hasInsertedBeforeOrAfterElements = true;
                 mutatedEntries.addAll(t);
                 insertIndex = i;
-                closeIndex = i + t.size();
+                closeIndex = i + t.size() - 1;
             }
             mutatedEntries.add(existingEntry);
             if (!hasInsertedBeforeOrAfterElements && insertMode == After && insertProperty.equals(getValue.apply(existingEntry))) {
                 hasInsertedBeforeOrAfterElements = true;
                 mutatedEntries.addAll(t);
-                insertIndex = i;
+                insertIndex = i + 1;
                 closeIndex = i + t.size();
             }
         }
         if (!hasInsertedBeforeOrAfterElements) {
             mutatedEntries.addAll(t);
         }
-        return new Concat<>(mutatedEntries, insertIndex, closeIndex);
+        return new ListConcat<>(mutatedEntries, insertIndex, closeIndex);
     }
 
     @Value
-    private static class Concat<T> {
+    private static class ListConcat<T> {
         List<T> ls;
-        int insertIndex;
-        int closeIndex;
+        int firstNewlyAddedItemIndex;
+        int lastNewlyAddedItemIndex;
     }
 
     private String substringOfBeforeFirstLineBreak(String s) {

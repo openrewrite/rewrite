@@ -2122,6 +2122,7 @@ class MergeYamlTest implements RewriteTest {
             //language=yaml
             """
               A: a
+              B: b
               """,
             null,
             null,
@@ -2137,6 +2138,7 @@ class MergeYamlTest implements RewriteTest {
               """,
             """
               A: a
+              B: b
               # Comment moved from root prefix to first
               first: value
               second: value
@@ -2146,14 +2148,14 @@ class MergeYamlTest implements RewriteTest {
     }
 
     @Test
-    void insertBeforeElementWithCommentOnFirstLineWithNesting() {
+    void insertBeforeElementWithCommentsWithNesting() {
         rewriteRun(
           spec -> spec.recipe(new MergeYaml(
             "$.level",
             //language=yaml
             """
-              A: a # New comment 1
-              B: b # New comment 2
+              A: a
+              B: b
               """,
             null,
             null,
@@ -2174,8 +2176,8 @@ class MergeYamlTest implements RewriteTest {
               # Comment 1
               level:
                   before: value # Comment 2
-                  A: a # New comment 1
-                  B: b # New comment 2
+                  A: a
+                  B: b
                   # Comment 3
                   first: value
                   second: value
@@ -2541,6 +2543,7 @@ class MergeYamlTest implements RewriteTest {
             //language=yaml
             """
               A: a
+              B: a
               """,
             null,
             null,
@@ -2569,6 +2572,7 @@ class MergeYamlTest implements RewriteTest {
                 # Comment 3
                 second: value # Comment 4
                 A: a
+                B: a
                 third: value # Comment 5
                 fourth: value # Comment 6
               # Comment 7
@@ -2676,7 +2680,7 @@ class MergeYamlTest implements RewriteTest {
               widget:
                 list:
                   - item 1
-                  # Comment untouched
+                  # Comment 2
                   - item 3
               """,
             """
@@ -2684,7 +2688,7 @@ class MergeYamlTest implements RewriteTest {
                 list:
                   - item 1
                   - item 2
-                  # Comment untouched
+                  # Comment 2
                   - item 3
                 another:
                   prop: value
