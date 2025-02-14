@@ -118,7 +118,7 @@ public class ChangePackage extends Recipe {
                     SourceFileWithReferences cu = (SourceFileWithReferences) tree;
                     boolean recursive = Boolean.TRUE.equals(ChangePackage.this.recursive);
                     String recursivePackageNamePrefix = oldPackageName + ".";
-                    for (Reference ref : cu.getReferences(getClass().getClassLoader()).getReferences()) {
+                    for (Reference ref : cu.getReferences().getReferences()) {
                         if (ref.getValue().equals(oldPackageName) || recursive && ref.getValue().startsWith(recursivePackageNamePrefix)) {
                             return SearchResult.found(cu);
                         }
@@ -141,7 +141,7 @@ public class ChangePackage extends Recipe {
                     return new JavaChangePackageVisitor().visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 } else if (tree instanceof SourceFileWithReferences) {
                     SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
-                    SourceFileWithReferences.References references = sourceFile.getReferences(getClass().getClassLoader());
+                    SourceFileWithReferences.References references = sourceFile.getReferences();
                     boolean recursive = Boolean.TRUE.equals(ChangePackage.this.recursive);
                     PackageMatcher matcher = new PackageMatcher(oldPackageName, recursive);
                     Map<Tree, Reference> matches = new HashMap<>();

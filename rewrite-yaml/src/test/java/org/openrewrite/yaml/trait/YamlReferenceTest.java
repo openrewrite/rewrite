@@ -53,7 +53,7 @@ class YamlReferenceTest implements RewriteTest {
           yaml(
             YAML,
             spec -> spec.path(filename).afterRecipe(doc ->
-              assertThat(doc.getReferences(getClass().getClassLoader()).getReferences()).satisfiesExactlyInAnyOrder(
+              assertThat(doc.getReferences().getReferences()).satisfiesExactlyInAnyOrder(
                 ref -> {
                     assertThat(ref.getKind()).isEqualTo(Reference.Kind.TYPE);
                     assertThat(ref.getValue()).isEqualTo("java.lang.String");
@@ -90,7 +90,7 @@ class YamlReferenceTest implements RewriteTest {
         rewriteRun(
           yaml(
             YAML,
-            spec -> spec.path(filename).afterRecipe(doc -> assertThat(doc.getReferences(getClass().getClassLoader()).getReferences()).isEmpty())
+            spec -> spec.path(filename).afterRecipe(doc -> assertThat(doc.getReferences().getReferences()).isEmpty())
           )
         );
     }
@@ -108,7 +108,7 @@ class YamlReferenceTest implements RewriteTest {
               """,
             spec -> spec
               .path("application.yml")
-              .afterRecipe(doc -> assertThat(doc.getReferences(getClass().getClassLoader()).getReferences()).singleElement().satisfies(
+              .afterRecipe(doc -> assertThat(doc.getReferences().getReferences()).singleElement().satisfies(
                 ref -> {
                     assertThat(ref.getKind()).isEqualTo(Reference.Kind.TYPE);
                     assertThat(ref.getValue()).isEqualTo("org.openrewrite.java.DoSomething");

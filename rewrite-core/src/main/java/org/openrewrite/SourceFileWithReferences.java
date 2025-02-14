@@ -27,7 +27,7 @@ import java.util.*;
 @Incubating(since = "8.39.0")
 public interface SourceFileWithReferences extends SourceFile {
 
-    References getReferences(ClassLoader classLoader);
+    References getReferences();
 
     default SoftReference<References> build(@Nullable SoftReference<@Nullable References> references) {
         References cache = references == null ? null : references.get();

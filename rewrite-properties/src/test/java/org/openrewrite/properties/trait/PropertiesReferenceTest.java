@@ -44,7 +44,7 @@ class PropertiesReferenceTest implements RewriteTest {
           properties(
             PROPERTIES,
             spec -> spec.path(filename).afterRecipe(doc ->
-              assertThat(doc.getReferences(getClass().getClassLoader()).getReferences())
+              assertThat(doc.getReferences().getReferences())
                 .satisfiesExactlyInAnyOrder(
                   ref -> {
                       assertThat(ref.getKind()).isEqualTo(Reference.Kind.TYPE);
@@ -72,7 +72,7 @@ class PropertiesReferenceTest implements RewriteTest {
         rewriteRun(
           properties(
             PROPERTIES,
-            spec -> spec.path(filename).afterRecipe(doc -> assertThat(doc.getReferences(getClass().getClassLoader()).getReferences()).isEmpty())
+            spec -> spec.path(filename).afterRecipe(doc -> assertThat(doc.getReferences().getReferences()).isEmpty())
           )
         );
     }

@@ -168,7 +168,7 @@ public interface Xml extends Tree {
         transient SoftReference<References> references;
 
         @Override
-        public References getReferences(ClassLoader classLoader) {
+        public References getReferences() {
             this.references = build(this.references);
             return Objects.requireNonNull(this.references.get());
         }

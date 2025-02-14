@@ -77,7 +77,7 @@ public class FindTypes extends Recipe {
                     return new JavaSourceFileVisitor(fullyQualifiedType).visit(tree, ctx);
                 } else if (tree instanceof SourceFileWithReferences) {
                     SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
-                    SourceFileWithReferences.References references = sourceFile.getReferences(getClass().getClassLoader());
+                    SourceFileWithReferences.References references = sourceFile.getReferences();
                     TypeMatcher matcher = new TypeMatcher(fullyQualifiedTypeName);
                     Set<Tree> matches = references.findMatches(matcher).stream().map(Trait::getTree).collect(Collectors.toSet());
                     return new ReferenceVisitor(matches).visit(tree, ctx);
