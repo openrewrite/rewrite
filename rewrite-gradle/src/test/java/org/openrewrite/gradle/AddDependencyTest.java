@@ -17,13 +17,19 @@ package org.openrewrite.gradle;
 
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
@@ -36,12 +42,7 @@ import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.groovy.Assertions.groovy;
 import static org.openrewrite.groovy.Assertions.srcMainGroovy;
-import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.java.Assertions.mavenProject;
-import static org.openrewrite.java.Assertions.srcMainJava;
-import static org.openrewrite.java.Assertions.srcMainResources;
-import static org.openrewrite.java.Assertions.srcSmokeTestJava;
-import static org.openrewrite.java.Assertions.srcTestJava;
+import static org.openrewrite.java.Assertions.*;
 import static org.openrewrite.properties.Assertions.properties;
 
 @SuppressWarnings("GroovyUnusedAssignment")

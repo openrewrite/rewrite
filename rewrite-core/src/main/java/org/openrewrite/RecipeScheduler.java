@@ -38,6 +38,7 @@ public class RecipeScheduler {
                                  int maxCycles,
                                  int minCycles) {
         try {
+            Thread.currentThread().setContextClassLoader(recipe.getClass().getClassLoader());
             LargeSourceSet after = runRecipeCycles(recipe, sourceSet, ctx, maxCycles, minCycles);
             return new RecipeRun(
                     after.getChangeset(),
