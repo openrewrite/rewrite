@@ -235,43 +235,37 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
                    if (it instanceof Yaml.Mapping) {
                        List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) it).getEntries();
-                       // last member should search further upwards until two entries are found
-                       if (entries.get(entries.size() - 1).equals(getCursor().getParentOrThrow().getValue())) {
-                           return false;
-                       }
-                       return entries.size() > 1;
+                       // At least two entries and when current elem is the last entry should not be current entry
+                       return entries.size() > 1 && !entries.get(entries.size() - 1).equals(getCursor().getParentOrThrow().getValue());
                    }
 
                    return false;
                });
 
-                if (c.getValue() instanceof Yaml.Document || c.getValue() instanceof Yaml.Mapping) {
-                    String comment = null;
+                String comment = null;
+                if (c.getValue() instanceof Yaml.Document) {
+                    comment = c.<Yaml.Document>getValue().getEnd().getPrefix();
+                } else if (c.getValue() instanceof Yaml.Mapping) {
+                    List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) c.getValue()).getEntries();
 
-                    if (c.getValue() instanceof Yaml.Document) {
-                        comment = c.<Yaml.Document>getValue().getEnd().getPrefix();
-                    } else {
-                        List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) c.getValue()).getEntries();
-
-                        // Get comment from next element in same mapping block
-                        for (int i = 0; i < entries.size() - 1; i++) {
-                            if (entries.get(i).getValue().equals(getCursor().getValue())) {
-                                comment = substringOfBeforeFirstLineBreak(entries.get(i + 1).getPrefix());
-                                break;
-                            }
-                        }
-                        // OR retrieve it for last item from next element (could potentially be much higher in the tree).
-                        if (comment == null && hasLineBreak(entries.get(entries.size() - 1).getPrefix())) {
-                            comment = substringOfBeforeFirstLineBreak(entries.get(entries.size() - 1).getPrefix());
+                    // Get comment from next element in same mapping block
+                    for (int i = 0; i < entries.size() - 1; i++) {
+                        if (entries.get(i).getValue().equals(getCursor().getValue())) {
+                            comment = substringOfBeforeFirstLineBreak(entries.get(i + 1).getPrefix());
+                            break;
                         }
                     }
-
-                    if (isNotEmpty(comment)) {
-                        // Copy comment to last mutated element AND put message on cursor to remove comment from original element
-                        Yaml.Mapping.Entry last = mutatedEntries.ls.get(mutatedEntries.ls.size() - 1);
-                        mutatedEntries.ls.set(mutatedEntries.ls.size() - 1, last.withPrefix(comment + last.getPrefix()));
-                        c.putMessage(REMOVE_PREFIX, true);
+                    // OR retrieve it for last item from next element (could potentially be much higher in the tree).
+                    if (comment == null && hasLineBreak(entries.get(entries.size() - 1).getPrefix())) {
+                        comment = substringOfBeforeFirstLineBreak(entries.get(entries.size() - 1).getPrefix());
                     }
+                }
+
+                if (isNotEmpty(comment)) {
+                    // Copy comment to last mutated element AND put message on cursor to remove comment from original element
+                    Yaml.Mapping.Entry last = mutatedEntries.ls.get(mutatedEntries.ls.size() - 1);
+                    mutatedEntries.ls.set(mutatedEntries.ls.size() - 1, last.withPrefix(comment + last.getPrefix()));
+                    c.putMessage(REMOVE_PREFIX, true);
                 }
             }
         }
