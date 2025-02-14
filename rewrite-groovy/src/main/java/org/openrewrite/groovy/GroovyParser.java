@@ -38,6 +38,7 @@ import org.openrewrite.tree.ParsingExecutionContextView;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -121,7 +122,13 @@ public class GroovyParser implements Parser {
                         );
 
                         pctx.getParsingListener().startedParsing(input);
-                        CompilationUnit compUnit = new CompilationUnit(configuration, null, classLoader, classLoader);
+                        CustomCompilationUnit compUnit = new CustomCompilationUnit(configuration, null, classLoader, classLoader);
+
+                        // Override the standard `ResolveVisitor` which otherwise inlines any annotation property values
+                        Field resolveVisitor = CompilationUnit.class.getDeclaredField("resolveVisitor");
+                        resolveVisitor.setAccessible(true);
+                        resolveVisitor.set(compUnit, new CustomResolveVisitor(compUnit));
+
                         compUnit.addSource(unit);
                         compUnit.compile(Phases.CANONICALIZATION);
                         ModuleNode ast = unit.getAST();

@@ -89,6 +89,34 @@ class AnnotationTest implements RewriteTest {
     }
 
     @Test
+    void withConstantProperty() {
+        rewriteRun(
+          groovy(
+            """
+              @Foo(value = Test.VERSION)
+              class Test {
+                  static final String VERSION = "1.23"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void withStaticallyImportedConstantProperty() {
+        rewriteRun(
+          groovy(
+            """
+              import static java.io.File.separator
+              @Deprecated(since = separator)
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void withImplicitValueProperty() {
         rewriteRun(
           groovy(
