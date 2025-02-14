@@ -24,11 +24,9 @@ import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
-import java.util.Base64;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.zip.GZIPOutputStream;
@@ -129,11 +127,13 @@ public interface HttpSender {
 
         @SuppressWarnings("UnusedReturnValue")
         public static class Builder {
-            private static final String APPLICATION_JSON = "application/json";
-            private static final String TEXT_PLAIN = "text/plain";
+            public static final String APPLICATION_JSON = "application/json";
+            public static final String TEXT_PLAIN = "text/plain";
+            private static final String CRLF = "\r\n";
 
             private final HttpSender sender;
             private final Map<String, String> requestHeaders = new LinkedHashMap<>();
+            private final String multipartBoundary = UUID.randomUUID().toString();
 
             private URL url;
             private byte[] entity = new byte[0];
@@ -298,31 +298,78 @@ public interface HttpSender {
                 return this;
             }
 
-            public final Builder withMultipartFile(File file) throws IOException {
-                String boundary = UUID.randomUUID().toString();
-                String contentType = "multipart/form-data; boundary=" + boundary;
-                byte[] content = multipart(boundary, file);
-                return withContent(contentType, content);
+            /**
+             * Adds a part to a multipart/form-data request body.
+             *
+             * @param type      The "Content-Type" of the part.
+             * @param name      The name of the part.
+             * @param content   The part contents.
+             * @return This request builder.
+             */
+            public final Builder withMultipartContent(String type, String name, String content) {
+                StringBuilder builder = new StringBuilder(1024);
+                if (entity.length == 0) {
+                    builder.append(CRLF).append("--").append(multipartBoundary).append(CRLF);
+                }
+                builder.append("Content-Disposition: form-data; name=\"").append(name).append("\"").append(CRLF);
+                builder.append("Content-Type: ").append(type).append(CRLF).append(CRLF);
+                builder.append(content);
+                builder.append(CRLF).append("--").append(multipartBoundary).append(CRLF);
+                return withMultipartContent(builder.toString().getBytes());
             }
 
-            private byte[] multipart(String boundary, File file) throws IOException {
+            /**
+             * @deprecated Use withMultipartFile(Path, String) instead.
+             */
+            @Deprecated
+            public final Builder withMultipartFile(File file) throws IOException {
+                return withMultipartFile(file.toPath(), "file");
+            }
+
+            /**
+             * Adds a file part to a multipart/form-data request body.
+             *
+             * @param path      Path of file to add to part.
+             * @param name      The name of the part.
+             * @return This request builder.
+             * @throws IOException If the file path cannot be read.
+             */
+            public final Builder withMultipartFile(Path path, String name) throws IOException {
+                return withMultipartContent(multipart(path, name));
+            }
+
+            private byte[] multipart(Path path, String name) throws IOException {
                 ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-                String mimeType = Files.probeContentType(file.toPath());
-                if (mimeType == null) {
-                    mimeType = "application/octet-stream";
+                String mimeType = Optional.ofNullable(Files.probeContentType(path)).orElse("application/octet-stream");
+                StringBuilder builder = new StringBuilder(512);
+                if (entity.length == 0) {
+                    builder.append(CRLF).append("--").append(multipartBoundary).append(CRLF);
                 }
-                outputStream.write(("--" + boundary + "\r\n").getBytes());
-                outputStream.write(("Content-Disposition: form-data; name=\"file\"; filename=\"" + file.getName() + "\"\r\n").getBytes());
-                outputStream.write(("Content-Type: " + mimeType + "\r\n").getBytes());
-                outputStream.write(("\r\n--" + boundary + "--\r\n").getBytes());
-                FileInputStream fileInputStream = new FileInputStream(file);
-                byte[] buffer = new byte[8192];
-                int bytesRead;
-                while ((bytesRead = fileInputStream.read(buffer)) != -1) {
-                    outputStream.write(buffer, 0, bytesRead);
+                builder.append("Content-Disposition: form-data; name=\"").append(name).append("\"; filename=\"")
+                        .append(path.getFileName())
+                        .append("\"")
+                        .append(CRLF);
+                builder.append("Content-Type: ").append(mimeType).append(CRLF).append(CRLF);
+                outputStream.write(builder.toString().getBytes());
+
+                try (InputStream inputStream = Files.newInputStream(path)) {
+                    byte[] buffer = new byte[8192];
+                    int bytesRead;
+                    while ((bytesRead = inputStream.read(buffer)) != -1) {
+                        outputStream.write(buffer, 0, bytesRead);
+                    }
                 }
-                fileInputStream.close();
+                outputStream.write((CRLF + "--" + multipartBoundary + CRLF).getBytes());
                 return outputStream.toByteArray();
+            }
+
+            private Builder withMultipartContent(byte[] content) {
+                withHeader("Content-Type", "multipart/form-data; boundary=" + multipartBoundary);
+                byte[] multipartContext = new byte[entity.length + content.length];
+                System.arraycopy(entity, 0, multipartContext, 0, entity.length);
+                System.arraycopy(content, 0, multipartContext, entity.length, content.length);
+                entity = multipartContext;
+                return this;
             }
 
             private static byte[] gzip(byte[] data) throws IOException {
