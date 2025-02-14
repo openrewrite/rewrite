@@ -404,7 +404,8 @@ class RuntimeClasspathCache {
                     .disableNestedJarScanning()
                     .getClasspathURIs().stream()
                     .filter(uri -> "file".equals(uri.getScheme()))
-                    .map(Paths::get).collect(toList());
+                    .map(Paths::get)
+                    .collect(toList());
         }
         return runtimeClasspath;
     }

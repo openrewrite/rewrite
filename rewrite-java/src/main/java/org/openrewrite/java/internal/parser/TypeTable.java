@@ -98,19 +98,18 @@ public class TypeTable implements JavaParserClasspathLoader {
     }
 
     TypeTable(ExecutionContext ctx, URL url, Collection<String> artifactNames) {
-        read(url, artifactNames, new Reader(ctx));
+        read(url, artifactNames, ctx);
     }
 
     TypeTable(ExecutionContext ctx, Enumeration<URL> resources, Collection<String> artifactNames) {
-        Reader reader = new Reader(ctx);
         while (resources.hasMoreElements()) {
-            read(resources.nextElement(), artifactNames, reader);
+            read(resources.nextElement(), artifactNames, ctx);
         }
     }
 
-    private static void read(URL url, Collection<String> artifactNames, Reader reader) {
+    private static void read(URL url, Collection<String> artifactNames, ExecutionContext ctx) {
         try (InputStream is = url.openStream(); InputStream inflate = new InflaterInputStream(is)) {
-            reader.read(inflate, artifactsNotYetWritten(artifactNames));
+            new Reader(ctx).read(inflate, artifactsNotYetWritten(artifactNames));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
