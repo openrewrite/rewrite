@@ -104,7 +104,7 @@ class TypeTableTest implements RewriteTest {
             }
         }
 
-        TypeTable table = new TypeTable(ctx, Files.newInputStream(tsv), List.of("junit-jupiter-api"));
+        TypeTable table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("junit-jupiter-api"));
         Path classesDir = table.load("junit-jupiter-api");
 
         assertThat(classesDir)

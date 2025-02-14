@@ -76,14 +76,11 @@ public interface JavaParser extends Parser {
                 artifacts.addAll(matchedArtifacts);
             }
         }
-
         if (!missingArtifactNames.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "Unable to find runtime dependencies beginning with: " +
-                    missingArtifactNames.stream().map(a -> "'" + a + "'").sorted().collect(joining(", ")) +
-                    ", classpath: " + runtimeClasspath);
+            String missing = missingArtifactNames.stream().sorted().collect(joining("', '", "'", "'"));
+            throw new IllegalArgumentException(String.format("Unable to find runtime dependencies beginning with: %s, classpath: %s",
+                    missing, runtimeClasspath));
         }
-
         return artifacts;
     }
 
@@ -110,7 +107,7 @@ public interface JavaParser extends Parser {
             String cpEntryString = cpEntry.toString();
             Path path = Paths.get(cpEntry);
             if (jarPattern.matcher(cpEntryString).find() ||
-                explodedPattern.matcher(cpEntryString).find() && path.toFile().isDirectory()) {
+                    explodedPattern.matcher(cpEntryString).find() && path.toFile().isDirectory()) {
                 artifacts.add(path);
                 // Do not break because jarPattern matches "foo-bar-1.0.jar" and "foo-1.0.jar" to "foo"
             }
@@ -139,15 +136,12 @@ public interface JavaParser extends Parser {
                     }
                 }
             }
-        }
 
-        if (!missingArtifactNames.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "Unable to find classpath resource dependencies beginning with: " +
-                    missingArtifactNames.stream().map(a -> "'" + a + "'").sorted().collect(joining(", ", "", ".\n"))
-            );
+            if (!missingArtifactNames.isEmpty()) {
+                String missing = missingArtifactNames.stream().sorted().collect(joining("', '", "'", "'"));
+                throw new IllegalArgumentException(String.format("Unable to find classpath resource dependencies beginning with: %s", missing));
+            }
         }
-
         return artifacts;
     }
 
@@ -208,8 +202,7 @@ public interface JavaParser extends Parser {
             //Fall through to an exception without making this the "cause".
         }
 
-        throw new IllegalStateException(
-                "Unable to create a Java parser instance. " +
+        throw new IllegalStateException("Unable to create a Java parser instance. " +
                 "`rewrite-java-8`, `rewrite-java-11`, `rewrite-java-17`, or `rewrite-java-21` must be on the classpath.");
     }
 
@@ -392,7 +385,7 @@ public interface JavaParser extends Parser {
         String pkg = packageMatcher.find() ? packageMatcher.group(1).replace('.', '/') + "/" : "";
 
         String className = Optional.ofNullable(simpleName.apply(sourceCode))
-                                   .orElse(Long.toString(System.nanoTime())) + ".java";
+                .orElse(Long.toString(System.nanoTime())) + ".java";
 
         return prefix.resolve(Paths.get(pkg + className));
     }
