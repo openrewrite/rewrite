@@ -67,6 +67,18 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void methodDeclarationWithModifiers() {
+        rewriteRun(
+          groovy(
+            """
+              def accept(final def Map m) {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void primitiveReturn() {
         rewriteRun(
           groovy(
