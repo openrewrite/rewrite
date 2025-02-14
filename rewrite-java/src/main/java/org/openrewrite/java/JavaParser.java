@@ -124,8 +124,8 @@ public interface JavaParser extends Parser {
 
         try (RewriteClasspathJarClasspathLoader rewriteClasspathJarClasspathLoader = new RewriteClasspathJarClasspathLoader(ctx)) {
             List<JavaParserClasspathLoader> loaders = new ArrayList<>(2);
-            Optional.ofNullable(TypeTable.fromClasspath(ctx, missingArtifactNames)).ifPresent(loaders::add);
             loaders.add(rewriteClasspathJarClasspathLoader);
+            Optional.ofNullable(TypeTable.fromClasspath(ctx, missingArtifactNames)).ifPresent(loaders::add);
 
             for (JavaParserClasspathLoader loader : loaders) {
                 for (String missingArtifactName : new ArrayList<>(missingArtifactNames)) {
@@ -372,7 +372,7 @@ public interface JavaParser extends Parser {
         Pattern classPattern = Pattern.compile("(class|interface|enum|record)\\s*(<[^>]*>)?\\s+(\\w+)");
         Pattern publicClassPattern = Pattern.compile("public\\s+" + classPattern.pattern());
 
-        Function<String, String> simpleName = sourceStr -> {
+        Function<String, @Nullable String> simpleName = sourceStr -> {
             Matcher classMatcher = publicClassPattern.matcher(sourceStr);
             if (classMatcher.find()) {
                 return classMatcher.group(3);
