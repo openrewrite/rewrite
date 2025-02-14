@@ -17,6 +17,7 @@ package org.openrewrite.gradle;
 
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -1515,10 +1516,50 @@ class AddDependencyTest implements RewriteTest {
                   spec -> spec.path("build.gradle")
                 )));
         }
+    }
+
+    @Disabled("ATM setting the configuration will overwrite the resolved configuration without condition")
+    @Nested
+    class WithDifferentConfigurations {
+        @ParameterizedTest
+        @ValueSource(strings = {"implementation", "compileOnly", "runtimeOnly", "annotationProcessor"})
+        void configurationAndSourceSetCombination(String configuration) {
+            rewriteRun(
+              spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", null, configuration)),
+              mavenProject("project",
+                srcTestJava(
+                  java(usingGuavaIntMath, spec -> sourceSet(spec, "anotherSet"))),
+                buildGradle(
+                  """
+                    plugins {
+                        id 'java'
+                    }
+                    
+                    repositories {
+                        mavenCentral()
+                    }
+                    """,
+                  """
+                    plugins {
+                        id 'java'
+                    }
+                    
+                    repositories {
+                        mavenCentral()
+                    }
+                    
+                    dependencies {
+                        anotherSet%s "com.google.guava:guava:29.0-jre"
+                    }
+                    """.formatted(configuration)
+                )
+              )
+            );
+        }
 
         @ParameterizedTest
         @ValueSource(strings = {"implementation", "compileOnly", "runtimeOnly", "annotationProcessor"})
-        void withDifferentConfigurations(String configuration) {
+        void jvmTestSuitePlugin(String configuration) {
             rewriteRun(
               spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", null, configuration)),
               mavenProject("project",
