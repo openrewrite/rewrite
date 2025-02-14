@@ -1448,7 +1448,7 @@ class AddDependencyTest implements RewriteTest {
                     
                     dependencies {
                         implementation "org.apache.logging.log4j:log4j-core:2.22.1"
-                        
+                    
                         testImplementation "com.google.guava:guava:29.0-jre"
                     }
                     
@@ -1457,63 +1457,6 @@ class AddDependencyTest implements RewriteTest {
                             integrationTest(JvmTestSuite) {
                                 dependencies {
                                 }
-                            }
-                        }
-                    }
-                    """,
-                  spec -> spec.path("build.gradle")
-                )));
-        }
-
-        @Test
-        void actNormalForDefaultTestWithSuiteDefinition() {
-            rewriteRun(
-              spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre")),
-              mavenProject("project",
-                srcMainJava(
-                  java(usingGuavaIntMath, sourceSpecs -> sourceSet(sourceSpecs, "test"))),
-                buildGradle(
-                  //language=groovy
-                  """
-                    plugins {
-                        id "java-library"
-                        id 'jvm-test-suite'
-                    }
-                    
-                    repositories {
-                        mavenCentral()
-                    }
-                    
-                    dependencies {
-                        implementation "org.apache.logging.log4j:log4j-core:2.22.1"
-                    }
-                    
-                    testing {
-                        suites {
-                            test(JvmTestSuite) {
-                            }
-                        }
-                    }
-                    """,
-                  """
-                    plugins {
-                        id "java-library"
-                        id 'jvm-test-suite'
-                    }
-                    
-                    repositories {
-                        mavenCentral()
-                    }
-                    
-                    dependencies {
-                        implementation "org.apache.logging.log4j:log4j-core:2.22.1"
-                        
-                        testImplementation "com.google.guava:guava:29.0-jre"
-                    }
-                    
-                    testing {
-                        suites {
-                            test(JvmTestSuite) {
                             }
                         }
                     }
@@ -1573,6 +1516,67 @@ class AddDependencyTest implements RewriteTest {
                 )));
         }
 
+        @ParameterizedTest
+        @ValueSource(strings = {"implementation", "compileOnly", "runtimeOnly", "annotationProcessor"})
+        void withDifferentConfigurations(String configuration) {
+            rewriteRun(
+              spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", null, configuration)),
+              mavenProject("project",
+                srcMainJava(
+                  java(usingGuavaIntMath, sourceSpecs -> sourceSet(sourceSpecs, "integrationTest"))),
+                buildGradle(
+                  //language=groovy
+                  """
+                    plugins {
+                        id "java-library"
+                        id 'jvm-test-suite'
+                    }
+                    
+                    repositories {
+                        mavenCentral()
+                    }
+                    
+                    dependencies {
+                        implementation "org.apache.logging.log4j:log4j-core:2.22.1"
+                    }
+                    
+                    testing {
+                        suites {
+                            integrationTest(JvmTestSuite) {
+                                dependencies {
+                                }
+                            }
+                        }
+                    }
+                    """,
+                  //language=groovy
+                  """
+                    plugins {
+                        id "java-library"
+                        id 'jvm-test-suite'
+                    }
+                    
+                    repositories {
+                        mavenCentral()
+                    }
+                    
+                    dependencies {
+                        implementation "org.apache.logging.log4j:log4j-core:2.22.1"
+                    }
+                    
+                    testing {
+                        suites {
+                            integrationTest(JvmTestSuite) {
+                                dependencies {
+                                    %s "com.google.guava:guava:29.0-jre"
+                                }
+                            }
+                        }
+                    }
+                    """.formatted(configuration),
+                  spec -> spec.path("build.gradle")
+                )));
+        }
     }
 
     private AddDependency addDependency(@SuppressWarnings("SameParameterValue") String gav) {

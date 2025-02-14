@@ -223,7 +223,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                             }
                             return method;
                         }
-                        return super.visitMethodInvocation(method, executionContext);
+                        return super.visitMethodInvocation(method, ctx);
                     }
                 }.visit(sourceFile, ctx);
                 return customJVMSuites;
