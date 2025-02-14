@@ -18,6 +18,8 @@ package org.openrewrite;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.scheduling.WorkingDirectoryExecutionContextView;
 
+import static org.openrewrite.Recipe.PANIC;
+
 public class CursorValidatingExecutionContextView extends DelegatingExecutionContext {
     private static final String VALIDATE_CURSOR_ACYCLIC = "org.openrewrite.CursorValidatingExecutionContextView.ValidateCursorAcyclic";
     private static final String VALIDATE_CTX_MUTATION = "org.openrewrite.CursorValidatingExecutionContextView.ValidateExecutionContextImmutability";
@@ -53,6 +55,7 @@ public class CursorValidatingExecutionContextView extends DelegatingExecutionCon
         boolean mutationAllowed = !getMessage(VALIDATE_CTX_MUTATION, false) ||
                 key.equals(VALIDATE_CURSOR_ACYCLIC) ||
                 key.equals(VALIDATE_CTX_MUTATION) ||
+                key.equals(PANIC) ||
                 key.equals(ExecutionContext.CURRENT_CYCLE) ||
                 key.equals(ExecutionContext.CURRENT_RECIPE) ||
                 key.equals(ExecutionContext.DATA_TABLES) ||

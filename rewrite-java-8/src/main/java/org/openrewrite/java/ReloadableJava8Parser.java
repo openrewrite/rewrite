@@ -187,7 +187,8 @@ class ReloadableJava8Parser implements JavaParser {
 
     LinkedHashMap<Input, JCTree.JCCompilationUnit> parseInputsToCompilerAst(Iterable<Input> sourceFiles, ExecutionContext ctx) {
         if (classpath != null) { // override classpath
-            if (context.get(JavaFileManager.class) != pfm) {
+            // Lombok is expected to replace the file manager with its own, so we need to check for that
+            if (context.get(JavaFileManager.class) != pfm && (annotationProcessors.isEmpty() || !(context.get(JavaFileManager.class) instanceof ForwardingJavaFileManager))) {
                 throw new IllegalStateException("JavaFileManager has been forked unexpectedly");
             }
 
