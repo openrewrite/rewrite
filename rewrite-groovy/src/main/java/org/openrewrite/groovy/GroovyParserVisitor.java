@@ -2115,41 +2115,6 @@ public class GroovyParserVisitor {
         }
     }
 
-    private List<J.Modifier> getModifiers(String varName) {
-        return getModifiers(varName, emptySet());
-    }
-
-    private List<J.Modifier> getModifiers(String varName, Set<String> excludeModifiers) {
-        List<J.Modifier> modifiers = new ArrayList<>();
-        int saveCursor = cursor;
-        Space prefix = whitespace();
-        Set<String> possibleModifiers = new LinkedHashSet<>(modifierNameToType.size());
-        for (String modifier : modifierNameToType.keySet()) {
-            if (!excludeModifiers.contains(modifier)) {
-                possibleModifiers.add(modifier);
-            }
-        }
-        String currentModifier = possibleModifiers.stream().filter(modifierName -> source.startsWith(modifierName, cursor))
-                .findFirst()
-                .orElse(null);
-        while (currentModifier != null) {
-            possibleModifiers.remove(currentModifier);
-            modifiers.add(new J.Modifier(randomId(), prefix, Markers.EMPTY, currentModifier, modifierNameToType.get(currentModifier), emptyList()));
-            skip(currentModifier);
-            saveCursor = cursor;
-            prefix = whitespace();
-            currentModifier = possibleModifiers.stream()
-                    .filter(modifierName ->
-                            // Try to avoid confusing a variable name with an incidentally similar modifier keyword
-                            (varName.length() < modifierName.length() || !source.startsWith(varName, cursor)) &&
-                                    source.startsWith(modifierName, cursor))
-                    .findFirst()
-                    .orElse(null);
-        }
-        cursor = saveCursor;
-        return modifiers;
-    }
-
     // handle the obscure case where there are empty parens ahead of a closure
     private Markers handlesCaseWhereEmptyParensAheadOfClosure(ArgumentListExpression args, Markers markers) {
         if (args.getExpressions().size() == 1 && args.getExpressions().get(0) instanceof ClosureExpression) {
@@ -2608,6 +2573,41 @@ public class GroovyParserVisitor {
             return new J.Primitive(randomId(), sourceBefore(classNode.getUnresolvedName()), Markers.EMPTY, primitiveType);
         }
         return typeTree(classNode, inferredType);
+    }
+
+    private List<J.Modifier> getModifiers(String varName) {
+        return getModifiers(varName, emptySet());
+    }
+
+    private List<J.Modifier> getModifiers(String varName, Set<String> excludeModifiers) {
+        List<J.Modifier> modifiers = new ArrayList<>();
+        int saveCursor = cursor;
+        Space prefix = whitespace();
+        Set<String> possibleModifiers = new LinkedHashSet<>(modifierNameToType.size());
+        for (String modifier : modifierNameToType.keySet()) {
+            if (!excludeModifiers.contains(modifier)) {
+                possibleModifiers.add(modifier);
+            }
+        }
+        String currentModifier = possibleModifiers.stream().filter(modifierName -> source.startsWith(modifierName, cursor))
+                .findFirst()
+                .orElse(null);
+        while (currentModifier != null) {
+            possibleModifiers.remove(currentModifier);
+            modifiers.add(new J.Modifier(randomId(), prefix, Markers.EMPTY, currentModifier, modifierNameToType.get(currentModifier), emptyList()));
+            skip(currentModifier);
+            saveCursor = cursor;
+            prefix = whitespace();
+            currentModifier = possibleModifiers.stream()
+                    .filter(modifierName ->
+                            // Try to avoid confusing a variable name with an incidentally similar modifier keyword
+                            (varName.length() < modifierName.length() || !source.startsWith(varName, cursor)) &&
+                                    source.startsWith(modifierName, cursor))
+                    .findFirst()
+                    .orElse(null);
+        }
+        cursor = saveCursor;
+        return modifiers;
     }
 
     private <G2 extends J> JRightPadded<G2> maybeSemicolon(G2 g) {
