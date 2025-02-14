@@ -526,13 +526,10 @@ public class GroovyParserVisitor {
                 Parameter param = unparsedParams[i];
 
                 List<J.Annotation> paramAnnotations = visitAndGetAnnotations(param, this);
-
-                TypeTree paramType;
-                if (param.isDynamicTyped()) {
-                    paramType = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), "", JavaType.ShallowClass.build("java.lang.Object"), null);
-                } else {
-                    paramType = visitTypeTree(param.getOriginType());
-                }
+                List<J.Modifier> paramModifiers = getModifiers(param);
+                TypeTree paramType = param.isDynamicTyped() ?
+                        new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), "", JavaType.ShallowClass.build("java.lang.Object"), null) :
+                        visitTypeTree(param.getOriginType());
 
                 Space varargs = null;
                 if (paramType instanceof J.ArrayType && sourceStartsWith("...")) {
@@ -559,7 +556,7 @@ public class GroovyParserVisitor {
                 Space rightPad = sourceBefore(i == unparsedParams.length - 1 ? ")" : ",");
 
                 params.add(JRightPadded.build((Statement) new J.VariableDeclarations(randomId(), EMPTY,
-                        Markers.EMPTY, paramAnnotations, emptyList(), paramType,
+                        Markers.EMPTY, paramAnnotations, paramModifiers, paramType,
                         varargs, emptyList(),
                         singletonList(paramName))).withAfter(rightPad));
             }
@@ -1430,33 +1427,6 @@ public class GroovyParserVisitor {
             return Optional.empty();
         }
 
-        private List<J.Modifier> getModifiers(Variable variable) {
-            String varName = variable.getName();
-            List<J.Modifier> modifiers = new ArrayList<>();
-            int saveCursor = cursor;
-            Space prefix = whitespace();
-            Set<String> possibleModifiers = new LinkedHashSet<>(modifierNameToType.keySet());
-            String currentModifier = possibleModifiers.stream().filter(modifierName -> source.startsWith(modifierName, cursor))
-                    .findFirst()
-                    .orElse(null);
-            while (currentModifier != null) {
-                possibleModifiers.remove(currentModifier);
-                modifiers.add(new J.Modifier(randomId(), prefix, Markers.EMPTY, currentModifier, modifierNameToType.get(currentModifier), emptyList()));
-                skip(currentModifier);
-                saveCursor = cursor;
-                prefix = whitespace();
-                currentModifier = possibleModifiers.stream()
-                        .filter(modifierName ->
-                                // Try to avoid confusing a variable name with an incidentally similar modifier keyword
-                                (varName.length() < modifierName.length() || !source.startsWith(varName, cursor)) &&
-                                source.startsWith(modifierName, cursor))
-                        .findFirst()
-                        .orElse(null);
-            }
-            cursor = saveCursor;
-            return modifiers;
-        }
-
         @Override
         public void visitEmptyExpression(EmptyExpression expression) {
             queue.add(new J.Empty(randomId(), EMPTY, Markers.EMPTY));
@@ -2144,6 +2114,33 @@ public class GroovyParserVisitor {
         private <T> T pollQueue() {
             return (T) queue.poll();
         }
+    }
+
+    private List<J.Modifier> getModifiers(Variable variable) {
+        String varName = variable.getName();
+        List<J.Modifier> modifiers = new ArrayList<>();
+        int saveCursor = cursor;
+        Space prefix = whitespace();
+        Set<String> possibleModifiers = new LinkedHashSet<>(modifierNameToType.keySet());
+        String currentModifier = possibleModifiers.stream().filter(modifierName -> source.startsWith(modifierName, cursor))
+                .findFirst()
+                .orElse(null);
+        while (currentModifier != null) {
+            possibleModifiers.remove(currentModifier);
+            modifiers.add(new J.Modifier(randomId(), prefix, Markers.EMPTY, currentModifier, modifierNameToType.get(currentModifier), emptyList()));
+            skip(currentModifier);
+            saveCursor = cursor;
+            prefix = whitespace();
+            currentModifier = possibleModifiers.stream()
+                    .filter(modifierName ->
+                            // Try to avoid confusing a variable name with an incidentally similar modifier keyword
+                            (varName.length() < modifierName.length() || !source.startsWith(varName, cursor)) &&
+                                    source.startsWith(modifierName, cursor))
+                    .findFirst()
+                    .orElse(null);
+        }
+        cursor = saveCursor;
+        return modifiers;
     }
 
     // handle the obscure case where there are empty parens ahead of a closure
