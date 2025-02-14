@@ -33,12 +33,12 @@ import java.util.List;
 @EqualsAndHashCode(callSuper = false)
 public class FindDependency extends Recipe {
     @Option(displayName = "Group",
-            description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`.",
+            description = "The first part of a dependency coordinate identifying its publisher.",
             example = "com.google.guava")
     String groupId;
 
     @Option(displayName = "Artifact",
-            description = "The second part of a dependency coordinate `com.google.guava:guava:VERSION`.",
+            description = "The second part of a dependency coordinate uniquely identifying it among artifacts from the same publisher.",
             example = "guava")
     String artifactId;
 
