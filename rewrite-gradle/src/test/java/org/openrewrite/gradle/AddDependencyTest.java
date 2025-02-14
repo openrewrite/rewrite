@@ -21,10 +21,12 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Issue;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
-import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
@@ -32,7 +34,6 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
-import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -41,12 +42,7 @@ import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.groovy.Assertions.groovy;
 import static org.openrewrite.groovy.Assertions.srcMainGroovy;
-import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.java.Assertions.mavenProject;
-import static org.openrewrite.java.Assertions.srcMainJava;
-import static org.openrewrite.java.Assertions.srcMainResources;
-import static org.openrewrite.java.Assertions.srcSmokeTestJava;
-import static org.openrewrite.java.Assertions.srcTestJava;
+import static org.openrewrite.java.Assertions.*;
 import static org.openrewrite.properties.Assertions.properties;
 
 @SuppressWarnings("GroovyUnusedAssignment")
@@ -66,47 +62,6 @@ class AddDependencyTest implements RewriteTest {
                 }
             }
       """;
-
-   public static class TSTRecipe extends Recipe {
-        @Override
-        public String getDisplayName() {
-            return "A";
-        }
-
-        @Override
-        public String getDescription() {
-            return "B.";
-        }
-
-        @Override
-        public TreeVisitor<?, ExecutionContext> getVisitor() {
-            return new JavaVisitor<>(){
-
-                @Override
-                public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                    return super.visitMethodDeclaration(method, ctx);
-                }
-            };
-        }
-    }
-
-    @Disabled
-    @Test
-    void tsts() {
-        rewriteRun(
-          spec -> spec.recipe(new TSTRecipe()),
-          java(
-                """
-            import java.util.List;
-            class A {
-                void tst() {
-                    List.of("A", "B");
-                }
-            }
-            """
-          )
-        );
-    }
 
     @ParameterizedTest
     @ValueSource(strings = {"com.google.common.math.*", "com.google.common.math.IntMath"})
