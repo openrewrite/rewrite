@@ -118,10 +118,10 @@ class ImportTest implements RewriteTest {
               
               
               import static java.util.Collections.**/java.util.Collections.*
-              import /*static java.util.Collections.singletonList;
+              /*static java.util.Collections.singletonList;
               
               
-              import static java.util.Collections.**/static          java.util.Collections.*
+              import static java.util.Collections.**/import static          java.util.Collections.*
               import static java.util.Collections.singletonList;import static java.util.Collections.*
               import java.util.Collections.*
               """
