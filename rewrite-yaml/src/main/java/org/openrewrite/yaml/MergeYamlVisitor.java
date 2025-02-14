@@ -36,6 +36,8 @@ import static org.openrewrite.Cursor.ROOT_VALUE;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.ListUtils.*;
 import static org.openrewrite.internal.StringUtils.*;
+import static org.openrewrite.yaml.MergeYaml.*;
+import static org.openrewrite.yaml.MergeYaml.InsertMode.*;
 import static org.openrewrite.yaml.MergeYaml.REMOVE_PREFIX;
 
 /**
@@ -62,7 +64,10 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     private final String objectIdentifyingProperty;
 
     @Nullable
-    private final String insertBefore;
+    private final InsertMode insertMode;
+
+    @Nullable
+    private final String insertProperty;
 
     private boolean shouldAutoFormat = true;
 
@@ -79,12 +84,12 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         return linebreak;
     }
 
-    public MergeYamlVisitor(Yaml.Block block, Yaml incoming, boolean acceptTheirs, @Nullable String objectIdentifyingProperty, boolean shouldAutoFormat, @Nullable String insertBefore) {
-        this(block, incoming, acceptTheirs, objectIdentifyingProperty, insertBefore);
+    public MergeYamlVisitor(Yaml.Block block, Yaml incoming, boolean acceptTheirs, @Nullable String objectIdentifyingProperty, boolean shouldAutoFormat, @Nullable InsertMode insertMode, @Nullable String insertProperty) {
+        this(block, incoming, acceptTheirs, objectIdentifyingProperty, insertMode, insertProperty);
         this.shouldAutoFormat = shouldAutoFormat;
     }
 
-    public MergeYamlVisitor(Yaml scope, @Language("yml") String yamlString, boolean acceptTheirs, @Nullable String objectIdentifyingProperty, @Nullable String insertBefore) {
+    public MergeYamlVisitor(Yaml scope, @Language("yml") String yamlString, boolean acceptTheirs, @Nullable String objectIdentifyingProperty, @Nullable InsertMode insertMode, @Nullable String insertProperty) {
         this(scope,
                 new YamlParser().parse(yamlString)
                         .findFirst()
@@ -104,7 +109,8 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                         .orElseThrow(() -> new IllegalArgumentException("Could not parse as YAML")),
                 acceptTheirs,
                 objectIdentifyingProperty,
-                insertBefore);
+                insertMode,
+                insertProperty);
     }
 
     @Override
@@ -122,7 +128,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 // Distribute the incoming mapping to each entry in the sequence
                 return existingSeq.withEntries(map(existingSeq.getEntries(), (i, existingSeqEntry) ->
                         existingSeqEntry.withBlock((Yaml.Block)
-                                new MergeYamlVisitor<>(existingSeqEntry.getBlock(), incoming, acceptTheirs, objectIdentifyingProperty, shouldAutoFormat, insertBefore)
+                                new MergeYamlVisitor<>(existingSeqEntry.getBlock(), incoming, acceptTheirs, objectIdentifyingProperty, shouldAutoFormat, insertMode, insertProperty)
                                         .visitNonNull(existingSeqEntry.getBlock(), p, new Cursor(getCursor(), existingSeqEntry))
                         )
                 ));
@@ -176,7 +182,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                         MultilineScalarChanged marker = new MultilineScalarChanged(randomId(), false, calculateMultilineIndent(incomingEntry));
                         value = autoFormat(value.withMarkers(value.getMarkers().add(marker)), p);
                     }
-                    Yaml mergedYaml = new MergeYamlVisitor<>(existingEntry.getValue(), value, acceptTheirs, objectIdentifyingProperty, shouldAutoFormat, insertBefore)
+                    Yaml mergedYaml = new MergeYamlVisitor<>(existingEntry.getValue(), value, acceptTheirs, objectIdentifyingProperty, shouldAutoFormat, insertMode, insertProperty)
                             .visitNonNull(existingEntry.getValue(), p, new Cursor(cursor, existingEntry));
                     return existingEntry.withValue((Yaml.Block) mergedYaml);
                 }
@@ -226,7 +232,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
                 if (c.getValue() instanceof Yaml.Document) {
                     Yaml.Document document = c.getValue();
-                    if (!isBlank(insertBefore)) {
+                    if (insertMode == Before) {
                         List<Yaml.Mapping.Entry> documentEntries = ((Yaml.Mapping) document.getBlock()).getEntries();
                         // Check if merge is done on the very first key of the yaml file
                         if (documentEntries.equals(((Yaml.Mapping) existing).getEntries()) && !documentEntries.get(0).equals((mutatedEntries.get(0)))) {
@@ -240,7 +246,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                         break COPY_COMMENTS;
                     }
                     comment = document.getEnd().getPrefix();
-                } else if (isBlank(insertBefore)) {
+                } else if (insertMode != Before) {
                     List<Yaml.Mapping.Entry> entries = ((Yaml.Mapping) c.getValue()).getEntries();
 
                     // Get comment from next element in same mapping block
@@ -265,7 +271,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
             }
         }
 
-        if (isBlank(insertBefore)) {
+        if (insertMode != Before) {
             removePrefixForDirectChildren(m1.getEntries(), mutatedEntries);
         }
 
@@ -348,23 +354,27 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     }
 
     /**
-     * Specialized concatAll function which takes the `insertBefore` property into account.
+     * Specialized concatAll function which takes the `insertPlace` property into account.
      */
     private <T> List<T> concatAll(List<T> ls, List<T> t, Function<T, String> getValue) {
-        if (isBlank(insertBefore) || t.isEmpty()) {
+        if (insertMode == null || insertMode == Last || t.isEmpty()) {
             return ListUtils.concatAll(ls, t);
         }
 
         List<T> mutatedEntries = new ArrayList<>();
-        boolean hasInsertedBeforeElements = false;
+        boolean hasInsertedBeforeOrAfterElements = false;
         for (T existingEntry : ls) {
-            if (!hasInsertedBeforeElements && insertBefore.equals(getValue.apply(existingEntry))) {
-                hasInsertedBeforeElements = true;
+            if (!hasInsertedBeforeOrAfterElements && insertMode == Before && insertProperty.equals(getValue.apply(existingEntry))) {
+                hasInsertedBeforeOrAfterElements = true;
                 mutatedEntries.addAll(t);
             }
             mutatedEntries.add(existingEntry);
+            if (!hasInsertedBeforeOrAfterElements && insertMode == After && insertProperty.equals(getValue.apply(existingEntry))) {
+                hasInsertedBeforeOrAfterElements = true;
+                mutatedEntries.addAll(t);
+            }
         }
-        if (!hasInsertedBeforeElements) {
+        if (!hasInsertedBeforeOrAfterElements) {
             mutatedEntries.addAll(t);
         }
         return mutatedEntries;

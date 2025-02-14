@@ -21,6 +21,8 @@ import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.yaml.Assertions.yaml;
+import static org.openrewrite.yaml.MergeYaml.InsertMode.After;
+import static org.openrewrite.yaml.MergeYaml.InsertMode.Before;
 
 @SuppressWarnings({"KubernetesUnknownResourcesInspection", "KubernetesNonEditableResources"})
 class MergeYamlTest implements RewriteTest {
@@ -37,6 +39,7 @@ class MergeYamlTest implements RewriteTest {
                   - cron: "0 18 * * *"
               """,
             true,
+            null,
             null,
             null,
             null
@@ -66,7 +69,8 @@ class MergeYamlTest implements RewriteTest {
             false,
             null,
             null,
-          null
+          null,
+            null
           )),
           yaml(
             "",
@@ -96,7 +100,8 @@ class MergeYamlTest implements RewriteTest {
             false,
             null,
             null,
-          null
+          null,
+            null
           )),
           yaml(
             """
@@ -129,6 +134,7 @@ class MergeYamlTest implements RewriteTest {
                         age: 7
               """,
             false,
+            null,
             null,
             null,
             null
@@ -170,6 +176,7 @@ class MergeYamlTest implements RewriteTest {
               false,
               null,
               null,
+              null,
               null
             )),
           yaml(
@@ -204,7 +211,8 @@ class MergeYamlTest implements RewriteTest {
               true,
               null,
               null,
-              null
+              null,
+            null
             )
           ),
           yaml(
@@ -227,6 +235,7 @@ class MergeYamlTest implements RewriteTest {
               bucketPolicyOnly: true
               """,
             false,
+            null,
             null,
             null,
             null
@@ -267,6 +276,7 @@ class MergeYamlTest implements RewriteTest {
               false,
               null,
               null,
+              null,
               null
             )),
           yaml(
@@ -301,6 +311,7 @@ class MergeYamlTest implements RewriteTest {
             true,
             null,
             null,
+            null,
             null
           )),
           yaml(
@@ -324,6 +335,7 @@ class MergeYamlTest implements RewriteTest {
             "$.spec.containers",
             "imagePullPolicy: Always",
             true,
+            null,
             null,
             null,
             null
@@ -355,6 +367,7 @@ class MergeYamlTest implements RewriteTest {
             true,
             null,
             null,
+            null,
             null
           )),
           yaml(
@@ -384,6 +397,7 @@ class MergeYamlTest implements RewriteTest {
             true,
             null,
             null,
+            null,
             null
           )),
           yaml(
@@ -404,6 +418,7 @@ class MergeYamlTest implements RewriteTest {
             "$..containers",
             "imagePullPolicy: Always",
             true,
+            null,
             null,
             null,
             null
@@ -435,6 +450,7 @@ class MergeYamlTest implements RewriteTest {
             true,
             null,
             null,
+            null,
             null
           )),
           yaml(
@@ -456,6 +472,7 @@ class MergeYamlTest implements RewriteTest {
             //language=yaml
             "imagePullPolicy: Always",
             true,
+            null,
             null,
             null,
             null
@@ -490,6 +507,7 @@ class MergeYamlTest implements RewriteTest {
             true,
             null,
             null,
+            null,
             null
           )),
           yaml(
@@ -515,6 +533,7 @@ class MergeYamlTest implements RewriteTest {
                 privileged: false
               """,
             true,
+            null,
             null,
             null,
             null
@@ -554,6 +573,7 @@ class MergeYamlTest implements RewriteTest {
             true,
             null,
             null,
+            null,
             null
           )),
           yaml(
@@ -586,6 +606,7 @@ class MergeYamlTest implements RewriteTest {
                 cache: 'gradle'
               """,
             false,
+            null,
             null,
             null,
             null
@@ -629,6 +650,7 @@ class MergeYamlTest implements RewriteTest {
                       - Mangrove
               """,
             true,
+            null,
             null,
             null,
             null
@@ -675,6 +697,7 @@ class MergeYamlTest implements RewriteTest {
             true,
             null,
             null,
+            null,
             null
           )),
           yaml(
@@ -711,6 +734,7 @@ class MergeYamlTest implements RewriteTest {
                     nnmap2: v222
               """,
             true,
+            null,
             null,
             null,
             null
@@ -757,6 +781,7 @@ class MergeYamlTest implements RewriteTest {
               false,
               "name",
               null,
+              null,
               null
             )),
           yaml(
@@ -793,6 +818,7 @@ class MergeYamlTest implements RewriteTest {
                 """,
               false,
               "name2",
+              null,
               null,
               null
             )),
@@ -831,6 +857,7 @@ class MergeYamlTest implements RewriteTest {
               false,
               "name",
               null,
+              null,
               null
             )),
           yaml(
@@ -865,6 +892,7 @@ class MergeYamlTest implements RewriteTest {
             false,
             null,
             null,
+            null,
             null
           )),
           yaml(
@@ -897,6 +925,7 @@ class MergeYamlTest implements RewriteTest {
                 """,
               false,
               "name",
+              null,
               null,
               null
             )),
@@ -935,6 +964,7 @@ class MergeYamlTest implements RewriteTest {
               false,
               "name",
               null,
+              null,
               null
             )),
           yaml(
@@ -968,6 +998,7 @@ class MergeYamlTest implements RewriteTest {
                 """,
               false,
               "name",
+              null,
               null,
               null
             )),
@@ -1004,6 +1035,7 @@ class MergeYamlTest implements RewriteTest {
                 """,
               false,
               "name",
+              null,
               null,
               null
             )),
@@ -1054,6 +1086,7 @@ class MergeYamlTest implements RewriteTest {
               false,
               "name",
               null,
+              null,
               null
             )),
           yaml(
@@ -1100,6 +1133,7 @@ class MergeYamlTest implements RewriteTest {
                   E: description
               """,
             false,
+            null,
             null,
             null,
             null
@@ -1155,6 +1189,7 @@ class MergeYamlTest implements RewriteTest {
             false,
             null,
             null,
+            null,
             null
           )),
           yaml(
@@ -1194,6 +1229,7 @@ class MergeYamlTest implements RewriteTest {
                       2: new text
               """,
             false,
+            null,
             null,
             null,
             null
@@ -1262,6 +1298,7 @@ class MergeYamlTest implements RewriteTest {
             false,
             null,
             null,
+            null,
             null
           )),
           yaml(
@@ -1292,6 +1329,7 @@ class MergeYamlTest implements RewriteTest {
               first:
                 new: value
               """,
+            null,
             null,
             null,
             null,
@@ -1328,6 +1366,7 @@ class MergeYamlTest implements RewriteTest {
               false,
               null,
               null,
+              null,
               null
             )),
           yaml(
@@ -1354,6 +1393,7 @@ class MergeYamlTest implements RewriteTest {
               false,
               null,
               null,
+              null,
               null
             )),
           yaml(
@@ -1378,6 +1418,7 @@ class MergeYamlTest implements RewriteTest {
                     - newJob
                 """,
               false, "name",
+              null,
               null,
               null
             )),
@@ -1421,6 +1462,7 @@ class MergeYamlTest implements RewriteTest {
                 false,
                 null,
                 null,
+                null,
                 null
               ),
               new CopyValue("$.spec.level1.level2", null, "$.spec.empty.initially", null))
@@ -1461,6 +1503,7 @@ class MergeYamlTest implements RewriteTest {
               false,
               null,
               null,
+              null,
               null
             )),
           yaml(
@@ -1497,6 +1540,7 @@ class MergeYamlTest implements RewriteTest {
                 """,
               false,
               "id",
+              null,
               null,
               null
             )),
@@ -1537,6 +1581,7 @@ class MergeYamlTest implements RewriteTest {
               true,
               null,
               null,
+              null,
               null
             )),
           yaml(
@@ -1571,6 +1616,7 @@ class MergeYamlTest implements RewriteTest {
               false,
               "name",
               null,
+              null,
               null
             )),
           yaml(
@@ -1604,6 +1650,7 @@ class MergeYamlTest implements RewriteTest {
                 something: else
                 """,
               false,
+              null,
               null,
               null,
               null
@@ -1648,6 +1695,7 @@ class MergeYamlTest implements RewriteTest {
               false,
               "name",
               null,
+              null,
               null
             )),
           yaml(
@@ -1691,6 +1739,7 @@ class MergeYamlTest implements RewriteTest {
                 """,
               false,
               "name",
+              null,
               null,
               null
             )),
@@ -1744,6 +1793,7 @@ class MergeYamlTest implements RewriteTest {
               false,
               "name",
               null,
+              null,
               null
             )),
           yaml(
@@ -1776,6 +1826,7 @@ class MergeYamlTest implements RewriteTest {
                 """,
               false,
               "name",
+              null,
               null,
               null
             )),
@@ -1810,6 +1861,7 @@ class MergeYamlTest implements RewriteTest {
               false,
               "name",
               null,
+              null,
               null
             )),
           yaml(
@@ -1839,6 +1891,7 @@ class MergeYamlTest implements RewriteTest {
               // language=yaml
               "vars: { version: 10.3 }",
               false,
+              null,
               null,
               null,
               null
@@ -1872,6 +1925,7 @@ class MergeYamlTest implements RewriteTest {
               // language=yaml
               "vars: { mapping: { version: 10.3 } }",
               false,
+              null,
               null,
               null,
               null
@@ -1908,6 +1962,7 @@ class MergeYamlTest implements RewriteTest {
                   version: 10.3 }
                 """,
               false,
+              null,
               null,
               null,
               null
@@ -1947,6 +2002,7 @@ class MergeYamlTest implements RewriteTest {
             null,
             null,
             null,
+            Before,
             "second"
           )),
           yaml(
@@ -1982,6 +2038,7 @@ class MergeYamlTest implements RewriteTest {
             null,
             null,
             null,
+            Before,
             "level"
           )),
           yaml(
@@ -2015,6 +2072,7 @@ class MergeYamlTest implements RewriteTest {
             null,
             null,
             null,
+            Before,
             "no-key"
           )),
           yaml(
@@ -2041,6 +2099,7 @@ class MergeYamlTest implements RewriteTest {
             null,
             null,
             null,
+            Before,
             "first"
           )),
           yaml(
@@ -2067,6 +2126,7 @@ class MergeYamlTest implements RewriteTest {
             null,
             null,
             null,
+            Before,
             "first"
           )),
           yaml(
@@ -2097,6 +2157,7 @@ class MergeYamlTest implements RewriteTest {
             null,
             null,
             null,
+            Before,
             "first"
           )),
           yaml(
@@ -2131,6 +2192,7 @@ class MergeYamlTest implements RewriteTest {
             null,
             null,
             null,
+            Before,
             "second"
           )),
           yaml(
@@ -2154,40 +2216,6 @@ class MergeYamlTest implements RewriteTest {
     }
 
     @Test
-    void insertBeforeEmpty() {
-        rewriteRun(
-          spec -> spec.recipe(new MergeYaml(
-            "$",
-            //language=yaml
-            """
-              A: a
-              B:
-                A: b
-              """,
-            null,
-            null,
-            null,
-            ""
-          )),
-          yaml(
-            """
-              first:
-              second: 2
-              third: 3
-              """,
-            """
-              first:
-              second: 2
-              third: 3
-              A: a
-              B:
-                A: b
-              """
-          )
-        );
-    }
-
-    @Test
     void insertBeforeWithKey() {
         rewriteRun(
           spec -> spec.recipe(new MergeYaml(
@@ -2199,6 +2227,7 @@ class MergeYamlTest implements RewriteTest {
             null,
             null,
             null,
+            Before,
             "some"
           )),
           yaml(
@@ -2241,6 +2270,7 @@ class MergeYamlTest implements RewriteTest {
             null,
             null,
             null,
+            Before,
             "item 3"
           )),
           yaml(
@@ -2279,6 +2309,7 @@ class MergeYamlTest implements RewriteTest {
               false,
               "name",
               null,
+              Before,
               "name: x"
             )),
           yaml(
@@ -2294,6 +2325,365 @@ class MergeYamlTest implements RewriteTest {
                   value: 1
                 # Comment untouched
                 - name: x
+                  value: 1
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertAfter() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              A: a
+              B:
+                A: b
+              """,
+            null,
+            null,
+            null,
+            After,
+            "first"
+          )),
+          yaml(
+            """
+              first:
+              second: 2
+              third: 3
+              """,
+            """
+              first:
+              A: a
+              B:
+                A: b
+              second: 2
+              third: 3
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertAfterMultiple() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              first:
+                key: one
+              second:
+                key: two
+              """,
+            null,
+            null,
+            null,
+            After,
+            "level-x"
+          )),
+          yaml(
+            """
+              first:
+                level-x: one
+                level-y: one
+              second:
+                level-x: two
+                level-y: two
+              """,
+            """
+              first:
+                level-x: one
+                key: one
+                level-y: one
+              second:
+                level-x: two
+                key: two
+                level-y: two
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertAfterWithNoMatch() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              A: a
+              """,
+            null,
+            null,
+            null,
+            After,
+            "no-key"
+          )),
+          yaml(
+            """
+              first:
+              """,
+            """
+              first:
+              A: a
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertAfterElementLastLine() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              A: a
+              """,
+            null,
+            null,
+            null,
+            After,
+            "first"
+          )),
+          yaml(
+            """
+              first: value
+              """,
+            """
+              first: value
+              A: a
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertAfterElementWithCommentOnFirstLine() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              A: a
+              """,
+            null,
+            null,
+            null,
+            After,
+            "first"
+          )),
+          yaml(
+            """
+              # Comment untouched
+              first: value
+              second: value
+              """,
+            """
+              # Comment untouched
+              first: value
+              A: a
+              second: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertAfterElementWithCommentsWithNesting() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.level",
+            //language=yaml
+            """
+              A: a
+              """,
+            null,
+            null,
+            null,
+            After,
+            "second"
+          )),
+          yaml(
+            """
+              # Comment untouched 1
+              level:
+                # Comment untouched 2
+                first: value
+                # Comment untouched 3
+                second: value
+              # Comment untouched 3
+              another: value
+              """,
+            """
+              # Comment untouched 1
+              level:
+                # Comment untouched 2
+                first: value
+                # Comment untouched 3
+                second: value
+                A: a
+              # Comment untouched 3
+              another: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertAfterElementWithComments() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              A: a
+              """,
+            null,
+            null,
+            null,
+            After,
+            "second"
+          )),
+          yaml(
+            """
+              # Some comment
+              first: value
+              # Some comment
+              # with multilines
+              second: value # Comment should be moved from root to previous element
+              """,
+            """
+              # Some comment
+              first: value
+              # Some comment
+              # with multilines
+              second: value # Comment should be moved from root to previous element
+              A: a
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertAfterWithKey() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.some.very.deep.object",
+            //language=yaml
+            """
+              and: B
+              """,
+            null,
+            null,
+            null,
+            After,
+            "with"
+          )),
+          yaml(
+            """
+              some:
+                very:
+                  deep:
+                    object:
+                      with: A
+                      some: C
+              yet: another
+              """,
+            """
+             some:
+               very:
+                 deep:
+                   object:
+                     with: A
+                     and: B
+                     some: C
+             yet: another
+             """
+          )
+        );
+    }
+
+    @Test
+    void insertAfterMergeList() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            """
+              widget:
+                list:
+                  - item 2
+                another:
+                  prop: value
+              """,
+            null,
+            null,
+            null,
+            After,
+            "item 1"
+          )),
+          yaml(
+            """
+              widget:
+                list:
+                  - item 1
+                  # Comment untouched
+                  - item 3
+              """,
+            """
+              widget:
+                list:
+                  - item 1
+                  - item 2
+                  # Comment untouched
+                  - item 3
+                another:
+                  prop: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertAfterMergeSequenceMapAddAdditionalObject() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml(
+              "$.testing",
+              //language=yaml
+              """
+                - name: y
+                  value: 1
+                """,
+              false,
+              "name",
+              null,
+              After,
+              "name: x"
+            )),
+          yaml(
+            """
+              testing:
+                # Comment untouched
+                - name: x
+                  value: 1
+                # Comment untouched
+                - name: z
+                  value: 1
+              """,
+            """
+              testing:
+                # Comment untouched
+                - name: x
+                  value: 1
+                - name: y
+                  value: 1
+                # Comment untouched
+                - name: z
                   value: 1
               """
           )
