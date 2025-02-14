@@ -137,7 +137,7 @@ public interface Yaml extends Tree {
 
         @Override
         public References getReferences(ClassLoader classLoader) {
-            this.references = build(this.references, getClass().getClassLoader());
+            this.references = build(this.references);
             return Objects.requireNonNull(this.references.get());
         }
     }

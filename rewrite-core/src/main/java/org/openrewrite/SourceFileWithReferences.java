@@ -29,10 +29,10 @@ public interface SourceFileWithReferences extends SourceFile {
 
     References getReferences(ClassLoader classLoader);
 
-    default SoftReference<References> build(@Nullable SoftReference<@Nullable References> references, ClassLoader classLoader) {
+    default SoftReference<References> build(@Nullable SoftReference<@Nullable References> references) {
         References cache = references == null ? null : references.get();
         if (cache == null || cache.getSourceFile() != this) {
-            return new SoftReference<>(References.build(this, classLoader));
+            return new SoftReference<>(References.build(this));
         }
         return references;
     }
@@ -54,9 +54,9 @@ public interface SourceFileWithReferences extends SourceFile {
             return list;
         }
 
-        private static References build(SourceFile sourceFile, ClassLoader classLoader) {
+        private static References build(SourceFile sourceFile) {
             Set<Reference> references = new HashSet<>();
-            ServiceLoader<Reference.Provider> loader = ServiceLoader.load(Reference.Provider.class, classLoader);
+            ServiceLoader<Reference.Provider> loader = ServiceLoader.load(Reference.Provider.class);
             loader.reload();
             loader.forEach(provider -> {
                 if (provider.isAcceptable(sourceFile)) {
