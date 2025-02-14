@@ -209,7 +209,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
         // copy comment to previous element if needed
         if (m1.getEntries().size() < mutatedEntries.ls.size() && !getCursor().isRoot()) {
-            // If newly entries are inserted somewhere, but not the last entry nor at the document root, we can be sure no changes to the rest of the tree are needed
+            // If newly entries are inserted somewhere, but not the last entry nor at the document root, we can be sure no changes to the rest of the tree is needed
             if (mutatedEntries.lastNewlyAddedItemIndex != -1 && mutatedEntries.lastNewlyAddedItemIndex < mutatedEntries.ls.size() - 1) {
                 Yaml.Mapping.Entry afterInsertEntry = mutatedEntries.ls.get(mutatedEntries.lastNewlyAddedItemIndex + 1);
 
@@ -295,14 +295,14 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         boolean isSequenceOfScalars = s2.getEntries().stream().allMatch(entry -> entry.getBlock() instanceof Yaml.Scalar);
         if (isSequenceOfScalars) {
             List<Yaml.Sequence.Entry> incomingEntries = new ArrayList<>(s2.getEntries());
-            NEXT_ENTRY:
+            nextEntry:
             for (Yaml.Sequence.Entry entry : s1.getEntries()) {
                 if (entry.getBlock() instanceof Yaml.Scalar) {
                     String existingScalar = ((Yaml.Scalar) entry.getBlock()).getValue();
                     for (Yaml.Sequence.Entry incomingEntry : incomingEntries) {
                         if (((Yaml.Scalar) incomingEntry.getBlock()).getValue().equals(existingScalar)) {
                             incomingEntries.remove(incomingEntry);
-                            continue NEXT_ENTRY;
+                            continue nextEntry;
                         }
                     }
                 }
