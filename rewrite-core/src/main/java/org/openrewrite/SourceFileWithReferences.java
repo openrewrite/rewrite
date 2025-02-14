@@ -57,7 +57,6 @@ public interface SourceFileWithReferences extends SourceFile {
         private static References build(SourceFile sourceFile) {
             Set<Reference> references = new HashSet<>();
             ServiceLoader<Reference.Provider> loader = ServiceLoader.load(Reference.Provider.class);
-            loader.reload();
             loader.forEach(provider -> {
                 if (provider.isAcceptable(sourceFile)) {
                     references.addAll(provider.getReferences(sourceFile));
