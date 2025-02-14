@@ -2152,7 +2152,8 @@ class MergeYamlTest implements RewriteTest {
             "$.level",
             //language=yaml
             """
-              A: a
+              A: a # New comment 1
+              B: b # New comment 2
               """,
             null,
             null,
@@ -2162,19 +2163,57 @@ class MergeYamlTest implements RewriteTest {
           )),
           yaml(
             """
-              # Comment untouched 1
+              # Comment 1
               level:
-                  # Comment untouched 2
+                  before: value # Comment 2
+                  # Comment 3
                   first: value
                   second: value
               """,
             """
-              # Comment untouched 1
+              # Comment 1
               level:
-                  A: a
-                  # Comment untouched 2
+                  before: value # Comment 2
+                  A: a # New comment 1
+                  B: b # New comment 2
+                  # Comment 3
                   first: value
                   second: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void insertBeforeElementWithCommentOnFirstLineWithNesting2() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.level",
+            //language=yaml
+            """
+              A: a
+              B: b
+              """,
+            null,
+            null,
+            null,
+            Before,
+            "first"
+          )),
+          yaml(
+            """
+              # Comment 1
+              level: # Comment 2
+                # Comment 3
+                first: value
+              """,
+            """
+              # Comment 1
+              level: # Comment 2
+                A: a
+                B: b
+                # Comment 3
+                first: value
               """
           )
         );
@@ -2353,6 +2392,7 @@ class MergeYamlTest implements RewriteTest {
               first:
               second: 2
               third: 3
+              fourth: 4
               """,
             """
               first:
@@ -2361,6 +2401,7 @@ class MergeYamlTest implements RewriteTest {
                 A: b
               second: 2
               third: 3
+              fourth: 4
               """
           )
         );
@@ -2509,24 +2550,28 @@ class MergeYamlTest implements RewriteTest {
           )),
           yaml(
             """
-              # Comment untouched 1
+              # Comment 1
               level:
-                # Comment untouched 2
+                # Comment 2
                 first: value
-                # Comment untouched 3
-                second: value
-              # Comment untouched 3
+                # Comment 3
+                second: value # Comment 4
+                third: value # Comment 5
+                fourth: value # Comment 6
+              # Comment 7
               another: value
               """,
             """
-              # Comment untouched 1
+              # Comment 1
               level:
-                # Comment untouched 2
+                # Comment 2
                 first: value
-                # Comment untouched 3
-                second: value
+                # Comment 3
+                second: value # Comment 4
                 A: a
-              # Comment untouched 3
+                third: value # Comment 5
+                fourth: value # Comment 6
+              # Comment 7
               another: value
               """
           )
