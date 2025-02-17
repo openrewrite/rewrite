@@ -80,6 +80,10 @@ public class TreeDatum {
         this.ref = ref;
     }
 
+    public boolean hasValue() {
+        return value != null;
+    }
+
     public <V> V getValue() {
         if (value instanceof Map) {
             try {

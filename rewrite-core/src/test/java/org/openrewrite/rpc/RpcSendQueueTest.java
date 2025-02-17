@@ -50,4 +50,23 @@ public class RpcSendQueueTest {
 
         assertThat(latch.await(10, TimeUnit.SECONDS)).isTrue();
     }
+
+    @Test
+    void emptyList() throws InterruptedException {
+        List<String> after = List.of();
+
+        CountDownLatch latch = new CountDownLatch(1);
+        RpcSendQueue q = new RpcSendQueue(10, t -> {
+            assertThat(t.getData()).containsExactly(
+              new TreeDatum(TreeDatum.State.ADD, null, null, null),
+              new TreeDatum(TreeDatum.State.CHANGE, null, List.of(), null)
+            );
+            latch.countDown();
+        }, new HashMap<>());
+
+        q.sendList(after, null, Function.identity(), null);
+        q.flush();
+
+        assertThat(latch.await(10, TimeUnit.SECONDS)).isTrue();
+    }
 }

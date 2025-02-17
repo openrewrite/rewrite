@@ -16,12 +16,16 @@
 package org.openrewrite.rpc;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.ThrowingConsumer;
+import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.Markers;
 
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import static org.openrewrite.rpc.Reference.asRef;
 import static org.openrewrite.rpc.TreeDatum.ADDED_LIST_ITEM;
 import static org.openrewrite.rpc.TreeDatum.State.*;
 
@@ -58,6 +62,13 @@ public class RpcSendQueue {
         batch.clear();
     }
 
+    public <T> void sendMarkers(@Nullable T parent, Function<T, Markers> markersFn) {
+        getAndSend(parent, t2 -> asRef(markersFn.apply(t2)), markersRef -> {
+            Markers markers = Reference.getValue(markersRef);
+            getAndSendList(markers, Markers::getMarkers, Marker::getId, null);
+        });
+    }
+
     public <T, U> void getAndSend(@Nullable T parent, Function<T, @Nullable U> value) {
         getAndSend(parent, value, null);
     }
@@ -72,7 +83,7 @@ public class RpcSendQueue {
     public <T, U> void getAndSendList(@Nullable T parent,
                                       Function<T, @Nullable List<U>> values,
                                       Function<U, ?> id,
-                                      Consumer<U> onChange) {
+                                      @Nullable Consumer<U> onChange) {
         List<U> after = values.apply(parent);
         //noinspection unchecked
         List<U> before = this.before == null ? null : values.apply((T) this.before);
@@ -175,7 +186,7 @@ public class RpcSendQueue {
         }
         Class<?> type = after.getClass();
         if (type.isPrimitive() || type.getPackage().getName().startsWith("java.lang") ||
-            type.equals(UUID.class)) {
+            type.equals(UUID.class) || Iterable.class.isAssignableFrom(type)) {
             return null;
         }
         return type.getName();

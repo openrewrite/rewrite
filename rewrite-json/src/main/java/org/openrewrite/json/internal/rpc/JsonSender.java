@@ -15,7 +15,6 @@
  */
 package org.openrewrite.json.internal.rpc;
 
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.json.JsonVisitor;
@@ -28,10 +27,10 @@ import static org.openrewrite.rpc.Reference.asRef;
 public class JsonSender extends JsonVisitor<RpcSendQueue> {
 
     @Override
-    public Json preVisit(@NonNull Json j, RpcSendQueue q) {
+    public Json preVisit(Json j, RpcSendQueue q) {
         q.getAndSend(j, Tree::getId);
         q.getAndSend(j, j2 -> asRef(j2.getPrefix()));
-        q.getAndSend(j, j2 -> asRef(j2.getMarkers()));
+        q.sendMarkers(j, Tree::getMarkers);
         return j;
     }
 
@@ -92,7 +91,7 @@ public class JsonSender extends JsonVisitor<RpcSendQueue> {
     public @Nullable <T extends Json> JsonRightPadded<T> visitRightPadded(@Nullable JsonRightPadded<T> right, RpcSendQueue q) {
         q.getAndSend(right, JsonRightPadded::getElement, j -> visit(j, q));
         q.getAndSend(right, j -> asRef(j.getAfter()));
-        q.getAndSend(right, j -> asRef(j.getMarkers()));
+        q.sendMarkers(right, JsonRightPadded::getMarkers);
         return right;
     }
 }

@@ -36,7 +36,7 @@ public class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
     public Json preVisit(@NonNull Json j, RpcReceiveQueue q) {
         j = j.withId(UUID.fromString(q.receiveAndGet(j.getId(), UUID::toString)));
         j = j.withPrefix(q.receive(j.getPrefix()));
-        j = j.withMarkers(q.receive(j.getMarkers()));
+        j = j.withMarkers(q.receiveMarkers(j.getMarkers()));
         return j;
     }
 
@@ -91,6 +91,6 @@ public class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
         //noinspection unchecked
         return right.withElement(q.receive(right.getElement(), j -> (T) visitNonNull(j, q)))
                 .withAfter(q.receive(right.getAfter()))
-                .withMarkers(q.receive(right.getMarkers()));
+                .withMarkers(q.receiveMarkers(right.getMarkers()));
     }
 }

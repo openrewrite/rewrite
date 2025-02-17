@@ -16,6 +16,7 @@
 package org.openrewrite.rpc;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.marker.Markers;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -64,6 +65,11 @@ public class RpcReceiveQueue {
         return receive(before == null ? null : apply.apply(before), null);
     }
 
+    public Markers receiveMarkers(Markers markers) {
+        return receive(markers, m -> m.withMarkers(
+                receiveList(m.getMarkers(), null)));
+    }
+
     /**
      * Receive a simple value from the remote.
      *
@@ -89,13 +95,14 @@ public class RpcReceiveQueue {
     @SuppressWarnings("DataFlowIssue")
     public <T> T receive(@Nullable T before, @Nullable UnaryOperator<T> onChange) {
         TreeDatum message = take();
+        Integer ref = null;
         switch (message.getState()) {
             case NO_CHANGE:
                 return before;
             case DELETE:
                 return null;
             case ADD:
-                Integer ref = message.getRef();
+                ref = message.getRef();
                 if (ref != null) {
                     if (refs.containsKey(ref)) {
                         //noinspection unchecked
@@ -104,7 +111,6 @@ public class RpcReceiveQueue {
                         before = onChange == null ?
                                 message.getValue() :
                                 newObj(message.getValueType());
-                        refs.put(ref, before);
                     }
                 } else {
                     before = onChange == null ?
@@ -113,13 +119,17 @@ public class RpcReceiveQueue {
                 }
                 // Intentional fall-through...
             case CHANGE:
-                return onChange == null ? message.getValue() : onChange.apply(before);
+                T after = onChange == null ? message.getValue() : onChange.apply(before);
+                if (ref != null) {
+                    refs.put(ref, after);
+                }
+                return after;
             default:
                 throw new UnsupportedOperationException("Unknown state type " + message.getState());
         }
     }
 
-    public <T> List<T> receiveList(@Nullable List<T> before, UnaryOperator<@Nullable T> onChange) {
+    public <T> List<T> receiveList(@Nullable List<T> before, @Nullable UnaryOperator<@Nullable T> onChange) {
         TreeDatum msg = take();
         switch (msg.getState()) {
             case NO_CHANGE:
@@ -135,24 +145,9 @@ public class RpcReceiveQueue {
                 msg = take(); // the next message should be a CHANGE with a list of positions
                 assert msg.getState() == TreeDatum.State.CHANGE;
                 List<Integer> positions = msg.getValue();
-
                 List<T> after = new ArrayList<>(positions.size());
                 for (int beforeIdx : positions) {
-                    msg = take();
-                    switch (msg.getState()) {
-                        case NO_CHANGE:
-                            after.add(requireNonNull(before).get(beforeIdx));
-                            break;
-                        case ADD:
-                            // Intentional fall-through...
-                        case CHANGE:
-                            after.add(onChange.apply(beforeIdx == -1 ?
-                                    newObj(requireNonNull(msg.getValueType())) :
-                                    requireNonNull(before).get(beforeIdx)));
-                            break;
-                        default:
-                            throw new UnsupportedOperationException("Unknown state type " + msg.getState());
-                    }
+                    after.add(receive(beforeIdx >= 0 ? requireNonNull(before).get(beforeIdx) : null, onChange));
                 }
                 return after;
             default:
