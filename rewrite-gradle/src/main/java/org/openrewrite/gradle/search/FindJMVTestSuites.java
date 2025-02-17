@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,28 +49,22 @@ public class FindJMVTestSuites extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Find a Gradle JVMTestSuite plugin configurations.";
+        return "Find Gradle JVMTestSuite plugin configurations and produce a data table.";
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        boolean checkForDependencies = definesDependencies != null && definesDependencies;
-
+        boolean requireDependencies = definesDependencies != null && definesDependencies;
         return new GroovyIsoVisitor<ExecutionContext>() {
             private boolean isJVMTestSuitesBlock() {
-
                 Cursor parent = getCursor().getParent();
-                if (parent == null) {
-                    return false;
+                if (parent != null) {
+                    Iterator<Object> path = parent.getPath(J.MethodInvocation.class::isInstance);
+                    if (path.hasNext() && "suites".equals(((J.MethodInvocation) path.next()).getSimpleName())) {
+                        return path.hasNext() && "testing".equals(((J.MethodInvocation) path.next()).getSimpleName());
+                    }
                 }
-
-                Iterator<Object> path = parent.getPath(J.MethodInvocation.class::isInstance);
-
-                if (!path.hasNext() || !"suites".equals(((J.MethodInvocation) path.next()).getSimpleName())) {
-                    return false;
-                }
-
-                return path.hasNext() && "testing".equals(((J.MethodInvocation) path.next()).getSimpleName());
+                return false;
             }
 
             private boolean definesDependencies(J.MethodInvocation suite) {
@@ -94,12 +88,8 @@ public class FindJMVTestSuites extends Recipe {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 if (isJVMTestSuitesBlock()) {
-                    //jvmTestSuitesDefined.insertRow(ctx, new JVMTestSuitesDefined.Row(method.getSimpleName()));
-                    if (checkForDependencies) {
-                        return definesDependencies(method) ? SearchResult.found(method) : method;
-                    } else {
-                        return SearchResult.found(method);
-                    }
+                    jvmTestSuitesDefined.insertRow(ctx, new JVMTestSuitesDefined.Row(method.getSimpleName()));
+                    return !requireDependencies || definesDependencies(method) ? SearchResult.found(method) : method;
                 }
                 return super.visitMethodInvocation(method, ctx);
             }

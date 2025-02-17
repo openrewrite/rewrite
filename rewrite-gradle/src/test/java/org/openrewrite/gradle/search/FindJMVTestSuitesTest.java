@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle.search;
 
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RecipeSpec;
@@ -38,8 +39,9 @@ class FindJMVTestSuitesTest implements RewriteTest {
               spec -> spec.recipe(new FindJMVTestSuites(null)),
               buildGradle(
                 withoutDependency,
-                withoutDependencyFound,
-                spec -> spec.path("build.gradle")));
+                withoutDependencyFound
+              )
+            );
         }
 
         @Test
@@ -48,17 +50,17 @@ class FindJMVTestSuitesTest implements RewriteTest {
               spec -> spec.recipe(new FindJMVTestSuites(false)),
               buildGradle(
                 withoutDependency,
-                withoutDependencyFound,
-                spec -> spec.path("build.gradle")));
+                withoutDependencyFound
+              )
+            );
         }
 
         @Test
         void configTrue() {
             rewriteRun(
               spec -> spec.recipe(new FindJMVTestSuites(true)),
-              buildGradle(
-                withoutDependency,
-                spec -> spec.path("build.gradle")));
+              buildGradle(withoutDependency)
+            );
         }
     }
 
@@ -70,8 +72,9 @@ class FindJMVTestSuitesTest implements RewriteTest {
               spec -> spec.recipe(new FindJMVTestSuites(null)),
               buildGradle(
                 withDependency,
-                withDependencyFound,
-                spec -> spec.path("build.gradle")));
+                withDependencyFound
+              )
+            );
         }
 
         @Test
@@ -80,8 +83,9 @@ class FindJMVTestSuitesTest implements RewriteTest {
               spec -> spec.recipe(new FindJMVTestSuites(false)),
               buildGradle(
                 withDependency,
-                withDependencyFound,
-                spec -> spec.path("build.gradle")));
+                withDependencyFound
+              )
+            );
         }
 
         @Test
@@ -90,133 +94,123 @@ class FindJMVTestSuitesTest implements RewriteTest {
               spec -> spec.recipe(new FindJMVTestSuites(true)),
               buildGradle(
                 withDependency,
-                withDependencyFound,
-                spec -> spec.path("build.gradle")));
+                withDependencyFound
+              )
+            );
         }
     }
 
     @Nested
     class NoPlugin {
         @Test
-        void configNull() {
+        void noSuiteDefined() {
             rewriteRun(
               spec -> spec.recipe(new FindJMVTestSuites(null)),
-              buildGradle(
-                noSuiteDefined,
-                spec -> spec.path("build.gradle")));
-        }
-
-        @Test
-        void configFalse() {
+              buildGradle(noSuiteDefined)
+            );
             rewriteRun(
               spec -> spec.recipe(new FindJMVTestSuites(false)),
-              buildGradle(
-                noSuiteDefined,
-                spec -> spec.path("build.gradle")));
-        }
-
-        @Test
-        void configTrue() {
+              buildGradle(noSuiteDefined)
+            );
             rewriteRun(
               spec -> spec.recipe(new FindJMVTestSuites(true)),
-              buildGradle(
-                noSuiteDefined,
-                spec -> spec.path("build.gradle")));
+              buildGradle(noSuiteDefined)
+            );
         }
     }
 
-    //language=groovy
+    @Language("groovy")
     private static final String withDependency = """
-          plugins {
-              id "java-library"
-              id 'jvm-test-suite'
-          }
-          
-          repositories {
-              mavenCentral()
-          }
-          
-          testing {
-              suites {
-                  integrationTest(JvmTestSuite) {
-                      dependencies {}
-                  }
+      plugins {
+          id "java-library"
+          id 'jvm-test-suite'
+      }
+      
+      repositories {
+          mavenCentral()
+      }
+      
+      testing {
+          suites {
+              integrationTest(JvmTestSuite) {
+                  dependencies {}
               }
           }
-          """;
+      }
+      """;
 
-    //language=groovy
+    @Language("groovy")
     private static final String withDependencyFound = """
-          plugins {
-              id "java-library"
-              id 'jvm-test-suite'
-          }
-          
-          repositories {
-              mavenCentral()
-          }
-          
-          testing {
-              suites {
-                  /*~~>*/integrationTest(JvmTestSuite) {
-                      dependencies {}
-                  }
+      plugins {
+          id "java-library"
+          id 'jvm-test-suite'
+      }
+      
+      repositories {
+          mavenCentral()
+      }
+      
+      testing {
+          suites {
+              /*~~>*/integrationTest(JvmTestSuite) {
+                  dependencies {}
               }
           }
-          """;
+      }
+      """;
 
-    //language=groovy
+    @Language("groovy")
     private static final String withoutDependency = """
-          plugins {
-              id "java-library"
-              id 'jvm-test-suite'
-          }
-          
-          repositories {
-              mavenCentral()
-          }
-          
-          testing {
-              suites {
-                  integrationTest(JvmTestSuite) {
-                  }
+      plugins {
+          id "java-library"
+          id 'jvm-test-suite'
+      }
+      
+      repositories {
+          mavenCentral()
+      }
+      
+      testing {
+          suites {
+              integrationTest(JvmTestSuite) {
               }
           }
-          """;
+      }
+      """;
 
-    //language=groovy
+    @Language("groovy")
     private static final String withoutDependencyFound = """
-          plugins {
-              id "java-library"
-              id 'jvm-test-suite'
-          }
-          
-          repositories {
-              mavenCentral()
-          }
-          
-          testing {
-              suites {
-                  /*~~>*/integrationTest(JvmTestSuite) {
-                  }
+      plugins {
+          id "java-library"
+          id 'jvm-test-suite'
+      }
+      
+      repositories {
+          mavenCentral()
+      }
+      
+      testing {
+          suites {
+              /*~~>*/integrationTest(JvmTestSuite) {
               }
           }
-          """;
+      }
+      """;
 
-    //language=groovy
+    @Language("groovy")
     private static final String noSuiteDefined = """
-          plugins {
-              id "java-library"
-              id 'jvm-test-suite'
+      plugins {
+          id "java-library"
+          id 'jvm-test-suite'
+      }
+      
+      repositories {
+          mavenCentral()
+      }
+      
+      testing {
+          suites {
           }
-          
-          repositories {
-              mavenCentral()
-          }
-          
-          testing {
-              suites {
-              }
-          }
-          """;
+      }
+      """;
 }
