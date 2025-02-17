@@ -182,7 +182,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     }
 
                     acc.customJvmTestSuitesWithDependencies
-                            .computeIfAbsent(javaProject, __ -> new HashSet<>())
+                            .computeIfAbsent(javaProject, ignored -> new HashSet<>())
                             .addAll(FindJMVTestSuites.jvmTestSuiteNames(tree, true));
 
                     Set<String> configurations = acc.configurationsByProject.computeIfAbsent(javaProject, ignored -> new HashSet<>());
@@ -257,12 +257,12 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
                         G.CompilationUnit g = (G.CompilationUnit) s;
                         for (String resolvedConfiguration : resolvedConfigurations) {
-                            if (!targetsCustomJVMTestSuite(resolvedConfiguration, acc.customJvmTestSuitesWithDependencies.get(jp))) {
-                                g = (G.CompilationUnit) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, resolvedConfiguration,
-                                        classifier, extension, metadataFailures, this::isTopLevel).visitNonNull(g, ctx);
-                            } else {
+                            if (targetsCustomJVMTestSuite(resolvedConfiguration, acc.customJvmTestSuitesWithDependencies.get(jp))) {
                                 g = (G.CompilationUnit) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, purgeSourceSet(configuration),
                                         classifier, extension, metadataFailures, isMatchingJVMTestSuite(resolvedConfiguration)).visitNonNull(g, ctx);
+                            } else {
+                                g = (G.CompilationUnit) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, resolvedConfiguration,
+                                        classifier, extension, metadataFailures, this::isTopLevel).visitNonNull(g, ctx);
                             }
                         }
 
@@ -330,6 +330,4 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                 })
         );
     }
-
-
 }

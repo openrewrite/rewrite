@@ -1400,8 +1400,7 @@ class AddDependencyTest implements RewriteTest {
                             }
                         }
                     }
-                    """,
-                  spec -> spec.path("build.gradle")
+                    """
                 )));
         }
 
@@ -1461,8 +1460,7 @@ class AddDependencyTest implements RewriteTest {
                             }
                         }
                     }
-                    """,
-                  spec -> spec.path("build.gradle")
+                    """
                 )));
         }
 
@@ -1512,8 +1510,7 @@ class AddDependencyTest implements RewriteTest {
                     dependencies {
                         integrationTestImplementation "com.google.guava:guava:29.0-jre"
                     }
-                    """,
-                  spec -> spec.path("build.gradle")
+                    """
                 )));
         }
 
@@ -1578,8 +1575,7 @@ class AddDependencyTest implements RewriteTest {
                             }
                         }
                     }
-                    """.formatted(gradleConfiguration),
-                  spec -> spec.path("build.gradle")
+                    """.formatted(gradleConfiguration)
                 )));
         }
     }
