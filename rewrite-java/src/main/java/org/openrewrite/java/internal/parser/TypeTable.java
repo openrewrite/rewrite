@@ -25,6 +25,7 @@ import org.openrewrite.Incubating;
 import org.openrewrite.java.JavaParserExecutionContextView;
 
 import java.io.*;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -85,15 +86,29 @@ public class TypeTable implements JavaParserClasspathLoader {
     private static final Map<GroupArtifactVersion, Path> classesDirByArtifact = new LinkedHashMap<>();
 
     public static @Nullable TypeTable fromClasspath(ExecutionContext ctx, Collection<String> artifactNames) {
-        try (InputStream is = findCaller().getClassLoader().getResourceAsStream(DEFAULT_RESOURCE_PATH)) {
-            return is == null ? null : new TypeTable(ctx, is, artifactNames);
+        try {
+            Enumeration<URL> resources = findCaller().getClassLoader().getResources(DEFAULT_RESOURCE_PATH);
+            if (resources.hasMoreElements()) {
+                return new TypeTable(ctx, resources, artifactNames);
+            }
+            return null;
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
-    public TypeTable(ExecutionContext ctx, InputStream is, Collection<String> artifactNames) {
-        try (InputStream inflate = new InflaterInputStream(is)) {
+    TypeTable(ExecutionContext ctx, URL url, Collection<String> artifactNames) {
+        read(url, artifactNames, ctx);
+    }
+
+    TypeTable(ExecutionContext ctx, Enumeration<URL> resources, Collection<String> artifactNames) {
+        while (resources.hasMoreElements()) {
+            read(resources.nextElement(), artifactNames, ctx);
+        }
+    }
+
+    private static void read(URL url, Collection<String> artifactNames, ExecutionContext ctx) {
+        try (InputStream is = url.openStream(); InputStream inflate = new InflaterInputStream(is)) {
             new Reader(ctx).read(inflate, artifactsNotYetWritten(artifactNames));
         } catch (IOException e) {
             throw new UncheckedIOException(e);

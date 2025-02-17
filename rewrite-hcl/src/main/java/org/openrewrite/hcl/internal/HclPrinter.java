@@ -360,14 +360,14 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
     @Override
     public Hcl visitSplatOperator(Hcl.Splat.Operator splatOperator, PrintOutputCapture<P> p) {
         beforeSyntax(splatOperator, Space.Location.SPLAT_OPERATOR, p);
-        if (splatOperator.getType().equals(Hcl.Splat.Operator.Type.Full)) {
+        if (splatOperator.getType() == Hcl.Splat.Operator.Type.Full) {
             p.append('[');
         } else {
             p.append('.');
         }
         visitSpace(splatOperator.getSplat().getElement().getPrefix(), Space.Location.SPLAT_OPERATOR_PREFIX, p);
         p.append('*');
-        if (splatOperator.getType().equals(Hcl.Splat.Operator.Type.Full)) {
+        if (splatOperator.getType() == Hcl.Splat.Operator.Type.Full) {
             visitSpace(splatOperator.getSplat().getAfter(), Space.Location.SPLAT_OPERATOR_SUFFIX, p);
             p.append(']');
         }
