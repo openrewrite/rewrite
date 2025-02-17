@@ -67,8 +67,7 @@ import java.util.stream.Stream;
 
 import static java.lang.Character.isJavaIdentifierPart;
 import static java.lang.Character.isWhitespace;
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
+import static java.util.Collections.*;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.groovy.internal.Delimiter.*;
@@ -238,7 +237,7 @@ public class GroovyParserVisitor {
         public void visitClass(ClassNode clazz) {
             Space fmt = whitespace();
             List<J.Annotation> leadingAnnotations = visitAndGetAnnotations(clazz, this);
-            List<J.Modifier> modifiers = visitModifiers(clazz.getModifiers());
+            List<J.Modifier> modifiers = getModifiers(clazz.getName());
 
             Space kindPrefix = whitespace();
             J.ClassDeclaration.Kind.Type kindType = null;
@@ -421,7 +420,7 @@ public class GroovyParserVisitor {
             RewriteGroovyVisitor visitor = new RewriteGroovyVisitor(field, this);
 
             List<J.Annotation> annotations = visitAndGetAnnotations(field, this);
-            List<J.Modifier> modifiers = visitModifiers(field.getModifiers());
+            List<J.Modifier> modifiers = getModifiers(field.getName(), new HashSet<>(Arrays.asList("def", "var")));
             TypeTree typeExpr = visitTypeTree(field.getOriginType());
 
             J.Identifier name = new J.Identifier(randomId(), sourceBefore(field.getName()), Markers.EMPTY,
@@ -468,7 +467,7 @@ public class GroovyParserVisitor {
             Space fmt = whitespace();
 
             List<J.Annotation> annotations = visitAndGetAnnotations(method, this);
-            List<J.Modifier> modifiers = visitModifiers(method.getModifiers());
+            List<J.Modifier> modifiers = getModifiers(method.getName(), singleton("def"));
             boolean isConstructorOfInnerNonStaticClass = false;
             RedundantDef redundantDef = getRedundantDefMarker(method);
             J.TypeParameters typeParameters = null;
@@ -528,13 +527,10 @@ public class GroovyParserVisitor {
                 Parameter param = unparsedParams[i];
 
                 List<J.Annotation> paramAnnotations = visitAndGetAnnotations(param, this);
-
-                TypeTree paramType;
-                if (param.isDynamicTyped()) {
-                    paramType = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), "", JavaType.ShallowClass.build("java.lang.Object"), null);
-                } else {
-                    paramType = visitTypeTree(param.getOriginType());
-                }
+                List<J.Modifier> paramModifiers = getModifiers(param.getName());
+                TypeTree paramType = param.isDynamicTyped() ?
+                        new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), "", JavaType.ShallowClass.build("java.lang.Object"), null) :
+                        visitTypeTree(param.getOriginType());
 
                 Space varargs = null;
                 if (paramType instanceof J.ArrayType && sourceStartsWith("...")) {
@@ -561,7 +557,7 @@ public class GroovyParserVisitor {
                 Space rightPad = sourceBefore(i == unparsedParams.length - 1 ? ")" : ",");
 
                 params.add(JRightPadded.build((Statement) new J.VariableDeclarations(randomId(), EMPTY,
-                        Markers.EMPTY, paramAnnotations, emptyList(), paramType,
+                        Markers.EMPTY, paramAnnotations, paramModifiers, paramType,
                         varargs, emptyList(),
                         singletonList(paramName))).withAfter(rightPad));
             }
@@ -1377,7 +1373,7 @@ public class GroovyParserVisitor {
             Space prefix = whitespace();
             List<J.Annotation> leadingAnnotations = visitAndGetAnnotations(expression, classVisitor);
             Optional<MultiVariable> multiVariable = maybeMultiVariable();
-            List<J.Modifier> modifiers = getModifiers(expression.getVariableExpression());
+            List<J.Modifier> modifiers = getModifiers(expression.getVariableExpression().getName());
             TypeTree typeExpr = visitVariableExpressionType(expression.getVariableExpression());
 
             J.VariableDeclarations.NamedVariable namedVariable;
@@ -1432,33 +1428,6 @@ public class GroovyParserVisitor {
             return Optional.empty();
         }
 
-        private List<J.Modifier> getModifiers(Variable variable) {
-            String varName = variable.getName();
-            List<J.Modifier> modifiers = new ArrayList<>();
-            int saveCursor = cursor;
-            Space prefix = whitespace();
-            Set<String> possibleModifiers = new LinkedHashSet<>(modifierNameToType.keySet());
-            String currentModifier = possibleModifiers.stream().filter(modifierName -> source.startsWith(modifierName, cursor))
-                    .findFirst()
-                    .orElse(null);
-            while (currentModifier != null) {
-                possibleModifiers.remove(currentModifier);
-                modifiers.add(new J.Modifier(randomId(), prefix, Markers.EMPTY, currentModifier, modifierNameToType.get(currentModifier), emptyList()));
-                skip(currentModifier);
-                saveCursor = cursor;
-                prefix = whitespace();
-                currentModifier = possibleModifiers.stream()
-                        .filter(modifierName ->
-                                // Try to avoid confusing a variable name with an incidentally similar modifier keyword
-                                (varName.length() < modifierName.length() || !source.startsWith(varName, cursor)) &&
-                                source.startsWith(modifierName, cursor))
-                        .findFirst()
-                        .orElse(null);
-            }
-            cursor = saveCursor;
-            return modifiers;
-        }
-
         @Override
         public void visitEmptyExpression(EmptyExpression expression) {
             queue.add(new J.Empty(randomId(), EMPTY, Markers.EMPTY));
@@ -1510,7 +1479,7 @@ public class GroovyParserVisitor {
                 } else {
                     Parameter param = forLoop.getVariable();
                     Space paramFmt = whitespace();
-                    List<J.Modifier> modifiers = getModifiers(param);
+                    List<J.Modifier> modifiers = getModifiers(param.getName());
                     TypeTree paramType = param.getOriginType().getColumnNumber() >= 0 ? visitTypeTree(param.getOriginType()) : null;
                     JRightPadded<J.VariableDeclarations.NamedVariable> paramName = JRightPadded.build(
                             new J.VariableDeclarations.NamedVariable(randomId(), whitespace(), Markers.EMPTY,
@@ -2608,57 +2577,31 @@ public class GroovyParserVisitor {
         return typeTree(classNode, inferredType);
     }
 
-    private List<J.Modifier> visitModifiers(int modifiers) {
-        List<J.Modifier> unorderedModifiers = new ArrayList<>();
+    private List<J.Modifier> getModifiers(String varName) {
+        return getModifiers(varName, emptySet());
+    }
 
-        if ((modifiers & Opcodes.ACC_ABSTRACT) != 0) {
-            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, null, J.Modifier.Type.Abstract, emptyList()));
-        }
-        if ((modifiers & Opcodes.ACC_FINAL) != 0) {
-            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, null, J.Modifier.Type.Final, emptyList()));
-        }
-        if ((modifiers & Opcodes.ACC_PRIVATE) != 0) {
-            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, null, J.Modifier.Type.Private, emptyList()));
-        }
-        if ((modifiers & Opcodes.ACC_PROTECTED) != 0) {
-            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, null, J.Modifier.Type.Protected, emptyList()));
-        }
-        if ((modifiers & Opcodes.ACC_PUBLIC) != 0) {
-            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, null, J.Modifier.Type.Public, emptyList()));
-        }
-        if ((modifiers & Opcodes.ACC_STATIC) != 0) {
-            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, null, J.Modifier.Type.Static, emptyList()));
-        }
-        if ((modifiers & Opcodes.ACC_SYNCHRONIZED) != 0) {
-            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, null, J.Modifier.Type.Synchronized, emptyList()));
-        }
-        if ((modifiers & Opcodes.ACC_TRANSIENT) != 0) {
-            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, null, J.Modifier.Type.Transient, emptyList()));
-        }
-        if ((modifiers & Opcodes.ACC_VOLATILE) != 0) {
-            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, null, J.Modifier.Type.Volatile, emptyList()));
-        }
-
-        List<J.Modifier> orderedModifiers = new ArrayList<>(unorderedModifiers.size());
-        boolean foundModifier = true;
-        nextModifier:
-        while (foundModifier) {
-            int saveCursor = cursor;
-            Space fmt = whitespace();
-            for (J.Modifier mod : unorderedModifiers) {
-                String modName = mod.getType().name().toLowerCase();
-                if (source.startsWith(modName, cursor)) {
-                    orderedModifiers.add(mod.withPrefix(fmt));
-                    unorderedModifiers.remove(mod);
-                    cursor += modName.length();
-                    continue nextModifier;
-                }
+    private List<J.Modifier> getModifiers(String varName, Set<String> excludeModifiers) {
+        List<J.Modifier> modifiers = new ArrayList<>();
+        Set<String> possibleModifiers = new LinkedHashSet<>(modifierNameToType.size());
+        for (String modifier : modifierNameToType.keySet()) {
+            if (!excludeModifiers.contains(modifier)) {
+                possibleModifiers.add(modifier);
             }
-            foundModifier = false;
-            cursor = saveCursor;
         }
-
-        return orderedModifiers;
+        String currentModifier = possibleModifiers.stream().filter(this::sourceStartsWith).findFirst().orElse(null);
+        while (currentModifier != null) {
+            possibleModifiers.remove(currentModifier);
+            modifiers.add(new J.Modifier(randomId(), whitespace(), Markers.EMPTY, currentModifier, modifierNameToType.get(currentModifier), emptyList()));
+            skip(currentModifier);
+            currentModifier = possibleModifiers.stream()
+                    .filter(modifierName ->
+                            // Try to avoid confusing a variable name with an incidentally similar modifier keyword like `def defaultPublicStaticFinal = 0`
+                            (varName.length() < modifierName.length() || !sourceStartsWith(varName)) && sourceStartsWith(modifierName))
+                    .findFirst()
+                    .orElse(null);
+        }
+        return modifiers;
     }
 
     private <G2 extends J> JRightPadded<G2> maybeSemicolon(G2 g) {
