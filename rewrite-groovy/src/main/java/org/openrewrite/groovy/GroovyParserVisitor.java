@@ -237,7 +237,7 @@ public class GroovyParserVisitor {
         public void visitClass(ClassNode clazz) {
             Space fmt = whitespace();
             List<J.Annotation> leadingAnnotations = visitAndGetAnnotations(clazz, this);
-            List<J.Modifier> modifiers = getModifiers(clazz.getName());
+            List<J.Modifier> modifiers = getModifiers();
 
             Space kindPrefix = whitespace();
             J.ClassDeclaration.Kind.Type kindType = null;
@@ -420,8 +420,8 @@ public class GroovyParserVisitor {
             RewriteGroovyVisitor visitor = new RewriteGroovyVisitor(field, this);
 
             List<J.Annotation> annotations = visitAndGetAnnotations(field, this);
-            List<J.Modifier> modifiers = getModifiers(field.getName(), new HashSet<>(Arrays.asList("def", "var")));
-            TypeTree typeExpr = visitTypeTree(field.getOriginType());
+            List<J.Modifier> modifiers = getModifiers();
+            TypeTree typeExpr = field.isDynamicTyped() ? null : visitTypeTree(field.getOriginType());
 
             J.Identifier name = new J.Identifier(randomId(), sourceBefore(field.getName()), Markers.EMPTY,
                     emptyList(), field.getName(), typeMapping.type(field.getOriginType()), typeMapping.variableType(field));
@@ -467,9 +467,8 @@ public class GroovyParserVisitor {
             Space fmt = whitespace();
 
             List<J.Annotation> annotations = visitAndGetAnnotations(method, this);
-            List<J.Modifier> modifiers = getModifiers(method.getName(), singleton("def"));
+            List<J.Modifier> modifiers = getModifiers();
             boolean isConstructorOfInnerNonStaticClass = false;
-            RedundantDef redundantDef = getRedundantDefMarker(method);
             J.TypeParameters typeParameters = null;
             if (method.getGenericsTypes() != null) {
                 Space prefix = sourceBefore("<");
@@ -481,7 +480,7 @@ public class GroovyParserVisitor {
                 }
                 typeParameters = new J.TypeParameters(randomId(), prefix, Markers.EMPTY, emptyList(), typeParametersList);
             }
-            TypeTree returnType = method instanceof ConstructorNode ? null : visitTypeTree(method.getReturnType());
+            TypeTree returnType = method instanceof ConstructorNode || method.isDynamicReturnType() ? null : visitTypeTree(method.getReturnType());
 
             Space namePrefix = whitespace();
             String methodName;
@@ -527,7 +526,7 @@ public class GroovyParserVisitor {
                 Parameter param = unparsedParams[i];
 
                 List<J.Annotation> paramAnnotations = visitAndGetAnnotations(param, this);
-                List<J.Modifier> paramModifiers = getModifiers(param.getName());
+                List<J.Modifier> paramModifiers = getModifiers();
                 TypeTree paramType = param.isDynamicTyped() ?
                         new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), "", JavaType.ShallowClass.build("java.lang.Object"), null) :
                         visitTypeTree(param.getOriginType());
@@ -585,7 +584,7 @@ public class GroovyParserVisitor {
 
             queue.add(new J.MethodDeclaration(
                     randomId(), fmt,
-                    redundantDef == null ? Markers.EMPTY : Markers.EMPTY.add(redundantDef),
+                    Markers.EMPTY,
                     annotations,
                     modifiers,
                     typeParameters,
@@ -597,24 +596,6 @@ public class GroovyParserVisitor {
                     null,
                     typeMapping.methodType(method)
             ));
-        }
-
-        /**
-         * Methods can be declared with "def" AND a return type (or constructors with "def").
-         * In these cases the "def" is semantically meaningless but needs to be preserved for source code accuracy.
-         * If there is both a def and a return type, this method returns a RedundantDef object and advances the cursor
-         * position past the "def" keyword, leaving the return type to be parsed as normal.
-         */
-        private @Nullable RedundantDef getRedundantDefMarker(MethodNode method) {
-            int saveCursor = cursor;
-            Space defPrefix = whitespace();
-            if (source.startsWith("def", cursor) && (method.getReturnType().isRedirectNode() || !Object.class.getName().equals(method.getReturnType().getName()))) {
-                skip("def");
-                return new RedundantDef(randomId(), defPrefix);
-            }
-
-            cursor = saveCursor;
-            return null;
         }
 
         @SuppressWarnings({"ConstantConditions", "unchecked"})
@@ -1373,7 +1354,7 @@ public class GroovyParserVisitor {
             Space prefix = whitespace();
             List<J.Annotation> leadingAnnotations = visitAndGetAnnotations(expression, classVisitor);
             Optional<MultiVariable> multiVariable = maybeMultiVariable();
-            List<J.Modifier> modifiers = getModifiers(expression.getVariableExpression().getName());
+            List<J.Modifier> modifiers = getModifiers();
             TypeTree typeExpr = visitVariableExpressionType(expression.getVariableExpression());
 
             J.VariableDeclarations.NamedVariable namedVariable;
@@ -1479,7 +1460,7 @@ public class GroovyParserVisitor {
                 } else {
                     Parameter param = forLoop.getVariable();
                     Space paramFmt = whitespace();
-                    List<J.Modifier> modifiers = getModifiers(param.getName());
+                    List<J.Modifier> modifiers = getModifiers();
                     TypeTree paramType = param.getOriginType().getColumnNumber() >= 0 ? visitTypeTree(param.getOriginType()) : null;
                     JRightPadded<J.VariableDeclarations.NamedVariable> paramName = JRightPadded.build(
                             new J.VariableDeclarations.NamedVariable(randomId(), whitespace(), Markers.EMPTY,
@@ -2442,6 +2423,20 @@ public class GroovyParserVisitor {
         return source.startsWith(delimiter, indexOfNextNonWhitespace(cursor, source));
     }
 
+    private boolean sourceStartsWith(String delimiter, String... optionalSuffixes) {
+        int whitespaceIndex = indexOfNextNonWhitespace(cursor, source);
+        boolean startsWith = source.startsWith(delimiter, whitespaceIndex);
+        if (startsWith) {
+            for (String suffix : optionalSuffixes) {
+                if (source.startsWith(suffix, whitespaceIndex + delimiter.length())) {
+                    return true;
+                }
+            }
+            return optionalSuffixes.length == 0;
+        }
+        return false;
+    }
+
     /**
      * Returns a string that is a part of this source. The substring begins at the specified beginIndex and extends until delimiter.
      * The cursor will not be moved.
@@ -2577,27 +2572,17 @@ public class GroovyParserVisitor {
         return typeTree(classNode, inferredType);
     }
 
-    private List<J.Modifier> getModifiers(String varName) {
-        return getModifiers(varName, emptySet());
-    }
-
-    private List<J.Modifier> getModifiers(String varName, Set<String> excludeModifiers) {
+    private List<J.Modifier> getModifiers() {
         List<J.Modifier> modifiers = new ArrayList<>();
-        Set<String> possibleModifiers = new LinkedHashSet<>(modifierNameToType.size());
-        for (String modifier : modifierNameToType.keySet()) {
-            if (!excludeModifiers.contains(modifier)) {
-                possibleModifiers.add(modifier);
-            }
-        }
+        Set<String> possibleModifiers = new LinkedHashSet<>(modifierNameToType.keySet());
         String currentModifier = possibleModifiers.stream().filter(this::sourceStartsWith).findFirst().orElse(null);
         while (currentModifier != null) {
             possibleModifiers.remove(currentModifier);
             modifiers.add(new J.Modifier(randomId(), whitespace(), Markers.EMPTY, currentModifier, modifierNameToType.get(currentModifier), emptyList()));
             skip(currentModifier);
             currentModifier = possibleModifiers.stream()
-                    .filter(modifierName ->
-                            // Try to avoid confusing a variable name with an incidentally similar modifier keyword like `def defaultPublicStaticFinal = 0`
-                            (varName.length() < modifierName.length() || !sourceStartsWith(varName)) && sourceStartsWith(modifierName))
+                    // Try to avoid confusing a variable name with an incidentally similar modifier keyword like `def defaultPublicStaticFinal = 0`
+                    .filter(modifierName -> sourceStartsWith(modifierName, "\n", " ", ")"))
                     .findFirst()
                     .orElse(null);
         }
