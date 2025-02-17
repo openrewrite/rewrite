@@ -22,7 +22,12 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.json.JsonVisitor;
 import org.openrewrite.json.internal.JsonPrinter;
+import org.openrewrite.json.internal.rpc.JsonReceiver;
+import org.openrewrite.json.internal.rpc.JsonSender;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.lang.ref.WeakReference;
 import java.nio.charset.Charset;
@@ -31,7 +36,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
 
-public interface Json extends Tree {
+public interface Json extends Tree, RpcCodec<Json> {
 
     @SuppressWarnings("unchecked")
     @Override
@@ -51,6 +56,16 @@ public interface Json extends Tree {
     Space getPrefix();
 
     <J extends Json> J withPrefix(Space prefix);
+
+    @Override
+    default void rpcSend(Json after, RpcSendQueue q) {
+        new JsonSender().visit(after, q);
+    }
+
+    @Override
+    default Json rpcReceive(Json before, RpcReceiveQueue q) {
+        return new JsonReceiver().visitNonNull(before, q);
+    }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -163,8 +178,9 @@ public interface Json extends Tree {
             return charsetName == null ? StandardCharsets.UTF_8 : Charset.forName(charsetName);
         }
 
+        @SuppressWarnings("unchecked")
         @Override
-        public SourceFile withCharset(Charset charset) {
+        public Json.Document withCharset(Charset charset) {
             return withCharsetName(charset.name());
         }
 

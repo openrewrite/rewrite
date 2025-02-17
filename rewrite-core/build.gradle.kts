@@ -20,6 +20,7 @@ dependencies {
     implementation("io.micrometer:micrometer-core:1.9.+")
     implementation("io.github.classgraph:classgraph:latest.release")
     implementation("org.yaml:snakeyaml:latest.release")
+    implementation("io.moderne:jsonrpc:latest.release")
 
     testImplementation("org.assertj:assertj-core:latest.release")
     testImplementation(project(":rewrite-test"))
