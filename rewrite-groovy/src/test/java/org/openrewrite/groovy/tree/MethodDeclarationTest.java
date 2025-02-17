@@ -281,4 +281,3 @@ class MethodDeclarationTest implements RewriteTest {
         );
     }
 }
-
