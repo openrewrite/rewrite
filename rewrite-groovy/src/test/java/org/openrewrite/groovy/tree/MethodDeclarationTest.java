@@ -67,18 +67,6 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
-    void methodDeclarationWithModifiers() {
-        rewriteRun(
-          groovy(
-            """
-              public final accept(final def Map m) {
-              }
-              """
-          )
-        );
-    }
-
-    @Test
     void primitiveReturn() {
         rewriteRun(
           groovy(
@@ -92,7 +80,7 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
-    void genericTypeParameter() {
+    void genericTypeParameterReturn() {
         rewriteRun(
           groovy(
             """
@@ -105,21 +93,21 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
-    void emptyArguments() {
+    void modifiersReturn() {
         rewriteRun(
-          groovy("def foo( ) {}")
+          groovy(
+            """
+              public final accept(Map m) {
+              }
+              """
+          )
         );
     }
 
     @Test
-    void methodThrows() {
+    void emptyArguments() {
         rewriteRun(
-          groovy(
-            """
-              def foo(int a) throws Exception , RuntimeException {
-              }
-              """
-          )
+          groovy("def foo( ) {}")
         );
     }
 
@@ -154,6 +142,30 @@ class MethodDeclarationTest implements RewriteTest {
           groovy(
             """
               def confirmNextStepWithCredentials(String message /* = prefix */ = /* hello prefix */ "Hello" ) {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void modifiersArguments() {
+        rewriteRun(
+          groovy(
+            """
+              def accept(final def Map m) {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodThrows() {
+        rewriteRun(
+          groovy(
+            """
+              def foo(int a) throws Exception , RuntimeException {
               }
               """
           )
