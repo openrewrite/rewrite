@@ -98,7 +98,7 @@ public class RpcSendQueue {
     public <T> void sendList(@Nullable List<T> after,
                              @Nullable List<T> before,
                              Function<T, ?> id,
-                             Consumer<T> onChange) {
+                             @Nullable Consumer<T> onChange) {
         send(after, before, () -> {
             assert after != null : "A DELETE event should have been sent.";
 
@@ -106,10 +106,9 @@ public class RpcSendQueue {
 
             for (T anAfter : after) {
                 Integer beforePos = beforeIdx.get(id.apply(anAfter));
-                Runnable onChangeRun = () -> onChange.accept(anAfter);
+                Runnable onChangeRun = onChange == null ? null : () -> onChange.accept(anAfter);
                 if (beforePos == null) {
-                    put(new TreeDatum(ADD, getValueType(anAfter), null, null));
-                    doChange(anAfter, null, onChangeRun);
+                    add(anAfter, onChangeRun);
                 } else {
                     T aBefore = before == null ? null : before.get(beforePos);
                     if (aBefore == anAfter) {

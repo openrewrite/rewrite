@@ -16,42 +16,36 @@
 package org.openrewrite.rpc;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.internal.ListUtils;
 
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
+import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class TreeDataSendQueueTest {
+public class RpcSendQueueTest {
 
     @Test
-    void sendDifference() throws InterruptedException {
+    void sendList() throws InterruptedException {
         List<String> before = List.of("A", "B", "C", "D");
         List<String> after = List.of("A", "E", "F", "C");
-        Map<String, UUID> ids = ListUtils.concatAll(before, after).stream()
-          .distinct()
-          .collect(Collectors.toMap(s -> s, s -> UUID.randomUUID()));
 
         CountDownLatch latch = new CountDownLatch(1);
         RpcSendQueue q = new RpcSendQueue(10, t -> {
             assertThat(t.getData()).containsExactly(
+              new TreeDatum(TreeDatum.State.CHANGE, null, null, null),
               new TreeDatum(TreeDatum.State.CHANGE, null, List.of(0, -1, -1, 2), null),
               new TreeDatum(TreeDatum.State.NO_CHANGE, null, null, null) /* A */,
-              new TreeDatum(TreeDatum.State.ADD, "string", ids.get("E"), null),
-              new TreeDatum(TreeDatum.State.ADD, "string", ids.get("F"), null),
+              new TreeDatum(TreeDatum.State.ADD, null, "E", null),
+              new TreeDatum(TreeDatum.State.ADD, null, "F", null),
               new TreeDatum(TreeDatum.State.NO_CHANGE, null, null, null) /* C */
             );
             latch.countDown();
         }, new HashMap<>());
 
-        q.send(after, before, () -> {
-        });
+        q.sendList(after, before, Function.identity(), null);
         q.flush();
 
         assertThat(latch.await(10, TimeUnit.SECONDS)).isTrue();
