@@ -41,7 +41,7 @@ import java.time.Duration;
 import static org.openrewrite.json.Assertions.json;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-public class JsonSendReceiveTest implements RewriteTest {
+class JsonSendReceiveTest implements RewriteTest {
     RewriteRpc server;
     RewriteRpc client;
 

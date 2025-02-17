@@ -40,6 +40,7 @@ public class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
         return j;
     }
 
+    @Override
     public Json visitDocument(Json.Document document, RpcReceiveQueue q) {
         String sourcePath = q.receiveAndGet(document.getSourcePath(), Path::toString);
         return document.withSourcePath(Paths.get(sourcePath))
@@ -51,6 +52,7 @@ public class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
                 .withEof(q.receive(document.getEof()));
     }
 
+    @Override
     public Json visitArray(Json.Array array, RpcReceiveQueue q) {
         return array.getPadding().withValues(
                 q.receiveList(array.getPadding().getValues(), j -> visitRightPadded(j, q)));
@@ -76,6 +78,7 @@ public class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
                 .withValue(q.receive(member.getValue(), j -> (JsonValue) visitNonNull(j, q)));
     }
 
+    @Override
     public Json visitObject(Json.JsonObject object, RpcReceiveQueue q) {
         return object.getPadding().withMembers(
                 q.receiveList(object.getPadding().getMembers(), j -> visitRightPadded(j, q)));

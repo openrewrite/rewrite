@@ -151,7 +151,7 @@ public class RewriteRpc {
         });
 //                (SourceFile) language
 //                .getReceiver().visit(before, q));
-        if (!q.take().getState().equals(END_OF_TREE)) {
+        if (q.take().getState() != END_OF_TREE) {
             throw new IllegalStateException("Expected END_OF_TREE");
         }
         // We are now in sync with the remote state of the tree.
