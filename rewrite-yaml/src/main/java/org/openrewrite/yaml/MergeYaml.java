@@ -15,6 +15,7 @@
  */
 package org.openrewrite.yaml;
 
+import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
@@ -28,6 +29,7 @@ import static org.openrewrite.yaml.MergeYaml.InsertMode.*;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
+@AllArgsConstructor
 public class MergeYaml extends Recipe {
     @Option(displayName = "Key path",
             description = "A [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expression used to find matching keys.",
@@ -75,6 +77,14 @@ public class MergeYaml extends Recipe {
             example = "some-key")
     @Nullable
     String insertProperty;
+
+    /**
+     * @deprecated Use {@link #MergeYaml(String, String, Boolean, String, String, InsertMode, String)} instead.
+     */
+    @Deprecated
+    public MergeYaml(String key, @Language("yml") String yaml, @Nullable Boolean acceptTheirs, @Nullable String objectIdentifyingProperty, @Nullable String filePattern, @Nullable String insertProperty) {
+        this(key, yaml, acceptTheirs, objectIdentifyingProperty, filePattern, null, insertProperty);
+    }
 
     public enum InsertMode { Before, After, Last }
 
