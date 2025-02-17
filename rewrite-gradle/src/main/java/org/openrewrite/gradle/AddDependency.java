@@ -21,7 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
-import org.openrewrite.gradle.search.FindJMVTestSuites;
+import org.openrewrite.gradle.search.FindJVMTestSuites;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
@@ -183,7 +183,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
                     acc.customJvmTestSuitesWithDependencies
                             .computeIfAbsent(javaProject, ignored -> new HashSet<>())
-                            .addAll(FindJMVTestSuites.jvmTestSuiteNames(tree, true));
+                            .addAll(FindJVMTestSuites.jvmTestSuiteNames(tree, true));
 
                     Set<String> configurations = acc.configurationsByProject.computeIfAbsent(javaProject, ignored -> new HashSet<>());
                     sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet ->

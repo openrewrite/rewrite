@@ -24,7 +24,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
-class FindJMVTestSuitesTest implements RewriteTest {
+class FindJVMTestSuitesTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
@@ -36,7 +36,7 @@ class FindJMVTestSuitesTest implements RewriteTest {
         @Test
         void configNull() {
             rewriteRun(
-              spec -> spec.recipe(new FindJMVTestSuites(null)),
+              spec -> spec.recipe(new FindJVMTestSuites(null)),
               buildGradle(
                 withoutDependency,
                 withoutDependencyFound
@@ -47,7 +47,7 @@ class FindJMVTestSuitesTest implements RewriteTest {
         @Test
         void configFalse() {
             rewriteRun(
-              spec -> spec.recipe(new FindJMVTestSuites(false)),
+              spec -> spec.recipe(new FindJVMTestSuites(false)),
               buildGradle(
                 withoutDependency,
                 withoutDependencyFound
@@ -58,7 +58,7 @@ class FindJMVTestSuitesTest implements RewriteTest {
         @Test
         void configTrue() {
             rewriteRun(
-              spec -> spec.recipe(new FindJMVTestSuites(true)),
+              spec -> spec.recipe(new FindJVMTestSuites(true)),
               buildGradle(withoutDependency)
             );
         }
@@ -69,7 +69,7 @@ class FindJMVTestSuitesTest implements RewriteTest {
         @Test
         void configNull() {
             rewriteRun(
-              spec -> spec.recipe(new FindJMVTestSuites(null)),
+              spec -> spec.recipe(new FindJVMTestSuites(null)),
               buildGradle(
                 withDependency,
                 withDependencyFound
@@ -80,7 +80,7 @@ class FindJMVTestSuitesTest implements RewriteTest {
         @Test
         void configFalse() {
             rewriteRun(
-              spec -> spec.recipe(new FindJMVTestSuites(false)),
+              spec -> spec.recipe(new FindJVMTestSuites(false)),
               buildGradle(
                 withDependency,
                 withDependencyFound
@@ -91,7 +91,7 @@ class FindJMVTestSuitesTest implements RewriteTest {
         @Test
         void configTrue() {
             rewriteRun(
-              spec -> spec.recipe(new FindJMVTestSuites(true)),
+              spec -> spec.recipe(new FindJVMTestSuites(true)),
               buildGradle(
                 withDependency,
                 withDependencyFound
@@ -105,15 +105,15 @@ class FindJMVTestSuitesTest implements RewriteTest {
         @Test
         void noSuiteDefined() {
             rewriteRun(
-              spec -> spec.recipe(new FindJMVTestSuites(null)),
+              spec -> spec.recipe(new FindJVMTestSuites(null)),
               buildGradle(noSuiteDefined)
             );
             rewriteRun(
-              spec -> spec.recipe(new FindJMVTestSuites(false)),
+              spec -> spec.recipe(new FindJVMTestSuites(false)),
               buildGradle(noSuiteDefined)
             );
             rewriteRun(
-              spec -> spec.recipe(new FindJMVTestSuites(true)),
+              spec -> spec.recipe(new FindJVMTestSuites(true)),
               buildGradle(noSuiteDefined)
             );
         }

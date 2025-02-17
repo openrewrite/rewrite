@@ -33,7 +33,7 @@ import java.util.stream.Collectors;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class FindJMVTestSuites extends Recipe {
+public class FindJVMTestSuites extends Recipe {
 
     transient JVMTestSuitesDefined jvmTestSuitesDefined = new JVMTestSuitesDefined(this);
 
@@ -97,7 +97,7 @@ public class FindJMVTestSuites extends Recipe {
     }
 
     public static Set<String> jvmTestSuiteNames(Tree tree, boolean definesDependencies) {
-        return TreeVisitor.collect(new FindJMVTestSuites(definesDependencies).getVisitor(), tree, new HashSet<>())
+        return TreeVisitor.collect(new FindJVMTestSuites(definesDependencies).getVisitor(), tree, new HashSet<>())
                 .stream()
                 .filter(J.MethodInvocation.class::isInstance)
                 .map(J.MethodInvocation.class::cast)
