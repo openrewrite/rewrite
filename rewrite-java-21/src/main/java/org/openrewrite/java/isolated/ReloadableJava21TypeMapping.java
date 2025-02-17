@@ -741,35 +741,39 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
     }
 
     private Object annotationElementValue(Object value) {
-        if (value instanceof Symbol.VarSymbol) {
+        if (value instanceof String || value instanceof Number || value instanceof Boolean || value instanceof Character) {
+            return value;
+        } else if (value instanceof Symbol.VarSymbol) {
             JavaType.Variable mapped = variableType((Symbol.VarSymbol) value);
-            return mapped != null ? mapped : JavaType.Unknown.getInstance();
-        } else if (value instanceof Type.ClassType) {
-            return type((Type.ClassType) value);
+            if (mapped != null) {
+                return mapped;
+            }
+        } else if (value instanceof Type) {
+            return type((Type) value);
         } else if (value instanceof Attribute.Array) {
             List<@Nullable Object> list = new ArrayList<>();
             for (Attribute attribute : ((Attribute.Array) value).values) {
                 list.add(annotationElementValue(attribute));
             }
-            return list.toArray(!list.isEmpty() && list.getFirst() instanceof JavaType ? JavaType.EMPTY_JAVA_TYPE_ARRAY : new Object[0]);
+            return list.toArray(!list.isEmpty() && list.get(0) instanceof JavaType ? JavaType.EMPTY_JAVA_TYPE_ARRAY : new Object[0]);
         } else if (value instanceof List<?>) {
             List<@Nullable Object> list = new ArrayList<>();
             for (Object o : ((List<?>) value)) {
                 list.add(annotationElementValue(o));
             }
-            return list.toArray(!list.isEmpty() && list.getFirst() instanceof JavaType ? JavaType.EMPTY_JAVA_TYPE_ARRAY : new Object[0]);
+            return list.toArray(!list.isEmpty() && list.get(0) instanceof JavaType ? JavaType.EMPTY_JAVA_TYPE_ARRAY : new Object[0]);
         } else if (value instanceof Attribute.Class) {
             return type(((Attribute.Class) value).classType);
         } else if (value instanceof Attribute.Compound) {
             JavaType.Annotation mapped = annotationType((Attribute.Compound) value);
-            return mapped != null ? mapped : JavaType.Unknown.getInstance();
+            if (mapped != null) {
+                return mapped;
+            }
         } else if (value instanceof Attribute.Constant) {
             return annotationElementValue(((Attribute.Constant) value).value);
         } else if (value instanceof Attribute.Enum) {
             return annotationElementValue(((Attribute.Enum) value).value);
-        } else if (value instanceof Attribute.Error) {
-            return JavaType.Unknown.getInstance();
         }
-        return value;
+        return JavaType.Unknown.getInstance();
     }
 }

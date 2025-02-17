@@ -45,7 +45,7 @@ class TypeTableTest implements RewriteTest {
 
     @BeforeEach
     void before() {
-        //TODO Dctx.putMessage(TypeTable.VERIFY_CLASS_WRITING, true);
+        //TODO ctx.putMessage(TypeTable.VERIFY_CLASS_WRITING, true);
         JavaParserExecutionContextView.view(ctx).setParserClasspathDownloadTarget(temp.toFile());
         tsv = temp.resolve("types.tsv.zip");
         System.out.println(tsv);
@@ -95,33 +95,45 @@ class TypeTableTest implements RewriteTest {
     }
 
     @Test
-    void writeReadMicrometer() throws IOException {
+    void writeReadJunitJupiterApi() throws IOException {
         try (TypeTable.Writer writer = TypeTable.newWriter(Files.newOutputStream(tsv))) {
             for (Path classpath : JavaParser.runtimeClasspath()) {
-                if (classpath.toFile().getName().contains("micrometer")) {
+                if (classpath.toFile().getName().contains("junit-jupiter-api")) {
                     writeJar(classpath, writer);
                 }
             }
         }
 
-        TypeTable table = new TypeTable(ctx, Files.newInputStream(tsv), List.of("micrometer"));
-        Path micrometerClassesDir = table.load("micrometer");
+        TypeTable table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("junit-jupiter-api"));
+        Path classesDir = table.load("junit-jupiter-api");
 
-        assertThat(micrometerClassesDir).isNotNull();
+        assertThat(classesDir)
+          .isNotNull()
+          .isDirectoryRecursivelyContaining("glob:**/Assertions.class")
+          .isDirectoryRecursivelyContaining("glob:**/BeforeEach.class"); // No fields or methods
 
         // Demonstrate that the bytecode we wrote for the classes in this
         // JAR is sufficient for the compiler to type attribute code that depends
         // on them.
         rewriteRun(
           spec -> spec.parser(JavaParser.fromJavaVersion()
-            .classpath(List.of(micrometerClassesDir))),
+            .classpath(List.of(classesDir))),
           java(
             """
-              import io.micrometer.core.instrument.Metrics;
-              import io.micrometer.core.instrument.Timer;
+              import org.junit.jupiter.api.Assertions;
+              import org.junit.jupiter.api.BeforeEach;
+              import org.junit.jupiter.api.Test;
               
               class Test {
-                  Timer timer = Metrics.timer("my.timer");
+              
+                  @BeforeEach
+                  void before() {
+                  }
+
+                  @Test
+                  void foo() {
+                      Assertions.assertTrue(true);
+                  }
               }
               """
           )

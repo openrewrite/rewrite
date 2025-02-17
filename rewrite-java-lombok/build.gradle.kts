@@ -53,7 +53,7 @@ val compiler = javaToolchains.compilerFor {
 val tools = compiler.get().metadata.installationPath.file("lib/tools.jar")
 
 dependencies {
-    implementation("org.jspecify:jspecify:latest.release")
+    implementation(project(":rewrite-core"))
     //runtimeOnly("org.projectlombok:lombok:latest.release")
     runtimeOnly("org.openrewrite.tools:lombok:latest.release") // Temporary pending the next stable release of lombok
 
