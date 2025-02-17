@@ -17,10 +17,10 @@ package org.openrewrite.gradle;
 
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
@@ -1516,52 +1516,16 @@ class AddDependencyTest implements RewriteTest {
                   spec -> spec.path("build.gradle")
                 )));
         }
-    }
-
-    @Disabled("ATM setting the configuration will overwrite the resolved configuration without condition")
-    @Nested
-    class WithDifferentConfigurations {
-        @ParameterizedTest
-        @ValueSource(strings = {"implementation", "compileOnly", "runtimeOnly", "annotationProcessor"})
-        void configurationAndSourceSetCombination(String configuration) {
-            rewriteRun(
-              spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", null, configuration)),
-              mavenProject("project",
-                srcTestJava(
-                  java(usingGuavaIntMath, spec -> sourceSet(spec, "anotherSet"))),
-                buildGradle(
-                  """
-                    plugins {
-                        id 'java'
-                    }
-                    
-                    repositories {
-                        mavenCentral()
-                    }
-                    """,
-                  """
-                    plugins {
-                        id 'java'
-                    }
-                    
-                    repositories {
-                        mavenCentral()
-                    }
-                    
-                    dependencies {
-                        anotherSet%s "com.google.guava:guava:29.0-jre"
-                    }
-                    """.formatted(configuration)
-                )
-              )
-            );
-        }
 
         @ParameterizedTest
-        @ValueSource(strings = {"implementation", "compileOnly", "runtimeOnly", "annotationProcessor"})
-        void jvmTestSuitePlugin(String configuration) {
+        @CsvSource({
+          "integrationTestImplementation,implementation",
+          "integrationTestCompileOnly,compileOnly",
+          "integrationTestRuntimeOnly,runtimeOnly",
+          "integrationTestAnnotationProcessor,annotationProcessor"})
+        void withExplicitConfiguration(String recipeConfiguration, String gradleConfiguration) {
             rewriteRun(
-              spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", null, configuration)),
+              spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", null, recipeConfiguration)),
               mavenProject("project",
                 srcMainJava(
                   java(usingGuavaIntMath, sourceSpecs -> sourceSet(sourceSpecs, "integrationTest"))),
@@ -1614,7 +1578,7 @@ class AddDependencyTest implements RewriteTest {
                             }
                         }
                     }
-                    """.formatted(configuration),
+                    """.formatted(gradleConfiguration),
                   spec -> spec.path("build.gradle")
                 )));
         }
