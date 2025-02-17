@@ -40,6 +40,7 @@ import org.openrewrite.groovy.marker.*;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.marker.OmitParentheses;
@@ -2843,7 +2844,7 @@ public class GroovyParserVisitor {
             while (offset < importSource.length()) {
                 int importIndex = importSource.indexOf("import", offset);
                 if (importIndex == -1) break;
-                lineNo += importSource.substring(offset, importIndex).chars().filter(ch -> ch == '\n').count();
+                lineNo += StringUtils.countOccurrences(importSource.substring(offset, importIndex), "\n");
 
                 int maybeStaticIndex = indexOfNextNonWhitespace(importIndex + 6, importSource);
                 if (!importSource.startsWith("static", maybeStaticIndex)) {
@@ -2864,7 +2865,7 @@ public class GroovyParserVisitor {
                     completeStaticStarImports.add(node);
                 }
 
-                lineNo += importSource.substring(importIndex, packageEnd).chars().filter(ch -> ch == '\n').count();
+                lineNo += StringUtils.countOccurrences(importSource.substring(importIndex, packageEnd), "\n");
                 offset = packageEnd;
             }
         }
