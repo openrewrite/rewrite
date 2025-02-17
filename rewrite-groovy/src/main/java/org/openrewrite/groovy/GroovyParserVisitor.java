@@ -2581,32 +2581,24 @@ public class GroovyParserVisitor {
 
     private List<J.Modifier> getModifiers(String varName, Set<String> excludeModifiers) {
         List<J.Modifier> modifiers = new ArrayList<>();
-        int saveCursor = cursor;
-        Space prefix = whitespace();
         Set<String> possibleModifiers = new LinkedHashSet<>(modifierNameToType.size());
         for (String modifier : modifierNameToType.keySet()) {
             if (!excludeModifiers.contains(modifier)) {
                 possibleModifiers.add(modifier);
             }
         }
-        String currentModifier = possibleModifiers.stream().filter(modifierName -> source.startsWith(modifierName, cursor))
-                .findFirst()
-                .orElse(null);
+        String currentModifier = possibleModifiers.stream().filter(this::sourceStartsWith).findFirst().orElse(null);
         while (currentModifier != null) {
             possibleModifiers.remove(currentModifier);
-            modifiers.add(new J.Modifier(randomId(), prefix, Markers.EMPTY, currentModifier, modifierNameToType.get(currentModifier), emptyList()));
+            modifiers.add(new J.Modifier(randomId(), whitespace(), Markers.EMPTY, currentModifier, modifierNameToType.get(currentModifier), emptyList()));
             skip(currentModifier);
-            saveCursor = cursor;
-            prefix = whitespace();
             currentModifier = possibleModifiers.stream()
                     .filter(modifierName ->
-                            // Try to avoid confusing a variable name with an incidentally similar modifier keyword
-                            (varName.length() < modifierName.length() || !source.startsWith(varName, cursor)) &&
-                                    source.startsWith(modifierName, cursor))
+                            // Try to avoid confusing a variable name with an incidentally similar modifier keyword like `def defaultPublicStaticFinal = 0`
+                            (varName.length() < modifierName.length() || !sourceStartsWith(varName)) && sourceStartsWith(modifierName))
                     .findFirst()
                     .orElse(null);
         }
-        cursor = saveCursor;
         return modifiers;
     }
 
