@@ -196,7 +196,7 @@ class JavaParserTest implements RewriteTest {
         package com.example.demo;
         class FooBar {
             public void test(int num string msg) {
-              String a; this.ownerR
+              String a;
               System.out.println();
             }
         }
@@ -204,7 +204,7 @@ class JavaParserTest implements RewriteTest {
       """
         package com.example.demo;
         class FooBar {
-            public void test(int num string s, int b) {
+            public void test() {
               String a; this.ownerR
               System.out.println();
             }

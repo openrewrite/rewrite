@@ -128,4 +128,45 @@ class ImportTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void multiLineCommentBeforeStarStaticImport() {
+        rewriteRun(
+          groovy(
+            """
+            /*
+             * Hello
+             */
+            import java.io.File
+            import static java.lang.Math.*
+            import java.nio.file.Path
+            final String s = new String("s")
+            """
+          )
+        );
+    }
+
+    @Test
+    void twoSameImportStarStatements() {
+        rewriteRun(
+          groovy(
+            """
+            import static java.lang.Math.*
+            import static java.lang.Math.*
+            """
+          )
+        );
+    }
+
+    @Test
+    void oneImportStaticStarSplitIntoTwoLines() {
+        rewriteRun(
+          groovy(
+            """
+            import/* export
+            */static java.lang.Math.*
+            """
+          )
+        );
+    }
 }
