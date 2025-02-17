@@ -71,7 +71,7 @@ class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              def accept(final def Map m) {
+              public final accept(final def Map m) {
               }
               """
           )
@@ -232,4 +232,41 @@ class MethodDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void parameterWithConflictingTypeName() {
+        rewriteRun(
+          groovy(
+            """
+              class variable {}
+              def accept(final def variable m) {}
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodDeclaration accept = (J.MethodDeclaration) cu.getStatements().get(1);
+                J.VariableDeclarations m = (J.VariableDeclarations) accept.getParameters().get(0);
+                assertThat(m.getModifiers()).satisfiesExactly(
+                  mod -> assertThat(mod.getType()).isEqualTo(J.Modifier.Type.Final),
+                  mod -> assertThat(mod.getKeyword()).isEqualTo("def")
+                );
+            })
+          )
+        );
+    }
+
+    @Test
+    void defIsNotReturnType() {
+        rewriteRun(
+          groovy(
+            """
+              final def accept(final def Object m) {
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodDeclaration accept = (J.MethodDeclaration) cu.getStatements().get(0);
+                assertThat(accept.getReturnTypeExpression()).isNull();
+            })
+          )
+        );
+    }
 }
+
