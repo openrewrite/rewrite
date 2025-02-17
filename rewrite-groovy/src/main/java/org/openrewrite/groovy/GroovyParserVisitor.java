@@ -45,9 +45,9 @@ import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.marker.Semicolon;
 import org.openrewrite.java.marker.TrailingComma;
-import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.lang.annotation.Annotation;
@@ -61,6 +61,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.lang.Character.isJavaIdentifierPart;
@@ -2835,44 +2836,43 @@ public class GroovyParserVisitor {
             }
             String importSource = sourceLineNumberOffsets.length <= lastLineNumber ? source : source.substring(0, sourceLineNumberOffsets[lastLineNumber]);
 
+            importSource = eraseComments(importSource);
             // Create a node for each `import static`, don't parse comments
-            String[] lines = eraseMultiLineComments(importSource).split("\n");
-            for (int i = 0; i < lines.length; i++) {
-                String line = lines[i].split(SINGLE_LINE_COMMENT.open)[0];
-                int index = 0;
+            int offset = 0;
+            int lineNo = 1;
+            while (offset < importSource.length()) {
+                int importIndex = importSource.indexOf("import", offset);
+                if (importIndex == -1) break;
+                lineNo += importSource.substring(offset, importIndex).chars().filter(ch -> ch == '\n').count();
 
-                while (index < line.length()) {
-                    int importIndex = line.indexOf("import", index);
-                    if (importIndex == -1) break;
-
-                    int maybeStaticIndex = indexOfNextNonWhitespace(importIndex + 6, line);
-                    if (!line.startsWith("static", maybeStaticIndex)) {
-                        index = importIndex + 6;
-                        continue;
-                    }
-
-                    int packageBegin = indexOfNextNonWhitespace(maybeStaticIndex + 6, line);
-                    int packageEnd = packageBegin;
-                    while (packageEnd < line.length() && (isJavaIdentifierPart(line.charAt(packageEnd)) || line.charAt(packageEnd) == '.')) {
-                        packageEnd++;
-                    }
-
-                    if (packageEnd < line.length() && line.charAt(packageEnd) == '*') {
-                        ImportNode node = new ImportNode(staticStarImports.get(line.substring(packageBegin, packageEnd - 1)).getType());
-                        node.setLineNumber(i + 1);
-                        node.setColumnNumber(importIndex + 1);
-                        completeStaticStarImports.add(node);
-                    }
-
-                    index = packageEnd;
+                int maybeStaticIndex = indexOfNextNonWhitespace(importIndex + 6, importSource);
+                if (!importSource.startsWith("static", maybeStaticIndex)) {
+                    offset = importIndex + 6;
+                    continue;
                 }
+
+                int packageBegin = indexOfNextNonWhitespace(maybeStaticIndex + 6, importSource);
+                int packageEnd = packageBegin;
+                while (packageEnd < importSource.length() && (isJavaIdentifierPart(importSource.charAt(packageEnd)) || importSource.charAt(packageEnd) == '.')) {
+                    packageEnd++;
+                }
+
+                if (packageEnd < importSource.length() && importSource.charAt(packageEnd) == '*') {
+                    ImportNode node = new ImportNode(staticStarImports.get(importSource.substring(packageBegin, packageEnd - 1)).getType());
+                    node.setLineNumber(lineNo);
+                    node.setColumnNumber(importIndex + 1);
+                    completeStaticStarImports.add(node);
+                }
+
+                lineNo += importSource.substring(importIndex, packageEnd).chars().filter(ch -> ch == '\n').count();
+                offset = packageEnd;
             }
         }
         return completeStaticStarImports;
     }
 
     // VisibleForTesting
-    static String eraseMultiLineComments(String importSource) {
+    static String eraseComments(String importSource) {
         Matcher matcher = MULTILINE_COMMENT_REGEX.matcher(importSource);
         StringBuffer sb = new StringBuffer(); // appendReplacement requires Java 9+ for StringBuilder
         while (matcher.find()) {
@@ -2881,7 +2881,9 @@ public class GroovyParserVisitor {
             matcher.appendReplacement(sb, replacement);
         }
         matcher.appendTail(sb);
-        return sb.toString();
+        String multiLineRemoved = sb.toString();
+        return Arrays.stream(multiLineRemoved.split("\n", -1)).map(x -> x.split(SINGLE_LINE_COMMENT.open)[0])
+                .collect(Collectors.joining("\n"));
     }
 
     private DeclarationExpression transformBackToDeclarationExpression(ConstantExpression expression) {

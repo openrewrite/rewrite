@@ -22,23 +22,35 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public class GroovyParserVisitorTest {
 
     @Test
-    void eraseMultiLineComments() {
-        assertEquals("a       b", GroovyParserVisitor.eraseMultiLineComments("a /* */ b"));
+    void eraseCommentsSimple() {
+        assertEquals("a       b", GroovyParserVisitor.eraseComments("a /* */ b"));
+    }
 
+    @Test
+    void eraseCommentsMultiLine() {
         assertEquals(
-            """
+          """
             a ____________
             ____
             ____________ b
             """.replaceAll("_", " "), // this is to prevent IntelliJ from removing trailing whitespace
-          GroovyParserVisitor.eraseMultiLineComments(
+          GroovyParserVisitor.eraseComments(
             """
-            a /* something
-            else
-            then this */ b
-            """)
+              a /* something
+              else
+              then this */ b
+              """)
         );
-
-        assertEquals("1       2       3", GroovyParserVisitor.eraseMultiLineComments("1 /* */ 2 /* */ 3"));
     }
+
+    @Test
+    void eraseCommentsTwoMultiLinesInALine() {
+        assertEquals("1       2       3", GroovyParserVisitor.eraseComments("1 /* */ 2 /* */ 3"));
+    }
+
+    @Test
+    void eraseCommentsJustAnEmptyLine() {
+        assertEquals("\n", GroovyParserVisitor.eraseComments("\n"));
+    }
+
 }

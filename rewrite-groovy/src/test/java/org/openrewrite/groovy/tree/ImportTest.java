@@ -157,4 +157,16 @@ class ImportTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void oneImportStaticStarSplitIntoTwoLines() {
+        rewriteRun(
+          groovy(
+            """
+            import/* export
+            */static java.lang.Math.*
+            """
+          )
+        );
+    }
 }
