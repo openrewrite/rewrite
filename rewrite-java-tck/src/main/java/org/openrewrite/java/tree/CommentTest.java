@@ -16,6 +16,7 @@
 package org.openrewrite.java.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
@@ -45,6 +46,20 @@ class CommentTest implements RewriteTest {
           java(
             """
               class Test {// /*
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4995")
+    @Test
+    void trailingComment() {
+        rewriteRun(
+          java(
+            """
+              abstract class Test {
+                void alert(String msg) /*-{ $wnd.alert(msg); }-*/;
               }
               """
           )

@@ -1840,9 +1840,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
         if (t instanceof JCMethodDecl) {
             JCMethodDecl m = (JCMethodDecl) t;
             if (m.body == null || m.defaultValue != null) {
-                String suffix = source.substring(cursor, positionOfNext(";", null));
-                int idx = findFirstNonWhitespaceChar(suffix);
-                return sourceBefore(idx >= 0 ? "" : ";");
+                return sourceBefore(";");
             } else {
                 return sourceBefore("");
             }
