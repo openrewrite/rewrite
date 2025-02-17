@@ -24,18 +24,14 @@ import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindJMVTestSuites;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
-import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.Statement;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.semver.Semver;
-import org.openrewrite.text.Find;
 
 import java.util.*;
 import java.util.function.Predicate;
@@ -265,7 +261,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                                 g = (G.CompilationUnit) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, resolvedConfiguration,
                                         classifier, extension, metadataFailures, this::isTopLevel).visitNonNull(g, ctx);
                             } else {
-                                g = (G.CompilationUnit) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, "implementation",
+                                g = (G.CompilationUnit) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, purgeSourceSet(configuration),
                                         classifier, extension, metadataFailures, isMatchingJVMTestSuite(resolvedConfiguration)).visitNonNull(g, ctx);
                             }
                         }
@@ -279,7 +275,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
                     private Predicate<Cursor> isMatchingJVMTestSuite(String resolvedConfiguration) {
                         return cursor -> {
-                            String sourceSet = resolvedConfiguration.substring(0, resolvedConfiguration.length() - 14);
+                            String sourceSet = purgeConfigurationSuffix(resolvedConfiguration);
                             J.MethodInvocation methodInvocation = cursor.getParentOrThrow().firstEnclosing(J.MethodInvocation.class);
                             return methodInvocation != null && sourceSet.equals(methodInvocation.getSimpleName());
                         };
@@ -300,8 +296,36 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                             return false;
                         }
 
-                        String sourceSet = configuration.substring(0, configuration.length() - 14);
+                        String sourceSet = purgeConfigurationSuffix(configuration);
                         return customJvmTestSuites.contains(sourceSet);
+                    }
+
+                    private String purgeConfigurationSuffix(String configuration) {
+                        if (configuration.endsWith("Implementation")) {
+                            return configuration.substring(0, configuration.length() - 14);
+                        } else if (configuration.endsWith("CompileOnly")) {
+                            return configuration.substring(0, configuration.length() - 11);
+                        } else if (configuration.endsWith("RuntimeOnly")) {
+                            return configuration.substring(0, configuration.length() - 11);
+                        } else if (configuration.endsWith("AnnotationProcessor")) {
+                            return configuration.substring(0, configuration.length() - 19);
+                        } else {
+                            return configuration;
+                        }
+                    }
+
+                    private String purgeSourceSet(@Nullable String configuration) {
+                        if (configuration == null || configuration.endsWith("Implementation")) {
+                            return "implementation";
+                        } else if (configuration.endsWith("CompileOnly")) {
+                            return "compileOnly";
+                        } else if (configuration.endsWith("RuntimeOnly")) {
+                            return "runtimeOnly";
+                        } else if (configuration.endsWith("AnnotationProcessor")) {
+                            return "annotationProcessor";
+                        } else {
+                            return configuration;
+                        }
                     }
                 })
         );
