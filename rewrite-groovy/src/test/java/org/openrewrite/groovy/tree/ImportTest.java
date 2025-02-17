@@ -118,10 +118,10 @@ class ImportTest implements RewriteTest {
               
               
               import static java.util.Collections.**/java.util.Collections.*
-              /*static java.util.Collections.singletonList;
+              import /*static java.util.Collections.singletonList;
               
               
-              import static java.util.Collections.**/import static          java.util.Collections.*
+              import static java.util.Collections.**/static          java.util.Collections.*
               import static java.util.Collections.singletonList;import static java.util.Collections.*
               import java.util.Collections.*
               """
@@ -140,8 +140,19 @@ class ImportTest implements RewriteTest {
             import java.io.File
             import static java.lang.Math.*
             import java.nio.file.Path
-
             final String s = new String("s")
+            """
+          )
+        );
+    }
+
+    @Test
+    void twoSameImportStarStatements() {
+        rewriteRun(
+          groovy(
+            """
+            import static java.lang.Math.*
+            import static java.lang.Math.*
             """
           )
         );
