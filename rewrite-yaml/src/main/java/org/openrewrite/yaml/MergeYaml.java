@@ -17,6 +17,7 @@ package org.openrewrite.yaml;
 
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
@@ -29,7 +30,8 @@ import static org.openrewrite.yaml.MergeYaml.InsertMode.*;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-@AllArgsConstructor
+@NoArgsConstructor(force = true) // TODO: remove with @deprecated constructor
+@AllArgsConstructor // TODO: remove with @deprecated constructor
 public class MergeYaml extends Recipe {
     @Option(displayName = "Key path",
             description = "A [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expression used to find matching keys.",
