@@ -21,8 +21,10 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.gradle.search.FindJMVTestSuites;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
@@ -33,6 +35,7 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.semver.Semver;
+import org.openrewrite.text.Find;
 
 import java.util.*;
 import java.util.function.Predicate;
@@ -171,64 +174,6 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                 return usesType.isAcceptable(sourceFile, ctx) && usesType.visit(sourceFile, ctx) != sourceFile;
             }
 
-            private Set<String> jvmTestSuites(SourceFile sourceFile, ExecutionContext ctx) {
-                HashSet<String> customJVMSuites = new HashSet<>();
-                new GroovyIsoVisitor<ExecutionContext>() {
-
-                    private boolean isJVMTestSuitesBlock(J.MethodInvocation methodInvocation) {
-                        if ("suites".equals(methodInvocation.getSimpleName())) {
-                            if (getCursor().getParent() != null) {
-                                J.MethodInvocation parentBlock = getCursor().getParent().firstEnclosing(J.MethodInvocation.class);
-                                return parentBlock != null && "testing".equals(parentBlock.getSimpleName());
-                            }
-                        }
-                        return false;
-                    }
-
-                    boolean definesDependencies(J.MethodInvocation suite) {
-                        for (Expression suiteDefinition : suite.getArguments()) {
-                            if (suiteDefinition instanceof J.Lambda) {
-                                for (Statement statement : ((J.Block) ((J.Lambda) suiteDefinition).getBody()).getStatements()) {
-                                    if (statement instanceof J.Return) {
-                                        Expression expression = ((J.Return) statement).getExpression();
-                                        if (expression instanceof J.MethodInvocation) {
-                                            if ("dependencies".equals(((J.MethodInvocation) expression).getSimpleName())) {
-                                                return true;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        return false;
-                    }
-
-                    @Override
-                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                        if (isJVMTestSuitesBlock(method)) {
-                            for (Expression suiteDefinition : method.getArguments()) {
-                                if (suiteDefinition instanceof J.Lambda) {
-                                    for (Statement statement : ((J.Block) ((J.Lambda) suiteDefinition).getBody()).getStatements()) {
-                                        if (statement instanceof J.Return) {
-                                            Expression expression = ((J.Return) statement).getExpression();
-                                            if (expression instanceof J.MethodInvocation) {
-                                                J.MethodInvocation suite = (J.MethodInvocation) expression;
-                                                if (definesDependencies(suite)) {
-                                                    customJVMSuites.add(suite.getSimpleName());
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            return method;
-                        }
-                        return super.visitMethodInvocation(method, ctx);
-                    }
-                }.visit(sourceFile, ctx);
-                return customJVMSuites;
-            }
-
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (!(tree instanceof SourceFile)) {
@@ -240,7 +185,9 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         acc.usingType = true;
                     }
 
-                    acc.customJvmTestSuitesWithDependencies.computeIfAbsent(javaProject, k -> jvmTestSuites(sourceFile, ctx));
+                    acc.customJvmTestSuitesWithDependencies
+                            .computeIfAbsent(javaProject, __ -> new HashSet<>())
+                            .addAll(FindJMVTestSuites.jvmTestSuiteNames(tree, true));
 
                     Set<String> configurations = acc.configurationsByProject.computeIfAbsent(javaProject, ignored -> new HashSet<>());
                     sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet ->
