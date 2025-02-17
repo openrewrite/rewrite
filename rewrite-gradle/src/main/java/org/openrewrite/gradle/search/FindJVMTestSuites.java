@@ -38,9 +38,14 @@ public class FindJVMTestSuites extends Recipe {
     transient JVMTestSuitesDefined jvmTestSuitesDefined = new JVMTestSuitesDefined(this);
 
     @Option(displayName = "Requires dependencies",
-            description = "Whether the test suite configuration defines dependencies to be resolved.")
+            description = "Whether the test suite configuration defines dependencies to be resolved. Defaults to false.")
     @Nullable
     Boolean definesDependencies;
+
+    @Option(displayName = "Insert rows",
+            description = "Whether to insert rows into the table. Defaults to true.")
+    @Nullable
+    Boolean insertRows;
 
     @Override
     public String getDisplayName() {
@@ -55,6 +60,7 @@ public class FindJVMTestSuites extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         boolean requireDependencies = definesDependencies != null && definesDependencies;
+        boolean tableAvailable = this.insertRows == null || this.insertRows;
         return new GroovyIsoVisitor<ExecutionContext>() {
             private boolean isJVMTestSuitesBlock() {
                 Cursor parent = getCursor().getParent();
@@ -88,7 +94,9 @@ public class FindJVMTestSuites extends Recipe {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 if (isJVMTestSuitesBlock()) {
-                    jvmTestSuitesDefined.insertRow(ctx, new JVMTestSuitesDefined.Row(method.getSimpleName()));
+                    if (tableAvailable) {
+                        jvmTestSuitesDefined.insertRow(ctx, new JVMTestSuitesDefined.Row(method.getSimpleName()));
+                    }
                     return !requireDependencies || definesDependencies(method) ? SearchResult.found(method) : method;
                 }
                 return super.visitMethodInvocation(method, ctx);
@@ -97,7 +105,7 @@ public class FindJVMTestSuites extends Recipe {
     }
 
     public static Set<String> jvmTestSuiteNames(Tree tree, boolean definesDependencies) {
-        return TreeVisitor.collect(new FindJVMTestSuites(definesDependencies).getVisitor(), tree, new HashSet<>())
+        return TreeVisitor.collect(new FindJVMTestSuites(definesDependencies, false).getVisitor(), tree, new HashSet<>())
                 .stream()
                 .filter(J.MethodInvocation.class::isInstance)
                 .map(J.MethodInvocation.class::cast)
