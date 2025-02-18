@@ -25,8 +25,7 @@ import org.openrewrite.java.tree.J;
 
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
@@ -56,31 +55,16 @@ public class RemoveRedundantImports extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new NoMissingTypes(), new RemoveRedundantImportsVisitor());
-    }
-
-    private static class RemoveRedundantImportsVisitor extends JavaIsoVisitor<ExecutionContext> {
-
-        @Override
-        public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-            List<J.Import> imports = cu.getImports();
-            Set<String> seenImports = new HashSet<>();
-            List<J.Import> uniqueImports = new ArrayList<>();
-
-            for (J.Import anImport : imports) {
-                String importName = anImport.getTypeName();
-                if (!seenImports.contains(importName)) {
-                    seenImports.add(importName);
-                    uniqueImports.add(anImport);
-                }
+        return Preconditions.check(new NoMissingTypes(), new JavaIsoVisitor<ExecutionContext>() {
+            @Override
+            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                Set<J.Import> uniqueImports = new LinkedHashSet<>(cu.getImports());
+                final ArrayList<J.Import> imports = new ArrayList<>(uniqueImports);
+                return uniqueImports.size() == cu.getImports().size()
+                        ? cu
+                        : cu.withImports(imports);
             }
-
-            if (imports.size() != uniqueImports.size()) {
-                cu = cu.withImports(uniqueImports);
-            }
-
-            return cu;
-        }
+        });
     }
 
 }
