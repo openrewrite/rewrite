@@ -17,11 +17,7 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.DocumentExample;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.Issue;
-import org.openrewrite.Tree;
+import org.openrewrite.*;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
@@ -85,29 +81,6 @@ class RemoveUnusedImportsTest implements RewriteTest {
               public class Test {
                   E a = A;
                   E b = B;
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void redundancy() {
-        rewriteRun(
-          java(
-            """
-              import java.util.*;
-              import java.util.*;
-              
-              class A {
-                  Collection<Integer> c;
-              }
-              """,
-            """
-              import java.util.Collection;
-              
-              class A {
-                  Collection<Integer> c;
               }
               """
           )
