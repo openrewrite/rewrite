@@ -86,204 +86,11 @@ public class RemoveUnusedImports extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new NoMissingTypes(), new ExecutionContextJavaIsoVisitor());
+        return Preconditions.check(new NoMissingTypes(), new RemoveUnusedImportsJavaIsoVisitor());
     }
 
-    private static @NotNull Map<String, Set<JavaType.FullyQualified>> typesByPackage(final J.CompilationUnit cu) {
-        Map<String, Set<JavaType.FullyQualified>> typesByPackage = new HashMap<>();
-        for (JavaType javaType : cu.getTypesInUse().getTypesInUse()) {
-            if (javaType instanceof JavaType.Parameterized) {
-                JavaType.Parameterized parameterized = (JavaType.Parameterized) javaType;
-                typesByPackage.computeIfAbsent(parameterized.getType().getPackageName(), f -> new HashSet<>())
-                        .add(parameterized.getType());
-                for (JavaType typeParameter : parameterized.getTypeParameters()) {
-                    JavaType.FullyQualified fq = TypeUtils.asFullyQualified(typeParameter);
-                    if (fq != null) {
-                        typesByPackage.computeIfAbsent(
-                                fq.getOwningClass() == null ?
-                                        fq.getPackageName() :
-                                        toFullyQualifiedName(fq.getOwningClass().getFullyQualifiedName()),
-                                f -> new HashSet<>()).add(fq);
-                    }
-                }
-            } else if (javaType instanceof JavaType.FullyQualified) {
-                JavaType.FullyQualified fq = (JavaType.FullyQualified) javaType;
-                typesByPackage.computeIfAbsent(
-                        fq.getOwningClass() == null ?
-                                fq.getPackageName() :
-                                toFullyQualifiedName(fq.getOwningClass().getFullyQualifiedName()),
-                        f -> new HashSet<>()).add(fq);
-            }
-        }
-        return typesByPackage;
-    }
+    private static class RemoveUnusedImportsJavaIsoVisitor extends JavaIsoVisitor<ExecutionContext> {
 
-    private static @NotNull Map<String, TreeSet<String>> methodsAndFieldsByTypeName(final J.CompilationUnit cu) {
-        Map<String, TreeSet<String>> methodsAndFieldsByTypeName = new HashMap<>();
-        for (JavaType.Method method : cu.getTypesInUse().getUsedMethods()) {
-            if (method.hasFlags(Flag.Static)) {
-                methodsAndFieldsByTypeName.computeIfAbsent(method.getDeclaringType().getFullyQualifiedName(),
-                                t -> new TreeSet<>())
-                        .add(method.getName());
-            }
-        }
-
-        for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
-            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getOwner());
-            if (fq != null) {
-                methodsAndFieldsByTypeName.computeIfAbsent(fq.getFullyQualifiedName(), f -> new TreeSet<>())
-                        .add(variable.getName());
-            }
-        }
-        return methodsAndFieldsByTypeName;
-    }
-
-    private static Set<String> getAmbiguousStaticImportNames(J.CompilationUnit cu) {
-        Set<String> typesWithWildcardImport = new HashSet<>();
-        for (J.Import elem : cu.getImports()) {
-            if ("*".equals(elem.getQualid().getSimpleName())) {
-                typesWithWildcardImport.add(elem.getTypeName());
-            }
-        }
-        Set<JavaType.FullyQualified> qualifiedTypes = new HashSet<>();
-        for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
-            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getOwner());
-            if (fq != null && typesWithWildcardImport.contains(fq.getFullyQualifiedName())) {
-                qualifiedTypes.add(fq);
-            }
-        }
-        Set<String> seen = new HashSet<>();
-        Set<String> ambiguous = new HashSet<>();
-        for (JavaType.FullyQualified fq : qualifiedTypes) {
-            for (JavaType.Variable member : fq.getMembers()) {
-                if (!seen.add(member.getName())) {
-                    ambiguous.add(member.getName());
-                }
-            }
-        }
-        return ambiguous;
-    }
-
-    private static final Set<String> JAVA_LANG_CLASS_NAMES = new HashSet<>(Arrays.asList(
-            "AbstractMethodError",
-            "Appendable",
-            "ArithmeticException",
-            "ArrayIndexOutOfBoundsException",
-            "ArrayStoreException",
-            "AssertionError",
-            "AutoCloseable",
-            "Boolean",
-            "BootstrapMethodError",
-            "Byte",
-            "Character",
-            "CharSequence",
-            "Class",
-            "ClassCastException",
-            "ClassCircularityError",
-            "ClassFormatError",
-            "ClassLoader",
-            "ClassNotFoundException",
-            "ClassValue",
-            "Cloneable",
-            "CloneNotSupportedException",
-            "Comparable",
-            "Deprecated",
-            "Double",
-            "Enum",
-            "EnumConstantNotPresentException",
-            "Error",
-            "Exception",
-            "ExceptionInInitializerError",
-            "Float",
-            "FunctionalInterface",
-            "IllegalAccessError",
-            "IllegalAccessException",
-            "IllegalArgumentException",
-            "IllegalCallerException",
-            "IllegalMonitorStateException",
-            "IllegalStateException",
-            "IllegalThreadStateException",
-            "IncompatibleClassChangeError",
-            "IndexOutOfBoundsException",
-            "InheritableThreadLocal",
-            "InstantiationError",
-            "InstantiationException",
-            "Integer",
-            "InternalError",
-            "InterruptedException",
-            "Iterable",
-            "LayerInstantiationException",
-            "LinkageError",
-            "Long",
-            "MatchException",
-            "Math",
-            "Module",
-            "ModuleLayer",
-            "NegativeArraySizeException",
-            "NoClassDefFoundError",
-            "NoSuchFieldError",
-            "NoSuchFieldException",
-            "NoSuchMethodError",
-            "NoSuchMethodException",
-            "NullPointerException",
-            "Number",
-            "NumberFormatException",
-            "Object",
-            "OutOfMemoryError",
-            "Override",
-            "Package",
-            "Process",
-            "ProcessBuilder",
-            "ProcessHandle",
-            "Readable",
-            "Record",
-            "ReflectiveOperationException",
-            "Runnable",
-            "Runtime",
-            "RuntimeException",
-            "RuntimePermission",
-            "SafeVarargs",
-            "ScopedValue",
-            "SecurityException",
-            "SecurityManager",
-            "Short",
-            "StackOverflowError",
-            "StackTraceElement",
-            "StackWalker",
-            "StrictMath",
-            "String",
-            "StringBuffer",
-            "StringBuilder",
-            "StringIndexOutOfBoundsException",
-            "StringTemplate",
-            "SuppressWarnings",
-            "System",
-            "Thread",
-            "ThreadDeath",
-            "ThreadGroup",
-            "ThreadLocal",
-            "Throwable",
-            "TypeNotPresentException",
-            "UnknownError",
-            "UnsatisfiedLinkError",
-            "UnsupportedClassVersionError",
-            "UnsupportedOperationException",
-            "VerifyError",
-            "VirtualMachineError",
-            "Void",
-            "WrongThreadException"
-    ));
-
-    private static boolean conflictsWithJavaLang(J.Import elem) {
-        return JAVA_LANG_CLASS_NAMES.contains(elem.getClassName());
-    }
-
-    private static class ImportUsage {
-        final List<JRightPadded<J.Import>> imports = new ArrayList<>();
-        boolean used = true;
-    }
-
-    private static class ExecutionContextJavaIsoVisitor extends JavaIsoVisitor<ExecutionContext> {
         @Override
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
             Map<String, TreeSet<String>> methodsAndFieldsByTypeName = methodsAndFieldsByTypeName(cu);
@@ -480,5 +287,199 @@ public class RemoveUnusedImports extends Recipe {
 
             return cu;
         }
+    }
+
+    private static @NotNull Map<String, Set<JavaType.FullyQualified>> typesByPackage(final J.CompilationUnit cu) {
+        Map<String, Set<JavaType.FullyQualified>> typesByPackage = new HashMap<>();
+        for (JavaType javaType : cu.getTypesInUse().getTypesInUse()) {
+            if (javaType instanceof JavaType.Parameterized) {
+                JavaType.Parameterized parameterized = (JavaType.Parameterized) javaType;
+                typesByPackage.computeIfAbsent(parameterized.getType().getPackageName(), f -> new HashSet<>())
+                        .add(parameterized.getType());
+                for (JavaType typeParameter : parameterized.getTypeParameters()) {
+                    JavaType.FullyQualified fq = TypeUtils.asFullyQualified(typeParameter);
+                    if (fq != null) {
+                        typesByPackage.computeIfAbsent(
+                                fq.getOwningClass() == null ?
+                                        fq.getPackageName() :
+                                        toFullyQualifiedName(fq.getOwningClass().getFullyQualifiedName()),
+                                f -> new HashSet<>()).add(fq);
+                    }
+                }
+            } else if (javaType instanceof JavaType.FullyQualified) {
+                JavaType.FullyQualified fq = (JavaType.FullyQualified) javaType;
+                typesByPackage.computeIfAbsent(
+                        fq.getOwningClass() == null ?
+                                fq.getPackageName() :
+                                toFullyQualifiedName(fq.getOwningClass().getFullyQualifiedName()),
+                        f -> new HashSet<>()).add(fq);
+            }
+        }
+        return typesByPackage;
+    }
+
+    private static @NotNull Map<String, TreeSet<String>> methodsAndFieldsByTypeName(final J.CompilationUnit cu) {
+        Map<String, TreeSet<String>> methodsAndFieldsByTypeName = new HashMap<>();
+        for (JavaType.Method method : cu.getTypesInUse().getUsedMethods()) {
+            if (method.hasFlags(Flag.Static)) {
+                methodsAndFieldsByTypeName.computeIfAbsent(method.getDeclaringType().getFullyQualifiedName(),
+                                t -> new TreeSet<>())
+                        .add(method.getName());
+            }
+        }
+
+        for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
+            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getOwner());
+            if (fq != null) {
+                methodsAndFieldsByTypeName.computeIfAbsent(fq.getFullyQualifiedName(), f -> new TreeSet<>())
+                        .add(variable.getName());
+            }
+        }
+        return methodsAndFieldsByTypeName;
+    }
+
+    private static Set<String> getAmbiguousStaticImportNames(J.CompilationUnit cu) {
+        Set<String> typesWithWildcardImport = new HashSet<>();
+        for (J.Import elem : cu.getImports()) {
+            if ("*".equals(elem.getQualid().getSimpleName())) {
+                typesWithWildcardImport.add(elem.getTypeName());
+            }
+        }
+        Set<JavaType.FullyQualified> qualifiedTypes = new HashSet<>();
+        for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
+            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getOwner());
+            if (fq != null && typesWithWildcardImport.contains(fq.getFullyQualifiedName())) {
+                qualifiedTypes.add(fq);
+            }
+        }
+        Set<String> seen = new HashSet<>();
+        Set<String> ambiguous = new HashSet<>();
+        for (JavaType.FullyQualified fq : qualifiedTypes) {
+            for (JavaType.Variable member : fq.getMembers()) {
+                if (!seen.add(member.getName())) {
+                    ambiguous.add(member.getName());
+                }
+            }
+        }
+        return ambiguous;
+    }
+
+    private static final Set<String> JAVA_LANG_CLASS_NAMES = new HashSet<>(Arrays.asList(
+            "AbstractMethodError",
+            "Appendable",
+            "ArithmeticException",
+            "ArrayIndexOutOfBoundsException",
+            "ArrayStoreException",
+            "AssertionError",
+            "AutoCloseable",
+            "Boolean",
+            "BootstrapMethodError",
+            "Byte",
+            "Character",
+            "CharSequence",
+            "Class",
+            "ClassCastException",
+            "ClassCircularityError",
+            "ClassFormatError",
+            "ClassLoader",
+            "ClassNotFoundException",
+            "ClassValue",
+            "Cloneable",
+            "CloneNotSupportedException",
+            "Comparable",
+            "Deprecated",
+            "Double",
+            "Enum",
+            "EnumConstantNotPresentException",
+            "Error",
+            "Exception",
+            "ExceptionInInitializerError",
+            "Float",
+            "FunctionalInterface",
+            "IllegalAccessError",
+            "IllegalAccessException",
+            "IllegalArgumentException",
+            "IllegalCallerException",
+            "IllegalMonitorStateException",
+            "IllegalStateException",
+            "IllegalThreadStateException",
+            "IncompatibleClassChangeError",
+            "IndexOutOfBoundsException",
+            "InheritableThreadLocal",
+            "InstantiationError",
+            "InstantiationException",
+            "Integer",
+            "InternalError",
+            "InterruptedException",
+            "Iterable",
+            "LayerInstantiationException",
+            "LinkageError",
+            "Long",
+            "MatchException",
+            "Math",
+            "Module",
+            "ModuleLayer",
+            "NegativeArraySizeException",
+            "NoClassDefFoundError",
+            "NoSuchFieldError",
+            "NoSuchFieldException",
+            "NoSuchMethodError",
+            "NoSuchMethodException",
+            "NullPointerException",
+            "Number",
+            "NumberFormatException",
+            "Object",
+            "OutOfMemoryError",
+            "Override",
+            "Package",
+            "Process",
+            "ProcessBuilder",
+            "ProcessHandle",
+            "Readable",
+            "Record",
+            "ReflectiveOperationException",
+            "Runnable",
+            "Runtime",
+            "RuntimeException",
+            "RuntimePermission",
+            "SafeVarargs",
+            "ScopedValue",
+            "SecurityException",
+            "SecurityManager",
+            "Short",
+            "StackOverflowError",
+            "StackTraceElement",
+            "StackWalker",
+            "StrictMath",
+            "String",
+            "StringBuffer",
+            "StringBuilder",
+            "StringIndexOutOfBoundsException",
+            "StringTemplate",
+            "SuppressWarnings",
+            "System",
+            "Thread",
+            "ThreadDeath",
+            "ThreadGroup",
+            "ThreadLocal",
+            "Throwable",
+            "TypeNotPresentException",
+            "UnknownError",
+            "UnsatisfiedLinkError",
+            "UnsupportedClassVersionError",
+            "UnsupportedOperationException",
+            "VerifyError",
+            "VirtualMachineError",
+            "Void",
+            "WrongThreadException"
+    ));
+
+    private static boolean conflictsWithJavaLang(J.Import elem) {
+        return JAVA_LANG_CLASS_NAMES.contains(elem.getClassName());
+    }
+
+    private static class ImportUsage {
+        final List<JRightPadded<J.Import>> imports = new ArrayList<>();
+        boolean used = true;
     }
 }
