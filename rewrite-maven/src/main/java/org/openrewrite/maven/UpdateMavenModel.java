@@ -22,8 +22,10 @@ import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.tree.Xml;
 
-import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -34,8 +36,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
         if (!(p instanceof ExecutionContext)) {
             throw new IllegalArgumentException("UpdateMavenModel must be provided an ExecutionContext");
         }
-        ExecutionContext ctx = (ExecutionContext) p;
-
+        MavenExecutionContextView ctx = MavenExecutionContextView.view((ExecutionContext) p);
         MavenResolutionResult resolutionResult = getResolutionResult();
         Pom requested = resolutionResult.getPom().getRequested();
 
@@ -127,14 +128,9 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
             requested = requested.withRepositories(Collections.emptyList());
         }
 
-        try {
-            MavenResolutionResult updated = updateResult(ctx, resolutionResult.withPom(resolutionResult.getPom().withRequested(requested)),
-                    resolutionResult.getProjectPoms());
-            return document.withMarkers(document.getMarkers().computeByType(getResolutionResult(),
-                    (original, ignored) -> updated));
-        } catch (MavenDownloadingExceptions e) {
-            return e.warn(document);
-        }
+        // we don't resolve just yet... it could be useless work in some cases, such as for the last maven visitor
+        ctx.updateProjectPom(requested);
+        return document;
     }
 
     private @Nullable List<GroupArtifact> mapExclusions(Xml.Tag tag) {
@@ -153,9 +149,9 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                 .orElse(null);
     }
 
-    private MavenResolutionResult updateResult(ExecutionContext ctx, MavenResolutionResult resolutionResult, Map<Path, Pom> projectPoms) throws MavenDownloadingExceptions {
-        MavenPomDownloader downloader = new MavenPomDownloader(projectPoms, ctx, getResolutionResult().getMavenSettings(),
-                getResolutionResult().getActiveProfiles());
+    public static MavenResolutionResult updateResult(MavenExecutionContextView ctx, MavenResolutionResult resolutionResult) throws MavenDownloadingExceptions {
+        MavenPomDownloader downloader = new MavenPomDownloader(ctx, resolutionResult.getMavenSettings(),
+                resolutionResult.getActiveProfiles());
 
         AtomicReference<MavenDownloadingExceptions> exceptions = new AtomicReference<>();
         try {
@@ -164,7 +160,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                     .withPom(resolved)
                     .withModules(ListUtils.map(resolutionResult.getModules(), module -> {
                         try {
-                            return updateResult(ctx, module, projectPoms);
+                            return updateResult(ctx, module);
                         } catch (MavenDownloadingExceptions e) {
                             exceptions.set(MavenDownloadingExceptions.append(exceptions.get(), e));
                             return module;

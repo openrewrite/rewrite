@@ -508,7 +508,6 @@ public class ResolvedPom {
                 throw new MavenParsingException("Could not resolve version for [" + ga + "] matching version requirements " + newRequirement);
             }
             gav = gav.withVersion(newRequiredVersion);
-
             return downloader.download(gav,
                     pom.getParent().getRelativePath(), ResolvedPom.this, repositories);
         }

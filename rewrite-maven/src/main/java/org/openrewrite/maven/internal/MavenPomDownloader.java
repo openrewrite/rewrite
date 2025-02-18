@@ -51,7 +51,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
-import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
@@ -71,8 +70,6 @@ public class MavenPomDownloader {
 
 
     private final MavenPomCache mavenCache;
-    private final Map<Path, Pom> projectPoms;
-    private final Map<GroupArtifactVersion, Pom> projectPomsByGav;
     private final MavenExecutionContextView ctx;
     private final HttpSender httpSender;
 
@@ -88,55 +85,30 @@ public class MavenPomDownloader {
     private boolean addLocalRepository;
 
     /**
-     * @param projectPoms    Other POMs in this project.
-     * @param ctx            The execution context, which potentially contain Maven settings customization
-     *                       and {@link HttpSender} customization.
-     * @param mavenSettings  The Maven settings to use, if any. This argument overrides any Maven settings
-     *                       set on the execution context.
-     * @param activeProfiles The active profiles to use, if any. This argument overrides any active profiles
-     *                       set on the execution context.
+     * @param ctx The execution context, which potentially contain Maven settings customization and {@link HttpSender} customization.
      */
-    public MavenPomDownloader(Map<Path, Pom> projectPoms, ExecutionContext ctx,
-                              @Nullable MavenSettings mavenSettings,
-                              @Nullable List<String> activeProfiles) {
-        this(projectPoms, HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
-        this.mavenSettings = mavenSettings != null ? mavenSettings : MavenExecutionContextView.view(ctx).getSettings();
-        this.mirrors = this.ctx.getMirrors(mavenSettings);
-        this.activeProfiles = activeProfiles;
+    public MavenPomDownloader(ExecutionContext ctx) {
+        this(HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
     }
 
     /**
      * A MavenPomDownloader for non-maven contexts where there are no project poms or assumption that maven central
-     * is implicitly added as a repository. In a Maven contexts, a non-empty projectPoms should be specified to
-     * {@link #MavenPomDownloader(Map, ExecutionContext)} for accurate results.
+     * is implicitly added as a repository. In a Maven contexts, the regular constructor should be used instead
      *
      * @param ctx The execution context, which potentially contain Maven settings customization and {@link HttpSender} customization.
      */
-    public MavenPomDownloader(ExecutionContext ctx) {
-        this(emptyMap(), HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
-        this.addCentralRepository = Boolean.TRUE.equals(MavenExecutionContextView.view(ctx).getAddCentralRepository());
-        this.addLocalRepository = Boolean.TRUE.equals(MavenExecutionContextView.view(ctx).getAddLocalRepository());
+    public static MavenPomDownloader nonMavenContext(ExecutionContext ctx) {
+        MavenPomDownloader result = new MavenPomDownloader(HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
+        result.addCentralRepository = Boolean.TRUE.equals(MavenExecutionContextView.view(ctx).getAddCentralRepository());
+        result.addLocalRepository = Boolean.TRUE.equals(MavenExecutionContextView.view(ctx).getAddLocalRepository());
+        return result;
     }
 
     /**
-     * @param projectPoms Other POMs in this project.
-     * @param ctx         The execution context, which potentially contain Maven settings customization
-     *                    and {@link HttpSender} customization.
+     * @param httpSender The HTTP sender.
+     * @param ctx        The execution context.
      */
-    public MavenPomDownloader(Map<Path, Pom> projectPoms, ExecutionContext ctx) {
-        this(projectPoms, HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
-    }
-
-    /**
-     * @param projectPoms Project poms on disk.
-     * @param httpSender  The HTTP sender.
-     * @param ctx         The execution context.
-     * @deprecated Use {@link #MavenPomDownloader(Map, ExecutionContext)} instead.
-     */
-    @Deprecated
-    public MavenPomDownloader(Map<Path, Pom> projectPoms, HttpSender httpSender, ExecutionContext ctx) {
-        this.projectPoms = projectPoms;
-        this.projectPomsByGav = projectPomsByGav(projectPoms);
+    public MavenPomDownloader(HttpSender httpSender, ExecutionContext ctx) {
         this.httpSender = httpSender;
         this.ctx = MavenExecutionContextView.view(ctx);
         this.mavenSettings = this.ctx.getSettings();
@@ -144,6 +116,65 @@ public class MavenPomDownloader {
         this.addCentralRepository = !Boolean.FALSE.equals(MavenExecutionContextView.view(ctx).getAddCentralRepository());
         this.addLocalRepository = !Boolean.FALSE.equals(MavenExecutionContextView.view(ctx).getAddLocalRepository());
         this.mirrors = this.ctx.getMirrors(this.ctx.getSettings());
+    }
+
+    /**
+     * @param ctx            The execution context, which potentially contain Maven settings customization
+     *                       and {@link HttpSender} customization.
+     * @param mavenSettings  The Maven settings to use, if any. This argument overrides any Maven settings
+     *                       set on the execution context.
+     * @param activeProfiles The active profiles to use, if any. This argument overrides any active profiles
+     *                       set on the execution context.
+     */
+    public MavenPomDownloader(ExecutionContext ctx,
+                              @Nullable MavenSettings mavenSettings,
+                              @Nullable List<String> activeProfiles) {
+        this(HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
+        this.mavenSettings = mavenSettings != null ? mavenSettings : MavenExecutionContextView.view(ctx).getSettings();
+        this.mirrors = this.ctx.getMirrors(mavenSettings);
+        this.activeProfiles = activeProfiles;
+    }
+
+    /**
+     * @param projectPoms    Ignored, project poms are read from context
+     * @param ctx            The execution context, which potentially contain Maven settings customization
+     *                       and {@link HttpSender} customization.
+     * @param mavenSettings  The Maven settings to use, if any. This argument overrides any Maven settings
+     *                       set on the execution context.
+     * @param activeProfiles The active profiles to use, if any. This argument overrides any active profiles
+     *                       set on the execution context.
+     * @Deprecated Use {@link #MavenPomDownloader(ExecutionContext)} instead.
+     */
+    @Deprecated
+    public MavenPomDownloader(Map<Path, Pom> projectPoms, ExecutionContext ctx,
+                              @Nullable MavenSettings mavenSettings,
+                              @Nullable List<String> activeProfiles) {
+        this(HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
+        this.mavenSettings = mavenSettings != null ? mavenSettings : MavenExecutionContextView.view(ctx).getSettings();
+        this.mirrors = this.ctx.getMirrors(mavenSettings);
+        this.activeProfiles = activeProfiles;
+    }
+
+    /**
+     * @param projectPoms Ignored, project poms are obtained from the context
+     * @param ctx         The execution context, which potentially contain Maven settings customization
+     *                    and {@link HttpSender} customization.
+     * @deprecated Use {@link #MavenPomDownloader(ExecutionContext)} instead.
+     */
+    @Deprecated
+    public MavenPomDownloader(Map<Path, Pom> projectPoms, ExecutionContext ctx) {
+        this(HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
+    }
+
+    /**
+     * @param projectPoms Project poms on disk.
+     * @param httpSender  The HTTP sender.
+     * @param ctx         The execution context.
+     * @deprecated Use {@link #MavenPomDownloader(HttpSender, ExecutionContext)} instead.
+     */
+    @Deprecated
+    public MavenPomDownloader(Map<Path, Pom> projectPoms, HttpSender httpSender, ExecutionContext ctx) {
+        this(httpSender, ctx);
     }
 
     byte[] sendRequest(HttpSender.Request request) throws IOException, HttpSenderResponseException {
@@ -170,22 +201,8 @@ public class MavenPomDownloader {
         }
     }
 
-    private Map<GroupArtifactVersion, Pom> projectPomsByGav(Map<Path, Pom> projectPoms) {
-        Map<GroupArtifactVersion, Pom> result = new HashMap<>();
-        for (Pom projectPom : projectPoms.values()) {
-            List<Pom> ancestryWithinProject = getAncestryWithinProject(projectPom, projectPoms);
-            Map<String, String> mergedProperties = mergeProperties(ancestryWithinProject);
-            GroupArtifactVersion gav = new GroupArtifactVersion(
-                    projectPom.getGroupId(),
-                    projectPom.getArtifactId(),
-                    ResolvedPom.placeholderHelper.replacePlaceholders(projectPom.getVersion(), mergedProperties::get)
-            );
-            result.put(gav, projectPom);
-        }
-        return result;
-    }
 
-    private Map<String, String> mergeProperties(final List<Pom> pomAncestry) {
+    public static Map<String, String> mergeProperties(final List<Pom> pomAncestry) {
         Map<String, String> mergedProperties = new HashMap<>();
         for (Pom pom : pomAncestry) {
             for (Map.Entry<String, String> property : pom.getProperties().entrySet()) {
@@ -195,7 +212,7 @@ public class MavenPomDownloader {
         return mergedProperties;
     }
 
-    private List<Pom> getAncestryWithinProject(Pom projectPom, Map<Path, Pom> projectPoms) {
+    public static List<Pom> getAncestryWithinProject(Pom projectPom, Map<Path, Pom> projectPoms) {
         Pom parentPom = getParentWithinProject(projectPom, projectPoms);
         if (parentPom == null) {
             return Collections.singletonList(projectPom);
@@ -204,7 +221,7 @@ public class MavenPomDownloader {
         }
     }
 
-    private @Nullable Pom getParentWithinProject(Pom projectPom, Map<Path, Pom> projectPoms) {
+    public static @Nullable Pom getParentWithinProject(Pom projectPom, Map<Path, Pom> projectPoms) {
         Parent parent = projectPom.getParent();
         if (parent == null || projectPom.getSourcePath() == null) {
             return null;
@@ -488,13 +505,13 @@ public class MavenPomDownloader {
 
         // The pom being examined might be from a remote repository or a local filesystem.
         // First try to match the requested download with one of the project POMs.
-        Pom projectPomWithResolvedVersion = projectPomsByGav.get(gav);
+        Pom projectPomWithResolvedVersion = ctx.getProjectPomsByGav().get(gav);
         if (projectPomWithResolvedVersion != null) {
             return projectPomWithResolvedVersion;
         }
 
         // The requested gav might itself have an unresolved placeholder in the version, so also check raw values
-        for (Pom projectPom : projectPoms.values()) {
+        for (Pom projectPom : ctx.getProjectPoms()) {
             if (!projectPom.getGroupId().equals(gav.getGroupId()) ||
                     !projectPom.getArtifactId().equals(gav.getArtifactId())) {
                 continue;
@@ -504,7 +521,7 @@ public class MavenPomDownloader {
                 return projectPom;
             }
 
-            Map<String, String> mergedProperties = mergeProperties(getAncestryWithinProject(projectPom, projectPoms));
+            Map<String, String> mergedProperties = mergeProperties(getAncestryWithinProject(projectPom, ctx.getProjectPomsBySourcePath()));
             String versionWithReplacements = ResolvedPom.placeholderHelper.replacePlaceholders(gav.getVersion(), mergedProperties::get);
             if (projectPom.getVersion().equals(versionWithReplacements)) {
                 return projectPom;
@@ -515,8 +532,8 @@ public class MavenPomDownloader {
                 !StringUtils.isBlank(relativePath) && !relativePath.contains(":")) {
             Path folderContainingPom = containingPom.getRequested().getSourcePath().getParent();
             if (folderContainingPom != null) {
-                Pom maybeLocalPom = projectPoms.get(folderContainingPom.resolve(Paths.get(relativePath, "pom.xml"))
-                        .normalize());
+                Pom maybeLocalPom = ctx.getProjectPomsBySourcePath()
+                        .get(folderContainingPom.resolve(Paths.get(relativePath, "pom.xml")).normalize());
                 // Even poms published to remote repositories still contain relative paths to their parent poms
                 // So double check that the GAV coordinates match so that we don't get a relative path from a remote
                 // pom like ".." or "../.." which coincidentally _happens_ to have led to an unrelated pom on the local filesystem

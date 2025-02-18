@@ -21,14 +21,17 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.maven.cache.InMemoryMavenPomCache;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.MavenParsingException;
+import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
 
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
 
 @SuppressWarnings({"unused", "UnusedReturnValue"})
@@ -47,6 +50,8 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     private static final String MAVEN_POM_CACHE = "org.openrewrite.maven.pomCache";
     private static final String MAVEN_RESOLUTION_LISTENER = "org.openrewrite.maven.resolutionListener";
     private static final String MAVEN_RESOLUTION_TIME = "org.openrewrite.maven.resolutionTime";
+    private static final String MAVEN_PROJECT_POMS_BY_SOURCE_PATH = "org.openrewrite.maven.project.poms.by.source.path";
+    private static final String MAVEN_PROJECT_POMS_BY_GAV = "org.openrewrite.maven.project.poms.by.gav";
 
     public MavenExecutionContextView(ExecutionContext delegate) {
         super(delegate);
@@ -308,4 +313,46 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
     }
+
+    public Map<Path, Pom> getProjectPomsBySourcePath() {
+        return getMessage(MAVEN_PROJECT_POMS_BY_SOURCE_PATH, emptyMap());
+    }
+
+    public Map<GroupArtifactVersion, Pom> getProjectPomsByGav() {
+        return getMessage(MAVEN_PROJECT_POMS_BY_GAV, emptyMap());
+    }
+
+    public void setProjectPoms(Map<Path, Pom> projectPoms){
+        putMessage(MAVEN_PROJECT_POMS_BY_SOURCE_PATH, projectPomsByGav(projectPoms));
+        putMessage(MAVEN_PROJECT_POMS_BY_GAV, projectPomsByGav(getProjectPomsBySourcePath()));
+    }
+
+    public void updateProjectPom(Pom projectPom) {
+        Objects.requireNonNull(projectPom.getSourcePath());
+        computeMessage(MAVEN_PROJECT_POMS_BY_SOURCE_PATH, projectPom, () -> new HashMap<Path, Pom>(), (pom, map) -> {
+            map.put(pom.getSourcePath(), pom);
+            return map;
+        });
+        putMessage(MAVEN_PROJECT_POMS_BY_GAV, projectPomsByGav(getProjectPomsBySourcePath()));
+    }
+
+    public List<Pom> getProjectPoms() {
+        return new ArrayList<>(getProjectPomsBySourcePath().values());
+    }
+
+    private Map<GroupArtifactVersion, Pom> projectPomsByGav(Map<Path, Pom> projectPoms) {
+        Map<GroupArtifactVersion, Pom> result = new HashMap<>();
+        for (Pom projectPom : projectPoms.values()) {
+            List<Pom> ancestryWithinProject = MavenPomDownloader.getAncestryWithinProject(projectPom, projectPoms);
+            Map<String, String> mergedProperties = MavenPomDownloader.mergeProperties(ancestryWithinProject);
+            GroupArtifactVersion gav = new GroupArtifactVersion(
+                    projectPom.getGroupId(),
+                    projectPom.getArtifactId(),
+                    ResolvedPom.placeholderHelper.replacePlaceholders(projectPom.getVersion(), mergedProperties::get)
+            );
+            result.put(gav, projectPom);
+        }
+        return result;
+    }
+
 }

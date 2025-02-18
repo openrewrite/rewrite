@@ -190,6 +190,7 @@ public class MavenResolutionResult implements Marker {
     }
 
     public Map<Path, Pom> getProjectPoms() {
+
         return getProjectPomsRecursive(new HashMap<>());
     }
 
@@ -203,10 +204,7 @@ public class MavenResolutionResult implements Marker {
         if (getParent() == null) {
             return false;
         }
-        ResolvedGroupArtifactVersion parentGav = getParent().getPom().getGav();
-        return getProjectPoms().values().stream()
-                .map(Pom::getGav)
-                .anyMatch(gav -> gav.equals(parentGav));
+        return getParent().getPom().getRequested().getSourcePath() != null;
     }
 
     public boolean isMultiModulePom() {
