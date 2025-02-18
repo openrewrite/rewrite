@@ -23,7 +23,7 @@ import static org.openrewrite.java.Assertions.java;
 class RemoveRedundantImportsTest implements RewriteTest {
 
     @Test
-    void redundancy() {
+    void wildcard() {
         rewriteRun(
           java(
             """
@@ -36,6 +36,28 @@ class RemoveRedundantImportsTest implements RewriteTest {
               """,
             """
               import java.util.*;
+              
+              class A {
+                  Collection<Integer> c;
+              }
+              """)
+        );
+    }
+
+    @Test
+    void single() {
+        rewriteRun(
+          java(
+            """
+              import java.util.Collection;
+              import java.util.Collection;
+              
+              class A {
+                  Collection<Integer> c;
+              }
+              """,
+            """
+              import java.util.Collection;
               
               class A {
                   Collection<Integer> c;
