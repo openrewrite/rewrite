@@ -27,7 +27,9 @@ import java.time.Duration;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
+
+import static java.time.Duration.ofMinutes;
+import static java.util.stream.Collectors.toList;
 
 /**
  * This recipe will remove any imports for types that are not referenced within the compilation unit. This recipe
@@ -51,18 +53,27 @@ public class RemoveRedundantImports extends Recipe {
 
     @Override
     public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(5);
+        return ofMinutes(5);
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new NoMissingTypes(), new JavaIsoVisitor<ExecutionContext>() {
+
             @Override
             public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                List<J.Import> uniqueImports = uniqueImports(cu);
+                return uniqueImports.size() == cu.getImports().size()
+                        ? cu
+                        : cu.withImports(uniqueImports);
+            }
+
+            private List<J.Import> uniqueImports(final J.CompilationUnit cu) {
                 Set<String> seenImports = new HashSet<>();
-                List<J.Import> uniqueImports = cu.getImports().stream()
-                        .filter(anImport -> seenImports.add(anImport.getTypeName())).collect(Collectors.toList());
-                return uniqueImports.size() == cu.getImports().size() ? cu : cu.withImports(uniqueImports);
+                return cu.getImports()
+                        .stream()
+                        .filter(anImport -> seenImports.add(anImport.getTypeName()))
+                        .collect(toList());
             }
         });
     }
