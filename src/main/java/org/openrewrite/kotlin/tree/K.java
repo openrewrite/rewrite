@@ -1474,7 +1474,7 @@ public interface K extends J {
         public Property(UUID id,
                         Space prefix,
                         Markers markers,
-                        JContainer<TypeParameter> typeParameters,
+                        @Nullable JContainer<TypeParameter> typeParameters,
                         @Nullable JRightPadded<J.VariableDeclarations> paddedVariableDeclarations,
                         @Nullable VariableDeclarations variableDeclarations,
                 K.@Nullable TypeConstraints typeConstraints,
