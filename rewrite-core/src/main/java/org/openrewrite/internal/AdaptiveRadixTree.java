@@ -23,7 +23,6 @@ import java.util.Arrays;
 
 @Incubating(since = "8.38.0")
 public class AdaptiveRadixTree<V> {
-    private transient int size = 0;
 
     @Nullable
     private Node<V> root;

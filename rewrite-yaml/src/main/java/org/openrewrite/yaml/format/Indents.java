@@ -25,8 +25,6 @@ import org.openrewrite.yaml.style.IndentsStyle;
 import org.openrewrite.yaml.style.YamlDefaultStyles;
 import org.openrewrite.yaml.tree.Yaml;
 
-import java.util.function.Supplier;
-
 public class Indents extends Recipe {
     @Override
     public String getDisplayName() {

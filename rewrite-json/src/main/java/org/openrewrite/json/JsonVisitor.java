@@ -66,7 +66,7 @@ public class JsonVisitor<P> extends TreeVisitor<Json, P> {
     public <Y2 extends Json> Y2 autoFormat(Y2 y, @Nullable Json stopAfter, P p, Cursor cursor) {
         return (Y2) new AutoFormatVisitor<>(stopAfter).visit(y, p, cursor);
     }
-    
+
     public Json visitArray(Json.Array array, P p) {
         Json.Array a = array;
         a = a.withPrefix(visitSpace(a.getPrefix(), p));

@@ -278,8 +278,7 @@ public class BlockStatementTemplateGenerator {
                 // variable declarations up to the point of insertion
                 addLeadingVariableDeclarations(cursor, prior, m.getBody(), before, insertionPoint);
 
-                if (m.getReturnTypeExpression() != null && !JavaType.Primitive.Void
-                        .equals(m.getReturnTypeExpression().getType())) {
+                if (m.getReturnTypeExpression() != null && JavaType.Primitive.Void != m.getReturnTypeExpression().getType()) {
                     before.insert(0, "if(true) {");
                     after.append("}\nreturn ")
                             .append(valueOfType(m.getReturnTypeExpression().getType()))
@@ -472,7 +471,7 @@ public class BlockStatementTemplateGenerator {
             J firstEnclosing = cursor.getParentOrThrow().firstEnclosing(J.class);
             if (m.getArguments().stream().anyMatch(arg -> referToSameElement(prior, arg))) {
                 before.insert(0, "__M__.any(");
-                if (firstEnclosing instanceof J.Block || firstEnclosing instanceof J.Case || 
+                if (firstEnclosing instanceof J.Block || firstEnclosing instanceof J.Case ||
                     firstEnclosing instanceof J.If || firstEnclosing instanceof J.If.Else) {
                     after.append(");");
                 } else {
@@ -666,7 +665,7 @@ public class BlockStatementTemplateGenerator {
         StringBuilder methodBuilder = new StringBuilder("\n");
         J.MethodDeclaration m = method.withBody(null).withLeadingAnnotations(emptyList()).withPrefix(Space.EMPTY);
         methodBuilder.append(m.printTrimmed(cursor).trim()).append('{');
-        if (method.getReturnTypeExpression() != null && !JavaType.Primitive.Void.equals(method.getReturnTypeExpression().getType())) {
+        if (method.getReturnTypeExpression() != null && JavaType.Primitive.Void != method.getReturnTypeExpression().getType()) {
             methodBuilder.append("\nreturn ")
                     .append(valueOfType(method.getReturnTypeExpression().getType()))
                     .append(";\n");

@@ -13,25 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.internal.parser;
+@NullMarked
+@NonNullFields
+package org.openrewrite.groovy.service;
 
-import org.jspecify.annotations.Nullable;
-import org.openrewrite.java.JavaParser;
-
-import java.nio.file.Path;
-
-/**
- * Prepares classpath resources for use by {@link JavaParser}.
- */
-public interface JavaParserClasspathLoader {
-
-    /**
-     * Load a classpath resource.
-     *
-     * @param artifactName A descriptor for the classpath resource to load.
-     * @return The path a JAR or classes directory that is suitable for use
-     * as a classpath entry in a compilation step.
-     */
-    @Nullable
-    Path load(String artifactName);
-}
+import org.jspecify.annotations.NullMarked;
+import org.openrewrite.internal.lang.NonNullFields;

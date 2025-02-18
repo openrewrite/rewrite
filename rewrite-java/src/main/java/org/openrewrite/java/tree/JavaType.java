@@ -640,6 +640,7 @@ public interface JavaType {
             this(type, arrayOrNullIfEmpty(values, EMPTY_ANNOTATION_VALUE_ARRAY));
         }
 
+        @JsonCreator
         Annotation(FullyQualified type, ElementValue @Nullable [] values) {
             this.type = type;
             this.values = nullIfEmpty(values);

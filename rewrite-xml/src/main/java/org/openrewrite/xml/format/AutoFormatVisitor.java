@@ -19,7 +19,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.style.GeneralFormatStyle;
-import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.style.Autodetect;
@@ -27,9 +26,6 @@ import org.openrewrite.xml.style.TabsAndIndentsStyle;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
-import java.util.function.Supplier;
-
-import static java.util.Collections.singletonList;
 import static org.openrewrite.xml.format.AutodetectGeneralFormatStyle.autodetectGeneralFormatStyle;
 
 public class AutoFormatVisitor<P> extends XmlVisitor<P> {
