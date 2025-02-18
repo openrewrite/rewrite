@@ -15,7 +15,9 @@
  */
 package org.openrewrite.yaml;
 
+import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
@@ -23,8 +25,13 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.yaml.tree.Yaml;
 
+import static org.openrewrite.internal.StringUtils.isBlank;
+import static org.openrewrite.yaml.MergeYaml.InsertMode.*;
+
 @Value
 @EqualsAndHashCode(callSuper = false)
+@NoArgsConstructor(force = true) // TODO: remove with @deprecated constructor
+@AllArgsConstructor // TODO: remove with @deprecated constructor
 public class MergeYaml extends Recipe {
     @Option(displayName = "Key path",
             description = "A [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expression used to find matching keys.",
@@ -58,12 +65,29 @@ public class MergeYaml extends Recipe {
     @Nullable
     String filePattern;
 
-    @Option(displayName = "Insert before property",
-            description = "Choose an insertion point when multiple mappings exist. Takes the `key` JsonPath into account.",
+    @Option(displayName = "Insert mode",
+            description = "Choose an insertion point when multiple mappings exist. Default is `Last`.",
+            valid = {"Before", "After", "Last"},
+            required = false)
+    @Nullable
+    InsertMode insertMode;
+
+    @Option(displayName = "Insert property",
+            description = "Define the key for the insertion mode. Takes the `key` JsonPath into account. Only useful when `insert mode` is either `Before` or `After`.",
             required = false,
             example = "some-key")
     @Nullable
-    String insertBefore;
+    String insertProperty;
+
+    /**
+     * @deprecated Use {@link #MergeYaml(String, String, Boolean, String, String, InsertMode, String)} instead.
+     */
+    @Deprecated
+    public MergeYaml(String key, @Language("yml") String yaml, @Nullable Boolean acceptTheirs, @Nullable String objectIdentifyingProperty, @Nullable String filePattern, @Nullable String insertProperty) {
+        this(key, yaml, acceptTheirs, objectIdentifyingProperty, filePattern, null, insertProperty);
+    }
+
+    public enum InsertMode { Before, After, Last }
 
     @Override
     public Validated<Object> validate() {
@@ -72,9 +96,10 @@ public class MergeYaml extends Recipe {
                         yaml, y -> new YamlParser().parse(yaml)
                                 .findFirst()
                                 .map(doc -> !((Yaml.Documents) doc).getDocuments().isEmpty())
-                                .orElse(false)));
+                                .orElse(false)))
+                .and(Validated.test("insertProperty", "Insert property must be filed when `insert mode` is either `BeforeProperty` or `AfterProperty`.", insertProperty,
+                        s -> insertMode == null || insertMode == Last || !isBlank(s)));
     }
-
     @Override
     public String getDisplayName() {
         return "Merge YAML snippet";
@@ -119,10 +144,13 @@ public class MergeYaml extends Recipe {
             public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
                 if ("$".equals(key)) {
                     Yaml.Document d = document.withBlock((Yaml.Block)
-                            new MergeYamlVisitor<>(document.getBlock(), yaml, Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty, insertBefore)
+                            new MergeYamlVisitor<>(document.getBlock(), yaml, Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty, insertMode, insertProperty)
                                     .visitNonNull(document.getBlock(), ctx, getCursor())
                     );
-                    return getCursor().getMessage(REMOVE_PREFIX, false) ? d.withEnd(d.getEnd().withPrefix("")) : d;
+                    if (getCursor().getMessage(REMOVE_PREFIX, false)) {
+                        d = insertMode == Before ? d.withPrefix("") : d.withEnd(d.getEnd().withPrefix(""));
+                    }
+                    return d;
                 }
                 Yaml.Document d = super.visitDocument(document, ctx);
                 if (d == document && !getCursor().getMessage(FOUND_MATCHING_ELEMENT, false)) {
@@ -141,7 +169,7 @@ public class MergeYaml extends Recipe {
                     // No matching element already exists, so it must be constructed
                     //noinspection LanguageMismatch
                     return d.withBlock((Yaml.Block) new MergeYamlVisitor<>(d.getBlock(), snippet,
-                            Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty, insertBefore).visitNonNull(d.getBlock(),
+                            Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty, insertMode, insertProperty).visitNonNull(d.getBlock(),
                             ctx, getCursor()));
                 }
                 return d;
@@ -186,7 +214,7 @@ public class MergeYaml extends Recipe {
                 if (matcher.matches(getCursor())) {
                     getCursor().putMessageOnFirstEnclosing(Yaml.Document.class, FOUND_MATCHING_ELEMENT, true);
                     m = (Yaml.Mapping) new MergeYamlVisitor<>(mapping, incoming, Boolean.TRUE.equals(acceptTheirs),
-                            objectIdentifyingProperty, insertBefore).visitNonNull(mapping, ctx, getCursor().getParentOrThrow());
+                            objectIdentifyingProperty, insertMode, insertProperty).visitNonNull(mapping, ctx, getCursor().getParentOrThrow());
                 }
                 return m;
             }
@@ -196,7 +224,7 @@ public class MergeYaml extends Recipe {
                 if (matcher.matches(getCursor())) {
                     getCursor().putMessageOnFirstEnclosing(Yaml.Document.class, FOUND_MATCHING_ELEMENT, true);
                     Yaml.Block value = (Yaml.Block) new MergeYamlVisitor<>(entry.getValue(), incoming,
-                            Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty, insertBefore).visitNonNull(entry.getValue(),
+                            Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty, insertMode, insertProperty).visitNonNull(entry.getValue(),
                             ctx, getCursor());
                     if (value instanceof Yaml.Scalar && value.getPrefix().isEmpty()) {
                         value = value.withPrefix(" ");
@@ -212,7 +240,7 @@ public class MergeYaml extends Recipe {
                     getCursor().putMessageOnFirstEnclosing(Yaml.Document.class, FOUND_MATCHING_ELEMENT, true);
                     return sequence.withEntries(ListUtils.map(sequence.getEntries(),
                             entry -> entry.withBlock((Yaml.Block) new MergeYamlVisitor<>(entry.getBlock(), incoming,
-                                    Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty, insertBefore)
+                                    Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty, insertMode, insertProperty)
                                     .visitNonNull(entry.getBlock(), ctx, new Cursor(getCursor(), entry)))));
                 }
                 return super.visitSequence(sequence, ctx);
