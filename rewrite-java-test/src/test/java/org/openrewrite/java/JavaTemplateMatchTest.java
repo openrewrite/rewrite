@@ -673,4 +673,37 @@ class JavaTemplateMatchTest implements RewriteTest {
               """)
         );
     }
+
+    @Test
+    void matchMethodWithGenericTypeWithConcreteType() {
+        rewriteRun(
+          spec -> spec
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+                private final JavaTemplate template = JavaTemplate.builder("java.util.Collections.<CharSequence>emptyList()").build();
+
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    boolean found = template.matches(getCursor());
+                    return found ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
+                }
+            })),
+          java(
+            """
+              import java.util.Collections;
+              import java.util.List;
+              class Test {
+                  static List<CharSequence> EXACT_MATCH     = Collections.emptyList();
+                  static List<String> COLLECTION_OF_SUBTYPE = Collections.emptyList(); // List of Dogs is not List of Animals
+              }
+            """,
+            """
+              import java.util.Collections;
+              import java.util.List;
+              class Test {
+                  static List<CharSequence> EXACT_MATCH     = /*~~>*/Collections.emptyList();
+                  static List<String> COLLECTION_OF_SUBTYPE = Collections.emptyList(); // List of Dogs is not List of Animals
+              }
+              """)
+        );
+    }
 }
