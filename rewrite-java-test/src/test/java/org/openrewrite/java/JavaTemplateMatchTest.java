@@ -657,14 +657,14 @@ class JavaTemplateMatchTest implements RewriteTest {
                 }
           })),
           java(
-            """
+              """
               import java.util.Collections;
               import java.util.List;
               class Test {
                   static List<Object> EMPTY_LIST = Collections.emptyList();
               }
-            """,
-            """
+              """,
+              """
               import java.util.Collections;
               import java.util.List;
               class Test {
@@ -688,15 +688,15 @@ class JavaTemplateMatchTest implements RewriteTest {
                 }
             })),
           java(
-            """
+              """
               import java.util.Collections;
               import java.util.List;
               class Test {
                   static List<CharSequence> EXACT_MATCH     = Collections.emptyList();
                   static List<String> COLLECTION_OF_SUBTYPE = Collections.emptyList(); // List of Dogs is not List of Animals
               }
-            """,
-            """
+              """,
+              """
               import java.util.Collections;
               import java.util.List;
               class Test {
