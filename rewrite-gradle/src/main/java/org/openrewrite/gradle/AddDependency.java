@@ -315,7 +315,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     }
 
                     private String purgeSourceSet(@Nullable String configuration) {
-                        if (configuration == null || configuration.endsWith("Implementation")) {
+                        if (StringUtils.isBlank(configuration) || configuration.endsWith("Implementation")) {
                             return "implementation";
                         } else if (configuration.endsWith("CompileOnly")) {
                             return "compileOnly";
