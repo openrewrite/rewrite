@@ -30,6 +30,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.style.Style;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -93,7 +94,7 @@ public class RemoveUnusedImports extends Recipe {
 
         @Override
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-            ImportLayoutStyle layoutStyle = Optional.ofNullable(cu.getStyle(ImportLayoutStyle.class))
+            ImportLayoutStyle layoutStyle = Optional.ofNullable(Style.from(ImportLayoutStyle.class, cu))
                     .orElse(IntelliJ.importLayout());
             String sourcePackage = cu.getPackageDeclaration() == null ? "" :
                     cu.getPackageDeclaration().getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");

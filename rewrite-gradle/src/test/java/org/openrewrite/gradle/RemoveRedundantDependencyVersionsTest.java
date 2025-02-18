@@ -250,6 +250,65 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     }
 
     @Test
+    void removeUnneededConstraint() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  constraints {
+                      implementation('org.springframework:spring-core:6.2.1') {
+                          because 'Gradle is resolving 6.2.2 already, this constraint has no effect and can be removed'
+                      }
+                  }
+                  implementation 'org.springframework.boot:spring-boot:3.4.2'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation 'org.springframework.boot:spring-boot:3.4.2'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepStrictConstraint() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  constraints {
+                      implementation('org.springframework:spring-core:6.2.1!!') {
+                          because 'The !! forces the usage of 6.2.1'
+                      }
+                  }
+                  implementation 'org.springframework.boot:spring-boot:3.4.2'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void transitiveConfiguration() {
         rewriteRun(
           buildGradle(

@@ -70,15 +70,15 @@ public class MavenDependency implements Trait<Xml.Tag> {
 
         try {
             MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
+            MavenSettings settings = mctx.effectiveSettings(mrr);
             MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> new MavenPomDownloader(
                     emptyMap(), ctx,
-                    Optional.ofNullable(mctx.getSettings())
-                            .orElse(mrr.getMavenSettings()),
-                    Optional.ofNullable(mctx.getSettings())
+                    settings,
+                    Optional.ofNullable(settings)
                             .map(MavenSettings::getActiveProfiles)
                             .map(MavenSettings.ActiveProfiles::getActiveProfiles)
-                            .orElse(mrr.getActiveProfiles()))
-                    .downloadMetadata(new GroupArtifact(groupId, artifactId), null, mrr.getPom().getRepositories()));
+                            .orElse(null)
+            ).downloadMetadata(new GroupArtifact(groupId, artifactId), null, mrr.getPom().getRepositories()));
             List<String> versions = new ArrayList<>();
             for (String v : mavenMetadata.getVersioning().getVersions()) {
                 if (versionComparator.isValid(finalVersion, v)) {

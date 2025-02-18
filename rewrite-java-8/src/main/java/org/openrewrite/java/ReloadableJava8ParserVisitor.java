@@ -25,7 +25,6 @@ import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
 import com.sun.tools.javac.util.Context;
-import lombok.Generated;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
@@ -46,7 +45,6 @@ import java.lang.reflect.Field;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.regex.Matcher;
@@ -140,17 +138,17 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
 
             args = JContainer.build(argsPrefix, expressions, Markers.EMPTY);
         } else {
-            String remaining = source.substring(cursor, endPos(node));
-
-            // TODO: technically, if there is code like this, we have a bug, but seems exceedingly unlikely:
-            // @MyAnnotation /* Comment () that contains parentheses */ ()
-
-            if (remaining.contains("(") && remaining.contains(")")) {
+            int saveCursor = cursor;
+            Space prefix = whitespace();
+            if (source.charAt(cursor) == '(') {
+                skip("(");
                 args = JContainer.build(
-                        sourceBefore("("),
+                        prefix,
                         singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)),
                         Markers.EMPTY
                 );
+            } else {
+                cursor = saveCursor;
             }
         }
 
@@ -343,6 +341,8 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                         ),
                         Markers.EMPTY
                 ),
+                null,
+                null,
                 JContainer.build(sourceBefore(":"), convertStatements(node.getStatements()), Markers.EMPTY),
                 null
         );
@@ -1639,7 +1639,8 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
             return null;
         }
         try {
-            String prefix = source.substring(cursor, Math.max(cursor, getActualStartPosition((JCTree) t)));
+            // The spacing of initialized enums such as `ONE   (1)` is handled in the `visitNewClass` method, so set it explicitly to “” here.
+            String prefix = isEnum(t) ? "" : source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
             cursor += prefix.length();
             @SuppressWarnings("unchecked") J2 j = (J2) scan(t, formatWithCommentTree(prefix, (JCTree) t, docCommentTable.getCommentTree((JCTree) t)));
             return j;
@@ -1669,12 +1670,12 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         }
     }
 
-    private static int getActualStartPosition(JCTree t) {
-        // not sure if this is a bug in Lombok, but the variable's start position is after the `val` annotation
-        if (t instanceof JCVariableDecl && isLombokGenerated(t)) {
-            return ((JCVariableDecl) t).mods.annotations.get(0).getStartPosition();
+    private boolean isEnum(Tree t) {
+        if (t instanceof JCNewClass) {
+            JCNewClass newClass = (JCNewClass) t;
+            return newClass.type != null && newClass.type.tsym != null && hasFlag(newClass.type.tsym.flags(), Flags.ENUM);
         }
-        return t.getStartPosition();
+        return false;
     }
 
     private <J2 extends @Nullable J> @Nullable JRightPadded<J2> convert(@Nullable Tree t, Function<Tree, Space> suffix) {
@@ -1787,17 +1788,17 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
 
     private Space statementDelim(@Nullable Tree t) {
         if (t instanceof JCAssert ||
-                t instanceof JCAssign ||
-                t instanceof JCAssignOp ||
-                t instanceof JCBreak ||
-                t instanceof JCContinue ||
-                t instanceof JCDoWhileLoop ||
-                t instanceof JCImport ||
-                t instanceof JCMethodInvocation ||
-                t instanceof JCNewClass ||
-                t instanceof JCReturn ||
-                t instanceof JCThrow ||
-                t instanceof JCUnary) {
+            t instanceof JCAssign ||
+            t instanceof JCAssignOp ||
+            t instanceof JCBreak ||
+            t instanceof JCContinue ||
+            t instanceof JCDoWhileLoop ||
+            t instanceof JCImport ||
+            t instanceof JCMethodInvocation ||
+            t instanceof JCNewClass ||
+            t instanceof JCReturn ||
+            t instanceof JCThrow ||
+            t instanceof JCUnary) {
             return sourceBefore(";");
         }
 
@@ -1808,7 +1809,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         if (t instanceof JCExpressionStatement) {
             ExpressionTree expTree = ((ExpressionStatementTree) t).getExpression();
             if (expTree instanceof ErroneousTree) {
-                return Space.build(source.substring(((JCTree) expTree).getEndPosition(endPosTable),((JCTree) t).getEndPosition(endPosTable)), Collections.emptyList());
+                return Space.build(source.substring(((JCTree) expTree).getEndPosition(endPosTable), ((JCTree) t).getEndPosition(endPosTable)), Collections.emptyList());
             } else {
                 return sourceBefore(";");
             }
@@ -1832,9 +1833,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         if (t instanceof JCMethodDecl) {
             JCMethodDecl m = (JCMethodDecl) t;
             if (m.body == null || m.defaultValue != null) {
-                String suffix = source.substring(cursor, positionOfNext(";", null));
-                int idx = findFirstNonWhitespaceChar(suffix);
-                return sourceBefore(idx >= 0 ? "" : ";");
+                return sourceBefore(";");
             } else {
                 return sourceBefore("");
             }
@@ -1910,7 +1909,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         //noinspection ConstantConditions
         return sym != null && (
                 "lombok.val".equals(sym.getQualifiedName().toString()) || "lombok.var".equals(sym.getQualifiedName().toString()) ||
-                sym.getAnnotation(Generated.class) != null
+                sym.getDeclarationAttributes().stream().anyMatch(a -> "lombok.Generated".equals(a.type.toString()))
         );
     }
 
@@ -1972,7 +1971,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                     char c2 = source.charAt(delimIndex + 1);
                     switch (c1) {
                         case '/':
-                            switch(c2) {
+                            switch (c2) {
                                 case '/':
                                     inSingleLineComment = true;
                                     delimIndex++;
@@ -1984,7 +1983,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                             }
                             break;
                         case '*':
-                            if(c2 == '/') {
+                            if (c2 == '/') {
                                 inMultiLineComment = false;
                                 delimIndex++;
                                 continue;
@@ -2039,7 +2038,11 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     private boolean hasFlag(ModifiersTree modifiers, long flag) {
-        return (((JCModifiers) modifiers).flags & flag) != 0L;
+        return hasFlag(((JCModifiers) modifiers).flags, flag);
+    }
+
+    private boolean hasFlag(long flags, long flag) {
+        return (flags & flag) != 0L;
     }
 
     @SuppressWarnings("unused")
@@ -2051,7 +2054,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                     try {
                         // FIXME instanceof probably not right here...
                         return field.get(null) instanceof Long &&
-                                field.getName().matches("[A-Z_]+");
+                               field.getName().matches("[A-Z_]+");
                     } catch (IllegalAccessException e) {
                         throw new RuntimeException(e);
                     }

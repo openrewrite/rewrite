@@ -69,7 +69,7 @@ public class TomlParser implements Parser {
 
     @Override
     public boolean accept(Path path) {
-        return path.toString().endsWith(".toml");
+        return path.toString().endsWith(".toml") || path.endsWith(".xmake.cfg");
     }
 
     @Override

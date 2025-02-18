@@ -26,7 +26,6 @@ import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
 import com.sun.tools.javac.util.Context;
-import lombok.Generated;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
@@ -49,7 +48,6 @@ import java.lang.reflect.Field;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.regex.Matcher;
@@ -143,17 +141,17 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
 
             args = JContainer.build(argsPrefix, expressions, Markers.EMPTY);
         } else {
-            String remaining = source.substring(cursor, endPos(node));
-
-            // TODO: technically, if there is code like this, we have a bug, but seems exceedingly unlikely:
-            // @MyAnnotation /* Comment () that contains parentheses */ ()
-
-            if (remaining.contains("(") && remaining.contains(")")) {
+            int saveCursor = cursor;
+            Space prefix = whitespace();
+            if (source.charAt(cursor) == '(') {
+                skip("(");
                 args = JContainer.build(
-                        sourceBefore("("),
+                        prefix,
                         singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)),
                         Markers.EMPTY
                 );
+            } else {
+                cursor = saveCursor;
             }
         }
 
@@ -346,6 +344,8 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                         ),
                         Markers.EMPTY
                 ),
+                null,
+                null,
                 JContainer.build(sourceBefore(":"), convertStatements(node.getStatements()), Markers.EMPTY),
                 null
         );
@@ -1655,7 +1655,8 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
             return null;
         }
         try {
-            String prefix = source.substring(cursor, max(cursor, getActualStartPosition((JCTree) t)));
+            // The spacing of initialized enums such as `ONE   (1)` is handled in the `visitNewClass` method, so set it explicitly to “” here.
+            String prefix = isEnum(t) ? "" : source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
             cursor += prefix.length();
             @SuppressWarnings("unchecked") J2 j = (J2) scan(t, formatWithCommentTree(prefix, (JCTree) t, docCommentTable.getCommentTree((JCTree) t)));
             return j;
@@ -1685,12 +1686,12 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
         }
     }
 
-    private static int getActualStartPosition(JCTree t) {
-        // The variable's start position in the source is wrongly after lombok's `@val` annotation
-        if (t instanceof JCVariableDecl && isLombokGenerated(t)) {
-            return ((JCVariableDecl) t).mods.annotations.get(0).getStartPosition();
+    private boolean isEnum(Tree t) {
+        if (t instanceof JCNewClass) {
+            JCNewClass newClass = (JCNewClass) t;
+            return newClass.type != null && newClass.type.tsym != null && hasFlag(newClass.type.tsym.flags(), Flags.ENUM);
         }
-        return t.getStartPosition();
+        return false;
     }
 
     private <J2 extends @Nullable J> @Nullable JRightPadded<J2> convert(@Nullable Tree t, Function<Tree, Space> suffix) {
@@ -1839,9 +1840,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
         if (t instanceof JCMethodDecl) {
             JCMethodDecl m = (JCMethodDecl) t;
             if (m.body == null || m.defaultValue != null) {
-                String suffix = source.substring(cursor, positionOfNext(";", null));
-                int idx = findFirstNonWhitespaceChar(suffix);
-                return sourceBefore(idx >= 0 ? "" : ";");
+                return sourceBefore(";");
             } else {
                 return sourceBefore("");
             }
@@ -1911,7 +1910,10 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         //noinspection ConstantConditions
-        return sym != null && ("lombok.val".equals(sym.getQualifiedName().toString()) || sym.getAnnotation(Generated.class) != null);
+        return sym != null && (
+                "lombok.val".equals(sym.getQualifiedName().toString()) ||
+                sym.getDeclarationAttributes().stream().anyMatch(a -> "lombok.Generated".equals(a.type.toString()))
+        );
     }
 
     /**
@@ -2040,7 +2042,11 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     private boolean hasFlag(ModifiersTree modifiers, long flag) {
-        return (((JCModifiers) modifiers).flags & flag) != 0L;
+        return hasFlag(((JCModifiers) modifiers).flags, flag);
+    }
+
+    private boolean hasFlag(long flags, long flag) {
+        return (flags & flag) != 0L;
     }
 
     @SuppressWarnings("unused")

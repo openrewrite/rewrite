@@ -702,6 +702,23 @@ public class MavenPomDownloader {
                 //This can happen if the artifact only exists in the local maven cache. In this case, just return the original
                 return gav.getVersion();
             }
+
+            // Find the newest <snapshotVersion> with a matching classifier - the latest snapshot may not have artifacts for all classifiers.
+            List<MavenMetadata.SnapshotVersion> snapshotVersions = mavenMetadata.getVersioning().getSnapshotVersions();
+            if (snapshotVersions != null) {
+                // Try to get requested classifier (this is unfortunately not present in 'gav' structure)
+                String classifier = getClassifierFromContainingPom(gav, containingPom);
+                MavenMetadata.SnapshotVersion snapshotVersion = snapshotVersions.stream()
+                        .sorted(Comparator.comparing(MavenMetadata.SnapshotVersion::getUpdated).reversed())
+                        .filter(s -> Objects.equals(s.getClassifier(), classifier))
+                        .findFirst()
+                        .orElse(null);
+                if (snapshotVersion != null) {
+                    return snapshotVersion.getValue();
+                }
+            }
+
+            // Replace SNAPSHOT suffix with timestamp and build number
             MavenMetadata.Snapshot snapshot = mavenMetadata.getVersioning().getSnapshot();
             if (snapshot != null && snapshot.getTimestamp() != null) {
                 return gav.getVersion().replaceFirst("SNAPSHOT$", snapshot.getTimestamp() + "-" + snapshot.getBuildNumber());
@@ -720,13 +737,6 @@ public class MavenPomDownloader {
             normalizedRepositories.put(ctx.getLocalRepository().getId(), ctx.getLocalRepository());
         }
 
-        for (MavenRepository repo : repositories) {
-            MavenRepository normalizedRepo = normalizeRepository(repo, ctx, containingPom);
-            if (normalizedRepo != null && (acceptsVersion == null || repositoryAcceptsVersion(normalizedRepo, acceptsVersion, containingPom))) {
-                normalizedRepositories.put(normalizedRepo.getId(), normalizedRepo);
-            }
-        }
-
         // repositories from maven settings
         for (MavenRepository repo : ctx.getRepositories(mavenSettings, activeProfiles)) {
             MavenRepository normalizedRepo = normalizeRepository(repo, ctx, containingPom);
@@ -734,12 +744,21 @@ public class MavenPomDownloader {
                 normalizedRepositories.put(normalizedRepo.getId(), normalizedRepo);
             }
         }
+
+        for (MavenRepository repo : repositories) {
+            MavenRepository normalizedRepo = normalizeRepository(repo, ctx, containingPom);
+            if (normalizedRepo != null && (acceptsVersion == null || repositoryAcceptsVersion(normalizedRepo, acceptsVersion, containingPom))) {
+                normalizedRepositories.put(normalizedRepo.getId(), normalizedRepo);
+            }
+        }
+
         if (!normalizedRepositories.containsKey(MavenRepository.MAVEN_CENTRAL.getId()) && addCentralRepository) {
             MavenRepository normalizedRepo = normalizeRepository(MavenRepository.MAVEN_CENTRAL, ctx, containingPom);
             if (normalizedRepo != null) {
                 normalizedRepositories.put(normalizedRepo.getId(), normalizedRepo);
             }
         }
+
         return normalizedRepositories.values();
     }
 
@@ -792,6 +811,8 @@ public class MavenPomDownloader {
 
                 mavenCache.putNormalizedRepository(repository, normalized);
                 result = Optional.ofNullable(normalized);
+            } else if(!result.isPresent()) {
+                ctx.getResolutionListener().repositoryAccessFailedPreviously(repository.getUri());
             }
         } catch (Exception e) {
             ctx.getResolutionListener().repositoryAccessFailed(repository.getUri(), e);
@@ -893,7 +914,7 @@ public class MavenPomDownloader {
             } catch (FailsafeException failsafeException) {
                 Throwable cause = failsafeException.getCause();
                 if (cause instanceof HttpSenderResponseException && hasCredentials(repo) &&
-                        ((HttpSenderResponseException) cause).isClientSideException()) {
+                    ((HttpSenderResponseException) cause).isClientSideException()) {
                     return Failsafe.with(retryPolicy).get(() -> {
                         HttpSender.Request unauthenticated = httpSender.get(jarUrl).build();
                         try (HttpSender.Response response = httpSender.send(unauthenticated)) {
@@ -1054,4 +1075,27 @@ public class MavenPomDownloader {
         String artifactPomFile = gav.getArtifactId() + "-" + versionPath.getFileName() + ".pom";
         return Files.exists(dir.resolve(versionPath.resolve(artifactPomFile)));
     }
+
+    /**
+     * Retrieves the classifier of a dependency from a provided resolved POM, if it exists.
+     *
+     * @param gav           The group, artifact, and version information of the dependency to locate.
+     * @param containingPom The resolved POM that potentially contains the dependency information.
+     *                      If null, the method will return null.
+     * @return The classifier of the dependency within the provided POM, or null if no matching
+     * dependency or classifier is found.
+     */
+    private static @Nullable String getClassifierFromContainingPom(GroupArtifactVersion gav, @Nullable ResolvedPom containingPom) {
+        if (containingPom != null) {
+            for (Dependency dep : containingPom.getRequestedDependencies()) {
+                if (Objects.equals(dep.getGroupId(), gav.getGroupId())) {
+                    if (Objects.equals(dep.getArtifactId(), gav.getArtifactId())) {
+                        return dep.getClassifier();
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
 }

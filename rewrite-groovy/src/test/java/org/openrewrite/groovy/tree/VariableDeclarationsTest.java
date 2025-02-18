@@ -15,7 +15,6 @@
  */
 package org.openrewrite.groovy.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
@@ -129,7 +128,6 @@ class VariableDeclarationsTest implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
     void singleTypeMultipleVariableDeclaration() {
         rewriteRun(
@@ -137,7 +135,6 @@ class VariableDeclarationsTest implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
     void multipleTypeMultipleVariableDeclaration() {
         rewriteRun(
@@ -190,7 +187,6 @@ class VariableDeclarationsTest implements RewriteTest {
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/4702")
-    @Disabled
     @Test
     void nestedTypeParameters() {
         rewriteRun(

@@ -15,11 +15,11 @@
  */
 package org.openrewrite.toml;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.toml.tree.*;
 
 public class TomlVisitor<P> extends TreeVisitor<Toml, P> {
@@ -93,7 +93,7 @@ public class TomlVisitor<P> extends TreeVisitor<Toml, P> {
         return t;
     }
 
-    public <T> TomlRightPadded<T> visitRightPadded(@Nullable TomlRightPadded<T> right, P p) {
+    public <T> @Nullable TomlRightPadded<T> visitRightPadded(@Nullable TomlRightPadded<T> right, P p) {
         if (right == null) {
             //noinspection ConstantConditions
             return null;

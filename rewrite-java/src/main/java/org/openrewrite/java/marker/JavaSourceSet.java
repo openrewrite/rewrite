@@ -226,26 +226,30 @@ public class JavaSourceSet implements SourceSet {
         String groupId = null;
         String artifactId = null;
         String version = null;
-        if (pathStr.contains("modules-2/files-2.1") && pathParts.size() >= 5) {
-            groupId = pathParts.get(pathParts.size() - 5);
-            artifactId = pathParts.get(pathParts.size() - 4);
-            version = pathParts.get(pathParts.size() - 3);
-        } else if (pathParts.size() >= 4) {
-            version = pathParts.get(pathParts.size() - 2);
-            artifactId = pathParts.get(pathParts.size() - 3);
-            // Unknown how many of the next several path parts will together comprise the groupId
-            // Maven repository root will have a "repository.xml" file
-            StringBuilder groupIdBuilder = new StringBuilder();
-            int i = pathParts.size() - 3;
-            while(i > 0) {
-                Path maybeRepositoryRoot = Paths.get(String.join("/", pathParts.subList(0, i)));
-                if(maybeRepositoryRoot.endsWith("repository") || Files.exists(maybeRepositoryRoot.resolve("repository.xml"))) {
-                    groupId = groupIdBuilder.substring(1); // Trim off the preceding "."
-                    break;
+        try {
+            if (pathStr.contains("modules-2/files-2.1") && pathParts.size() >= 5) {
+                groupId = pathParts.get(pathParts.size() - 5);
+                artifactId = pathParts.get(pathParts.size() - 4);
+                version = pathParts.get(pathParts.size() - 3);
+            } else if (pathParts.size() >= 4) {
+                version = pathParts.get(pathParts.size() - 2);
+                artifactId = pathParts.get(pathParts.size() - 3);
+                // Unknown how many of the next several path parts will together comprise the groupId
+                // Maven repository root will have a "repository.xml" file
+                StringBuilder groupIdBuilder = new StringBuilder();
+                int i = pathParts.size() - 3;
+                while (i > 0) {
+                    Path maybeRepositoryRoot = Paths.get(String.join("/", pathParts.subList(0, i)));
+                    if (maybeRepositoryRoot.endsWith("repository") || Files.exists(maybeRepositoryRoot.resolve("repository.xml"))) {
+                        groupId = groupIdBuilder.substring(1); // Trim off the preceding "."
+                        break;
+                    }
+                    groupIdBuilder.insert(0, "." + pathParts.get(i - 1));
+                    i--;
                 }
-                groupIdBuilder.insert(0, "." + pathParts.get(i - 1));
-                i--;
             }
+        } catch (Exception e) {
+            return null;
         }
         if(groupId == null || artifactId == null || version == null) {
             return null;

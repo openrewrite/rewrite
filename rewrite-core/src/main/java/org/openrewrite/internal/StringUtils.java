@@ -692,16 +692,18 @@ public class StringUtils {
                 continue;
             } else if (length > cursor + 1) {
                 char next = source.charAt(cursor + 1);
-                if (current == '/' && next == '/') {
+                if (inMultiLineComment) {
+                    if (current == '*' && next == '/') {
+                        inMultiLineComment = false;
+                        cursor++;
+                        continue;
+                    }
+                } else if (current == '/' && next == '/') {
                     inSingleLineComment = true;
                     cursor++;
                     continue;
                 } else if (current == '/' && next == '*') {
                     inMultiLineComment = true;
-                    cursor++;
-                    continue;
-                } else if (current == '*' && next == '/') {
-                    inMultiLineComment = false;
                     cursor++;
                     continue;
                 }

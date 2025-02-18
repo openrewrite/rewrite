@@ -23,6 +23,7 @@ import org.openrewrite.hcl.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.function.UnaryOperator;
 
@@ -289,6 +290,18 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public Hcl visitLegacyIndexAttribute(Hcl.LegacyIndexAttributeAccess laccess, PrintOutputCapture<P> p) {
+        beforeSyntax(laccess, Space.Location.LEGACY_INDEX_ATTRIBUTE_ACCESS, p);
+        visitRightPadded(
+                Collections.singletonList(laccess.getPadding().getBase()),
+                HclRightPadded.Location.LEGACY_INDEX_ATTRIBUTE_ACCESS_BASE, "", p);
+        p.append(".");
+        visitLiteral(laccess.getIndex(), p);
+        afterSyntax(laccess, p);
+        return laccess;
+    }
+
+    @Override
     public Hcl visitLiteral(Hcl.Literal literal, PrintOutputCapture<P> p) {
         beforeSyntax(literal, Space.Location.LITERAL, p);
         p.append(literal.getValueSource());
@@ -347,14 +360,14 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
     @Override
     public Hcl visitSplatOperator(Hcl.Splat.Operator splatOperator, PrintOutputCapture<P> p) {
         beforeSyntax(splatOperator, Space.Location.SPLAT_OPERATOR, p);
-        if (splatOperator.getType().equals(Hcl.Splat.Operator.Type.Full)) {
+        if (splatOperator.getType() == Hcl.Splat.Operator.Type.Full) {
             p.append('[');
         } else {
             p.append('.');
         }
         visitSpace(splatOperator.getSplat().getElement().getPrefix(), Space.Location.SPLAT_OPERATOR_PREFIX, p);
         p.append('*');
-        if (splatOperator.getType().equals(Hcl.Splat.Operator.Type.Full)) {
+        if (splatOperator.getType() == Hcl.Splat.Operator.Type.Full) {
             visitSpace(splatOperator.getSplat().getAfter(), Space.Location.SPLAT_OPERATOR_SUFFIX, p);
             p.append(']');
         }

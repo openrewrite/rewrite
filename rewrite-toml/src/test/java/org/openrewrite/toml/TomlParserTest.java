@@ -17,7 +17,9 @@ package org.openrewrite.toml;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.toml.tree.Toml;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.toml.Assertions.toml;
 
 class TomlParserTest implements RewriteTest {
@@ -198,7 +200,13 @@ class TomlParserTest implements RewriteTest {
               
               [dog."tater.man"]
               type.name = "pug"
-              """
+              """,
+            spec -> spec.afterRecipe(doc -> {
+                assertThat(doc.getValues()).hasSize(3);
+                assertThat(doc.getValues()).allSatisfy(
+                  v -> assertThat(v).isInstanceOf(Toml.Table.class)
+                );
+            })
           )
         );
     }

@@ -234,7 +234,7 @@ public class Space {
 
     @SuppressWarnings("ConstantConditions")
     public static <J2 extends J> @Nullable List<JRightPadded<J2>> formatLastSuffix(@Nullable List<JRightPadded<J2>> trees,
-                                                                         Space suffix) {
+                                                                                   Space suffix) {
         if (trees == null) {
             return null;
         }
@@ -295,8 +295,8 @@ public class Space {
         String whitespaces = printedWs.toString();
 
         return "Space(" +
-                "comments=<" + (comments.size() == 1 ? "1 comment" : comments.size() + " comments") + ">, " +
-                "whitespace=" + (whitespaces.isEmpty() ? "<empty>" : "'" + whitespaces + "'") + ")";
+               "comments=<" + (comments.size() == 1 ? "1 comment" : comments.size() + " comments") + ">, " +
+               "whitespace=" + (whitespaces.isEmpty() ? "<empty>" : "'" + whitespaces + "'") + ")";
     }
 
     public enum Location {
@@ -325,6 +325,7 @@ public class Space {
         CASE,
         CASE_BODY,
         CASE_EXPRESSION,
+        CASE_LABEL,
         CASE_PREFIX,
         CASE_SUFFIX,
         CATCH_ALTERNATIVE_SUFFIX,
@@ -335,6 +336,9 @@ public class Space {
         COMPILATION_UNIT_PREFIX,
         CONTINUE_PREFIX,
         CONTROL_PARENTHESES_PREFIX,
+        DECONSTRUCTION_PATTERN_PREFIX,
+        DECONSTRUCTION_PATTERN_NESTED,
+        DECONSTRUCTION_PATTERN_NESTED_SUFFIX,
         DIMENSION,
         DIMENSION_PREFIX,
         DIMENSION_SUFFIX,

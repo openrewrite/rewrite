@@ -442,8 +442,8 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
                         getCursor()
                                 .dropParentUntil(
                                         c -> c instanceof Switch ||
-                                                c instanceof SwitchExpression ||
-                                                c == Cursor.ROOT_VALUE
+                                             c instanceof SwitchExpression ||
+                                             c == Cursor.ROOT_VALUE
                                 )
                                 .getValue();
                 if (aSwitch instanceof SwitchExpression) {
@@ -484,11 +484,15 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     @Override
     public J visitCase(Case case_, PrintOutputCapture<P> p) {
         beforeSyntax(case_, Space.Location.CASE_PREFIX, p);
-        Expression elem = case_.getExpressions().get(0);
+        J elem = case_.getCaseLabels().get(0);
         if (!(elem instanceof Identifier) || !((Identifier) elem).getSimpleName().equals("default")) {
             p.append("case");
         }
-        visitContainer("", case_.getPadding().getExpressions(), JContainer.Location.CASE_EXPRESSION, ",", "", p);
+        visitContainer("", case_.getPadding().getCaseLabels(), JContainer.Location.CASE_LABEL, ",", "", p);
+        if (case_.getGuard() != null) {
+            p.append("when");
+            visit(case_.getGuard(), p);
+        }
         visitSpace(case_.getPadding().getStatements().getBefore(), Space.Location.CASE, p);
         p.append(case_.getType() == Case.Type.Statement ? ":" : "->");
         visitStatements(case_.getPadding().getStatements().getPadding()
@@ -726,6 +730,15 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         visit(instanceOf.getPattern(), p);
         afterSyntax(instanceOf, p);
         return instanceOf;
+    }
+
+    @Override
+    public J visitDeconstructionPattern(DeconstructionPattern deconstructionPattern, PrintOutputCapture<P> p) {
+        beforeSyntax(deconstructionPattern, Space.Location.DECONSTRUCTION_PATTERN_PREFIX, p);
+        visitAndCast(deconstructionPattern.getDeconstructor(), p);
+        visitContainer("(", deconstructionPattern.getPadding().getNested(), JContainer.Location.DECONSTRUCTION_PATTERN_NESTED, ",", ")", p);
+        afterSyntax(deconstructionPattern, p);
+        return deconstructionPattern;
     }
 
     @Override

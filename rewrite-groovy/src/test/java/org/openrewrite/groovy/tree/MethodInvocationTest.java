@@ -192,7 +192,7 @@ class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              foo(String.class)
+              foo(String    .class)
               """
           )
         );
@@ -453,6 +453,21 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
+    void topLevelCallWithoutReceiver() {
+        rewriteRun(
+          groovy(
+            """
+              from('timer:groovy?period=1000')
+                  .setBody()
+                      .constant('Hello Camel K')
+                  .setBody()
+                      .simple('body - header.RandomValue')
+              """
+          )
+        );
+    }
+
+    @Test
     void insideParenthesesWithNewline() {
         rewriteRun(
           groovy(
@@ -486,6 +501,21 @@ class MethodInvocationTest implements RewriteTest {
             """
               ((((
                 something(a)
+              ))))
+              """
+          )
+        );
+    }
+
+    @Test
+    void insideFourParenthesesAndEntersWithCommentWithParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              ((/* comment :-) ((
+              */((
+                // :-((
+                /*)*/something(a)
               ))))
               """
           )

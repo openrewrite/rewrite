@@ -26,7 +26,6 @@ import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
 import com.sun.tools.javac.util.Context;
-import lombok.Generated;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
@@ -149,17 +148,17 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
 
             args = JContainer.build(argsPrefix, expressions, Markers.EMPTY);
         } else {
-            String remaining = source.substring(cursor, endPos(node));
-
-            // TODO: technically, if there is code like this, we have a bug, but seems exceedingly unlikely:
-            // @MyAnnotation /* Comment () that contains parentheses */ ()
-
-            if (remaining.contains("(") && remaining.contains(")")) {
+            int saveCursor = cursor;
+            Space prefix = whitespace();
+            if (source.charAt(cursor) == '(') {
+                skip("(");
                 args = JContainer.build(
-                        sourceBefore("("),
+                        prefix,
                         singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)),
                         Markers.EMPTY
                 );
+            } else {
+                cursor = saveCursor;
             }
         }
 
@@ -348,13 +347,16 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 Markers.EMPTY,
                 type,
                 null,
+                null,
                 JContainer.build(
-                        node.getExpressions().isEmpty() ? EMPTY : sourceBefore("case"),
-                        node.getExpressions().isEmpty() ?
+                        node.getLabels().isEmpty() || node.getLabels().getFirst() instanceof DefaultCaseLabelTree ?
+                                EMPTY : sourceBefore("case"),
+                        node.getLabels().isEmpty() || node.getLabels().getFirst() instanceof DefaultCaseLabelTree ?
                                 List.of(JRightPadded.build(new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), skip("default"), null, null))) :
-                                convertAll(node.getExpressions(), commaDelim, t -> EMPTY),
+                                convertAll(node.getLabels(), commaDelim, ignored -> node.getGuard() != null ? sourceBefore("when", '-') : EMPTY),
                         Markers.EMPTY
                 ),
+                convert(node.getGuard()),
                 JContainer.build(
                         sourceBefore(type == J.Case.Type.Rule ? "->" : ":"),
                         convertStatements(node.getStatements()),
@@ -779,10 +781,37 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         return new J.InstanceOf(randomId(), fmt, Markers.EMPTY,
                 convert(node.getExpression(), t -> sourceBefore("instanceof")),
                 convert(node.getType()),
-                node.getPattern() instanceof JCBindingPattern b ?
-                        new J.Identifier(randomId(), sourceBefore(b.getVariable().getName().toString()), Markers.EMPTY, emptyList(), b.getVariable().getName().toString(),
-                                type, typeMapping.variableType(b.var.sym)) : null,
+                getNodePattern(node.getPattern(), type),
                 type);
+    }
+
+    @Override
+    public J visitDeconstructionPattern(DeconstructionPatternTree node, Space fmt) {
+        JavaType type = typeMapping.type(node);
+        return new J.DeconstructionPattern(randomId(),
+                fmt,
+                Markers.EMPTY,
+                convert(node.getDeconstructor()),
+                JContainer.build(sourceBefore("("), convertAll(node.getNestedPatterns(), commaDelim, t -> sourceBefore(")")), Markers.EMPTY),
+                type);
+    }
+
+    private @Nullable J getNodePattern(@Nullable PatternTree pattern, JavaType type) {
+        if (pattern instanceof JCBindingPattern b) {
+            return new J.Identifier(randomId(), sourceBefore(b.getVariable().getName().toString()), Markers.EMPTY, emptyList(), b.getVariable().getName().toString(),
+                    type, typeMapping.variableType(b.var.sym));
+        } else if (pattern instanceof DeconstructionPatternTree r) {
+            return visitDeconstructionPattern(r, whitespace());
+        } else {
+            if (pattern == null) {
+                return null;
+            }
+            int saveCursor = cursor;
+            int endCursor = max(endPos(pattern), cursor);
+            cursor = endCursor;
+            return new J.Unknown(randomId(), whitespace(), Markers.EMPTY, new J.Unknown.Source(randomId(), whitespace(), Markers.EMPTY, source.substring(saveCursor, endCursor)));
+
+        }
     }
 
     @Override
@@ -962,11 +991,15 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
                 convertAll(node.getArguments(), commaDelim, t -> sourceBefore(")")), Markers.EMPTY);
 
-        Symbol methodSymbol = (jcSelect instanceof JCFieldAccess) ? ((JCFieldAccess) jcSelect).sym :
-                ((JCIdent) jcSelect).sym;
+        JavaType.Method methodType;
+        if (name.getType() instanceof JavaType.Method) {
+            methodType = (JavaType.Method) name.getType();
+        } else {
+            Symbol methodSymbol = (jcSelect instanceof JCFieldAccess) ? ((JCFieldAccess) jcSelect).sym : ((JCIdent) jcSelect).sym;
+            methodType = typeMapping.methodInvocationType(jcSelect.type, methodSymbol);
+        }
 
-        return new J.MethodInvocation(randomId(), fmt, Markers.EMPTY, select, typeParams, name, args,
-                typeMapping.methodInvocationType(jcSelect.type, methodSymbol));
+        return new J.MethodInvocation(randomId(), fmt, Markers.EMPTY, select, typeParams, name, args, methodType);
     }
 
     @Override
@@ -1251,7 +1284,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         return new J.SwitchExpression(randomId(), fmt, Markers.EMPTY,
                 convert(node.getExpression()),
                 new J.Block(randomId(), sourceBefore("{"), Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
-                        convertAll(node.getCases(), noDelim, noDelim), sourceBefore("}")));
+                        convertAll(node.getCases(), noDelim, noDelim), sourceBefore("}")), typeMapping.type(node));
     }
 
     @Override
@@ -1733,7 +1766,8 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
             return null;
         }
         try {
-            String prefix = source.substring(cursor, Math.max(cursor, getActualStartPosition((JCTree) t)));
+            // The spacing of initialized enums such as `ONE   (1)` is handled in the `visitNewClass` method, so set it explicitly to “” here.
+            String prefix = isEnum(t) ? "" : source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
             cursor += prefix.length();
             // Java 21 and 23 have a different return type from getCommentTree; with reflection we can support both
             Method getCommentTreeMethod = DocCommentTable.class.getMethod("getCommentTree", JCTree.class);
@@ -1749,12 +1783,11 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         }
     }
 
-    private static int getActualStartPosition(JCTree t) {
-        // The variable's start position in the source is wrongly after lombok's `@val` annotation
-        if (t instanceof JCVariableDecl && isLombokGenerated(t)) {
-            return ((JCVariableDecl) t).mods.annotations.get(0).getStartPosition();
+    private boolean isEnum(Tree t) {
+        if (t instanceof JCNewClass newClass) {
+            return newClass.type != null && newClass.type.tsym != null && hasFlag(newClass.type.tsym.flags(), Flags.ENUM);
         }
-        return t.getStartPosition();
+        return false;
     }
 
     private void reportJavaParsingException(Throwable ex) {
@@ -1804,7 +1837,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         if (endPos(t) == cursor && rightPadded.getElement() instanceof J.Erroneous) {
             cursor += ((J.Erroneous) rightPadded.getElement()).getText().length();
         } else {
-            cursor(max(endPos(t), cursor)); // if there is a non-empty suffix, the cursor may have already moved past it
+            cursor(max(endPos(t), cursor)); // if there is a non-empty suffix or a lombok generated method, the cursor can be already moved past it
         }
         return rightPadded;
     }
@@ -1920,9 +1953,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
             case METHOD:
                 JCMethodDecl m = (JCMethodDecl) t;
                 if (m.body == null || m.defaultValue != null) {
-                    String suffix = source.substring(cursor, positionOfNext(";", null));
-                    int idx = findFirstNonWhitespaceChar(suffix);
-                    return sourceBefore(idx >= 0 ? "" : ";");
+                    return sourceBefore(";");
                 } else {
                     return sourceBefore("");
                 }
@@ -1992,7 +2023,10 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         //noinspection ConstantConditions
-        return sym != null && ("lombok.val".equals(sym.getQualifiedName().toString()) || sym.getAnnotation(Generated.class) != null);
+        return sym != null && (
+                "lombok.val".equals(sym.getQualifiedName().toString()) ||
+                sym.getDeclarationAttributes().stream().anyMatch(a -> "lombok.Generated".equals(a.type.toString()))
+        );
     }
 
     /**
@@ -2121,7 +2155,11 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     private boolean hasFlag(ModifiersTree modifiers, long flag) {
-        return (((JCModifiers) modifiers).flags & flag) != 0L;
+        return hasFlag(((JCModifiers) modifiers).flags, flag);
+    }
+
+    private boolean hasFlag(long flags, long flag) {
+        return (flags & flag) != 0L;
     }
 
     @SuppressWarnings("unused")

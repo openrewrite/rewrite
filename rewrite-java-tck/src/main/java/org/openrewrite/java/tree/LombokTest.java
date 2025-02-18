@@ -19,8 +19,11 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.MinimumJava11;
+import org.openrewrite.java.MinimumJava17;
 import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -37,6 +40,7 @@ class LombokTest implements RewriteTest {
 
     @BeforeAll
     static void setUp() {
+        // Only needed for Java 8, until enabled by default there
         System.setProperty("rewrite.lombok", "true");
     }
 
@@ -69,6 +73,29 @@ class LombokTest implements RewriteTest {
                     out.write(b, 0, r);
                   }
                 }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void setterWithAdditionalAnnotations() {
+        rewriteRun(
+          // I was unable to reproduce this problem only using built-in annotations like `@SuppressWarnings` or `@Deprecated`
+          // This is a parsing test, so we don't really need to check for type attribution
+          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).classDeclarations(false).build()),
+          java(
+            """
+              import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
+              import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
+              import lombok.Setter;
+              
+              class Profiles {
+                  @Setter
+                  @JacksonXmlProperty(localName = "profile")
+                  @JacksonXmlElementWrapper(useWrapping = false)
+                  String profile;
               }
               """
           )
@@ -373,7 +400,57 @@ class LombokTest implements RewriteTest {
     }
 
     @Test
+    void gett() {
+        rewriteRun(
+          java(
+            """
+              import lombok.Getter;
+              
+              public class WithExample {
+                @Getter int age;
+              
+                public WithExample(int age) {
+                  this.age = age;
+                }
+              
+                void test() {
+                    int x = getAge();
+                }
+              }
+              """
+          )
+        );
+    }
+
+    //TODO fix for Java 8 and 11
+    @Test
+    @MinimumJava17
     void with() {
+        rewriteRun(
+          java(
+            """
+              import lombok.With;
+              
+              public class WithExample {
+                @With int age;
+              
+                public WithExample(int age) {
+                  this.age = age;
+                }
+              
+                void test() {
+                    WithExample x = withAge("name", 23);
+                }
+              }
+              """
+          )
+        );
+    }
+
+    //TODO fix for Java 8 and 11
+    @Test
+    @MinimumJava17
+    void withWithParams() {
         rewriteRun(
           java(
             """
@@ -388,6 +465,42 @@ class LombokTest implements RewriteTest {
                 public WithExample(@NonNull String name, int age) {
                   this.name = name;
                   this.age = age;
+                }
+              
+                static void test() {
+                    WithExample x = new WithExample("old name", 22);
+                    x.withName("name", 23);
+                }
+              }
+              """
+          )
+        );
+    }
+
+    //TODO fix for Java 8 and 11
+    @Test
+    @MinimumJava17
+    void withOnClass() {
+        rewriteRun(
+          java(
+            """
+              import lombok.AccessLevel;
+              import lombok.NonNull;
+              import lombok.With;
+              
+              @With
+              public class WithExample {
+                private final String name;
+                private final int age;
+              
+                public WithExample(String name, int age) {
+                  this.name = name;
+                  this.age = age;
+                }
+              
+                void test() {
+                    WithExample x = new WithExample("old name", 22);
+                    x.withName("name", 23);
                 }
               }
               """
@@ -821,6 +934,38 @@ class LombokTest implements RewriteTest {
                   }
               }
               """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "AllArgsConstructor",
+      "Builder",
+      "Data",
+      "EqualsAndHashCode",
+      "NoArgsConstructor",
+      "RequiredArgsConstructor",
+      "ToString",
+      "Value",
+      "With"
+    })
+    @MinimumJava11
+    void npeSeenOnMultipleAnnotations(String annotation) {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath())),
+          java(
+            //language=java
+            String.format("""
+              import lombok.%s;
+              import org.jspecify.annotations.Nullable;
+              
+              @%1$s
+              public class Foo {
+                  @Nullable
+                  String bar;
+              }
+              """, annotation)
           )
         );
     }

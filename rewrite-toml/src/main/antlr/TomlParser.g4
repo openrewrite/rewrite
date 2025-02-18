@@ -109,8 +109,7 @@ dateTime
     ;
 
 commentOrNl
-    : COMMENT NL
-    | NL
+    : COMMENT? NL
     ;
 
 array
@@ -124,7 +123,7 @@ table
     ;
 
 standardTable
-    : L_BRACKET key R_BRACKET (commentOrNl* expression)*
+    : L_BRACKET key R_BRACKET (commentOrNl* keyValue)*
     ;
 
 inlineTable
@@ -133,5 +132,5 @@ inlineTable
     ;
 
 arrayTable
-    : DOUBLE_L_BRACKET key DOUBLE_R_BRACKET (commentOrNl* expression)*
+    : DOUBLE_L_BRACKET key DOUBLE_R_BRACKET (commentOrNl* keyValue)*
     ;

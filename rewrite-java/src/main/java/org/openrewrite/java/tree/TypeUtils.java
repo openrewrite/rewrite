@@ -125,6 +125,8 @@ public class TypeUtils {
                 } else if (type1 instanceof JavaType.Parameterized && type2 instanceof JavaType.Parameterized) {
                     JavaTypeSignatureBuilder signatureBuilder = new DefaultJavaTypeSignatureBuilder();
                     return signatureBuilder.signature(type1).equals(signatureBuilder.signature(type2));
+                } else if (type1 instanceof JavaType.Annotation && type2 instanceof JavaType.Annotation) {
+                    return isOfType((JavaType.Annotation) type1, (JavaType.Annotation) type2);
                 }
             }
         }
@@ -139,11 +141,9 @@ public class TypeUtils {
             JavaType.Method method1 = (JavaType.Method) type1;
             JavaType.Method method2 = (JavaType.Method) type2;
             if (!method1.getName().equals(method2.getName()) ||
-                method1.getFlags().size() != method2.getFlags().size() ||
-                !method1.getFlags().containsAll(method2.getFlags()) ||
+                method1.getFlagsBitMap() != method2.getFlagsBitMap() ||
                 !TypeUtils.isOfType(method1.getDeclaringType(), method2.getDeclaringType()) ||
                 !TypeUtils.isOfType(method1.getReturnType(), method2.getReturnType()) ||
-                method1.getAnnotations().size() != method2.getAnnotations().size() ||
                 method1.getThrownExceptions().size() != method2.getThrownExceptions().size() ||
                 method1.getParameterTypes().size() != method2.getParameterTypes().size()) {
                 return false;
@@ -159,14 +159,74 @@ public class TypeUtils {
                     return false;
                 }
             }
-            for (int index = 0; index < method1.getAnnotations().size(); index++) {
-                if (!TypeUtils.isOfType(method1.getAnnotations().get(index), method2.getAnnotations().get(index))) {
-                    return false;
-                }
-            }
             return true;
         }
         return type1.equals(type2);
+    }
+
+    private static boolean isOfType(JavaType.Annotation annotation1, JavaType.Annotation annotation2) {
+        if (!isOfType(annotation1.getType(), annotation2.getType())) {
+            return false;
+        }
+        List<JavaType.Annotation.ElementValue> values1 = annotation1.getValues();
+        List<JavaType.Annotation.ElementValue> values2 = annotation2.getValues();
+        if (values1.size() != values2.size()) {
+            return false;
+        }
+        for (int i = 0; i < values1.size(); i++) {
+            if (!isOfType(values1.get(i), values2.get(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isOfType(JavaType.Annotation.ElementValue value1, JavaType.Annotation.ElementValue value2) {
+        if (!isOfType(value1.getElement(), value2.getElement())) {
+            return false;
+        }
+        if (value1 instanceof JavaType.Annotation.SingleElementValue) {
+            JavaType.Annotation.SingleElementValue singleValue1 = (JavaType.Annotation.SingleElementValue) value1;
+            if (value2 instanceof JavaType.Annotation.SingleElementValue) {
+                JavaType.Annotation.SingleElementValue singleValue2 = (JavaType.Annotation.SingleElementValue) value2;
+                return isOfType(singleValue1.getReferenceValue(), singleValue2.getReferenceValue()) &&
+                       Objects.equals(singleValue1.getConstantValue(), singleValue2.getConstantValue());
+            } else {
+                JavaType.Annotation.ArrayElementValue arrayValue2 = (JavaType.Annotation.ArrayElementValue) value2;
+                return arrayValue2.getReferenceValues() != null && arrayValue2.getReferenceValues().length == 1 && isOfType(singleValue1.getReferenceValue(), arrayValue2.getReferenceValues()[0]) ||
+                       arrayValue2.getConstantValues() != null && arrayValue2.getConstantValues().length == 1 && Objects.equals(singleValue1.getConstantValue(), arrayValue2.getConstantValues()[0]);
+            }
+        } else if (value2 instanceof JavaType.Annotation.ArrayElementValue) {
+            JavaType.Annotation.ArrayElementValue arrayValue1 = (JavaType.Annotation.ArrayElementValue) value1;
+            JavaType.Annotation.ArrayElementValue arrayValue2 = (JavaType.Annotation.ArrayElementValue) value2;
+            if (arrayValue1.getConstantValues() != null) {
+                Object[] constantValues1 = arrayValue1.getConstantValues();
+                if (arrayValue2.getConstantValues() == null || arrayValue2.getConstantValues().length != constantValues1.length) {
+                    return false;
+                }
+                for (int i = 0; i < constantValues1.length; i++) {
+                    if (!Objects.equals(constantValues1[i], arrayValue2.getConstantValues()[i])) {
+                        return false;
+                    }
+                }
+                return true;
+            } else if (arrayValue1.getReferenceValues() != null) {
+                JavaType[] referenceValues1 = arrayValue1.getReferenceValues();
+                if (arrayValue2.getReferenceValues() == null || arrayValue2.getReferenceValues().length != referenceValues1.length) {
+                    return false;
+                }
+                for (int i = 0; i < referenceValues1.length; i++) {
+                    if (!isOfType(referenceValues1[i], arrayValue2.getReferenceValues()[i])) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+        } else {
+            // value1 is an `ArrayElementValue` and value2 is a `SingleElementValue`
+            return isOfType(value2, value1);
+        }
+        return false;
     }
 
     /**

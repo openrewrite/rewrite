@@ -101,5 +101,7 @@ public class MavenMetadata {
         String extension;
         String value;
         String updated;
+        @Nullable
+        String classifier;
     }
 }

@@ -57,4 +57,9 @@ public class YamlIsoVisitor<P> extends YamlVisitor<P> {
     public Yaml.Sequence.Entry visitSequenceEntry(Yaml.Sequence.Entry entry, P p) {
         return (Yaml.Sequence.Entry) super.visitSequenceEntry(entry, p);
     }
+
+    @Override
+    public Yaml.Tag visitTag(Yaml.Tag tag, P p) {
+        return (Yaml.Tag) super.visitTag(tag, p);
+    }
 }

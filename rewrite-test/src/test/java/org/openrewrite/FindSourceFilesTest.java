@@ -195,4 +195,13 @@ class FindSourceFilesTest implements RewriteTest {
           text("this", "~~>this", spec -> spec.path("this.txt"))
         );
     }
+
+    @Test
+    void folderNegation() {
+        rewriteRun(
+          spec -> spec.recipe(new FindSourceFiles("!(not-this/**)")),
+          text("not-this", spec -> spec.path("not-this/not-this.txt")),
+          text("this", "~~>this", spec -> spec.path("this/this.txt"))
+        );
+    }
 }
