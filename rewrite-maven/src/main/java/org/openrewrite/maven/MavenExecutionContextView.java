@@ -337,8 +337,8 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         return getMessage(MAVEN_PROJECT_POMS_BY_GAV, emptyMap());
     }
 
-    public void setProjectPoms(Map<Path, Pom> projectPoms){
-        putMessage(MAVEN_PROJECT_POMS_BY_SOURCE_PATH, projectPomsByGav(projectPoms));
+    public void setProjectPoms(Map<Path, Pom> projectPoms) {
+        putMessage(MAVEN_PROJECT_POMS_BY_SOURCE_PATH, projectPoms);
         putMessage(MAVEN_PROJECT_POMS_BY_GAV, projectPomsByGav(getProjectPomsBySourcePath()));
     }
 
