@@ -16,6 +16,8 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
@@ -634,6 +636,41 @@ class JavaTemplateMatchTest implements RewriteTest {
               }
               """
           )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "java.util.Collections.emptyList()",
+      "java.util.Collections.<Object>emptyList()"
+    })
+    void matchMethodWithGenericType(String templateString) {
+        rewriteRun(
+          spec -> spec
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+                private final JavaTemplate template = JavaTemplate.builder(templateString).build();
+
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    boolean found = template.matches(getCursor());
+                    return found ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
+                }
+          })),
+          java(
+            """
+              import java.util.Collections;
+              import java.util.List;
+              class Test {
+                  static List<Object> EMPTY_LIST = Collections.emptyList();
+              }
+            """,
+            """
+              import java.util.Collections;
+              import java.util.List;
+              class Test {
+                  static List<Object> EMPTY_LIST = /*~~>*/Collections.emptyList();
+              }
+              """)
         );
     }
 }

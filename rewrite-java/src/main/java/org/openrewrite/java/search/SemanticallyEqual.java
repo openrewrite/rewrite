@@ -976,8 +976,7 @@ public class SemanticallyEqual {
                       !nullMissMatch(method.getSelect(), compareTo.getSelect())) ||
                     method.getMethodType() == null ||
                     compareTo.getMethodType() == null ||
-                    !TypeUtils.isAssignableTo(method.getMethodType().getReturnType(), compareTo.getMethodType().getReturnType()) ||
-                    nullListSizeMissMatch(method.getTypeParameters(), compareTo.getTypeParameters())) {
+                    !TypeUtils.isAssignableTo(method.getMethodType().getReturnType(), compareTo.getMethodType().getReturnType())) {
                     isEqual.set(false);
                     return method;
                 }
@@ -1019,7 +1018,6 @@ public class SemanticallyEqual {
                 if (compareMethodArguments || containsLiteral) {
                     this.visitList(method.getArguments(), compareTo.getArguments());
                 }
-                this.visitList(method.getTypeParameters(), compareTo.getTypeParameters());
             }
             return method;
         }
