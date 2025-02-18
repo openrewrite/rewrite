@@ -16,12 +16,27 @@
 package org.openrewrite.java.tree;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import lombok.*;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+import lombok.ToString;
+import lombok.Value;
+import lombok.With;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.*;
+import org.openrewrite.Checksum;
+import org.openrewrite.Cursor;
+import org.openrewrite.FileAttributes;
+import org.openrewrite.Incubating;
+import org.openrewrite.PrintOutputCapture;
+import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.LoathingOfOthers;
 import org.openrewrite.internal.SelfLoathing;
@@ -40,7 +55,14 @@ import java.lang.ref.WeakReference;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
@@ -2678,6 +2700,7 @@ public interface J extends Tree {
 
         @With
         @Getter
+        @EqualsAndHashCode.Include
         FieldAccess qualid;
 
         @Nullable

@@ -24,9 +24,10 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.tree.J;
 
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * This recipe will remove any imports for types that are not referenced within the compilation unit. This recipe
@@ -58,12 +59,21 @@ public class RemoveRedundantImports extends Recipe {
         return Preconditions.check(new NoMissingTypes(), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-                Set<J.Import> uniqueImports = new LinkedHashSet<>(cu.getImports());
-                final ArrayList<J.Import> imports = new ArrayList<>(uniqueImports);
-                return uniqueImports.size() == cu.getImports().size()
-                        ? cu
-                        : cu.withImports(imports);
+                Set<String> seenImports = new HashSet<>();
+                List<J.Import> uniqueImports = cu.getImports().stream()
+                        .filter(anImport -> seenImports.add(anImport.getTypeName())).collect(Collectors.toList());
+                return uniqueImports.size() == cu.getImports().size() ? cu : cu.withImports(uniqueImports);
             }
+
+//            @Override
+//            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+//                final List<J.Import> imports1 = cu.getImports();
+//                Set<J.Import> uniqueImports = new HashSet<>(imports1);
+//                final ArrayList<J.Import> imports = new ArrayList<>(uniqueImports);
+//                return uniqueImports.size() == imports1.size()
+//                        ? cu
+//                        : cu.withImports(imports);
+//            }
         });
     }
 
