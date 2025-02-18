@@ -59,19 +59,23 @@ public class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
                 q.receiveList(array.getPadding().getValues(), j -> visitRightPadded(j, q)));
     }
 
+    @Override
     public Json visitEmpty(Json.Empty empty, RpcReceiveQueue q) {
         return empty;
     }
 
+    @Override
     public Json visitIdentifier(Json.Identifier identifier, RpcReceiveQueue q) {
         return identifier.withName(q.receive(identifier.getName()));
     }
 
+    @Override
     public Json visitLiteral(Json.Literal literal, RpcReceiveQueue q) {
         return literal.withSource(q.receive(literal.getSource()))
                 .withValue(q.receive(literal.getValue()));
     }
 
+    @Override
     public Json visitMember(Json.Member member, RpcReceiveQueue q) {
         return member
                 .getPadding().withKey(q.receive(member.getPadding().getKey(),
