@@ -86,10 +86,10 @@ public class RemoveUnusedImports extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new NoMissingTypes(), new RemoveUnusedImportsJavaIsoVisitor());
+        return Preconditions.check(new NoMissingTypes(), new RemoveUnusedImportsVisitor());
     }
 
-    private static class RemoveUnusedImportsJavaIsoVisitor extends JavaIsoVisitor<ExecutionContext> {
+    private static class RemoveUnusedImportsVisitor extends JavaIsoVisitor<ExecutionContext> {
 
         @Override
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
