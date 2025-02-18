@@ -160,7 +160,6 @@ public class RecipeIntrospectionUtils {
             field.setAccessible(true);
             Column column = field.getAnnotation(Column.class);
             if (column != null) {
-                Object fieldValue;
                 columns.add(new ColumnDescriptor(field.getName(),
                         field.getType().getSimpleName(),
                         column.displayName(),

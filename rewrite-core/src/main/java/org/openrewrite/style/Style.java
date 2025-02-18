@@ -22,7 +22,6 @@ import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
 
-import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**

@@ -25,6 +25,7 @@ import org.openrewrite.Incubating;
 import org.openrewrite.java.JavaParserExecutionContextView;
 
 import java.io.*;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -85,15 +86,29 @@ public class TypeTable implements JavaParserClasspathLoader {
     private static final Map<GroupArtifactVersion, Path> classesDirByArtifact = new LinkedHashMap<>();
 
     public static @Nullable TypeTable fromClasspath(ExecutionContext ctx, Collection<String> artifactNames) {
-        try (InputStream is = findCaller().getClassLoader().getResourceAsStream(DEFAULT_RESOURCE_PATH)) {
-            return is == null ? null : new TypeTable(ctx, is, artifactNames);
+        try {
+            Enumeration<URL> resources = findCaller().getClassLoader().getResources(DEFAULT_RESOURCE_PATH);
+            if (resources.hasMoreElements()) {
+                return new TypeTable(ctx, resources, artifactNames);
+            }
+            return null;
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
-    public TypeTable(ExecutionContext ctx, InputStream is, Collection<String> artifactNames) {
-        try (InputStream inflate = new InflaterInputStream(is)) {
+    TypeTable(ExecutionContext ctx, URL url, Collection<String> artifactNames) {
+        read(url, artifactNames, ctx);
+    }
+
+    TypeTable(ExecutionContext ctx, Enumeration<URL> resources, Collection<String> artifactNames) {
+        while (resources.hasMoreElements()) {
+            read(resources.nextElement(), artifactNames, ctx);
+        }
+    }
+
+    private static void read(URL url, Collection<String> artifactNames, ExecutionContext ctx) {
+        try (InputStream is = url.openStream(); InputStream inflate = new InflaterInputStream(is)) {
             new Reader(ctx).read(inflate, artifactsNotYetWritten(artifactNames));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -146,23 +161,25 @@ public class TypeTable implements JavaParserClasspathLoader {
                     }
 
                     if (gav != null) {
-                        Member member = new Member(
-                                new ClassDefinition(
-                                        Integer.parseInt(fields[3]),
-                                        fields[4],
-                                        fields[5].isEmpty() ? null : fields[5],
-                                        fields[6].isEmpty() ? null : fields[6],
-                                        fields[7].isEmpty() ? null : fields[7].split("\\|")
-                                ),
-                                Integer.parseInt(fields[8]),
-                                fields[9],
-                                fields[10],
-                                fields[11].isEmpty() ? null : fields[11],
-                                fields[12].isEmpty() ? null : fields[12].split("\\|")
+                        ClassDefinition classDefinition = new ClassDefinition(
+                                Integer.parseInt(fields[3]),
+                                fields[4],
+                                fields[5].isEmpty() ? null : fields[5],
+                                fields[6].isEmpty() ? null : fields[6],
+                                fields[7].isEmpty() ? null : fields[7].split("\\|")
                         );
-                        membersByClassName
-                                .computeIfAbsent(member.getClassDefinition(), cd -> new ArrayList<>())
-                                .add(member);
+                        List<Member> classMembers = membersByClassName.computeIfAbsent(classDefinition, cd -> new ArrayList<>());
+                        int memberAccess = Integer.parseInt(fields[8]);
+                        if (memberAccess != -1) {
+                            classMembers.add(new Member(
+                                    classDefinition,
+                                    memberAccess,
+                                    fields[9],
+                                    fields[10],
+                                    fields[11].isEmpty() ? null : fields[11],
+                                    fields[12].isEmpty() ? null : fields[12].split("\\|")
+                            ));
+                        }
                     }
                 });
             }
@@ -321,23 +338,31 @@ public class TypeTable implements JavaParserClasspathLoader {
                                 new ClassReader(inputStream).accept(new ClassVisitor(Opcodes.ASM9) {
                                     @Nullable
                                     ClassDefinition classDefinition;
+                                    boolean wroteFieldOrMethod;
 
                                     @Override
                                     public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
-                                        classDefinition = classDefinition(access, name, signature, superName, interfaces);
+                                        classDefinition = new ClassDefinition(Jar.this, access, name, signature, superName, interfaces);
+                                        wroteFieldOrMethod = false;
                                         super.visit(version, access, name, signature, superName, interfaces);
+                                        if (!wroteFieldOrMethod && !"module-info".equals(name)) {
+                                            // No fields or methods, which can happen for marker annotations for example
+                                            classDefinition.writeClass();
+                                        }
                                     }
 
                                     @Override
                                     public FieldVisitor visitField(int access, String name, String descriptor, String signature, Object value) {
-                                        requireNonNull(classDefinition).writeField(access, name, descriptor, signature);
+                                        wroteFieldOrMethod |= requireNonNull(classDefinition)
+                                                .writeField(access, name, descriptor, signature);
                                         return super.visitField(access, name, descriptor, signature, value);
                                     }
 
                                     @Override
                                     public MethodVisitor visitMethod(int access, String name, String descriptor,
                                                                      String signature, String[] exceptions) {
-                                        requireNonNull(classDefinition).writeMethod(access, name, descriptor, signature, null, exceptions);
+                                        wroteFieldOrMethod |= requireNonNull(classDefinition)
+                                                .writeMethod(access, name, descriptor, signature, null, exceptions);
                                         return super.visitMethod(access, name, descriptor, signature, exceptions);
                                     }
                                 }, SKIP_CODE);
@@ -347,11 +372,6 @@ public class TypeTable implements JavaParserClasspathLoader {
                 } catch (IOException e) {
                     throw new UncheckedIOException(e);
                 }
-            }
-
-            public ClassDefinition classDefinition(int access, String name, @Nullable String signature,
-                                                   String superclassName, String @Nullable [] superinterfaceSignatures) {
-                return new ClassDefinition(this, access, name, signature, superclassName, superinterfaceSignatures);
             }
         }
 
@@ -367,10 +387,23 @@ public class TypeTable implements JavaParserClasspathLoader {
             String classSuperclassName;
             String @Nullable [] classSuperinterfaceSignatures;
 
-            public void writeMethod(int access, String name, String descriptor,
-                                    @Nullable String signature,
-                                    String @Nullable [] parameterNames,
-                                    String @Nullable [] exceptions) {
+            public void writeClass() {
+                if (((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & classAccess) == 0) {
+                    out.printf(
+                            "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s%n",
+                            jar.groupId, jar.artifactId, jar.version,
+                            classAccess, className,
+                            classSignature == null ? "" : classSignature,
+                            classSuperclassName,
+                            classSuperinterfaceSignatures == null ? "" : String.join("|", classSuperinterfaceSignatures),
+                            -1, null, null, null, null, null);
+                }
+            }
+
+            public boolean writeMethod(int access, String name, String descriptor,
+                                       @Nullable String signature,
+                                       String @Nullable [] parameterNames,
+                                       String @Nullable [] exceptions) {
                 if (((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & access) == 0) {
                     out.printf(
                             "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s%n",
@@ -384,15 +417,14 @@ public class TypeTable implements JavaParserClasspathLoader {
                             parameterNames == null ? "" : String.join("|", parameterNames),
                             exceptions == null ? "" : String.join("|", exceptions)
                     );
+                    return true;
                 }
+                return false;
             }
 
-            public void writeField(int access, String name, String descriptor,
-                                   @Nullable String signature) {
-                if (((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & access) == 0) {
-                    // Fits into the same table structure
-                    writeMethod(access, name, descriptor, signature, null, null);
-                }
+            public boolean writeField(int access, String name, String descriptor, @Nullable String signature) {
+                // Fits into the same table structure
+                return writeMethod(access, name, descriptor, signature, null, null);
             }
         }
     }

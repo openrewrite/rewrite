@@ -112,7 +112,7 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
                 entries.set(lastEntryIndex, existingEntry.withTrailingCommaPrefix(""));
             }
         }
-        Yaml.Scalar newItem = new Yaml.Scalar(randomId(), itemPrefix, Markers.EMPTY, style, null, value);
+        Yaml.Scalar newItem = new Yaml.Scalar(randomId(), itemPrefix, Markers.EMPTY, style, null, null, value);
         Yaml.Sequence.Entry newEntry = new Yaml.Sequence.Entry(randomId(), entryPrefix, Markers.EMPTY, newItem, hasDash, entryTrailingCommaPrefix);
         entries.add(newEntry);
         return newSequence.withMarkers(Markers.EMPTY.addIfAbsent(new AlreadyReplaced(randomId(), value, value)));
