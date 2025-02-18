@@ -35,6 +35,8 @@ class RemoveRedundantImportsTest implements RewriteTest {
             """
               import java.util.*;
               import java.util.*;
+              import java.util.Objects;
+              import java.util.Objects;
               
               class A {
                   Collection<Integer> c;
@@ -42,6 +44,7 @@ class RemoveRedundantImportsTest implements RewriteTest {
               """,
             """
               import java.util.*;
+              import java.util.Objects;
               
               class A {
                   Collection<Integer> c;
@@ -57,6 +60,8 @@ class RemoveRedundantImportsTest implements RewriteTest {
             """
               import java.util.Collection;
               import java.util.Collection;
+              import java.util.Objects;
+              import java.util.Objects;
               
               class A {
                   Collection<Integer> c;
@@ -64,6 +69,7 @@ class RemoveRedundantImportsTest implements RewriteTest {
               """,
             """
               import java.util.Collection;
+              import java.util.Objects;
               
               class A {
                   Collection<Integer> c;
