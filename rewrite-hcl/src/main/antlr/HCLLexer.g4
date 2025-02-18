@@ -20,6 +20,13 @@ FOR_BRACK             : '[' (WS|NEWLINE|COMMENT|LINE_COMMENT)* 'for' WS;
 IF              : 'if';
 IN              : 'in';
 
+BooleanLiteral
+    : 'true'
+    | 'false'
+    ;
+
+NULL                            : 'null';
+
 LBRACE                          : '{'
 {
     leftCurlyStack.push(CurlyType.OBJECT);
@@ -90,13 +97,7 @@ fragment ExponentPart
     : [eE] [+\-]? [0-9]+
     ;
 
-BooleanLiteral
-    : 'true'
-    | 'false'
-    ;
-
 QUOTE                               : '"'       -> pushMode(TEMPLATE);
-NULL                                : 'null';
 
 // Lexical Elements - Operators and Delimiters
 // https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md#operators-and-delimiters

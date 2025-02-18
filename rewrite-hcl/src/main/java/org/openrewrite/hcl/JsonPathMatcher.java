@@ -388,6 +388,8 @@ public class JsonPathMatcher {
             String s = null;
             if (ctx.StringLiteral() != null) {
                 s = ctx.StringLiteral().getText();
+            } else if (ctx.TRUE() != null || ctx.FALSE() != null) {
+                return Boolean.valueOf(ctx.getText());
             } else if (!ctx.children.isEmpty()) {
                 s = ctx.children.get(0).getText();
             }
