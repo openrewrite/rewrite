@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jetbrains.annotations.NotNull;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
@@ -83,65 +84,14 @@ public class RemoveUnusedImports extends Recipe {
         return Duration.ofMinutes(5);
     }
 
-    private static class ImportUsage {
-        final List<JRightPadded<J.Import>> imports = new ArrayList<>();
-        boolean used = true;
-    }
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new NoMissingTypes(), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-                ImportLayoutStyle layoutStyle = Optional.ofNullable(Style.from(ImportLayoutStyle.class, cu))
-                        .orElse(IntelliJ.importLayout());
-                String sourcePackage = cu.getPackageDeclaration() == null ? "" :
-                        cu.getPackageDeclaration().getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");
-                Map<String, TreeSet<String>> methodsAndFieldsByTypeName = new HashMap<>();
-                Map<String, Set<JavaType.FullyQualified>> typesByPackage = new HashMap<>();
-
-                for (JavaType.Method method : cu.getTypesInUse().getUsedMethods()) {
-                    if (method.hasFlags(Flag.Static)) {
-                        methodsAndFieldsByTypeName.computeIfAbsent(method.getDeclaringType().getFullyQualifiedName(),
-                                        t -> new TreeSet<>())
-                                .add(method.getName());
-                    }
-                }
-
-                for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
-                    JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getOwner());
-                    if (fq != null) {
-                        methodsAndFieldsByTypeName.computeIfAbsent(fq.getFullyQualifiedName(), f -> new TreeSet<>())
-                                .add(variable.getName());
-                    }
-                }
-
-                for (JavaType javaType : cu.getTypesInUse().getTypesInUse()) {
-                    if (javaType instanceof JavaType.Parameterized) {
-                        JavaType.Parameterized parameterized = (JavaType.Parameterized) javaType;
-                        typesByPackage.computeIfAbsent(parameterized.getType().getPackageName(), f -> new HashSet<>())
-                                .add(parameterized.getType());
-                        for (JavaType typeParameter : parameterized.getTypeParameters()) {
-                            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(typeParameter);
-                            if (fq != null) {
-                                typesByPackage.computeIfAbsent(
-                                        fq.getOwningClass() == null ?
-                                                fq.getPackageName() :
-                                                toFullyQualifiedName(fq.getOwningClass().getFullyQualifiedName()),
-                                        f -> new HashSet<>()).add(fq);
-                            }
-                        }
-                    } else if (javaType instanceof JavaType.FullyQualified) {
-                        JavaType.FullyQualified fq = (JavaType.FullyQualified) javaType;
-                        typesByPackage.computeIfAbsent(
-                                fq.getOwningClass() == null ?
-                                        fq.getPackageName() :
-                                        toFullyQualifiedName(fq.getOwningClass().getFullyQualifiedName()),
-                                f -> new HashSet<>()).add(fq);
-                    }
-                }
-
+                Map<String, TreeSet<String>> methodsAndFieldsByTypeName = methodsAndFieldsByTypeName(cu);
+                Map<String, Set<JavaType.FullyQualified>> typesByPackage = typesByPackage(cu);
                 boolean changed = false;
-
                 // the key is a list because a star import may get replaced with multiple unfolded imports
                 List<ImportUsage> importUsage = new ArrayList<>(cu.getPadding().getImports().size());
                 for (JRightPadded<J.Import> anImport : cu.getPadding().getImports()) {
@@ -150,11 +100,12 @@ public class RemoveUnusedImports extends Recipe {
                     singleUsage.imports.add(anImport);
                     importUsage.add(singleUsage);
                 }
-
                 // whenever an import statement is found to be used and not already in use it should be marked true
                 Set<String> checkedImports = new HashSet<>();
                 Set<String> usedWildcardImports = new HashSet<>();
                 Set<String> usedStaticWildcardImports = new HashSet<>();
+                ImportLayoutStyle layoutStyle =
+                        Optional.ofNullable(Style.from(ImportLayoutStyle.class, cu)).orElse(IntelliJ.importLayout());
                 for (ImportUsage anImport : importUsage) {
                     J.Import elem = anImport.imports.get(0).getElement();
                     J.FieldAccess qualid = elem.getQualid();
@@ -240,6 +191,10 @@ public class RemoveUnusedImports extends Recipe {
                                         typesByFullyQualifiedClassPath.stream())
                                 .collect(Collectors.toSet());
                         JavaType.FullyQualified qualidType = TypeUtils.asFullyQualified(elem.getQualid().getType());
+                        String sourcePackage = cu.getPackageDeclaration() == null
+                                ? ""
+                                : cu.getPackageDeclaration().getExpression().printTrimmed(getCursor())
+                                .replaceAll("\\s", "");
                         if (combinedTypes.isEmpty() || sourcePackage.equals(elem.getPackageName()) && qualidType != null && !qualidType.getFullyQualifiedName().contains("$")) {
                             anImport.used = false;
                             changed = true;
@@ -329,6 +284,55 @@ public class RemoveUnusedImports extends Recipe {
                 return cu;
             }
         });
+    }
+
+    private static @NotNull Map<String, Set<JavaType.FullyQualified>> typesByPackage(final J.CompilationUnit cu) {
+        Map<String, Set<JavaType.FullyQualified>> typesByPackage = new HashMap<>();
+        for (JavaType javaType : cu.getTypesInUse().getTypesInUse()) {
+            if (javaType instanceof JavaType.Parameterized) {
+                JavaType.Parameterized parameterized = (JavaType.Parameterized) javaType;
+                typesByPackage.computeIfAbsent(parameterized.getType().getPackageName(), f -> new HashSet<>())
+                        .add(parameterized.getType());
+                for (JavaType typeParameter : parameterized.getTypeParameters()) {
+                    JavaType.FullyQualified fq = TypeUtils.asFullyQualified(typeParameter);
+                    if (fq != null) {
+                        typesByPackage.computeIfAbsent(
+                                fq.getOwningClass() == null ?
+                                        fq.getPackageName() :
+                                        toFullyQualifiedName(fq.getOwningClass().getFullyQualifiedName()),
+                                f -> new HashSet<>()).add(fq);
+                    }
+                }
+            } else if (javaType instanceof JavaType.FullyQualified) {
+                JavaType.FullyQualified fq = (JavaType.FullyQualified) javaType;
+                typesByPackage.computeIfAbsent(
+                        fq.getOwningClass() == null ?
+                                fq.getPackageName() :
+                                toFullyQualifiedName(fq.getOwningClass().getFullyQualifiedName()),
+                        f -> new HashSet<>()).add(fq);
+            }
+        }
+        return typesByPackage;
+    }
+
+    private static @NotNull Map<String, TreeSet<String>> methodsAndFieldsByTypeName(final J.CompilationUnit cu) {
+        Map<String, TreeSet<String>> methodsAndFieldsByTypeName = new HashMap<>();
+        for (JavaType.Method method : cu.getTypesInUse().getUsedMethods()) {
+            if (method.hasFlags(Flag.Static)) {
+                methodsAndFieldsByTypeName.computeIfAbsent(method.getDeclaringType().getFullyQualifiedName(),
+                                t -> new TreeSet<>())
+                        .add(method.getName());
+            }
+        }
+
+        for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
+            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getOwner());
+            if (fq != null) {
+                methodsAndFieldsByTypeName.computeIfAbsent(fq.getFullyQualifiedName(), f -> new TreeSet<>())
+                        .add(variable.getName());
+            }
+        }
+        return methodsAndFieldsByTypeName;
     }
 
     private static Set<String> getAmbiguousStaticImportNames(J.CompilationUnit cu) {
@@ -469,5 +473,10 @@ public class RemoveUnusedImports extends Recipe {
 
     private static boolean conflictsWithJavaLang(J.Import elem) {
         return JAVA_LANG_CLASS_NAMES.contains(elem.getClassName());
+    }
+
+    private static class ImportUsage {
+        final List<JRightPadded<J.Import>> imports = new ArrayList<>();
+        boolean used = true;
     }
 }
