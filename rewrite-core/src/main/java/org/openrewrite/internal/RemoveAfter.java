@@ -15,14 +15,16 @@
  */
 package org.openrewrite.internal;
 
+import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
  * An annotation that indicates that the element should be removed after a certain point.
  * Intended to be used with a matching recipe to clear out elements on a schedule.
  */
-@Retention(RetentionPolicy.RUNTIME)
+@Retention(RetentionPolicy.SOURCE)
 public @interface RemoveAfter {
     /**
      * Expects a date without a time-zone in the ISO-8601 calendar system, such as 2007-12-03.
