@@ -30,20 +30,20 @@ import java.util.function.UnaryOperator;
 import static java.util.Objects.requireNonNull;
 
 public class RpcReceiveQueue {
-    private final List<TreeDatum> batch;
+    private final List<RpcObjectData> batch;
     private final Map<Integer, Object> refs;
-    private final Supplier<TreeData> pull;
+    private final Supplier<List<RpcObjectData>> pull;
 
-    public RpcReceiveQueue(Map<Integer, Object> refs, Supplier<TreeData> pull) {
+    public RpcReceiveQueue(Map<Integer, Object> refs, Supplier<List<RpcObjectData>> pull) {
         this.refs = refs;
         this.batch = new ArrayList<>();
         this.pull = pull;
     }
 
-    public TreeDatum take() {
+    public RpcObjectData take() {
         if (batch.isEmpty()) {
-            TreeData data = pull.get();
-            batch.addAll(data.getData());
+            List<RpcObjectData> data = pull.get();
+            batch.addAll(data);
         }
         return batch.remove(0);
     }
@@ -94,7 +94,7 @@ public class RpcReceiveQueue {
      */
     @SuppressWarnings("DataFlowIssue")
     public <T> T receive(@Nullable T before, @Nullable UnaryOperator<T> onChange) {
-        TreeDatum message = take();
+        RpcObjectData message = take();
         Integer ref = null;
         switch (message.getState()) {
             case NO_CHANGE:
@@ -130,7 +130,7 @@ public class RpcReceiveQueue {
     }
 
     public <T> List<T> receiveList(@Nullable List<T> before, @Nullable UnaryOperator<T> onChange) {
-        TreeDatum msg = take();
+        RpcObjectData msg = take();
         switch (msg.getState()) {
             case NO_CHANGE:
                 //noinspection DataFlowIssue
@@ -143,7 +143,7 @@ public class RpcReceiveQueue {
                 // Intentional fall-through...
             case CHANGE:
                 msg = take(); // the next message should be a CHANGE with a list of positions
-                assert msg.getState() == TreeDatum.State.CHANGE;
+                assert msg.getState() == RpcObjectData.State.CHANGE;
                 List<Integer> positions = msg.getValue();
                 List<T> after = new ArrayList<>(positions.size());
                 for (int beforeIdx : positions) {

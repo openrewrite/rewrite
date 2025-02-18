@@ -32,7 +32,7 @@ import java.util.Map;
  * A single piece of data in a tree, which can be a marker, leaf value, tree element, etc.
  */
 @Value
-public class TreeDatum {
+public class RpcObjectData {
     private static final ObjectMapper mapper = JsonMapper.builder()
             // to be able to construct classes that have @Data and a single field
             // see https://cowtowncoder.medium.com/jackson-2-12-most-wanted-3-5-246624e2d3d0
@@ -48,7 +48,7 @@ public class TreeDatum {
 
     /**
      * Used to construct a new instance of the class with
-     * initially only the ID populated. Subsequent {@link TreeDatum}
+     * initially only the ID populated. Subsequent {@link RpcObjectData}
      * messages will fill in the object fully.
      */
     @Nullable
@@ -73,7 +73,7 @@ public class TreeDatum {
     @Nullable
     Integer ref;
 
-    public TreeDatum(State state, @Nullable String valueType, @Nullable Object value, @Nullable Integer ref) {
+    public RpcObjectData(State state, @Nullable String valueType, @Nullable Object value, @Nullable Integer ref) {
         this.state = state;
         this.valueType = valueType;
         this.value = value;
@@ -102,6 +102,6 @@ public class TreeDatum {
         ADD,
         DELETE,
         CHANGE,
-        END_OF_TREE
+        END_OF_OBJECT
     }
 }

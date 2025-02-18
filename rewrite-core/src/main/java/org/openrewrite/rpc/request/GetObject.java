@@ -20,6 +20,6 @@ import lombok.Value;
 import java.util.UUID;
 
 @Value
-public class GetTreeDataRequest implements RecipeRpcRequest {
-    UUID treeId;
+public class GetObject implements RecipeRpcRequest {
+    UUID id;
 }

@@ -13,13 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.rpc;
+package org.openrewrite.rpc.request;
 
 import lombok.Value;
 
-import java.util.List;
+import java.util.UUID;
 
 @Value
-public class TreeData {
-    List<TreeDatum> data;
+public class Visit implements RecipeRpcRequest {
+    String visitor;
+    UUID treeId;
+    Object p;
 }

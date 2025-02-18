@@ -16,7 +16,7 @@
 package org.openrewrite.rpc;
 
 /**
- * A codec decomposes a value into multiple RPC {@link TreeDatum} events, and
+ * A codec decomposes a value into multiple RPC {@link RpcObjectData} events, and
  * on the receiving side reconstitutes the value from those events.
  *
  * @param <T> The type of the value being sent and received.
@@ -28,7 +28,7 @@ public interface RpcCodec<T> {
      * to send the values that comprise it.
      *
      * @param after The value that has been either added or changed.
-     * @param q     The send queue that is collecting {@link TreeDatum} to send.
+     * @param q     The send queue that is collecting {@link RpcObjectData} to send.
      */
     void rpcSend(T after, RpcSendQueue q);
 
@@ -39,7 +39,7 @@ public interface RpcCodec<T> {
      * @param before The value that has been either added or changed. In the case where it is added,
      *               the before state will be non-null, but will be an initialized object with
      *               all null fields that are expecting to be populated by this method.
-     * @param q      The queue that is receiving {@link TreeDatum} from a remote.
+     * @param q      The queue that is receiving {@link RpcObjectData} from a remote.
      */
     T rpcReceive(T before, RpcReceiveQueue q);
 }

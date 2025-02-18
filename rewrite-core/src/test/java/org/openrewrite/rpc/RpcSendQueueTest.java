@@ -35,12 +35,12 @@ public class RpcSendQueueTest {
         CountDownLatch latch = new CountDownLatch(1);
         RpcSendQueue q = new RpcSendQueue(10, t -> {
             assertThat(t.getData()).containsExactly(
-              new TreeDatum(TreeDatum.State.CHANGE, null, null, null),
-              new TreeDatum(TreeDatum.State.CHANGE, null, List.of(0, -1, -1, 2), null),
-              new TreeDatum(TreeDatum.State.NO_CHANGE, null, null, null) /* A */,
-              new TreeDatum(TreeDatum.State.ADD, null, "E", null),
-              new TreeDatum(TreeDatum.State.ADD, null, "F", null),
-              new TreeDatum(TreeDatum.State.NO_CHANGE, null, null, null) /* C */
+              new RpcObjectData(RpcObjectData.State.CHANGE, null, null, null),
+              new RpcObjectData(RpcObjectData.State.CHANGE, null, List.of(0, -1, -1, 2), null),
+              new RpcObjectData(RpcObjectData.State.NO_CHANGE, null, null, null) /* A */,
+              new RpcObjectData(RpcObjectData.State.ADD, null, "E", null),
+              new RpcObjectData(RpcObjectData.State.ADD, null, "F", null),
+              new RpcObjectData(RpcObjectData.State.NO_CHANGE, null, null, null) /* C */
             );
             latch.countDown();
         }, new HashMap<>());
@@ -58,8 +58,8 @@ public class RpcSendQueueTest {
         CountDownLatch latch = new CountDownLatch(1);
         RpcSendQueue q = new RpcSendQueue(10, t -> {
             assertThat(t.getData()).containsExactly(
-              new TreeDatum(TreeDatum.State.ADD, null, null, null),
-              new TreeDatum(TreeDatum.State.CHANGE, null, List.of(), null)
+              new RpcObjectData(RpcObjectData.State.ADD, null, null, null),
+              new RpcObjectData(RpcObjectData.State.CHANGE, null, List.of(), null)
             );
             latch.countDown();
         }, new HashMap<>());

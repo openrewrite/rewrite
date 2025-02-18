@@ -25,26 +25,26 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 import static org.openrewrite.rpc.Reference.asRef;
-import static org.openrewrite.rpc.TreeDatum.ADDED_LIST_ITEM;
-import static org.openrewrite.rpc.TreeDatum.State.*;
+import static org.openrewrite.rpc.RpcObjectData.ADDED_LIST_ITEM;
+import static org.openrewrite.rpc.RpcObjectData.State.*;
 
 public class RpcSendQueue {
     private final int batchSize;
-    private final List<TreeDatum> batch;
-    private final Consumer<TreeData> drain;
+    private final List<RpcObjectData> batch;
+    private final Consumer<List<RpcObjectData>> drain;
     private final Map<Object, Integer> refs;
 
     private @Nullable Object before;
 
-    public RpcSendQueue(int batchSize, ThrowingConsumer<TreeData> drain, Map<Object, Integer> refs) {
+    public RpcSendQueue(int batchSize, ThrowingConsumer<List<RpcObjectData>> drain, Map<Object, Integer> refs) {
         this.batchSize = batchSize;
         this.batch = new ArrayList<>(batchSize);
         this.drain = drain;
         this.refs = refs;
     }
 
-    public void put(TreeDatum treeDatum) {
-        batch.add(treeDatum);
+    public void put(RpcObjectData rpcObjectData) {
+        batch.add(rpcObjectData);
         if (batch.size() == batchSize) {
             flush();
         }
@@ -57,7 +57,7 @@ public class RpcSendQueue {
         if (batch.isEmpty()) {
             return;
         }
-        drain.accept(new TreeData(new ArrayList<>(batch)));
+        drain.accept(new ArrayList<>(batch));
         batch.clear();
     }
 
@@ -94,13 +94,13 @@ public class RpcSendQueue {
         Object beforeVal = Reference.getValue(before);
 
         if (beforeVal == afterVal) {
-            put(new TreeDatum(NO_CHANGE, null, null, null));
+            put(new RpcObjectData(NO_CHANGE, null, null, null));
         } else if (beforeVal == null) {
             add(after, onChange);
         } else if (afterVal == null) {
-            put(new TreeDatum(DELETE, null, null, null));
+            put(new RpcObjectData(DELETE, null, null, null));
         } else {
-            put(new TreeDatum(CHANGE, null, onChange == null ? afterVal : null, null));
+            put(new RpcObjectData(CHANGE, null, onChange == null ? afterVal : null, null));
             doChange(after, before, onChange);
         }
     }
@@ -122,9 +122,9 @@ public class RpcSendQueue {
                 } else {
                     T aBefore = before == null ? null : before.get(beforePos);
                     if (aBefore == anAfter) {
-                        put(new TreeDatum(NO_CHANGE, null, null, null));
+                        put(new RpcObjectData(NO_CHANGE, null, null, null));
                     } else {
-                        put(new TreeDatum(CHANGE, null, null, null));
+                        put(new RpcObjectData(CHANGE, null, null, null));
                         doChange(anAfter, aBefore, onChangeRun);
                     }
                 }
@@ -144,7 +144,7 @@ public class RpcSendQueue {
             Integer beforePos = beforeIdx.get(id.apply(t));
             positions.add(beforePos == null ? ADDED_LIST_ITEM : beforePos);
         }
-        put(new TreeDatum(CHANGE, null, positions, null));
+        put(new RpcObjectData(CHANGE, null, positions, null));
         return beforeIdx;
     }
 
@@ -153,14 +153,14 @@ public class RpcSendQueue {
         Integer ref = null;
         if (afterVal != null && after != afterVal /* Is a reference */) {
             if (refs.containsKey(afterVal)) {
-                put(new TreeDatum(ADD, getValueType(afterVal), null, refs.get(afterVal)));
+                put(new RpcObjectData(ADD, getValueType(afterVal), null, refs.get(afterVal)));
                 // No onChange call because the remote will be using an instance from its ref cache
                 return;
             }
             ref = refs.size() + 1;
             refs.put(afterVal, ref);
         }
-        put(new TreeDatum(ADD, getValueType(afterVal),
+        put(new RpcObjectData(ADD, getValueType(afterVal),
                 onChange == null ? afterVal : null, ref));
         doChange(afterVal, null, onChange);
     }
