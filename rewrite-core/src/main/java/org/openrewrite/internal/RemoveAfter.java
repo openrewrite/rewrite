@@ -15,10 +15,8 @@
  */
 package org.openrewrite.internal;
 
-import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
 
 /**
  * An annotation that indicates that the element should be removed after a certain point.
