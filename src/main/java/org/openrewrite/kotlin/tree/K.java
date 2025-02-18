@@ -453,13 +453,17 @@ public interface K extends J {
 
         JRightPadded<Expression> useSite;
 
-        @Getter
-        @With
-        J.Annotation callee;
-
         public Expression getUseSite() {
             return useSite.getElement();
         }
+
+        public K.AnnotationType withUseSite(Expression useSite) {
+            return getPadding().withUseSite(this.useSite.withElement(useSite));
+        }
+
+        @Getter
+        @With
+        J.Annotation callee;
 
         @Override
         public @Nullable JavaType getType() {
@@ -681,7 +685,6 @@ public interface K extends J {
         @With
         J.MethodDeclaration methodDeclaration;
 
-        // A replacement of `colon` and `constructorInvocation`
         JLeftPadded<ConstructorInvocation> invocation;
 
         public ConstructorInvocation getInvocation() {
@@ -690,28 +693,6 @@ public interface K extends J {
 
         public K.Constructor withInvocation(ConstructorInvocation invocation) {
             return getPadding().withInvocation(this.invocation.withElement(invocation));
-        }
-
-        // For backward compatibility, handle removed fields `colon` and `constructorInvocation` which has been relocated to `invocation`
-        // Todo, Remove when we feel good that kotlin LSTs have been rebuilt.
-        @Deprecated
-        @JsonCreator
-        public Constructor(UUID id,
-                           Markers markers,
-                           J.MethodDeclaration methodDeclaration,
-                           @Nullable @JsonProperty("colon") Space colon,
-                           @Nullable @JsonProperty("constructorInvocation") ConstructorInvocation constructorInvocation,
-                           JLeftPadded<ConstructorInvocation> invocation
-        ) {
-            padding = null;
-            this.id = id;
-            this.markers = markers;
-            this.methodDeclaration = methodDeclaration;
-            if (colon != null && constructorInvocation != null) {
-                this.invocation = new JLeftPadded<>(colon, constructorInvocation, Markers.EMPTY);
-            } else {
-                this.invocation = invocation;
-            }
         }
 
         @Override
@@ -940,24 +921,10 @@ public interface K extends J {
         @With
         J.VariableDeclarations initializer;
 
-        @Deprecated // Use destructAssignments instead
-        @Nullable
-        JContainer<J.VariableDeclarations.NamedVariable> assignments;
-
         JContainer<Statement> destructAssignments;
-
-        @Deprecated
-        public @Nullable List<J.VariableDeclarations.NamedVariable> getAssignments() {
-            return assignments != null ? assignments.getElements() : null;
-        }
 
         public List<Statement> getDestructAssignments() {
             return destructAssignments.getElements();
-        }
-
-        @Deprecated
-        public K.DestructuringDeclaration withAssignments(List<J.VariableDeclarations.NamedVariable> assignments) {
-            return getPadding().withAssignments(requireNonNull(JContainer.withElementsNullable(this.assignments, assignments)));
         }
 
         public K.DestructuringDeclaration withDestructAssignments(List<Statement> assignments) {
@@ -994,22 +961,13 @@ public interface K extends J {
         public static class Padding {
             private final K.DestructuringDeclaration t;
 
-            @Deprecated
-            public @Nullable JContainer<J.VariableDeclarations.NamedVariable> getAssignments() {
-                return t.assignments;
-            }
-
-            @Deprecated
-            public DestructuringDeclaration withAssignments(JContainer<J.VariableDeclarations.NamedVariable> assignments) {
-                return t;
-            }
 
             public JContainer<Statement> getDestructAssignments() {
                 return t.destructAssignments;
             }
 
             public DestructuringDeclaration withDestructAssignments(JContainer<Statement> assignments) {
-                return t.destructAssignments == assignments ? t : new DestructuringDeclaration(t.id, t.prefix, t.markers, t.initializer, null, assignments);
+                return t.destructAssignments == assignments ? t : new DestructuringDeclaration(t.id, t.prefix, t.markers, t.initializer, assignments);
             }
         }
 
@@ -1382,7 +1340,7 @@ public interface K extends J {
         }
 
         @Override
-        public @Nullable JavaType getType() {
+        public JavaType getType() {
             return methodDeclaration.getType();
         }
 
@@ -1638,7 +1596,7 @@ public interface K extends J {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @RequiredArgsConstructor
     @Data
     @With
     final class Return implements K, Statement, Expression {
@@ -1646,19 +1604,9 @@ public interface K extends J {
         @EqualsAndHashCode.Include
         UUID id;
 
-        /**
-         * @deprecated Wrap with {@link AnnotatedExpression} to add annotations. To be deleted.
-         */
-        @Deprecated
-        List<J.Annotation> annotations;
-
         J.Return expression;
 
         J.@Nullable Identifier label;
-
-        public Return(UUID id, J.Return expression, J.@Nullable Identifier label) {
-            this(id, Collections.emptyList(), expression, label);
-        }
 
         @Override
         public Space getPrefix() {
@@ -2026,7 +1974,7 @@ public interface K extends J {
                 return t.initializer;
             }
 
-            public TypeAlias withInitializer(@Nullable JLeftPadded<Expression> initializer) {
+            public TypeAlias withInitializer(JLeftPadded<Expression> initializer) {
                 return t.initializer == initializer ? t : new TypeAlias(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.name, t.typeParameters, initializer, t.type);
             }
         }
