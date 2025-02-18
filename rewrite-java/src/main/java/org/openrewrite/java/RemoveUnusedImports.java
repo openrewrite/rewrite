@@ -289,7 +289,7 @@ public class RemoveUnusedImports extends Recipe {
         }
     }
 
-    private static @NotNull Map<String, Set<JavaType.FullyQualified>> typesByPackage(final J.CompilationUnit cu) {
+    private static Map<String, Set<JavaType.FullyQualified>> typesByPackage(final J.CompilationUnit cu) {
         Map<String, Set<JavaType.FullyQualified>> typesByPackage = new HashMap<>();
         for (JavaType javaType : cu.getTypesInUse().getTypesInUse()) {
             if (javaType instanceof JavaType.Parameterized) {
