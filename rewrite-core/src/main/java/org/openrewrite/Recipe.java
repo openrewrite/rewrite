@@ -39,9 +39,16 @@ import java.lang.reflect.Field;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Duration;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 
+import static java.time.Duration.ofMinutes;
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 import static org.openrewrite.internal.RecipeIntrospectionUtils.dataTableDescriptorFromDataTable;
 
 /**
@@ -60,6 +67,10 @@ import static org.openrewrite.internal.RecipeIntrospectionUtils.dataTableDescrip
 @JsonPropertyOrder({"@c"}) // serialize type info first
 public abstract class Recipe implements Cloneable {
     public static final String PANIC = "__AHHH_PANIC!!!__";
+
+    protected Recipe() {
+        descriptor = null;
+    }
 
     @SuppressWarnings("unused")
     @JsonProperty("@c")
@@ -192,14 +203,14 @@ public abstract class Recipe implements Cloneable {
      * @return The tags.
      */
     public Set<String> getTags() {
-        return Collections.emptySet();
+        return emptySet();
     }
 
     /**
      * @return An estimated effort were a developer to fix manually instead of using this recipe.
      */
     public @Nullable Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(5);
+        return ofMinutes(5);
     }
 
     public final RecipeDescriptor getDescriptor() {

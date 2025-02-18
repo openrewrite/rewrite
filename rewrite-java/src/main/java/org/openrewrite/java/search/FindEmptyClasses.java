@@ -23,7 +23,6 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.SearchResult;
 
-import java.time.Duration;
 import java.util.Collections;
 import java.util.Set;
 
@@ -42,11 +41,6 @@ public class FindEmptyClasses extends Recipe {
     @Override
     public Set<String> getTags() {
         return Collections.singleton("RSPEC-S2094");
-    }
-
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(5);
     }
 
     @Override

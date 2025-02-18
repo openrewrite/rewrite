@@ -27,7 +27,6 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.J;
 
-import java.time.Duration;
 import java.util.Set;
 
 import static java.util.Collections.singleton;
@@ -48,11 +47,6 @@ public class UseHttpsForRepositories extends Recipe {
     @Override
     public Set<String> getTags() {
         return singleton("security");
-    }
-
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(5);
     }
 
     @Override
