@@ -15,8 +15,6 @@
  */
 package org.openrewrite.kotlin.tree;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
@@ -1466,60 +1464,6 @@ public interface K extends J {
 
         @Nullable
         JRightPadded<Expression> receiver;
-
-        // For backward compatibility, handle removed fields `getter`, 'setter' and `isSetterFirst` which has been relocated to `accessors`
-        // Todo, Remove when all kotlin LSTs have been rebuilt.
-        @Deprecated
-        @JsonCreator
-        public Property(UUID id,
-                        Space prefix,
-                        Markers markers,
-                        @Nullable JContainer<TypeParameter> typeParameters,
-                        @Nullable JRightPadded<J.VariableDeclarations> paddedVariableDeclarations,
-                        @Nullable VariableDeclarations variableDeclarations,
-                K.@Nullable TypeConstraints typeConstraints,
-                @JsonProperty("getter") J.@Nullable MethodDeclaration getter,
-                @JsonProperty("setter") J.@Nullable MethodDeclaration setter,
-                        @Nullable @JsonProperty("isSetterFirst") Boolean isSetterFirst,
-                        JContainer<J.MethodDeclaration> accessors,
-                        @Nullable JRightPadded<Expression> receiver
-                        ) {
-            this.id = id;
-            this.prefix = prefix;
-            this.markers = markers;
-            this.typeParameters = typeParameters;
-
-            if (variableDeclarations != null) {
-                // from old LST
-                this.paddedVariableDeclarations = new JRightPadded<>(variableDeclarations, Space.EMPTY, Markers.EMPTY);
-            } else {
-                this.paddedVariableDeclarations = requireNonNull(paddedVariableDeclarations);
-            }
-
-            this.typeConstraints = typeConstraints;
-
-            if (getter != null || setter != null || isSetterFirst != null) {
-                List<JRightPadded<J.MethodDeclaration>> rps = new ArrayList<>(2);
-
-                // handle old LST removed fields `getter`, 'setter' and `isSetterFirst` which has been relocated to `accessors`
-                if (setter != null) {
-                    rps.add(new JRightPadded<>(setter, Space.EMPTY, Markers.EMPTY));
-                }
-
-                if (getter != null) {
-                    rps.add(new JRightPadded<>(getter, Space.EMPTY, Markers.EMPTY));
-                }
-
-                if (Boolean.FALSE.equals(isSetterFirst)) {
-                    Collections.reverse(rps);
-                }
-                this.accessors = JContainer.build(rps);
-            } else {
-                this.accessors = accessors;
-            }
-
-            this.receiver = receiver;
-        }
 
         public J.VariableDeclarations getVariableDeclarations() {
             return paddedVariableDeclarations.getElement();
