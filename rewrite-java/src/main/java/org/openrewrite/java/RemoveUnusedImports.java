@@ -318,7 +318,7 @@ public class RemoveUnusedImports extends Recipe {
         return typesByPackage;
     }
 
-    private static @NotNull Map<String, TreeSet<String>> methodsAndFieldsByTypeName(final J.CompilationUnit cu) {
+    private static Map<String, TreeSet<String>> methodsAndFieldsByTypeName(final J.CompilationUnit cu) {
         Map<String, TreeSet<String>> methodsAndFieldsByTypeName = new HashMap<>();
         for (JavaType.Method method : cu.getTypesInUse().getUsedMethods()) {
             if (method.hasFlags(Flag.Static)) {
