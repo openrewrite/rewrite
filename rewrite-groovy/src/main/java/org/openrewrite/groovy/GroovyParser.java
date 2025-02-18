@@ -127,7 +127,7 @@ public class GroovyParser implements Parser {
                         // Override the standard `ResolveVisitor` which otherwise inlines any annotation property values
                         Field resolveVisitor = CompilationUnit.class.getDeclaredField("resolveVisitor");
                         resolveVisitor.setAccessible(true);
-                        resolveVisitor.set(compUnit, new CustomResolveVisitor(compUnit));
+                        resolveVisitor.set(compUnit, new NoInlineAnnotationTransformationResolveVisitor(compUnit));
 
                         compUnit.addSource(unit);
                         compUnit.compile(Phases.CANONICALIZATION);
