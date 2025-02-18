@@ -20,7 +20,7 @@ tasks.register<JavaExec>("generateAntlrSources") {
 
 dependencies {
     implementation(project(":rewrite-core"))
-    implementation("org.antlr:antlr4-runtime:4.11.1")
+    implementation("org.antlr:antlr4-runtime:4.13.2")
     implementation("io.micrometer:micrometer-core:1.9.+")
 
     antlrGeneration("org.antlr:antlr4:4.11.1")

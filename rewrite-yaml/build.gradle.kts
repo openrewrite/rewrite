@@ -21,7 +21,7 @@ dependencies {
 
     compileOnly(project(":rewrite-test"))
 
-    implementation("org.antlr:antlr4-runtime:4.11.1")
+    implementation("org.antlr:antlr4-runtime:4.13.2")
     implementation("org.yaml:snakeyaml:latest.release")
     implementation("io.micrometer:micrometer-core:1.9.+")
 
