@@ -2700,7 +2700,6 @@ public interface J extends Tree {
 
         @With
         @Getter
-        @EqualsAndHashCode.Include
         FieldAccess qualid;
 
         @Nullable

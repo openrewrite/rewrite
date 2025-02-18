@@ -64,16 +64,6 @@ public class RemoveRedundantImports extends Recipe {
                         .filter(anImport -> seenImports.add(anImport.getTypeName())).collect(Collectors.toList());
                 return uniqueImports.size() == cu.getImports().size() ? cu : cu.withImports(uniqueImports);
             }
-
-//            @Override
-//            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-//                final List<J.Import> imports1 = cu.getImports();
-//                Set<J.Import> uniqueImports = new HashSet<>(imports1);
-//                final ArrayList<J.Import> imports = new ArrayList<>(uniqueImports);
-//                return uniqueImports.size() == imports1.size()
-//                        ? cu
-//                        : cu.withImports(imports);
-//            }
         });
     }
 
