@@ -68,16 +68,13 @@ import static org.openrewrite.internal.RecipeIntrospectionUtils.dataTableDescrip
 public abstract class Recipe implements Cloneable {
     public static final String PANIC = "__AHHH_PANIC!!!__";
 
-    protected Recipe() {
-        descriptor = null;
-    }
-
     @SuppressWarnings("unused")
     @JsonProperty("@c")
     public String getJacksonPolymorphicTypeTag() {
         return getClass().getName();
     }
 
+    @Nullable
     private transient RecipeDescriptor descriptor;
 
     @Nullable
@@ -289,6 +286,7 @@ public abstract class Recipe implements Cloneable {
     }
 
     @Setter
+    @Nullable
     protected List<Contributor> contributors;
 
     public List<Contributor> getContributors() {
