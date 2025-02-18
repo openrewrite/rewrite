@@ -17,6 +17,7 @@ package org.openrewrite.rpc;
 
 import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.JsonRpcRequest;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
@@ -43,8 +44,8 @@ public class RewriteRpc {
      * visits and other operations for which incremental state sharing is useful
      * between two processes.
      */
-    private final Map<UUID, Object> remoteObjects = new HashMap<>();
-    private final Map<UUID, Object> localObjects = new HashMap<>();
+    private final Map<String, Object> remoteObjects = new HashMap<>();
+    private final Map<String, Object> localObjects = new HashMap<>();
 
     /**
      * Keeps track of objects that need to be referentially deduplicated, and
@@ -53,8 +54,7 @@ public class RewriteRpc {
     private final Map<Object, Integer> localRefs = new IdentityHashMap<>();
     private final Map<Integer, Object> remoteRefs = new IdentityHashMap<>();
 
-    // TODO This should be keyed on both the visit (transaction) ID in addition to the tree ID
-    private final Map<UUID, BlockingQueue<List<RpcObjectData>>> inProgressGetRpcObjects = new ConcurrentHashMap<>();
+    private final Map<String, BlockingQueue<List<RpcObjectData>>> inProgressGetRpcObjects = new ConcurrentHashMap<>();
 
     private static final ExecutorService forkJoin = ForkJoinPool.commonPool();
 
@@ -67,15 +67,21 @@ public class RewriteRpc {
 
             //noinspection unchecked
             TreeVisitor<Tree, Object> visitor = (TreeVisitor<Tree, Object>) ctor.newInstance();
+
             SourceFile before = getObject(request.getTreeId());
+            localObjects.put(before.getId().toString(), before);
 
-            localObjects.put(before.getId(), before);
+            Object p = getObject(request.getP());
+            if (p instanceof ExecutionContext) {
+                // This is likely to be reused in subsequent visits, so we keep it.
+                localObjects.put(request.getP(), p);
+            }
 
-            SourceFile after = (SourceFile) visitor.visit(before, request.getP());
+            SourceFile after = (SourceFile) visitor.visit(before, p);
             if (after == null) {
-                localObjects.remove(before.getId());
+                localObjects.remove(before.getId().toString());
             } else {
-                localObjects.put(after.getId(), after);
+                localObjects.put(after.getId().toString(), after);
             }
             return new VisitResponse(before != after);
         }));
@@ -83,18 +89,17 @@ public class RewriteRpc {
         jsonRpc.method("GetObject", typed(GetObject.class, request -> {
             BlockingQueue<List<RpcObjectData>> q = inProgressGetRpcObjects.computeIfAbsent(request.getId(), id -> {
                 BlockingQueue<List<RpcObjectData>> batch = new ArrayBlockingQueue<>(1);
+                Object after = localObjects.get(id);
                 Object before = remoteObjects.get(id);
+
                 RpcSendQueue sendQueue = new RpcSendQueue(batchSize, batch::put, localRefs);
                 forkJoin.submit(() -> {
                     try {
-                        Object after = localObjects.get(id);
-                        sendQueue.send(after, before, () -> {
-                            if (after instanceof RpcCodec) {
-                                //noinspection unchecked
-                                ((RpcCodec<Object>) after).rpcSend(after, sendQueue);
-                            }
-                            throw new IllegalArgumentException(after.getClass().getName() + " is not an RpcCodec");
-                        });
+                        Runnable onChange = after instanceof RpcCodec ? () -> {
+                            //noinspection unchecked
+                            ((RpcCodec<Object>) after).rpcSend(after, sendQueue);
+                        } : null;
+                        sendQueue.send(after, before, onChange);
 
                         // All the data has been sent, and the remote should have received
                         // the full tree, so update our understanding of the remote state
@@ -137,19 +142,22 @@ public class RewriteRpc {
     public <P> Tree visit(SourceFile sourceFile, String visitorName, P p) {
         VisitResponse response = scan(sourceFile, visitorName, p);
         return response.isModified() ?
-                getObject(sourceFile.getId()) :
+                getObject(sourceFile.getId().toString()) :
                 sourceFile;
     }
 
     public <P> VisitResponse scan(SourceFile sourceFile, String visitorName, P p) {
         // Set the local state of this tree, so that when the remote
         // asks for it, we know what to send.
-        localObjects.put(sourceFile.getId(), sourceFile);
-        return send("Visit", new Visit(visitorName, sourceFile.getId(), p),
+        localObjects.put(sourceFile.getId().toString(), sourceFile);
+        String pId = Integer.toString(System.identityHashCode(p));
+        localObjects.put(pId, p);
+
+        return send("Visit", new Visit(visitorName, sourceFile.getId().toString(), pId),
                 VisitResponse.class);
     }
 
-    private <T> T getObject(UUID id) {
+    private <T> T getObject(String id) {
         RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, () -> send("GetObject",
                 new GetObject(id), RecipeObjectDataBatch.class));
         Object remoteObject = q.receive(localObjects.get(id), before -> {
@@ -157,7 +165,7 @@ public class RewriteRpc {
                 //noinspection unchecked
                 return ((RpcCodec<Object>) before).rpcReceive(before, q);
             }
-            throw new IllegalArgumentException(before.getClass().getName() + " is not an RpcCodec");
+            return before;
         });
         if (q.take().getState() != END_OF_OBJECT) {
             throw new IllegalStateException("Expected END_OF_OBJECT");
@@ -167,9 +175,6 @@ public class RewriteRpc {
 
         //noinspection unchecked
         return (T) remoteObject;
-    }
-
-    private static class RecipeObjectDataBatch extends ArrayList<RpcObjectData> {
     }
 
     private <P> P send(String method, RecipeRpcRequest body, Class<P> responseType) {
@@ -184,5 +189,8 @@ public class RewriteRpc {
         } catch (ExecutionException | TimeoutException | InterruptedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private static class RecipeObjectDataBatch extends ArrayList<RpcObjectData> {
     }
 }

@@ -22,6 +22,10 @@ import java.util.UUID;
 @Value
 public class Visit implements RecipeRpcRequest {
     String visitor;
-    UUID treeId;
-    Object p;
+    String treeId;
+
+    /**
+     * An ID of the p value stored in the caller's local object cache.
+     */
+    String p;
 }

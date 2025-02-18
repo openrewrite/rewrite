@@ -16,10 +16,9 @@
 package org.openrewrite.rpc;
 
 import org.jspecify.annotations.Nullable;
+import org.objenesis.ObjenesisStd;
 import org.openrewrite.marker.Markers;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -103,20 +102,13 @@ public class RpcReceiveQueue {
                 return null;
             case ADD:
                 ref = message.getRef();
-                if (ref != null) {
-                    if (refs.containsKey(ref)) {
-                        //noinspection unchecked
-                        return (T) refs.get(ref);
-                    } else {
-                        before = onChange == null ?
-                                message.getValue() :
-                                newObj(message.getValueType());
-                    }
-                } else {
-                    before = onChange == null ?
-                            message.getValue() :
-                            newObj(message.getValueType());
+                if (refs.containsKey(ref)) {
+                    //noinspection unchecked
+                    return (T) refs.get(ref);
                 }
+                before = onChange == null || message.getValueType() == null ?
+                        message.getValue() :
+                        newObj(message.getValueType());
                 // Intentional fall-through...
             case CHANGE:
                 T after = onChange == null ? message.getValue() : onChange.apply(before);
@@ -158,35 +150,9 @@ public class RpcReceiveQueue {
     private static <T> T newObj(String type) {
         try {
             Class<?> clazz = Class.forName(type);
-            for (Constructor<?> ctor : clazz.getDeclaredConstructors()) {
-                Object[] args = new Object[ctor.getParameterCount()];
-                for (int i = 0; i < args.length; i++) {
-                    Class<?> paramType = ctor.getParameters()[i].getType();
-                    if (paramType == boolean.class) {
-                        args[i] = false;
-                    } else if (paramType == int.class) {
-                        args[i] = 0;
-                    } else if (paramType == short.class) {
-                        args[i] = (short) 0;
-                    } else if (paramType == long.class) {
-                        args[i] = 0L;
-                    } else if (paramType == byte.class) {
-                        args[i] = (byte) 0;
-                    } else if (paramType == float.class) {
-                        args[i] = 0.0f;
-                    } else if (paramType == double.class) {
-                        args[i] = 0.0d;
-                    } else if (paramType == char.class) {
-                        args[i] = '\u0000';
-                    }
-                }
-                ctor.setAccessible(true);
-                //noinspection unchecked
-                return (T) ctor.newInstance(args);
-            }
-            throw new IllegalStateException("Unable to find a constructor for " + clazz);
-        } catch (ClassNotFoundException | InvocationTargetException | IllegalAccessException |
-                 InstantiationException e) {
+            //noinspection unchecked
+            return (T) new ObjenesisStd().newInstance(clazz);
+        } catch (ClassNotFoundException e) {
             throw new RuntimeException(e);
         }
     }

@@ -21,5 +21,5 @@ import java.util.UUID;
 
 @Value
 public class GetObject implements RecipeRpcRequest {
-    UUID id;
+    String id;
 }
