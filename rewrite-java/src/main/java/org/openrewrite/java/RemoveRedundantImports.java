@@ -25,8 +25,7 @@ import org.openrewrite.java.tree.J;
 
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
@@ -63,22 +62,10 @@ public class RemoveRedundantImports extends Recipe {
 
         @Override
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-            List<J.Import> imports = cu.getImports();
-            Set<String> seenImports = new HashSet<>();
-            List<J.Import> uniqueImports = new ArrayList<>();
-
-            for (J.Import anImport : imports) {
-                String importName = anImport.getTypeName();
-                if (!seenImports.contains(importName)) {
-                    seenImports.add(importName);
-                    uniqueImports.add(anImport);
-                }
+            Set<J.Import> uniqueImports = new LinkedHashSet<>(cu.getImports());
+            if (cu.getImports().size() != uniqueImports.size()) {
+                return cu.withImports(new ArrayList<>(uniqueImports));
             }
-
-            if (imports.size() != uniqueImports.size()) {
-                cu = cu.withImports(uniqueImports);
-            }
-
             return cu;
         }
     }
