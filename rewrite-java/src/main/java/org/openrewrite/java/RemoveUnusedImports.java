@@ -72,6 +72,7 @@ public class RemoveUnusedImports extends Recipe {
         return Preconditions.check(new NoMissingTypes(), new RemoveUnusedImportsVisitor());
     }
 
+    // TODO add redudant import fix
     private static class RemoveUnusedImportsVisitor extends JavaIsoVisitor<ExecutionContext> {
 
         @Override
