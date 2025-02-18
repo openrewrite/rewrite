@@ -68,8 +68,7 @@ public class MergeYaml extends Recipe {
     @Option(displayName = "Insert mode",
             description = "Choose an insertion point when multiple mappings exist. Default is `Last`.",
             valid = {"Before", "After", "Last"},
-            required = false,
-            example = "Last")
+            required = false)
     @Nullable
     InsertMode insertMode;
 

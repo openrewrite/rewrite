@@ -356,7 +356,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
      * Specialized concatAll function which takes the `insertPlace` property into account.
      */
     private <T> ListConcat<T> concatAll(List<T> ls, List<T> t, Function<T, String> getValue) {
-        if (insertMode == null || insertMode == Last || t.isEmpty()) {
+        if (insertMode == null || insertMode == Last || insertProperty == null || t.isEmpty()) {
             return new ListConcat<>(ListUtils.concatAll(ls, t), -1,-1);
         }
 
