@@ -253,16 +253,14 @@ public abstract class Recipe implements Cloneable {
                 value = null;
             }
             Option option = field.getAnnotation(Option.class);
-            if (option != null) {
-                options.add(new OptionDescriptor(field.getName(),
-                        field.getType().getSimpleName(),
-                        option.displayName(),
-                        option.description(),
-                        option.example().isEmpty() ? null : option.example(),
-                        option.valid().length == 1 && option.valid()[0].isEmpty() ? null : Arrays.asList(option.valid()),
-                        option.required(),
-                        value));
-            }
+            options.add(new OptionDescriptor(field.getName(),
+                    field.getType().getSimpleName(),
+                    option.displayName(),
+                    option.description(),
+                    option.example().isEmpty() ? null : option.example(),
+                    option.valid().length == 1 && option.valid()[0].isEmpty() ? null : Arrays.asList(option.valid()),
+                    option.required(),
+                    value));
         }
         options.trimToSize();
         return options;
@@ -297,6 +295,7 @@ public abstract class Recipe implements Cloneable {
     }
 
     @Setter
+    @Nullable
     protected transient List<RecipeExample> examples;
 
     public List<RecipeExample> getExamples() {
