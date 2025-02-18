@@ -18,6 +18,8 @@ package org.openrewrite.rpc;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 
+import static java.util.Objects.requireNonNull;
+
 /**
  * An instance that is passed to the remote by reference (i.e. for instances
  * that are referentially deduplicated in the LST).
@@ -50,5 +52,14 @@ public class Reference {
     public static <T> @Nullable T getValue(@Nullable Object maybeRef) {
         // noinspection unchecked
         return (T) (maybeRef instanceof Reference ? ((Reference) maybeRef).getValue() : maybeRef);
+    }
+
+    /**
+     * @param maybeRef A reference (or not).
+     * @param <T>      The type of the value.
+     * @return The value of the reference, or the value itself if it is not a reference.
+     */
+    public static <T> T getValueNonNull(@Nullable Object maybeRef) {
+        return requireNonNull(getValue(maybeRef));
     }
 }

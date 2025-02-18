@@ -18,8 +18,11 @@ package org.openrewrite.json.internal.rpc;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.json.JsonVisitor;
+import org.openrewrite.json.tree.Comment;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonRightPadded;
+import org.openrewrite.json.tree.Space;
+import org.openrewrite.rpc.Reference;
 import org.openrewrite.rpc.RpcSendQueue;
 
 import static org.openrewrite.rpc.Reference.asRef;
@@ -29,7 +32,8 @@ public class JsonSender extends JsonVisitor<RpcSendQueue> {
     @Override
     public Json preVisit(Json j, RpcSendQueue q) {
         q.getAndSend(j, Tree::getId);
-        q.getAndSend(j, j2 -> asRef(j2.getPrefix()));
+        q.getAndSend(j, j2 -> asRef(j2.getPrefix()), space ->
+                visitSpace(Reference.getValueNonNull(space), q));
         q.sendMarkers(j, Tree::getMarkers);
         return j;
     }
@@ -88,9 +92,22 @@ public class JsonSender extends JsonVisitor<RpcSendQueue> {
     }
 
     @Override
+    public Space visitSpace(Space space, RpcSendQueue q) {
+        q.getAndSendList(space, Space::getComments, c -> c.getText() + c.getSuffix(), c -> {
+            q.getAndSend(c, Comment::isMultiline);
+            q.getAndSend(c, Comment::getText);
+            q.getAndSend(c, Comment::getSuffix);
+            q.sendMarkers(c, Comment::getMarkers);
+        });
+        q.getAndSend(space, Space::getWhitespace);
+        return space;
+    }
+
+    @Override
     public @Nullable <T extends Json> JsonRightPadded<T> visitRightPadded(@Nullable JsonRightPadded<T> right, RpcSendQueue q) {
         q.getAndSend(right, JsonRightPadded::getElement, j -> visit(j, q));
-        q.getAndSend(right, j -> asRef(j.getAfter()));
+        q.getAndSend(right, j -> asRef(j.getAfter()),
+                space -> visitSpace(Reference.getValueNonNull(space), q));
         q.sendMarkers(right, JsonRightPadded::getMarkers);
         return right;
     }

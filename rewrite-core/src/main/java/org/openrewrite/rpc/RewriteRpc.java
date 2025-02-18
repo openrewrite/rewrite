@@ -35,7 +35,8 @@ import static org.openrewrite.rpc.TreeDatum.State.END_OF_TREE;
 
 public class RewriteRpc {
     private final JsonRpc jsonRpc;
-    private final Duration timeout;
+    private int batchSize = 10;
+    private Duration timeout = Duration.ofMinutes(1);
 
     /**
      * Keeps track of the local and remote state of trees that are used in
@@ -56,9 +57,8 @@ public class RewriteRpc {
 
     private static final ExecutorService forkJoin = ForkJoinPool.commonPool();
 
-    public RewriteRpc(JsonRpc jsonRpc, Duration timeout) {
+    public RewriteRpc(JsonRpc jsonRpc) {
         this.jsonRpc = jsonRpc;
-        this.timeout = timeout;
 
         jsonRpc.method("visit", typed(VisitRequest.class, request -> {
             Constructor<?> ctor = Class.forName(request.getVisitor()).getDeclaredConstructor();
@@ -83,7 +83,7 @@ public class RewriteRpc {
             BlockingQueue<TreeData> q = inProgressGetTreeDatas.computeIfAbsent(request.getTreeId(), id -> {
                 BlockingQueue<TreeData> batch = new ArrayBlockingQueue<>(1);
                 SourceFile before = remoteTrees.get(id);
-                RpcSendQueue sendQueue = new RpcSendQueue(10, batch::put, localRefs);
+                RpcSendQueue sendQueue = new RpcSendQueue(batchSize, batch::put, localRefs);
                 forkJoin.submit(() -> {
                     try {
                         SourceFile after = localTrees.get(id);
@@ -118,6 +118,16 @@ public class RewriteRpc {
             return batch;
         }));
         jsonRpc.bind();
+    }
+
+    public RewriteRpc batchSize(int batchSize) {
+        this.batchSize = batchSize;
+        return this;
+    }
+
+    public RewriteRpc timeout(Duration timeout) {
+        this.timeout = timeout;
+        return this;
     }
 
     public void shutdown() {

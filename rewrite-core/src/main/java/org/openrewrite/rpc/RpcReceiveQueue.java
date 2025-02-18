@@ -129,7 +129,7 @@ public class RpcReceiveQueue {
         }
     }
 
-    public <T> List<T> receiveList(@Nullable List<T> before, @Nullable UnaryOperator<@Nullable T> onChange) {
+    public <T> List<T> receiveList(@Nullable List<T> before, @Nullable UnaryOperator<T> onChange) {
         TreeDatum msg = take();
         switch (msg.getState()) {
             case NO_CHANGE:

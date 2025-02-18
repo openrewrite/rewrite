@@ -16,7 +16,6 @@
 package org.openrewrite.rpc;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.Tree;
 import org.openrewrite.internal.ThrowingConsumer;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
@@ -151,22 +150,19 @@ public class RpcSendQueue {
 
     private void add(@Nullable Object after, @Nullable Runnable onChange) {
         Object afterVal = Reference.getValue(after);
+        Integer ref = null;
         if (afterVal != null && after != afterVal /* Is a reference */) {
             if (refs.containsKey(afterVal)) {
                 put(new TreeDatum(ADD, getValueType(afterVal), null, refs.get(afterVal)));
                 // No onChange call because the remote will be using an instance from its ref cache
-            } else {
-                int ref = refs.size() + 1;
-                refs.put(afterVal, ref);
-                put(new TreeDatum(ADD, getValueType(afterVal),
-                        onChange == null ? afterVal : null, ref));
-                doChange(afterVal, null, onChange);
+                return;
             }
-        } else {
-            put(new TreeDatum(ADD, getValueType(afterVal),
-                    onChange == null ? afterVal : null, null));
-            doChange(afterVal, null, onChange);
+            ref = refs.size() + 1;
+            refs.put(afterVal, ref);
         }
+        put(new TreeDatum(ADD, getValueType(afterVal),
+                onChange == null ? afterVal : null, ref));
+        doChange(afterVal, null, onChange);
     }
 
     private void doChange(@Nullable Object after, @Nullable Object before, @Nullable Runnable onChange) {

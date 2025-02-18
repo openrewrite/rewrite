@@ -21,6 +21,7 @@ import org.openrewrite.json.JsonVisitor;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonRightPadded;
 import org.openrewrite.json.tree.JsonValue;
+import org.openrewrite.json.tree.Space;
 import org.openrewrite.rpc.RpcReceiveQueue;
 
 import java.nio.charset.Charset;
@@ -35,7 +36,7 @@ public class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
     @Override
     public Json preVisit(@NonNull Json j, RpcReceiveQueue q) {
         j = j.withId(UUID.fromString(q.receiveAndGet(j.getId(), UUID::toString)));
-        j = j.withPrefix(q.receive(j.getPrefix()));
+        j = j.withPrefix(q.receive(j.getPrefix(), space -> visitSpace(space, q)));
         j = j.withMarkers(q.receiveMarkers(j.getMarkers()));
         return j;
     }
@@ -85,12 +86,23 @@ public class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
     }
 
     @Override
-    public @Nullable <T extends Json> JsonRightPadded<T> visitRightPadded(@Nullable JsonRightPadded<T> right, RpcReceiveQueue q) {
+    public Space visitSpace(Space space, RpcReceiveQueue q) {
+        return space
+                .withComments(q.receiveList(space.getComments(), c -> c
+                        .withMultiline(q.receive(c.isMultiline()))
+                        .withText(q.receive(c.getText()))
+                        .withSuffix(q.receive(c.getSuffix()))
+                        .withMarkers(q.receiveMarkers(c.getMarkers()))))
+                .withWhitespace(q.receive(space.getWhitespace()));
+    }
+
+    @Override
+    public <T extends Json> JsonRightPadded<T> visitRightPadded(@Nullable JsonRightPadded<T> right, RpcReceiveQueue q) {
         assert right != null : "TreeDataReceiveQueue should have instantiated an empty padding";
 
         //noinspection unchecked
         return right.withElement(q.receive(right.getElement(), j -> (T) visitNonNull(j, q)))
-                .withAfter(q.receive(right.getAfter()))
+                .withAfter(q.receive(right.getAfter(), space -> visitSpace(space, q)))
                 .withMarkers(q.receiveMarkers(right.getMarkers()));
     }
 }

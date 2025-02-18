@@ -54,11 +54,11 @@ class JsonSendReceiveTest implements RewriteTest {
 
         JsonRpc serverJsonRpc = new JsonRpc(new TraceMessageHandler("server",
           new HeaderDelimitedMessageHandler(serverIn, serverOut)));
-        server = new RewriteRpc(serverJsonRpc, Duration.ofSeconds(10));
+        server = new RewriteRpc(serverJsonRpc).batchSize(1).timeout(Duration.ofSeconds(10));
 
         JsonRpc clientJsonRpc = new JsonRpc(new TraceMessageHandler("client",
           new HeaderDelimitedMessageHandler(clientIn, clientOut)));
-        client = new RewriteRpc(clientJsonRpc, Duration.ofSeconds(10));
+        client = new RewriteRpc(clientJsonRpc).batchSize(1).timeout(Duration.ofSeconds(10));
     }
 
     @AfterEach
