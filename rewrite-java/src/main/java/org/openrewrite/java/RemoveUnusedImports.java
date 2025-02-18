@@ -284,13 +284,18 @@ public class RemoveUnusedImports extends Recipe {
     }
 
     private static class ExecutionContextJavaIsoVisitor extends JavaIsoVisitor<ExecutionContext> {
+
+        private Map<String, TreeSet<String>> methodsAndFieldsByTypeName;
+        private Map<String, Set<JavaType.FullyQualified>> typesByPackage;
+        private List<ImportUsage> importUsage;
+        private boolean changed = false;
+
         @Override
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-            Map<String, TreeSet<String>> methodsAndFieldsByTypeName = methodsAndFieldsByTypeName(cu);
-            Map<String, Set<JavaType.FullyQualified>> typesByPackage = typesByPackage(cu);
-            boolean changed = false;
+            methodsAndFieldsByTypeName = methodsAndFieldsByTypeName(cu);
+            typesByPackage = typesByPackage(cu);
             // the key is a list because a star import may get replaced with multiple unfolded imports
-            List<ImportUsage> importUsage = new ArrayList<>(cu.getPadding().getImports().size());
+            importUsage = new ArrayList<>(cu.getPadding().getImports().size());
             for (JRightPadded<J.Import> anImport : cu.getPadding().getImports()) {
                 // assume initially that all imports are unused
                 ImportUsage singleUsage = new ImportUsage();
