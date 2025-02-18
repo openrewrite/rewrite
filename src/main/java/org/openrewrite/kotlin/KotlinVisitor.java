@@ -210,14 +210,6 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         return m;
     }
 
-    public J visitNamedVariableInitializer(K.NamedVariableInitializer namedVariableInitializer, P p) {
-        K.NamedVariableInitializer n = namedVariableInitializer;
-        n = n.withPrefix(visitSpace(n.getPrefix(), KSpace.Location.NAMED_VARIABLE_INITIALIZER_PREFIX, p));
-        n = n.withMarkers(visitMarkers(n.getMarkers(), p));
-        n = n.withInitializations(ListUtils.map(n.getInitializations(), it -> visitAndCast(it, p)));
-        return n;
-    }
-
     @SuppressWarnings("DataFlowIssue")
     public J visitProperty(K.Property property, P p) {
         K.Property pr = property;

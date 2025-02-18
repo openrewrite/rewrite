@@ -1474,39 +1474,6 @@ public interface K extends J {
         }
     }
 
-    @Value
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @With
-    class NamedVariableInitializer implements K, Expression {
-
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        Space prefix;
-        Markers markers;
-        List<J> initializations;
-
-        @Override
-        public @Nullable JavaType getType() {
-            return null;
-        }
-
-        @Override
-        public <T extends J> T withType(@Nullable JavaType type) {
-            throw new UnsupportedOperationException("NamedVariableInitializer cannot have a type");
-        }
-
-        @Override
-        public CoordinateBuilder.Expression getCoordinates() {
-            return new CoordinateBuilder.Expression(this);
-        }
-
-        @Override
-        public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
-            return v.visitNamedVariableInitializer(this, p);
-        }
-    }
-
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
