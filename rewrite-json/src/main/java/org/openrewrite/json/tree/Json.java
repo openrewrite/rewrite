@@ -246,6 +246,7 @@ public interface Json extends Tree {
 
         String source;
 
+        @Nullable // for `null` values
         Object value;
 
         @Override

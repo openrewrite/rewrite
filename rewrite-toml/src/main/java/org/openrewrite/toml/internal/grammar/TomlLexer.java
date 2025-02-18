@@ -13,9 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from java-escape by ANTLR 4.11.1
+// Generated from ~/git/rewrite/rewrite-toml/src/main/antlr/TomlLexer.g4 by ANTLR 4.13.2
 package org.openrewrite.toml.internal.grammar;
-
 import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.atn.ATN;
 import org.antlr.v4.runtime.atn.ATNDeserializer;
@@ -23,19 +22,19 @@ import org.antlr.v4.runtime.atn.LexerATNSimulator;
 import org.antlr.v4.runtime.atn.PredictionContextCache;
 import org.antlr.v4.runtime.dfa.DFA;
 
-@SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue"})
+@SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue", "this-escape"})
 public class TomlLexer extends Lexer {
-	static { RuntimeMetaData.checkVersion("4.11.1", RuntimeMetaData.VERSION); }
+	static { RuntimeMetaData.checkVersion("4.13.2", RuntimeMetaData.VERSION); }
 
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		WS=1, NL=2, COMMENT=3, L_BRACKET=4, DOUBLE_L_BRACKET=5, R_BRACKET=6, DOUBLE_R_BRACKET=7, 
-		EQUALS=8, DOT=9, COMMA=10, BASIC_STRING=11, LITERAL_STRING=12, UNQUOTED_KEY=13, 
-		VALUE_WS=14, L_BRACE=15, BOOLEAN=16, ML_BASIC_STRING=17, ML_LITERAL_STRING=18, 
-		FLOAT=19, INF=20, NAN=21, DEC_INT=22, HEX_INT=23, OCT_INT=24, BIN_INT=25, 
-		OFFSET_DATE_TIME=26, LOCAL_DATE_TIME=27, LOCAL_DATE=28, LOCAL_TIME=29, 
+		WS=1, NL=2, COMMENT=3, L_BRACKET=4, DOUBLE_L_BRACKET=5, R_BRACKET=6, DOUBLE_R_BRACKET=7,
+		EQUALS=8, DOT=9, COMMA=10, BASIC_STRING=11, LITERAL_STRING=12, UNQUOTED_KEY=13,
+		VALUE_WS=14, L_BRACE=15, BOOLEAN=16, ML_BASIC_STRING=17, ML_LITERAL_STRING=18,
+		FLOAT=19, INF=20, NAN=21, DEC_INT=22, HEX_INT=23, OCT_INT=24, BIN_INT=25,
+		OFFSET_DATE_TIME=26, LOCAL_DATE_TIME=27, LOCAL_DATE=28, LOCAL_TIME=29,
 		INLINE_TABLE_WS=30, R_BRACE=31, ARRAY_WS=32;
 	public static final int
 		SIMPLE_VALUE_MODE=1, INLINE_TABLE_MODE=2, ARRAY_MODE=3;
@@ -49,23 +48,23 @@ public class TomlLexer extends Lexer {
 
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"WS", "NL", "COMMENT", "L_BRACKET", "DOUBLE_L_BRACKET", "R_BRACKET", 
-			"DOUBLE_R_BRACKET", "EQUALS", "DOT", "COMMA", "DIGIT", "ALPHA", "ESC", 
-			"UNICODE", "EX_UNICODE", "BASIC_STRING", "LITERAL_STRING", "UNQUOTED_KEY", 
-			"VALUE_WS", "L_BRACE", "ARRAY_START", "BOOLEAN", "ML_ESC", "VALUE_BASIC_STRING", 
-			"ML_BASIC_STRING", "VALUE_LITERAL_STRING", "ML_LITERAL_STRING", "EXP", 
-			"ZERO_PREFIXABLE_INT", "FRAC", "FLOAT", "INF", "NAN", "HEX_DIGIT", "DIGIT_1_9", 
-			"DIGIT_0_7", "DIGIT_0_1", "DEC_INT", "HEX_INT", "OCT_INT", "BIN_INT", 
-			"YEAR", "MONTH", "DAY", "DELIM", "HOUR", "MINUTE", "SECOND", "SECFRAC", 
-			"NUMOFFSET", "OFFSET", "PARTIAL_TIME", "FULL_DATE", "FULL_TIME", "OFFSET_DATE_TIME", 
-			"LOCAL_DATE_TIME", "LOCAL_DATE", "LOCAL_TIME", "INLINE_TABLE_WS", "INLINE_TABLE_KEY_DOT", 
-			"INLINE_TABLE_COMMA", "R_BRACE", "INLINE_TABLE_KEY_BASIC_STRING", "INLINE_TABLE_KEY_LITERAL_STRING", 
-			"INLINE_TABLE_KEY_UNQUOTED", "INLINE_TABLE_EQUALS", "ARRAY_WS", "ARRAY_NL", 
-			"ARRAY_COMMENT", "ARRAY_COMMA", "ARRAY_INLINE_TABLE_START", "NESTED_ARRAY_START", 
-			"ARRAY_END", "ARRAY_BOOLEAN", "ARRAY_BASIC_STRING", "ARRAY_ML_BASIC_STRING", 
-			"ARRAY_LITERAL_STRING", "ARRAY_ML_LITERAL_STRING", "ARRAY_FLOAT", "ARRAY_INF", 
-			"ARRAY_NAN", "ARRAY_DEC_INT", "ARRAY_HEX_INT", "ARRAY_OCT_INT", "ARRAY_BIN_INT", 
-			"ARRAY_OFFSET_DATE_TIME", "ARRAY_LOCAL_DATE_TIME", "ARRAY_LOCAL_DATE", 
+			"WS", "NL", "COMMENT", "L_BRACKET", "DOUBLE_L_BRACKET", "R_BRACKET",
+			"DOUBLE_R_BRACKET", "EQUALS", "DOT", "COMMA", "DIGIT", "ALPHA", "ESC",
+			"UNICODE", "EX_UNICODE", "BASIC_STRING", "LITERAL_STRING", "UNQUOTED_KEY",
+			"VALUE_WS", "L_BRACE", "ARRAY_START", "BOOLEAN", "ML_ESC", "VALUE_BASIC_STRING",
+			"ML_BASIC_STRING", "VALUE_LITERAL_STRING", "ML_LITERAL_STRING", "EXP",
+			"ZERO_PREFIXABLE_INT", "FRAC", "FLOAT", "INF", "NAN", "HEX_DIGIT", "DIGIT_1_9",
+			"DIGIT_0_7", "DIGIT_0_1", "DEC_INT", "HEX_INT", "OCT_INT", "BIN_INT",
+			"YEAR", "MONTH", "DAY", "DELIM", "HOUR", "MINUTE", "SECOND", "SECFRAC",
+			"NUMOFFSET", "OFFSET", "PARTIAL_TIME", "FULL_DATE", "FULL_TIME", "OFFSET_DATE_TIME",
+			"LOCAL_DATE_TIME", "LOCAL_DATE", "LOCAL_TIME", "INLINE_TABLE_WS", "INLINE_TABLE_KEY_DOT",
+			"INLINE_TABLE_COMMA", "R_BRACE", "INLINE_TABLE_KEY_BASIC_STRING", "INLINE_TABLE_KEY_LITERAL_STRING",
+			"INLINE_TABLE_KEY_UNQUOTED", "INLINE_TABLE_EQUALS", "ARRAY_WS", "ARRAY_NL",
+			"ARRAY_COMMENT", "ARRAY_COMMA", "ARRAY_INLINE_TABLE_START", "NESTED_ARRAY_START",
+			"ARRAY_END", "ARRAY_BOOLEAN", "ARRAY_BASIC_STRING", "ARRAY_ML_BASIC_STRING",
+			"ARRAY_LITERAL_STRING", "ARRAY_ML_LITERAL_STRING", "ARRAY_FLOAT", "ARRAY_INF",
+			"ARRAY_NAN", "ARRAY_DEC_INT", "ARRAY_HEX_INT", "ARRAY_OCT_INT", "ARRAY_BIN_INT",
+			"ARRAY_OFFSET_DATE_TIME", "ARRAY_LOCAL_DATE_TIME", "ARRAY_LOCAL_DATE",
 			"ARRAY_LOCAL_TIME"
 		};
 	}
@@ -73,19 +72,19 @@ public class TomlLexer extends Lexer {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, null, null, null, "'['", "'[['", "']'", "']]'", "'='", "'.'", "','", 
-			null, null, null, null, "'{'", null, null, null, null, null, null, null, 
+			null, null, null, null, "'['", "'[['", "']'", "']]'", "'='", "'.'", "','",
+			null, null, null, null, "'{'", null, null, null, null, null, null, null,
 			null, null, null, null, null, null, null, null, "'}'"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "WS", "NL", "COMMENT", "L_BRACKET", "DOUBLE_L_BRACKET", "R_BRACKET", 
-			"DOUBLE_R_BRACKET", "EQUALS", "DOT", "COMMA", "BASIC_STRING", "LITERAL_STRING", 
-			"UNQUOTED_KEY", "VALUE_WS", "L_BRACE", "BOOLEAN", "ML_BASIC_STRING", 
-			"ML_LITERAL_STRING", "FLOAT", "INF", "NAN", "DEC_INT", "HEX_INT", "OCT_INT", 
-			"BIN_INT", "OFFSET_DATE_TIME", "LOCAL_DATE_TIME", "LOCAL_DATE", "LOCAL_TIME", 
+			null, "WS", "NL", "COMMENT", "L_BRACKET", "DOUBLE_L_BRACKET", "R_BRACKET",
+			"DOUBLE_R_BRACKET", "EQUALS", "DOT", "COMMA", "BASIC_STRING", "LITERAL_STRING",
+			"UNQUOTED_KEY", "VALUE_WS", "L_BRACE", "BOOLEAN", "ML_BASIC_STRING",
+			"ML_LITERAL_STRING", "FLOAT", "INF", "NAN", "DEC_INT", "HEX_INT", "OCT_INT",
+			"BIN_INT", "OFFSET_DATE_TIME", "LOCAL_DATE_TIME", "LOCAL_DATE", "LOCAL_TIME",
 			"INLINE_TABLE_WS", "R_BRACE", "ARRAY_WS"
 		};
 	}

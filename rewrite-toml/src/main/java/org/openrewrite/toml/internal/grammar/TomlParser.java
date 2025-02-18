@@ -13,9 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from java-escape by ANTLR 4.11.1
+// Generated from ~/git/rewrite/rewrite-toml/src/main/antlr/TomlParser.g4 by ANTLR 4.13.2
 package org.openrewrite.toml.internal.grammar;
-
 import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.atn.ATN;
 import org.antlr.v4.runtime.atn.ATNDeserializer;
@@ -28,32 +27,32 @@ import org.antlr.v4.runtime.tree.TerminalNode;
 
 import java.util.List;
 
-@SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue"})
+@SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue", "this-escape"})
 public class TomlParser extends Parser {
-	static { RuntimeMetaData.checkVersion("4.11.1", RuntimeMetaData.VERSION); }
+	static { RuntimeMetaData.checkVersion("4.13.2", RuntimeMetaData.VERSION); }
 
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		WS=1, NL=2, COMMENT=3, L_BRACKET=4, DOUBLE_L_BRACKET=5, R_BRACKET=6, DOUBLE_R_BRACKET=7, 
-		EQUALS=8, DOT=9, COMMA=10, BASIC_STRING=11, LITERAL_STRING=12, UNQUOTED_KEY=13, 
-		VALUE_WS=14, L_BRACE=15, BOOLEAN=16, ML_BASIC_STRING=17, ML_LITERAL_STRING=18, 
-		FLOAT=19, INF=20, NAN=21, DEC_INT=22, HEX_INT=23, OCT_INT=24, BIN_INT=25, 
-		OFFSET_DATE_TIME=26, LOCAL_DATE_TIME=27, LOCAL_DATE=28, LOCAL_TIME=29, 
+		WS=1, NL=2, COMMENT=3, L_BRACKET=4, DOUBLE_L_BRACKET=5, R_BRACKET=6, DOUBLE_R_BRACKET=7,
+		EQUALS=8, DOT=9, COMMA=10, BASIC_STRING=11, LITERAL_STRING=12, UNQUOTED_KEY=13,
+		VALUE_WS=14, L_BRACE=15, BOOLEAN=16, ML_BASIC_STRING=17, ML_LITERAL_STRING=18,
+		FLOAT=19, INF=20, NAN=21, DEC_INT=22, HEX_INT=23, OCT_INT=24, BIN_INT=25,
+		OFFSET_DATE_TIME=26, LOCAL_DATE_TIME=27, LOCAL_DATE=28, LOCAL_TIME=29,
 		INLINE_TABLE_WS=30, R_BRACE=31, ARRAY_WS=32;
 	public static final int
-		RULE_document = 0, RULE_expression = 1, RULE_comment = 2, RULE_keyValue = 3, 
-		RULE_key = 4, RULE_simpleKey = 5, RULE_unquotedKey = 6, RULE_quotedKey = 7, 
-		RULE_dottedKey = 8, RULE_value = 9, RULE_string = 10, RULE_integer = 11, 
-		RULE_floatingPoint = 12, RULE_bool = 13, RULE_dateTime = 14, RULE_commentOrNl = 15, 
-		RULE_array = 16, RULE_table = 17, RULE_standardTable = 18, RULE_inlineTable = 19, 
+		RULE_document = 0, RULE_expression = 1, RULE_comment = 2, RULE_keyValue = 3,
+		RULE_key = 4, RULE_simpleKey = 5, RULE_unquotedKey = 6, RULE_quotedKey = 7,
+		RULE_dottedKey = 8, RULE_value = 9, RULE_string = 10, RULE_integer = 11,
+		RULE_floatingPoint = 12, RULE_bool = 13, RULE_dateTime = 14, RULE_commentOrNl = 15,
+		RULE_array = 16, RULE_table = 17, RULE_standardTable = 18, RULE_inlineTable = 19,
 		RULE_arrayTable = 20;
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"document", "expression", "comment", "keyValue", "key", "simpleKey", 
-			"unquotedKey", "quotedKey", "dottedKey", "value", "string", "integer", 
-			"floatingPoint", "bool", "dateTime", "commentOrNl", "array", "table", 
+			"document", "expression", "comment", "keyValue", "key", "simpleKey",
+			"unquotedKey", "quotedKey", "dottedKey", "value", "string", "integer",
+			"floatingPoint", "bool", "dateTime", "commentOrNl", "array", "table",
 			"standardTable", "inlineTable", "arrayTable"
 		};
 	}
@@ -61,19 +60,19 @@ public class TomlParser extends Parser {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, null, null, null, "'['", "'[['", "']'", "']]'", "'='", "'.'", "','", 
-			null, null, null, null, "'{'", null, null, null, null, null, null, null, 
+			null, null, null, null, "'['", "'[['", "']'", "']]'", "'='", "'.'", "','",
+			null, null, null, null, "'{'", null, null, null, null, null, null, null,
 			null, null, null, null, null, null, null, null, "'}'"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "WS", "NL", "COMMENT", "L_BRACKET", "DOUBLE_L_BRACKET", "R_BRACKET", 
-			"DOUBLE_R_BRACKET", "EQUALS", "DOT", "COMMA", "BASIC_STRING", "LITERAL_STRING", 
-			"UNQUOTED_KEY", "VALUE_WS", "L_BRACE", "BOOLEAN", "ML_BASIC_STRING", 
-			"ML_LITERAL_STRING", "FLOAT", "INF", "NAN", "DEC_INT", "HEX_INT", "OCT_INT", 
-			"BIN_INT", "OFFSET_DATE_TIME", "LOCAL_DATE_TIME", "LOCAL_DATE", "LOCAL_TIME", 
+			null, "WS", "NL", "COMMENT", "L_BRACKET", "DOUBLE_L_BRACKET", "R_BRACKET",
+			"DOUBLE_R_BRACKET", "EQUALS", "DOT", "COMMA", "BASIC_STRING", "LITERAL_STRING",
+			"UNQUOTED_KEY", "VALUE_WS", "L_BRACE", "BOOLEAN", "ML_BASIC_STRING",
+			"ML_LITERAL_STRING", "FLOAT", "INF", "NAN", "DEC_INT", "HEX_INT", "OCT_INT",
+			"BIN_INT", "OFFSET_DATE_TIME", "LOCAL_DATE_TIME", "LOCAL_DATE", "LOCAL_TIME",
 			"INLINE_TABLE_WS", "R_BRACE", "ARRAY_WS"
 		};
 	}
@@ -112,7 +111,7 @@ public class TomlParser extends Parser {
 	}
 
 	@Override
-	public String getGrammarFileName() { return "java-escape"; }
+	public String getGrammarFileName() { return "TomlParser.g4"; }
 
 	@Override
 	public String[] getRuleNames() { return ruleNames; }
@@ -170,7 +169,7 @@ public class TomlParser extends Parser {
 			setState(43);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			if (((_la) & ~0x3f) == 0 && ((1L << _la) & 14392L) != 0) {
+			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & 14392L) != 0)) {
 				{
 				setState(42);
 				expression();
@@ -188,7 +187,7 @@ public class TomlParser extends Parser {
 				setState(47);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
-				if (((_la) & ~0x3f) == 0 && ((1L << _la) & 14392L) != 0) {
+				if ((((_la) & ~0x3f) == 0 && ((1L << _la) & 14392L) != 0)) {
 					{
 					setState(46);
 					expression();
@@ -670,7 +669,7 @@ public class TomlParser extends Parser {
 			{
 			setState(85);
 			simpleKey();
-			setState(88); 
+			setState(88);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			do {
@@ -682,7 +681,7 @@ public class TomlParser extends Parser {
 				simpleKey();
 				}
 				}
-				setState(90); 
+				setState(90);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			} while ( _la==DOT );
@@ -857,7 +856,7 @@ public class TomlParser extends Parser {
 			{
 			setState(101);
 			_la = _input.LA(1);
-			if ( !(((_la) & ~0x3f) == 0 && ((1L << _la) & 399360L) != 0) ) {
+			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 399360L) != 0)) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
@@ -912,7 +911,7 @@ public class TomlParser extends Parser {
 			{
 			setState(103);
 			_la = _input.LA(1);
-			if ( !(((_la) & ~0x3f) == 0 && ((1L << _la) & 62914560L) != 0) ) {
+			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 62914560L) != 0)) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
@@ -966,7 +965,7 @@ public class TomlParser extends Parser {
 			{
 			setState(105);
 			_la = _input.LA(1);
-			if ( !(((_la) & ~0x3f) == 0 && ((1L << _la) & 3670016L) != 0) ) {
+			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 3670016L) != 0)) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
@@ -1064,7 +1063,7 @@ public class TomlParser extends Parser {
 			{
 			setState(109);
 			_la = _input.LA(1);
-			if ( !(((_la) & ~0x3f) == 0 && ((1L << _la) & 1006632960L) != 0) ) {
+			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 1006632960L) != 0)) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
@@ -1441,7 +1440,7 @@ public class TomlParser extends Parser {
 					setState(171);
 					keyValue();
 					}
-					} 
+					}
 				}
 				setState(176);
 				_errHandler.sync(this);
@@ -1698,7 +1697,7 @@ public class TomlParser extends Parser {
 					setState(228);
 					keyValue();
 					}
-					} 
+					}
 				}
 				setState(233);
 				_errHandler.sync(this);

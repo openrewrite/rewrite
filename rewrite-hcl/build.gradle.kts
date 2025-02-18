@@ -3,7 +3,7 @@ plugins {
 }
 
 // run manually with `./gradlew rewrite-hcl:generateAntlrSources` when you need to regenerate
-// be sure to use `implementation("org.antlr:antlr4:4.11.1")` below when generating
+// be sure to use `implementation("org.antlr:antlr4:4.13.2")` below when generating
 tasks.register<JavaExec>("generateAntlrSources") {
     mainClass.set("org.antlr.v4.Tool")
 
@@ -23,7 +23,7 @@ dependencies {
 
     compileOnly(project(":rewrite-test"))
 
-    implementation("org.antlr:antlr4-runtime:4.11.1")
+    implementation("org.antlr:antlr4-runtime:4.13.2")
     implementation("io.micrometer:micrometer-core:1.9.+")
 
     testImplementation(project(":rewrite-test"))
