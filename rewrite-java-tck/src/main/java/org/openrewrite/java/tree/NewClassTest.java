@@ -187,7 +187,7 @@ class NewClassTest implements RewriteTest {
                   void method() {
                       Arrays.sort(new ArrayList[]{new ArrayList<File>()}, new Comparator<Object>() {
                           long time1, time2;
-                  
+
                           @Override
                           public int compare(Object o1, Object o2) {
                               time1 = ((File) o1).lastModified();
@@ -196,6 +196,36 @@ class NewClassTest implements RewriteTest {
                           }
                       });
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void semicolonInBody(){
+        rewriteRun(
+          java(
+            """
+              class A {
+                  Object o = new Object() {;
+                      @Override
+                      public String toString() {
+                          return super.toString();
+                      }
+                  };
+              }
+              """
+          ),
+          java(
+            """
+              class B {
+                  Object o = new Object() {
+                      @Override
+                      public String toString() {
+                          return super.toString();
+                      };
+                  };
               }
               """
           )
