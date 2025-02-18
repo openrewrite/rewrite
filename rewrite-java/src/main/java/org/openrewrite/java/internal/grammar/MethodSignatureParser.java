@@ -1157,8 +1157,7 @@ public class MethodSignatureParser extends Parser {
 		return _localctx;
 	}
 
-    @Override
-    public boolean sempred(RuleContext _localctx, int ruleIndex, int predIndex) {
+	public boolean sempred(RuleContext _localctx, int ruleIndex, int predIndex) {
 		switch (ruleIndex) {
 		case 6:
 			return targetTypePattern_sempred((TargetTypePatternContext)_localctx, predIndex);
