@@ -40,7 +40,7 @@ public class FindDeprecatedMethods extends Recipe {
     transient MethodCalls deprecatedMethodCalls = new MethodCalls(this);
 
     @Option(displayName = "Method pattern",
-            description = "A method pattern that is used to find matching method invocations.",
+            description = MethodMatcher.METHOD_PATTERN_DESCRIPTION,
             example = "java.util.List add(..)",
             required = false)
     @Nullable
