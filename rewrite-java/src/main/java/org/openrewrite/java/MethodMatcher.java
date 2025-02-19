@@ -59,6 +59,14 @@ import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
  */
 @SuppressWarnings("NotNullFieldNotInitialized")
 public class MethodMatcher {
+    //language=markdown
+    public static final String METHOD_PATTERN_DESCRIPTION = "To find all method invocations in the Guava library, use the pattern " +
+                                                             "`com.google.common..*#*(..)`. The pattern format is `<PACKAGE>#<METHOD_NAME>(<ARGS>)`. " +
+                                                             "`..*` includes all subpackages of `com.google.common`. " +
+                                                             "`*(..)` matches any method name with any number of arguments. " +
+                                                             "For more specific queries, like Guava's `ImmutableMap`, use " +
+                                                             "`com.google.common.collect.ImmutableMap#*(..)` to narrow down the results.";
+
     private static final String ASPECTJ_DOT_PATTERN = StringUtils.aspectjNameToPattern(".");
     private static final String ASPECTJ_DOTDOT_PATTERN = StringUtils.aspectjNameToPattern("..");
     private static final Pattern EMPTY_ARGUMENTS_PATTERN = Pattern.compile("");

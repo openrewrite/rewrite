@@ -29,7 +29,7 @@ import org.openrewrite.marker.SearchResult;
 public class FindMethodDeclaration extends Recipe {
 
     @Option(displayName = "Method pattern",
-            description = "A method pattern that is used to find matching method invocations.",
+            description = MethodMatcher.METHOD_PATTERN_DESCRIPTION,
             example = "java.util.List add(..)")
     String methodPattern;
 
