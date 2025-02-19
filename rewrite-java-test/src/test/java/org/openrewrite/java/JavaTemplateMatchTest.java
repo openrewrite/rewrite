@@ -692,16 +692,18 @@ class JavaTemplateMatchTest implements RewriteTest {
               import java.util.Collections;
               import java.util.List;
               class Test {
-                  static List<CharSequence> EXACT_MATCH     = Collections.emptyList();
-                  static List<String> COLLECTION_OF_SUBTYPE = Collections.emptyList(); // List of Dogs is not List of Animals
+                  static List<CharSequence> EXACT_MATCH            = Collections.emptyList();
+                  static List<CharSequence> EXACT_MATCH_EXPLICIT   = Collections.<CharSequence>emptyList();
+                  static List<String> COLLECTION_OF_SUBTYPE        = Collections.emptyList(); // List of Dogs is not List of Animals
               }
               """,
               """
               import java.util.Collections;
               import java.util.List;
               class Test {
-                  static List<CharSequence> EXACT_MATCH     = /*~~>*/Collections.emptyList();
-                  static List<String> COLLECTION_OF_SUBTYPE = Collections.emptyList(); // List of Dogs is not List of Animals
+                  static List<CharSequence> EXACT_MATCH            = /*~~>*/Collections.emptyList();
+                  static List<CharSequence> EXACT_MATCH_EXPLICIT   = /*~~>*/Collections.<CharSequence>emptyList();
+                  static List<String> COLLECTION_OF_SUBTYPE        = Collections.emptyList(); // List of Dogs is not List of Animals
               }
               """)
         );
