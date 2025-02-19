@@ -220,6 +220,7 @@ class NewClassTest implements RewriteTest {
           )
         );
     }
+
     @Test
     @SuppressWarnings("UnnecessarySemicolon")
     void unnecessarySemicolonInBody2() {

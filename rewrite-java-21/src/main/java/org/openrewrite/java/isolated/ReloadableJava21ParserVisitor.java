@@ -541,6 +541,18 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
         }
         members.addAll(convertStatements(membersMultiVariablesSeparated));
 
+        while (true) {
+            int closingBracePosition = positionOfNext("}", null);
+            int semicolonPosition = positionOfNext(";", null);
+
+            if (semicolonPosition > -1 && semicolonPosition < closingBracePosition) {
+                members.add(new JRightPadded<>(new J.Empty(randomId(), sourceBefore(";"), Markers.EMPTY), Space.EMPTY, Markers.EMPTY));
+                cursor = semicolonPosition + 1;
+            } else {
+                break;
+            }
+        }
+
         J.Block body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
                 members, sourceBefore("}"));
 
@@ -1181,9 +1193,22 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                     members.add(m);
                 }
             }
+            List<JRightPadded<Statement>> converted = convertStatements(members);
+
+            while (true) {
+                int closingBracePosition = positionOfNext("}", null);
+                int semicolonPosition = positionOfNext(";", null);
+
+                if (semicolonPosition > -1 && semicolonPosition < closingBracePosition) {
+                    converted.add(new JRightPadded<>(new J.Empty(randomId(), sourceBefore(";"), Markers.EMPTY), Space.EMPTY, Markers.EMPTY));
+                    cursor = semicolonPosition + 1;
+                } else {
+                    break;
+                }
+            }
 
             body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
-                    convertStatements(members), sourceBefore("}"));
+                    converted, sourceBefore("}"));
         }
 
         JCNewClass jcNewClass = (JCNewClass) node;
@@ -1970,7 +1995,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
     private List<JRightPadded<Statement>> convertStatements(@Nullable List<? extends Tree> trees,
                                                             Function<Tree, Space> suffix) {
         if (trees == null || trees.isEmpty()) {
-            return emptyList();
+            return new ArrayList<>();
         }
 
         Map<Integer, List<Tree>> treesGroupedByStartPosition = new LinkedHashMap<>();
