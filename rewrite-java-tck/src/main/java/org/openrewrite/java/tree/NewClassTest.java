@@ -203,7 +203,8 @@ class NewClassTest implements RewriteTest {
     }
 
     @Test
-    void semicolonInBody(){
+    @SuppressWarnings("UnnecessarySemicolon")
+    void unnecessarySemicolonInBody1() {
         rewriteRun(
           java(
             """
@@ -216,7 +217,13 @@ class NewClassTest implements RewriteTest {
                   };
               }
               """
-          ),
+          )
+        );
+    }
+    @Test
+    @SuppressWarnings("UnnecessarySemicolon")
+    void unnecessarySemicolonInBody2() {
+        rewriteRun(
           java(
             """
               class B {

@@ -1875,6 +1875,14 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                 int startPosition = ((JCTree) t).getStartPosition();
                 if (cursor > startPosition)
                     continue;
+                if (cursor < startPosition) {
+                    int semicolonIndex = source.substring(cursor, startPosition).indexOf(";");
+                    if (semicolonIndex > -1) {
+                        Space prefix = Space.build(source.substring(cursor, cursor + semicolonIndex), Collections.emptyList());
+                        converted.add(new JRightPadded<>(new J.Empty(randomId(), prefix, Markers.EMPTY), Space.EMPTY, Markers.EMPTY));
+                        cursor += semicolonIndex + 1;
+                    }
+                }
                 converted.add(convert(treeGroup.get(0), suffix));
             } else {
                 // multi-variable declarations are split into independent overlapping JCVariableDecl's by the OpenJDK AST

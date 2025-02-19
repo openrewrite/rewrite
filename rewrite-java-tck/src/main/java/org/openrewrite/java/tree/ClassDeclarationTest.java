@@ -234,4 +234,19 @@ class ClassDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @SuppressWarnings("UnnecessarySemicolon")
+    void unnecessarySemicolonInBody() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  int i = 0;;
+                  int j = 0;
+              }
+              """
+          )
+        );
+    }
 }
