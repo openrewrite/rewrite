@@ -476,18 +476,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
             members.add(enumSet);
         }
         members.addAll(convertStatements(membersMultiVariablesSeparated));
-
-        while (true) {
-            int closingBracePosition = positionOfNext("}", null);
-            int semicolonPosition = positionOfNext(";", null);
-
-            if (semicolonPosition > -1 && semicolonPosition < closingBracePosition) {
-                members.add(new JRightPadded<>(new J.Empty(randomId(), sourceBefore(";"), Markers.EMPTY), Space.EMPTY, Markers.EMPTY));
-                cursor = semicolonPosition + 1;
-            } else {
-                break;
-            }
-        }
+        addPossibleEmptyStatementsBeforeClosingBrace(members);
 
         J.Block body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
                 members, sourceBefore("}"));
@@ -1092,18 +1081,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
             }
 
             List<JRightPadded<Statement>> converted = convertStatements(members);
-
-            while (true) {
-                int closingBracePosition = positionOfNext("}", null);
-                int semicolonPosition = positionOfNext(";", null);
-
-                if (semicolonPosition > -1 && semicolonPosition < closingBracePosition) {
-                    converted.add(new JRightPadded<>(new J.Empty(randomId(), sourceBefore(";"), Markers.EMPTY), Space.EMPTY, Markers.EMPTY));
-                    cursor = semicolonPosition + 1;
-                } else {
-                    break;
-                }
-            }
+            addPossibleEmptyStatementsBeforeClosingBrace(converted);
 
             body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
                     converted, sourceBefore("}"));
@@ -2317,5 +2295,19 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         return fmt;
+    }
+
+    private void addPossibleEmptyStatementsBeforeClosingBrace(List<JRightPadded<Statement>> converted) {
+        while (true) {
+            int closingBracePosition = positionOfNext("}", null);
+            int semicolonPosition = positionOfNext(";", null);
+
+            if (semicolonPosition > -1 && semicolonPosition < closingBracePosition) {
+                converted.add(new JRightPadded<>(new J.Empty(randomId(), sourceBefore(";"), Markers.EMPTY), Space.EMPTY, Markers.EMPTY));
+                cursor = semicolonPosition + 1;
+            } else {
+                break;
+            }
+        }
     }
 }
