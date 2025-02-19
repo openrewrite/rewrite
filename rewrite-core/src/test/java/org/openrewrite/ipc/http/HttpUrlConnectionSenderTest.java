@@ -17,6 +17,7 @@ package org.openrewrite.ipc.http;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.jgit.util.IO;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -28,31 +29,29 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class HttpUrlConnectionSenderTest {
 
     @Test
-    void withMultipartContentWithApplicationJsonType() {
+    void withMultipartContentWithApplicationJsonType() throws IOException {
         HttpSender.Request request =
           new HttpUrlConnectionSender().newRequest("http://github.com")
             .withMultipartContent(HttpSender.Request.Builder.APPLICATION_JSON,
               "json", "{\"foo\":\"bar\"}")
             .build();
         assertThat(new String(request.getEntity())).matches(Pattern.compile("""
-          \r
           --.*\r
           Content-Disposition: form-data; name="json"\r
           Content-Type: application/json\r
           \r
           \\{"foo":"bar"}\r
-          --.*\r
+          --.*--\r
           """));
     }
 
     @Test
-    void withMultipartContentWithApplicationJsonAndTextPlainType() {
+    void withMultipartContentWithApplicationJsonAndTextPlainType() throws IOException {
         HttpSender.Request request = new HttpUrlConnectionSender().newRequest("http://github.com")
           .withMultipartContent(HttpSender.Request.Builder.APPLICATION_JSON, "json", "{\"foo\":\"bar\"}")
           .withMultipartContent(HttpSender.Request.Builder.TEXT_PLAIN, "text", "abc123")
           .build();
         assertThat(new String(request.getEntity())).matches(Pattern.compile("""
-          \r
           --.*\r
           Content-Disposition: form-data; name="json"\r
           Content-Type: application/json\r
@@ -63,7 +62,7 @@ public class HttpUrlConnectionSenderTest {
           Content-Type: text/plain\r
           \r
           abc123\r
-          --.*\r
+          --.*--\r
           """));
     }
 
@@ -76,7 +75,6 @@ public class HttpUrlConnectionSenderTest {
           .withMultipartFile(path, "file")
           .build();
         assertThat(new String(request.getEntity())).matches(Pattern.compile("""
-          \r
           --.*\r
           Content-Disposition: form-data; name="text"\r
           Content-Type: text/plain\r
@@ -87,7 +85,7 @@ public class HttpUrlConnectionSenderTest {
           Content-Type: application/octet-stream\r
           \r
           The quick brown fox...\r
-          --.*\r
+          --.*--\r
           """));
     }
 }

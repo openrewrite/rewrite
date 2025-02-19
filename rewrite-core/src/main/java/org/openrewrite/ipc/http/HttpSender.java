@@ -306,15 +306,11 @@ public interface HttpSender {
              * @param content   The part contents.
              * @return This request builder.
              */
-            public final Builder withMultipartContent(String type, String name, String content) {
+            public final Builder withMultipartContent(String type, String name, String content) throws IOException {
                 StringBuilder builder = new StringBuilder(1024);
-                if (entity.length == 0) {
-                    builder.append(CRLF).append("--").append(multipartBoundary).append(CRLF);
-                }
                 builder.append("Content-Disposition: form-data; name=\"").append(name).append("\"").append(CRLF);
                 builder.append("Content-Type: ").append(type).append(CRLF).append(CRLF);
                 builder.append(content);
-                builder.append(CRLF).append("--").append(multipartBoundary).append(CRLF);
                 return withMultipartContent(builder.toString().getBytes());
             }
 
@@ -342,10 +338,9 @@ public interface HttpSender {
                 ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
                 String mimeType = Optional.ofNullable(Files.probeContentType(path)).orElse("application/octet-stream");
                 StringBuilder builder = new StringBuilder(512);
-                if (entity.length == 0) {
-                    builder.append(CRLF).append("--").append(multipartBoundary).append(CRLF);
-                }
-                builder.append("Content-Disposition: form-data; name=\"").append(name).append("\"; filename=\"")
+                builder.append("Content-Disposition: form-data; name=\"")
+                        .append(name)
+                        .append("\"; filename=\"")
                         .append(path.getFileName())
                         .append("\"")
                         .append(CRLF);
@@ -359,16 +354,23 @@ public interface HttpSender {
                         outputStream.write(buffer, 0, bytesRead);
                     }
                 }
-                outputStream.write((CRLF + "--" + multipartBoundary + CRLF).getBytes());
                 return outputStream.toByteArray();
             }
 
-            private Builder withMultipartContent(byte[] content) {
+            private Builder withMultipartContent(byte[] content) throws IOException {
                 withHeader("Content-Type", "multipart/form-data; boundary=" + multipartBoundary);
-                byte[] multipartContext = new byte[entity.length + content.length];
-                System.arraycopy(entity, 0, multipartContext, 0, entity.length);
-                System.arraycopy(content, 0, multipartContext, entity.length, content.length);
-                entity = multipartContext;
+
+                ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+                if (entity.length == 0) {
+                    outputStream.write(("--" + multipartBoundary + CRLF).getBytes());
+                } else {
+                    outputStream.write(entity, 0, entity.length - 4);
+                    outputStream.write('\r');
+                    outputStream.write('\n');
+                }
+                outputStream.write(content);
+                outputStream.write((CRLF + "--" + multipartBoundary + "--" + CRLF).getBytes());
+                entity = outputStream.toByteArray();
                 return this;
             }
 
