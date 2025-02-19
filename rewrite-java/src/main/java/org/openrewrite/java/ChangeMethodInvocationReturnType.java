@@ -34,7 +34,7 @@ import static java.util.Collections.emptyList;
 public class ChangeMethodInvocationReturnType extends Recipe {
 
     @Option(displayName = "Method pattern",
-            description = "A method pattern that is used to find matching method declarations/invocations.",
+            description = MethodMatcher.METHOD_PATTERN_DESCRIPTION,
             example = "org.mockito.Matchers anyVararg()")
     String methodPattern;
 
