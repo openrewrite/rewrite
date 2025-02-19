@@ -20,6 +20,7 @@ import java.lang.annotation.RetentionPolicy;
 
 /**
  * An annotation that indicates that the element should be removed after a certain point.
+ * Ideally applied with a matching `@Deprecated` annotation listing the reason & replacement.
  * Intended to be used with a matching recipe to clear out elements on a schedule.
  */
 @Retention(RetentionPolicy.SOURCE)
