@@ -133,8 +133,9 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 }
                 List<SourceFile> generated = new ArrayList<>(scanningRecipe.generate(scanningRecipe.getAccumulator(rootCursor, ctx), unmodifiableList(acc), ctx));
                 generated.replaceAll(source -> addRecipesThatMadeChanges(recipeStack, source));
-                acc.addAll(generated);
                 if (!generated.isEmpty()) {
+                    acc.addAll(generated);
+                    generated.forEach(source -> recordSourceFileResult(null, source, recipeStack, ctx));
                     madeChangesInThisCycle.add(recipe);
                 }
             }

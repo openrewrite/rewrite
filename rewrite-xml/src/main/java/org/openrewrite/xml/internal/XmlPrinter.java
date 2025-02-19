@@ -103,7 +103,7 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
     public Xml visitAttributeValue(Xml.Attribute.Value value, PrintOutputCapture<P> p) {
         beforeSyntax(value, p);
         char valueDelim;
-        if (Xml.Attribute.Value.Quote.Double.equals(value.getQuote())) {
+        if (Xml.Attribute.Value.Quote.Double == value.getQuote()) {
             valueDelim = '"';
         } else {
             valueDelim = '\'';

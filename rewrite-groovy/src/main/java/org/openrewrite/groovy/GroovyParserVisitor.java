@@ -40,14 +40,15 @@ import org.openrewrite.groovy.marker.*;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.marker.Semicolon;
 import org.openrewrite.java.marker.TrailingComma;
-import org.openrewrite.java.tree.*;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.lang.annotation.Annotation;
@@ -61,12 +62,12 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.lang.Character.isJavaIdentifierPart;
 import static java.lang.Character.isWhitespace;
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
+import static java.util.Collections.*;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.groovy.internal.Delimiter.*;
@@ -91,7 +92,7 @@ public class GroovyParserVisitor {
 
     private int cursor = 0;
 
-    private static final String MULTILINE_COMMENT_REGEX = "(?s)/\\*.*?\\*/";
+    private static final Pattern MULTILINE_COMMENT_REGEX = Pattern.compile("(?s)/\\*.*?\\*/");
     private static final Pattern whitespacePrefixPattern = Pattern.compile("^\\s*");
 
     @SuppressWarnings("RegExpSimplifiable")
@@ -236,7 +237,7 @@ public class GroovyParserVisitor {
         public void visitClass(ClassNode clazz) {
             Space fmt = whitespace();
             List<J.Annotation> leadingAnnotations = visitAndGetAnnotations(clazz, this);
-            List<J.Modifier> modifiers = visitModifiers(clazz.getModifiers());
+            List<J.Modifier> modifiers = getModifiers();
 
             Space kindPrefix = whitespace();
             J.ClassDeclaration.Kind.Type kindType = null;
@@ -419,8 +420,8 @@ public class GroovyParserVisitor {
             RewriteGroovyVisitor visitor = new RewriteGroovyVisitor(field, this);
 
             List<J.Annotation> annotations = visitAndGetAnnotations(field, this);
-            List<J.Modifier> modifiers = visitModifiers(field.getModifiers());
-            TypeTree typeExpr = visitTypeTree(field.getOriginType());
+            List<J.Modifier> modifiers = getModifiers();
+            TypeTree typeExpr = field.isDynamicTyped() ? null : visitTypeTree(field.getOriginType());
 
             J.Identifier name = new J.Identifier(randomId(), sourceBefore(field.getName()), Markers.EMPTY,
                     emptyList(), field.getName(), typeMapping.type(field.getOriginType()), typeMapping.variableType(field));
@@ -466,9 +467,8 @@ public class GroovyParserVisitor {
             Space fmt = whitespace();
 
             List<J.Annotation> annotations = visitAndGetAnnotations(method, this);
-            List<J.Modifier> modifiers = visitModifiers(method.getModifiers());
+            List<J.Modifier> modifiers = getModifiers();
             boolean isConstructorOfInnerNonStaticClass = false;
-            RedundantDef redundantDef = getRedundantDefMarker(method);
             J.TypeParameters typeParameters = null;
             if (method.getGenericsTypes() != null) {
                 Space prefix = sourceBefore("<");
@@ -480,7 +480,7 @@ public class GroovyParserVisitor {
                 }
                 typeParameters = new J.TypeParameters(randomId(), prefix, Markers.EMPTY, emptyList(), typeParametersList);
             }
-            TypeTree returnType = method instanceof ConstructorNode ? null : visitTypeTree(method.getReturnType());
+            TypeTree returnType = method instanceof ConstructorNode || method.isDynamicReturnType() ? null : visitTypeTree(method.getReturnType());
 
             Space namePrefix = whitespace();
             String methodName;
@@ -526,13 +526,10 @@ public class GroovyParserVisitor {
                 Parameter param = unparsedParams[i];
 
                 List<J.Annotation> paramAnnotations = visitAndGetAnnotations(param, this);
-
-                TypeTree paramType;
-                if (param.isDynamicTyped()) {
-                    paramType = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), "", JavaType.ShallowClass.build("java.lang.Object"), null);
-                } else {
-                    paramType = visitTypeTree(param.getOriginType());
-                }
+                List<J.Modifier> paramModifiers = getModifiers();
+                TypeTree paramType = param.isDynamicTyped() ?
+                        new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), "", JavaType.ShallowClass.build("java.lang.Object"), null) :
+                        visitTypeTree(param.getOriginType());
 
                 Space varargs = null;
                 if (paramType instanceof J.ArrayType && sourceStartsWith("...")) {
@@ -559,7 +556,7 @@ public class GroovyParserVisitor {
                 Space rightPad = sourceBefore(i == unparsedParams.length - 1 ? ")" : ",");
 
                 params.add(JRightPadded.build((Statement) new J.VariableDeclarations(randomId(), EMPTY,
-                        Markers.EMPTY, paramAnnotations, emptyList(), paramType,
+                        Markers.EMPTY, paramAnnotations, paramModifiers, paramType,
                         varargs, emptyList(),
                         singletonList(paramName))).withAfter(rightPad));
             }
@@ -587,7 +584,7 @@ public class GroovyParserVisitor {
 
             queue.add(new J.MethodDeclaration(
                     randomId(), fmt,
-                    redundantDef == null ? Markers.EMPTY : Markers.EMPTY.add(redundantDef),
+                    Markers.EMPTY,
                     annotations,
                     modifiers,
                     typeParameters,
@@ -599,24 +596,6 @@ public class GroovyParserVisitor {
                     null,
                     typeMapping.methodType(method)
             ));
-        }
-
-        /**
-         * Methods can be declared with "def" AND a return type (or constructors with "def").
-         * In these cases the "def" is semantically meaningless but needs to be preserved for source code accuracy.
-         * If there is both a def and a return type, this method returns a RedundantDef object and advances the cursor
-         * position past the "def" keyword, leaving the return type to be parsed as normal.
-         */
-        private @Nullable RedundantDef getRedundantDefMarker(MethodNode method) {
-            int saveCursor = cursor;
-            Space defPrefix = whitespace();
-            if (source.startsWith("def", cursor) && (method.getReturnType().isRedirectNode() || !Object.class.getName().equals(method.getReturnType().getName()))) {
-                skip("def");
-                return new RedundantDef(randomId(), defPrefix);
-            }
-
-            cursor = saveCursor;
-            return null;
         }
 
         @SuppressWarnings({"ConstantConditions", "unchecked"})
@@ -1375,7 +1354,7 @@ public class GroovyParserVisitor {
             Space prefix = whitespace();
             List<J.Annotation> leadingAnnotations = visitAndGetAnnotations(expression, classVisitor);
             Optional<MultiVariable> multiVariable = maybeMultiVariable();
-            List<J.Modifier> modifiers = getModifiers(expression.getVariableExpression());
+            List<J.Modifier> modifiers = getModifiers();
             TypeTree typeExpr = visitVariableExpressionType(expression.getVariableExpression());
 
             J.VariableDeclarations.NamedVariable namedVariable;
@@ -1430,33 +1409,6 @@ public class GroovyParserVisitor {
             return Optional.empty();
         }
 
-        private List<J.Modifier> getModifiers(Variable variable) {
-            String varName = variable.getName();
-            List<J.Modifier> modifiers = new ArrayList<>();
-            int saveCursor = cursor;
-            Space prefix = whitespace();
-            Set<String> possibleModifiers = new LinkedHashSet<>(modifierNameToType.keySet());
-            String currentModifier = possibleModifiers.stream().filter(modifierName -> source.startsWith(modifierName, cursor))
-                    .findFirst()
-                    .orElse(null);
-            while (currentModifier != null) {
-                possibleModifiers.remove(currentModifier);
-                modifiers.add(new J.Modifier(randomId(), prefix, Markers.EMPTY, currentModifier, modifierNameToType.get(currentModifier), emptyList()));
-                skip(currentModifier);
-                saveCursor = cursor;
-                prefix = whitespace();
-                currentModifier = possibleModifiers.stream()
-                        .filter(modifierName ->
-                                // Try to avoid confusing a variable name with an incidentally similar modifier keyword
-                                (varName.length() < modifierName.length() || !source.startsWith(varName, cursor)) &&
-                                source.startsWith(modifierName, cursor))
-                        .findFirst()
-                        .orElse(null);
-            }
-            cursor = saveCursor;
-            return modifiers;
-        }
-
         @Override
         public void visitEmptyExpression(EmptyExpression expression) {
             queue.add(new J.Empty(randomId(), EMPTY, Markers.EMPTY));
@@ -1508,7 +1460,7 @@ public class GroovyParserVisitor {
                 } else {
                     Parameter param = forLoop.getVariable();
                     Space paramFmt = whitespace();
-                    List<J.Modifier> modifiers = getModifiers(param);
+                    List<J.Modifier> modifiers = getModifiers();
                     TypeTree paramType = param.getOriginType().getColumnNumber() >= 0 ? visitTypeTree(param.getOriginType()) : null;
                     JRightPadded<J.VariableDeclarations.NamedVariable> paramName = JRightPadded.build(
                             new J.VariableDeclarations.NamedVariable(randomId(), whitespace(), Markers.EMPTY,
@@ -2471,6 +2423,20 @@ public class GroovyParserVisitor {
         return source.startsWith(delimiter, indexOfNextNonWhitespace(cursor, source));
     }
 
+    private boolean sourceStartsWith(String delimiter, String... optionalSuffixes) {
+        int whitespaceIndex = indexOfNextNonWhitespace(cursor, source);
+        boolean startsWith = source.startsWith(delimiter, whitespaceIndex);
+        if (startsWith) {
+            for (String suffix : optionalSuffixes) {
+                if (source.startsWith(suffix, whitespaceIndex + delimiter.length())) {
+                    return true;
+                }
+            }
+            return optionalSuffixes.length == 0;
+        }
+        return false;
+    }
+
     /**
      * Returns a string that is a part of this source. The substring begins at the specified beginIndex and extends until delimiter.
      * The cursor will not be moved.
@@ -2606,57 +2572,21 @@ public class GroovyParserVisitor {
         return typeTree(classNode, inferredType);
     }
 
-    private List<J.Modifier> visitModifiers(int modifiers) {
-        List<J.Modifier> unorderedModifiers = new ArrayList<>();
-
-        if ((modifiers & Opcodes.ACC_ABSTRACT) != 0) {
-            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, null, J.Modifier.Type.Abstract, emptyList()));
+    private List<J.Modifier> getModifiers() {
+        List<J.Modifier> modifiers = new ArrayList<>();
+        Set<String> possibleModifiers = new LinkedHashSet<>(modifierNameToType.keySet());
+        String currentModifier = possibleModifiers.stream().filter(this::sourceStartsWith).findFirst().orElse(null);
+        while (currentModifier != null) {
+            possibleModifiers.remove(currentModifier);
+            modifiers.add(new J.Modifier(randomId(), whitespace(), Markers.EMPTY, currentModifier, modifierNameToType.get(currentModifier), emptyList()));
+            skip(currentModifier);
+            currentModifier = possibleModifiers.stream()
+                    // Try to avoid confusing a variable name with an incidentally similar modifier keyword like `def defaultPublicStaticFinal = 0`
+                    .filter(modifierName -> sourceStartsWith(modifierName, "\n", " ", ")"))
+                    .findFirst()
+                    .orElse(null);
         }
-        if ((modifiers & Opcodes.ACC_FINAL) != 0) {
-            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, null, J.Modifier.Type.Final, emptyList()));
-        }
-        if ((modifiers & Opcodes.ACC_PRIVATE) != 0) {
-            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, null, J.Modifier.Type.Private, emptyList()));
-        }
-        if ((modifiers & Opcodes.ACC_PROTECTED) != 0) {
-            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, null, J.Modifier.Type.Protected, emptyList()));
-        }
-        if ((modifiers & Opcodes.ACC_PUBLIC) != 0) {
-            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, null, J.Modifier.Type.Public, emptyList()));
-        }
-        if ((modifiers & Opcodes.ACC_STATIC) != 0) {
-            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, null, J.Modifier.Type.Static, emptyList()));
-        }
-        if ((modifiers & Opcodes.ACC_SYNCHRONIZED) != 0) {
-            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, null, J.Modifier.Type.Synchronized, emptyList()));
-        }
-        if ((modifiers & Opcodes.ACC_TRANSIENT) != 0) {
-            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, null, J.Modifier.Type.Transient, emptyList()));
-        }
-        if ((modifiers & Opcodes.ACC_VOLATILE) != 0) {
-            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, null, J.Modifier.Type.Volatile, emptyList()));
-        }
-
-        List<J.Modifier> orderedModifiers = new ArrayList<>(unorderedModifiers.size());
-        boolean foundModifier = true;
-        nextModifier:
-        while (foundModifier) {
-            int saveCursor = cursor;
-            Space fmt = whitespace();
-            for (J.Modifier mod : unorderedModifiers) {
-                String modName = mod.getType().name().toLowerCase();
-                if (source.startsWith(modName, cursor)) {
-                    orderedModifiers.add(mod.withPrefix(fmt));
-                    unorderedModifiers.remove(mod);
-                    cursor += modName.length();
-                    continue nextModifier;
-                }
-            }
-            foundModifier = false;
-            cursor = saveCursor;
-        }
-
-        return orderedModifiers;
+        return modifiers;
     }
 
     private <G2 extends J> JRightPadded<G2> maybeSemicolon(G2 g) {
@@ -2835,42 +2765,54 @@ public class GroovyParserVisitor {
             }
             String importSource = sourceLineNumberOffsets.length <= lastLineNumber ? source : source.substring(0, sourceLineNumberOffsets[lastLineNumber]);
 
+            importSource = eraseComments(importSource);
             // Create a node for each `import static`, don't parse comments
-            String[] lines = importSource.replaceAll(MULTILINE_COMMENT_REGEX, "").split("\n");
-            for (int i = 0; i < lines.length; i++) {
-                String line = lines[i].split(SINGLE_LINE_COMMENT.open)[0];
-                int index = 0;
+            int offset = 0;
+            int lineNo = 1;
+            while (offset < importSource.length()) {
+                int importIndex = importSource.indexOf("import", offset);
+                if (importIndex == -1) break;
+                lineNo += StringUtils.countOccurrences(importSource.substring(offset, importIndex), "\n");
 
-                while (index < line.length()) {
-                    int importIndex = line.indexOf("import", index);
-                    if (importIndex == -1) break;
-
-                    int maybeStaticIndex = indexOfNextNonWhitespace(importIndex + 6, line);
-                    if (!line.startsWith("static", maybeStaticIndex)) {
-                        index = importIndex + 6;
-                        continue;
-                    }
-
-                    int packageBegin = indexOfNextNonWhitespace(maybeStaticIndex + 6, line);
-                    int packageEnd = packageBegin;
-                    while (packageEnd < line.length() && (isJavaIdentifierPart(line.charAt(packageEnd)) || line.charAt(packageEnd) == '.')) {
-                        packageEnd++;
-                    }
-
-                    if (packageEnd < line.length() && line.charAt(packageEnd) == '*') {
-                        ImportNode node = new ImportNode(staticStarImports.get(line.substring(packageBegin, packageEnd - 1)).getType());
-                        // The line numbers can be off, because we filter away all the multiline comments.
-                        // This does not really do any harm, because we only use the line numbers to order the nodes in the `sortedByPosition` var.
-                        node.setLineNumber(i + 1);
-                        node.setColumnNumber(importIndex + 1);
-                        completeStaticStarImports.add(node);
-                    }
-
-                    index = packageEnd;
+                int maybeStaticIndex = indexOfNextNonWhitespace(importIndex + 6, importSource);
+                if (!importSource.startsWith("static", maybeStaticIndex)) {
+                    offset = importIndex + 6;
+                    continue;
                 }
+
+                int packageBegin = indexOfNextNonWhitespace(maybeStaticIndex + 6, importSource);
+                int packageEnd = packageBegin;
+                while (packageEnd < importSource.length() && (isJavaIdentifierPart(importSource.charAt(packageEnd)) || importSource.charAt(packageEnd) == '.')) {
+                    packageEnd++;
+                }
+
+                if (packageEnd < importSource.length() && importSource.charAt(packageEnd) == '*') {
+                    ImportNode node = new ImportNode(staticStarImports.get(importSource.substring(packageBegin, packageEnd - 1)).getType());
+                    node.setLineNumber(lineNo);
+                    node.setColumnNumber(importIndex + 1);
+                    completeStaticStarImports.add(node);
+                }
+
+                lineNo += StringUtils.countOccurrences(importSource.substring(importIndex, packageEnd), "\n");
+                offset = packageEnd;
             }
         }
         return completeStaticStarImports;
+    }
+
+    // VisibleForTesting
+    static String eraseComments(String importSource) {
+        Matcher matcher = MULTILINE_COMMENT_REGEX.matcher(importSource);
+        StringBuffer sb = new StringBuffer(); // appendReplacement requires Java 9+ for StringBuilder
+        while (matcher.find()) {
+            String match = matcher.group();
+            String replacement = match.replaceAll("[^\\n]", " ");
+            matcher.appendReplacement(sb, replacement);
+        }
+        matcher.appendTail(sb);
+        String multiLineRemoved = sb.toString();
+        return Arrays.stream(multiLineRemoved.split("\n", -1)).map(x -> x.split(SINGLE_LINE_COMMENT.open)[0])
+                .collect(Collectors.joining("\n"));
     }
 
     private DeclarationExpression transformBackToDeclarationExpression(ConstantExpression expression) {
