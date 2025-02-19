@@ -34,7 +34,7 @@ public class RpcSendQueueTest {
 
         CountDownLatch latch = new CountDownLatch(1);
         RpcSendQueue q = new RpcSendQueue(10, t -> {
-            assertThat(t.getData()).containsExactly(
+            assertThat(t).containsExactly(
               new RpcObjectData(RpcObjectData.State.CHANGE, null, null, null),
               new RpcObjectData(RpcObjectData.State.CHANGE, null, List.of(0, -1, -1, 2), null),
               new RpcObjectData(RpcObjectData.State.NO_CHANGE, null, null, null) /* A */,
@@ -57,7 +57,7 @@ public class RpcSendQueueTest {
 
         CountDownLatch latch = new CountDownLatch(1);
         RpcSendQueue q = new RpcSendQueue(10, t -> {
-            assertThat(t.getData()).containsExactly(
+            assertThat(t).containsExactly(
               new RpcObjectData(RpcObjectData.State.ADD, null, null, null),
               new RpcObjectData(RpcObjectData.State.CHANGE, null, List.of(), null)
             );
