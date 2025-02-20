@@ -148,7 +148,7 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
     @Test
     void replaceStringLiteralWithConstantValueWhenLiteralValueIsNotConfigured() {
         rewriteRun(
-          spec -> spec.recipe(new ReplaceStringLiteralWithConstant(EXAMPLE_STRING_FQN)),
+          spec -> spec.recipe(new ReplaceStringLiteralWithConstant(null, EXAMPLE_STRING_FQN)),
           java(
             """ 
               class Test {
@@ -253,7 +253,7 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
               @Override
               public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                   // Circumvent validation to match use in rewrite-spring's ReplaceStringLiteralsWithMediaTypeConstants
-                  doAfterVisit(new ReplaceStringLiteralWithConstant(EXAMPLE_STRING_FQN + "_xyz").getVisitor());
+                  doAfterVisit(new ReplaceStringLiteralWithConstant(null, EXAMPLE_STRING_FQN + "_xyz").getVisitor());
                   return super.visit(tree, ctx);
               }
           })),
