@@ -1879,12 +1879,14 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                 int startPosition = ((JCTree) t).getStartPosition();
                 if (cursor > startPosition)
                     continue;
-                if (cursor < startPosition) {
+                while (cursor < startPosition) {
                     int semicolonIndex = source.substring(cursor, startPosition).indexOf(";");
                     if (semicolonIndex > -1) {
-                        Space prefix = Space.build(source.substring(cursor, cursor + semicolonIndex), Collections.emptyList());
+                        Space prefix = Space.format(source, cursor, cursor+semicolonIndex);
                         converted.add(new JRightPadded<>(new J.Empty(randomId(), prefix, Markers.EMPTY), Space.EMPTY, Markers.EMPTY));
                         cursor += semicolonIndex + 1;
+                    } else {
+                        break;
                     }
                 }
                 converted.add(convert(treeGroup.get(0), suffix));
