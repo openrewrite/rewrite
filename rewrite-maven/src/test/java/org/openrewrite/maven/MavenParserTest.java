@@ -52,7 +52,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.openrewrite.java.Assertions.mavenProject;
+import static org.openrewrite.maven.AddRuntimeConfig.MAVEN_CONFIG_PATH;
 import static org.openrewrite.maven.Assertions.pomXml;
+import static org.openrewrite.test.SourceSpecs.text;
 
 class MavenParserTest implements RewriteTest {
 
@@ -3707,4 +3709,28 @@ class MavenParserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void mavenConfigRevision() {
+        rewriteRun(
+          text(
+            "-Drevision=1.0.0",
+            spec -> spec.path(".mvn/maven.config")
+          ),
+          pomXml(
+            """
+              <project xmlns="http://maven.apache.org/POM/4.0.0"
+                       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+              
+                  <groupId>com.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>${revision}</version>
+              </project>
+              """
+          )
+        );
+    }
+
 }
