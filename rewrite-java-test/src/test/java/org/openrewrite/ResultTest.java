@@ -21,13 +21,19 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.marker.DeserializationError;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.quark.Quark;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.text.PlainText;
 
+import java.nio.file.Paths;
 import java.util.List;
 
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.Assertions.java;
 
 class ResultTest implements RewriteTest {
@@ -49,18 +55,31 @@ class ResultTest implements RewriteTest {
                     public J.Block visitBlock(J.Block block, Integer p) {
                         // intentional inappropriate creation of a new list
                         List<Statement> statements = ListUtils.concat(block.getStatements(),
-                          new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY));
+                          new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY));
                         return block
                           .withStatements(statements)
                           .withStatements(ListUtils.map(statements, (n, s) -> n == 0 ? s : null));
                     }
                 }.visitNonNull(before, 0);
 
-                assertThat(
-                  assertThrows(IllegalStateException.class, () -> new Result(before, after))
-                    .getMessage()
-                ).contains("+class Test /*~~>*/{");
+                var unknownSourceFileChangeException = assertThrows(UnknownSourceFileChangeException.class, () -> new Result(before, after));
+                assertThat(unknownSourceFileChangeException.getDiff()).contains("+class Test /*~~>*/{");
             })
+          )
+        );
+    }
+
+    @Test
+    void deserializationError() {
+        PlainText before = PlainText.builder().sourcePath(Paths.get("foo.txt")).text("foo").build();
+        new Result(
+          before,
+          new Quark(
+            randomId(),
+            before.getSourcePath(),
+            Markers.build(singletonList(new DeserializationError(randomId(), "Foo", new RuntimeException()))),
+            before.getChecksum(),
+            before.getFileAttributes()
           )
         );
     }

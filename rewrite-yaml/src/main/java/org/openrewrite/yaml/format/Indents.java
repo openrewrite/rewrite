@@ -18,6 +18,7 @@ package org.openrewrite.yaml.format;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.style.Style;
 import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.style.Autodetect;
 import org.openrewrite.yaml.style.IndentsStyle;
@@ -43,10 +44,7 @@ public class Indents extends Recipe {
     private static class TabsAndIndentsFromCompilationUnitStyle extends YamlIsoVisitor<ExecutionContext> {
         @Override
         public Yaml.Documents visitDocuments(Yaml.Documents docs, ExecutionContext ctx) {
-            IndentsStyle style = docs.getStyle(IndentsStyle.class);
-            if (style == null) {
-                style = Autodetect.tabsAndIndents(docs, YamlDefaultStyles.indents());
-            }
+            IndentsStyle style = Style.from(IndentsStyle.class, docs, () -> Autodetect.tabsAndIndents(docs, YamlDefaultStyles.indents()));
             doAfterVisit(new IndentsVisitor<>(style, null));
             return docs;
         }

@@ -27,7 +27,7 @@ import org.openrewrite.java.tree.J;
 public class ChangeMethodAccessLevel extends Recipe {
 
     @Option(displayName = "Method pattern",
-            description = "A method pattern that is used to find matching method declarations/invocations.",
+            description = MethodMatcher.METHOD_PATTERN_DESCRIPTION,
             example = "org.mockito.Matchers anyVararg()")
     String methodPattern;
 

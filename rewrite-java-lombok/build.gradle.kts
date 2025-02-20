@@ -4,7 +4,7 @@ plugins {
     id("org.openrewrite.build.language-library")
 }
 
-// Create the lombok configuration and ensure it extends compileOnly
+// Create the lombok configuration with known specific version containing a fix
 val lombok = configurations.create("lombok")
 configurations.named("compileOnly").configure {
     extendsFrom(lombok)
@@ -53,11 +53,13 @@ val compiler = javaToolchains.compilerFor {
 val tools = compiler.get().metadata.installationPath.file("lib/tools.jar")
 
 dependencies {
-    implementation("org.jspecify:jspecify:latest.release")
-    runtimeOnly("org.projectlombok:lombok:latest.release")
+    implementation(project(":rewrite-core"))
+    //runtimeOnly("org.projectlombok:lombok:latest.release")
+    runtimeOnly("org.openrewrite.tools:lombok:latest.release") // Temporary pending the next stable release of lombok
 
     // Add lombok dependency to the newly created lombok configuration
-    lombok("org.projectlombok:lombok:latest.release")
+    //lombok("org.projectlombok:lombok:latest.release")
+    lombok("org.openrewrite.tools:lombok:latest.release") // Temporary pending the next stable release of lombok
     compileOnly(files(tools))
     compileOnly(files(unpackedAndRenamedLombokDir))
 }

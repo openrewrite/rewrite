@@ -35,12 +35,12 @@ public class FindMissingTypes extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Find missing type information on Java ASTs";
+        return "Find missing type information on Java LSTs";
     }
 
     @Override
     public String getDescription() {
-        return "This is a diagnostic recipe to highlight where ASTs are missing type attribution information.";
+        return "This is a diagnostic recipe to highlight where LSTs are missing type attribution information.";
     }
 
     @Override

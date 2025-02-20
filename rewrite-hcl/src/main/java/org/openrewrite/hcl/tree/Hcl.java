@@ -26,7 +26,6 @@ import org.openrewrite.hcl.HclVisitor;
 import org.openrewrite.hcl.internal.HclPrinter;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.template.SourceTemplate;
 
 import java.lang.ref.WeakReference;
 import java.nio.charset.Charset;
@@ -232,6 +231,75 @@ public interface Hcl extends Tree {
 
             public AttributeAccess withName(HclLeftPadded<Identifier> name) {
                 return t.name == name ? t : new AttributeAccess(t.id, t.prefix, t.markers, t.attribute, name);
+            }
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class LegacyIndexAttributeAccess implements Expression, Label {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
+        HclRightPadded<Expression> base;
+
+        @With
+        @Getter
+        Literal index;
+
+        @Override
+        public <P> Hcl acceptHcl(HclVisitor<P> v, P p) {
+            return v.visitLegacyIndexAttribute(this, p);
+        }
+
+        @Override
+        public String toString() {
+            return "LegacyIndexAttributeAccess{" + base + "." + index + "}";
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final LegacyIndexAttributeAccess t;
+
+            public HclRightPadded<Expression> getBase() {
+                return t.base;
+            }
+
+            public LegacyIndexAttributeAccess withBase(HclRightPadded<Expression> base) {
+                return t.base == base ? t : new LegacyIndexAttributeAccess(t.id, t.prefix, t.markers, base, t.index);
             }
         }
     }
@@ -1195,6 +1263,7 @@ public interface Hcl extends Tree {
         Markers markers;
 
         @With
+        @Nullable
         Object value;
 
         @With
@@ -1610,6 +1679,7 @@ public interface Hcl extends Tree {
         Markers markers;
 
         @With
+        @Nullable // FIXME remove this annotation after 2025-05-01, once new LST models are in use
         Identifier name;
 
         @Override

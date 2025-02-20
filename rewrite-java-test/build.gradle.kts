@@ -14,9 +14,7 @@ dependencies {
     testRuntimeOnly("org.apache.hbase:hbase-shaded-client:2.4.11")
     testRuntimeOnly("com.google.guava:guava:latest.release")
     testRuntimeOnly("org.mapstruct:mapstruct:latest.release")
-    testRuntimeOnly("org.projectlombok:lombok:latest.release")
     testRuntimeOnly(project(":rewrite-yaml"))
-    testImplementation(project(":rewrite-maven"))
     testImplementation(project(":rewrite-properties"))
     testImplementation(project(":rewrite-xml"))
 }

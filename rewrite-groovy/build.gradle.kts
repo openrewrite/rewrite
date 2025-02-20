@@ -18,7 +18,18 @@ dependencies {
 
     testImplementation(project(":rewrite-test"))
     testImplementation(project(":rewrite-java-test"))
-    testImplementation("org.junit-pioneer:junit-pioneer:2.0.0")
+    testImplementation("org.junit-pioneer:junit-pioneer:latest.release")
+    testRuntimeOnly("org.antlr:antlr4-runtime:4.13.2")
     testRuntimeOnly("org.codehaus.groovy:groovy-all:latest.release")
     testRuntimeOnly(project(":rewrite-java-17"))
 }
+
+//val testJava8 = tasks.register<Test>("testJava8") {
+//    javaLauncher.set(javaToolchains.launcherFor {
+//        languageVersion.set(JavaLanguageVersion.of(8))
+//    })
+//}
+//tasks.named("check").configure {
+//    // Enable once the java8 tests are passing
+//    // dependsOn(testJava8)
+//}

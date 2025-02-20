@@ -18,7 +18,7 @@
 # Any differences produced by this recipe will result in code suggestion comments on pull requests.
 ---
 type: specs.openrewrite.org/v1beta/recipe
-name: org.openrewrite.recipes.OpenRewriteBestPracticesSubset
+name: org.openrewrite.recipes.rewrite.OpenRewriteRecipeBestPracticesSubset
 displayName: OpenRewrite best practices
 description: Best practices for OpenRewrite recipe development.
 recipeList:
@@ -64,7 +64,7 @@ recipeList:
   - org.openrewrite.java.testing.cleanup.RemoveTestPrefix
   - org.openrewrite.java.testing.cleanup.TestsShouldNotBePublic
   - org.openrewrite.staticanalysis.NeedBraces
-  - org.openrewrite.staticanalysis.RemoveSystemOutPrintln
+  #- org.openrewrite.staticanalysis.RemoveSystemOutPrintln
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.recipes.RecipeNullabilityBestPracticesSubset

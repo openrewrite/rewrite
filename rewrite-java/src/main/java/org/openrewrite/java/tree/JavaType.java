@@ -19,9 +19,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.With;
+import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
@@ -48,6 +46,7 @@ public interface JavaType {
     Method[] EMPTY_METHOD_ARRAY = new Method[0];
     String[] EMPTY_STRING_ARRAY = new String[0];
     JavaType[] EMPTY_JAVA_TYPE_ARRAY = new JavaType[0];
+    Annotation.ElementValue[] EMPTY_ANNOTATION_VALUE_ARRAY = new Annotation.ElementValue[0];
 
     // TODO: To be removed with OpenRewrite 9
     default @Nullable Integer getManagedReference() {
@@ -625,6 +624,153 @@ public interface JavaType {
 
             return new ShallowClass(null, 1, fullyQualifiedName, Kind.Class, emptyList(), null, owningClass,
                     emptyList(), emptyList(), emptyList(), emptyList());
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    class Annotation extends FullyQualified {
+
+        @Getter
+        @With
+        final FullyQualified type;
+
+        final ElementValue @Nullable [] values;
+
+        public Annotation(FullyQualified type, List<ElementValue> values) {
+            this(type, arrayOrNullIfEmpty(values, EMPTY_ANNOTATION_VALUE_ARRAY));
+        }
+
+        @JsonCreator
+        Annotation(FullyQualified type, ElementValue @Nullable [] values) {
+            this.type = type;
+            this.values = nullIfEmpty(values);
+        }
+
+        public List<ElementValue> getValues() {
+            return values == null ? emptyList() : Arrays.asList(values);
+        }
+
+        public Annotation withValues(@Nullable List<ElementValue> values) {
+            ElementValue[] valuesArray = arrayOrNullIfEmpty(values, EMPTY_ANNOTATION_VALUE_ARRAY);
+            if (Arrays.equals(valuesArray, this.values)) {
+                return this;
+            }
+            return new Annotation(type, valuesArray);
+        }
+
+        @Override
+        public String getFullyQualifiedName() {
+            return type.getFullyQualifiedName();
+        }
+
+        @Override
+        public FullyQualified withFullyQualifiedName(String fullyQualifiedName) {
+            return withType(type.withFullyQualifiedName(fullyQualifiedName));
+        }
+
+        @Override
+        public List<FullyQualified> getAnnotations() {
+            return type.getAnnotations();
+        }
+
+        @Override
+        public boolean hasFlags(Flag... test) {
+            return type.hasFlags(test);
+        }
+
+        @Override
+        public Set<Flag> getFlags() {
+            return type.getFlags();
+        }
+
+        @Override
+        public List<FullyQualified> getInterfaces() {
+            return type.getInterfaces();
+        }
+
+        @Override
+        public Kind getKind() {
+            return type.getKind();
+        }
+
+        @Override
+        public List<Variable> getMembers() {
+            return type.getMembers();
+        }
+
+        @Override
+        public List<Method> getMethods() {
+            return type.getMethods();
+        }
+
+        @Override
+        public List<JavaType> getTypeParameters() {
+            return type.getTypeParameters();
+        }
+
+        @Override
+        public @Nullable FullyQualified getOwningClass() {
+            return type.getOwningClass();
+        }
+
+        @Override
+        public @Nullable FullyQualified getSupertype() {
+            return type.getSupertype();
+        }
+
+        @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c", include = JsonTypeInfo.As.PROPERTY)
+        public interface ElementValue {
+            JavaType getElement();
+
+            Object getValue();
+        }
+
+        @Value
+        public static class SingleElementValue implements ElementValue {
+            JavaType element;
+
+            @Nullable
+            Object constantValue;
+
+            @Nullable
+            JavaType referenceValue;
+
+            public static SingleElementValue from(JavaType element, Object value) {
+                if (value instanceof JavaType) {
+                    return new SingleElementValue(element, null, (JavaType) value);
+                } else {
+                    return new SingleElementValue(element, value, null);
+                }
+            }
+
+            @Override
+            public Object getValue() {
+                return constantValue != null ? constantValue : referenceValue;
+            }
+        }
+
+        @Value
+        public static class ArrayElementValue implements ElementValue {
+            JavaType element;
+            Object @Nullable [] constantValues;
+            JavaType @Nullable [] referenceValues;
+
+            public static ArrayElementValue from(JavaType element, Object[] values) {
+                if (values.length > 0 && values[0] instanceof JavaType) {
+                    return new ArrayElementValue(element, null, (JavaType[]) values);
+                } else {
+                    return new ArrayElementValue(element, values, null);
+                }
+            }
+
+            @Override
+            public Object getValue() {
+                return getValues();
+            }
+
+            public List<?> getValues() {
+                return Arrays.asList(constantValues != null ? constantValues : referenceValues);
+            }
         }
     }
 

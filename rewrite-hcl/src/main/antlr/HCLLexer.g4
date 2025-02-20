@@ -20,6 +20,13 @@ FOR_BRACK             : '[' (WS|NEWLINE|COMMENT|LINE_COMMENT)* 'for' WS;
 IF              : 'if';
 IN              : 'in';
 
+BooleanLiteral
+    : 'true'
+    | 'false'
+    ;
+
+NULL                            : 'null';
+
 LBRACE                          : '{'
 {
     leftCurlyStack.push(CurlyType.OBJECT);
@@ -81,7 +88,7 @@ fragment HexDigit
 // https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md#numeric-literals
 
 NumericLiteral
-    : [0-9]+ '.' [0-9]* ExponentPart?
+    : [0-9]+ '.' [0-9]+ ExponentPart?
     | [0-9]+ ExponentPart
     | [0-9]+
     ;
@@ -90,13 +97,7 @@ fragment ExponentPart
     : [eE] [+\-]? [0-9]+
     ;
 
-BooleanLiteral
-    : 'true'
-    | 'false'
-    ;
-
 QUOTE                               : '"'       -> pushMode(TEMPLATE);
-NULL                                : 'null';
 
 // Lexical Elements - Operators and Delimiters
 // https://github.com/hashicorp/hcl2/blob/master/hcl/hclsyntax/spec.md#operators-and-delimiters
@@ -128,6 +129,7 @@ COMMA                           : ',';
 MOD                             : '%';
 ELLIPSIS                        : '...';
 TILDE                           : '~';
+
 
 // ----------------------------------------------------------------------------------------------
 mode TEMPLATE;

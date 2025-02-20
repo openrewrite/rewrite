@@ -57,7 +57,6 @@ class RemoveTrailingWhitespaceTest implements RewriteTest {
         );
     }
 
-    @Disabled // TODO: This exposes bug around trailing commas in the parser
     @Issue("https://github.com/openrewrite/rewrite/issues/1053")
     @Test
     void doNotRemoveTrailingComma() {

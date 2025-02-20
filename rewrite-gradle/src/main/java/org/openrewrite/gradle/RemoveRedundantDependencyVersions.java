@@ -19,12 +19,12 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.gradle.internal.ChangeStringLiteral;
+import org.openrewrite.gradle.internal.Dependency;
+import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.trait.GradleDependency;
-import org.openrewrite.gradle.util.ChangeStringLiteral;
-import org.openrewrite.gradle.util.Dependency;
-import org.openrewrite.gradle.util.DependencyStringNotationConverter;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
@@ -33,6 +33,7 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
@@ -44,13 +45,17 @@ import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class RemoveRedundantDependencyVersions extends Recipe {
     @Option(displayName = "Group",
             description = "Group glob expression pattern used to match dependencies that should be managed." +
-                    "Group is the first part of a dependency coordinate `com.google.guava:guava:VERSION`.",
+                          "Group is the first part of a dependency coordinate `com.google.guava:guava:VERSION`.",
             example = "com.google.*",
             required = false)
     @Nullable
@@ -58,7 +63,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
     @Option(displayName = "Artifact",
             description = "Artifact glob expression pattern used to match dependencies that should be managed." +
-                    "Artifact is the second part of a dependency coordinate `com.google.guava:guava:VERSION`.",
+                          "Artifact is the second part of a dependency coordinate `com.google.guava:guava:VERSION`.",
             example = "guava*",
             required = false)
     @Nullable
@@ -66,16 +71,16 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
     @Option(displayName = "Only if managed version is ...",
             description = "Only remove the explicit version if the managed version has the specified comparative relationship to the explicit version. " +
-                    "For example, `gte` will only remove the explicit version if the managed version is the same or newer. " +
-                    "Default `eq`.",
-            valid = {"any", "eq", "lt", "lte", "gt", "gte"},
+                          "For example, `gte` will only remove the explicit version if the managed version is the same or newer. " +
+                          "Default `eq`.",
+            valid = {"ANY", "EQ", "LT", "LTE", "GT", "GTE"},
             required = false)
     @Nullable
     Comparator onlyIfManagedVersionIs;
 
     @Option(displayName = "Except",
-            description = "Accepts a list of GAVs. Dependencies matching a GAV will be ignored by this recipe."
-                    + " GAV versions are ignored if provided.",
+            description = "Accepts a list of GAVs. Dependencies matching a GAV will be ignored by this recipe." +
+                          " GAV versions are ignored if provided.",
             example = "com.jcraft:jsch",
             required = false)
     @Nullable
@@ -99,6 +104,10 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     public String getDescription() {
         return "Remove explicitly-specified dependency versions that are managed by a Gradle `platform`/`enforcedPlatform`.";
     }
+
+    private static final MethodMatcher CONSTRAINTS_MATCHER = new MethodMatcher("DependencyHandlerSpec constraints(..)");
+    private static final MethodMatcher INDIVIDUAL_CONSTRAINTS_MATCHER = new MethodMatcher("DependencyHandlerSpec *(..)");
+    private static final VersionComparator VERSION_COMPARATOR = requireNonNull(Semver.validate("latest.release", null).getValue());
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -192,6 +201,80 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                 return m;
                             }
                         }.visit(cu, ctx);
+                        cu = (G.CompilationUnit) new GroovyIsoVisitor<ExecutionContext>() {
+
+                            @Override
+                            public J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                                if (CONSTRAINTS_MATCHER.matches(m)) {
+                                    if (m.getArguments().isEmpty() || !(m.getArguments().get(0) instanceof J.Lambda)) {
+                                        return m;
+                                    }
+                                    J.Lambda l = (J.Lambda) m.getArguments().get(0);
+                                    if (!(l.getBody() instanceof J.Block)) {
+                                        return m;
+                                    }
+                                    J.Block b = (J.Block) l.getBody();
+                                    if (b.getStatements().isEmpty()) {
+                                        //noinspection DataFlowIssue
+                                        return null;
+                                    }
+                                    return m;
+                                } else if (INDIVIDUAL_CONSTRAINTS_MATCHER.matches(m)) {
+                                    if (!TypeUtils.isAssignableTo("org.gradle.api.artifacts.Dependency", requireNonNull(m.getMethodType()).getReturnType())) {
+                                        return m;
+                                    }
+                                    if (m.getArguments().isEmpty() || !(m.getArguments().get(0) instanceof J.Literal) || !(((J.Literal) m.getArguments().get(0)).getValue() instanceof String)) {
+                                        return m;
+                                    }
+                                    //noinspection DataFlowIssue
+                                    if (shouldRemoveRedundantConstraint((String) ((J.Literal) m.getArguments().get(0)).getValue(), m.getSimpleName())) {
+                                        //noinspection DataFlowIssue
+                                        return null;
+                                    }
+                                }
+                                return m;
+                            }
+
+                            @Override
+                            public J.@Nullable Return visitReturn(J.Return _return, ExecutionContext ctx) {
+                                J.Return r = super.visitReturn(_return, ctx);
+                                if (r.getExpression() == null) {
+                                    //noinspection DataFlowIssue
+                                    return null;
+                                }
+                                return r;
+                            }
+
+                            boolean shouldRemoveRedundantConstraint(String dependencyNotation, String configurationName) {
+                                return shouldRemoveRedundantConstraint(
+                                        DependencyStringNotationConverter.parse(dependencyNotation),
+                                        gp.getConfiguration(configurationName));
+                            }
+
+                            boolean shouldRemoveRedundantConstraint(@Nullable Dependency constraint, @Nullable GradleDependencyConfiguration c) {
+                                if (c == null || constraint == null || constraint.getVersion() == null) {
+                                    return false;
+                                }
+                                if(constraint.getVersion().contains("[") || constraint.getVersion().contains("!!")) {
+                                    // https://docs.gradle.org/current/userguide/dependency_versions.html#sec:strict-version
+                                    return false;
+                                }
+                                if ((groupPattern != null && !StringUtils.matchesGlob(constraint.getGroupId(), groupPattern)) ||
+                                    (artifactPattern != null && !StringUtils.matchesGlob(constraint.getArtifactId(), artifactPattern))) {
+                                    return false;
+                                }
+                                return Stream.concat(
+                                                Stream.of(c),
+                                                gp.configurationsExtendingFrom(c, true).stream()
+                                        )
+                                        .filter(GradleDependencyConfiguration::isCanBeResolved)
+                                        .distinct()
+                                        .map(conf -> conf.findResolvedDependency(requireNonNull(constraint.getGroupId()), constraint.getArtifactId()))
+                                        .filter(Objects::nonNull)
+                                        .anyMatch(resolvedDependency -> VERSION_COMPARATOR.compare(null, resolvedDependency.getVersion(), constraint.getVersion()) > 0);
+                            }
+                        }.visitNonNull(cu, ctx);
 
                         return super.visitCompilationUnit(cu, ctx);
                     }
@@ -258,7 +341,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                 G.MapLiteral mapLiteral = (G.MapLiteral) arg;
                                 return mapLiteral.withElements(ListUtils.map(mapLiteral.getElements(), entry -> {
                                     if (entry.getKey() instanceof J.Literal &&
-                                            "version".equals(((J.Literal) entry.getKey()).getValue())) {
+                                        "version".equals(((J.Literal) entry.getKey()).getValue())) {
                                         return null;
                                     }
                                     return entry;
@@ -268,7 +351,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                             return m.withArguments(ListUtils.map(m.getArguments(), arg -> {
                                 G.MapEntry entry = (G.MapEntry) arg;
                                 if (entry.getKey() instanceof J.Literal &&
-                                        "version".equals(((J.Literal) entry.getKey()).getValue())) {
+                                    "version".equals(((J.Literal) entry.getKey()).getValue())) {
                                     return null;
                                 }
                                 return entry;

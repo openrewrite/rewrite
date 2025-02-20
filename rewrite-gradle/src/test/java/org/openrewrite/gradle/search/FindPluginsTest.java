@@ -34,7 +34,7 @@ import static org.openrewrite.test.SourceSpecs.text;
 class FindPluginsTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new FindPlugins("org.openrewrite.rewrite"));
+        spec.recipe(new FindPlugins("org.openrewrite.rewrite", "org.openrewrite.gradle.RewritePlugin"));
     }
 
     @DocumentExample
@@ -123,6 +123,68 @@ class FindPluginsTest implements RewriteTest {
             spec -> spec.beforeRecipe(cu -> assertThat(FindPlugins.find(cu, "org.openrewrite.rewrite"))
               .isNotEmpty()
               .anySatisfy(p -> assertThat(p.getPluginId()).isEqualTo("org.openrewrite.rewrite")))
+          )
+        );
+    }
+
+    @Test
+    void buildscriptId() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()),
+          buildGradle(
+            """
+             buildscript {
+                 repositories {
+                     gradlePluginPortal()
+                 }
+                 dependencies {
+                     classpath("org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:7.1.3")
+                 }
+             }
+             apply plugin: "org.openrewrite.rewrite"
+             """,
+            """
+             /*~~>*/buildscript {
+                 repositories {
+                     gradlePluginPortal()
+                 }
+                 dependencies {
+                     classpath("org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:7.1.3")
+                 }
+             }
+             apply plugin: "org.openrewrite.rewrite"
+             """
+          )
+        );
+    }
+
+    @Test
+    void buildscriptClassname() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()),
+          buildGradle(
+            """
+             buildscript {
+                 repositories {
+                     gradlePluginPortal()
+                 }
+                 dependencies {
+                     classpath("org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:7.1.3")
+                 }
+             }
+             apply plugin: org.openrewrite.gradle.RewritePlugin
+             """,
+            """
+             /*~~>*/buildscript {
+                 repositories {
+                     gradlePluginPortal()
+                 }
+                 dependencies {
+                     classpath("org.openrewrite.rewrite:org.openrewrite.rewrite.gradle.plugin:7.1.3")
+                 }
+             }
+             apply plugin: org.openrewrite.gradle.RewritePlugin
+             """
           )
         );
     }

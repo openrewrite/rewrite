@@ -281,7 +281,9 @@ public class ResolvedPom {
         if (property == null) {
             return null;
         }
-        String propVal = properties.get(property);
+        // Maven allows system properties to override project properties
+        // This facilitates the usage of "-D" arguments on the command line to customize builds
+        String propVal = System.getProperty(property, properties.get(property));
         if (propVal != null) {
             return propVal;
         }
@@ -318,11 +320,13 @@ public class ResolvedPom {
 
     public @Nullable String getManagedVersion(@Nullable String groupId, String artifactId, @Nullable String type, @Nullable String classifier) {
         for (ResolvedManagedDependency dm : dependencyManagement) {
+            if (dm.getVersion() == null) {
+                continue; // Unclear why this happens; just ignore those entries, because a valid version is requested
+            }
             if (dm.matches(groupId, artifactId, type, classifier)) {
                 return getValue(dm.getVersion());
             }
         }
-
         return null;
     }
 
@@ -397,19 +401,17 @@ public class ResolvedPom {
         private void resolveParentPropertiesAndRepositoriesRecursively(List<Pom> pomAncestry) throws MavenDownloadingException {
             Pom pom = pomAncestry.get(0);
 
+            List<Profile> effectiveProfiles = pom.effectiveProfiles(activeProfiles);
+
             //Resolve properties
-            for (Profile profile : pom.getProfiles()) {
-                if (profile.isActive(activeProfiles)) {
-                    mergeProperties(profile.getProperties(), pom);
-                }
+            for (Profile profile : effectiveProfiles) {
+                mergeProperties(profile.getProperties(), pom);
             }
             mergeProperties(pom.getProperties(), pom);
 
             //Resolve repositories (which may rely on properties ^^^)
-            for (Profile profile : pom.getProfiles()) {
-                if (profile.isActive(activeProfiles)) {
-                    mergeRepositories(profile.getRepositories());
-                }
+            for (Profile profile : effectiveProfiles) {
+                mergeRepositories(profile.getRepositories());
             }
             mergeRepositories(pom.getRepositories());
 
@@ -431,11 +433,11 @@ public class ResolvedPom {
         private void resolveParentDependenciesRecursively(List<Pom> pomAncestry) throws MavenDownloadingException {
             Pom pom = pomAncestry.get(0);
 
-            for (Profile profile : pom.getProfiles()) {
-                if (profile.isActive(activeProfiles)) {
-                    mergeDependencyManagement(profile.getDependencyManagement(), pomAncestry);
-                    mergeRequestedDependencies(profile.getDependencies());
-                }
+            List<Profile> effectiveProfiles = pom.effectiveProfiles(activeProfiles);
+
+            for (Profile profile : effectiveProfiles) {
+                mergeDependencyManagement(profile.getDependencyManagement(), pomAncestry);
+                mergeRequestedDependencies(profile.getDependencies());
             }
 
             mergeDependencyManagement(pom.getDependencyManagement(), pomAncestry);

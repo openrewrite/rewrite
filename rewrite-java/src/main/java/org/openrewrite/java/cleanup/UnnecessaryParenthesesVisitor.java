@@ -16,12 +16,14 @@
 package org.openrewrite.java.cleanup;
 
 import lombok.EqualsAndHashCode;
-import org.openrewrite.*;
+import org.openrewrite.Cursor;
+import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.UnwrapParentheses;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.style.UnnecessaryParenthesesStyle;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.style.Style;
 
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
@@ -41,7 +43,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
             if(cu == null) {
                 style = Checkstyle.unnecessaryParentheses();
             } else {
-                style = ((SourceFile) cu).getStyle(UnnecessaryParenthesesStyle.class, Checkstyle.unnecessaryParentheses());
+                style = Style.from(UnnecessaryParenthesesStyle.class, cu, Checkstyle::unnecessaryParentheses);
             }
         }
         return style;
