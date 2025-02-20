@@ -30,7 +30,7 @@ import static java.util.Collections.singletonList;
 @EqualsAndHashCode(callSuper = false)
 public class RemoveMethodInvocations extends Recipe {
     @Option(displayName = "Method pattern",
-            description = "A pattern to match method invocations for removal.",
+            description = "A pattern to match method invocations for removal. " + MethodMatcher.METHOD_PATTERN_DESCRIPTION,
             example = "java.lang.StringBuilder append(java.lang.String)")
     String methodPattern;
 

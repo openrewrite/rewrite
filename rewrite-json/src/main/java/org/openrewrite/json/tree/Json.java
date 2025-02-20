@@ -262,6 +262,7 @@ public interface Json extends Tree, RpcCodec<Json> {
 
         String source;
 
+        @Nullable // for `null` values
         Object value;
 
         @Override

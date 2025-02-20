@@ -457,6 +457,9 @@ public class JsonPathMatcher {
             String s = null;
             if (ctx.StringLiteral() != null) {
                 s = ctx.StringLiteral().getText();
+            } else if (ctx.TRUE() != null || ctx.FALSE() != null) {
+                // FIXME type of Yaml.Literal#value should be `Object` rather than `String`
+                return ctx.getText();
             } else if (!ctx.children.isEmpty()) {
                 s = ctx.children.get(0).getText();
             }

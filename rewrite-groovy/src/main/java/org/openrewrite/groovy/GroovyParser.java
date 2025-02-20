@@ -121,7 +121,7 @@ public class GroovyParser implements Parser {
                         );
 
                         pctx.getParsingListener().startedParsing(input);
-                        CompilationUnit compUnit = new CompilationUnit(configuration, null, classLoader, classLoader);
+                        CompilationUnit compUnit = new LessAstTransformationsCompilationUnit(configuration, null, classLoader, classLoader);
                         compUnit.addSource(unit);
                         compUnit.compile(Phases.CANONICALIZATION);
                         ModuleNode ast = unit.getAST();

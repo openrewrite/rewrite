@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.gradle.search.FindJVMTestSuites;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
@@ -33,8 +34,9 @@ import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.semver.Semver;
 
 import java.util.*;
+import java.util.function.Predicate;
 
-import static java.util.Collections.*;
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 
 @Value
@@ -56,9 +58,9 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     @Option(displayName = "Version",
             description = "An exact version number or node-style semver selector used to select the version number. " +
-                          "You can also use `latest.release` for the latest available version and `latest.patch` if " +
-                          "the current version is a valid semantic version. For more details, you can look at the documentation " +
-                          "page of [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors).",
+                    "You can also use `latest.release` for the latest available version and `latest.patch` if " +
+                    "the current version is a valid semantic version. For more details, you can look at the documentation " +
+                    "page of [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors).",
             example = "29.X",
             required = false)
     @Nullable
@@ -66,7 +68,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example, " +
-                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
@@ -74,7 +76,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     @Option(displayName = "Configuration",
             description = "A configuration to use when it is not what can be inferred from usage. Most of the time this will be left empty, but " +
-                          "is used when adding a new as of yet unused dependency.",
+                    "is used when adding a new as of yet unused dependency.",
             example = "implementation",
             required = false)
     @Nullable
@@ -103,7 +105,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     @Option(displayName = "Family pattern",
             description = "A pattern, applied to groupIds, used to determine which other dependencies should have aligned version numbers. " +
-                          "Accepts '*' as a wildcard character.",
+                    "Accepts '*' as a wildcard character.",
             example = "com.fasterxml.jackson*",
             required = false)
     @Nullable
@@ -143,6 +145,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     public static class Scanned {
         boolean usingType;
         Map<JavaProject, Set<String>> configurationsByProject = new HashMap<>();
+        Map<JavaProject, Set<String>> customJvmTestSuitesWithDependencies = new HashMap<>();
     }
 
     @Override
@@ -156,11 +159,12 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
             @Nullable
             UsesType<ExecutionContext> usesType = null;
+
             private boolean usesType(SourceFile sourceFile, ExecutionContext ctx) {
-                if(onlyIfUsing == null) {
+                if (onlyIfUsing == null) {
                     return true;
                 }
-                if(usesType == null) {
+                if (usesType == null) {
                     usesType = new UsesType<>(onlyIfUsing, true);
                 }
                 return usesType.isAcceptable(sourceFile, ctx) && usesType.visit(sourceFile, ctx) != sourceFile;
@@ -176,6 +180,11 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     if (usesType(sourceFile, ctx)) {
                         acc.usingType = true;
                     }
+
+                    acc.customJvmTestSuitesWithDependencies
+                            .computeIfAbsent(javaProject, ignored -> new HashSet<>())
+                            .addAll(FindJVMTestSuites.jvmTestSuiteNames(tree, true));
+
                     Set<String> configurations = acc.configurationsByProject.computeIfAbsent(javaProject, ignored -> new HashSet<>());
                     sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet ->
                             configurations.add("main".equals(sourceSet.getName()) ? "implementation" : sourceSet.getName() + "Implementation"));
@@ -248,8 +257,13 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
                         G.CompilationUnit g = (G.CompilationUnit) s;
                         for (String resolvedConfiguration : resolvedConfigurations) {
-                            g = (G.CompilationUnit) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, resolvedConfiguration,
-                                    classifier, extension, metadataFailures, this::isTopLevel).visitNonNull(g, ctx);
+                            if (targetsCustomJVMTestSuite(resolvedConfiguration, acc.customJvmTestSuitesWithDependencies.get(jp))) {
+                                g = (G.CompilationUnit) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, purgeSourceSet(configuration),
+                                        classifier, extension, metadataFailures, isMatchingJVMTestSuite(resolvedConfiguration)).visitNonNull(g, ctx);
+                            } else {
+                                g = (G.CompilationUnit) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, resolvedConfiguration,
+                                        classifier, extension, metadataFailures, this::isTopLevel).visitNonNull(g, ctx);
+                            }
                         }
 
                         return g;
@@ -257,6 +271,61 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
                     private boolean isTopLevel(Cursor cursor) {
                         return cursor.getParentOrThrow().firstEnclosing(J.MethodInvocation.class) == null;
+                    }
+
+                    private Predicate<Cursor> isMatchingJVMTestSuite(String resolvedConfiguration) {
+                        return cursor -> {
+                            String sourceSet = purgeConfigurationSuffix(resolvedConfiguration);
+                            J.MethodInvocation methodInvocation = cursor.getParentOrThrow().firstEnclosing(J.MethodInvocation.class);
+                            return methodInvocation != null && sourceSet.equals(methodInvocation.getSimpleName());
+                        };
+                    }
+
+                    private final Set<String> gradleStandardConfigurations = new HashSet<>(Arrays.asList(
+                            "api",
+                            "implementation",
+                            "compileOnly",
+                            "compileOnlyApi",
+                            "runtimeOnly",
+                            "testImplementation",
+                            "testCompileOnly",
+                            "testRuntimeOnly"));
+
+                    boolean targetsCustomJVMTestSuite(String configuration, Set<String> customJvmTestSuites) {
+                        if (gradleStandardConfigurations.contains(configuration) || "default".equals(configuration)) {
+                            return false;
+                        }
+
+                        String sourceSet = purgeConfigurationSuffix(configuration);
+                        return customJvmTestSuites.contains(sourceSet);
+                    }
+
+                    private String purgeConfigurationSuffix(String configuration) {
+                        if (configuration.endsWith("Implementation")) {
+                            return configuration.substring(0, configuration.length() - 14);
+                        } else if (configuration.endsWith("CompileOnly")) {
+                            return configuration.substring(0, configuration.length() - 11);
+                        } else if (configuration.endsWith("RuntimeOnly")) {
+                            return configuration.substring(0, configuration.length() - 11);
+                        } else if (configuration.endsWith("AnnotationProcessor")) {
+                            return configuration.substring(0, configuration.length() - 19);
+                        } else {
+                            return configuration;
+                        }
+                    }
+
+                    private String purgeSourceSet(@Nullable String configuration) {
+                        if (StringUtils.isBlank(configuration) || configuration.endsWith("Implementation")) {
+                            return "implementation";
+                        } else if (configuration.endsWith("CompileOnly")) {
+                            return "compileOnly";
+                        } else if (configuration.endsWith("RuntimeOnly")) {
+                            return "runtimeOnly";
+                        } else if (configuration.endsWith("AnnotationProcessor")) {
+                            return "annotationProcessor";
+                        } else {
+                            return configuration;
+                        }
                     }
                 })
         );

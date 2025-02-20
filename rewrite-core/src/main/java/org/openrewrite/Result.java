@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.InMemoryDiffEntry;
 import org.openrewrite.jgit.lib.FileMode;
+import org.openrewrite.marker.DeserializationError;
 import org.openrewrite.marker.RecipesThatMadeChanges;
 import org.openrewrite.marker.SearchResult;
 
@@ -30,7 +31,9 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
+import static org.openrewrite.Tree.randomId;
 
 public class Result {
     /**
@@ -76,10 +79,13 @@ public class Result {
     public Result(@Nullable SourceFile before, SourceFile after) {
         this(before, after, after.getMarkers()
                 .findFirst(RecipesThatMadeChanges.class)
-                .orElseThrow(() -> new UnknownSourceFileChangeException(
-                        after,
-                        explainWhatChanged(before, after)
-                ))
+                .orElseGet(() -> after.getMarkers()
+                        .findFirst(DeserializationError.class)
+                        .map(m -> new RecipesThatMadeChanges(randomId(), emptyList()))
+                        .orElseThrow(() -> new UnknownSourceFileChangeException(
+                                after,
+                                explainWhatChanged(before, after)
+                        )))
                 .getRecipes());
     }
 

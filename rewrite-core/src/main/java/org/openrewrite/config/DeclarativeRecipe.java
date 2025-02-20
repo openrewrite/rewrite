@@ -41,6 +41,7 @@ public class DeclarativeRecipe extends Recipe {
 
     @Getter
     @Language("markdown")
+    @Nullable // in YAML the description is not always present
     private final String description;
 
     @Getter
@@ -149,7 +150,7 @@ public class DeclarativeRecipe extends Recipe {
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
             return new TreeVisitor<Tree, ExecutionContext>() {
-                TreeVisitor<?, ExecutionContext> p = precondition.get();
+                final TreeVisitor<?, ExecutionContext> p = precondition.get();
 
                 @Override
                 public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
@@ -368,7 +369,7 @@ public class DeclarativeRecipe extends Recipe {
         for (Recipe childRecipe : getRecipeList()) {
             recipeList.add(childRecipe.getDescriptor());
         }
-        return new RecipeDescriptor(getName(), getDisplayName(), getDescription(),
+        return new RecipeDescriptor(getName(), getDisplayName(), getDescription() != null ? getDescription() : "",
                 getTags(), getEstimatedEffortPerOccurrence(),
                 emptyList(), recipeList, getDataTableDescriptors(), getMaintainers(), getContributors(),
                 getExamples(), source);
