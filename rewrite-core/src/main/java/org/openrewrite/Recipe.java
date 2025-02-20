@@ -278,6 +278,7 @@ public abstract class Recipe implements Cloneable {
     }
 
     @Setter
+    @Nullable
     protected List<Contributor> contributors;
 
     public List<Contributor> getContributors() {
@@ -288,6 +289,7 @@ public abstract class Recipe implements Cloneable {
     }
 
     @Setter
+    @Nullable
     protected transient List<RecipeExample> examples;
 
     public List<RecipeExample> getExamples() {
