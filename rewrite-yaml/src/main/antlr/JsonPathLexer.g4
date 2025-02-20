@@ -30,6 +30,10 @@ CONTAINS : 'contains';
 //SUBSET : 'subset'
 //SIZE : 'size'
 
+TRUE : 'true';
+FALSE : 'false';
+NULL : 'null';
+
 Identifier
     : [_A-Za-z] [_A-Za-z0-9-]*
     ;
@@ -73,10 +77,6 @@ NE : '!=';
 //GT : '>';
 //LE : '<=';
 //LT : '<';
-
-TRUE : 'true';
-FALSE : 'false';
-NULL : 'null';
 
 fragment
 ESCAPE_SEQUENCE
