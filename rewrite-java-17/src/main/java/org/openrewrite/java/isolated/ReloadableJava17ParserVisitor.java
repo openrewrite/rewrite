@@ -62,6 +62,7 @@ import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.StreamSupport.stream;
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.internal.StringUtils.indexOf;
 import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
 import static org.openrewrite.java.tree.Space.EMPTY;
 import static org.openrewrite.java.tree.Space.format;
@@ -1957,14 +1958,17 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 int startPosition = ((JCTree) t).getStartPosition();
                 if (cursor > startPosition)
                     continue;
-                while (cursor < startPosition) {
-                    int semicolonIndex = source.substring(cursor, startPosition).indexOf(";");
-                    if (semicolonIndex > -1) {
-                        Space prefix = Space.format(source, cursor, cursor+semicolonIndex);
-                        converted.add(new JRightPadded<>(new J.Empty(randomId(), prefix, Markers.EMPTY), Space.EMPTY, Markers.EMPTY));
-                        cursor += semicolonIndex + 1;
-                    } else {
-                        break;
+                if (!(t instanceof JCSkip)) {
+                    while (cursor < startPosition) {
+                        int nonWhitespaceIndex = indexOfNextNonWhitespace(cursor, source);
+                        int semicolonIndex = source.charAt(nonWhitespaceIndex) == ';' ? nonWhitespaceIndex : -1;
+                        if (semicolonIndex > -1) {
+                            Space prefix = Space.format(source, cursor, semicolonIndex);
+                            converted.add(new JRightPadded<>(new J.Empty(randomId(), prefix, Markers.EMPTY), Space.EMPTY, Markers.EMPTY));
+                            cursor = semicolonIndex + 1;
+                        } else {
+                            break;
+                        }
                     }
                 }
                 converted.add(convert(treeGroup.get(0), suffix));
