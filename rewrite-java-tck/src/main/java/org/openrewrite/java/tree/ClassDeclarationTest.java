@@ -254,28 +254,24 @@ class ClassDeclarationTest implements RewriteTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-      ";", ";;",
-      "; // comment", "; /* comment\n*/", "; // comment1\n// comment2\n;",
+      ";",
+      ";;;",
+      "; // comment",
+      "; // comment;with;semicolons",
+      "; /* comment\n*/", "; // comment1\n// comment2\n;",
       "static String method() { return null; };"
     })
-    void unnecessarySemicolonAtTheEndOfTheBody(String suffix) {
+    void unnecessaryLeadingOrEndingSemicolons(String suffix) {
         rewriteRun(
           java(
             """
               class A {
+                  /*@@*/
                   int i = 0;
                   /*@@*/
               }
             """.replaceAll("/[*]@@[*]/", suffix)
           )
-        );
-    }
-
-    @Test
-    @SuppressWarnings("UnnecessarySemicolon")
-    void leadingSemicolons() {
-        rewriteRun(
-          java("class A {;;;int i = 0;}")
         );
     }
 }
