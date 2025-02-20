@@ -371,6 +371,33 @@ class JsonPathMatcherTest {
     }
 
     @Test
+    void booleanLiteralMatching() {
+        //language=yaml
+        assertMatched(
+          "$[?(@.bool == true)]",
+          List.of(
+            """
+              "bool": true
+              """
+          ),
+          List.of(
+            """
+              "bool": true
+              """
+          )
+        );
+        //language=yaml
+        assertNotMatched(
+          "$[?(@.bool == true)]",
+          List.of(
+            """
+              "bool": false
+              """
+          )
+        );
+    }
+
+    @Test
     void recurseToMatchProperties() {
         assertMatched(
           "$..object.literal",
