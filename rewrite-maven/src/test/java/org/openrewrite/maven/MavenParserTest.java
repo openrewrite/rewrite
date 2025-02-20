@@ -3733,4 +3733,31 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void mavenConfigRevisionWithFallback() {
+        rewriteRun(
+          text(
+            "-Drevision=1.0.0",
+            spec -> spec.path(".mvn/maven.config")
+          ),
+          pomXml(
+            """
+              <project xmlns="http://maven.apache.org/POM/4.0.0"
+                       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+              
+                  <groupId>com.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>${revision}</version>
+              
+                  <properties>
+                      <revision>${revision:-1.0.0}</revision>
+                  </properties>
+              </project>
+              """
+          )
+        );
+    }
+
 }
