@@ -209,7 +209,26 @@ class NewClassTest implements RewriteTest {
           java(
             """
               class A {
-                  Object o = new Object() {;
+                  Object o = new Object() {;;;;;
+                      @Override
+                      public String toString() {
+                          return super.toString();
+                      }
+                  };
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @SuppressWarnings("UnnecessarySemicolon")
+    void unnecessarySemicolonInBody1WithComment() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  Object o = new Object() {    /*~~>*/    ; /*<~~*/
                       @Override
                       public String toString() {
                           return super.toString();
@@ -232,7 +251,26 @@ class NewClassTest implements RewriteTest {
                       @Override
                       public String toString() {
                           return super.toString();
-                      };
+                      };;;;
+                  };
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @SuppressWarnings("UnnecessarySemicolon")
+    void unnecessarySemicolonInBody2WithComment() {
+        rewriteRun(
+          java(
+            """
+              class B {
+                  Object o = new Object() {
+                      @Override
+                      public String toString() {
+                          return super.toString();
+                      }     /*~~>*/    ; /*<~~*/
                   };
               }
               """
