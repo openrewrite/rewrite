@@ -17,10 +17,8 @@ package org.openrewrite.rpc;
 
 import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.JsonRpcRequest;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.*;
 import org.openrewrite.rpc.request.GetObject;
 import org.openrewrite.rpc.request.RecipeRpcRequest;
 import org.openrewrite.rpc.request.Visit;
@@ -30,6 +28,7 @@ import java.lang.reflect.Constructor;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.stream.Collectors;
 
 import static io.moderne.jsonrpc.JsonRpcMethod.typed;
 import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
@@ -77,7 +76,16 @@ public class RewriteRpc {
                 localObjects.put(request.getP(), p);
             }
 
-            SourceFile after = (SourceFile) visitor.visit(before, p);
+            Cursor cursor = new Cursor(null, Cursor.ROOT_VALUE);
+            if (request.getCursor() != null) {
+                for (String cursorId : request.getCursor()) {
+                    Object cursorObject = getObject(cursorId);
+                    localObjects.put(cursorId, cursorObject);
+                    cursor = new Cursor(cursor, cursorObject);
+                }
+            }
+
+            SourceFile after = (SourceFile) visitor.visit(before, p, cursor);
             if (after == null) {
                 localObjects.remove(before.getId().toString());
             } else {
@@ -140,20 +148,40 @@ public class RewriteRpc {
     }
 
     public <P> Tree visit(SourceFile sourceFile, String visitorName, P p) {
-        VisitResponse response = scan(sourceFile, visitorName, p);
+        return visit(sourceFile, visitorName, p, null);
+    }
+
+    public <P> Tree visit(SourceFile sourceFile, String visitorName, P p, @Nullable Cursor cursor) {
+        VisitResponse response = scan(sourceFile, visitorName, p, cursor);
         return response.isModified() ?
                 getObject(sourceFile.getId().toString()) :
                 sourceFile;
     }
 
     public <P> VisitResponse scan(SourceFile sourceFile, String visitorName, P p) {
+        return scan(sourceFile, visitorName, p, null);
+    }
+
+    public <P> VisitResponse scan(SourceFile sourceFile, String visitorName, P p,
+                                  @Nullable Cursor cursor) {
         // Set the local state of this tree, so that when the remote
         // asks for it, we know what to send.
         localObjects.put(sourceFile.getId().toString(), sourceFile);
         String pId = Integer.toString(System.identityHashCode(p));
         localObjects.put(pId, p);
 
-        return send("Visit", new Visit(visitorName, sourceFile.getId().toString(), pId),
+        List<String> cursorIds = null;
+        if (cursor != null) {
+            cursorIds = cursor.getPathAsStream().map(c -> {
+                String id = c instanceof Tree ?
+                        ((Tree) c).getId().toString()
+                        : Integer.toString(System.identityHashCode(c));
+                localObjects.put(id, c);
+                return id;
+            }).collect(Collectors.toList());
+        }
+
+        return send("Visit", new Visit(visitorName, sourceFile.getId().toString(), pId, cursorIds),
                 VisitResponse.class);
     }
 

@@ -16,7 +16,9 @@
 package org.openrewrite.rpc.request;
 
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 
+import java.util.List;
 import java.util.UUID;
 
 @Value
@@ -28,4 +30,11 @@ public class Visit implements RecipeRpcRequest {
      * An ID of the p value stored in the caller's local object cache.
      */
     String p;
+
+    /**
+     * A list of IDs representing the cursor whose objects are stored in the
+     * caller's local object cache.
+     */
+    @Nullable
+    List<String> cursor;
 }
