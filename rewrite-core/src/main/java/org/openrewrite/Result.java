@@ -205,6 +205,11 @@ public class Result {
             afterPath = after.getSourcePath();
         }
 
+        if (after != null && after.getMarkers().findFirst(DeserializationError.class).isPresent()) {
+            // empty diff for deserialization errors
+            return "";
+        }
+
         PrintOutputCapture<Integer> out = markerPrinter == null ?
                 new PrintOutputCapture<>(0) :
                 new PrintOutputCapture<>(0, markerPrinter);
