@@ -270,4 +270,12 @@ class ClassDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @SuppressWarnings("UnnecessarySemicolon")
+    void leadingSemicolons() {
+        rewriteRun(
+          java("class A {;;;int i = 0;}")
+        );
+    }
 }
