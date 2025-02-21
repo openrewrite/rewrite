@@ -187,7 +187,7 @@ class NewClassTest implements RewriteTest {
                   void method() {
                       Arrays.sort(new ArrayList[]{new ArrayList<File>()}, new Comparator<Object>() {
                           long time1, time2;
-
+              
                           @Override
                           public int compare(Object o1, Object o2) {
                               time1 = ((File) o1).lastModified();
