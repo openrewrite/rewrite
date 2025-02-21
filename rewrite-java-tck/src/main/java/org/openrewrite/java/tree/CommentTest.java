@@ -65,4 +65,17 @@ class CommentTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void commentAsLastLine() {
+        rewriteRun(
+          java(
+            """
+            class A {
+            }
+            //
+            """
+          )
+        );
+    }
 }
