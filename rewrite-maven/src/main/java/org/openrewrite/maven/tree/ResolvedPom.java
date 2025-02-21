@@ -66,7 +66,8 @@ public class ResolvedPom {
     Pom requested;
 
     @With
-    Iterable<String> activeProfiles;
+    @Builder.Default
+    Iterable<String> activeProfiles = emptyList();
 
     public ResolvedPom(Pom requested, Iterable<String> activeProfiles) {
         this(requested, activeProfiles, emptyMap(), emptyList(), null, emptyList(), emptyList(), emptyList(), emptyList(), emptyList());

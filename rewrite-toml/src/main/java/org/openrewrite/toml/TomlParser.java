@@ -17,11 +17,11 @@ package org.openrewrite.toml;
 
 import org.antlr.v4.runtime.*;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.toml.internal.TomlParserVisitor;
 import org.openrewrite.toml.internal.grammar.TomlLexer;
 import org.openrewrite.toml.tree.Toml;

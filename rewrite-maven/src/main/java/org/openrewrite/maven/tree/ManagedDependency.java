@@ -47,6 +47,7 @@ public interface ManagedDependency {
         @Nullable
         String classifier;
 
+        @Nullable
         List<GroupArtifact> exclusions;
 
         @Override

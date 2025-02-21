@@ -221,7 +221,7 @@ public class Space {
             last = c;
         }
         // If a file ends with a single-line comment there may be no terminating newline
-        if (comment.length() > 0) {
+        if (comment.length() > 0 || inSingleLineComment) {
             comments.add(new Comment(false, comment.toString(), prefix.toString(), Markers.EMPTY));
             prefix.setLength(0);
         }

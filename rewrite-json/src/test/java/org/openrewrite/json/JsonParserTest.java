@@ -18,9 +18,12 @@ package org.openrewrite.json;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.Recipe;
+import org.openrewrite.json.tree.Json;
+import org.openrewrite.json.tree.JsonValue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.json.Assertions.json;
 
 @SuppressWarnings({"JsonStandardCompliance", "JsonDuplicatePropertyKeys"})
@@ -36,7 +39,7 @@ class JsonParserTest implements RewriteTest {
     void parseJsonDocument() {
         rewriteRun(
           json(
-      """
+            """
             {
               // comments
               unquoted: 'and you can quote me on that',
@@ -47,6 +50,7 @@ class JsonParserTest implements RewriteTest {
               trailingComma: 'in objects', andIn: ['arrays',],
               "backwardsCompatible": "with JSON",
             }
+            //
             """
           )
         );
@@ -135,6 +139,24 @@ class JsonParserTest implements RewriteTest {
                 "timestamp": 1577000812973
             }
             """
+          )
+        );
+    }
+
+    @Test
+    void nullValue() {
+        rewriteRun(
+          json(
+            """
+            null
+            """,
+            spec -> spec.afterRecipe(doc -> {
+                JsonValue value = doc.getValue();
+                assertThat(value).isInstanceOf(Json.Literal.class);
+                assertThat(((Json.Literal) value).getSource()).isEqualTo("null");
+                //noinspection DataFlowIssue
+                assertThat(((Json.Literal) value).getValue()).isNull();
+            })
           )
         );
     }

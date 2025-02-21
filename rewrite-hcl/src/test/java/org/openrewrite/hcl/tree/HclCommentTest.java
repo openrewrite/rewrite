@@ -223,4 +223,18 @@ class HclCommentTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void emptySingleLineCommentAtTheEndOfTheFile() {
+        rewriteRun(
+          hcl(
+            """
+              module "something" {
+                source = "../else/"
+              }
+              //
+              """
+          )
+        );
+    }
 }

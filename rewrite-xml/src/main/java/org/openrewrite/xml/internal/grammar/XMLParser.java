@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from java-escape by ANTLR 4.11.1
+// Generated from ~/git/rewrite/rewrite-xml/src/main/antlr/XMLParser.g4 by ANTLR 4.13.2
 package org.openrewrite.xml.internal.grammar;
 import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.atn.ATN;
@@ -27,9 +27,9 @@ import org.antlr.v4.runtime.tree.TerminalNode;
 
 import java.util.List;
 
-@SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue"})
+@SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue", "this-escape"})
 public class XMLParser extends Parser {
-	static { RuntimeMetaData.checkVersion("4.11.1", RuntimeMetaData.VERSION); }
+	static { RuntimeMetaData.checkVersion("4.13.2", RuntimeMetaData.VERSION); }
 
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
@@ -110,7 +110,7 @@ public class XMLParser extends Parser {
 	}
 
 	@Override
-	public String getGrammarFileName() { return "java-escape"; }
+	public String getGrammarFileName() { return "XMLParser.g4"; }
 
 	@Override
 	public String[] getRuleNames() { return ruleNames; }
@@ -245,7 +245,7 @@ public class XMLParser extends Parser {
 			setState(44);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			while (((_la) & ~0x3f) == 0 && ((1L << _la) & 6146L) != 0) {
+			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 6146L) != 0)) {
 				{
 				{
 				setState(41);
@@ -561,7 +561,7 @@ public class XMLParser extends Parser {
 			setState(89);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			while (((_la) & ~0x3f) == 0 && ((1L << _la) & 526346L) != 0) {
+			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 526346L) != 0)) {
 				{
 				setState(87);
 				_errHandler.sync(this);
@@ -1331,7 +1331,7 @@ public class XMLParser extends Parser {
 			{
 			setState(179);
 			_la = _input.LA(1);
-			if ( !(((_la) & ~0x3f) == 0 && ((1L << _la) & 8512L) != 0) ) {
+			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 8512L) != 0)) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {

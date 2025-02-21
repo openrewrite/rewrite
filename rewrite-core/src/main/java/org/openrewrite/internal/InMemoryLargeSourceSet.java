@@ -18,6 +18,7 @@ package org.openrewrite.internal;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.marker.DeserializationError;
 import org.openrewrite.marker.Generated;
 import org.openrewrite.marker.RecipesThatMadeChanges;
 
@@ -140,7 +141,7 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
             SourceFile original = sourceFileIdentities.get(s.getId());
             if (original != s) {
                 if (original != null) {
-                    if (original.getMarkers().findFirst(Generated.class).isPresent()) {
+                    if (original.getMarkers().findFirst(Generated.class).isPresent() || s.getMarkers().findFirst(DeserializationError.class).isPresent()) {
                         continue;
                     }
                     changes.add(new Result(original, s));

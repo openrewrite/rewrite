@@ -15,6 +15,7 @@
  */
 package org.openrewrite.yaml.tree;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
@@ -243,6 +244,22 @@ public interface Yaml extends Tree {
             PLAIN
         }
 
+        @Deprecated
+        public Scalar(UUID id, String prefix, Markers markers, Style style, @Nullable Anchor anchor, String value) {
+            this(id, prefix, markers, style, anchor, null, value);
+        }
+
+        @JsonCreator
+        public Scalar(UUID id, String prefix, Markers markers, Style style, @Nullable Anchor anchor, @Nullable Tag tag, String value) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            this.style = style;
+            this.anchor = anchor;
+            this.tag = tag;
+            this.value = value;
+        }
+
         @Override
         public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
             return v.visitScalar(this, p);
@@ -282,6 +299,22 @@ public interface Yaml extends Tree {
 
         @Nullable
         Tag tag;
+
+        @Deprecated
+        public Mapping(UUID id, Markers markers, @Nullable String openingBracePrefix, List<Entry> entries, @Nullable String closingBracePrefix, @Nullable Anchor anchor) {
+            this(id, markers, openingBracePrefix, entries, closingBracePrefix, anchor, null);
+        }
+
+        @JsonCreator
+        public Mapping(UUID id, Markers markers, @Nullable String openingBracePrefix, List<Entry> entries, @Nullable String closingBracePrefix, @Nullable Anchor anchor, @Nullable Tag tag) {
+            this.id = id;
+            this.markers = markers;
+            this.openingBracePrefix = openingBracePrefix;
+            this.entries = entries;
+            this.closingBracePrefix = closingBracePrefix;
+            this.anchor = anchor;
+            this.tag = tag;
+        }
 
         @Override
         public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
@@ -370,6 +403,22 @@ public interface Yaml extends Tree {
 
         @Nullable
         Tag tag;
+
+        @Deprecated
+        public Sequence(UUID id, Markers markers, @Nullable String openingBracketPrefix, List<Entry> entries, @Nullable String closingBracketPrefix, @Nullable Anchor anchor) {
+            this(id, markers, openingBracketPrefix, entries, closingBracketPrefix, anchor, null);
+        }
+
+        @JsonCreator
+        public Sequence(UUID id, Markers markers, @Nullable String openingBracketPrefix, List<Entry> entries, @Nullable String closingBracketPrefix, @Nullable Anchor anchor, @Nullable Tag tag) {
+            this.id = id;
+            this.markers = markers;
+            this.openingBracketPrefix = openingBracketPrefix;
+            this.entries = entries;
+            this.closingBracketPrefix = closingBracketPrefix;
+            this.anchor = anchor;
+            this.tag = tag;
+        }
 
         @Override
         public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {

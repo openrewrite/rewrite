@@ -35,6 +35,7 @@ import java.util.*;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
+import static java.util.Collections.emptyMap;
 import static org.openrewrite.Tree.randomId;
 
 @Value
@@ -95,7 +96,7 @@ public class JavaSourceSet implements SourceSet {
 
         // Peculiarly, Classgraph will not return a ClassInfo for java.lang.Object, although it does for all other java.lang types
         typeNames.add("java.lang.Object");
-        return new JavaSourceSet(randomId(), sourceSetName, typesFrom(typeNames), null);
+        return new JavaSourceSet(randomId(), sourceSetName, typesFrom(typeNames), emptyMap());
     }
 
 
