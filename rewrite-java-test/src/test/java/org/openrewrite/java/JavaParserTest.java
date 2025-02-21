@@ -374,4 +374,70 @@ class JavaParserTest implements RewriteTest {
           .containsOnly(Paths.get("/.m2/repository/org/openrewrite/rewrite-java/8.41.1/rewrite-java-8.41.1.jar"));
     }
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3881")
+    void annotatedVargArgs() {
+        rewriteRun(
+          java(
+            """
+              import org.jspecify.annotations.NonNull;
+              
+              class C1 {
+                  void m(@NonNull String @NonNull[] arrayArgs) {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              import org.jspecify.annotations.NonNull;
+              
+              class C2 {
+                  void m(@NonNull String @NonNull ... varArgs) {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              import org.jspecify.annotations.NonNull;
+              
+              class C3 {
+                  void m(String @NonNull[] @NonNull[] arrayArgs) {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              import org.jspecify.annotations.NonNull;
+              
+              class C4 {
+                  void m(String @NonNull [ ] @NonNull ... s) {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              import org.jspecify.annotations.NonNull;
+              
+              class C5 {
+                  void m(@NonNull String @NonNull[] @NonNull[] arrayArgs) {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              import org.jspecify.annotations.NonNull;
+              
+              class C6 {
+                  void m(@NonNull String @NonNull [ ] @NonNull ... s) {
+                  }
+              }
+              """
+          )
+        );
+    }
 }
