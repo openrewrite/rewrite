@@ -3738,6 +3738,42 @@ class MavenParserTest implements RewriteTest {
     }
 
     @Test
+    void mavenPartlyManagedInParent() {
+        rewriteRun(
+          text(
+            "-Drevision=1.0.0",
+            spec -> spec.path(".mvn/maven.config")
+          ),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>parent</artifactId>
+                <version>${revision}</version>
+              </project>
+              """
+          ),
+          mavenProject("child",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                  <parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                  </parent>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>child</artifactId>
+                  <version>1</version>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
     void mavenConfigRevisionWithFallback() {
         rewriteRun(
           text(
