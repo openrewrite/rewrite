@@ -12,7 +12,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
@@ -22,6 +21,7 @@ import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.time.Duration;
 
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
@@ -51,25 +51,32 @@ public class RewriteRpcTest implements RewriteTest {
         client.shutdown();
     }
 
-    @Override
-    public void defaults(RecipeSpec spec) {
-        spec.recipe(toRecipe(() -> new TreeVisitor<>() {
-            @SneakyThrows
-            @Override
-            public Tree preVisit(@NonNull Tree tree, ExecutionContext ctx) {
-                Tree t = server.visit((SourceFile) tree, ChangeText.class.getName(), 0);
-                stopAfterPreVisit();
-                return t;
-            }
-        }));
-    }
-
     @Test
     void sendReceiveIdempotence() {
         rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
+              @SneakyThrows
+              @Override
+              public Tree preVisit(@NonNull Tree tree, ExecutionContext ctx) {
+                  Tree t = server.visit((SourceFile) tree, ChangeText.class.getName(), 0);
+                  stopAfterPreVisit();
+                  return t;
+              }
+          })),
           text(
             "Hello Jon!",
             "Hello World!"
+          )
+        );
+    }
+
+    @Test
+    void print() {
+        rewriteRun(
+          text(
+            "Hello Jon!",
+            spec -> spec.beforeRecipe(text ->
+              assertThat(server.print(text)).isEqualTo("Hello Jon!"))
           )
         );
     }

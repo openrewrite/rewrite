@@ -183,6 +183,10 @@ public class RewriteRpc {
                 VisitResponse.class);
     }
 
+    public String print(SourceFile tree) {
+        return print(tree, new Cursor(null, Cursor.ROOT_VALUE));
+    }
+
     public String print(Tree tree, Cursor parent) {
         localObjects.put(tree.getId().toString(), tree);
         return send("Print", new Print(tree.getId().toString(), getCursorIds(parent)), String.class);
