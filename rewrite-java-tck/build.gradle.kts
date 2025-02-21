@@ -16,6 +16,14 @@ dependencies {
     }
 }
 
+infoBroker {
+    // Prevent cache misses due to unstable attributes, e.g. "Build-Date"
+    includedManifestProperties = listOf(
+        "Module-Owner",
+        "Module-Email",
+    )
+}
+
 tasks.withType<Javadoc> {
     isFailOnError = false
     exclude("org/openrewrite/java/**")
