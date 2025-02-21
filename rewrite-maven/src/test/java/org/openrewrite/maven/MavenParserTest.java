@@ -3761,7 +3761,7 @@ class MavenParserTest implements RewriteTest {
                   <parent>
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>parent</artifactId>
-                    <version>1</version>
+                    <version>${revision}</version>
                   </parent>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>child</artifactId>
