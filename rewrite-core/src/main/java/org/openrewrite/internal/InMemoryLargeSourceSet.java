@@ -39,20 +39,32 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
 
     private List<Recipe> currentRecipeStack;
 
+    @Nullable
+    private ClassLoader originalTCCL;
+
+    @Nullable
+    private ClassLoader recipeClassLoader;
+
     public InMemoryLargeSourceSet(List<SourceFile> ls) {
-        this(null, null, ls);
+        this(null, null, ls, null);
+    }
+
+    public InMemoryLargeSourceSet(List<SourceFile> ls, @Nullable ClassLoader classLoader) {
+        this(null, null, ls, classLoader);
     }
 
     protected InMemoryLargeSourceSet(@Nullable InMemoryLargeSourceSet initialState,
                                      @Nullable Map<SourceFile, List<Recipe>> deletions,
-                                     List<SourceFile> ls) {
+                                     List<SourceFile> ls,
+                                     @Nullable ClassLoader classLoader) {
         this.initialState = initialState;
         this.ls = ls;
         this.deletions = deletions;
+        this.recipeClassLoader = classLoader;
     }
 
     protected InMemoryLargeSourceSet withChanges(@Nullable Map<SourceFile, List<Recipe>> deletions, List<SourceFile> mapped) {
-        return new InMemoryLargeSourceSet(getInitialState(), deletions, mapped);
+        return new InMemoryLargeSourceSet(getInitialState(), deletions, mapped, recipeClassLoader);
     }
 
     @Override
@@ -92,6 +104,26 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
 
     protected InMemoryLargeSourceSet getInitialState() {
         return initialState == null ? this : initialState;
+    }
+
+    @Override
+    public void beforeCycle(boolean definitelyLastCycle) {
+        LargeSourceSet.super.beforeCycle(definitelyLastCycle);
+        if (recipeClassLoader != null) {
+            // set TCCL to the recipe's classloader and store the original value, needed by SPI to load providers from recipe artifacts
+            originalTCCL = Thread.currentThread().getContextClassLoader();
+            Thread.currentThread().setContextClassLoader(recipeClassLoader);
+        }
+    }
+
+    @Override
+    public void afterCycle(boolean lastCycle) {
+        try {
+            LargeSourceSet.super.afterCycle(lastCycle);
+        } finally {
+            // reset TCCL value to the original one to no infer with other tooling
+            Thread.currentThread().setContextClassLoader(originalTCCL);
+        }
     }
 
     @Override
