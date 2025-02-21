@@ -39,7 +39,7 @@ class JsonParserTest implements RewriteTest {
     void parseJsonDocument() {
         rewriteRun(
           json(
-      """
+            """
             {
               // comments
               unquoted: 'and you can quote me on that',
@@ -50,6 +50,7 @@ class JsonParserTest implements RewriteTest {
               trailingComma: 'in objects', andIn: ['arrays',],
               "backwardsCompatible": "with JSON",
             }
+            //
             """
           )
         );
