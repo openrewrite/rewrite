@@ -157,6 +157,7 @@ public interface RewriteTest extends SourceSpecs {
             markerPrinter = PrintOutputCapture.MarkerPrinter.DEFAULT;
         }
 
+        RecipeSerializer recipeSerializer = new RecipeSerializer();
         PrintOutputCapture<ExecutionContext> out = new PrintOutputCapture<>(ctx, markerPrinter);
 
         Recipe recipe = testMethodSpec.recipe == null ?
@@ -167,7 +168,6 @@ public interface RewriteTest extends SourceSpecs {
             !(recipe instanceof CompositeRecipe) && !(recipe.equals(Recipe.noop())) &&
             testClassSpec.serializationValidation &&
             testMethodSpec.serializationValidation) {
-            RecipeSerializer recipeSerializer = new RecipeSerializer();
             assertThat(recipeSerializer.read(recipeSerializer.write(recipe)))
                     .as("Recipe must be serializable/deserializable")
                     .isEqualTo(recipe);
@@ -443,6 +443,10 @@ public interface RewriteTest extends SourceSpecs {
                     String actual = result.getAfter().printAll(out.clone()).trim();
                     String expected = trimIndentPreserveCRLF(sourceSpec.after.apply(actual));
                     if (actual.equals(expected)) {
+                        if (TypeValidation.before(testMethodSpec, testClassSpec).serializable()) {
+                            recipeSerializer.validateSerializability(result.getAfter());
+                        }
+
                         expectedNewSources.remove(sourceSpec);
                         expectedNewResults.add(result);
                         //noinspection unchecked
@@ -521,6 +525,9 @@ public interface RewriteTest extends SourceSpecs {
                                         .as("The recipe must not make changes to \"" + result.getBefore().getSourcePath() + "\"")
                                         .isEqualTo(before);
                             }
+                        }
+                        if (TypeValidation.before(testMethodSpec, testClassSpec).serializable()) {
+                            recipeSerializer.validateSerializability(result.getAfter());
                         }
                     } else {
                         if (sourceSpec.after == null) {
