@@ -1,6 +1,8 @@
 plugins {
     id("org.openrewrite.build.language-library")
     id("org.openrewrite.build.java8-text-blocks")
+    // Prevent cache misses due to metadata differences inside the JAR
+    id("org.gradlex.reproducible-builds") version "1.0"
 }
 
 dependencies {
