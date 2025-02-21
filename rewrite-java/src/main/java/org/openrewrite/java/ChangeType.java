@@ -266,8 +266,11 @@ public class ChangeType extends Recipe {
         public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
             if (fieldAccess.isFullyQualifiedClassReference(originalType.getFullyQualifiedName())) {
                 if (targetType instanceof JavaType.FullyQualified) {
-                    return updateOuterClassTypes(TypeTree.build(((JavaType.FullyQualified) targetType).getFullyQualifiedName())
+                    J.FieldAccess fa = (J.FieldAccess) updateOuterClassTypes(TypeTree.build(((JavaType.FullyQualified) targetType).getFullyQualifiedName())
                             .withPrefix(fieldAccess.getPrefix()));
+                    // FIXME we need to make sure the `J.FieldAccess` already is properly type attributed
+                    fa = fa.withName(fa.getName().withType(targetType));
+                    return ShortenFullyQualifiedTypeReferences.modifyOnly(fa).visitNonNull(fa, ctx, getCursor().getParent());
                 } else if (targetType instanceof JavaType.Primitive) {
                     return new J.Primitive(
                             fieldAccess.getId(),
