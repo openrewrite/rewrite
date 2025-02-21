@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven.tree;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
 import lombok.AccessLevel;
@@ -58,11 +59,30 @@ public class MavenMetadata {
         @Nullable
         ZonedDateTime lastUpdated;
 
+        @Nullable
+        String release;
+
+        @Nullable
+        String latest;
+
         public Versioning(
+                List<String> versions,
+                @Nullable List<SnapshotVersion> snapshotVersions,
+                @Nullable Snapshot snapshot,
+                @Nullable ZonedDateTime lastUpdated) {
+            this(null, null, versions, snapshotVersions, snapshot, lastUpdated);
+        }
+
+        @JsonCreator
+        public Versioning(
+                @Nullable String latest,
+                @Nullable String release,
                 @JacksonXmlElementWrapper(localName = "versions") List<String> versions,
                 @JacksonXmlElementWrapper(localName = "snapshotVersions") @Nullable List<SnapshotVersion> snapshotVersions,
                 @Nullable Snapshot snapshot,
                 @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyyMMddHHmmss", timezone = "UTC") @Nullable ZonedDateTime lastUpdated) {
+            this.latest = latest;
+            this.release = release;
             this.lastUpdated = lastUpdated;
             this.versions = versions;
             this.snapshotVersions = snapshotVersions;
