@@ -27,7 +27,6 @@ import org.openrewrite.test.RewriteTest;
 import java.util.List;
 
 import static org.openrewrite.maven.Assertions.pomXml;
-import static org.openrewrite.test.SourceSpecs.text;
 
 class UpgradeParentVersionTest implements RewriteTest {
 
