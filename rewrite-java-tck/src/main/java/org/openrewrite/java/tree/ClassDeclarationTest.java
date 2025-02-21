@@ -259,7 +259,8 @@ class ClassDeclarationTest implements RewriteTest {
       "; // comment",
       "; // comment;with;semicolons",
       "; /* comment;with;semicolons */",
-      "; /* comment\n*/", "; // comment1\n// comment2\n;",
+      "; /* comment\n*/",
+      "; // comment1\n// comment2\n;",
       "static String method() { return null; };"
     })
     void unnecessaryLeadingOrEndingSemicolons(String suffix) {
