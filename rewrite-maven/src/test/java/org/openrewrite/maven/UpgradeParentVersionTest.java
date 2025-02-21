@@ -27,6 +27,7 @@ import org.openrewrite.test.RewriteTest;
 import java.util.List;
 
 import static org.openrewrite.maven.Assertions.pomXml;
+import static org.openrewrite.test.SourceSpecs.text;
 
 class UpgradeParentVersionTest implements RewriteTest {
 
@@ -241,6 +242,39 @@ class UpgradeParentVersionTest implements RewriteTest {
                   <groupId>org.springframework.boot</groupId>
                   <artifactId>spring-boot-starter-parent</artifactId>
                   <version>1.5.22.RELEASE</version>
+                  <relativePath/> <!-- lookup parent from repository -->
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradeVersionWithConfigFile() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeParentVersion(
+            "org.springframework.boot",
+            "spring-boot-starter-parent",
+            "~1.5",
+            null,
+            null
+          )),
+          text(
+            "-Dspring-boot-version=1.5.12.RELEASE",
+            "-Dspring-boot-version=1.5.22.RELEASE",
+            spec -> spec.path(".mvn/maven.config")
+          ),
+          pomXml(
+            """
+              <project>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>${spring-boot-version}</version>
                   <relativePath/> <!-- lookup parent from repository -->
                 </parent>
                 <groupId>com.mycompany.app</groupId>
