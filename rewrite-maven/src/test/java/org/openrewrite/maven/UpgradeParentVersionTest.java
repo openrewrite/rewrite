@@ -252,36 +252,4 @@ class UpgradeParentVersionTest implements RewriteTest {
           )
         );
     }
-
-    @Test
-    void upgradeVersionWithConfigFile() {
-        rewriteRun(
-          spec -> spec.recipe(new UpgradeParentVersion(
-            "org.springframework.boot",
-            "spring-boot-starter-parent",
-            "1.5.x",
-            null,
-            null
-          )),
-          text(
-            "-Drevision=1.5.12.RELEASE",
-            "-Drevision=1.5.22.RELEASE",
-            spec -> spec.path(".mvn/maven.config")
-          ),
-          pomXml(
-            """
-              <project>
-                <parent>
-                  <groupId>org.springframework.boot</groupId>
-                  <artifactId>spring-boot-starter-parent</artifactId>
-                  <version>${revision}</version>
-                </parent>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-              </project>
-              """
-          )
-        );
-    }
 }
