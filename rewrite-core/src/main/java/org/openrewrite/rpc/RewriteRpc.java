@@ -19,10 +19,7 @@ import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.JsonRpcRequest;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.rpc.request.GetObject;
-import org.openrewrite.rpc.request.RecipeRpcRequest;
-import org.openrewrite.rpc.request.Visit;
-import org.openrewrite.rpc.request.VisitResponse;
+import org.openrewrite.rpc.request.*;
 
 import java.lang.reflect.Constructor;
 import java.time.Duration;
@@ -76,22 +73,20 @@ public class RewriteRpc {
                 localObjects.put(request.getP(), p);
             }
 
-            Cursor cursor = new Cursor(null, Cursor.ROOT_VALUE);
-            if (request.getCursor() != null) {
-                for (String cursorId : request.getCursor()) {
-                    Object cursorObject = getObject(cursorId);
-                    localObjects.put(cursorId, cursorObject);
-                    cursor = new Cursor(cursor, cursorObject);
-                }
-            }
-
-            SourceFile after = (SourceFile) visitor.visit(before, p, cursor);
+            SourceFile after = (SourceFile) visitor.visit(before, p,
+                    getCursor(request.getCursor()));
             if (after == null) {
                 localObjects.remove(before.getId().toString());
             } else {
                 localObjects.put(after.getId().toString(), after);
             }
             return new VisitResponse(before != after);
+        }));
+
+        jsonRpc.method("Print", typed(Print.class, request -> {
+            Tree tree = getObject(request.getId());
+            Cursor cursor = getCursor(request.getCursor());
+            return tree.print(new Cursor(cursor, tree));
         }));
 
         jsonRpc.method("GetObject", typed(GetObject.class, request -> {
@@ -133,6 +128,18 @@ public class RewriteRpc {
         jsonRpc.bind();
     }
 
+    private Cursor getCursor(@Nullable List<String> cursorIds) {
+        Cursor cursor = new Cursor(null, Cursor.ROOT_VALUE);
+        if (cursorIds != null) {
+            for (String cursorId : cursorIds) {
+                Object cursorObject = getObject(cursorId);
+                remoteObjects.put(cursorId, cursorObject);
+                cursor = new Cursor(cursor, cursorObject);
+            }
+        }
+        return cursor;
+    }
+
     public RewriteRpc batchSize(int batchSize) {
         this.batchSize = batchSize;
         return this;
@@ -170,6 +177,18 @@ public class RewriteRpc {
         String pId = Integer.toString(System.identityHashCode(p));
         localObjects.put(pId, p);
 
+        List<String> cursorIds = getCursorIds(cursor);
+
+        return send("Visit", new Visit(visitorName, sourceFile.getId().toString(), pId, cursorIds),
+                VisitResponse.class);
+    }
+
+    public String print(Tree tree, Cursor parent) {
+        localObjects.put(tree.getId().toString(), tree);
+        return send("Print", new Print(tree.getId().toString(), getCursorIds(parent)), String.class);
+    }
+
+    private @Nullable List<String> getCursorIds(@Nullable Cursor cursor) {
         List<String> cursorIds = null;
         if (cursor != null) {
             cursorIds = cursor.getPathAsStream().map(c -> {
@@ -180,9 +199,7 @@ public class RewriteRpc {
                 return id;
             }).collect(Collectors.toList());
         }
-
-        return send("Visit", new Visit(visitorName, sourceFile.getId().toString(), pId, cursorIds),
-                VisitResponse.class);
+        return cursorIds;
     }
 
     private <T> T getObject(String id) {
