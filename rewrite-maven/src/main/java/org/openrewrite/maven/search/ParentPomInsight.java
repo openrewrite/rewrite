@@ -102,7 +102,7 @@ public class ParentPomInsight extends Recipe {
                 }
 
                 MavenResolutionResult mrr = getResolutionResult();
-                MavenPomDownloader mpd = new MavenPomDownloader(mrr.getProjectPoms(), ctx, mrr.getMavenSettings(), mrr.getActiveProfiles());
+                MavenPomDownloader mpd = new MavenPomDownloader(ctx, mrr.getMavenSettings(), mrr.getActiveProfiles());
 
                 Parent ancestor = mrr.getPom().getRequested().getParent();
                 String relativePath = tag.getChildValue("relativePath").orElse(null);
