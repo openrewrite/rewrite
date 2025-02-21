@@ -52,7 +52,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.openrewrite.java.Assertions.mavenProject;
-import static org.openrewrite.maven.AddRuntimeConfig.MAVEN_CONFIG_PATH;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.test.SourceSpecs.text;
 
@@ -3728,7 +3727,12 @@ class MavenParserTest implements RewriteTest {
                   <artifactId>my-app</artifactId>
                   <version>${revision}</version>
               </project>
-              """
+              """,
+            spec -> spec.afterRecipe(p -> {
+                var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                assertThat(results.getPom().getVersion()).isEqualTo("${revision}");
+                assertThat(results.getPom().getProperties().get("revision")).isEqualTo("1.0.0");
+            })
           )
         );
     }
@@ -3749,13 +3753,15 @@ class MavenParserTest implements RewriteTest {
               
                   <groupId>com.example</groupId>
                   <artifactId>my-app</artifactId>
-                  <version>${revision}</version>
-              
-                  <properties>
-                      <revision>${revision:-1.0.0}</revision>
-                  </properties>
+                  <version>${revision:-1.0.0-SNAPSHOT}</version>
               </project>
-              """
+              """,
+            spec -> spec.afterRecipe(p -> {
+                  var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                  assertThat(results.getPom().getVersion()).isEqualTo("${revision}");
+                  assertThat(results.getPom().getProperties().get("revision")).isEqualTo("1.0.0");
+              }
+            )
           )
         );
     }
