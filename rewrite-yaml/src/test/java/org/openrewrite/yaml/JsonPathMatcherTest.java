@@ -113,6 +113,15 @@ class JsonPathMatcherTest {
     }
 
     @Test
+    void wildcardInMiddle() {
+        assertMatched(
+          "$.*.literal",
+          complex,
+          List.of("literal:  $.object.literal", "literal:  $.objects.literal")
+        );
+    }
+
+    @Test
     void complex() {
         assertMatched(
           "..spec.containers[:1].resources.limits.cpu",
@@ -180,14 +189,13 @@ class JsonPathMatcherTest {
           simple,
           List.of(
             """
-                  root:
-                    literal: $.root.literal
-                    object:
-                      literal: $.root.object.literal
-                      list:
-                        - literal: $.root.object.list[0]
-                    list:
-                      - literal: $.root.list[0]
+                literal: $.root.literal
+                object:
+                  literal: $.root.object.literal
+                  list:
+                    - literal: $.root.object.list[0]
+                list:
+                  - literal: $.root.list[0]
               """
           )
         );
@@ -199,16 +207,14 @@ class JsonPathMatcherTest {
           "$.*.*",
           simple,
           List.of(
-            "literal: $.root.literal",
+            "$.root.literal",
             """
-                  object:
-                      literal: $.root.object.literal
-                      list:
-                        - literal: $.root.object.list[0]
+                  literal: $.root.object.literal
+                  list:
+                    - literal: $.root.object.list[0]
               """,
             """
-                  list:
-                      - literal: $.root.list[0]
+                  - literal: $.root.list[0]
               """
           )
         );
