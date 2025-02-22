@@ -15,7 +15,7 @@ import java.util.Set;
 
 @RequiredArgsConstructor
 public class RpcRecipe extends ScanningRecipe<Integer> {
-    private final RewriteRpc rpc;
+    private final transient RewriteRpc rpc;
 
     /**
      * The ID that the remote is using to refer to this recipe.
@@ -80,7 +80,7 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public Tree preVisit(@NonNull Tree tree, ExecutionContext ctx) {
-                rpc.scan((SourceFile) tree, scanVisitor, 0);
+                rpc.scan((SourceFile) tree, scanVisitor, ctx);
                 stopAfterPreVisit();
                 return tree;
             }
@@ -97,7 +97,7 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public @Nullable Tree preVisit(@NonNull Tree tree, ExecutionContext ctx) {
-                Tree t = rpc.visit((SourceFile) tree, editVisitor, 0);
+                Tree t = rpc.visit((SourceFile) tree, editVisitor, ctx);
                 stopAfterPreVisit();
                 return t;
             }

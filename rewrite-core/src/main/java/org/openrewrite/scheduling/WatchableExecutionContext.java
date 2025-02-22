@@ -15,16 +15,15 @@
  */
 package org.openrewrite.scheduling;
 
-import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.DelegatingExecutionContext;
 import org.openrewrite.ExecutionContext;
 
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
+public class WatchableExecutionContext extends DelegatingExecutionContext {
+    public WatchableExecutionContext(ExecutionContext delegate) {
+        super(delegate);
+    }
 
-@RequiredArgsConstructor
-public class WatchableExecutionContext implements ExecutionContext {
-    private final ExecutionContext delegate;
     private boolean hasNewMessages;
 
     public boolean hasNewMessages() {
@@ -38,30 +37,10 @@ public class WatchableExecutionContext implements ExecutionContext {
     @Override
     public void putMessage(String key, @Nullable Object value) {
         hasNewMessages = true;
-        delegate.putMessage(key, value);
+        super.putMessage(key, value);
     }
 
     public void putCycle(RecipeRunCycle<?> cycle) {
-        delegate.putMessage(CURRENT_CYCLE, cycle);
-    }
-
-    @Override
-    public <T> @Nullable T getMessage(String key) {
-        return delegate.getMessage(key);
-    }
-
-    @Override
-    public <T> @Nullable T pollMessage(String key) {
-        return delegate.pollMessage(key);
-    }
-
-    @Override
-    public Consumer<Throwable> getOnError() {
-        return delegate.getOnError();
-    }
-
-    @Override
-    public BiConsumer<Throwable, ExecutionContext> getOnTimeout() {
-        return delegate.getOnTimeout();
+        super.putMessage(CURRENT_CYCLE, cycle);
     }
 }

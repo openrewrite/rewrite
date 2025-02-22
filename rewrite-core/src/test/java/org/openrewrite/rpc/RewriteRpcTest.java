@@ -8,10 +8,7 @@ import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.config.Environment;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
@@ -21,6 +18,7 @@ import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.time.Duration;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -57,6 +55,16 @@ public class RewriteRpcTest implements RewriteTest {
     }
 
     @Test
+    void sendReceiveExecutionContext() {
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        ctx.putMessage("key", "value");
+
+        client.localObjects.put("123", ctx);
+        InMemoryExecutionContext received = server.getObject("123");
+        assertThat(received.<String>getMessage("key")).isEqualTo("value");
+    }
+
+    @Test
     void sendReceiveIdempotence() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
@@ -89,6 +97,27 @@ public class RewriteRpcTest implements RewriteTest {
     @Test
     void getRecipes() {
         assertThat(server.getRecipes()).isNotEmpty();
+    }
+
+    @Test
+    void prepareRecipe() {
+        Recipe recipe = server.prepareRecipe("org.openrewrite.text.Find",
+          Map.of("find", "hello"));
+        assertThat(recipe.getDescriptor().getDisplayName()).isEqualTo("Find text");
+    }
+
+    @Test
+    void runRecipe() {
+        rewriteRun(
+          spec -> spec
+            .recipe(server.prepareRecipe("org.openrewrite.text.Find",
+              Map.of("find", "hello")))
+            .validateRecipeSerialization(false),
+          text(
+            "Hello Jon!",
+            "~~>Hello Jon!"
+          )
+        );
     }
 
     static class ChangeText extends PlainTextVisitor<Integer> {

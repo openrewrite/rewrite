@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.JsonRpcRequest;
 import io.moderne.jsonrpc.internal.SnowflakeId;
+import org.jetbrains.annotations.VisibleForTesting;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.config.Environment;
@@ -27,6 +28,7 @@ import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.ObjectMappers;
 import org.openrewrite.internal.RecipeLoader;
 import org.openrewrite.rpc.request.*;
+import org.openrewrite.scheduling.WatchableExecutionContext;
 
 import java.time.Duration;
 import java.util.*;
@@ -52,7 +54,9 @@ public class RewriteRpc {
      * between two processes.
      */
     private final Map<String, Object> remoteObjects = new HashMap<>();
-    private final Map<String, Object> localObjects = new HashMap<>();
+
+    @VisibleForTesting
+    final Map<String, Object> localObjects = new HashMap<>();
 
     /**
      * Keeps track of objects that need to be referentially deduplicated, and
@@ -60,9 +64,7 @@ public class RewriteRpc {
      */
     private final Map<Object, Integer> localRefs = new IdentityHashMap<>();
     private final Map<Integer, Object> remoteRefs = new IdentityHashMap<>();
-
     private final Map<String, Recipe> preparedRecipes = new HashMap<>();
-
     private final Map<String, BlockingQueue<List<RpcObjectData>>> inProgressGetRpcObjects = new ConcurrentHashMap<>();
 
     private static final ExecutorService forkJoin = ForkJoinPool.commonPool();
@@ -157,7 +159,7 @@ public class RewriteRpc {
         }));
 
         jsonRpc.method("Print", typed(Print.class, request -> {
-            Tree tree = getObject(request.getId());
+            Tree tree = getObject(request.getTreeId());
             Cursor cursor = getCursor(request.getCursor());
             return tree.print(new Cursor(cursor, tree));
         }));
@@ -170,11 +172,11 @@ public class RewriteRpc {
 
         if (visitorName.startsWith("scan:")) {
             //noinspection unchecked
-            return ((ScanningRecipe<Object>) preparedRecipes.get(visitorName.substring("scan:".length() + 1)))
-                    .getScanner(0);
+            ScanningRecipe<Object> recipe = (ScanningRecipe<Object>) preparedRecipes.get(visitorName.substring("scan:".length()));
+            return recipe.getScanner(0);
         } else if (visitorName.startsWith("edit:")) {
-            return preparedRecipes.get(visitorName.substring("edit:".length() + 1))
-                    .getVisitor();
+            Recipe recipe = preparedRecipes.get(visitorName.substring("edit:".length()));
+            return recipe.getVisitor();
         }
 
         Map<Object, Object> withJsonType = request.getVisitorOptions() == null ?
@@ -232,7 +234,12 @@ public class RewriteRpc {
         // asks for it, we know what to send.
         localObjects.put(sourceFile.getId().toString(), sourceFile);
         String pId = Integer.toString(System.identityHashCode(p));
-        localObjects.put(pId, p);
+
+        Object p2 = p;
+        while (p2 instanceof DelegatingExecutionContext) {
+            p2 = ((DelegatingExecutionContext) p2).getDelegate();
+        }
+        localObjects.put(pId, p2);
 
         List<String> cursorIds = getCursorIds(cursor);
 
@@ -282,7 +289,8 @@ public class RewriteRpc {
         return cursorIds;
     }
 
-    private <T> T getObject(String id) {
+    @VisibleForTesting
+    <T> T getObject(String id) {
         RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, () -> send("GetObject",
                 new GetObject(id), GetObjectResponse.class));
         Object remoteObject = q.receive(localObjects.get(id), before -> {

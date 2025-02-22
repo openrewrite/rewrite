@@ -22,7 +22,7 @@ import java.util.List;
 
 @Value
 public class Print implements RpcRequest {
-    String id;
+    String treeId;
 
     /**
      * A list of IDs representing the cursor whose objects are stored in the
