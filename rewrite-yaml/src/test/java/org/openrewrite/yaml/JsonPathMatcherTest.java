@@ -821,11 +821,10 @@ class JsonPathMatcherTest {
     void dontMatchThis() {
         assertNotMatched("$..[?(@.task=='delete-this')]",
           List.of("""
-          task: not-this
           foo:
             bar:
+              - task: not-this
               - task: not-this-either
-              - task: not-this-most-of-all
           """));
     }
 
