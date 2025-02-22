@@ -19,11 +19,14 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
-import java.util.UUID;
+import java.util.Map;
 
 @Value
-public class Visit implements RecipeRpcRequest {
+public class Visit implements RpcRequest {
     String visitor;
+
+    Map<String, Object> visitorOptions;
+
     String treeId;
 
     /**

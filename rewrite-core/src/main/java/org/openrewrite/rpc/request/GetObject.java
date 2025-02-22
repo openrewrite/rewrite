@@ -17,9 +17,7 @@ package org.openrewrite.rpc.request;
 
 import lombok.Value;
 
-import java.util.UUID;
-
 @Value
-public class GetObject implements RecipeRpcRequest {
+public class GetObject implements RpcRequest {
     String id;
 }

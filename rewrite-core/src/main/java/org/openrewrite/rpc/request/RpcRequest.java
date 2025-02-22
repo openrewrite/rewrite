@@ -15,5 +15,5 @@
  */
 package org.openrewrite.rpc.request;
 
-public interface RecipeRpcRequest {
+public interface RpcRequest {
 }

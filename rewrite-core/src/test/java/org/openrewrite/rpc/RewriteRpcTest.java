@@ -12,6 +12,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.config.Environment;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
@@ -21,11 +22,15 @@ import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.time.Duration;
 
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
 public class RewriteRpcTest implements RewriteTest {
+    Environment env = Environment.builder()
+      .scanRuntimeClasspath("org.openrewrite.text")
+      .build();
+
     RewriteRpc server;
     RewriteRpc client;
 
@@ -38,11 +43,11 @@ public class RewriteRpcTest implements RewriteTest {
 
         JsonRpc serverJsonRpc = new JsonRpc(new TraceMessageHandler("server",
           new HeaderDelimitedMessageHandler(serverIn, serverOut)));
-        server = new RewriteRpc(serverJsonRpc).batchSize(1).timeout(Duration.ofSeconds(10));
+        server = new RewriteRpc(serverJsonRpc, env).batchSize(1).timeout(Duration.ofSeconds(10));
 
         JsonRpc clientJsonRpc = new JsonRpc(new TraceMessageHandler("client",
           new HeaderDelimitedMessageHandler(clientIn, clientOut)));
-        client = new RewriteRpc(clientJsonRpc).batchSize(1).timeout(Duration.ofSeconds(10));
+        client = new RewriteRpc(clientJsonRpc, env).batchSize(1).timeout(Duration.ofSeconds(10));
     }
 
     @AfterEach
@@ -79,6 +84,11 @@ public class RewriteRpcTest implements RewriteTest {
               assertThat(server.print(text)).isEqualTo("Hello Jon!"))
           )
         );
+    }
+
+    @Test
+    void getRecipes() {
+        assertThat(server.getRecipes()).isNotEmpty();
     }
 
     static class ChangeText extends PlainTextVisitor<Integer> {

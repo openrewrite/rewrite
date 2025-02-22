@@ -27,6 +27,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.config.Environment;
 import org.openrewrite.json.JsonVisitor;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.rpc.RewriteRpc;
@@ -52,13 +53,15 @@ class JsonSendReceiveTest implements RewriteTest {
         PipedInputStream serverIn = new PipedInputStream(clientOut);
         PipedInputStream clientIn = new PipedInputStream(serverOut);
 
+        Environment env = Environment.builder().build();
+
         JsonRpc serverJsonRpc = new JsonRpc(new TraceMessageHandler("server",
           new HeaderDelimitedMessageHandler(serverIn, serverOut)));
-        server = new RewriteRpc(serverJsonRpc).batchSize(1).timeout(Duration.ofSeconds(10));
+        server = new RewriteRpc(serverJsonRpc, env).batchSize(1).timeout(Duration.ofSeconds(10));
 
         JsonRpc clientJsonRpc = new JsonRpc(new TraceMessageHandler("client",
           new HeaderDelimitedMessageHandler(clientIn, clientOut)));
-        client = new RewriteRpc(clientJsonRpc).batchSize(1).timeout(Duration.ofSeconds(10));
+        client = new RewriteRpc(clientJsonRpc, env).batchSize(1).timeout(Duration.ofSeconds(10));
     }
 
     @AfterEach

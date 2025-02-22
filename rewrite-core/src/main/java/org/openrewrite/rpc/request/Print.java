@@ -21,7 +21,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.List;
 
 @Value
-public class Print implements RecipeRpcRequest {
+public class Print implements RpcRequest {
     String id;
 
     /**
