@@ -15,6 +15,7 @@
  */
 package org.openrewrite.yaml;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.internal.StringUtils;
@@ -813,6 +814,19 @@ class JsonPathMatcherTest {
               """),
           Collections.emptyList()
         );
+    }
+
+    @Disabled
+    @Test
+    void dontMatchThis() {
+        assertNotMatched("$..[?(@.task=='delete-this')]",
+          List.of("""
+          task: not-this
+          foo:
+            bar:
+              - task: not-this-either
+              - task: not-this-most-of-all
+          """));
     }
 
     @Test
