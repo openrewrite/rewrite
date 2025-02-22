@@ -67,6 +67,7 @@ public abstract class Recipe implements Cloneable {
         return getClass().getName();
     }
 
+    @Nullable
     private transient RecipeDescriptor descriptor;
 
     @Nullable
@@ -223,7 +224,7 @@ public abstract class Recipe implements Cloneable {
             throw new RuntimeException(e);
         }
 
-        return new RecipeDescriptor(getName(), getDisplayName(), getDescription(), getTags(),
+        return new RecipeDescriptor(getName(), getDisplayName(), getInstanceName(), getDescription(), getTags(),
                 getEstimatedEffortPerOccurrence(), options, recipeList1, getDataTableDescriptors(),
                 getMaintainers(), getContributors(), getExamples(), recipeSource);
     }

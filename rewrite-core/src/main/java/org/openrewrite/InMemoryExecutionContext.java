@@ -15,16 +15,24 @@
  */
 package org.openrewrite;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
 import java.time.Duration;
+import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 public class InMemoryExecutionContext implements ExecutionContext {
-    private final Map<String, Object> messages = new ConcurrentHashMap<>();
+    @Getter
+    @Nullable
+    private Map<String, Object> messages;
+
     private final Consumer<Throwable> onError;
     private final BiConsumer<Throwable, ExecutionContext> onTimeout;
 
@@ -52,15 +60,21 @@ public class InMemoryExecutionContext implements ExecutionContext {
 
     @Override
     public void putMessage(String key, @Nullable Object value) {
-        if (value == null) {
+        if (value == null && messages != null) {
             messages.remove(key);
         } else {
+            if (messages == null) {
+                messages = new ConcurrentHashMap<>();
+            }
             messages.put(key, value);
         }
     }
 
     @Override
     public <T> @Nullable T getMessage(String key) {
+        if (messages == null) {
+            messages = new ConcurrentHashMap<>();
+        }
         //noinspection unchecked
         return (T) messages.get(key);
     }
@@ -68,7 +82,7 @@ public class InMemoryExecutionContext implements ExecutionContext {
     @Override
     public <T> @Nullable T pollMessage(String key) {
         //noinspection unchecked
-        return (T) messages.remove(key);
+        return (T) (messages == null ? null : messages.remove(key));
     }
 
     @Override

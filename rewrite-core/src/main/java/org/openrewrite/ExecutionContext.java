@@ -16,6 +16,9 @@
 package org.openrewrite;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 import org.openrewrite.scheduling.RecipeRunCycle;
 
 import java.util.*;
@@ -24,13 +27,14 @@ import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
+import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 
 /**
  * Passes messages between individual visitors or parsing operations and allows errors to be propagated
  * back to the process controlling parsing or recipe execution.
  */
-public interface ExecutionContext {
+public interface ExecutionContext extends RpcCodec<ExecutionContext> {
     String CURRENT_CYCLE = "org.openrewrite.currentCycle";
     String CURRENT_RECIPE = "org.openrewrite.currentRecipe";
     String DATA_TABLES = "org.openrewrite.dataTables";
@@ -48,6 +52,9 @@ public interface ExecutionContext {
     default Set<TreeObserver.Subscription> getObservers() {
         return getMessage("org.openrewrite.internal.treeObservers", Collections.emptySet());
     }
+
+    @Nullable
+    Map<String, Object> getMessages();
 
     void putMessage(String key, @Nullable Object value);
 
@@ -106,5 +113,32 @@ public interface ExecutionContext {
 
     default RecipeRunCycle<?> getCycleDetails() {
         return requireNonNull(getMessage(CURRENT_CYCLE));
+    }
+
+    @Override
+    default void rpcSend(ExecutionContext after, RpcSendQueue q) {
+        q.getAndSend(after, ctx -> {
+            Map<String, Object> messages = new HashMap<>(ctx.getMessages() == null ?
+                    emptyMap() : ctx.getMessages());
+
+            // TODO how do we feed run stats back?
+            messages.remove(CURRENT_CYCLE);
+            messages.remove(CURRENT_RECIPE);
+
+            return messages;
+        });
+    }
+
+    @Override
+    default ExecutionContext rpcReceive(ExecutionContext before, RpcReceiveQueue q) {
+        Map<String, Object> messages = q.receive(null);
+        for (Map.Entry<String, Object> e : messages.entrySet()) {
+            before.putMessage(e.getKey(), e.getValue());
+        }
+        if (before.getMessage(CURRENT_CYCLE) == null) {
+//            before.putMessage(CURRENT_CYCLE, new RecipeRunCycle<>(
+//                    Recipe.noop(), 0, ));
+        }
+        return before;
     }
 }
