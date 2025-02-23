@@ -16,6 +16,7 @@
 package org.openrewrite.rpc;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
@@ -23,7 +24,6 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import lombok.Value;
-import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 
@@ -88,8 +88,16 @@ public class RpcObjectData {
     public <V> V getValue() {
         if (value instanceof Map) {
             try {
+                Class<?> valueClass = Class.forName(valueType);
+
+                // While we know exactly what type of value we are converting to,
+                // Jackson will still require the '@c' field in the map when the type
+                // we are converting to is annotated with @JsonTypeInfo.
                 //noinspection unchecked
-                return (V) mapper.convertValue(value, Class.forName(valueType));
+                ((Map<String, Object>) value).put("@c", valueType);
+
+                //noinspection unchecked
+                return (V) mapper.convertValue(value, valueClass);
             } catch (ClassNotFoundException e) {
                 throw new RuntimeException(e);
             }

@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.JsonRpcRequest;
 import io.moderne.jsonrpc.internal.SnowflakeId;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.VisibleForTesting;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -28,7 +29,11 @@ import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.ObjectMappers;
 import org.openrewrite.internal.RecipeLoader;
 import org.openrewrite.rpc.request.*;
+import org.openrewrite.scheduling.RecipeRunCycle;
 import org.openrewrite.scheduling.WatchableExecutionContext;
+import org.openrewrite.table.RecipeRunStats;
+import org.openrewrite.table.SourcesFileErrors;
+import org.openrewrite.table.SourcesFileResults;
 
 import java.time.Duration;
 import java.util.*;
@@ -79,11 +84,7 @@ public class RewriteRpc {
             SourceFile before = getObject(request.getTreeId());
             localObjects.put(before.getId().toString(), before);
 
-            Object p = getObject(request.getP());
-            if (p instanceof ExecutionContext) {
-                // This is likely to be reused in subsequent visits, so we keep it.
-                localObjects.put(request.getP(), p);
-            }
+            Object p = getVisitorP(request);
 
             SourceFile after = (SourceFile) visitor.visit(before, p,
                     getCursor(request.getCursor()));
@@ -165,6 +166,29 @@ public class RewriteRpc {
         }));
 
         jsonRpc.bind();
+    }
+
+    private Object getVisitorP(Visit request) {
+        Object p = getObject(request.getP());
+        if (p instanceof ExecutionContext) {
+            String visitorName = request.getVisitor();
+
+            // This is really probably particular to the Java implementation of RewriteRpc,
+            // because we are carrying forward the legacy of cycles that are likely to be
+            // removed from OpenRewrite in the future.
+            if (visitorName.startsWith("scan:") || visitorName.startsWith("edit:")) {
+                WatchableExecutionContext ctx = new WatchableExecutionContext((ExecutionContext) p);
+                Recipe recipe = preparedRecipes.get(visitorName.substring(
+                        "edit:".length() /* 'scan:' has same length*/));
+                ctx.putCycle(new RecipeRunCycle<>(recipe, 0, new Cursor(null, Cursor.ROOT_VALUE), ctx,
+                        new RecipeRunStats(Recipe.noop()), new SourcesFileResults(Recipe.noop()),
+                        new SourcesFileErrors(Recipe.noop()), LargeSourceSet::edit));
+            }
+
+            // This is likely to be reused in subsequent visits, so we keep it.
+            localObjects.put(request.getP(), p);
+        }
+        return p;
     }
 
     private TreeVisitor<?, ?> instantiateVisitor(Visit request) {
