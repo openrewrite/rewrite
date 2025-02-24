@@ -638,7 +638,7 @@ public class AdaptiveRadixTree<V> {
     }
 
     public AdaptiveRadixTree<V> copy() {
-        AdaptiveRadixTree<V> newTree = new AdaptiveRadixTree<>(keyTable);
+        AdaptiveRadixTree<V> newTree = new AdaptiveRadixTree<>(keyTable.copy());
         if (root != null) {
             newTree.root = root.copy();
         }
@@ -660,6 +660,13 @@ public class AdaptiveRadixTree<V> {
         KeyTable() {
             this.storage = new byte[INITIAL_CAPACITY];
             this.size = 0;
+        }
+
+        KeyTable copy() {
+            KeyTable copy = new KeyTable();
+            copy.storage = Arrays.copyOf(storage, storage.length);
+            copy.size = size;
+            return copy;
         }
 
         // Returns offset where the key was stored
