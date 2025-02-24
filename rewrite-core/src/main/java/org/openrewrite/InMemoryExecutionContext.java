@@ -15,6 +15,7 @@
  */
 package org.openrewrite;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
@@ -23,8 +24,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
-public class InMemoryExecutionContext implements ExecutionContext {
-    private final Map<String, Object> messages = new ConcurrentHashMap<>();
+public class InMemoryExecutionContext implements ExecutionContext, Cloneable {
+    @Getter
+    @Nullable
+    private Map<String, Object> messages;
+
     private final Consumer<Throwable> onError;
     private final BiConsumer<Throwable, ExecutionContext> onTimeout;
 
@@ -52,15 +56,21 @@ public class InMemoryExecutionContext implements ExecutionContext {
 
     @Override
     public void putMessage(String key, @Nullable Object value) {
-        if (value == null) {
+        if (value == null && messages != null) {
             messages.remove(key);
         } else {
+            if (messages == null) {
+                messages = new ConcurrentHashMap<>();
+            }
             messages.put(key, value);
         }
     }
 
     @Override
     public <T> @Nullable T getMessage(String key) {
+        if (messages == null) {
+            messages = new ConcurrentHashMap<>();
+        }
         //noinspection unchecked
         return (T) messages.get(key);
     }
@@ -68,7 +78,7 @@ public class InMemoryExecutionContext implements ExecutionContext {
     @Override
     public <T> @Nullable T pollMessage(String key) {
         //noinspection unchecked
-        return (T) messages.remove(key);
+        return (T) (messages == null ? null : messages.remove(key));
     }
 
     @Override
@@ -79,5 +89,15 @@ public class InMemoryExecutionContext implements ExecutionContext {
     @Override
     public BiConsumer<Throwable, ExecutionContext> getOnTimeout() {
         return onTimeout;
+    }
+
+    @SuppressWarnings("MethodDoesntCallSuperMethod")
+    @Override
+    public InMemoryExecutionContext clone() {
+        InMemoryExecutionContext clone = new InMemoryExecutionContext();
+        clone.messages = new ConcurrentHashMap<>(messages);
+        clone.messages.computeIfPresent(DATA_TABLES, (key, dt) ->
+                new ConcurrentHashMap<>(((Map<?, ?>) dt)));
+        return clone;
     }
 }

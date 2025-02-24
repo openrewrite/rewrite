@@ -37,6 +37,9 @@ public class RecipeDescriptor {
     @NlsRewrite.DisplayName
     String displayName;
 
+    @NlsRewrite.DisplayName
+    String instanceName;
+
     @NlsRewrite.Description
     String description;
 

@@ -67,6 +67,7 @@ public abstract class Recipe implements Cloneable {
         return getClass().getName();
     }
 
+    @Nullable
     private transient RecipeDescriptor descriptor;
 
     @Nullable
@@ -223,7 +224,7 @@ public abstract class Recipe implements Cloneable {
             throw new RuntimeException(e);
         }
 
-        return new RecipeDescriptor(getName(), getDisplayName(), getDescription(), getTags(),
+        return new RecipeDescriptor(getName(), getDisplayName(), getInstanceName(), getDescription(), getTags(),
                 getEstimatedEffortPerOccurrence(), options, recipeList1, getDataTableDescriptors(),
                 getMaintainers(), getContributors(), getExamples(), recipeSource);
     }
@@ -308,6 +309,17 @@ public abstract class Recipe implements Cloneable {
      */
     public boolean causesAnotherCycle() {
         return false;
+    }
+
+    /**
+     * At the end of a recipe run, a {@link RecipeScheduler} will call this method to allow the
+     * recipe to perform any cleanup or finalization tasks. This method is guaranteed to be called
+     * only once per run.
+     *
+     * @param ctx The recipe run execution context.
+     */
+    @Incubating(since = "8.48.0")
+    public void onComplete(ExecutionContext ctx) {
     }
 
     /**

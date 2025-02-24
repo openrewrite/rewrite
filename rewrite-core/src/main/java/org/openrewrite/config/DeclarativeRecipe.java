@@ -369,7 +369,7 @@ public class DeclarativeRecipe extends Recipe {
         for (Recipe childRecipe : getRecipeList()) {
             recipeList.add(childRecipe.getDescriptor());
         }
-        return new RecipeDescriptor(getName(), getDisplayName(), getDescription() != null ? getDescription() : "",
+        return new RecipeDescriptor(getName(), getDisplayName(), getInstanceName(), getDescription() != null ? getDescription() : "",
                 getTags(), getEstimatedEffortPerOccurrence(),
                 emptyList(), recipeList, getDataTableDescriptors(), getMaintainers(), getContributors(),
                 getExamples(), source);
