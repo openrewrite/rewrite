@@ -23,7 +23,7 @@ import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class AddDependencyVisitorTest {
+class AddDependencyVisitorTest {
 
     @Test
     void shouldHonorMetadataLastRelease() throws MavenDownloadingException {
