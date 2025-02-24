@@ -374,4 +374,22 @@ class JavaParserTest implements RewriteTest {
           .containsOnly(Paths.get("/.m2/repository/org/openrewrite/rewrite-java/8.41.1/rewrite-java-8.41.1.jar"));
     }
 
+    @Test
+    void multiLineComment() {
+        rewriteRun(
+          java(
+            """
+              package hello;
+              public class Test {
+                public static void test() {
+                  /*addItem("Site A", "http://hello.com/A");
+                  addItem("Site B", "http://hello.com/B");
+                  addItem("Site C", "http://hello.com/C");*/
+                }
+              }
+              """
+          )
+        );
+    }
+
 }
