@@ -15,11 +15,24 @@
  */
 package org.openrewrite.rpc.request;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.moderne.jsonrpc.JsonRpcMethod;
+import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.*;
+import org.openrewrite.internal.ObjectMappers;
+import org.openrewrite.scheduling.RecipeRunCycle;
+import org.openrewrite.scheduling.WatchableExecutionContext;
+import org.openrewrite.table.RecipeRunStats;
+import org.openrewrite.table.SourcesFileErrors;
+import org.openrewrite.table.SourcesFileResults;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 @Value
 public class Visit implements RpcRequest {
@@ -40,4 +53,99 @@ public class Visit implements RpcRequest {
      */
     @Nullable
     List<String> cursor;
+
+    @RequiredArgsConstructor
+    public static class Handler extends JsonRpcMethod<Visit> {
+        private static final ObjectMapper mapper = ObjectMappers.propertyBasedMapper(null);
+
+        private final Map<String, Object> remoteObjects;
+        private final Map<String, Object> localObjects;
+        private final Map<String, Recipe> preparedRecipes;
+        private final Function<String, ?> getObject;
+        private final Function<List<String>, Cursor> getCursor;
+
+        @Override
+        protected Object handle(Visit request) throws Exception {
+            //noinspection unchecked
+            TreeVisitor<?, Object> visitor = (TreeVisitor<?, Object>) instantiateVisitor(request);
+
+            SourceFile before = (SourceFile) getObject.apply(request.getTreeId());
+            localObjects.put(before.getId().toString(), before);
+
+            Object p = getVisitorP(request);
+
+            SourceFile after = (SourceFile) visitor.visit(before, p, getCursor.apply(
+                    request.getCursor()));
+            if (after == null) {
+                localObjects.remove(before.getId().toString());
+            } else {
+                localObjects.put(after.getId().toString(), after);
+            }
+
+            maybeUpdateExecutionContext(request.getP(), p);
+
+            return new VisitResponse(before != after);
+        }
+
+        private TreeVisitor<?, ?> instantiateVisitor(Visit request) {
+            String visitorName = request.getVisitor();
+
+            if (visitorName.startsWith("scan:")) {
+                //noinspection unchecked
+                ScanningRecipe<Object> recipe = (ScanningRecipe<Object>) preparedRecipes.get(visitorName.substring("scan:".length()));
+                return recipe.getScanner(0);
+            } else if (visitorName.startsWith("edit:")) {
+                Recipe recipe = preparedRecipes.get(visitorName.substring("edit:".length()));
+                return recipe.getVisitor();
+            }
+
+            Map<Object, Object> withJsonType = request.getVisitorOptions() == null ?
+                    new HashMap<>() :
+                    new HashMap<>(request.getVisitorOptions());
+            withJsonType.put("@c", visitorName);
+            return mapper.convertValue(withJsonType, new TypeReference<TreeVisitor<Tree, Object>>() {
+            });
+        }
+
+        private Object getVisitorP(Visit request) {
+            Object p = getObject.apply(request.getP());
+            // This is likely to be reused in subsequent visits, so we keep it.
+            localObjects.put(request.getP(), p);
+
+            if (p instanceof ExecutionContext) {
+                String visitorName = request.getVisitor();
+
+                // This is really probably particular to the Java implementation of RewriteRpc,
+                // because we are carrying forward the legacy of cycles that are likely to be
+                // removed from OpenRewrite in the future.
+                if (visitorName.startsWith("scan:") || visitorName.startsWith("edit:")) {
+                    WatchableExecutionContext ctx = new WatchableExecutionContext((ExecutionContext) p);
+                    Recipe recipe = preparedRecipes.get(visitorName.substring(
+                            "edit:".length() /* 'scan:' has same length*/));
+                    ctx.putCycle(new RecipeRunCycle<>(recipe, 0, new Cursor(null, Cursor.ROOT_VALUE), ctx,
+                            new RecipeRunStats(Recipe.noop()), new SourcesFileResults(Recipe.noop()),
+                            new SourcesFileErrors(Recipe.noop()), LargeSourceSet::edit));
+                    ctx.putCurrentRecipe(recipe);
+                    return ctx;
+                }
+            }
+            return p;
+        }
+
+        /**
+         * If the object is an instance of WatchableExecutionContext, and it has new messages,
+         * clone the underlying execution context and update the local state, so that when the
+         * remote asks for it, we see the ExecutionContext in CHANGE state.
+         *
+         * @param pId The ID of p
+         * @param p   An object, which may be an ExecutionContext
+         */
+        private void maybeUpdateExecutionContext(String pId, Object p) {
+            if (p instanceof WatchableExecutionContext && ((WatchableExecutionContext) p).hasNewMessages()) {
+                ExecutionContext ctx = ((WatchableExecutionContext) p).getDelegate();
+                InMemoryExecutionContext newCtx = new InMemoryExecutionContext();
+                localObjects.put(pId, ctx);
+            }
+        }
+    }
 }

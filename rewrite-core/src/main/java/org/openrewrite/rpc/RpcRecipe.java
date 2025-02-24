@@ -103,4 +103,10 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
             }
         };
     }
+
+    @Override
+    public void onComplete(ExecutionContext ctx) {
+        Object dataTables = rpc.getObject(ctx.getMessage("org.openrewrite.rpc.id") + ":dataTables");
+        ctx.putMessage(ExecutionContext.DATA_TABLES, dataTables);
+    }
 }

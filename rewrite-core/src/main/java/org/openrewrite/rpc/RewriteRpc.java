@@ -15,39 +15,27 @@
  */
 package org.openrewrite.rpc;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.moderne.jsonrpc.JsonRpc;
+import io.moderne.jsonrpc.JsonRpcMethod;
 import io.moderne.jsonrpc.JsonRpcRequest;
-import io.moderne.jsonrpc.internal.SnowflakeId;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.VisibleForTesting;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.RecipeDescriptor;
-import org.openrewrite.internal.ObjectMappers;
-import org.openrewrite.internal.RecipeLoader;
 import org.openrewrite.rpc.request.*;
-import org.openrewrite.scheduling.RecipeRunCycle;
-import org.openrewrite.scheduling.WatchableExecutionContext;
-import org.openrewrite.table.RecipeRunStats;
-import org.openrewrite.table.SourcesFileErrors;
-import org.openrewrite.table.SourcesFileResults;
 
 import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.*;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
-import static io.moderne.jsonrpc.JsonRpcMethod.typed;
 import static java.util.Collections.emptyList;
-import static org.openrewrite.rpc.RpcObjectData.State.DELETE;
 import static org.openrewrite.rpc.RpcObjectData.State.END_OF_OBJECT;
 
 public class RewriteRpc {
-    private final ObjectMapper mapper = ObjectMappers.propertyBasedMapper(null);
-
     private final JsonRpc jsonRpc;
 
     private int batchSize = 10;
@@ -63,164 +51,33 @@ public class RewriteRpc {
     @VisibleForTesting
     final Map<String, Object> localObjects = new HashMap<>();
 
-    /**
-     * Keeps track of objects that need to be referentially deduplicated, and
-     * the ref IDs to look them up by on the remote.
-     */
-    private final Map<Object, Integer> localRefs = new IdentityHashMap<>();
     private final Map<Integer, Object> remoteRefs = new IdentityHashMap<>();
-    private final Map<String, Recipe> preparedRecipes = new HashMap<>();
-    private final Map<String, BlockingQueue<List<RpcObjectData>>> inProgressGetRpcObjects = new ConcurrentHashMap<>();
-
-    private static final ExecutorService forkJoin = ForkJoinPool.commonPool();
 
     public RewriteRpc(JsonRpc jsonRpc, Environment marketplace) {
         this.jsonRpc = jsonRpc;
+        Map<String, Recipe> preparedRecipes = new HashMap<>();
 
-        jsonRpc.method("Visit", typed(Visit.class, request -> {
-            //noinspection unchecked
-            TreeVisitor<?, Object> visitor = (TreeVisitor<?, Object>) instantiateVisitor(request);
-
-            SourceFile before = getObject(request.getTreeId());
-            localObjects.put(before.getId().toString(), before);
-
-            Object p = getVisitorP(request);
-
-            SourceFile after = (SourceFile) visitor.visit(before, p,
-                    getCursor(request.getCursor()));
-            if (after == null) {
-                localObjects.remove(before.getId().toString());
-            } else {
-                localObjects.put(after.getId().toString(), after);
+        jsonRpc.rpc("Visit", new Visit.Handler(remoteObjects, localObjects, preparedRecipes,
+                this::getObject, this::getCursor));
+        jsonRpc.rpc("Generate", new Generate.Handler());
+        jsonRpc.rpc("GetObject", new GetObject.Handler(batchSize, remoteObjects, localObjects));
+        jsonRpc.rpc("GetRecipes", new JsonRpcMethod<Map<?, ?>>() {
+            @Override
+            protected Object handle(Map<?, ?> params) {
+                return marketplace.listRecipeDescriptors();
             }
-            return new VisitResponse(before != after);
-        }));
-
-        jsonRpc.method("Generate", typed(Generate.class, request -> {
-            // TODO implement me!
-            return emptyList();
-        }));
-
-        jsonRpc.method("GetObject", typed(GetObject.class, request -> {
-            Object after = localObjects.get(request.getId());
-
-            if (after == null) {
-                List<RpcObjectData> deleted = new ArrayList<>(2);
-                deleted.add(new RpcObjectData(DELETE, null, null, null));
-                deleted.add(new RpcObjectData(END_OF_OBJECT, null, null, null));
-                return deleted;
+        });
+        jsonRpc.rpc("PrepareRecipe", new PrepareRecipe.Handler(preparedRecipes));
+        jsonRpc.rpc("Print", new JsonRpcMethod<Print>() {
+            @Override
+            protected Object handle(Print request) {
+                Tree tree = getObject(request.getTreeId());
+                Cursor cursor = getCursor(request.getCursor());
+                return tree.print(new Cursor(cursor, tree));
             }
-
-            BlockingQueue<List<RpcObjectData>> q = inProgressGetRpcObjects.computeIfAbsent(request.getId(), id -> {
-                BlockingQueue<List<RpcObjectData>> batch = new ArrayBlockingQueue<>(1);
-                Object before = remoteObjects.get(id);
-
-                RpcSendQueue sendQueue = new RpcSendQueue(batchSize, batch::put, localRefs);
-                forkJoin.submit(() -> {
-                    try {
-                        Runnable onChange = after instanceof RpcCodec ? () -> {
-                            //noinspection unchecked
-                            ((RpcCodec<Object>) after).rpcSend(after, sendQueue);
-                        } : null;
-                        sendQueue.send(after, before, onChange);
-
-                        // All the data has been sent, and the remote should have received
-                        // the full tree, so update our understanding of the remote state
-                        // of this tree.
-                        remoteObjects.put(id, after);
-                    } catch (Throwable ignored) {
-                        // TODO do something with this exception
-                    } finally {
-                        sendQueue.put(new RpcObjectData(END_OF_OBJECT, null, null, null));
-                        sendQueue.flush();
-                    }
-                    return 0;
-                });
-                return batch;
-            });
-
-            List<RpcObjectData> batch = q.take();
-            if (batch.get(batch.size() - 1).getState() == END_OF_OBJECT) {
-                inProgressGetRpcObjects.remove(request.getId());
-            }
-
-            return batch;
-        }));
-
-        jsonRpc.method("GetRecipes", typed(Map.class, request ->
-                marketplace.listRecipeDescriptors()));
-
-        jsonRpc.method("PrepareRecipe", typed(PrepareRecipe.class, request -> {
-            Recipe recipe = new RecipeLoader(null).load(request.getId(), request.getOptions());
-            String instanceId = SnowflakeId.generateId();
-            preparedRecipes.put(instanceId, recipe);
-            return new PrepareRecipeResponse(instanceId, recipe.getDescriptor(),
-                    "edit:" + instanceId,
-                    recipe instanceof ScanningRecipe ? "scan:" + instanceId : null);
-        }));
-
-        jsonRpc.method("Print", typed(Print.class, request -> {
-            Tree tree = getObject(request.getTreeId());
-            Cursor cursor = getCursor(request.getCursor());
-            return tree.print(new Cursor(cursor, tree));
-        }));
+        });
 
         jsonRpc.bind();
-    }
-
-    private Object getVisitorP(Visit request) {
-        Object p = getObject(request.getP());
-        if (p instanceof ExecutionContext) {
-            String visitorName = request.getVisitor();
-
-            // This is really probably particular to the Java implementation of RewriteRpc,
-            // because we are carrying forward the legacy of cycles that are likely to be
-            // removed from OpenRewrite in the future.
-            if (visitorName.startsWith("scan:") || visitorName.startsWith("edit:")) {
-                WatchableExecutionContext ctx = new WatchableExecutionContext((ExecutionContext) p);
-                Recipe recipe = preparedRecipes.get(visitorName.substring(
-                        "edit:".length() /* 'scan:' has same length*/));
-                ctx.putCycle(new RecipeRunCycle<>(recipe, 0, new Cursor(null, Cursor.ROOT_VALUE), ctx,
-                        new RecipeRunStats(Recipe.noop()), new SourcesFileResults(Recipe.noop()),
-                        new SourcesFileErrors(Recipe.noop()), LargeSourceSet::edit));
-            }
-
-            // This is likely to be reused in subsequent visits, so we keep it.
-            localObjects.put(request.getP(), p);
-        }
-        return p;
-    }
-
-    private TreeVisitor<?, ?> instantiateVisitor(Visit request) {
-        String visitorName = request.getVisitor();
-
-        if (visitorName.startsWith("scan:")) {
-            //noinspection unchecked
-            ScanningRecipe<Object> recipe = (ScanningRecipe<Object>) preparedRecipes.get(visitorName.substring("scan:".length()));
-            return recipe.getScanner(0);
-        } else if (visitorName.startsWith("edit:")) {
-            Recipe recipe = preparedRecipes.get(visitorName.substring("edit:".length()));
-            return recipe.getVisitor();
-        }
-
-        Map<Object, Object> withJsonType = request.getVisitorOptions() == null ?
-                new HashMap<>() :
-                new HashMap<>(request.getVisitorOptions());
-        withJsonType.put("@c", visitorName);
-        return mapper.convertValue(withJsonType, new TypeReference<TreeVisitor<Tree, Object>>() {
-        });
-    }
-
-    private Cursor getCursor(@Nullable List<String> cursorIds) {
-        Cursor cursor = new Cursor(null, Cursor.ROOT_VALUE);
-        if (cursorIds != null) {
-            for (String cursorId : cursorIds) {
-                Object cursorObject = getObject(cursorId);
-                remoteObjects.put(cursorId, cursorObject);
-                cursor = new Cursor(cursor, cursorObject);
-            }
-        }
-        return cursor;
     }
 
     public RewriteRpc batchSize(int batchSize) {
@@ -314,7 +171,7 @@ public class RewriteRpc {
     }
 
     @VisibleForTesting
-    <T> T getObject(String id) {
+    public <T> T getObject(String id) {
         RpcReceiveQueue q = new RpcReceiveQueue(remoteRefs, () -> send("GetObject",
                 new GetObject(id), GetObjectResponse.class));
         Object remoteObject = q.receive(localObjects.get(id), before -> {
@@ -338,13 +195,24 @@ public class RewriteRpc {
         try {
             // TODO handle error
             return jsonRpc
-                    .send(JsonRpcRequest.newRequest(method)
-                            .namedParameters(body)
-                            .build())
+                    .send(JsonRpcRequest.newRequest(method, body))
                     .get(timeout.getSeconds(), TimeUnit.SECONDS)
                     .getResult(responseType);
         } catch (ExecutionException | TimeoutException | InterruptedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @VisibleForTesting
+    Cursor getCursor(@Nullable List<String> cursorIds) {
+        Cursor cursor = new Cursor(null, Cursor.ROOT_VALUE);
+        if (cursorIds != null) {
+            for (String cursorId : cursorIds) {
+                Object cursorObject = getObject(cursorId);
+                remoteObjects.put(cursorId, cursorObject);
+                cursor = new Cursor(cursor, cursorObject);
+            }
+        }
+        return cursor;
     }
 }

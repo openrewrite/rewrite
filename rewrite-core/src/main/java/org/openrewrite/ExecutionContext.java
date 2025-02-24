@@ -121,9 +121,10 @@ public interface ExecutionContext extends RpcCodec<ExecutionContext> {
             Map<String, Object> messages = new HashMap<>(ctx.getMessages() == null ?
                     emptyMap() : ctx.getMessages());
 
-            // TODO how do we feed run stats back?
+            // The remote side will manage its own recipe and cycle state.
             messages.remove(CURRENT_CYCLE);
             messages.remove(CURRENT_RECIPE);
+            messages.remove(DATA_TABLES);
 
             return messages;
         });
@@ -135,10 +136,7 @@ public interface ExecutionContext extends RpcCodec<ExecutionContext> {
         for (Map.Entry<String, Object> e : messages.entrySet()) {
             before.putMessage(e.getKey(), e.getValue());
         }
-        if (before.getMessage(CURRENT_CYCLE) == null) {
-//            before.putMessage(CURRENT_CYCLE, new RecipeRunCycle<>(
-//                    Recipe.noop(), 0, ));
-        }
+
         return before;
     }
 }

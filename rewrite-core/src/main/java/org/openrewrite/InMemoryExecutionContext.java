@@ -17,18 +17,14 @@ package org.openrewrite;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.rpc.RpcCodec;
-import org.openrewrite.rpc.RpcReceiveQueue;
-import org.openrewrite.rpc.RpcSendQueue;
 
 import java.time.Duration;
-import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
-public class InMemoryExecutionContext implements ExecutionContext {
+public class InMemoryExecutionContext implements ExecutionContext, Cloneable {
     @Getter
     @Nullable
     private Map<String, Object> messages;
@@ -93,5 +89,15 @@ public class InMemoryExecutionContext implements ExecutionContext {
     @Override
     public BiConsumer<Throwable, ExecutionContext> getOnTimeout() {
         return onTimeout;
+    }
+
+    @SuppressWarnings("MethodDoesntCallSuperMethod")
+    @Override
+    public InMemoryExecutionContext clone() {
+        InMemoryExecutionContext clone = new InMemoryExecutionContext();
+        clone.messages = new ConcurrentHashMap<>(messages);
+        clone.messages.computeIfPresent(DATA_TABLES, (key, dt) ->
+                new ConcurrentHashMap<>(((Map<?, ?>) dt)));
+        return clone;
     }
 }

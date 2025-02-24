@@ -312,6 +312,17 @@ public abstract class Recipe implements Cloneable {
     }
 
     /**
+     * At the end of a recipe run, a {@link RecipeScheduler} will call this method to allow the
+     * recipe to perform any cleanup or finalization tasks. This method is guaranteed to be called
+     * only once per run.
+     *
+     * @param ctx The recipe run execution context.
+     */
+    @Incubating(since = "8.48.0")
+    public void onComplete(ExecutionContext ctx) {
+    }
+
+    /**
      * A list of recipes that run, source file by source file,
      * after this recipe. This method is guaranteed to be called only once
      * per cycle.

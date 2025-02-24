@@ -113,6 +113,7 @@ public class RecipeScheduler {
             }
         } finally {
             recipeRunStats.flush(ctx);
+            recipe.onComplete(ctxWithWatch);
         }
         return after;
     }
