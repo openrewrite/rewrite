@@ -231,7 +231,6 @@ public class MavenParser implements Parser {
                         }
                     }
                 }
-                return this;
             }
             return this;
         }

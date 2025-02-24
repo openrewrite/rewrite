@@ -53,7 +53,6 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
-import static org.openrewrite.test.SourceSpecs.text;
 
 class MavenParserTest implements RewriteTest {
 
@@ -3727,8 +3726,8 @@ class MavenParserTest implements RewriteTest {
               }
             ),
             """
-              -Drevision=1.0.0
-              """
+            -Drevision=1.0.0
+            """
           )
         );
     }
@@ -3750,8 +3749,8 @@ class MavenParserTest implements RewriteTest {
               }
             ),
             """
-              -P a,b,c
-              """
+            -P a,b,c
+            """
           )
         );
     }

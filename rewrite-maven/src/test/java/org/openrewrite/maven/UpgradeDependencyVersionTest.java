@@ -35,7 +35,6 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
-import static org.openrewrite.test.SourceSpecs.text;
 
 class UpgradeDependencyVersionTest implements RewriteTest {
 
