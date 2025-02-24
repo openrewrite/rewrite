@@ -119,16 +119,6 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
     }
 
     @Override
-    public void beforeCycle(boolean definitelyLastCycle) {
-        LargeSourceSet.super.beforeCycle(definitelyLastCycle);
-    }
-
-    @Override
-    public void afterCycle(boolean lastCycle) {
-        LargeSourceSet.super.afterCycle(lastCycle);
-    }
-
-    @Override
     public Changeset getChangeset() {
         Map<UUID, SourceFile> sourceFileIdentities = new HashMap<>();
         for (SourceFile sourceFile : getInitialState().ls) {
