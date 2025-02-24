@@ -38,6 +38,7 @@ import java.util.function.Function;
 public class Visit implements RpcRequest {
     String visitor;
 
+    @Nullable
     Map<String, Object> visitorOptions;
 
     String treeId;
@@ -62,7 +63,7 @@ public class Visit implements RpcRequest {
         private final Map<String, Object> localObjects;
         private final Map<String, Recipe> preparedRecipes;
         private final Function<String, ?> getObject;
-        private final Function<List<String>, Cursor> getCursor;
+        private final Function<@Nullable List<String>, Cursor> getCursor;
 
         @Override
         protected Object handle(Visit request) throws Exception {
