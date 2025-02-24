@@ -39,9 +39,16 @@ import java.lang.reflect.Field;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Duration;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 
+import static java.time.Duration.ofMinutes;
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 import static org.openrewrite.internal.RecipeIntrospectionUtils.dataTableDescriptorFromDataTable;
 
 /**
@@ -67,6 +74,7 @@ public abstract class Recipe implements Cloneable {
         return getClass().getName();
     }
 
+    @Nullable
     private transient RecipeDescriptor descriptor;
 
     @Nullable
@@ -192,14 +200,14 @@ public abstract class Recipe implements Cloneable {
      * @return The tags.
      */
     public Set<String> getTags() {
-        return Collections.emptySet();
+        return emptySet();
     }
 
     /**
      * @return An estimated effort were a developer to fix manually instead of using this recipe.
      */
     public @Nullable Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(5);
+        return ofMinutes(5);
     }
 
     public final RecipeDescriptor getDescriptor() {
@@ -245,16 +253,14 @@ public abstract class Recipe implements Cloneable {
                 value = null;
             }
             Option option = field.getAnnotation(Option.class);
-            if (option != null) {
-                options.add(new OptionDescriptor(field.getName(),
-                        field.getType().getSimpleName(),
-                        option.displayName(),
-                        option.description(),
-                        option.example().isEmpty() ? null : option.example(),
-                        option.valid().length == 1 && option.valid()[0].isEmpty() ? null : Arrays.asList(option.valid()),
-                        option.required(),
-                        value));
-            }
+            options.add(new OptionDescriptor(field.getName(),
+                    field.getType().getSimpleName(),
+                    option.displayName(),
+                    option.description(),
+                    option.example().isEmpty() ? null : option.example(),
+                    option.valid().length == 1 && option.valid()[0].isEmpty() ? null : Arrays.asList(option.valid()),
+                    option.required(),
+                    value));
         }
         options.trimToSize();
         return options;
