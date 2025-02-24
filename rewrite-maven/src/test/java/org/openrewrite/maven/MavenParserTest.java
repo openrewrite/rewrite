@@ -3710,34 +3710,6 @@ class MavenParserTest implements RewriteTest {
     }
 
     @Test
-    void mavenConfigRevision() {
-        rewriteRun(
-          text(
-            "-Drevision=1.0.0",
-            spec -> spec.path(".mvn/maven.config")
-          ),
-          pomXml(
-            """
-              <project xmlns="http://maven.apache.org/POM/4.0.0"
-                       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-                  <modelVersion>4.0.0</modelVersion>
-              
-                  <groupId>com.example</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>${revision}</version>
-              </project>
-              """,
-            spec -> spec.afterRecipe(p -> {
-                var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                assertThat(results.getPom().getVersion()).isEqualTo("${revision}");
-                assertThat(results.getPom().getProperties().get("revision")).isEqualTo("1.0.0");
-            })
-          )
-        );
-    }
-
-    @Test
     void propertyFromMavenConfig() {
         rewriteRun(
           pomXml(
@@ -3750,7 +3722,7 @@ class MavenParserTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(p -> {
                   var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                  assertThat(results.getPom().getVersion()).isEqualTo("${revision:-1.0.0-SNAPSHOT}");
+                  assertThat(results.getPom().getVersion()).isEqualTo("${revision}");
                   assertThat(results.getPom().getProperties().get("revision")).isEqualTo("1.0.0");
               }
             ),
