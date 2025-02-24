@@ -29,7 +29,9 @@ import org.openrewrite.tree.ParseError;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.tree.Xml;
 
+import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -213,6 +215,18 @@ public class MavenParser implements Parser {
         }
 
         @SuppressWarnings("unused") // Used in `MavenMojoProjectParser.parseMaven(..)`
+        public Builder mavenConfig(@Nullable Path mavenConfig) {
+            if (mavenConfig != null && mavenConfig.toFile().exists()) {
+                try {
+                    String mavenConfigText = new String(Files.readAllBytes(mavenConfig));
+                    return mavenConfig(mavenConfigText);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }
+            return this;
+        }
+
         public Builder mavenConfig(@Nullable String mavenConfig) {
             if (mavenConfig != null) {
                 String[] lines = mavenConfig.split("\n");
