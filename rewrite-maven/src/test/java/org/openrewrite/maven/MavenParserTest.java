@@ -3725,9 +3725,11 @@ class MavenParserTest implements RewriteTest {
                   assertThat(results.getPom().getProperties().get("revision")).isEqualTo("1.0.0");
               }
             ),
-            """
-            -Drevision=1.0.0
-            """
+            MavenParser.builder().mavenConfig(
+              """
+              -Drevision=1.0.0
+              """
+            )
           )
         );
     }
@@ -3748,9 +3750,11 @@ class MavenParserTest implements RewriteTest {
                   assertThat(results.getPom().getActiveProfiles()).contains("a", "b", "c");
               }
             ),
-            """
-            -P a,b,c
-            """
+            MavenParser.builder().mavenConfig(
+              """
+              -P a,b,c
+              """
+            )
           )
         );
     }
