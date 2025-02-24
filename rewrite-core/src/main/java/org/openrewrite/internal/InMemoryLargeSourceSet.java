@@ -41,9 +41,6 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
     private List<Recipe> currentRecipeStack;
 
     @Nullable
-    private ClassLoader originalTCCL;
-
-    @Nullable
     private ClassLoader recipeClassLoader;
 
     public InMemoryLargeSourceSet(List<SourceFile> ls) {
@@ -75,17 +72,31 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
 
     @Override
     public LargeSourceSet edit(UnaryOperator<SourceFile> map) {
-        List<SourceFile> mapped = ListUtils.map(ls, before -> {
-            SourceFile after = map.apply(before);
-            if (after == null) {
-                if (deletions == null) {
-                    deletions = new LinkedHashMap<>();
-                }
-                deletions.put(before, currentRecipeStack);
+        ClassLoader originalTCCL = null;
+        try {
+            if (recipeClassLoader != null) {
+                // set TCCL to the recipe's classloader and store the original value, needed by SPI to load providers from recipe artifacts
+                originalTCCL = Thread.currentThread().getContextClassLoader();
+                Thread.currentThread().setContextClassLoader(recipeClassLoader);
             }
-            return after;
-        });
-        return mapped != ls ? withChanges(deletions, mapped) : this;
+            List<SourceFile> mapped = ListUtils.map(ls, before -> {
+                SourceFile after = map.apply(before);
+                if (after == null) {
+                    if (deletions == null) {
+                        deletions = new LinkedHashMap<>();
+                    }
+                    deletions.put(before, currentRecipeStack);
+                }
+                return after;
+            });
+            return mapped != ls ? withChanges(deletions, mapped) : this;
+        } finally {
+            if (originalTCCL != null) {
+                // reset TCCL value to the original one to no infer with other tooling
+                Thread.currentThread().setContextClassLoader(originalTCCL);
+            }
+        }
+
     }
 
     @Override
@@ -110,21 +121,11 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
     @Override
     public void beforeCycle(boolean definitelyLastCycle) {
         LargeSourceSet.super.beforeCycle(definitelyLastCycle);
-        if (recipeClassLoader != null) {
-            // set TCCL to the recipe's classloader and store the original value, needed by SPI to load providers from recipe artifacts
-            originalTCCL = Thread.currentThread().getContextClassLoader();
-            Thread.currentThread().setContextClassLoader(recipeClassLoader);
-        }
     }
 
     @Override
     public void afterCycle(boolean lastCycle) {
-        try {
-            LargeSourceSet.super.afterCycle(lastCycle);
-        } finally {
-            // reset TCCL value to the original one to no infer with other tooling
-            Thread.currentThread().setContextClassLoader(originalTCCL);
-        }
+        LargeSourceSet.super.afterCycle(lastCycle);
     }
 
     @Override
