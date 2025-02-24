@@ -91,14 +91,14 @@ public class ChangePackage extends Recipe {
                 stopAfterPreVisit();
                 if (tree instanceof JavaSourceFile) {
                     JavaSourceFile cu = (JavaSourceFile) tree;
+                    boolean recursive = ChangePackage.this.recursive == null || ChangePackage.this.recursive;
                     if (cu.getPackageDeclaration() != null) {
                         String original = cu.getPackageDeclaration().getExpression()
                                 .printTrimmed(getCursor()).replaceAll("\\s", "");
-                        if (original.startsWith(oldPackageName)) {
+                        if (original.equals(oldPackageName) || recursive && original.startsWith(oldPackageName)) {
                             return SearchResult.found(cu);
                         }
                     }
-                    boolean recursive = Boolean.TRUE.equals(ChangePackage.this.recursive);
                     String recursivePackageNamePrefix = oldPackageName + ".";
                     for (J.Import anImport : cu.getImports()) {
                         String importedPackage = anImport.getPackageName();
