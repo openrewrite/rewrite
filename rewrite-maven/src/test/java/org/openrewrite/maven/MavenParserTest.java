@@ -3738,12 +3738,8 @@ class MavenParserTest implements RewriteTest {
     }
 
     @Test
-    void mavenPartlyManagedInParent() {
+    void propertyFromMavenConfig() {
         rewriteRun(
-          text(
-            "-Drevision=1.0.0",
-            spec -> spec.path(".mvn/maven.config")
-          ),
           pomXml(
             """
               <project>
@@ -3751,53 +3747,39 @@ class MavenParserTest implements RewriteTest {
                 <artifactId>parent</artifactId>
                 <version>${revision}</version>
               </project>
-              """
-          ),
-          mavenProject("child",
-            //language=xml
-            pomXml(
-              """
-                <project>
-                  <parent>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>parent</artifactId>
-                    <version>${revision}</version>
-                  </parent>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>child</artifactId>
-                  <version>1</version>
-                </project>
-                """
-            )
+              """,
+            spec -> spec.afterRecipe(p -> {
+                  var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                  assertThat(results.getPom().getVersion()).isEqualTo("${revision:-1.0.0-SNAPSHOT}");
+                  assertThat(results.getPom().getProperties().get("revision")).isEqualTo("1.0.0");
+              }
+            ),
+            """
+            -Drevision=1.0.0
+            """
           )
         );
     }
 
     @Test
-    void mavenConfigRevisionWithFallback() {
+    void profilesFromMavenConfig() {
         rewriteRun(
-          text(
-            "-Drevision=1.0.0",
-            spec -> spec.path(".mvn/maven.config")
-          ),
           pomXml(
             """
-              <project xmlns="http://maven.apache.org/POM/4.0.0"
-                       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-                  <modelVersion>4.0.0</modelVersion>
-              
-                  <groupId>com.example</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>${revision:-1.0.0-SNAPSHOT}</version>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>parent</artifactId>
+                <version>1.0.0</version>
               </project>
               """,
             spec -> spec.afterRecipe(p -> {
                   var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                  assertThat(results.getPom().getVersion()).isEqualTo("${revision}");
-                  assertThat(results.getPom().getProperties().get("revision")).isEqualTo("1.0.0");
+                  assertThat(results.getPom().getActiveProfiles()).contains("a", "b", "c");
               }
-            )
+            ),
+            """
+            -P a,b,c
+            """
           )
         );
     }

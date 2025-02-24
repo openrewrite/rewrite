@@ -27,6 +27,8 @@ import org.openrewrite.test.TypeValidation;
 import org.openrewrite.xml.tree.Xml;
 import org.opentest4j.AssertionFailedError;
 
+import java.nio.file.Path;
+
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.fail;
@@ -49,6 +51,14 @@ public class Assertions {
 
     public static SourceSpecs pomXml(@Language("xml") @Nullable String before, Consumer<SourceSpec<Xml.Document>> spec) {
         SourceSpec<Xml.Document> maven = new SourceSpec<>(Xml.Document.class, "maven", MavenParser.builder(), before,
+                Assertions::pomResolvedSuccessfully, Assertions::customizeExecutionContext);
+        maven.path("pom.xml");
+        spec.accept(maven);
+        return maven;
+    }
+
+    public static SourceSpecs pomXml(@Language("xml") @Nullable String before, Consumer<SourceSpec<Xml.Document>> spec, String mavenConfig) {
+        SourceSpec<Xml.Document> maven = new SourceSpec<>(Xml.Document.class, "maven", MavenParser.builder().mavenConfig(mavenConfig), before,
                 Assertions::pomResolvedSuccessfully, Assertions::customizeExecutionContext);
         maven.path("pom.xml");
         spec.accept(maven);
