@@ -16,14 +16,10 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
-import org.openrewrite.DocumentExample;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.java.tree.J;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.test.RewriteTest.toRecipe;
+import static org.openrewrite.java.Assertions.*;
 
 
 /**
@@ -31,113 +27,139 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
  */
 class JavaTemplateAnnotationTest implements RewriteTest {
 
-    @DocumentExample
+
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.recipe(new ReplaceAnnotation(
+                "javax.annotation.Nullable",
+                "org.checkerframework.checker.nullness.qual.Nullable",
+                null));
+    }
+
     @Test
-    void replaceAnnotation() {
-        rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2)
-            .recipe(toRecipe(() -> new JavaVisitor<>() {
-                  @Override
-                  public J visitAnnotation(J.Annotation annotation, ExecutionContext executionContext) {
-                      return JavaTemplate.apply("@Deprecated(since = \"#{}\", forRemoval = true)",
-                        getCursor(), annotation.getCoordinates().replace(), "2.0");
-                  }
-              }
-            )),
-          java(
-            """
-              @Deprecated(since = "1.0", forRemoval = true)
-              class A {
-              }
-                """,
-            """
-              @Deprecated(since = "2.0", forRemoval = true)
-              class A {
-              }
-              """
-          )
+    void enumParsing() {
+        rewriteRun(java(
+                        """
+                                import com.google.common.collect.ImmutableMap;
+                                import javax.annotation.Nullable;
+
+                                public enum NullableRecipeValidationEnum {
+                                    INVALID("invalid"),
+                                    CLICKED("clicked");
+
+                                    private static final ImmutableMap<String, NullableRecipeValidationEnum> VALUE_TO_ACTION_TYPE;
+                                    static {
+                                        final ImmutableMap.Builder<String, NullableRecipeValidationEnum> builder = new ImmutableMap.Builder<>();
+                                        for (final NullableRecipeValidationEnum enumTest : values()) {
+                                            builder.put(enumTest.value, enumTest);
+                                        }
+                                        VALUE_TO_ACTION_TYPE = builder.build();
+                                    }
+
+
+                                    private final String value;
+
+                                    NullableRecipeValidationEnum(@Nullable final String value){
+                                        this.value = value;
+                                    }
+
+                                }
+                                """,
+                        """
+                                import com.google.common.collect.ImmutableMap;
+                                import org.checkerframework.checker.nullness.qual.Nullable;
+
+                                public enum NullableRecipeValidationEnum {
+                                    INVALID("invalid"),
+                                    CLICKED("clicked");
+
+                                    private static final ImmutableMap<String, NullableRecipeValidationEnum> VALUE_TO_ACTION_TYPE;
+                                    static {
+                                        final ImmutableMap.Builder<String, NullableRecipeValidationEnum> builder = new ImmutableMap.Builder<>();
+                                        for (final NullableRecipeValidationEnum enumTest : values()) {
+                                            builder.put(enumTest.value, enumTest);
+                                        }
+                                        VALUE_TO_ACTION_TYPE = builder.build();
+                                    }
+
+
+                                    private final String value;
+
+                                    NullableRecipeValidationEnum(@Nullable final String value){
+                                        this.value = value;
+                                    }
+
+                                }
+                                """)
         );
     }
 
-    @ExpectedToFail
     @Test
-    void replaceAnnotation2() {
+    void functionParsing() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-                  @Override
-                  public J visitAnnotation(J.Annotation annotation, ExecutionContext executionContext) {
-                      annotation = JavaTemplate.apply("@Deprecated(since = \"#{any(java.lang.String)}\", forRemoval = true)",
-                        getCursor(), annotation.getCoordinates().replace(), "2.0");
-                      return annotation;
-                  }
-              }
-            )),
-          java(
-            """
-              @Deprecated(since = "1.0", forRemoval = true)
-              class A {
-              }
-                """,
-            """
-              @Deprecated(since = "2.0", forRemoval = true)
-              class A {
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void replacesInRecordVisitor() {
-        rewriteRun(
-                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-                    @Override
-                    public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext p) {
-                        if (annotation.getSimpleName().equals("NotNull")) {
-                            return JavaTemplate.apply("@NonNull", getCursor(), annotation.getCoordinates().replace());
-                        }
-                        return annotation;
-                    }
-                })),
                 java(
                         """
-                import org.jetbrains.annotations.NotNull;
-    
-                public record Person(
-                    @NotNull String firstName,
-                    @NotNull String lastName
-                ) {}
-                """,
+                                import com.google.common.base.Function;
+
+                                import javax.annotation.Nullable;
+
+                                public class AttachmentMetadata {
+                                    public final String filename;
+                                    public final String extension;
+                                    public final String contentType;
+                                    public final long size;
+
+                                    public AttachmentMetadata(@Nullable final String filename,
+                                                           final String contentType,
+                                                           final long size) {
+                                        this.filename = filename;
+                                        final int dot = (filename == null) ? -1 : filename.lastIndexOf('.');
+                                        this.extension = (dot == -1) ? null : filename.substring(dot + 1).toLowerCase();
+                                        this.contentType = contentType;
+                                        this.size = size;
+                                    }
+
+                                    public static final Function<AttachmentMetadata, String> ATTACHMENT_METADATA_TO_FILENAME_EXTENSION = new Function<AttachmentMetadata, String>() {
+                                        @Nullable
+                                        @Override
+                                        public String apply(@Nullable final AttachmentMetadata attachment) {
+                                            return (attachment == null) ? null : attachment.extension;
+                                        }
+                                    };
+
+                                }
+                                """,
                         """
-                import lombok.NonNull;
-    
-                public record Person(
-                    @NonNull String firstName,
-                    @NonNull String lastName
-                ) {}
-                """));
+                                import com.google.common.base.Function;
+
+                                import org.checkerframework.checker.nullness.qual.Nullable;
+
+                                public class AttachmentMetadata {
+                                    public final String filename;
+                                    public final String extension;
+                                    public final String contentType;
+                                    public final long size;
+
+                                    public AttachmentMetadata(@Nullable final String filename,
+                                                           final String contentType,
+                                                           final long size) {
+                                        this.filename = filename;
+                                        final int dot = (filename == null) ? -1 : filename.lastIndexOf('.');
+                                        this.extension = (dot == -1) ? null : filename.substring(dot + 1).toLowerCase();
+                                        this.contentType = contentType;
+                                        this.size = size;
+                                    }
+
+                                    public static final Function<AttachmentMetadata, String> ATTACHMENT_METADATA_TO_FILENAME_EXTENSION = new Function<AttachmentMetadata, String>() {
+                                        @Nullable
+                                        @Override
+                                        public String apply(@Nullable final AttachmentMetadata attachment) {
+                                            return (attachment == null) ? null : attachment.extension;
+                                        }
+                                    };
+                                }
+                                """));
     }
 
-    @Test
-    void replacesInRecord() {
-        rewriteRun(
-                spec -> spec.recipe(new ReplaceAnnotation("@org.jetbrains.annotations.NotNull", "@lombok.NonNull", null)),
-                java(
-                        """
-                import org.jetbrains.annotations.NotNull;
-    
-                public record Person(
-                    @NotNull String firstName,
-                    @NotNull String lastName
-                ) {}
-                """,
-                        """
-                import lombok.NonNull;
-    
-                public record Person(
-                    @NonNull String firstName,
-                    @NonNull String lastName
-                ) {}
-                """));
-    }
 }
+
