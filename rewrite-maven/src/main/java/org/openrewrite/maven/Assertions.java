@@ -27,8 +27,6 @@ import org.openrewrite.test.TypeValidation;
 import org.openrewrite.xml.tree.Xml;
 import org.opentest4j.AssertionFailedError;
 
-import java.nio.file.Path;
-
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.fail;

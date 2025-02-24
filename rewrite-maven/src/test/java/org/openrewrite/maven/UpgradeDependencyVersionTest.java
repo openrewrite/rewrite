@@ -2017,15 +2017,15 @@ class UpgradeDependencyVersionTest implements RewriteTest {
             null, null)),
           text(
             """
-            -Dquarkus.platform.artifact-id=1.0.0
-            -Dquarkus.platform.group-id=io.quarkus
-            -Dquarkus.platform.version=1.11.7.Final
-            """,
+              -Dquarkus.platform.artifact-id=1.0.0
+              -Dquarkus.platform.group-id=io.quarkus
+              -Dquarkus.platform.version=1.11.7.Final
+              """,
             """
-            -Dquarkus.platform.artifact-id=1.0.0
-            -Dquarkus.platform.group-id=io.quarkus
-            -Dquarkus.platform.version=1.13.7.Final
-            """,
+              -Dquarkus.platform.artifact-id=1.0.0
+              -Dquarkus.platform.group-id=io.quarkus
+              -Dquarkus.platform.version=1.13.7.Final
+              """,
             spec -> spec.path(".mvn/maven.config")
           ),
           pomXml(
