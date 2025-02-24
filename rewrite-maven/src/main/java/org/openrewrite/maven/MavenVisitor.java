@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import lombok.SneakyThrows;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
@@ -31,6 +32,7 @@ import java.util.function.Predicate;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
+import static org.openrewrite.maven.UpdateMavenModel.updateResult;
 import static org.openrewrite.maven.tree.Plugin.PLUGIN_DEFAULT_GROUPID;
 
 public class MavenVisitor<P> extends XmlVisitor<P> {
@@ -416,5 +418,14 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             }
         }
         return null;
+    }
+
+
+    @SneakyThrows
+    @Override
+    public Xml visitDocument(Xml.Document document, P p) {
+        MavenExecutionContextView ctx = MavenExecutionContextView.view((ExecutionContext) p);
+        resolutionResult = updateResult(ctx, getResolutionResult());
+        return super.visitDocument(document, p);
     }
 }
