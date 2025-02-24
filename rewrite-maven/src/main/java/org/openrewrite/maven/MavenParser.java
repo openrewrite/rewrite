@@ -229,16 +229,14 @@ public class MavenParser implements Parser {
 
         public Builder mavenConfig(@Nullable String mavenConfig) {
             if (mavenConfig != null) {
-                String[] lines = mavenConfig.split("\n");
-                for (String line : lines) {
+                for (String line : mavenConfig.split("\n")) {
                     if (line.startsWith("-P")) {
                         Matcher matcher = Pattern.compile("-P\\s+(.*)").matcher(line);
                         if (matcher.find()) {
                             String[] profiles = matcher.group(1).split(",");
                             activeProfiles(Arrays.stream(profiles).map(String::trim).toArray(String[]::new));
                         }
-                    }
-                    if (line.startsWith("-D")) {
+                    } else if (line.startsWith("-D")) {
                         Matcher matcher = Pattern.compile("-D(.*?)=(.*)").matcher(line);
                         if (matcher.find()) {
                             property(matcher.group(1).trim(), matcher.group(2).trim());

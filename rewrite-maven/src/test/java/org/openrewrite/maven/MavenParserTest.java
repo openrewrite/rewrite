@@ -3727,8 +3727,8 @@ class MavenParserTest implements RewriteTest {
             ),
             MavenParser.builder().mavenConfig(
               """
-              -Drevision=1.0.0
-              """
+                -Drevision=1.0.0
+                """
             )
           )
         );
@@ -3752,8 +3752,27 @@ class MavenParserTest implements RewriteTest {
             ),
             MavenParser.builder().mavenConfig(
               """
-              -P a,b,c
+                -P a,b,c
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void emptyMavenConfig() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>parent</artifactId>
+                <version>1.0.0</version>
+              </project>
+              """,
+            MavenParser.builder().mavenConfig(
               """
+                """
             )
           )
         );
