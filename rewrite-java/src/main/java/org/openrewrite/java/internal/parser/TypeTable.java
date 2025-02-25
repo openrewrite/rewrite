@@ -29,6 +29,7 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.regex.Pattern;
@@ -135,8 +136,6 @@ public class TypeTable implements JavaParserClasspathLoader {
     @RequiredArgsConstructor
     static class Reader {
         private final ExecutionContext ctx;
-        private @Nullable GroupArtifactVersion gav;
-        private final Map<ClassDefinition, List<Member>> membersByClassName = new HashMap<>();
 
         public void read(InputStream is, Collection<String> artifactNames) throws IOException {
             if (artifactNames.isEmpty()) {
@@ -148,24 +147,32 @@ public class TypeTable implements JavaParserClasspathLoader {
                     .map(name -> Pattern.compile(name + ".*"))
                     .collect(Collectors.toSet());
 
+            AtomicReference<@Nullable GroupArtifactVersion> matchedGav = new AtomicReference<>();
+            Map<ClassDefinition, List<Member>> membersByClassName = new HashMap<>();
+
             try (BufferedReader in = new BufferedReader(new InputStreamReader(is))) {
+                AtomicReference<@Nullable GroupArtifactVersion> lastGav = new AtomicReference<>();
                 in.lines().skip(1).forEach(line -> {
                     String[] fields = line.split("\t", -1);
                     GroupArtifactVersion rowGav = new GroupArtifactVersion(fields[0], fields[1], fields[2]);
-                    if (!rowGav.equals(gav)) {
-                        writeClassesDir();
-                    }
 
-                    String artifactVersion = fields[1] + "-" + fields[2];
+                    if (!Objects.equals(rowGav, lastGav.get())) {
+                        writeClassesDir(matchedGav.get(), membersByClassName);
+                        matchedGav.set(null);
+                        membersByClassName.clear();
 
-                    for (Pattern artifactNamePattern : artifactNamePatterns) {
-                        if (artifactNamePattern.matcher(artifactVersion).matches()) {
-                            gav = rowGav;
-                            break;
+                        String artifactVersion = fields[1] + "-" + fields[2];
+
+                        for (Pattern artifactNamePattern : artifactNamePatterns) {
+                            if (artifactNamePattern.matcher(artifactVersion).matches()) {
+                                matchedGav.set(rowGav);
+                                break;
+                            }
                         }
                     }
+                    lastGav.set(rowGav);
 
-                    if (gav != null) {
+                    if (matchedGav.get() != null) {
                         ClassDefinition classDefinition = new ClassDefinition(
                                 Integer.parseInt(fields[3]),
                                 fields[4],
@@ -188,10 +195,11 @@ public class TypeTable implements JavaParserClasspathLoader {
                     }
                 });
             }
-            writeClassesDir();
+
+            writeClassesDir(matchedGav.get(), membersByClassName);
         }
 
-        private void writeClassesDir() {
+        private void writeClassesDir(@Nullable GroupArtifactVersion gav, Map<ClassDefinition, List<Member>> membersByClassName) {
             if (gav == null) {
                 return;
             }
@@ -265,8 +273,6 @@ public class TypeTable implements JavaParserClasspathLoader {
                     throw new UncheckedIOException(e);
                 }
             });
-
-            gav = null;
         }
     }
 
