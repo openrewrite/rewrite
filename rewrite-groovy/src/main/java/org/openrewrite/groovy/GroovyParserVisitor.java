@@ -2253,18 +2253,27 @@ public class GroovyParserVisitor {
                 }
             } else {
                 if (source.length() - untilDelim.length() > delimIndex + 1) {
-                    switch (source.substring(delimIndex, delimIndex + 2)) {
-                        case "//":
-                            inSingleLineComment = !inMultiLineComment;
-                            delimIndex++;
+                    char c1 = source.charAt(delimIndex);
+                    char c2 = source.charAt(delimIndex + 1);
+                    switch (c1) {
+                        case '/':
+                            switch (c2) {
+                                case '/':
+                                    inSingleLineComment = !inMultiLineComment;
+                                    delimIndex++;
+                                    break;
+                                case '*':
+                                    inMultiLineComment = true;
+                                    delimIndex++;
+                                    break;
+                            }
                             break;
-                        case "/*":
-                            inMultiLineComment = true;
-                            delimIndex++;
-                            break;
-                        case "*/":
-                            inMultiLineComment = false;
-                            delimIndex = delimIndex + 2;
+                        case '*':
+                            if (c2 == '/') {
+                                inMultiLineComment = false;
+                                delimIndex++;
+                                continue;
+                            }
                             break;
                     }
                 }
