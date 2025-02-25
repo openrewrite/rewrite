@@ -237,4 +237,17 @@ class HclCommentTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void multiLineCommentWithUrl() {
+        rewriteRun(
+          hcl(
+            """
+              module "something" {
+                /* https://www.example.com */
+              }
+              """
+          )
+        );
+    }
 }
