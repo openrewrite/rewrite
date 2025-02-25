@@ -17,7 +17,6 @@ package org.openrewrite.config;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
@@ -27,11 +26,14 @@ import org.openrewrite.text.ChangeText;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
+import java.net.URI;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
@@ -44,8 +46,8 @@ class DeclarativeRecipeTest implements RewriteTest {
         rewriteRun(
           spec -> {
               spec.validateRecipeSerialization(false);
-              DeclarativeRecipe dr = new DeclarativeRecipe("test", "test", "test", null,
-                null, null, true, null);
+              DeclarativeRecipe dr = new DeclarativeRecipe("test", "test", "test", emptySet(),
+                null, URI.create("null"), true, emptyList());
               dr.addPrecondition(
                 toRecipe(() -> new PlainTextVisitor<>() {
                     @Override
@@ -73,8 +75,8 @@ class DeclarativeRecipeTest implements RewriteTest {
 
     @Test
     void addingPreconditionsWithOptions() {
-        DeclarativeRecipe dr = new DeclarativeRecipe("test", "test", "test", null,
-          null, null, true, null);
+        DeclarativeRecipe dr = new DeclarativeRecipe("test", "test", "test", emptySet(),
+          null, URI.create("dummy"), true, emptyList());
         dr.addPrecondition(
           toRecipe(() -> new PlainTextVisitor<>() {
               @Override
@@ -103,8 +105,8 @@ class DeclarativeRecipeTest implements RewriteTest {
 
     @Test
     void uninitializedFailsValidation() {
-        DeclarativeRecipe dr = new DeclarativeRecipe("test", "test", "test", null,
-          null, null, true, null);
+        DeclarativeRecipe dr = new DeclarativeRecipe("test", "test", "test", emptySet(),
+          null, URI.create("dummy"), true, emptyList());
         dr.addUninitializedPrecondition(
           toRecipe(() -> new PlainTextVisitor<>() {
               @Override
@@ -130,8 +132,8 @@ class DeclarativeRecipeTest implements RewriteTest {
 
     @Test
     void uninitializedWithInitializedRecipesPassesValidation() {
-        DeclarativeRecipe dr = new DeclarativeRecipe("test", "test", "test", null,
-          null, null, true, null);
+        DeclarativeRecipe dr = new DeclarativeRecipe("test", "test", "test", emptySet(),
+          null, URI.create("dummy"), true, emptyList());
         dr.setPreconditions(
           List.of(
             toRecipe(() -> new PlainTextVisitor<>() {
@@ -347,7 +349,7 @@ class DeclarativeRecipeTest implements RewriteTest {
         public TreeVisitor<?, ExecutionContext> getVisitor() {
             return new TreeVisitor<>() {
                 @Override
-                public @Nullable @NonNull Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                     PlainText text = ((PlainText) tree);
                     assert text != null;
                     return text.withText(text.getText().replaceAll(find, replace));

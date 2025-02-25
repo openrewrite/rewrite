@@ -670,7 +670,7 @@ public class JsonPathMatcher {
                         }
                     }
                     // The filterExpression matched a result inside a Mapping. I.E. originalScope[?(filterExpression)]
-                    if (originalScope instanceof Yaml.Mapping.Entry && ((Yaml.Mapping.Entry) originalScope).getValue() instanceof Yaml.Mapping) {
+                    if (!matches.isEmpty() && originalScope instanceof Yaml.Mapping.Entry && ((Yaml.Mapping.Entry) originalScope).getValue() instanceof Yaml.Mapping) {
                         return originalScope;
                     }
                     return matches;
