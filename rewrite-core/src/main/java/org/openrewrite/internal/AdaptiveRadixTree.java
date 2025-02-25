@@ -647,6 +647,7 @@ public class AdaptiveRadixTree<V> {
 
     public void clear() {
         root = null;
+        keyTable.clear();
     }
 
     private static class KeyTable {
@@ -709,6 +710,11 @@ public class AdaptiveRadixTree<V> {
 
         public byte get(int offset) {
             return storage[offset];
+        }
+
+        public void clear() {
+            storage = new byte[INITIAL_CAPACITY];
+            size = 0;
         }
     }
 }
