@@ -41,7 +41,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
-public class RewriteRpcTest implements RewriteTest {
+class RewriteRpcTest implements RewriteTest {
     Environment env = Environment.builder()
       .scanRuntimeClasspath("org.openrewrite.text")
       .build();
