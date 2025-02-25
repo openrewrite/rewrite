@@ -24,7 +24,6 @@ import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.java.JavaParser;
-import org.openrewrite.java.internal.AdaptiveRadixJavaTypeCache;
 import org.openrewrite.java.internal.JavaTypeCache;
 
 import java.net.URISyntaxException;
@@ -40,7 +39,7 @@ public class JavaParserBenchmark {
 
     @Benchmark
     public void snappy(JavaCompilationUnitState state, Blackhole bh) {
-        JavaTypeCache typeCache = new JavaTypeCache();
+        JavaTypeCache typeCache = new JavaCompilationUnitState.SnappyJavaTypeCache();
         JavaParser parser = state.javaParser.typeCache(typeCache).build();
         parser
                 .parse(state.inputs, null, new InMemoryExecutionContext())
@@ -49,7 +48,7 @@ public class JavaParserBenchmark {
 
     @Benchmark
     public void adaptiveRadix(JavaCompilationUnitState state, Blackhole bh) {
-        AdaptiveRadixJavaTypeCache typeCache = new AdaptiveRadixJavaTypeCache();
+        JavaTypeCache typeCache = new JavaTypeCache();
         JavaParser parser = state.javaParser.typeCache(typeCache).build();
         parser
                 .parse(state.inputs, null, new InMemoryExecutionContext())
