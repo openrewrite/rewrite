@@ -139,6 +139,11 @@ public class TypeTable implements JavaParserClasspathLoader {
         private final Map<ClassDefinition, List<Member>> membersByClassName = new HashMap<>();
 
         public void read(InputStream is, Collection<String> artifactNames) throws IOException {
+            if (artifactNames.isEmpty()) {
+                // could be empty due to the filtering in `artifactsNotYetWritten()`
+                return;
+            }
+
             Set<Pattern> artifactNamePatterns = artifactNames.stream()
                     .map(name -> Pattern.compile(name + ".*"))
                     .collect(Collectors.toSet());
