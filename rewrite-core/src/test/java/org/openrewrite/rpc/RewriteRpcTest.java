@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 
@@ -144,6 +145,18 @@ class RewriteRpcTest implements RewriteTest {
         );
 
         assertThat(latch.getCount()).isEqualTo(0);
+    }
+
+    @Test
+    void getCursor() {
+        Cursor parent = new Cursor(null, Cursor.ROOT_VALUE);
+        Cursor c1 = new Cursor(parent, 0);
+        Cursor c2 = new Cursor(c1, 1);
+
+        Cursor clientC2 = client.getCursor(server.getCursorIds(c2));
+        assertThat(clientC2.<Integer>getValue()).isEqualTo(1);
+        assertThat(clientC2.getParentOrThrow().<Integer>getValue()).isEqualTo(0);
+        assertThat(clientC2.getParentOrThrow(2).<String>getValue()).isEqualTo(Cursor.ROOT_VALUE);
     }
 
     static class ChangeText extends PlainTextVisitor<Integer> {

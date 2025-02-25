@@ -159,7 +159,9 @@ public class RewriteRpc {
         return send("Print", new Print(tree.getId().toString(), getCursorIds(parent)), String.class);
     }
 
-    private @Nullable List<String> getCursorIds(@Nullable Cursor cursor) {
+    @VisibleForTesting
+    @Nullable
+    List<String> getCursorIds(@Nullable Cursor cursor) {
         List<String> cursorIds = null;
         if (cursor != null) {
             cursorIds = cursor.getPathAsStream().map(c -> {
@@ -210,7 +212,8 @@ public class RewriteRpc {
     Cursor getCursor(@Nullable List<String> cursorIds) {
         Cursor cursor = new Cursor(null, Cursor.ROOT_VALUE);
         if (cursorIds != null) {
-            for (String cursorId : cursorIds) {
+            for (int i = cursorIds.size() - 1; i >= 0; i--) {
+                String cursorId = cursorIds.get(i);
                 Object cursorObject = getObject(cursorId);
                 remoteObjects.put(cursorId, cursorObject);
                 cursor = new Cursor(cursor, cursorObject);
