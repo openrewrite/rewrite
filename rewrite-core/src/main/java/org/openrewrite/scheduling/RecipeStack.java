@@ -45,7 +45,7 @@ class RecipeStack {
     int recipePosition;
 
     public <T> @Nullable T reduce(LargeSourceSet sourceSet, Recipe recipe, ExecutionContext ctx,
-                                  BiFunction<@Nullable T, Stack<Recipe>, @Nullable T> consumer, T acc) {
+                                  BiFunction<@Nullable T, Stack<Recipe>, @Nullable T> consumer, @Nullable T acc) {
         init(recipe);
         AtomicInteger recipePosition = new AtomicInteger(0);
         while (!allRecipesStack.isEmpty()) {

@@ -60,7 +60,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     RecipeRunStats recipeRunStats;
     SourcesFileResults sourcesFileResults;
     SourcesFileErrors errorsTable;
-    BiFunction<LSS, UnaryOperator<SourceFile>, LSS> sourceSetEditor;
+    BiFunction<LSS, UnaryOperator<@Nullable SourceFile>, LSS> sourceSetEditor;
 
     RecipeStack allRecipeStack = new RecipeStack();
     long cycleStartTime = System.nanoTime();
@@ -75,7 +75,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
 
     public LSS scanSources(LSS sourceSet) {
         return sourceSetEditor.apply(sourceSet, sourceFile ->
-                requireNonNull(allRecipeStack.reduce(sourceSet, recipe, ctx, (source, recipeStack) -> {
+                allRecipeStack.reduce(sourceSet, recipe, ctx, (source, recipeStack) -> {
                     Recipe recipe = recipeStack.peek();
                     if (source == null) {
                         return null;
@@ -104,7 +104,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                         }
                     }
                     return after;
-                }, sourceFile))
+                }, sourceFile)
         );
     }
 
@@ -154,7 +154,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         // that later fails to apply on a freshly cloned repository
         // consider any recipes adding new messages as a changing recipe (which can request another cycle)
         return sourceSetEditor.apply(sourceSet, sourceFile ->
-                requireNonNull(allRecipeStack.reduce(sourceSet, recipe, ctx, (source, recipeStack) -> {
+                allRecipeStack.reduce(sourceSet, recipe, ctx, (source, recipeStack) -> {
                     Recipe recipe = recipeStack.peek();
                     if (source == null) {
                         return null;
@@ -211,7 +211,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                         after = addRecipesThatMadeChanges(recipeStack, after);
                     }
                     return after;
-                }, sourceFile))
+                }, sourceFile)
         );
     }
 
