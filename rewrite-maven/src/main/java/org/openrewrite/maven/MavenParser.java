@@ -45,6 +45,7 @@ import static org.openrewrite.Tree.randomId;
 public class MavenParser implements Parser {
 
     private final Collection<String> activeProfiles;
+    private final Map<String, String> properties;
     private final boolean skipDependencyResolution;
 
     @Override
@@ -83,6 +84,7 @@ public class MavenParser implements Parser {
                 String baseDir = pomPath.toAbsolutePath().getParent().toString();
                 pom.getProperties().put("project.basedir", baseDir);
                 pom.getProperties().put("basedir", baseDir);
+                pom.getProperties().putAll(properties);
 
                 SourceFile sourceFile = new MavenXmlParser()
                         .parseInputs(singletonList(source), relativeTo, ctx)
@@ -141,7 +143,7 @@ public class MavenParser implements Parser {
         for (int i = 0; i < parsed.size(); i++) {
             SourceFile maven = parsed.get(i);
             Optional<MavenResolutionResult> maybeResolutionResult = maven.getMarkers().findFirst(MavenResolutionResult.class);
-            if(!maybeResolutionResult.isPresent()) {
+            if (!maybeResolutionResult.isPresent()) {
                 continue;
             }
             MavenResolutionResult resolutionResult = maybeResolutionResult.get();
@@ -151,7 +153,7 @@ public class MavenParser implements Parser {
                     continue;
                 }
                 Optional<MavenResolutionResult> maybeModuleResolutionResult = possibleModule.getMarkers().findFirst(MavenResolutionResult.class);
-                if(!maybeModuleResolutionResult.isPresent()) {
+                if (!maybeModuleResolutionResult.isPresent()) {
                     continue;
                 }
                 MavenResolutionResult moduleResolutionResult = maybeModuleResolutionResult.get();
@@ -184,6 +186,7 @@ public class MavenParser implements Parser {
 
     public static class Builder extends Parser.Builder {
         private final Collection<String> activeProfiles = new HashSet<>();
+        private final Map<String, String> properties = new HashMap<>();
         private boolean skipDependencyResolution;
 
         public Builder() {
@@ -203,16 +206,20 @@ public class MavenParser implements Parser {
             return this;
         }
 
+        public Builder property(@Nullable String key, String value) {
+            //noinspection ConstantConditions
+            if (key != null && value != null) {
+                this.properties.put(key, value);
+            }
+            return this;
+        }
+
         @SuppressWarnings("unused") // Used in `MavenMojoProjectParser.parseMaven(..)`
         public Builder mavenConfig(@Nullable Path mavenConfig) {
             if (mavenConfig != null && mavenConfig.toFile().exists()) {
                 try {
                     String mavenConfigText = new String(Files.readAllBytes(mavenConfig));
-                    Matcher matcher = Pattern.compile("(?:$|\\s)-P\\s+(\\S+)").matcher(mavenConfigText);
-                    if (matcher.find()) {
-                        String[] profiles = matcher.group(1).split(",");
-                        return activeProfiles(profiles);
-                    }
+                    return mavenConfig(mavenConfigText);
                 } catch (IOException e) {
                     throw new UncheckedIOException(e);
                 }
@@ -220,9 +227,29 @@ public class MavenParser implements Parser {
             return this;
         }
 
+        public Builder mavenConfig(@Nullable String mavenConfig) {
+            if (mavenConfig != null) {
+                for (String line : mavenConfig.split("\n")) {
+                    if (line.startsWith("-P")) {
+                        Matcher matcher = Pattern.compile("-P\\s+(.*)").matcher(line);
+                        if (matcher.find()) {
+                            String[] profiles = matcher.group(1).split(",");
+                            activeProfiles(Arrays.stream(profiles).map(String::trim).toArray(String[]::new));
+                        }
+                    } else if (line.startsWith("-D")) {
+                        Matcher matcher = Pattern.compile("-D(.*?)=(.*)").matcher(line);
+                        if (matcher.find()) {
+                            property(matcher.group(1).trim(), matcher.group(2).trim());
+                        }
+                    }
+                }
+            }
+            return this;
+        }
+
         @Override
         public MavenParser build() {
-            return new MavenParser(activeProfiles, skipDependencyResolution);
+            return new MavenParser(activeProfiles, properties, skipDependencyResolution);
         }
 
         @Override

@@ -45,7 +45,7 @@ public class FindMethods extends Recipe {
      * See {@link MethodMatcher} for details on the expression's syntax.
      */
     @Option(displayName = "Method pattern",
-            description = "A method pattern that is used to find matching method invocations.",
+            description = MethodMatcher.METHOD_PATTERN_DESCRIPTION,
             example = "java.util.List add(..)")
     String methodPattern;
 
