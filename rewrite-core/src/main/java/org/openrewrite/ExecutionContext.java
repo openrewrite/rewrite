@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.*;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -121,6 +122,17 @@ public interface ExecutionContext extends RpcCodec<ExecutionContext> {
      */
     @Override
     default void rpcSend(ExecutionContext after, RpcSendQueue q) {
+        // The after state will change if any messages have changed by a call to clone
+        q.getAndSend(after, ctx -> {
+            Map<String, Object> messages = new HashMap<>(ctx.getMessages() == null ?
+                    emptyMap() : ctx.getMessages());
+            // The remote side will manage its own recipe and cycle state.
+            messages.remove(CURRENT_CYCLE);
+            messages.remove(CURRENT_RECIPE);
+            messages.remove(DATA_TABLES);
+            return messages;
+        });
+
         Map<DataTable<?>, List<?>> dt = after.getMessage(DATA_TABLES);
         q.getAndSendList(after, sendWholeList(dt == null ? null : dt.keySet()), DataTable::getName, null);
         if (dt != null) {
@@ -135,6 +147,11 @@ public interface ExecutionContext extends RpcCodec<ExecutionContext> {
 
     @Override
     default ExecutionContext rpcReceive(ExecutionContext before, RpcReceiveQueue q) {
+        Map<String, Object> messages = q.receive(before.getMessages());
+        for (Map.Entry<String, Object> e : messages.entrySet()) {
+            before.putMessage(e.getKey(), e.getValue());
+        }
+
         List<DataTable<?>> dataTables = q.receiveList(emptyList(), null);
         //noinspection ConstantValue
         if (dataTables != null) {

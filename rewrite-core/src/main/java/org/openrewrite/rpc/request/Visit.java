@@ -15,8 +15,8 @@
  */
 package org.openrewrite.rpc.request;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.type.TypeFactory;
 import io.moderne.jsonrpc.JsonRpcMethod;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
@@ -103,8 +103,12 @@ public class Visit implements RpcRequest {
                     new HashMap<>() :
                     new HashMap<>(request.getVisitorOptions());
             withJsonType.put("@c", visitorName);
-            return mapper.convertValue(withJsonType, new TypeReference<TreeVisitor<Tree, Object>>() {
-            });
+            try {
+                Class<?> visitorType = TypeFactory.defaultInstance().findClass(visitorName);
+                return (TreeVisitor<?, ?>) mapper.convertValue(withJsonType, visitorType);
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException(e);
+            }
         }
 
         private Object getVisitorP(Visit request) {

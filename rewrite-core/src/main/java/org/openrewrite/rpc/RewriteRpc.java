@@ -61,9 +61,9 @@ public class RewriteRpc {
                 this::getObject, this::getCursor));
         jsonRpc.rpc("Generate", new Generate.Handler());
         jsonRpc.rpc("GetObject", new GetObject.Handler(batchSize, remoteObjects, localObjects));
-        jsonRpc.rpc("GetRecipes", new JsonRpcMethod<Map<?, ?>>() {
+        jsonRpc.rpc("GetRecipes", new JsonRpcMethod<Void>() {
             @Override
-            protected Object handle(Map<?, ?> params) {
+            protected Object handle(Void noParams) {
                 return marketplace.listRecipeDescriptors();
             }
         });
@@ -142,7 +142,7 @@ public class RewriteRpc {
     }
 
     public List<RecipeDescriptor> getRecipes() {
-        return send("GetRecipes", new GetRecipes(), GetRecipesResponse.class);
+        return send("GetRecipes", null, GetRecipesResponse.class);
     }
 
     public Recipe prepareRecipe(String id, Map<String, Object> options) {
@@ -196,7 +196,7 @@ public class RewriteRpc {
         return (T) remoteObject;
     }
 
-    private <P> P send(String method, RpcRequest body, Class<P> responseType) {
+    private <P> P send(String method, @Nullable RpcRequest body, Class<P> responseType) {
         try {
             // TODO handle error
             return jsonRpc
