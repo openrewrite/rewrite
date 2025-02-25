@@ -36,8 +36,10 @@ public class WatchableExecutionContext extends DelegatingExecutionContext {
 
     @Override
     public void putMessage(String key, @Nullable Object value) {
-        hasNewMessages = true;
-        super.putMessage(key, value);
+        if (value != null) {
+            hasNewMessages = true;
+            super.putMessage(key, value);
+        }
     }
 
     public void putCycle(RecipeRunCycle<?> cycle) {

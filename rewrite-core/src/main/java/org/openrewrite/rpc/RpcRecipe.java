@@ -12,6 +12,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
+import static java.util.Objects.requireNonNull;
+
 
 @RequiredArgsConstructor
 public class RpcRecipe extends ScanningRecipe<Integer> {
@@ -106,7 +108,13 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
 
     @Override
     public void onComplete(ExecutionContext ctx) {
-        Object dataTables = rpc.getObject(ctx.getMessage("org.openrewrite.rpc.id") + ":dataTables");
-        ctx.putMessage(ExecutionContext.DATA_TABLES, dataTables);
+        // This will merge data tables from the remote into the local context.
+        //
+        // When multiple recipes ran on the same RPC peer, they will all have been
+        // adding to the same ExecutionContext instance on that peer, and so really
+        // a CHANGE will only be returned for the first of any recipes on that peer.
+        // It doesn't matter which one added data table entries, because they all share
+        // the same view of the data tables.
+        rpc.getObject(requireNonNull(ctx.getMessage("org.openrewrite.rpc.id")));
     }
 }

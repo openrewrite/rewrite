@@ -59,7 +59,6 @@ public class Visit implements RpcRequest {
     public static class Handler extends JsonRpcMethod<Visit> {
         private static final ObjectMapper mapper = ObjectMappers.propertyBasedMapper(null);
 
-        private final Map<String, Object> remoteObjects;
         private final Map<String, Object> localObjects;
         private final Map<String, Recipe> preparedRecipes;
         private final Function<String, ?> getObject;
@@ -116,13 +115,13 @@ public class Visit implements RpcRequest {
             if (p instanceof ExecutionContext) {
                 String visitorName = request.getVisitor();
 
-                // This is really probably particular to the Java implementation of RewriteRpc,
-                // because we are carrying forward the legacy of cycles that are likely to be
-                // removed from OpenRewrite in the future.
                 if (visitorName.startsWith("scan:") || visitorName.startsWith("edit:")) {
                     WatchableExecutionContext ctx = new WatchableExecutionContext((ExecutionContext) p);
                     Recipe recipe = preparedRecipes.get(visitorName.substring(
                             "edit:".length() /* 'scan:' has same length*/));
+                    // This is really probably particular to the Java implementation,
+                    // because we are carrying forward the legacy of cycles that are likely to be
+                    // removed from OpenRewrite in the future.
                     ctx.putCycle(new RecipeRunCycle<>(recipe, 0, new Cursor(null, Cursor.ROOT_VALUE), ctx,
                             new RecipeRunStats(Recipe.noop()), new SourcesFileResults(Recipe.noop()),
                             new SourcesFileErrors(Recipe.noop()), LargeSourceSet::edit));
@@ -144,8 +143,10 @@ public class Visit implements RpcRequest {
         private void maybeUpdateExecutionContext(String pId, Object p) {
             if (p instanceof WatchableExecutionContext && ((WatchableExecutionContext) p).hasNewMessages()) {
                 ExecutionContext ctx = ((WatchableExecutionContext) p).getDelegate();
-                InMemoryExecutionContext newCtx = new InMemoryExecutionContext();
-                localObjects.put(pId, ctx);
+                while (ctx instanceof DelegatingExecutionContext) {
+                    ctx = ((DelegatingExecutionContext) ctx).getDelegate();
+                }
+                localObjects.put(pId, ((InMemoryExecutionContext) ctx).clone());
             }
         }
     }

@@ -16,7 +16,6 @@
 package org.openrewrite.rpc;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
@@ -86,7 +85,7 @@ public class RpcObjectData {
     }
 
     public <V> V getValue() {
-        if (value instanceof Map) {
+        if (value instanceof Map && valueType != null) {
             try {
                 Class<?> valueClass = Class.forName(valueType);
 

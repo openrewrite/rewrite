@@ -57,7 +57,7 @@ public class RewriteRpc {
         this.jsonRpc = jsonRpc;
         Map<String, Recipe> preparedRecipes = new HashMap<>();
 
-        jsonRpc.rpc("Visit", new Visit.Handler(remoteObjects, localObjects, preparedRecipes,
+        jsonRpc.rpc("Visit", new Visit.Handler(localObjects, preparedRecipes,
                 this::getObject, this::getCursor));
         jsonRpc.rpc("Generate", new Generate.Handler());
         jsonRpc.rpc("GetObject", new GetObject.Handler(batchSize, remoteObjects, localObjects));
@@ -119,6 +119,9 @@ public class RewriteRpc {
         Object p2 = p;
         while (p2 instanceof DelegatingExecutionContext) {
             p2 = ((DelegatingExecutionContext) p2).getDelegate();
+        }
+        if (p2 instanceof ExecutionContext) {
+            ((ExecutionContext) p2).putMessage("org.openrewrite.rpc.id", pId);
         }
         localObjects.put(pId, p2);
 

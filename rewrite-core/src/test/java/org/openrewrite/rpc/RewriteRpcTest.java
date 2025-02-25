@@ -25,6 +25,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
 import org.openrewrite.config.Environment;
+import org.openrewrite.table.TextMatches;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
@@ -34,6 +35,7 @@ import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.time.Duration;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -123,16 +125,25 @@ public class RewriteRpcTest implements RewriteTest {
 
     @Test
     void runRecipe() {
+        CountDownLatch latch = new CountDownLatch(1);
         rewriteRun(
           spec -> spec
             .recipe(server.prepareRecipe("org.openrewrite.text.Find",
               Map.of("find", "hello")))
-            .validateRecipeSerialization(false),
+            .validateRecipeSerialization(false)
+            .dataTable(TextMatches.Row.class, rows -> {
+                assertThat(rows).contains(new TextMatches.Row(
+                  "hello.txt", "~~>Hello Jon!"));
+                latch.countDown();
+            }),
           text(
             "Hello Jon!",
-            "~~>Hello Jon!"
+            "~~>Hello Jon!",
+            spec -> spec.path("hello.txt")
           )
         );
+
+        assertThat(latch.getCount()).isEqualTo(0);
     }
 
     static class ChangeText extends PlainTextVisitor<Integer> {

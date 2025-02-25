@@ -246,6 +246,7 @@ public abstract class Recipe implements Cloneable {
                 value = null;
             }
             Option option = field.getAnnotation(Option.class);
+            //noinspection ConstantValue
             if (option != null) {
                 options.add(new OptionDescriptor(field.getName(),
                         field.getType().getSimpleName(),
@@ -373,11 +374,12 @@ public abstract class Recipe implements Cloneable {
         return TreeVisitor.noop();
     }
 
-    public void addDataTable(DataTable<?> dataTable) {
+    public <D extends DataTable<?>> D addDataTable(D dataTable) {
         if (dataTables == null) {
             dataTables = new ArrayList<>();
         }
         dataTables.add(dataTableDescriptorFromDataTable(dataTable));
+        return dataTable;
     }
 
     public final RecipeRun run(LargeSourceSet before, ExecutionContext ctx) {

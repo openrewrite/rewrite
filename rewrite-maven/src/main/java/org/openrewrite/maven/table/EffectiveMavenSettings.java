@@ -23,10 +23,7 @@ import org.openrewrite.Recipe;
 public class EffectiveMavenSettings extends DataTable<EffectiveMavenSettings.Row> {
 
     public EffectiveMavenSettings(Recipe recipe) {
-        super(recipe, EffectiveMavenSettings.Row.class,
-                EffectiveMavenSettings.class.getName(),
-                "Effective maven settings",
-                "The maven settings file used by each pom.");
+        super(recipe, "Effective maven settings", "The maven settings file used by each pom.");
     }
 
     @Value

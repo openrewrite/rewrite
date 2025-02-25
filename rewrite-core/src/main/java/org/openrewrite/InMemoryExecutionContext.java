@@ -33,10 +33,8 @@ public class InMemoryExecutionContext implements ExecutionContext, Cloneable {
     private final BiConsumer<Throwable, ExecutionContext> onTimeout;
 
     public InMemoryExecutionContext() {
-        this(
-                t -> {
-                }
-        );
+        this(t -> {
+        });
     }
 
     public InMemoryExecutionContext(Consumer<Throwable> onError) {
@@ -62,7 +60,9 @@ public class InMemoryExecutionContext implements ExecutionContext, Cloneable {
             if (messages == null) {
                 messages = new ConcurrentHashMap<>();
             }
-            messages.put(key, value);
+            if (value != null) {
+                messages.put(key, value);
+            }
         }
     }
 
