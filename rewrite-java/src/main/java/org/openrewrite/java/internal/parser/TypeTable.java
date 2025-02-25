@@ -136,7 +136,6 @@ public class TypeTable implements JavaParserClasspathLoader {
     @RequiredArgsConstructor
     static class Reader {
         private final ExecutionContext ctx;
-        private final Map<ClassDefinition, List<Member>> membersByClassName = new HashMap<>();
 
         public void read(InputStream is, Collection<String> artifactNames) throws IOException {
             if (artifactNames.isEmpty()) {
@@ -149,6 +148,8 @@ public class TypeTable implements JavaParserClasspathLoader {
                     .collect(Collectors.toSet());
 
             AtomicReference<@Nullable GroupArtifactVersion> matchedGav = new AtomicReference<>();
+            Map<ClassDefinition, List<Member>> membersByClassName = new HashMap<>();
+
             try (BufferedReader in = new BufferedReader(new InputStreamReader(is))) {
                 AtomicReference<@Nullable GroupArtifactVersion> lastGav = new AtomicReference<>();
                 in.lines().skip(1).forEach(line -> {
@@ -156,8 +157,9 @@ public class TypeTable implements JavaParserClasspathLoader {
                     GroupArtifactVersion rowGav = new GroupArtifactVersion(fields[0], fields[1], fields[2]);
 
                     if (!Objects.equals(rowGav, lastGav.get())) {
-                        writeClassesDir(matchedGav.get());
+                        writeClassesDir(matchedGav.get(), membersByClassName);
                         matchedGav.set(null);
+                        membersByClassName.clear();
 
                         String artifactVersion = fields[1] + "-" + fields[2];
 
@@ -194,10 +196,10 @@ public class TypeTable implements JavaParserClasspathLoader {
                 });
             }
 
-            writeClassesDir(matchedGav.get());
+            writeClassesDir(matchedGav.get(), membersByClassName);
         }
 
-        private void writeClassesDir(@Nullable GroupArtifactVersion gav) {
+        private void writeClassesDir(@Nullable GroupArtifactVersion gav, Map<ClassDefinition, List<Member>> membersByClassName) {
             if (gav == null) {
                 return;
             }
