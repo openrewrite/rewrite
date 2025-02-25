@@ -16,7 +16,14 @@
 package org.openrewrite.rpc.request;
 
 import io.moderne.jsonrpc.JsonRpcMethod;
+import lombok.RequiredArgsConstructor;
 import lombok.Value;
+import org.openrewrite.*;
+
+import java.util.Collection;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 
@@ -24,10 +31,33 @@ import static java.util.Collections.emptyList;
 public class Generate implements RpcRequest {
     String id;
 
+    /**
+     * An ID of the p value stored in the caller's local object cache.
+     */
+    String p;
+
+    @RequiredArgsConstructor
     public static class Handler extends JsonRpcMethod<Generate> {
+        private final Map<String, Object> localObjects;
+        private final Map<String, Recipe> preparedRecipes;
+        private final Map<Recipe, Cursor> recipeCursors;
+        private final Function<String, ?> getObject;
+
         @Override
         protected Object handle(Generate request) throws Exception {
-            // TODO implement me!
+            ExecutionContext ctx = (ExecutionContext) getObject.apply(request.getP());
+            Recipe recipe = preparedRecipes.get(request.getId());
+            if (recipe instanceof ScanningRecipe) {
+                //noinspection unchecked
+                ScanningRecipe<Object> scanningRecipe = (ScanningRecipe<Object>) recipe;
+                Object acc = scanningRecipe.getAccumulator(recipeCursors.computeIfAbsent(recipe,
+                        r -> new Cursor(null, Cursor.ROOT_VALUE)), ctx);
+                Collection<? extends SourceFile> generated = scanningRecipe.generate(acc, ctx);
+                generated.forEach(g -> localObjects.put(g.getId().toString(), g));
+                return generated.stream()
+                        .map(SourceFile::getId)
+                        .collect(Collectors.toList());
+            }
             return emptyList();
         }
     }

@@ -30,6 +30,7 @@ import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.table.SourcesFileResults;
 
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -60,19 +61,22 @@ public class Visit implements RpcRequest {
         private static final ObjectMapper mapper = ObjectMappers.propertyBasedMapper(null);
 
         private final Map<String, Object> localObjects;
+
         private final Map<String, Recipe> preparedRecipes;
+        private final Map<Recipe, Cursor> recipeCursors;
+
         private final Function<String, ?> getObject;
         private final Function<@Nullable List<String>, Cursor> getCursor;
 
         @Override
         protected Object handle(Visit request) throws Exception {
-            //noinspection unchecked
-            TreeVisitor<?, Object> visitor = (TreeVisitor<?, Object>) instantiateVisitor(request);
-
-            SourceFile before = (SourceFile) getObject.apply(request.getTreeId());
+            Tree before = (Tree) getObject.apply(request.getTreeId());
             localObjects.put(before.getId().toString(), before);
 
             Object p = getVisitorP(request);
+
+            //noinspection unchecked
+            TreeVisitor<?, Object> visitor = (TreeVisitor<?, Object>) instantiateVisitor(request, p);
 
             SourceFile after = (SourceFile) visitor.visit(before, p, getCursor.apply(
                     request.getCursor()));
@@ -87,13 +91,17 @@ public class Visit implements RpcRequest {
             return new VisitResponse(before != after);
         }
 
-        private TreeVisitor<?, ?> instantiateVisitor(Visit request) {
+        private TreeVisitor<?, ?> instantiateVisitor(Visit request, Object p) {
             String visitorName = request.getVisitor();
 
             if (visitorName.startsWith("scan:")) {
+                assert p instanceof ExecutionContext;
+
                 //noinspection unchecked
                 ScanningRecipe<Object> recipe = (ScanningRecipe<Object>) preparedRecipes.get(visitorName.substring("scan:".length()));
-                return recipe.getScanner(0);
+                Object acc = recipe.getAccumulator(recipeCursors.computeIfAbsent(recipe, r -> new Cursor(null, Cursor.ROOT_VALUE)),
+                        (ExecutionContext) p);
+                return recipe.getScanner(acc);
             } else if (visitorName.startsWith("edit:")) {
                 Recipe recipe = preparedRecipes.get(visitorName.substring("edit:".length()));
                 return recipe.getVisitor();

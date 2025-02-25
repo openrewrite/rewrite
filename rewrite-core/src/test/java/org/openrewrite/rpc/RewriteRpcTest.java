@@ -147,6 +147,21 @@ class RewriteRpcTest implements RewriteTest {
     }
 
     @Test
+    void runScanningRecipeThatGenerates() {
+        rewriteRun(
+          spec -> spec
+            .recipe(server.prepareRecipe("org.openrewrite.text.CreateTextFile",
+              Map.of("fileContents", "hello", "relativeFileName", "hello.txt")))
+            .validateRecipeSerialization(false),
+          text(
+            null,
+            "hello",
+            spec -> spec.path("hello.txt")
+          )
+        );
+    }
+
+    @Test
     void getCursor() {
         Cursor parent = new Cursor(null, Cursor.ROOT_VALUE);
         Cursor c1 = new Cursor(parent, 0);

@@ -55,11 +55,14 @@ public class RewriteRpc {
 
     public RewriteRpc(JsonRpc jsonRpc, Environment marketplace) {
         this.jsonRpc = jsonRpc;
-        Map<String, Recipe> preparedRecipes = new HashMap<>();
 
-        jsonRpc.rpc("Visit", new Visit.Handler(localObjects, preparedRecipes,
+        Map<String, Recipe> preparedRecipes = new HashMap<>();
+        Map<Recipe, Cursor> recipeCursors = new IdentityHashMap<>();
+
+        jsonRpc.rpc("Visit", new Visit.Handler(localObjects, preparedRecipes, recipeCursors,
                 this::getObject, this::getCursor));
-        jsonRpc.rpc("Generate", new Generate.Handler());
+        jsonRpc.rpc("Generate", new Generate.Handler(localObjects, preparedRecipes, recipeCursors,
+                this::getObject));
         jsonRpc.rpc("GetObject", new GetObject.Handler(batchSize, remoteObjects, localObjects));
         jsonRpc.rpc("GetRecipes", new JsonRpcMethod<Void>() {
             @Override
@@ -131,8 +134,9 @@ public class RewriteRpc {
                 VisitResponse.class);
     }
 
-    public Collection<? extends SourceFile> generate(String remoteRecipeId) {
-        List<String> generated = send("Generate", new Generate(remoteRecipeId), GenerateResponse.class);
+    public Collection<? extends SourceFile> generate(String remoteRecipeId, ExecutionContext ctx) {
+        List<String> generated = send("Generate", new Generate(remoteRecipeId,
+                Integer.toString(System.identityHashCode(ctx))), GenerateResponse.class);
         if (!generated.isEmpty()) {
             return generated.stream()
                     .map(this::<SourceFile>getObject)

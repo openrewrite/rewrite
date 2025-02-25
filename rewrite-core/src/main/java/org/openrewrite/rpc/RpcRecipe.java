@@ -106,7 +106,7 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
 
     @Override
     public Collection<? extends SourceFile> generate(Integer acc, ExecutionContext ctx) {
-        return rpc.generate(remoteId);
+        return rpc.generate(remoteId, ctx);
     }
 
     @Override
@@ -130,6 +130,9 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
         // a CHANGE will only be returned for the first of any recipes on that peer.
         // It doesn't matter which one added data table entries, because they all share
         // the same view of the data tables.
-        rpc.getObject(requireNonNull(ctx.getMessage("org.openrewrite.rpc.id")));
+        String id = ctx.getMessage("org.openrewrite.rpc.id");
+        if (id != null) {
+            rpc.getObject(id);
+        }
     }
 }
