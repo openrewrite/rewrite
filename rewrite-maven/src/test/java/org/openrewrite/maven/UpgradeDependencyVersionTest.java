@@ -37,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
-import static org.openrewrite.test.SourceSpecs.text;
+import static org.openrewrite.maven.MavenParser.mavenConfig;
 
 class UpgradeDependencyVersionTest implements RewriteTest {
 
@@ -2042,7 +2042,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   assertThat(results.getPom().getProperties().get("quarkus.platform.version")).isEqualTo("1.11.7.Final");
               }
             ),
-            MavenParser.builder().mavenConfig("""
+            mavenConfig("""
               -Dquarkus.platform.artifact-id=quarkus-bom
               -Dquarkus.platform.group-id=io.quarkus
               -Dquarkus.platform.version=1.11.7.Final

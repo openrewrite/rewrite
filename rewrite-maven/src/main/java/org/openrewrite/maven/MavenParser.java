@@ -184,6 +184,10 @@ public class MavenParser implements Parser {
         return new Builder();
     }
 
+    public static Builder mavenConfig(@Nullable String mavenConfig) {
+        return new Builder().mavenConfig(mavenConfig);
+    }
+
     public static class Builder extends Parser.Builder {
         private final Collection<String> activeProfiles = new HashSet<>();
         private final Map<String, String> properties = new HashMap<>();

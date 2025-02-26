@@ -53,6 +53,7 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
+import static org.openrewrite.maven.MavenParser.mavenConfig;
 
 class MavenParserTest implements RewriteTest {
 
@@ -3725,7 +3726,7 @@ class MavenParserTest implements RewriteTest {
                   assertThat(results.getPom().getProperties().get("revision")).isEqualTo("1.0.0");
               }
             ),
-            MavenParser.builder().mavenConfig(
+            mavenConfig(
               """
                 -Drevision=1.0.0
                 """
@@ -3750,7 +3751,7 @@ class MavenParserTest implements RewriteTest {
                   assertThat(results.getPom().getActiveProfiles()).contains("a", "b", "c");
               }
             ),
-            MavenParser.builder().mavenConfig(
+            mavenConfig(
               """
                 -P a,b,c
                 """
@@ -3770,10 +3771,7 @@ class MavenParserTest implements RewriteTest {
                 <version>1.0.0</version>
               </project>
               """,
-            MavenParser.builder().mavenConfig(
-              """
-                """
-            )
+            mavenConfig("")
           )
         );
     }
