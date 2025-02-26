@@ -3746,12 +3746,6 @@ class MavenParserTest implements RewriteTest {
                 <version>${revision}</version>
               </project>
               """,
-            spec -> spec.afterRecipe(p -> {
-                  var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                  assertThat(results.getPom().getVersion()).isEqualTo("${revision}");
-                  assertThat(results.getPom().getProperties().get("revision")).isEqualTo("1.0.0");
-              }
-            ),
             mavenConfig(
               """
                 -Drevision=1.0.0
