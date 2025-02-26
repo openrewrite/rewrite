@@ -25,9 +25,7 @@ import java.time.LocalDate;
 public class CommitsByDay extends DataTable<CommitsByDay.Row> {
 
     public CommitsByDay(Recipe recipe) {
-        super(recipe,
-                "Commits by day",
-                "The commit activity by day by committer.");
+        super(recipe, "Commits by day", "The commit activity by day by committer.");
     }
 
     @Value

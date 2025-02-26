@@ -102,6 +102,7 @@ public abstract class ScanningRecipe<T> extends Recipe {
     public final TreeVisitor<?, ExecutionContext> getVisitor() {
         return new TreeVisitor<Tree, ExecutionContext>() {
 
+            @Nullable
             private TreeVisitor<?, ExecutionContext> delegate;
 
             private TreeVisitor<?, ExecutionContext> delegate(ExecutionContext ctx) {
@@ -128,7 +129,9 @@ public abstract class ScanningRecipe<T> extends Recipe {
         };
     }
 
-    // For now, ScanningRecipes do not support `*RecipeList`, as the accumulator is not evaluated for these methods
+    /**
+     * For now, ScanningRecipes do not support `getRecipeList`, as the accumulator is not evaluated for these methods
+     */
     @Override
     public final List<Recipe> getRecipeList() {
         return super.getRecipeList();

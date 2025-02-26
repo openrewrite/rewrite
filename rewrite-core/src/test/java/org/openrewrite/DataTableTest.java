@@ -67,8 +67,7 @@ class DataTableTest implements RewriteTest {
     @JsonIgnoreType
     static class WordTable extends DataTable<WordTable.Row> {
         public WordTable(Recipe recipe) {
-            super(recipe, Row.class, WordTable.class.getName(),
-              "Words", "Each word in the text.");
+            super(recipe, "Words", "Each word in the text.");
         }
 
         static class Row {
