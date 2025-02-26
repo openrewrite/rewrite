@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven;
 
-import lombok.SneakyThrows;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
@@ -62,7 +61,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     @Override
     public boolean isAcceptable(SourceFile sourceFile, P p) {
         return super.isAcceptable(sourceFile, p) &&
-               sourceFile.getMarkers().findFirst(MavenResolutionResult.class).isPresent();
+                sourceFile.getMarkers().findFirst(MavenResolutionResult.class).isPresent();
     }
 
     protected MavenResolutionResult getResolutionResult() {
@@ -73,7 +72,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             if (document != null && document != newDocument) {
                 throw new IllegalStateException(
                         "The same MavenVisitor instance has been used on two different XML documents. " +
-                        "This violates the Recipe contract that they will return a unique visitor instance every time getVisitor() is called.");
+                                "This violates the Recipe contract that they will return a unique visitor instance every time getVisitor() is called.");
             }
             document = newDocument;
         }
@@ -106,7 +105,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             if (isTag("dependency") && PROFILE_DEPENDENCY_MATCHER.matches(getCursor())) {
                 Xml.Tag tag = getCursor().getValue();
                 return matchesGlob(tag.getChildValue("groupId").orElse(null), groupId) &&
-                       matchesGlob(tag.getChildValue("artifactId").orElse(null), artifactId);
+                        matchesGlob(tag.getChildValue("artifactId").orElse(null), artifactId);
             }
             return false;
         }
@@ -132,8 +131,8 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                         Dependency req = resolvedDependency.getRequested();
                         String reqGroup = req.getGroupId();
                         if ((reqGroup == null || reqGroup.equals(tag.getChildValue("groupId").orElse(null))) &&
-                            req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
-                            scope == tagScope) {
+                                req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
+                                scope == tagScope) {
                             return true;
                         }
                     }
@@ -145,13 +144,13 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
 
     public boolean isPluginDependencyTag(String groupId, String artifactId) {
         if (!isTag("dependency") ||
-            !PLUGIN_DEPENDENCY_MATCHER.matches(getCursor()) &&
-            !PROFILE_PLUGIN_DEPENDENCY_MATCHER.matches(getCursor())) {
+                !PLUGIN_DEPENDENCY_MATCHER.matches(getCursor()) &&
+                        !PROFILE_PLUGIN_DEPENDENCY_MATCHER.matches(getCursor())) {
             return false;
         }
         Xml.Tag tag = getCursor().getValue();
         return matchesGlob(tag.getChildValue("groupId").orElse(null), groupId) &&
-               matchesGlob(tag.getChildValue("artifactId").orElse(null), artifactId);
+                matchesGlob(tag.getChildValue("artifactId").orElse(null), artifactId);
     }
 
     public boolean isManagedDependencyTag() {
@@ -170,7 +169,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             if (isTag("dependency") && PROFILE_MANAGED_DEPENDENCY_MATCHER.matches(getCursor())) {
                 Xml.Tag tag = getCursor().getValue();
                 return matchesGlob(tag.getChildValue("groupId").orElse(null), groupId) &&
-                       matchesGlob(tag.getChildValue("artifactId").orElse(null), artifactId);
+                        matchesGlob(tag.getChildValue("artifactId").orElse(null), artifactId);
             }
             return false;
         }
@@ -180,8 +179,8 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                 ManagedDependency req = dm.getRequested();
                 String reqGroup = req.getGroupId();
                 if (reqGroup.equals(tag.getChildValue("groupId").orElse(null)) &&
-                    req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
-                    dm.getScope() == tag.getChildValue("scope").map(Scope::fromName).orElse(null)) {
+                        req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
+                        dm.getScope() == tag.getChildValue("scope").map(Scope::fromName).orElse(null)) {
                     return true;
                 }
             }
@@ -190,7 +189,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                     ManagedDependency requestedBom = dm.getRequestedBom();
                     //noinspection ConstantConditions
                     if (requestedBom.getGroupId().equals(tag.getChildValue("groupId").orElse(null)) &&
-                        requestedBom.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null))) {
+                            requestedBom.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null))) {
                         return true;
                     }
                 }
@@ -205,7 +204,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         }
         Xml.Tag tag = getCursor().getValue();
         return tag.getChildValue("type").map("pom"::equalsIgnoreCase).orElse(false) &&
-               tag.getChildValue("scope").map("import"::equalsIgnoreCase).orElse(false);
+                tag.getChildValue("scope").map("import"::equalsIgnoreCase).orElse(false);
     }
 
     public void maybeUpdateModel() {
@@ -280,9 +279,9 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                 String reqGroup = req.getGroupId();
                 String reqVersion = req.getVersion();
                 if ((reqGroup == null || reqGroup.equals(tag.getChildValue("groupId").orElse(null))) &&
-                    req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
-                    (reqVersion == null || reqVersion.equals(tag.getChildValue("version").orElse(null))) &&
-                    (req.getClassifier() == null || req.getClassifier().equals(tag.getChildValue("classifier").orElse(null)))) {
+                        req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
+                        (reqVersion == null || reqVersion.equals(tag.getChildValue("version").orElse(null))) &&
+                        (req.getClassifier() == null || req.getClassifier().equals(tag.getChildValue("classifier").orElse(null)))) {
                     return resolvedDependency;
                 }
             }
@@ -313,9 +312,9 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     private @Nullable ResolvedManagedDependency findManagedDependency(String groupId, String artifactId, @Nullable String classifier, @Nullable String type) {
         for (ResolvedManagedDependency d : getResolutionResult().getPom().getDependencyManagement()) {
             if (groupId.equals(d.getGroupId()) &&
-                artifactId.equals(d.getArtifactId()) &&
-                (classifier == null || classifier.equals(d.getClassifier())) &&
-                (type == null || type.equals(d.getType()))) {
+                    artifactId.equals(d.getArtifactId()) &&
+                    (classifier == null || classifier.equals(d.getClassifier())) &&
+                    (type == null || type.equals(d.getType()))) {
                 return d;
             }
         }
@@ -339,7 +338,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             if (inClasspathOf == null || scope.getKey() == inClasspathOf || scope.getKey().isInClasspathOf(inClasspathOf)) {
                 for (ResolvedDependency d : scope.getValue()) {
                     if (tag.getChildValue("groupId").orElse(getResolutionResult().getPom().getGroupId()).equals(d.getGroupId()) &&
-                        tag.getChildValue("artifactId").orElse(getResolutionResult().getPom().getArtifactId()).equals(d.getArtifactId())) {
+                            tag.getChildValue("artifactId").orElse(getResolutionResult().getPom().getArtifactId()).equals(d.getArtifactId())) {
                         return d;
                     }
                 }
@@ -412,20 +411,50 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             String reqGroup = resolvedPlugin.getGroupId();
             String reqVersion = resolvedPlugin.getVersion();
             if (reqGroup.equals(tag.getChildValue("groupId").orElse(PLUGIN_DEFAULT_GROUPID)) &&
-                resolvedPlugin.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
-                (reqVersion == null || reqVersion.equals(tag.getChildValue("version").orElse(null)))) {
+                    resolvedPlugin.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
+                    (reqVersion == null || reqVersion.equals(tag.getChildValue("version").orElse(null)))) {
                 return resolvedPlugin;
             }
         }
         return null;
     }
 
-
-    @SneakyThrows
     @Override
     public Xml visitDocument(Xml.Document document, P p) {
         MavenExecutionContextView ctx = MavenExecutionContextView.view((ExecutionContext) p);
-        resolutionResult = updateResult(ctx, getResolutionResult());
+        if (parentPomWasUpdated(getResolutionResult(), ctx)) {
+            try {
+                resolutionResult = updateResult(ctx, getResolutionResult());
+            } catch (MavenDownloadingExceptions mde) {
+                mde.warn(document);
+            }
+        }
         return super.visitDocument(document, p);
+    }
+
+    private boolean parentPomWasUpdated(@Nullable MavenResolutionResult mrr, MavenExecutionContextView ctx) {
+        if (mrr == null) {
+            return false;
+        }
+        MavenResolutionResult parentResolutionResult = mrr.getParent();
+        // pom has no parent
+        if (parentResolutionResult == null) {
+            return false;
+        }
+        Pom parentPom = parentResolutionResult.getPom().getRequested();
+        // parent pom is outside of project
+        if (parentPom.getSourcePath() == null) {
+            return false;
+        }
+        // get eventually updated version of the parent pom from the context
+        Pom fromContext = ctx.getProjectPomsBySourcePath().get(parentPom.getSourcePath());
+        if (fromContext == null) {
+            return false;
+        }
+        if (fromContext != parentPom) {
+            return true;
+        }
+        // parent of parent might be in the project and have been updated
+        return parentPomWasUpdated(parentResolutionResult.getParent(), ctx);
     }
 }

@@ -128,9 +128,14 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
             requested = requested.withRepositories(Collections.emptyList());
         }
 
-        // we don't resolve just yet... it could be useless work in some cases, such as for the last maven visitor
         ctx.updateProjectPom(requested);
-        return document;
+        try {
+            MavenResolutionResult updated = updateResult(ctx, resolutionResult);
+            return document.withMarkers(document.getMarkers().computeByType(getResolutionResult(),
+                    (original, ignored) -> updated));
+        } catch (MavenDownloadingExceptions e) {
+            return e.warn(document);
+        }
     }
 
     private @Nullable List<GroupArtifact> mapExclusions(Xml.Tag tag) {
@@ -156,6 +161,9 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
         AtomicReference<MavenDownloadingExceptions> exceptions = new AtomicReference<>();
         try {
             Pom pom = ctx.getProjectPomsBySourcePath().get(resolutionResult.getPom().getRequested().getSourcePath());
+            if (pom == null){
+                pom = resolutionResult.getPom().getRequested();
+            }
             ResolvedPom resolved = pom.resolve(ctx.getActiveProfiles(), downloader, ctx);
             MavenResolutionResult mrr = resolutionResult
                     .withPom(resolved)
