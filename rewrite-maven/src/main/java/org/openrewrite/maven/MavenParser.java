@@ -231,7 +231,7 @@ public class MavenParser implements Parser {
             return this;
         }
 
-        public Builder mavenConfig(@Nullable String mavenConfig) {
+        private Builder mavenConfig(@Nullable String mavenConfig) {
             if (mavenConfig != null) {
                 for (String line : mavenConfig.split("\n")) {
                     if (line.startsWith("-P")) {
