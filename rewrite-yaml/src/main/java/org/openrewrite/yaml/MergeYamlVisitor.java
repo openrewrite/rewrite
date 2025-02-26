@@ -90,27 +90,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     }
 
     public MergeYamlVisitor(Yaml scope, @Language("yml") String yamlString, boolean acceptTheirs, @Nullable String objectIdentifyingProperty, @Nullable InsertMode insertMode, @Nullable String insertProperty) {
-        this(scope,
-                new YamlParser().parse(yamlString)
-                        .findFirst()
-                        .map(Yaml.Documents.class::cast)
-                        .map(docs -> {
-                            // Any comments will have been put on the parent Yaml.Document node, preserve by copying to the mapping
-                            Yaml.Document doc = docs.getDocuments().get(0);
-                            if (doc.getBlock() instanceof Yaml.Mapping) {
-                                Yaml.Mapping m = (Yaml.Mapping) doc.getBlock();
-                                return m.withEntries(mapFirst(m.getEntries(), entry -> entry.withPrefix(doc.getPrefix())));
-                            } else if (doc.getBlock() instanceof Yaml.Sequence) {
-                                Yaml.Sequence s = (Yaml.Sequence) doc.getBlock();
-                                return s.withEntries(mapFirst(s.getEntries(), entry -> entry.withPrefix(doc.getPrefix())));
-                            }
-                            return doc.getBlock().withPrefix(doc.getPrefix());
-                        })
-                        .orElseThrow(() -> new IllegalArgumentException("Could not parse as YAML")),
-                acceptTheirs,
-                objectIdentifyingProperty,
-                insertMode,
-                insertProperty);
+        this(scope, MergeYaml.parse(yamlString), acceptTheirs, objectIdentifyingProperty, insertMode, insertProperty);
     }
 
     @Override
