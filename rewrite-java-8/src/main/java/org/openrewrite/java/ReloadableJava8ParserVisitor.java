@@ -1990,7 +1990,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                         case '/':
                             switch (c2) {
                                 case '/':
-                                    inSingleLineComment = true;
+                                    inSingleLineComment = !inMultiLineComment;
                                     delimIndex++;
                                     break;
                                 case '*':

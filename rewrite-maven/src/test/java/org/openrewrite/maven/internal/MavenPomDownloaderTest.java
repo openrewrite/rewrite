@@ -33,13 +33,11 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
-import org.openrewrite.maven.MavenDownloadingException;
-import org.openrewrite.maven.MavenExecutionContextView;
-import org.openrewrite.maven.MavenParser;
-import org.openrewrite.maven.MavenSettings;
+import org.openrewrite.maven.*;
 import org.openrewrite.maven.http.OkHttpSender;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.xml.tree.Xml;
 
 import javax.net.ssl.SSLSocketFactory;
 import java.io.IOException;
@@ -1298,4 +1296,34 @@ class MavenPomDownloaderTest implements RewriteTest {
             }
         }
     }
+
+    @Test
+    void resolveDependencies() throws MavenDownloadingExceptions {
+        Xml.Document doc = (Xml.Document) MavenParser.builder().build().parse("""
+                  <project>
+                      <parent>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-starter-parent</artifactId>
+                          <version>3.2.0</version>
+                          <relativePath/>
+                      </parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>demo</artifactId>
+                      <version>0.0.1-SNAPSHOT</version>
+                      <name>demo</name>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.springframework.boot</groupId>
+                              <artifactId>spring-boot-starter-web</artifactId>
+                          </dependency>
+                      </dependencies>
+                  </project>
+        """).toList().get(0);
+        MavenResolutionResult resolutionResult = doc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+        resolutionResult = resolutionResult.resolveDependencies(new MavenPomDownloader(Collections.emptyMap(), new InMemoryExecutionContext(), null, null), new InMemoryExecutionContext());
+        List<ResolvedDependency> deps = resolutionResult.getDependencies().get(Scope.Compile);
+        assertThat(deps).hasSize(34);
+    }
+
+
 }

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.yaml;
 
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.internal.StringUtils;
@@ -119,21 +120,21 @@ class JsonPathMatcherTest {
           List.of(
             //language=yaml
             """
-              apiVersion: apps/v1
-              kind: Deployment
-              metadata:
-                labels:
-                  app: application
-              spec:
-                template:
-                  spec:
-                    containers:
-                      - image: nginx:latest
-                        name: nginx
-                        resources:
-                          limits:
-                            cpu: "64Mi"
-            """
+                apiVersion: apps/v1
+                kind: Deployment
+                metadata:
+                  labels:
+                    app: application
+                spec:
+                  template:
+                    spec:
+                      containers:
+                        - image: nginx:latest
+                          name: nginx
+                          resources:
+                            limits:
+                              cpu: "64Mi"
+              """
           ),
           List.of("cpu: \"64Mi\"")
         );
@@ -816,6 +817,18 @@ class JsonPathMatcherTest {
     }
 
     @Test
+    void dontMatchThis() {
+        assertNotMatched("$..[?(@.task=='delete-this')]",
+          //language=yaml
+          List.of("""
+          foo:
+            bar:
+              - task: not-this
+              - task: not-this-either
+          """));
+    }
+
+    @Test
     void returnResultsWithVisitDocument() {
 //            var ctx = InMemoryExecutionContext
 //            {
@@ -847,16 +860,16 @@ class JsonPathMatcherTest {
 //            assertThat(results).hasSize(1);
     }
 
-    private void assertNotMatched(String jsonPath, List<String> before) {
+    private void assertNotMatched(@Language("jsonpath") String jsonPath, List<String> before) {
         var results = visit(before, jsonPath, false);
         assertThat(results).hasSize(0);
     }
 
-    private void assertMatched(String jsonPath, List<String> before, List<String> after) {
+    private void assertMatched(@Language("jsonpath") String jsonPath, List<String> before, List<String> after) {
         assertMatched(jsonPath, before, after, false);
     }
 
-    private void assertMatched(String jsonPath, List<String> before, List<String> after,
+    private void assertMatched(@Language("jsonpath") String jsonPath, List<String> before, List<String> after,
                                @SuppressWarnings("SameParameterValue") boolean printMatches) {
         var results = visit(before, jsonPath, printMatches);
         assertThat(results).hasSize(after.size());
@@ -866,7 +879,7 @@ class JsonPathMatcherTest {
         }
     }
 
-    private List<String> visit(List<String> before, String jsonPath, boolean printMatches) {
+    private List<String> visit(List<String> before, @Language("jsonpath") String jsonPath, boolean printMatches) {
         var matcher = new JsonPathMatcher(jsonPath);
         return new YamlVisitor<List<String>>() {
             @Override

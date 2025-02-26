@@ -1394,7 +1394,6 @@ class JavaTemplateTest implements RewriteTest {
                       JavaCoordinates coordinates = vd.getCoordinates().replace();
                       return JavaTemplate.builder("final var #{}")
                         .contextSensitive()
-                        .doBeforeParseTemplate(System.out::println)
                         .build()
                         .apply(getCursor(), coordinates, new Object[]{vd.getVariables().get(0).getSimpleName()});
                   }
