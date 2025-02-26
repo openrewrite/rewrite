@@ -235,8 +235,8 @@ class ChangeTypeTest implements RewriteTest {
               
               class Test {
                   List p;
-                  java.util.List p2;
-                  java.util.List p3;
+                  List p2;
+                  List p3;
               }
               """
           )
@@ -380,7 +380,11 @@ class ChangeTypeTest implements RewriteTest {
           java(a2),
           java(
             "public class B extends a.A1 {}",
-            "public class B extends a.A2 {}"
+            """
+              import a.A2;
+              
+              public class B extends A2 {}
+              """
           )
         );
     }
@@ -392,8 +396,14 @@ class ChangeTypeTest implements RewriteTest {
           java("package a.b.c;\npublic @interface A1 {}"),
           java("package a.b.d;\npublic @interface A2 {}"),
           java(
-            "@a.b.c.A1 public class B {}",
-            "@a.b.d.A2 public class B {}"
+            """
+              @a.b.c.A1 public class B {}
+              """,
+            """
+              import a.b.d.A2;
+              
+              @A2 public class B {}
+              """
           )
         );
     }

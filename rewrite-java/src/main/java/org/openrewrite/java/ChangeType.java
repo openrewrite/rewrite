@@ -256,7 +256,15 @@ public class ChangeType extends Recipe {
                     }
                 }
 
-                j = sf.withImports(ListUtils.map(sf.getImports(), i -> visitAndCast(i, ctx, super::visitImport)));
+                j = sf.withImports(ListUtils.map(sf.getImports(), i -> {
+                    Cursor cursor = getCursor();
+                    setCursor(new Cursor(cursor, i));
+                    try {
+                        return visitAndCast(i, ctx, super::visitImport);
+                    } finally {
+                        setCursor(cursor);
+                    }
+                }));
             }
 
             return j;
@@ -268,9 +276,12 @@ public class ChangeType extends Recipe {
                 if (targetType instanceof JavaType.FullyQualified) {
                     J.FieldAccess fa = (J.FieldAccess) updateOuterClassTypes(TypeTree.build(((JavaType.FullyQualified) targetType).getFullyQualifiedName())
                             .withPrefix(fieldAccess.getPrefix()));
-                    // FIXME we need to make sure the `J.FieldAccess` already is properly type attributed
-                    fa = fa.withName(fa.getName().withType(targetType));
-                    return ShortenFullyQualifiedTypeReferences.modifyOnly(fa).visitNonNull(fa, ctx, getCursor().getParent());
+                    if (getCursor().firstEnclosing(J.Import.class) == null) {
+                        // don't shorten qualified names in imports
+                        fa = fa.withName(fa.getName().withType(targetType));
+                        doAfterVisit(ShortenFullyQualifiedTypeReferences.modifyOnly(fa));
+                    }
+                    return fa;
                 } else if (targetType instanceof JavaType.Primitive) {
                     return new J.Primitive(
                             fieldAccess.getId(),
