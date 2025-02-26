@@ -19,20 +19,24 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.config.RecipeExample;
 
 import java.time.Duration;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-
-import static java.util.Objects.requireNonNull;
+import java.util.stream.Collectors;
 
 
 @RequiredArgsConstructor
 public class RpcRecipe extends ScanningRecipe<Integer> {
     private final transient RewriteRpc rpc;
+
+    @Nullable
+    private transient List<Recipe> recipeList;
 
     /**
      * The ID that the remote is using to refer to this recipe.
@@ -119,6 +123,18 @@ public class RpcRecipe extends ScanningRecipe<Integer> {
                 return t;
             }
         };
+    }
+
+    @Override
+    public synchronized List<Recipe> getRecipeList() {
+        if (recipeList == null) {
+            recipeList = descriptor.getRecipeList().stream()
+                    .map(r -> rpc.prepareRecipe(r.getName(), r.getOptions().stream()
+                            .filter(opt -> opt.getValue() != null)
+                            .collect(Collectors.toMap(OptionDescriptor::getName, OptionDescriptor::getValue))))
+                    .collect(Collectors.toList());
+        }
+        return recipeList;
     }
 
     @Override
