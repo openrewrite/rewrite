@@ -72,7 +72,7 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
-    void testOkWithTopLevelType1() {
+    void okWithTopLevelType() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType("java.util.Map$Entry", "java.util.List", true)),
           java("""
