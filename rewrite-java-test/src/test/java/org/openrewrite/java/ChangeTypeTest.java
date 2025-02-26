@@ -75,26 +75,27 @@ class ChangeTypeTest implements RewriteTest {
     void okWithTopLevelType() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType("java.util.Map$Entry", "java.util.List", true)),
-          java("""
-               import java.util.Map;
-
-               public class TestController {
-
-                   public Map.Entry respond() {
-                      return null;
-                   }
-               }
-               """,
+          java(
             """
-               import java.util.List;
-
-               public class TestController {
-
-                   public List respond() {
-                      return null;
-                   }
-               }
-            """)
+              import java.util.Map;
+              
+              public class TestController {
+              
+                  public Map.Entry respond() {
+                     return null;
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              
+              public class TestController {
+              
+                  public List respond() {
+                     return null;
+                  }
+              }
+              """)
         );
     }
 
