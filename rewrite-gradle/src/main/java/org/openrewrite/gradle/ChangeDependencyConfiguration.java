@@ -18,7 +18,12 @@ package org.openrewrite.gradle;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Preconditions;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.Validated;
 import org.openrewrite.gradle.internal.Dependency;
 import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
 import org.openrewrite.gradle.trait.GradleDependency;
@@ -30,7 +35,6 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.semver.DependencyMatcher;
 
-import java.time.Duration;
 import java.util.List;
 
 @Value
@@ -77,11 +81,6 @@ public class ChangeDependencyConfiguration extends Recipe {
     @Override
     public Validated<Object> validate() {
         return super.validate().and(DependencyMatcher.build(groupId + ":" + artifactId));
-    }
-
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(5);
     }
 
     @Override
