@@ -18,6 +18,8 @@ package org.openrewrite.rpc;
 import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.JsonRpcMethod;
 import io.moderne.jsonrpc.JsonRpcRequest;
+import io.moderne.jsonrpc.internal.SnowflakeId;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.VisibleForTesting;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -50,6 +52,8 @@ public class RewriteRpc {
 
     @VisibleForTesting
     final Map<String, Object> localObjects = new HashMap<>();
+    /* A reverse map of the objects back to their IDs */
+    final Map<Object, String> localObjectIds = new IdentityHashMap<>();
 
     private final Map<Integer, Object> remoteRefs = new IdentityHashMap<>();
 
@@ -117,17 +121,8 @@ public class RewriteRpc {
         // Set the local state of this tree, so that when the remote
         // asks for it, we know what to send.
         localObjects.put(sourceFile.getId().toString(), sourceFile);
-        String pId = Integer.toString(System.identityHashCode(p));
 
-        Object p2 = p;
-        while (p2 instanceof DelegatingExecutionContext) {
-            p2 = ((DelegatingExecutionContext) p2).getDelegate();
-        }
-        if (p2 instanceof ExecutionContext) {
-            ((ExecutionContext) p2).putMessage("org.openrewrite.rpc.id", pId);
-        }
-        localObjects.put(pId, p2);
-
+        String pId = maybeUnwrapExecutionContext(p);
         List<String> cursorIds = getCursorIds(cursor);
 
         return send("Visit", new Visit(visitorName, null, sourceFile.getId().toString(), pId, cursorIds),
@@ -135,14 +130,36 @@ public class RewriteRpc {
     }
 
     public Collection<? extends SourceFile> generate(String remoteRecipeId, ExecutionContext ctx) {
-        List<String> generated = send("Generate", new Generate(remoteRecipeId,
-                Integer.toString(System.identityHashCode(ctx))), GenerateResponse.class);
+        String ctxId = maybeUnwrapExecutionContext(ctx);
+        List<String> generated = send("Generate", new Generate(remoteRecipeId, ctxId),
+                GenerateResponse.class);
         if (!generated.isEmpty()) {
             return generated.stream()
                     .map(this::<SourceFile>getObject)
                     .collect(Collectors.toList());
         }
         return emptyList();
+    }
+
+    /**
+     * If the p object is a DelegatingExecutionContext, unwrap it to get the underlying
+     * ExecutionContext
+     *
+     * @param p   A visitor parameter, which may or may not be an ExecutionContext
+     * @param <P> The type of p
+     * @return The ID of p as represented in the local object cache.
+     */
+    private <P> String maybeUnwrapExecutionContext(P p) {
+        Object p2 = p;
+        while (p2 instanceof DelegatingExecutionContext) {
+            p2 = ((DelegatingExecutionContext) p2).getDelegate();
+        }
+        String pId = localObjectIds.computeIfAbsent(p2, p3 -> SnowflakeId.generateId());
+        if (p2 instanceof ExecutionContext) {
+            ((ExecutionContext) p2).putMessage("org.openrewrite.rpc.id", pId);
+        }
+        localObjects.put(pId, p2);
+        return pId;
     }
 
     public List<RecipeDescriptor> getRecipes() {
@@ -171,7 +188,7 @@ public class RewriteRpc {
             cursorIds = cursor.getPathAsStream().map(c -> {
                 String id = c instanceof Tree ?
                         ((Tree) c).getId().toString()
-                        : Integer.toString(System.identityHashCode(c));
+                        : localObjectIds.computeIfAbsent(c, c2 -> SnowflakeId.generateId());
                 localObjects.put(id, c);
                 return id;
             }).collect(Collectors.toList());
@@ -195,6 +212,7 @@ public class RewriteRpc {
         }
         // We are now in sync with the remote state of the object.
         remoteObjects.put(id, remoteObject);
+        localObjects.put(id, remoteObject);
 
         //noinspection unchecked
         return (T) remoteObject;

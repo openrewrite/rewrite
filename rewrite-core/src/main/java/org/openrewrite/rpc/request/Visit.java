@@ -127,12 +127,12 @@ public class Visit implements RpcRequest {
                 String visitorName = request.getVisitor();
 
                 if (visitorName.startsWith("scan:") || visitorName.startsWith("edit:")) {
-                    WatchableExecutionContext ctx = new WatchableExecutionContext((ExecutionContext) p);
                     Recipe recipe = preparedRecipes.get(visitorName.substring(
                             "edit:".length() /* 'scan:' has same length*/));
                     // This is really probably particular to the Java implementation,
                     // because we are carrying forward the legacy of cycles that are likely to be
                     // removed from OpenRewrite in the future.
+                    WatchableExecutionContext ctx = new WatchableExecutionContext((ExecutionContext) p);
                     ctx.putCycle(new RecipeRunCycle<>(recipe, 0, new Cursor(null, Cursor.ROOT_VALUE), ctx,
                             new RecipeRunStats(Recipe.noop()), new SourcesFileResults(Recipe.noop()),
                             new SourcesFileErrors(Recipe.noop()), LargeSourceSet::edit));
