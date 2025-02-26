@@ -341,7 +341,7 @@ public abstract class Recipe implements Cloneable {
     }
 
     /**
-     * Used to build up a recipe recipes programmatically. Using the
+     * Used to build up a recipe list programmatically. Using the
      * methods on {@link RecipeList}, the appearance of a recipe
      * that chains other recipes with options will be not strikingly
      * different from defining it in a recipe.yml.
@@ -351,11 +351,11 @@ public abstract class Recipe implements Cloneable {
      * since these assistants are primarily optimized for providing completion
      * assistance in a single file.
      * <p>
-     * When creating a recipe with a fixed recipe recipes, either override
+     * When creating a recipe with a fixed recipe list, either override
      * this method or {@link #getRecipeList()} but ideally not
      * both, as their default implementations are interconnected.
      *
-     * @param recipes A recipe recipes used to build up a series of recipes
+     * @param recipes A recipe list used to build up a series of recipes
      *             in code in a way that looks fairly declarative and
      *             therefore is more amenable to AI code completion.
      */
