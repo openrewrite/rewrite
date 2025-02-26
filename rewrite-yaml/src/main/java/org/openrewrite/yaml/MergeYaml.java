@@ -94,6 +94,7 @@ public class MergeYaml extends Recipe {
         return super.validate()
                 .and(Validated.test("yaml", "Must be valid YAML",
                         yaml, y -> new YamlParser().parse(yaml)
+                                .filter(it -> it instanceof Yaml.Documents) // Could also be a ParserError
                                 .findFirst()
                                 .map(doc -> !((Yaml.Documents) doc).getDocuments().isEmpty())
                                 .orElse(false)))
