@@ -24,6 +24,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
@@ -31,6 +32,7 @@ import java.util.Collections;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.java.Assertions.mavenProject;
@@ -2034,6 +2036,12 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """,
+            spec -> spec.afterRecipe(p -> {
+                  var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                  // `maven.config` properties are read-only at the moment, so version stays te same
+                  assertThat(results.getPom().getProperties().get("quarkus.platform.version")).isEqualTo("1.11.7.Final");
+              }
+            ),
             MavenParser.builder().mavenConfig("""
               -Dquarkus.platform.artifact-id=quarkus-bom
               -Dquarkus.platform.group-id=io.quarkus
