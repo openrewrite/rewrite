@@ -95,7 +95,8 @@ class ChangeTypeTest implements RewriteTest {
                      return null;
                   }
               }
-              """)
+              """
+          )
         );
     }
 
