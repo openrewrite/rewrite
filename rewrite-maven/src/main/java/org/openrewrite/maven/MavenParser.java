@@ -184,7 +184,7 @@ public class MavenParser implements Parser {
         return new Builder();
     }
 
-    public static Builder mavenConfig(@Nullable String mavenConfig) {
+    public static Builder mavenConfig(@Nullable @Language("properties") String mavenConfig) {
         return new Builder().mavenConfig(mavenConfig);
     }
 
