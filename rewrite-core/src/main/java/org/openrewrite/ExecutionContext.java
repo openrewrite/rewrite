@@ -16,21 +16,26 @@
 package org.openrewrite;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
+import org.openrewrite.rpc.request.Visit;
 import org.openrewrite.scheduling.RecipeRunCycle;
 
 import java.util.*;
-import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
-import java.util.function.Consumer;
-import java.util.function.Supplier;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.*;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 
 /**
  * Passes messages between individual visitors or parsing operations and allows errors to be propagated
  * back to the process controlling parsing or recipe execution.
  */
-public interface ExecutionContext {
+public interface ExecutionContext extends RpcCodec<ExecutionContext> {
     String CURRENT_CYCLE = "org.openrewrite.currentCycle";
     String CURRENT_RECIPE = "org.openrewrite.currentRecipe";
     String DATA_TABLES = "org.openrewrite.dataTables";
@@ -48,6 +53,9 @@ public interface ExecutionContext {
     default Set<TreeObserver.Subscription> getObservers() {
         return getMessage("org.openrewrite.internal.treeObservers", Collections.emptySet());
     }
+
+    @Nullable
+    Map<String, Object> getMessages();
 
     void putMessage(String key, @Nullable Object value);
 
@@ -106,5 +114,67 @@ public interface ExecutionContext {
 
     default RecipeRunCycle<?> getCycleDetails() {
         return requireNonNull(getMessage(CURRENT_CYCLE));
+    }
+
+    /**
+     * The after state will change if any messages have changed by a call to clone in the
+     * {@link Visit.Handler} implementation.
+     */
+    @Override
+    default void rpcSend(ExecutionContext after, RpcSendQueue q) {
+        // The after state will change if any messages have changed by a call to clone
+        q.getAndSend(after, ctx -> {
+            Map<String, Object> messages = new HashMap<>(ctx.getMessages() == null ?
+                    emptyMap() : ctx.getMessages());
+            // The remote side will manage its own recipe and cycle state.
+            messages.remove(CURRENT_CYCLE);
+            messages.remove(CURRENT_RECIPE);
+            messages.remove(DATA_TABLES);
+            return messages;
+        });
+
+        Map<DataTable<?>, List<?>> dt = after.getMessage(DATA_TABLES);
+        q.getAndSendList(after, sendWholeList(dt == null ? null : dt.keySet()), DataTable::getName, null);
+        if (dt != null) {
+            for (List<?> rowSet : dt.values()) {
+                q.getAndSendList(after, sendWholeList(rowSet),
+                        row -> Integer.toString(System.identityHashCode(row)),
+                        null);
+            }
+
+        }
+    }
+
+    @Override
+    default ExecutionContext rpcReceive(ExecutionContext before, RpcReceiveQueue q) {
+        Map<String, Object> messages = q.receive(before.getMessages());
+        for (Map.Entry<String, Object> e : messages.entrySet()) {
+            before.putMessage(e.getKey(), e.getValue());
+        }
+
+        List<DataTable<?>> dataTables = q.receiveList(emptyList(), null);
+        //noinspection ConstantValue
+        if (dataTables != null) {
+            for (DataTable<?> dataTable : dataTables) {
+                List<?> rows = q.receiveList(emptyList(), null);
+                before.computeMessage(ExecutionContext.DATA_TABLES, rows, ConcurrentHashMap::new, (extract, allDataTables) -> {
+                    //noinspection unchecked
+                    List<Object> dataTablesOfType = (List<Object>) allDataTables.computeIfAbsent(dataTable, c -> new ArrayList<>());
+                    dataTablesOfType.addAll(rows);
+                    return allDataTables;
+                });
+            }
+        }
+        return before;
+    }
+
+    static <T> Function<ExecutionContext, @Nullable List<T>> sendWholeList(@Nullable Collection<T> list) {
+        AtomicBoolean retrievedAfter = new AtomicBoolean(false);
+        return ctx -> {
+            if (!retrievedAfter.getAndSet(true)) {
+                return list == null ? null : new ArrayList<>(list);
+            }
+            return null;
+        };
     }
 }

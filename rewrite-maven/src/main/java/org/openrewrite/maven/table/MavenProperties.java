@@ -26,9 +26,7 @@ import org.openrewrite.Recipe;
 public class MavenProperties extends DataTable<MavenProperties.Row> {
 
     public MavenProperties(Recipe recipe) {
-        super(recipe, Row.class,
-                MavenProperties.class.getName(),
-                "Maven properties", "Property and value.");
+        super(recipe, "Maven properties", "Property and value.");
     }
 
     @Value
