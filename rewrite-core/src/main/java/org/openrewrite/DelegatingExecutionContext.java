@@ -15,16 +15,24 @@
  */
 package org.openrewrite;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 public class DelegatingExecutionContext implements ExecutionContext {
+    @Getter
     private final ExecutionContext delegate;
 
     public DelegatingExecutionContext(ExecutionContext delegate) {
         this.delegate = delegate;
+    }
+
+    @Override
+    public @Nullable Map<String, Object> getMessages() {
+        return delegate.getMessages();
     }
 
     @Override
