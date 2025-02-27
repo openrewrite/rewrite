@@ -75,10 +75,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
     @Option(displayName = "New version",
             description = "An exact version number or node-style semver selector used to select the version number. " +
-                          "You can also use `latest.release` for the latest available version and `latest.patch` if " +
-                          "the current version is a valid semantic version. For more details, you can look at the documentation " +
-                          "page of [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors). " +
-                          "Defaults to `latest.release`.",
+                    "You can also use `latest.release` for the latest available version and `latest.patch` if " +
+                    "the current version is a valid semantic version. For more details, you can look at the documentation " +
+                    "page of [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors). " +
+                    "Defaults to `latest.release`.",
             example = "29.X",
             required = false)
     @Nullable
@@ -86,7 +86,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                          "Setting 'newVersion' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+                    "Setting 'newVersion' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
@@ -106,10 +106,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
     public String getDescription() {
         //language=markdown
         return "Upgrade the version of a dependency in a build.gradle file. " +
-               "Supports updating dependency declarations of various forms:\n" +
-               "* `String` notation: `\"group:artifact:version\"` \n" +
-               "* `Map` notation: `group: 'group', name: 'artifact', version: 'version'`\n" +
-               "Can update version numbers which are defined earlier in the same file in variable declarations.";
+                "Supports updating dependency declarations of various forms:\n" +
+                "* `String` notation: `\"group:artifact:version\"` \n" +
+                "* `Map` notation: `group: 'group', name: 'artifact', version: 'version'`\n" +
+                "Can update version numbers which are defined earlier in the same file in variable declarations.";
     }
 
     @Override
@@ -277,7 +277,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             private boolean shouldResolveVersion(String declaredGroupId, String declaredArtifactId) {
                 //noinspection ConstantValue
                 return (groupId == null || artifactId == null) ||
-                       new DependencyMatcher(groupId, artifactId, null).matches(declaredGroupId, declaredArtifactId);
+                        new DependencyMatcher(groupId, artifactId, null).matches(declaredGroupId, declaredArtifactId);
             }
         };
     }
@@ -390,8 +390,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry) {
                     m = updateDependency(m, ctx);
                 } else if (depArgs.get(0) instanceof J.MethodInvocation &&
-                           (((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("platform") ||
-                            ((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("enforcedPlatform"))) {
+                        (((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("platform") ||
+                                ((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("enforcedPlatform"))) {
                     m = m.withArguments(ListUtils.mapFirst(depArgs, platform -> updateDependency((J.MethodInvocation) platform, ctx)));
                 }
             }
@@ -439,8 +439,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     }
                     Dependency dep = DependencyStringNotationConverter.parse(gav);
                     if (dep != null && dependencyMatcher.matches(dep.getGroupId(), dep.getArtifactId()) &&
-                        dep.getVersion() != null &&
-                        !dep.getVersion().startsWith("$")) {
+                            dep.getVersion() != null &&
+                            !dep.getVersion().startsWith("$")) {
                         Object scanResult = acc.gaToNewVersion.get(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()));
                         if (scanResult instanceof Exception) {
                             getCursor().putMessage(UPDATE_VERSION_ERROR_KEY, scanResult);
@@ -477,8 +477,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             }
             List<Expression> depArgs = m.getArguments();
             if (depArgs.size() >= 3 && depArgs.get(0) instanceof G.MapEntry &&
-                depArgs.get(1) instanceof G.MapEntry &&
-                depArgs.get(2) instanceof G.MapEntry) {
+                    depArgs.get(1) instanceof G.MapEntry &&
+                    depArgs.get(2) instanceof G.MapEntry) {
                 Expression groupValue = ((G.MapEntry) depArgs.get(0)).getValue();
                 Expression artifactValue = ((G.MapEntry) depArgs.get(1)).getValue();
                 if (!(groupValue instanceof J.Literal) || !(artifactValue instanceof J.Literal)) {
@@ -640,7 +640,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return gp;
             }
 
-            MavenPomDownloader mpd = new MavenPomDownloader(ctx);
+            MavenPomDownloader mpd = MavenPomDownloader.forNonMavenContext(ctx);
             Pom pom = mpd.download(gav, null, null, gp.getMavenRepositories());
             ResolvedPom resolvedPom = pom.resolve(emptyList(), mpd, gp.getMavenRepositories(), ctx);
             List<ResolvedDependency> transitiveDependencies = resolvedPom.resolveDependencies(Scope.Runtime, mpd, ctx);

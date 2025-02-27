@@ -45,7 +45,6 @@ import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
 import java.util.*;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.Objects.requireNonNull;
@@ -143,7 +142,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                     }
 
                                     Dependency dependency = DependencyStringNotationConverter.parse((String) l.getValue());
-                                    MavenPomDownloader mpd = new MavenPomDownloader(ctx);
+                                    MavenPomDownloader mpd = MavenPomDownloader.forNonMavenContext(ctx);
                                     try {
                                         ResolvedPom platformPom = mpd.download(new GroupArtifactVersion(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion()), null, null, gp.getMavenRepositories())
                                                 .resolve(Collections.emptyList(), mpd, ctx);
@@ -189,7 +188,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                                         return m;
                                     }
 
-                                    MavenPomDownloader mpd = new MavenPomDownloader(ctx);
+                                    MavenPomDownloader mpd = MavenPomDownloader.forNonMavenContext(ctx);
                                     try {
                                         ResolvedPom platformPom = mpd.download(new GroupArtifactVersion(groupId, artifactId, version), null, null, gp.getMavenRepositories())
                                                 .resolve(Collections.emptyList(), mpd, ctx);

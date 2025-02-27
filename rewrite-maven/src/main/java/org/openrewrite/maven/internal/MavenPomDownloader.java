@@ -95,9 +95,9 @@ public class MavenPomDownloader {
      * A MavenPomDownloader for non-maven contexts where there are no project poms or assumption that maven central
      * is implicitly added as a repository. In a Maven contexts, the regular constructor should be used instead
      *
-     * @param ctx The execution context, which potentially contain Maven settings customization and {@link HttpSender} customization.
+     * @param ctx The execution context
      */
-    public static MavenPomDownloader nonMavenContext(ExecutionContext ctx) {
+    public static MavenPomDownloader forNonMavenContext(ExecutionContext ctx) {
         MavenPomDownloader result = new MavenPomDownloader(HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
         result.addCentralRepository = Boolean.TRUE.equals(MavenExecutionContextView.view(ctx).getAddCentralRepository());
         result.addLocalRepository = Boolean.TRUE.equals(MavenExecutionContextView.view(ctx).getAddLocalRepository());

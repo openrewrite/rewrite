@@ -72,7 +72,7 @@ class MavenPomDownloaderTest implements RewriteTest {
           .uri("https://oss.sonatype.org/content/repositories/snapshots/")
           .snapshots(true)
           .build();
-        MavenRepository repo = new MavenPomDownloader(ctx).normalizeRepository(ossSonatype,
+        MavenRepository repo = MavenPomDownloader.forNonMavenContext(ctx).normalizeRepository(ossSonatype,
           MavenExecutionContextView.view(ctx), null);
         assertThat(repo).isNotNull().extracting((MavenRepository::getUri)).isEqualTo(ossSonatype.getUri());
     }
@@ -89,7 +89,7 @@ class MavenPomDownloaderTest implements RewriteTest {
       """)
     @ParameterizedTest
     void normalizeRepository(String originalUrl, String expectedUrl) throws Throwable {
-        MavenPomDownloader downloader = new MavenPomDownloader(new InMemoryExecutionContext());
+        MavenPomDownloader downloader = MavenPomDownloader.forNonMavenContext(new InMemoryExecutionContext());
         MavenRepository repository = new MavenRepository("id", originalUrl, null, null, null, null, null);
         MavenRepository normalized = downloader.normalizeRepository(repository);
         assertThat(normalized).isNotNull();
@@ -219,7 +219,7 @@ class MavenPomDownloaderTest implements RewriteTest {
             });
 
             try {
-                new MavenPomDownloader(ctx)
+                Pom download = MavenPomDownloader.forNonMavenContext(ctx)
                   .download(new GroupArtifactVersion("org.openrewrite", "rewrite-core", "7.0.0"), null, null, singletonList(nonexistentRepo));
             } catch (Exception e) {
                 // not expected to succeed
@@ -246,7 +246,7 @@ class MavenPomDownloaderTest implements RewriteTest {
             });
 
             try {
-                new MavenPomDownloader(ctx)
+                MavenPomDownloader.forNonMavenContext(ctx)
                   .download(new GroupArtifactVersion("org.openrewrite", "rewrite-core", "7.0.0"), null, null, singletonList(nonexistentRepo));
             } catch (Exception e) {
                 // not expected to succeed
@@ -804,7 +804,7 @@ class MavenPomDownloaderTest implements RewriteTest {
         @Issue("https://github.com/openrewrite/rewrite/issues/4080")
         @Test
         void connectTimeout() {
-            var downloader = new MavenPomDownloader(ctx);
+            var downloader = MavenPomDownloader.forNonMavenContext(ctx);
             var gav = new GroupArtifactVersion("org.openrewrite", "rewrite-core", "7.0.0");
             var repos = singletonList(MavenRepository.builder()
               .id("non-routable").uri("http://10.0.0.0/maven").knownToExist(true).build());
