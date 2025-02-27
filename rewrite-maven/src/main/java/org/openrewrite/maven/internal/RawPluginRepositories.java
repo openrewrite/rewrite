@@ -33,8 +33,7 @@ public class RawPluginRepositories {
     @JacksonXmlElementWrapper(useWrapping = false)
     List<PluginRepository> pluginRepositories = emptyList();
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Data
+    @Value
     public static class PluginRepository {
         @Nullable
         String id;
@@ -49,9 +48,7 @@ public class RawPluginRepositories {
         ArtifactPolicy snapshots;
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode
-    @Getter
+    @Value
     public static class ArtifactPolicy {
 
         @Nullable
