@@ -53,6 +53,7 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
+import static org.openrewrite.maven.MavenParser.mavenConfig;
 
 class MavenParserTest implements RewriteTest {
 
@@ -3725,10 +3726,54 @@ class MavenParserTest implements RewriteTest {
                   assertThat(results.getPom().getProperties().get("revision")).isEqualTo("1.0.0");
               }
             ),
-            MavenParser.builder().mavenConfig(
+            mavenConfig(
               """
                 -Drevision=1.0.0
                 """
+            )
+          )
+        );
+    }
+
+    @Test
+    void propertyFromMavenConfigFromParentPomCanBeUsedInChild() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>parent</artifactId>
+                <version>${revision}</version>
+              </project>
+              """,
+            mavenConfig(
+              """
+                -Drevision=1.0.0
+                """
+            )
+          ),
+          mavenProject("child",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                  <parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>${revision}</version>
+                  </parent>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>child</artifactId>
+                  <version>${revision}</version>
+                </project>
+                """,
+              spec -> spec.afterRecipe(p -> {
+                  var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                  assertThat(results.getPom().getVersion()).isEqualTo("${revision}");
+                  assertThat(results.getPom().getProperties().get("revision")).isEqualTo("1.0.0");
+                  assertThat(results.getParent().getPom().getVersion()).isEqualTo("${revision}");
+                  assertThat(results.getParent().getPom().getProperties().get("revision")).isEqualTo("1.0.0");
+              })
             )
           )
         );
@@ -3750,7 +3795,7 @@ class MavenParserTest implements RewriteTest {
                   assertThat(results.getPom().getActiveProfiles()).contains("a", "b", "c");
               }
             ),
-            MavenParser.builder().mavenConfig(
+            mavenConfig(
               """
                 -P a,b,c
                 """
@@ -3770,10 +3815,7 @@ class MavenParserTest implements RewriteTest {
                 <version>1.0.0</version>
               </project>
               """,
-            MavenParser.builder().mavenConfig(
-              """
-                """
-            )
+            mavenConfig("")
           )
         );
     }

@@ -184,6 +184,10 @@ public class MavenParser implements Parser {
         return new Builder();
     }
 
+    public static Builder mavenConfig(@Language("properties") String mavenConfig) {
+        return new Builder().mavenConfig(mavenConfig);
+    }
+
     public static class Builder extends Parser.Builder {
         private final Collection<String> activeProfiles = new HashSet<>();
         private final Map<String, String> properties = new HashMap<>();
@@ -227,7 +231,7 @@ public class MavenParser implements Parser {
             return this;
         }
 
-        public Builder mavenConfig(@Nullable String mavenConfig) {
+        private Builder mavenConfig(@Nullable String mavenConfig) {
             if (mavenConfig != null) {
                 for (String line : mavenConfig.split("\n")) {
                     if (line.startsWith("-P")) {
