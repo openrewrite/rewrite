@@ -141,6 +141,67 @@ class UpgradePluginVersionTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5065")
+    void handlesPluginRepositories() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion(
+            "io.quarkus",
+            "quarkus-maven-plugin",
+            "3.15.3.redhat-00002",
+            null,
+            null,
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>io.quarkus</groupId>
+                      <artifactId>quarkus-maven-plugin</artifactId>
+                      <version>3.14.0</version>
+                     </plugin>
+                  </plugins>
+                </build>
+                <pluginRepositories>
+                  <pluginRepository>
+                    <id>redhat-ga</id>
+                    <url>https://maven.repository.redhat.com/ga/</url>
+                  </pluginRepository>
+                </pluginRepositories>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>io.quarkus</groupId>
+                      <artifactId>quarkus-maven-plugin</artifactId>
+                      <version>3.15.3.redhat-00002</version>
+                     </plugin>
+                  </plugins>
+                </build>
+                <pluginRepositories>
+                  <pluginRepository>
+                    <id>redhat-ga</id>
+                    <url>https://maven.repository.redhat.com/ga/</url>
+                  </pluginRepository>
+                </pluginRepositories>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     @Issue("Should be changed/removed when this recipe supports dynamic version resolution")
     void ignorePluginWithoutExplicitVersionDeclared() {
         rewriteRun(
