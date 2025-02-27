@@ -461,6 +461,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
 
         @Nullable
         String because;
+
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             if ("version".equals(method.getSimpleName())) {
@@ -500,6 +501,8 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                                 }
                                 return arg;
                             })))
+                    // Assign a unique ID so multiple constraints can be added
+                    .map(it -> it.withId(Tree.randomId()))
                     .orElseThrow(() -> new IllegalStateException("Unable to find constraint"));
 
             m = autoFormat(m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
