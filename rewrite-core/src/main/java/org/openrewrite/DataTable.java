@@ -106,7 +106,7 @@ public class DataTable<Row> {
      * @param ctx the execution context
      * @return weather to allow writing in this cycle
      */
-    public boolean allowWritingInThisCycle(ExecutionContext ctx) {
+    protected boolean allowWritingInThisCycle(ExecutionContext ctx) {
         return ctx.getCycle() <= 1;
     }
 }
