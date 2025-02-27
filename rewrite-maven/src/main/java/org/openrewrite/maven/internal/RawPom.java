@@ -114,6 +114,9 @@ public class RawPom {
     RawRepositories repositories;
 
     @Nullable
+    RawPluginRepositories pluginRepositories;
+
+    @Nullable
     Licenses licenses;
 
     @Nullable
@@ -372,6 +375,9 @@ public class RawPom {
 
         @Nullable
         RawRepositories repositories;
+
+        @Nullable
+        RawPluginRepositories pluginRepositories;
     }
 
     public @Nullable String getGroupId() {
@@ -421,6 +427,7 @@ public class RawPom {
             builder.dependencies(mapRequestedDependencies(getDependencies()))
                     .dependencyManagement(mapDependencyManagement(getDependencyManagement()))
                     .repositories(mapRepositories(getRepositories()))
+                    .pluginRepositories(mapPluginRepositories(getPluginRepositories()))
                     .plugins(mapPlugins((build != null) ? build.getPlugins() : null))
                     .pluginManagement(mapPlugins((build != null && build.getPluginManagement() != null) ? build.getPluginManagement().getPlugins() : null));
         }
@@ -458,6 +465,7 @@ public class RawPom {
                             mapRequestedDependencies(p.getDependencies()),
                             mapDependencyManagement(p.getDependencyManagement()),
                             mapRepositories(p.getRepositories()),
+                            mapPluginRepositories(p.getPluginRepositories()),
                             mapPlugins((build != null) ? build.getPlugins() : null),
                             mapPlugins((build != null && build.getPluginManagement() != null) ? build.getPluginManagement().getPlugins() : null)
                     ));
@@ -476,6 +484,25 @@ public class RawPom {
             if (unmappedRepos != null) {
                 pomRepositories = new ArrayList<>(unmappedRepos.size());
                 for (RawRepositories.Repository r : unmappedRepos) {
+                    pomRepositories.add(new MavenRepository(r.getId(), r.getUrl(),
+                            r.getReleases() == null ? null : r.getReleases().getEnabled(),
+                            r.getSnapshots() == null ? null : r.getSnapshots().getEnabled(),
+                            false, null, null, null, null));
+                }
+
+            }
+        }
+        return pomRepositories;
+    }
+
+    @NonNull
+    private List<MavenRepository> mapPluginRepositories(@Nullable RawPluginRepositories rawRepositories) {
+        List<MavenRepository> pomRepositories = emptyList();
+        if (rawRepositories != null) {
+            List<RawPluginRepositories.PluginRepository> unmappedRepos = rawRepositories.getPluginRepositories();
+            if (unmappedRepos != null) {
+                pomRepositories = new ArrayList<>(unmappedRepos.size());
+                for (RawPluginRepositories.PluginRepository r : unmappedRepos) {
                     pomRepositories.add(new MavenRepository(r.getId(), r.getUrl(),
                             r.getReleases() == null ? null : r.getReleases().getEnabled(),
                             r.getSnapshots() == null ? null : r.getSnapshots().getEnabled(),
