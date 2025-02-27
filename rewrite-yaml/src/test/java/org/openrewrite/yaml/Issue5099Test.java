@@ -17,12 +17,14 @@ package org.openrewrite.yaml;
 
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.openrewrite.yaml.Assertions.yaml;
 
 class Issue5099Test implements RewriteTest {
+    @Issue("https://github.com/openrewrite/rewrite/issues/5099")
     @Test
     void parseFlowSequenceAtBufferBoundary() {
         // May change over time in SnakeYaml, rendering this test fragile
