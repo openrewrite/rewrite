@@ -106,17 +106,12 @@ public class MergeYaml extends Recipe {
 
     @Override
     public Validated<Object> validate() {
-        // parse here
         return super.validate()
                 .and(Validated.test("yaml", "Must be valid YAML",
                         yaml, y -> {
                             Optional<Yaml.Block> firstDocument = MergeYaml.maybeParse(yaml);
-                            if (firstDocument.isPresent()) {
-                                incoming = MergeYaml.parse(yaml);
-                                return true;
-                            } else {
-                                return false;
-                            }
+                            firstDocument.ifPresent(it -> incoming = it);
+                            return firstDocument.isPresent();
                         }))
                 .and(Validated.test("insertProperty", "Insert property must be filed when `insert mode` is either `BeforeProperty` or `AfterProperty`.", insertProperty,
                         s -> insertMode == null || insertMode == Last || !isBlank(s)));
@@ -141,15 +136,15 @@ public class MergeYaml extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        //assert incoming != null; // silence compiler warning, incoming cannot be null here. Otherwise, validate() would have failed.
+        // When `new MergeYaml(..).getVisitor() is used directly in another recipe, the `validate` function will not be called, thus `incoming` is null
+        if (incoming == null) {
+            incoming = MergeYaml.parse(yaml);
+        }
         return Preconditions.check(new FindSourceFiles(filePattern), new YamlIsoVisitor<ExecutionContext>() {
             final JsonPathMatcher matcher = new JsonPathMatcher(key);
 
             @Override
             public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
-                if (incoming == null) {
-                    return super.visitDocument(document, ctx);
-                }
                 if ("$".equals(key)) {
                     Yaml.Document d = document.withBlock((Yaml.Block)
                             new MergeYamlVisitor<>(document.getBlock(), incoming, Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty, insertMode, insertProperty)
@@ -218,9 +213,6 @@ public class MergeYaml extends Recipe {
 
             @Override
             public Yaml.Mapping visitMapping(Yaml.Mapping mapping, ExecutionContext ctx) {
-                if (incoming == null) {
-                    return super.visitMapping(mapping, ctx);
-                }
                 Yaml.Mapping m = super.visitMapping(mapping, ctx);
                 if (matcher.matches(getCursor())) {
                     getCursor().putMessageOnFirstEnclosing(Yaml.Document.class, FOUND_MATCHING_ELEMENT, true);
@@ -232,9 +224,6 @@ public class MergeYaml extends Recipe {
 
             @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
-                if (incoming == null) {
-                    return super.visitMappingEntry(entry, ctx);
-                }
                 if (matcher.matches(getCursor())) {
                     getCursor().putMessageOnFirstEnclosing(Yaml.Document.class, FOUND_MATCHING_ELEMENT, true);
                     Yaml.Block value = (Yaml.Block) new MergeYamlVisitor<>(entry.getValue(), incoming,
@@ -250,9 +239,6 @@ public class MergeYaml extends Recipe {
 
             @Override
             public Yaml.Sequence visitSequence(Yaml.Sequence sequence, ExecutionContext ctx) {
-                if (incoming == null) {
-                    return super.visitSequence(sequence, ctx);
-                }
                 if (matcher.matches(getCursor().getParentOrThrow())) {
                     getCursor().putMessageOnFirstEnclosing(Yaml.Document.class, FOUND_MATCHING_ELEMENT, true);
                     return sequence.withEntries(ListUtils.map(sequence.getEntries(),
@@ -265,7 +251,7 @@ public class MergeYaml extends Recipe {
         });
     }
 
-    static Optional<Yaml.Block> maybeParse(@Language("yml") String yaml) {
+    private static Optional<Yaml.Block> maybeParse(@Language("yml") String yaml) {
         return new YamlParser().parse(yaml)
                 .findFirst()
                 .filter(Yaml.Documents.class::isInstance)

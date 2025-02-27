@@ -2754,6 +2754,7 @@ class MergeYamlTest implements RewriteTest {
               false,
               null,
               null,
+              null,
               null
             )),
 
@@ -2790,6 +2791,7 @@ class MergeYamlTest implements RewriteTest {
                   new-key: new-value
                 """,
               false,
+              null,
               null,
               null,
               null
