@@ -15,15 +15,17 @@
  */
 package org.openrewrite.yaml;
 
-import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.Value;
+import lombok.experimental.NonFinal;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.yaml.tree.Yaml;
+
+import java.util.Optional;
 
 import static org.openrewrite.internal.StringUtils.isBlank;
 import static org.openrewrite.yaml.MergeYaml.InsertMode.*;
@@ -31,7 +33,6 @@ import static org.openrewrite.yaml.MergeYaml.InsertMode.*;
 @Value
 @EqualsAndHashCode(callSuper = false)
 @NoArgsConstructor(force = true) // TODO: remove with @deprecated constructor
-@AllArgsConstructor // TODO: remove with @deprecated constructor
 public class MergeYaml extends Recipe {
     @Option(displayName = "Key path",
             description = "A [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expression used to find matching keys.",
@@ -87,17 +88,36 @@ public class MergeYaml extends Recipe {
         this(key, yaml, acceptTheirs, objectIdentifyingProperty, filePattern, null, insertProperty);
     }
 
+    public MergeYaml(String key, @Language("yml") String yaml, @Nullable Boolean acceptTheirs, @Nullable String objectIdentifyingProperty, @Nullable String filePattern, @Nullable InsertMode insertMode, @Nullable String insertProperty) {
+        this.key = key;
+        this.yaml = yaml;
+        this.acceptTheirs = acceptTheirs;
+        this.objectIdentifyingProperty = objectIdentifyingProperty;
+        this.filePattern = filePattern;
+        this.insertMode = insertMode;
+        this.insertProperty = insertProperty;
+    }
+
     public enum InsertMode { Before, After, Last }
+
+    @Nullable
+    @NonFinal
+    transient Yaml incoming = null;
 
     @Override
     public Validated<Object> validate() {
+        // parse here
         return super.validate()
                 .and(Validated.test("yaml", "Must be valid YAML",
-                        yaml, y -> new YamlParser().parse(yaml)
-                                .filter(it -> it instanceof Yaml.Documents) // Could also be a ParserError
-                                .findFirst()
-                                .map(doc -> !((Yaml.Documents) doc).getDocuments().isEmpty())
-                                .orElse(false)))
+                        yaml, y -> {
+                            Optional<Yaml.Block> firstDocument = MergeYaml.maybeParse(yaml);
+                            if (firstDocument.isPresent()) {
+                                incoming = MergeYaml.parse(yaml);
+                                return true;
+                            } else {
+                                return false;
+                            }
+                        }))
                 .and(Validated.test("insertProperty", "Insert property must be filed when `insert mode` is either `BeforeProperty` or `AfterProperty`.", insertProperty,
                         s -> insertMode == null || insertMode == Last || !isBlank(s)));
     }
@@ -121,22 +141,18 @@ public class MergeYaml extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+        //assert incoming != null; // silence compiler warning, incoming cannot be null here. Otherwise, validate() would have failed.
         return Preconditions.check(new FindSourceFiles(filePattern), new YamlIsoVisitor<ExecutionContext>() {
             final JsonPathMatcher matcher = new JsonPathMatcher(key);
 
-            @Nullable Yaml incoming;
-            private Yaml incoming() {
-                if (incoming == null) {
-                    incoming = parse(yaml);
-                }
-                return incoming;
-            }
-
             @Override
             public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
+                if (incoming == null) {
+                    return super.visitDocument(document, ctx);
+                }
                 if ("$".equals(key)) {
                     Yaml.Document d = document.withBlock((Yaml.Block)
-                            new MergeYamlVisitor<>(document.getBlock(), yaml, Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty, insertMode, insertProperty)
+                            new MergeYamlVisitor<>(document.getBlock(), incoming, Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty, insertMode, insertProperty)
                                     .visitNonNull(document.getBlock(), ctx, getCursor())
                     );
                     if (getCursor().getMessage(REMOVE_PREFIX, false)) {
@@ -153,14 +169,14 @@ public class MergeYaml extends Recipe {
                     }
                     // If there is no space between the colon and the value it will not be interpreted as a mapping
                     String snippet;
-                    if (incoming() instanceof Yaml.Mapping) {
+                    if (incoming instanceof Yaml.Mapping) {
                         snippet = valueKey + ":\n" + indent(yaml);
                     } else {
                         snippet = valueKey + ":" + (yaml.startsWith(" ") ? yaml : " " + yaml);
                     }
                     // No matching element already exists, so it must be constructed
                     //noinspection LanguageMismatch
-                    return d.withBlock((Yaml.Block) new MergeYamlVisitor<>(d.getBlock(), snippet,
+                    return d.withBlock((Yaml.Block) new MergeYamlVisitor<>(d.getBlock(), MergeYaml.parse(snippet),
                             Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty, insertMode, insertProperty).visitNonNull(d.getBlock(),
                             ctx, getCursor()));
                 }
@@ -202,10 +218,13 @@ public class MergeYaml extends Recipe {
 
             @Override
             public Yaml.Mapping visitMapping(Yaml.Mapping mapping, ExecutionContext ctx) {
+                if (incoming == null) {
+                    return super.visitMapping(mapping, ctx);
+                }
                 Yaml.Mapping m = super.visitMapping(mapping, ctx);
                 if (matcher.matches(getCursor())) {
                     getCursor().putMessageOnFirstEnclosing(Yaml.Document.class, FOUND_MATCHING_ELEMENT, true);
-                    m = (Yaml.Mapping) new MergeYamlVisitor<>(mapping, incoming(), Boolean.TRUE.equals(acceptTheirs),
+                    m = (Yaml.Mapping) new MergeYamlVisitor<>(mapping, incoming, Boolean.TRUE.equals(acceptTheirs),
                             objectIdentifyingProperty, insertMode, insertProperty).visitNonNull(mapping, ctx, getCursor().getParentOrThrow());
                 }
                 return m;
@@ -213,9 +232,12 @@ public class MergeYaml extends Recipe {
 
             @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
+                if (incoming == null) {
+                    return super.visitMappingEntry(entry, ctx);
+                }
                 if (matcher.matches(getCursor())) {
                     getCursor().putMessageOnFirstEnclosing(Yaml.Document.class, FOUND_MATCHING_ELEMENT, true);
-                    Yaml.Block value = (Yaml.Block) new MergeYamlVisitor<>(entry.getValue(), incoming(),
+                    Yaml.Block value = (Yaml.Block) new MergeYamlVisitor<>(entry.getValue(), incoming,
                             Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty, insertMode, insertProperty).visitNonNull(entry.getValue(),
                             ctx, getCursor());
                     if (value instanceof Yaml.Scalar && value.getPrefix().isEmpty()) {
@@ -228,10 +250,13 @@ public class MergeYaml extends Recipe {
 
             @Override
             public Yaml.Sequence visitSequence(Yaml.Sequence sequence, ExecutionContext ctx) {
+                if (incoming == null) {
+                    return super.visitSequence(sequence, ctx);
+                }
                 if (matcher.matches(getCursor().getParentOrThrow())) {
                     getCursor().putMessageOnFirstEnclosing(Yaml.Document.class, FOUND_MATCHING_ELEMENT, true);
                     return sequence.withEntries(ListUtils.map(sequence.getEntries(),
-                            entry -> entry.withBlock((Yaml.Block) new MergeYamlVisitor<>(entry.getBlock(), incoming(),
+                            entry -> entry.withBlock((Yaml.Block) new MergeYamlVisitor<>(entry.getBlock(), incoming,
                                     Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty, insertMode, insertProperty)
                                     .visitNonNull(entry.getBlock(), ctx, new Cursor(getCursor(), entry)))));
                 }
@@ -240,9 +265,10 @@ public class MergeYaml extends Recipe {
         });
     }
 
-    static Yaml parse(@Language("yml") String yaml) {
+    static Optional<Yaml.Block> maybeParse(@Language("yml") String yaml) {
         return new YamlParser().parse(yaml)
                 .findFirst()
+                .filter(Yaml.Documents.class::isInstance)
                 .map(Yaml.Documents.class::cast)
                 .map(docs -> {
                     // Any comments will have been put on the parent Document node, preserve by copying to the mapping
@@ -255,7 +281,11 @@ public class MergeYaml extends Recipe {
                         return s.withEntries(ListUtils.mapFirst(s.getEntries(), entry -> entry.withPrefix(doc.getPrefix())));
                     }
                     return doc.getBlock().withPrefix(doc.getPrefix());
-                })
+                });
+    }
+
+    static Yaml parse(@Language("yml") String yaml) {
+        return maybeParse(yaml)
                 .orElseThrow(() -> new IllegalArgumentException("Could not parse as YAML"));
     }
 }
