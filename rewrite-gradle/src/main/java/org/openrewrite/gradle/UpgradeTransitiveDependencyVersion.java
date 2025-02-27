@@ -116,8 +116,9 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
      * it is much faster to produce these LST elements only once then manipulate their arguments.
      * This largely mimics how caching works in JavaTemplate. If we create a Gradle/GroovyTemplate this could be refactored.
      */
-    private static Map<String, Optional<G.CompilationUnit>> snippetCache(Cursor cursor) {
-        return cursor.getRoot().computeMessageIfAbsent(UpgradeTransitiveDependencyVersion.class.getName() + ".snippetCache", k -> new HashMap<>());
+    private static Map<String, Optional<G.CompilationUnit>> snippetCache(ExecutionContext ctx) {
+        //noinspection unchecked
+        return (Map<String, Optional<G.CompilationUnit>>) ctx.getMessages().computeIfAbsent(UpgradeTransitiveDependencyVersion.class.getName() + ".snippetCache", k -> new HashMap<>());
     }
 
     @Override
@@ -335,7 +336,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
             if (DEPENDENCIES_DSL_MATCHER.matches(method)) {
-                G.CompilationUnit withConstraints = snippetCache(getCursor()).computeIfAbsent(
+                G.CompilationUnit withConstraints = snippetCache(ctx).computeIfAbsent(
                         //language=groovy
                         "plugins { id 'java' }\n" +
                         "dependencies {\n" +
@@ -466,7 +467,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                 return method;
             }
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            Optional<G.CompilationUnit> withConstraint = snippetCache(getCursor()).computeIfAbsent(
+            Optional<G.CompilationUnit> withConstraint = snippetCache(ctx).computeIfAbsent(
                         because == null ? INDIVIDUAL_CONSTRAINT_SNIPPET : INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET,
                         snippet -> GradleParser.builder().build()
                                 .parse(snippet)
@@ -623,7 +624,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            J.Lambda becauseArg = snippetCache(getCursor())
+            J.Lambda becauseArg = snippetCache(ctx)
                     .computeIfAbsent(INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET, snippet -> GradleParser.builder().build()
                     .parse(snippet)
                     .findFirst()
