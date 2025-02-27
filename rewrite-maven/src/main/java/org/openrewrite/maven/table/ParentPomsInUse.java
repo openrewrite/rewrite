@@ -26,9 +26,7 @@ import org.openrewrite.Recipe;
 public class ParentPomsInUse extends DataTable<ParentPomsInUse.Row> {
 
     public ParentPomsInUse(Recipe recipe) {
-        super(recipe, Row.class,
-                ParentPomsInUse.class.getName(),
-                "Maven parent POMs in use", "Projects, GAVs and relativePaths for Maven parent POMs in use.");
+        super(recipe, "Maven parent POMs in use", "Projects, GAVs and relativePaths for Maven parent POMs in use.");
     }
 
     @Value

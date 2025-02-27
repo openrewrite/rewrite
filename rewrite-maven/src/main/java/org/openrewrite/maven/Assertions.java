@@ -47,8 +47,21 @@ public class Assertions {
         });
     }
 
+    public static SourceSpecs pomXml(@Language("xml") @Nullable String before, MavenParser.Builder mavenParserBuilder) {
+        return pomXml(before, s -> {
+        }, mavenParserBuilder);
+    }
+
     public static SourceSpecs pomXml(@Language("xml") @Nullable String before, Consumer<SourceSpec<Xml.Document>> spec) {
         SourceSpec<Xml.Document> maven = new SourceSpec<>(Xml.Document.class, "maven", MavenParser.builder(), before,
+                Assertions::pomResolvedSuccessfully, Assertions::customizeExecutionContext);
+        maven.path("pom.xml");
+        spec.accept(maven);
+        return maven;
+    }
+
+    public static SourceSpecs pomXml(@Language("xml") @Nullable String before, Consumer<SourceSpec<Xml.Document>> spec, MavenParser.Builder mavenParserBuilder) {
+        SourceSpec<Xml.Document> maven = new SourceSpec<>(Xml.Document.class, "maven", mavenParserBuilder, before,
                 Assertions::pomResolvedSuccessfully, Assertions::customizeExecutionContext);
         maven.path("pom.xml");
         spec.accept(maven);

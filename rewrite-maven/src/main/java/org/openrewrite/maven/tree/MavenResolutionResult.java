@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven.tree;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.jspecify.annotations.Nullable;
@@ -34,6 +35,7 @@ import static java.util.Objects.requireNonNull;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @SuppressWarnings("unused")
+@NoArgsConstructor(access = AccessLevel.PRIVATE, onConstructor_ = @JsonCreator)
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter

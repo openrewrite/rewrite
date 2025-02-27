@@ -113,8 +113,16 @@ public class RecipeScheduler {
             }
         } finally {
             recipeRunStats.flush(ctx);
+            recursiveOnComplete(recipe, ctxWithWatch);
         }
         return after;
+    }
+
+    private void recursiveOnComplete(Recipe recipe, ExecutionContext ctx) {
+        recipe.onComplete(ctx);
+        for (Recipe r : recipe.getRecipeList()) {
+            recursiveOnComplete(r, ctx);
+        }
     }
 
     private boolean hasScanningRecipe(Recipe recipe) {

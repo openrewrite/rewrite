@@ -47,7 +47,7 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
     public Yaml.Sequence visitSequence(Yaml.Sequence existingSeq, ExecutionContext ctx) {
         Cursor parent = getCursor().getParent();
         if (matcher.matches(parent) &&
-            !existingSeq.getMarkers().findFirst(AlreadyReplaced.class).filter(m -> m.getFind().equals(value)).isPresent() &&
+            !existingSeq.getMarkers().findFirst(AlreadyReplaced.class).filter(m -> value.equals(m.getFind())).isPresent() &&
             checkExistingSequenceValues(existingSeq, parent)) {
             return appendToSequence(existingSeq, this.value, ctx);
         }

@@ -16,12 +16,14 @@
 package org.openrewrite.internal;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.PathUtils;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -73,14 +75,18 @@ public class ReflectionUtils {
             Enumeration<URL> resources = classLoader.getResources(resourceName);
             while (resources.hasMoreElements()) {
                 URL resource = resources.nextElement();
+                String path = PathUtils.separatorsToUnix(resource.getPath());
                 if (resource.getProtocol().equals("jar") && resource.getPath().startsWith("file:")) {
-                    classPathEntries.add(Paths.get(URI.create(resource.getPath().substring(0, resource.getPath().indexOf("!")))));
+                    classPathEntries.add(Paths.get(URI.create(path.substring(0, path.indexOf("!")))));
                 } else if (resource.getProtocol().equals("file")) {
-                    classPathEntries.add(Paths.get(resource.getPath().substring(0, resource.getPath().indexOf(resourceName))));
+                    path = PathUtils.separatorsToUnix(Paths.get(resource.toURI()).toString());
+                    classPathEntries.add(Paths.get(path.substring(0, path.indexOf(resourceName))));
                 }
             }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
+        } catch (URISyntaxException e) {
+            throw new RuntimeException(e);
         }
         return classPathEntries;
     }

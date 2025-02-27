@@ -67,6 +67,7 @@ public abstract class Recipe implements Cloneable {
         return getClass().getName();
     }
 
+    @Nullable
     private transient RecipeDescriptor descriptor;
 
     @Nullable
@@ -223,7 +224,7 @@ public abstract class Recipe implements Cloneable {
             throw new RuntimeException(e);
         }
 
-        return new RecipeDescriptor(getName(), getDisplayName(), getDescription(), getTags(),
+        return new RecipeDescriptor(getName(), getDisplayName(), getInstanceName(), getDescription(), getTags(),
                 getEstimatedEffortPerOccurrence(), options, recipeList1, getDataTableDescriptors(),
                 getMaintainers(), getContributors(), getExamples(), recipeSource);
     }
@@ -245,6 +246,7 @@ public abstract class Recipe implements Cloneable {
                 value = null;
             }
             Option option = field.getAnnotation(Option.class);
+            //noinspection ConstantValue
             if (option != null) {
                 options.add(new OptionDescriptor(field.getName(),
                         field.getType().getSimpleName(),
@@ -278,6 +280,7 @@ public abstract class Recipe implements Cloneable {
     }
 
     @Setter
+    @Nullable
     protected List<Contributor> contributors;
 
     public List<Contributor> getContributors() {
@@ -288,6 +291,7 @@ public abstract class Recipe implements Cloneable {
     }
 
     @Setter
+    @Nullable
     protected transient List<RecipeExample> examples;
 
     public List<RecipeExample> getExamples() {
@@ -306,6 +310,17 @@ public abstract class Recipe implements Cloneable {
      */
     public boolean causesAnotherCycle() {
         return false;
+    }
+
+    /**
+     * At the end of a recipe run, a {@link RecipeScheduler} will call this method to allow the
+     * recipe to perform any cleanup or finalization tasks. This method is guaranteed to be called
+     * only once per run.
+     *
+     * @param ctx The recipe run execution context.
+     */
+    @Incubating(since = "8.48.0")
+    public void onComplete(ExecutionContext ctx) {
     }
 
     /**
@@ -340,12 +355,12 @@ public abstract class Recipe implements Cloneable {
      * this method or {@link #getRecipeList()} but ideally not
      * both, as their default implementations are interconnected.
      *
-     * @param list A recipe list used to build up a series of recipes
+     * @param recipes A recipe list used to build up a series of recipes
      *             in code in a way that looks fairly declarative and
      *             therefore is more amenable to AI code completion.
      */
     @SuppressWarnings("unused")
-    public void buildRecipeList(RecipeList list) {
+    public void buildRecipeList(RecipeList recipes) {
     }
 
     /**
@@ -359,11 +374,12 @@ public abstract class Recipe implements Cloneable {
         return TreeVisitor.noop();
     }
 
-    public void addDataTable(DataTable<?> dataTable) {
+    public <D extends DataTable<?>> D addDataTable(D dataTable) {
         if (dataTables == null) {
             dataTables = new ArrayList<>();
         }
         dataTables.add(dataTableDescriptorFromDataTable(dataTable));
+        return dataTable;
     }
 
     public final RecipeRun run(LargeSourceSet before, ExecutionContext ctx) {

@@ -2738,4 +2738,86 @@ class MergeYamlTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5031")
+    void preventKeysToBeAppendedToPreviousComment() {
+        rewriteRun(spec -> spec
+            .recipe(new MergeYaml(//language=jsonpath
+              "$",
+              // language=yaml
+              """
+                foo:
+                  new-key: new-value
+                """,
+              false,
+              null,
+              null,
+              null
+            )),
+
+          yaml(// language=yaml
+            """
+              #
+              foo:
+                existing-key: existing-value
+              # A simple comment
+              bar: bar-value
+              """,
+            // language=yaml
+            """
+              #
+              foo:
+                existing-key: existing-value
+                new-key: new-value
+              # A simple comment
+              bar: bar-value
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5031")
+    void preventKeysToBeAppendedToPreviousCommentIfManyLineBreaks() {
+        rewriteRun(spec -> spec
+            .recipe(new MergeYaml(//language=jsonpath
+              "$",
+              // language=yaml
+              """
+                foo:
+                  new-key: new-value
+                """,
+              false,
+              null,
+              null,
+              null
+            )),
+
+          yaml(// language=yaml
+            """
+              #
+              foo:
+                existing-key: existing-value
+              # A simple comment with trailing line breaks
+              
+              
+              
+              bar: bar-value
+              """,
+            // language=yaml
+            """
+              #
+              foo:
+                existing-key: existing-value
+                new-key: new-value
+              # A simple comment with trailing line breaks
+              
+              
+              
+              bar: bar-value
+              """
+          )
+        );
+    }
 }
