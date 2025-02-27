@@ -87,10 +87,7 @@ public class DataTable<Row> {
     }
 
     public void insertRow(ExecutionContext ctx, Row row) {
-        // Ignore any row insertions after this cycle. This prevents
-        // data table producing recipes from having to keep track of state across
-        // multiple cycles to prevent duplicate row entries.
-        if (ctx.getCycle() > 1) {
+        if (!allowWritingInThisCycle(ctx)) {
             return;
         }
         ctx.computeMessage(ExecutionContext.DATA_TABLES, row, ConcurrentHashMap::new, (extract, allDataTables) -> {
@@ -99,5 +96,17 @@ public class DataTable<Row> {
             dataTablesOfType.add(row);
             return allDataTables;
         });
+    }
+
+    /**
+     * This method is used to decide weather to ignore any row insertions in the current cycle.
+     * This prevents (by default) data table producing recipes from having to keep track of state across
+     * multiple cycles to prevent duplicate row entries.
+     *
+     * @param ctx the execution context
+     * @return weather to allow writing in this cycle
+     */
+    public boolean allowWritingInThisCycle(ExecutionContext ctx) {
+        return ctx.getCycle() <= 1;
     }
 }
