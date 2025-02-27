@@ -7,7 +7,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.openrewrite.yaml.Assertions.yaml;
 
-public class Issue5099Test implements RewriteTest {
+class Issue5099Test implements RewriteTest {
     @Test
     void parseFlowSequenceAtBufferBoundary() {
         // May change over time in SnakeYaml, rendering this test fragile
