@@ -233,7 +233,15 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         }
                     } else {
                         for (Expression depArg : m.getArguments()) {
-                            if (depArg instanceof G.GString) {
+                            Dependency dep = null;
+                            String versionVariableName = null;
+                            if (depArg instanceof J.Literal && ((J.Literal) depArg).getValue() instanceof String) {
+                                String gav = (String) ((J.Literal) depArg).getValue();
+                                dep = DependencyStringNotationConverter.parse(gav);
+                                if (dep != null) {
+                                    versionVariableName = dep.getVersion();
+                                }
+                            } else if (depArg instanceof G.GString) {
                                 G.GString gString = (G.GString) depArg;
                                 List<J> strings = gString.getStrings();
                                 if (strings.size() != 2 || !(strings.get(0) instanceof J.Literal) || !(strings.get(1) instanceof G.GString.Value)) {
@@ -244,25 +252,25 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                 if (!(versionValue.getTree() instanceof J.Identifier) || !(groupArtifact.getValue() instanceof String)) {
                                     continue;
                                 }
-                                Dependency dep = DependencyStringNotationConverter.parse((String) groupArtifact.getValue());
-                                if (dep == null) {
-                                    continue;
+                                dep = DependencyStringNotationConverter.parse((String) groupArtifact.getValue());
+                                versionVariableName = ((J.Identifier) versionValue.getTree()).getSimpleName();
+                            }
+                            if (dep == null || versionVariableName == null) {
+                                continue;
+                            }
+                            GroupArtifact ga = new GroupArtifact(dep.getGroupId(), dep.getArtifactId());
+                            if (acc.gaToNewVersion.containsKey(ga) || !shouldResolveVersion(dep.getGroupId(), dep.getArtifactId())) {
+                                continue;
+                            }
+                            try {
+                                String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                                        .select(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
+                                if (resolvedVersion != null) {
+                                    acc.versionPropNameToGA.put(versionVariableName, ga);
+                                    acc.gaToNewVersion.put(ga, resolvedVersion);
                                 }
-                                String versionVariableName = ((J.Identifier) versionValue.getTree()).getSimpleName();
-                                GroupArtifact ga = new GroupArtifact(dep.getGroupId(), dep.getArtifactId());
-                                if (acc.gaToNewVersion.containsKey(ga) || !shouldResolveVersion(dep.getGroupId(), dep.getArtifactId())) {
-                                    continue;
-                                }
-                                try {
-                                    String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
-                                            .select(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
-                                    if (resolvedVersion != null) {
-                                        acc.versionPropNameToGA.put(versionVariableName, ga);
-                                        acc.gaToNewVersion.put(ga, resolvedVersion);
-                                    }
-                                } catch (MavenDownloadingException e) {
-                                    acc.gaToNewVersion.put(ga, e);
-                                }
+                            } catch (MavenDownloadingException e) {
+                                acc.gaToNewVersion.put(ga, e);
                             }
                         }
                     }
