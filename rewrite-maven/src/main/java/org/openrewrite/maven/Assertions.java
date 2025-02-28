@@ -82,6 +82,15 @@ public class Assertions {
         return maven;
     }
 
+    public static SourceSpecs pomXml(@Language("xml") @Nullable String before, @Language("xml") @Nullable String after,
+                                     Consumer<SourceSpec<Xml.Document>> spec, MavenParser.Builder mavenParserBuilder) {
+        SourceSpec<Xml.Document> maven = new SourceSpec<>(Xml.Document.class, "maven", mavenParserBuilder, before,
+                Assertions::pomResolvedSuccessfully, Assertions::customizeExecutionContext).after(s -> after);
+        maven.path("pom.xml");
+        spec.accept(maven);
+        return maven;
+    }
+
     private static SourceFile pomResolvedSuccessfully(SourceFile sourceFile, TypeValidation typeValidation) {
         if (typeValidation.dependencyModel()) {
             sourceFile.getMarkers()

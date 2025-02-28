@@ -24,12 +24,15 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.java.ChangePackage;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.*;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.test.RewriteTest.toRecipe;
+import static org.openrewrite.maven.MavenParser.mavenConfig;
 
 class AddDependencyTest implements RewriteTest {
 
@@ -1645,6 +1648,49 @@ class AddDependencyTest implements RewriteTest {
                 </project>
                 """
             )
+          )
+        );
+    }
+
+    @Test
+    void mavenConfigReproducer() {
+        rewriteRun(
+          spec -> spec
+            .recipes(addDependency("org.openrewrite:rewrite-maven:8.47.3"), addDependency("org.openrewrite:rewrite-gradle:8.47.3")),
+          pomXml(
+            """
+                  <project>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                  </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.openrewrite</groupId>
+                          <artifactId>rewrite-gradle</artifactId>
+                          <version>8.47.3</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>org.openrewrite</groupId>
+                          <artifactId>rewrite-maven</artifactId>
+                          <version>8.47.3</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            spec -> spec.afterRecipe(p -> {
+                var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                assertThat(results.getPom().getProperties().get("revision")).isEqualTo("1.0.0");
+            }),
+            mavenConfig("""
+            -Drevision=1.0.0
+            """)
           )
         );
     }
