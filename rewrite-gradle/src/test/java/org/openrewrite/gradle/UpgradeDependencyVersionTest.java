@@ -100,6 +100,33 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void fromMilestoneToLatestPatch() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new UpgradeDependencyVersion("org.apache.tomcat.embed", "*", "latest.patch", null)),
+          //language=groovy
+          buildGradle(
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  implementation 'org.apache.tomcat.embed:tomcat-embed-core:10.0.0-M1'
+              }
+              """,
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+
+              dependencies {
+                  implementation 'org.apache.tomcat.embed:tomcat-embed-core:10.0.27'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void mockitoTestImplementation() {
         rewriteRun(recipeSpec -> {
               recipeSpec.beforeRecipe(withToolingApi())

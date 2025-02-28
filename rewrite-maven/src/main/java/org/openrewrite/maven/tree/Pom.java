@@ -104,6 +104,9 @@ public class Pom {
     List<MavenRepository> repositories = emptyList();
 
     @Builder.Default
+    List<MavenRepository> pluginRepositories = emptyList();
+
+    @Builder.Default
     List<License> licenses = emptyList();
 
     @Builder.Default
@@ -206,6 +209,7 @@ public class Pom {
                 emptyList(),
                 concatAll(initialRepositories, getEffectiveRepositories()),
                 repositories,
+                pluginRepositories,
                 dependencies,
                 plugins,
                 pluginManagement,
