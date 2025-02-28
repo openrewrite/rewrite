@@ -43,11 +43,11 @@ class UpdateMavenModelTest implements RewriteTest {
             ),
           pomXml(
             """
-                  <project>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                  </project>
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+              </project>
               """,
             """
               <project>
