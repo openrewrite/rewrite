@@ -92,6 +92,9 @@ public class Pom {
     String packaging;
 
     @Builder.Default
+    Map<String, String> constants = emptyMap();
+
+    @Builder.Default
     Map<String, String> properties = emptyMap();
 
     @Builder.Default
@@ -205,6 +208,7 @@ public class Pom {
         return new ResolvedPom(
                 this,
                 activeProfiles,
+                constants,
                 properties,
                 emptyList(),
                 concatAll(initialRepositories, getEffectiveRepositories()),

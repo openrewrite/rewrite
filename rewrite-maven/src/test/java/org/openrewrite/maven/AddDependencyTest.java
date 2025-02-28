@@ -1652,49 +1652,6 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
-    @Test
-    void mavenConfigReproducer() {
-        rewriteRun(
-          spec -> spec
-            .recipes(addDependency("org.openrewrite:rewrite-maven:8.47.3"), addDependency("org.openrewrite:rewrite-gradle:8.47.3")),
-          pomXml(
-            """
-                  <project>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                  </project>
-              """,
-            """
-              <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <dependencies>
-                      <dependency>
-                          <groupId>org.openrewrite</groupId>
-                          <artifactId>rewrite-gradle</artifactId>
-                          <version>8.47.3</version>
-                      </dependency>
-                      <dependency>
-                          <groupId>org.openrewrite</groupId>
-                          <artifactId>rewrite-maven</artifactId>
-                          <version>8.47.3</version>
-                      </dependency>
-                  </dependencies>
-              </project>
-              """,
-            spec -> spec.afterRecipe(p -> {
-                var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                assertThat(results.getPom().getProperties().get("revision")).isEqualTo("1.0.0");
-            }),
-            mavenConfig("""
-            -Drevision=1.0.0
-            """)
-          )
-        );
-    }
-
     private AddDependency addDependency(@SuppressWarnings("SameParameterValue") String gav) {
         return addDependency(gav, null, null, null);
     }

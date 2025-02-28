@@ -71,13 +71,14 @@ public class ResolvedPom {
     Iterable<String> activeProfiles = emptyList();
 
     public ResolvedPom(Pom requested, Iterable<String> activeProfiles) {
-        this(requested, activeProfiles, emptyMap(), emptyList(), null, emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList());
+        this(requested, activeProfiles, requested.getConstants(), emptyMap(), emptyList(), null, emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList());
     }
 
     @JsonCreator
-    ResolvedPom(Pom requested, Iterable<String> activeProfiles, Map<String, String> properties, List<ResolvedManagedDependency> dependencyManagement, @Nullable List<MavenRepository> initialRepositories, List<MavenRepository> repositories, List<MavenRepository> pluginRepositories, List<Dependency> requestedDependencies, List<Plugin> plugins, List<Plugin> pluginManagement, List<String> subprojects) {
+    ResolvedPom(Pom requested, Iterable<String> activeProfiles, Map<String, String> constants, Map<String, String> properties, List<ResolvedManagedDependency> dependencyManagement, @Nullable List<MavenRepository> initialRepositories, List<MavenRepository> repositories, List<MavenRepository> pluginRepositories, List<Dependency> requestedDependencies, List<Plugin> plugins, List<Plugin> pluginManagement, List<String> subprojects) {
         this.requested = requested;
         this.activeProfiles = activeProfiles;
+        this.constants = constants;
         this.properties = properties;
         this.dependencyManagement = dependencyManagement;
         this.initialRepositories = initialRepositories;
@@ -88,6 +89,10 @@ public class ResolvedPom {
         this.pluginManagement = pluginManagement;
         this.subprojects = subprojects;
     }
+
+    @NonFinal
+    @Builder.Default
+    Map<String, String> constants = emptyMap();
 
     @NonFinal
     @Builder.Default
@@ -125,6 +130,12 @@ public class ResolvedPom {
     @Builder.Default
     @Nullable // on older LSTs, this field is not yet present
     List<String> subprojects = emptyList();
+
+    public Map<String, String> getProperties() {
+        Map<String, String> result = new HashMap<>(constants);
+        result.putAll(properties);
+        return result;
+    }
 
     /**
      * Deduplicate dependencies and dependency management dependencies
@@ -178,6 +189,7 @@ public class ResolvedPom {
         ResolvedPom resolved = new ResolvedPom(
                 requested,
                 activeProfiles,
+                constants,
                 emptyMap(),
                 emptyList(),
                 initialRepositories,
@@ -384,7 +396,7 @@ public class ResolvedPom {
             if (initialRepositories != null) {
                 mergeRepositories(initialRepositories);
             }
-            resolveParentPropertiesAndRepositoriesRecursively(new ArrayList<>(pomAncestry));
+            resolveParentPropertiesAndRepositoriesRecursively(requested);
             if (initialRepositories == null) {
                 initialRepositories = repositories;
             }
@@ -406,9 +418,7 @@ public class ResolvedPom {
             resolveParentPluginsRecursively(new ArrayList<>(pomAncestry));
         }
 
-        private void resolveParentPropertiesAndRepositoriesRecursively(List<Pom> pomAncestry) throws MavenDownloadingException {
-            Pom pom = pomAncestry.get(0);
-
+        private void resolveParentPropertiesAndRepositoriesRecursively(Pom pom) throws MavenDownloadingException {
             List<Profile> effectiveProfiles = pom.effectiveProfiles(activeProfiles);
 
             //Resolve properties
@@ -425,16 +435,7 @@ public class ResolvedPom {
 
             if (pom.getParent() != null) {
                 Pom parentPom = resolveParentPom(pom);
-
-                for (Pom ancestor : pomAncestry) {
-                    if (ancestor.getGav().equals(parentPom.getGav())) {
-                        // parent cycle
-                        return;
-                    }
-                }
-
-                pomAncestry.add(0, parentPom);
-                resolveParentPropertiesAndRepositoriesRecursively(pomAncestry);
+                resolveParentPropertiesAndRepositoriesRecursively(parentPom);
             }
         }
 
@@ -941,7 +942,7 @@ public class ResolvedPom {
                     MavenPomCache cache = MavenExecutionContextView.view(ctx).getPomCache();
                     ResolvedPom resolvedPom = cache.getResolvedDependencyPom(dPom.getGav());
                     if (resolvedPom == null) {
-                        resolvedPom = new ResolvedPom(dPom, getActiveProfiles(), emptyMap(),
+                        resolvedPom = new ResolvedPom(dPom, getActiveProfiles(), dPom.getConstants(), emptyMap(),
                                 emptyList(), initialRepositories, emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList());
                         resolvedPom.resolver(ctx, downloader).resolveParentsRecursively(dPom);
                         cache.putResolvedDependencyPom(dPom.getGav(), resolvedPom);
