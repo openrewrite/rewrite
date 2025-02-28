@@ -70,26 +70,6 @@ public class ResolvedPom {
     @Builder.Default
     Iterable<String> activeProfiles = emptyList();
 
-    public ResolvedPom(Pom requested, Iterable<String> activeProfiles) {
-        this(requested, activeProfiles, requested.getConstants(), emptyMap(), emptyList(), null, emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList());
-    }
-
-    @JsonCreator
-    ResolvedPom(Pom requested, Iterable<String> activeProfiles, Map<String, String> constants, Map<String, String> properties, List<ResolvedManagedDependency> dependencyManagement, @Nullable List<MavenRepository> initialRepositories, List<MavenRepository> repositories, List<MavenRepository> pluginRepositories, List<Dependency> requestedDependencies, List<Plugin> plugins, List<Plugin> pluginManagement, List<String> subprojects) {
-        this.requested = requested;
-        this.activeProfiles = activeProfiles;
-        this.constants = constants;
-        this.properties = properties;
-        this.dependencyManagement = dependencyManagement;
-        this.initialRepositories = initialRepositories;
-        this.repositories = repositories;
-        this.pluginRepositories = pluginRepositories;
-        this.requestedDependencies = requestedDependencies;
-        this.plugins = plugins;
-        this.pluginManagement = pluginManagement;
-        this.subprojects = subprojects;
-    }
-
     @NonFinal
     @Builder.Default
     Map<String, String> constants = emptyMap();
@@ -130,6 +110,26 @@ public class ResolvedPom {
     @Builder.Default
     @Nullable // on older LSTs, this field is not yet present
     List<String> subprojects = emptyList();
+
+    public ResolvedPom(Pom requested, Iterable<String> activeProfiles) {
+        this(requested, activeProfiles, requested.getConstants(), emptyMap(), emptyList(), null, emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList());
+    }
+
+    @JsonCreator
+    ResolvedPom(Pom requested, Iterable<String> activeProfiles, Map<String, String> constants, Map<String, String> properties, List<ResolvedManagedDependency> dependencyManagement, @Nullable List<MavenRepository> initialRepositories, List<MavenRepository> repositories, List<MavenRepository> pluginRepositories, List<Dependency> requestedDependencies, List<Plugin> plugins, List<Plugin> pluginManagement, List<String> subprojects) {
+        this.requested = requested;
+        this.activeProfiles = activeProfiles;
+        this.constants = constants;
+        this.properties = properties;
+        this.dependencyManagement = dependencyManagement;
+        this.initialRepositories = initialRepositories;
+        this.repositories = repositories;
+        this.pluginRepositories = pluginRepositories;
+        this.requestedDependencies = requestedDependencies;
+        this.plugins = plugins;
+        this.pluginManagement = pluginManagement;
+        this.subprojects = subprojects;
+    }
 
     public Map<String, String> getProperties() {
         Map<String, String> result = new HashMap<>(constants);
