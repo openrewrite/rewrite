@@ -109,9 +109,8 @@ public class MergeYaml extends Recipe {
         return super.validate()
                 .and(Validated.test("yaml", "Must be valid YAML",
                         yaml, y -> {
-                            Optional<Yaml.Block> firstDocument = MergeYaml.maybeParse(yaml);
-                            firstDocument.ifPresent(it -> incoming = it);
-                            return firstDocument.isPresent();
+                            MergeYaml.maybeParse(yaml).ifPresent(it -> incoming = it);
+                            return incoming != null;
                         }))
                 .and(Validated.test("insertProperty", "Insert property must be filed when `insert mode` is either `BeforeProperty` or `AfterProperty`.", insertProperty,
                         s -> insertMode == null || insertMode == Last || !isBlank(s)));
