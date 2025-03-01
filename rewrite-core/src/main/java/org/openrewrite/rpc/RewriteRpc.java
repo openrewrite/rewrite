@@ -19,7 +19,6 @@ import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.JsonRpcMethod;
 import io.moderne.jsonrpc.JsonRpcRequest;
 import io.moderne.jsonrpc.internal.SnowflakeId;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.VisibleForTesting;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -56,7 +55,7 @@ public class RewriteRpc {
     /* A reverse map of the objects back to their IDs */
     final Map<Object, String> localObjectIds = new IdentityHashMap<>();
 
-    private final Map<Integer, Object> remoteRefs = new IdentityHashMap<>();
+    private final Map<Integer, Object> remoteRefs = new HashMap<>();
 
     public RewriteRpc(JsonRpc jsonRpc, Environment marketplace) {
         this.jsonRpc = jsonRpc;
@@ -106,18 +105,18 @@ public class RewriteRpc {
         return visit(sourceFile, visitorName, p, null);
     }
 
-    public <P> @Nullable Tree visit(SourceFile sourceFile, String visitorName, P p, @Nullable Cursor cursor) {
-        VisitResponse response = scan(sourceFile, visitorName, p, cursor);
+    public <P> @Nullable Tree visit(Tree tree, String visitorName, P p, @Nullable Cursor cursor) {
+        VisitResponse response = scan(tree, visitorName, p, cursor);
         return response.isModified() ?
-                getObject(sourceFile.getId().toString()) :
-                sourceFile;
+                getObject(tree.getId().toString()) :
+                tree;
     }
 
     public <P> VisitResponse scan(SourceFile sourceFile, String visitorName, P p) {
         return scan(sourceFile, visitorName, p, null);
     }
 
-    public <P> VisitResponse scan(SourceFile sourceFile, String visitorName, P p,
+    public <P> VisitResponse scan(Tree sourceFile, String visitorName, P p,
                                   @Nullable Cursor cursor) {
         // Set the local state of this tree, so that when the remote
         // asks for it, we know what to send.

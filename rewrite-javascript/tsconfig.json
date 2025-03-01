@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "es2016",
+    "module": "Node16",
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "rootDir": ".",
+    "outDir": "./dist",
+    "experimentalDecorators": true,
+    "moduleResolution": "node16"
+  },
+  "include": [
+    "src/main/javascript/**/*",
+    "src/test/javascript/**/*"
+  ]
+}

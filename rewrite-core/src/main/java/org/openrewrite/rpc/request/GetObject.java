@@ -49,7 +49,7 @@ public class GetObject implements RpcRequest {
          * Keeps track of objects that need to be referentially deduplicated, and
          * the ref IDs to look them up by on the remote.
          */
-        private final Map<Object, Integer> localRefs = new IdentityHashMap<>();
+        private final IdentityHashMap<Object, Integer> localRefs = new IdentityHashMap<>();
 
         @Override
         protected Object handle(GetObject request) throws Exception {

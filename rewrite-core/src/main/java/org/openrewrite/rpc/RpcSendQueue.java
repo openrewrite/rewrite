@@ -32,11 +32,11 @@ public class RpcSendQueue {
     private final int batchSize;
     private final List<RpcObjectData> batch;
     private final Consumer<List<RpcObjectData>> drain;
-    private final Map<Object, Integer> refs;
+    private final IdentityHashMap<Object, Integer> refs;
 
     private @Nullable Object before;
 
-    public RpcSendQueue(int batchSize, ThrowingConsumer<List<RpcObjectData>> drain, Map<Object, Integer> refs) {
+    public RpcSendQueue(int batchSize, ThrowingConsumer<List<RpcObjectData>> drain, IdentityHashMap<Object, Integer> refs) {
         this.batchSize = batchSize;
         this.batch = new ArrayList<>(batchSize);
         this.drain = drain;
@@ -61,18 +61,18 @@ public class RpcSendQueue {
         batch.clear();
     }
 
-    public <T> void sendMarkers(@Nullable T parent, Function<T, Markers> markersFn) {
+    public <T> void sendMarkers(T parent, Function<T, Markers> markersFn) {
         getAndSend(parent, t2 -> asRef(markersFn.apply(t2)), markersRef -> {
             Markers markers = Reference.getValue(markersRef);
             getAndSendList(markers, Markers::getMarkers, Marker::getId, null);
         });
     }
 
-    public <T, U> void getAndSend(@Nullable T parent, Function<T, @Nullable U> value) {
+    public <T, U> void getAndSend(T parent, Function<T, @Nullable U> value) {
         getAndSend(parent, value, null);
     }
 
-    public <T, U> void getAndSend(@Nullable T parent, Function<T, @Nullable U> value, @Nullable Consumer<U> onChange) {
+    public <T, U> void getAndSend(T parent, Function<T, @Nullable U> value, @Nullable Consumer<U> onChange) {
         U after = value.apply(parent);
         //noinspection unchecked
         U before = this.before == null ? null : value.apply((T) this.before);
