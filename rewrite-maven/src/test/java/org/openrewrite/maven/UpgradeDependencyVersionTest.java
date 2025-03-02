@@ -37,7 +37,6 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
-import static org.openrewrite.maven.MavenParser.mavenConfig;
 
 class UpgradeDependencyVersionTest implements RewriteTest {
 
@@ -2015,8 +2014,13 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void upgradeVersionWithGroupIdAndArtifactIdDefinedAsMavenConfigProperty() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("io.quarkus", "quarkus-universe-bom", "1.13.7.Final", null,
-            null, null)),
+          spec -> spec
+            .parser(MavenParser.builder()
+                .property("quarkus.platform.group-id", "io.quarkus")
+                .property("quarkus.platform.artifact-id", "quarkus-bom")
+                .property("quarkus.platform.version", "1.11.7.Final")            )
+            .recipe(new UpgradeDependencyVersion("io.quarkus", "quarkus-universe-bom", "1.13.7.Final", null,
+              null, null)),
           pomXml(
             """
               <project>
@@ -2041,12 +2045,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   // `maven.config` properties are read-only at the moment, so version stays te same
                   assertThat(results.getPom().getProperties().get("quarkus.platform.version")).isEqualTo("1.11.7.Final");
               }
-            ),
-            mavenConfig("""
-              -Dquarkus.platform.artifact-id=quarkus-bom
-              -Dquarkus.platform.group-id=io.quarkus
-              -Dquarkus.platform.version=1.11.7.Final
-              """)
+            )
           )
         );
     }

@@ -29,13 +29,9 @@ import org.openrewrite.tree.ParseError;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.tree.Xml;
 
-import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static java.util.Collections.*;
@@ -167,9 +163,9 @@ public class MavenParser implements Parser {
                 MavenResolutionResult moduleResolutionResult = maybeModuleResolutionResult.get();
                 Parent parent = moduleResolutionResult.getPom().getRequested().getParent();
                 if (parent != null &&
-                    resolutionResult.getPom().getGroupId().equals(resolutionResult.getPom().getValue(parent.getGroupId())) &&
-                    resolutionResult.getPom().getArtifactId().equals(resolutionResult.getPom().getValue(parent.getArtifactId())) &&
-                    Objects.equals(resolutionResult.getPom().getValue(resolutionResult.getPom().getVersion()), resolutionResult.getPom().getValue(parent.getVersion()))) {
+                        resolutionResult.getPom().getGroupId().equals(resolutionResult.getPom().getValue(parent.getGroupId())) &&
+                        resolutionResult.getPom().getArtifactId().equals(resolutionResult.getPom().getValue(parent.getArtifactId())) &&
+                        Objects.equals(resolutionResult.getPom().getValue(resolutionResult.getPom().getVersion()), resolutionResult.getPom().getValue(parent.getVersion()))) {
                     moduleResolutionResult.unsafeSetParent(resolutionResult);
                     modules.add(moduleResolutionResult);
                 }
