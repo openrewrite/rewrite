@@ -192,10 +192,6 @@ public class MavenParser implements Parser {
         return new Builder();
     }
 
-    public static Builder mavenConfig(@Language("properties") String mavenConfig) {
-        return new Builder().mavenConfig(mavenConfig);
-    }
-
     public static class Builder extends Parser.Builder {
         private final Collection<String> activeProfiles = new HashSet<>();
         private final Map<String, String> properties = new HashMap<>();
@@ -222,34 +218,6 @@ public class MavenParser implements Parser {
             //noinspection ConstantConditions
             if (key != null && value != null) {
                 this.properties.put(key, value);
-            }
-            return this;
-        }
-
-        @SuppressWarnings("unused") // Used in `MavenMojoProjectParser.parseMaven(..)`
-        public Builder mavenConfig(@Nullable Path mavenConfig) {
-            if (mavenConfig != null && mavenConfig.toFile().exists()) {
-                try {
-                    String mavenConfigText = new String(Files.readAllBytes(mavenConfig));
-                    return mavenConfig(mavenConfigText);
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-            }
-            return this;
-        }
-
-        private Builder mavenConfig(@Nullable String mavenConfig) {
-            if (mavenConfig != null) {
-                for (String line : mavenConfig.split("\n")) {
-                    if (line.startsWith("-P")) {
-                        Matcher matcher = Pattern.compile("-P\\s+(.*)").matcher(line);
-                        if (matcher.find()) {
-                            String[] profiles = matcher.group(1).split(",");
-                            activeProfiles(Arrays.stream(profiles).map(String::trim).toArray(String[]::new));
-                        }
-                    }
-                }
             }
             return this;
         }
