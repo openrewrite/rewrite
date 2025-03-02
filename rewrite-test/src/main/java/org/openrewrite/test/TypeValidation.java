@@ -118,6 +118,12 @@ public class TypeValidation {
     private boolean immutableExecutionContext = true;
 
     /**
+     * Validates that the LST is serializable. This may for example be important due to Java's type erasure.
+     */
+    @Builder.Default
+    private boolean serializable = true;
+
+    /**
      * Enable all invariant validation checks.
      */
     public static TypeValidation all() {
@@ -128,7 +134,7 @@ public class TypeValidation {
      * Skip all invariant validation checks.
      */
     public static TypeValidation none() {
-        return new TypeValidation(false, false, false, false, false, false, false, false, o -> false, false, false, false);
+        return new TypeValidation(false, false, false, false, false, false, false, false, o -> false, false, false, false, false);
     }
 
     static TypeValidation before(RecipeSpec testMethodSpec, RecipeSpec testClassSpec) {
