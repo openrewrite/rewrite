@@ -102,7 +102,7 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
      *
      * @param visitor The visitor to run.
      */
-    protected void doAfterVisit(TreeVisitor<?, P> visitor) {
+    public void doAfterVisit(TreeVisitor<?, P> visitor) {
         if (afterVisit == null) {
             afterVisit = new ArrayList<>(2);
         }
