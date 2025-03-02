@@ -81,10 +81,13 @@ public class MavenParser implements Parser {
                 if (pom.getProperties().isEmpty()) {
                     pom = pom.withProperties(new LinkedHashMap<>());
                 }
+
                 String baseDir = pomPath.toAbsolutePath().getParent().toString();
-                pom.getProperties().put("project.basedir", baseDir);
-                pom.getProperties().put("basedir", baseDir);
-                pom.getProperties().putAll(properties);
+                pom = pom.withConstants(new HashMap<String, String>() {{
+                    put("project.basedir", baseDir);
+                    put("basedir", baseDir);
+                    putAll(properties);
+                }});
 
                 SourceFile sourceFile = new MavenXmlParser()
                         .parseInputs(singletonList(source), relativeTo, ctx)
