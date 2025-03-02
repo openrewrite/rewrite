@@ -15,7 +15,6 @@
  */
 package org.openrewrite;
 
-import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
 
@@ -163,7 +162,7 @@ public interface Validated<T> extends Iterable<Validated<T>> {
         }
 
         @Override
-        public @NotNull T getValue() {
+        public T getValue() {
             throw new IllegalStateException("Value does not exist");
         }
 
@@ -330,7 +329,7 @@ public interface Validated<T> extends Iterable<Validated<T>> {
         }
 
         @Override
-        public @NotNull T getValue() {
+        public T getValue() {
             return findAny()
                     .map(Validated::getValue)
                     .orElseThrow(() -> new IllegalStateException("Value does not exist"));
