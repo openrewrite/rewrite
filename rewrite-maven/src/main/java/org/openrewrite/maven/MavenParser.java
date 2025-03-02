@@ -113,7 +113,15 @@ public class MavenParser implements Parser {
         for (Map.Entry<Xml.Document, Pom> docToPom : projectPoms.entrySet()) {
             try {
                 ResolvedPom resolvedPom = docToPom.getValue().resolve(activeProfiles, downloader, ctx);
-                MavenResolutionResult model = new MavenResolutionResult(randomId(), null, resolvedPom, emptyList(), null, emptyMap(), sanitizedSettings, mavenCtx.getActiveProfiles());
+                MavenResolutionResult model = new MavenResolutionResult(randomId(),
+                        null,
+                        resolvedPom,
+                        emptyList(),
+                        null,
+                        emptyMap(),
+                        sanitizedSettings,
+                        mavenCtx.getActiveProfiles(),
+                        properties);
                 if (!skipDependencyResolution) {
                     model = model.resolveDependencies(downloader, ctx);
                 }
@@ -239,11 +247,6 @@ public class MavenParser implements Parser {
                         if (matcher.find()) {
                             String[] profiles = matcher.group(1).split(",");
                             activeProfiles(Arrays.stream(profiles).map(String::trim).toArray(String[]::new));
-                        }
-                    } else if (line.startsWith("-D")) {
-                        Matcher matcher = Pattern.compile("-D(.*?)=(.*)").matcher(line);
-                        if (matcher.find()) {
-                            property(matcher.group(1).trim(), matcher.group(2).trim());
                         }
                     }
                 }

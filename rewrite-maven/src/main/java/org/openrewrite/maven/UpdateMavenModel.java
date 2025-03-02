@@ -38,15 +38,16 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
 
         MavenResolutionResult resolutionResult = getResolutionResult();
         Pom requested = resolutionResult.getPom().getRequested();
+        requested.getProperties().clear();
 
         Optional<Xml.Tag> properties = document.getRoot().getChild("properties");
-        requested.getProperties().clear();
         if (properties.isPresent()) {
             for (final Xml.Tag propertyTag : properties.get().getChildren()) {
                 requested.getProperties().put(propertyTag.getName(),
                         propertyTag.getValue().orElse(""));
             }
         }
+        requested.getProperties().putAll(resolutionResult.getUserProperties());
 
         Optional<Xml.Tag> parent = document.getRoot().getChild("parent");
         if (parent.isPresent()) {
