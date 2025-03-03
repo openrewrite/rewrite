@@ -890,7 +890,7 @@ public class ResolvedPom {
                         throw new MavenDownloadingException("No version provided", null, dd.getDependency().getGav());
                     }
 
-                    if (d.getType() != null && (!"jar".equals(d.getType()) && !"pom".equals(d.getType()))) {
+                    if (d.getType() != null && (!"jar".equals(d.getType()) && !"pom".equals(d.getType()) && !"zip".equals(d.getType()))) {
                         continue;
                     }
 
