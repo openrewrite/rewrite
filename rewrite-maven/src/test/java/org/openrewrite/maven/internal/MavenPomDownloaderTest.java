@@ -141,7 +141,7 @@ class MavenPomDownloaderTest implements RewriteTest {
               """,
             spec -> spec.beforeRecipe(pom -> {
                 MavenResolutionResult result = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                assertThat(new MavenPomDownloader(ctx).distinctNormalizedRepositories(result.getPom().getRepositories(), result.getPom(), null)
+                assertThat(MavenPomDownloader.forNonMavenContext(ctx).distinctNormalizedRepositories(result.getPom().getRepositories(), result.getPom(), null)
                   .stream()
                   .map(MavenRepository::getId))
                   .containsExactly("settings-provided", "local-provided");
