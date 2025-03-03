@@ -52,6 +52,7 @@ public class RewriteRpc {
 
     @VisibleForTesting
     final Map<String, Object> localObjects = new HashMap<>();
+
     /* A reverse map of the objects back to their IDs */
     final Map<Object, String> localObjectIds = new IdentityHashMap<>();
 
