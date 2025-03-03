@@ -678,7 +678,7 @@ public class YamlParser implements org.openrewrite.Parser {
                     SequenceWithPrefix sequenceWithPrefix = (SequenceWithPrefix) sequence;
                     if (sequenceWithPrefix.getOpeningBracketPrefix() != null) {
                         // For inline sequence, the prefix got already transferred to the left-hand neighbor
-                        return sequenceWithPrefix.toSequence();
+                        return super.visitSequence(sequenceWithPrefix.toSequence(), p);
                     } else {
                         // For normal sequence with dashes, the prefix of the sequence gets transferred to the first entry
                         return super.visitSequence(

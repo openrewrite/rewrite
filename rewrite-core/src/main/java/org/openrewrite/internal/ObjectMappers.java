@@ -33,6 +33,7 @@ public class ObjectMappers {
         ObjectMapper m = JsonMapper.builder()
                 .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES)
                 .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
+                .configure(MapperFeature.PROPAGATE_TRANSIENT_MARKER, true)
                 .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
                 .build()
                 .registerModule(new ParameterNamesModule())
