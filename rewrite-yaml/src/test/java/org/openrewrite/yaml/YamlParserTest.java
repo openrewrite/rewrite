@@ -321,4 +321,22 @@ class YamlParserTest implements RewriteTest {
         assertEquals("map", withinPerson.getTag().getName());
         assertEquals(Yaml.Tag.Kind.IMPLICIT_GLOBAL, withinPerson.getTag().getKind());
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5099")
+    @Test
+    void parseFlowSequenceAtBufferBoundary() {
+        // May change over time in SnakeYaml, rendering this test fragile
+        var snakeYamlEffectiveStreamReaderBufferSize = 1024 - 1;
+
+        @Language("yml")
+        var yaml = "a: " + "x".repeat(1000) + "\n" + "b".repeat(16) + ": []";
+        assertEquals(snakeYamlEffectiveStreamReaderBufferSize - 1, yaml.lastIndexOf('['));
+
+        rewriteRun(
+          // Could be whatever recipe, it just proves the `IndexOutOfBoundsException` is not thrown,
+          // thus proving the parser can handle a flow-style sequence ending at the boundary of the internal buffer used by SnakeYaml StreamReader.
+          spec -> spec.recipe(new DeleteKey(".nonexistent","*")),
+          yaml(yaml)
+        );
+    }
 }
