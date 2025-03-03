@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 package org.openrewrite.maven;
+
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.maven.tree.MavenResolutionResult;
@@ -36,10 +37,10 @@ class UpdateMavenModelTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .parser(MavenParser.builder()
-                .property("revision", "1.0.0"))
-                .recipes(
-              new AddDependency("com.google.guava", "guava","29.0-jre", null, null, true, null, null, null,false, null, null),
-              new AddDependency("com.fasterxml.jackson.module", "jackson-module-afterburner","2.10.5", null, null, true, null, null, null,false, null, null)
+              .property("revision", "1.0.0"))
+            .recipes(
+              new AddDependency("com.google.guava", "guava", "29.0-jre", null, null, true, null, null, null, false, null, null),
+              new AddDependency("com.fasterxml.jackson.module", "jackson-module-afterburner", "2.10.5", null, null, true, null, null, null, false, null, null)
             ),
           pomXml(
             """

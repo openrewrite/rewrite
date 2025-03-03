@@ -2016,9 +2016,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .parser(MavenParser.builder()
-                .property("quarkus.platform.group-id", "io.quarkus")
-                .property("quarkus.platform.artifact-id", "quarkus-bom")
-                .property("quarkus.platform.version", "1.11.7.Final"))
+              .property("quarkus.platform.group-id", "io.quarkus")
+              .property("quarkus.platform.artifact-id", "quarkus-bom")
+              .property("quarkus.platform.version", "1.11.7.Final"))
             .recipe(new UpgradeDependencyVersion("io.quarkus", "quarkus-universe-bom", "1.13.7.Final", null,
               null, null)),
           pomXml(

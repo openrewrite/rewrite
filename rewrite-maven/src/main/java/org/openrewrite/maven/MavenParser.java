@@ -163,9 +163,9 @@ public class MavenParser implements Parser {
                 MavenResolutionResult moduleResolutionResult = maybeModuleResolutionResult.get();
                 Parent parent = moduleResolutionResult.getPom().getRequested().getParent();
                 if (parent != null &&
-                        resolutionResult.getPom().getGroupId().equals(resolutionResult.getPom().getValue(parent.getGroupId())) &&
-                        resolutionResult.getPom().getArtifactId().equals(resolutionResult.getPom().getValue(parent.getArtifactId())) &&
-                        Objects.equals(resolutionResult.getPom().getValue(resolutionResult.getPom().getVersion()), resolutionResult.getPom().getValue(parent.getVersion()))) {
+                    resolutionResult.getPom().getGroupId().equals(resolutionResult.getPom().getValue(parent.getGroupId())) &&
+                    resolutionResult.getPom().getArtifactId().equals(resolutionResult.getPom().getValue(parent.getArtifactId())) &&
+                    Objects.equals(resolutionResult.getPom().getValue(resolutionResult.getPom().getVersion()), resolutionResult.getPom().getValue(parent.getVersion()))) {
                     moduleResolutionResult.unsafeSetParent(resolutionResult);
                     modules.add(moduleResolutionResult);
                 }
