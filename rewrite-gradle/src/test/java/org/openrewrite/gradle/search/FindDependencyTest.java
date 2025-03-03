@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle.search;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
@@ -83,55 +84,109 @@ class FindDependencyTest implements RewriteTest {
           """));
     }
 
+    @Nested
     @Issue("https://github.com/moderneinc/customer-requests/issues/895")
-    @Test
-    void findWithInterpolatedVersion() {
-        rewriteRun(spec -> spec.recipe(new FindDependency("org.*", "rewrite-core", "api")), buildGradle(
-          //language=gradle
-          """
-            plugins {
-                id 'java-library'
-            }
-            
-            repositories {
-                mavenCentral()
-            }
-            
-            ext {
-                someVersion = "latest.release"
-                otherVersion = "latest.integration"
-            }
-            
-            dependencies {
-                api "org.openrewrite:rewrite-core:${someVersion}"
-                api "org.openrewrite.internal:rewrite-core:${otherVersion}"
-                api "org.openrewrite:rewrite-java:${someVersion}"
-                implementation "org.openrewrite:rewrite-core:${someVersion}"
-                api "de.openrewrite:rewrite-core:${someVersion}"
-                implementation "de.openrewrite:rewrite-core:${someVersion}"
-            }
-            """, """
-            plugins {
-                id 'java-library'
-            }
-            
-            repositories {
-                mavenCentral()
-            }
-            
-            ext {
-                someVersion = 'latest.release'
-                otherVersion = 'latest.integration'
-            }
-            
-            dependencies {
-                /*~~>*/api "org.openrewrite:rewrite-core:${someVersion}"
-                /*~~>*/api "org.openrewrite.internal:rewrite-core:${otherVersion}"
-                api "org.openrewrite:rewrite-java:$someVersion"
-                implementation "org.openrewrite:rewrite-core:$someVersion"
-                api "de.openrewrite:rewrite-core:$someVersion"
-                implementation "de.openrewrite:rewrite-core:$someVersion"
-            }
-            """));
+    class WithInterpolatedVersion {
+        @Test
+        void withCurly() {
+            rewriteRun(spec -> spec.recipe(new FindDependency("org.*", "rewrite-core", "api")), buildGradle(
+              //language=gradle
+              """
+                plugins {
+                    id 'java-library'
+                }
+                
+                repositories {
+                    mavenCentral()
+                }
+                
+                ext {
+                    someVersion = 'latest.release'
+                    otherVersion = 'latest.integration'
+                }
+                
+                dependencies {
+                    api "org.openrewrite:rewrite-core:${someVersion}"
+                    api "org.openrewrite.internal:rewrite-core:${otherVersion}"
+                    api "org.openrewrite:rewrite-java:${someVersion}"
+                    implementation "org.openrewrite:rewrite-core:${someVersion}"
+                    api "de.openrewrite:rewrite-core:${someVersion}"
+                    implementation "de.openrewrite:rewrite-core:${someVersion}"
+                }
+                """, """
+                plugins {
+                    id 'java-library'
+                }
+                
+                repositories {
+                    mavenCentral()
+                }
+                
+                ext {
+                    someVersion = 'latest.release'
+                    otherVersion = 'latest.integration'
+                }
+                
+                dependencies {
+                    /*~~>*/api "org.openrewrite:rewrite-core:${someVersion}"
+                    /*~~>*/api "org.openrewrite.internal:rewrite-core:${otherVersion}"
+                    api "org.openrewrite:rewrite-java:${someVersion}"
+                    implementation "org.openrewrite:rewrite-core:${someVersion}"
+                    api "de.openrewrite:rewrite-core:${someVersion}"
+                    implementation "de.openrewrite:rewrite-core:${someVersion}"
+                }
+                """));
+        }
+
+        @Test
+        void noCurly() {
+            rewriteRun(spec -> spec.recipe(new FindDependency("org.*", "rewrite-core", "api")), buildGradle(
+              //language=gradle
+              """
+                plugins {
+                    id 'java-library'
+                }
+                
+                repositories {
+                    mavenCentral()
+                }
+                
+                ext {
+                    someVersion = 'latest.release'
+                    otherVersion = 'latest.integration'
+                }
+                
+                dependencies {
+                    api "org.openrewrite:rewrite-core:$someVersion"
+                    api "org.openrewrite.internal:rewrite-core:$otherVersion"
+                    api "org.openrewrite:rewrite-java:$someVersion"
+                    implementation "org.openrewrite:rewrite-core:$someVersion"
+                    api "de.openrewrite:rewrite-core:$someVersion"
+                    implementation "de.openrewrite:rewrite-core:$someVersion"
+                }
+                """, """
+                plugins {
+                    id 'java-library'
+                }
+                
+                repositories {
+                    mavenCentral()
+                }
+                
+                ext {
+                    someVersion = 'latest.release'
+                    otherVersion = 'latest.integration'
+                }
+                
+                dependencies {
+                    /*~~>*/api "org.openrewrite:rewrite-core:$someVersion"
+                    /*~~>*/api "org.openrewrite.internal:rewrite-core:$otherVersion"
+                    api "org.openrewrite:rewrite-java:$someVersion"
+                    implementation "org.openrewrite:rewrite-core:$someVersion"
+                    api "de.openrewrite:rewrite-core:$someVersion"
+                    implementation "de.openrewrite:rewrite-core:$someVersion"
+                }
+                """));
+        }
     }
 }
