@@ -47,7 +47,11 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                         propertyTag.getValue().orElse(""));
             }
         }
-        requested.getProperties().putAll(resolutionResult.getUserProperties());
+        // for backwards compatibility with ASTs that were serialized before userProperties was added
+        //noinspection ConstantValue
+        if (resolutionResult.getUserProperties() != null) {
+            requested.getProperties().putAll(resolutionResult.getUserProperties());
+        }
 
         Optional<Xml.Tag> parent = document.getRoot().getChild("parent");
         if (parent.isPresent()) {

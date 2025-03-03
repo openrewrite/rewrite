@@ -71,6 +71,7 @@ class UpdateMavenModelTest implements RewriteTest {
             spec -> spec.afterRecipe(p -> {
                 var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
                 assertThat(results.getUserProperties().get("revision")).isEqualTo("1.0.0");
+                assertThat(results.getPom().getProperties().get("revision")).isEqualTo("1.0.0");
             })
           )
         );
