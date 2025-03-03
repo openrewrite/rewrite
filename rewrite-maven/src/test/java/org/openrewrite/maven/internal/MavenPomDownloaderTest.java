@@ -151,8 +151,10 @@ class MavenPomDownloaderTest implements RewriteTest {
 
     @Nested
     class WithNativeHttpURLConnectionAndTLS {
-        private final ExecutionContext ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
-          .setHttpSender(new HttpUrlConnectionSender(Duration.ofMillis(250), Duration.ofMillis(250)));
+        private final MavenExecutionContextView ctx = MavenExecutionContextView.view(
+          HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
+          .setHttpSender(new HttpUrlConnectionSender(Duration.ofMillis(250), Duration.ofMillis(250)))
+        );
 
         @Issue("https://github.com/openrewrite/rewrite/issues/3908")
         @Test
@@ -883,7 +885,8 @@ class MavenPomDownloaderTest implements RewriteTest {
             String httpUrl = "http://%s.com".formatted(UUID.randomUUID());
             MavenRepository nonexistentRepo = new MavenRepository("repo", httpUrl, null, null, false, null, null, null, null);
 
-            MavenPomDownloader downloader = new MavenPomDownloader(pomsByPath, ctx);
+            ctx.setProjectPoms(pomsByPath);
+            MavenPomDownloader downloader = new MavenPomDownloader(ctx);
 
             assertDoesNotThrow(() -> downloader.download(gav, Objects.requireNonNull(pom.getParent()).getRelativePath(), resolvedPom, singletonList(nonexistentRepo)));
         }
