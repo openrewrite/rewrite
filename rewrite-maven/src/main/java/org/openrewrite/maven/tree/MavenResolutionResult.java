@@ -192,7 +192,6 @@ public class MavenResolutionResult implements Marker {
     }
 
     public Map<Path, Pom> getProjectPoms() {
-
         return getProjectPomsRecursive(new HashMap<>());
     }
 

@@ -285,7 +285,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
             private boolean shouldResolveVersion(String declaredGroupId, String declaredArtifactId) {
                 //noinspection ConstantValue
                 return (groupId == null || artifactId == null) ||
-                        new DependencyMatcher(groupId, artifactId, null).matches(declaredGroupId, declaredArtifactId);
+                       new DependencyMatcher(groupId, artifactId, null).matches(declaredGroupId, declaredArtifactId);
             }
         };
     }
@@ -447,8 +447,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     }
                     Dependency dep = DependencyStringNotationConverter.parse(gav);
                     if (dep != null && dependencyMatcher.matches(dep.getGroupId(), dep.getArtifactId()) &&
-                            dep.getVersion() != null &&
-                            !dep.getVersion().startsWith("$")) {
+                        dep.getVersion() != null &&
+                        !dep.getVersion().startsWith("$")) {
                         Object scanResult = acc.gaToNewVersion.get(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()));
                         if (scanResult instanceof Exception) {
                             getCursor().putMessage(UPDATE_VERSION_ERROR_KEY, scanResult);
