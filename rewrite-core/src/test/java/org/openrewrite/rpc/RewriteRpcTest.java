@@ -37,6 +37,7 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
@@ -90,7 +91,7 @@ class RewriteRpcTest implements RewriteTest {
               public Tree preVisit(@NonNull Tree tree, ExecutionContext ctx) {
                   Tree t = server.visit((SourceFile) tree, ChangeText.class.getName(), 0);
                   stopAfterPreVisit();
-                  return t;
+                  return requireNonNull(t);
               }
           })),
           text(
@@ -162,6 +163,19 @@ class RewriteRpcTest implements RewriteTest {
     }
 
     @Test
+    void runRecipeWithRecipeList() {
+        rewriteRun(
+          spec -> spec
+            .recipe(server.prepareRecipe("org.openrewrite.rpc.RewriteRpcTest$RecipeWithRecipeList", Map.of()))
+            .validateRecipeSerialization(false),
+          text(
+            "hi",
+            "hello"
+          )
+        );
+    }
+
+    @Test
     void getCursor() {
         Cursor parent = new Cursor(null, Cursor.ROOT_VALUE);
         Cursor c1 = new Cursor(parent, 0);
@@ -177,6 +191,24 @@ class RewriteRpcTest implements RewriteTest {
         @Override
         public PlainText visitText(PlainText text, Integer p) {
             return text.withText("Hello World!");
+        }
+    }
+
+    @SuppressWarnings("unused")
+    static class RecipeWithRecipeList extends Recipe {
+        @Override
+        public String getDisplayName() {
+            return "A recipe that has a recipe list";
+        }
+
+        @Override
+        public String getDescription() {
+            return "To verify that it is possible for a recipe list to be called over RPC.";
+        }
+
+        @Override
+        public void buildRecipeList(RecipeList recipes) {
+            recipes.recipe(new org.openrewrite.text.ChangeText("hello"));
         }
     }
 }

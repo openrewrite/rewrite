@@ -42,7 +42,7 @@ preconditions:
       checkAssignability: true
 recipeList:
   - org.openrewrite.java.recipes.BlankLinesAroundFieldsWithAnnotations
-  - org.openrewrite.java.recipes.ExecutionContextParameterName
+  #- org.openrewrite.java.recipes.ExecutionContextParameterName
   - org.openrewrite.java.recipes.MissingOptionExample
   - org.openrewrite.java.recipes.RecipeEqualsAndHashCodeCallSuper
   - org.openrewrite.java.recipes.UseTreeRandomId

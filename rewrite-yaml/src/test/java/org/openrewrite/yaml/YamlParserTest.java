@@ -15,6 +15,8 @@
  */
 package org.openrewrite.yaml;
 
+import java.util.List;
+import java.util.stream.Stream;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -25,11 +27,7 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.yaml.tree.Yaml;
 
-import java.util.List;
-import java.util.stream.Stream;
-
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.within;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.openrewrite.yaml.Assertions.yaml;
 
@@ -322,5 +320,23 @@ class YamlParserTest implements RewriteTest {
         Yaml.Mapping withinPerson = (Yaml.Mapping) person.getValue();
         assertEquals("map", withinPerson.getTag().getName());
         assertEquals(Yaml.Tag.Kind.IMPLICIT_GLOBAL, withinPerson.getTag().getKind());
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5099")
+    @Test
+    void parseFlowSequenceAtBufferBoundary() {
+        // May change over time in SnakeYaml, rendering this test fragile
+        var snakeYamlEffectiveStreamReaderBufferSize = 1024 - 1;
+
+        @Language("yml")
+        var yaml = "a: " + "x".repeat(1000) + "\n" + "b".repeat(16) + ": []";
+        assertEquals(snakeYamlEffectiveStreamReaderBufferSize - 1, yaml.lastIndexOf('['));
+
+        rewriteRun(
+          // Could be whatever recipe, it just proves the `IndexOutOfBoundsException` is not thrown,
+          // thus proving the parser can handle a flow-style sequence ending at the boundary of the internal buffer used by SnakeYaml StreamReader.
+          spec -> spec.recipe(new DeleteKey(".nonexistent","*")),
+          yaml(yaml)
+        );
     }
 }

@@ -691,7 +691,7 @@ public class MavenPomDownloader {
     private RawPom rawPomFromGav(GroupArtifactVersion gav) {
         return new RawPom(null, null, gav.getGroupId(), gav.getArtifactId(), gav.getVersion(), null,
                 null, null, null, "jar", null, null, null,
-                null, null, null, null, null, null);
+                null, null, null, null, null, null, null);
     }
 
     /**
@@ -759,7 +759,15 @@ public class MavenPomDownloader {
             List<MavenRepository> repositories,
             @Nullable ResolvedPom containingPom,
             @Nullable String acceptsVersion) {
+        // Temporary guard for the introduction of pluginRepositories to ResolvedPom,
+        //  which on older LSTs will be null.
+        //noinspection ConstantValue
+        if (repositories == null) {
+            repositories = emptyList();
+        }
+
         LinkedHashMap<String, MavenRepository> normalizedRepositories = new LinkedHashMap<>();
+
         if (addLocalRepository) {
             normalizedRepositories.put(ctx.getLocalRepository().getId(), ctx.getLocalRepository());
         }
@@ -838,7 +846,7 @@ public class MavenPomDownloader {
 
                 mavenCache.putNormalizedRepository(repository, normalized);
                 result = Optional.ofNullable(normalized);
-            } else if(!result.isPresent()) {
+            } else if (!result.isPresent()) {
                 ctx.getResolutionListener().repositoryAccessFailedPreviously(repository.getUri());
             }
         } catch (Exception e) {

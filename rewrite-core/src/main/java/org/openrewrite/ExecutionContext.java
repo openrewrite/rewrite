@@ -54,14 +54,18 @@ public interface ExecutionContext extends RpcCodec<ExecutionContext> {
         return getMessage("org.openrewrite.internal.treeObservers", Collections.emptySet());
     }
 
-    @Nullable
     Map<String, Object> getMessages();
 
     void putMessage(String key, @Nullable Object value);
 
     <T> @Nullable T getMessage(String key);
 
-    default <V, T> T computeMessage(String key, V value, Supplier<T> defaultValue, BiFunction<V, ? super T, ? extends T> remappingFunction) {
+    default <T> T computeMessageIfAbsent(String key, Function<? super String, ? extends T> defaultValue) {
+        //noinspection unchecked
+        return (T) getMessages().computeIfAbsent(key, defaultValue);
+    }
+
+    default <V, T> T computeMessage(String key, @Nullable V value, Supplier<T> defaultValue, BiFunction<@Nullable V, ? super T, ? extends T> remappingFunction) {
         T oldMessage = getMessage(key);
         if (oldMessage == null) {
             oldMessage = defaultValue.get();

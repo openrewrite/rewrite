@@ -19,7 +19,6 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.Collections;
-import java.util.List;
 import java.util.UUID;
 
 /**
@@ -127,18 +126,5 @@ public abstract class ScanningRecipe<T> extends Recipe {
                 return delegate(ctx).visit(tree, ctx);
             }
         };
-    }
-
-    /**
-     * For now, ScanningRecipes do not support `getRecipeList`, as the accumulator is not evaluated for these methods
-     */
-    @Override
-    public final List<Recipe> getRecipeList() {
-        return super.getRecipeList();
-    }
-
-    @Override
-    public final void buildRecipeList(RecipeList list) {
-        super.buildRecipeList(list);
     }
 }

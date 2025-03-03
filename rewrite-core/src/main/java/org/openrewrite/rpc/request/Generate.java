@@ -19,6 +19,11 @@ import io.moderne.jsonrpc.JsonRpcMethod;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.scheduling.RecipeRunCycle;
+import org.openrewrite.scheduling.WatchableExecutionContext;
+import org.openrewrite.table.RecipeRunStats;
+import org.openrewrite.table.SourcesFileErrors;
+import org.openrewrite.table.SourcesFileResults;
 
 import java.util.Collection;
 import java.util.Map;
@@ -26,6 +31,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static org.openrewrite.ExecutionContext.CURRENT_RECIPE;
 
 @Value
 public class Generate implements RpcRequest {
@@ -45,8 +51,17 @@ public class Generate implements RpcRequest {
 
         @Override
         protected Object handle(Generate request) throws Exception {
-            ExecutionContext ctx = (ExecutionContext) getObject.apply(request.getP());
             Recipe recipe = preparedRecipes.get(request.getId());
+
+            ExecutionContext ctx = (ExecutionContext) getObject.apply(request.getP());
+            if (ctx.getMessage(CURRENT_RECIPE) == null) {
+                WatchableExecutionContext wctx = new WatchableExecutionContext((ExecutionContext) ctx);
+                wctx.putCycle(new RecipeRunCycle<>(recipe, 0, new Cursor(null, Cursor.ROOT_VALUE), wctx,
+                        new RecipeRunStats(Recipe.noop()), new SourcesFileResults(Recipe.noop()),
+                        new SourcesFileErrors(Recipe.noop()), LargeSourceSet::edit));
+                ctx.putCurrentRecipe(recipe);
+            }
+
             if (recipe instanceof ScanningRecipe) {
                 //noinspection unchecked
                 ScanningRecipe<Object> scanningRecipe = (ScanningRecipe<Object>) recipe;

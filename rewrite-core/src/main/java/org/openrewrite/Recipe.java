@@ -355,12 +355,12 @@ public abstract class Recipe implements Cloneable {
      * this method or {@link #getRecipeList()} but ideally not
      * both, as their default implementations are interconnected.
      *
-     * @param list A recipe list used to build up a series of recipes
+     * @param recipes A recipe list used to build up a series of recipes
      *             in code in a way that looks fairly declarative and
      *             therefore is more amenable to AI code completion.
      */
     @SuppressWarnings("unused")
-    public void buildRecipeList(RecipeList list) {
+    public void buildRecipeList(RecipeList recipes) {
     }
 
     /**
