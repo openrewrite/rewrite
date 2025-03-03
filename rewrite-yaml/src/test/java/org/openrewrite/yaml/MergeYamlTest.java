@@ -986,7 +986,7 @@ class MergeYamlTest implements RewriteTest {
     }
 
     @Test
-    void mergeMappingIntoNewMapping() {
+    void dontMergeMappingIntoNewMapping() {
         rewriteRun(
           spec -> spec
             .recipe(new MergeYaml(
@@ -1006,13 +1006,6 @@ class MergeYamlTest implements RewriteTest {
           yaml(
             """
               foo: bar
-              """,
-            """
-              foo: bar
-              testing:
-                table:
-                  - name: jdk_version
-                    value: 17
               """
           )
         );
@@ -1399,6 +1392,7 @@ class MergeYamlTest implements RewriteTest {
             )),
           yaml(
             """
+              name:
               """,
             """
               name: sam

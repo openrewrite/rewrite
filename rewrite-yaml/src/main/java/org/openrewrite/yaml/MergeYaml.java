@@ -130,7 +130,6 @@ public class MergeYaml extends Recipe {
         return "Merge a YAML snippet with an existing YAML document.";
     }
 
-    final static String FOUND_MATCHING_ELEMENT = "FOUND_MATCHING_ELEMENT";
     final static String REMOVE_PREFIX = "REMOVE_PREFIX";
 
     @Override
@@ -154,27 +153,7 @@ public class MergeYaml extends Recipe {
                     }
                     return d;
                 }
-                Yaml.Document d = super.visitDocument(document, ctx);
-                if (d == document && !getCursor().getMessage(FOUND_MATCHING_ELEMENT, false)) {
-                    // No matching element already exists, attempt to construct one
-                    String valueKey = maybeKeyFromJsonPath(key);
-                    if (valueKey == null) {
-                        return d;
-                    }
-                    // If there is no space between the colon and the value it will not be interpreted as a mapping
-                    String snippet;
-                    if (incoming instanceof Yaml.Mapping) {
-                        snippet = valueKey + ":\n" + indent(yaml);
-                    } else {
-                        snippet = valueKey + ":" + (yaml.startsWith(" ") ? yaml : " " + yaml);
-                    }
-                    // No matching element already exists, so it must be constructed
-                    //noinspection LanguageMismatch
-                    return d.withBlock((Yaml.Block) new MergeYamlVisitor<>(d.getBlock(), MergeYaml.parse(snippet),
-                            Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty, insertMode, insertProperty).visitNonNull(d.getBlock(),
-                            ctx, getCursor()));
-                }
-                return d;
+                return super.visitDocument(document, ctx);
             }
 
             private String indent(String text) {
@@ -214,7 +193,6 @@ public class MergeYaml extends Recipe {
             public Yaml.Mapping visitMapping(Yaml.Mapping mapping, ExecutionContext ctx) {
                 Yaml.Mapping m = super.visitMapping(mapping, ctx);
                 if (matcher.matches(getCursor())) {
-                    getCursor().putMessageOnFirstEnclosing(Yaml.Document.class, FOUND_MATCHING_ELEMENT, true);
                     m = (Yaml.Mapping) new MergeYamlVisitor<>(mapping, incoming, Boolean.TRUE.equals(acceptTheirs),
                             objectIdentifyingProperty, insertMode, insertProperty).visitNonNull(mapping, ctx, getCursor().getParentOrThrow());
                 }
@@ -224,7 +202,6 @@ public class MergeYaml extends Recipe {
             @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                 if (matcher.matches(getCursor())) {
-                    getCursor().putMessageOnFirstEnclosing(Yaml.Document.class, FOUND_MATCHING_ELEMENT, true);
                     Yaml.Block value = (Yaml.Block) new MergeYamlVisitor<>(entry.getValue(), incoming,
                             Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty, insertMode, insertProperty).visitNonNull(entry.getValue(),
                             ctx, getCursor());
@@ -239,7 +216,6 @@ public class MergeYaml extends Recipe {
             @Override
             public Yaml.Sequence visitSequence(Yaml.Sequence sequence, ExecutionContext ctx) {
                 if (matcher.matches(getCursor().getParentOrThrow())) {
-                    getCursor().putMessageOnFirstEnclosing(Yaml.Document.class, FOUND_MATCHING_ELEMENT, true);
                     return sequence.withEntries(ListUtils.map(sequence.getEntries(),
                             entry -> entry.withBlock((Yaml.Block) new MergeYamlVisitor<>(entry.getBlock(), incoming,
                                     Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty, insertMode, insertProperty)
