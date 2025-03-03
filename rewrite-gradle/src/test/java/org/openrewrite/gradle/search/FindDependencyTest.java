@@ -17,9 +17,11 @@ package org.openrewrite.gradle.search;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 
 class FindDependencyTest implements RewriteTest {
 
@@ -39,7 +41,7 @@ class FindDependencyTest implements RewriteTest {
               }
               
               dependencies {
-                  api 'org.openrewrite:rewrite-core:latest.release'
+                  api "org.openrewrite:rewrite-core:latest.release"
               }
               """,
             """
@@ -52,7 +54,7 @@ class FindDependencyTest implements RewriteTest {
               }
               
               dependencies {
-                  /*~~>*/api 'org.openrewrite:rewrite-core:latest.release'
+                  /*~~>*/api "org.openrewrite:rewrite-core:latest.release"
               }
               """
           )
@@ -90,6 +92,61 @@ class FindDependencyTest implements RewriteTest {
                   /*~~>*/api 'org.openrewrite:rewrite-core:latest.release'
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void findWithExternalVersion () {
+        rewriteRun(
+          spec -> spec.recipe(new FindDependency("org.*", "rewrite-core", "api")),
+          buildGradle(
+            //language=gradle
+            """
+          plugins {
+              id 'java-library'
+          }
+          
+          repositories {
+              mavenCentral()
+          }
+          
+          ext {
+              someVersion = 'latest.release'
+              otherVersion = 'latest.integration'
+          }
+          
+          dependencies {
+              api 'org.openrewrite:rewrite-core:${someVersion}'
+              api 'org.openrewrite.internal:rewrite-core:${otherVersion}'
+              api 'org.openrewrite:rewrite-java:${someVersion}'
+              implementation 'org.openrewrite:rewrite-core:${someVersion}'
+              api 'de.openrewrite:rewrite-core:${someVersion}'
+              implementation 'de.openrewrite:rewrite-core:${someVersion}'
+          }
+          ""","""
+          plugins {
+              id 'java-library'
+          }
+          
+          repositories {
+              mavenCentral()
+          }
+          
+          ext {
+              someVersion = 'latest.release'
+              otherVersion = 'latest.integration'
+          }
+          
+          dependencies {
+              /*~~>*/api 'org.openrewrite:rewrite-core:${someVersion}'
+              /*~~>*/api 'org.openrewrite.internal:rewrite-core:${otherVersion}'
+              api 'org.openrewrite:rewrite-java:${someVersion}'
+              implementation 'org.openrewrite:rewrite-core:${someVersion}'
+              api 'de.openrewrite:rewrite-core:${someVersion}'
+              implementation 'de.openrewrite:rewrite-core:${someVersion}'
+          }
+          """
           )
         );
     }
