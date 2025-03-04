@@ -21,6 +21,7 @@ import org.jetbrains.annotations.VisibleForTesting;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Validated;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.maven.internal.InsertDependencyComparator;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenMetadata;
@@ -137,7 +138,7 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
     }
 
     @RequiredArgsConstructor
-    class InsertDependencyInOrder extends MavenVisitor<ExecutionContext> {
+    private class InsertDependencyInOrder extends MavenVisitor<ExecutionContext> {
 
         @Nullable
         private final String scope;
@@ -156,7 +157,11 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
                     }
                     if (versionToUse == null) {
                         try {
-                            versionToUse = findVersionToUse(versionComparator, version, versionPattern, releasesOnly, ctx);
+                            if (versionComparator == null || versionComparator instanceof ExactVersion) {
+                                versionToUse = version;
+                            } else {
+                                versionToUse = findVersionToUse(ctx);
+                            }
                         } catch (MavenDownloadingException e) {
                             return e.warn(tag);
                         }
@@ -165,22 +170,21 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
 
                 Xml.Tag dependencyTag = Xml.Tag.build(
                         "\n<dependency>\n" +
-                                "<groupId>" + groupId + "</groupId>\n" +
-                                "<artifactId>" + artifactId + "</artifactId>\n" +
-                                (versionToUse == null ? "" :
-                                        "<version>" + versionToUse + "</version>\n") +
-                                (classifier == null ? "" :
-                                        "<classifier>" + classifier + "</classifier>\n") +
-                                (type == null || "jar".equals(type) ? "" :
-                                        "<type>" + type + "</type>\n") +
-                                (scope == null || "compile".equals(scope) ? "" :
-                                        "<scope>" + scope + "</scope>\n") +
-                                (Boolean.TRUE.equals(optional) ? "<optional>true</optional>\n" : "") +
-                                "</dependency>"
+                        "<groupId>" + groupId + "</groupId>\n" +
+                        "<artifactId>" + artifactId + "</artifactId>\n" +
+                        (versionToUse == null ? "" :
+                                "<version>" + versionToUse + "</version>\n") +
+                        (classifier == null ? "" :
+                                "<classifier>" + classifier + "</classifier>\n") +
+                        (type == null || "jar".equals(type) ? "" :
+                                "<type>" + type + "</type>\n") +
+                        (scope == null || "compile".equals(scope) ? "" :
+                                "<scope>" + scope + "</scope>\n") +
+                        (Boolean.TRUE.equals(optional) ? "<optional>true</optional>\n" : "") +
+                        "</dependency>"
                 );
 
-                doAfterVisit(new AddToTagVisitor<>(tag, dependencyTag,
-                        new InsertDependencyComparator(tag.getContent() == null ? emptyList() : tag.getContent(), dependencyTag)));
+                doAfterVisit(new AddToTagVisitor<>(tag, dependencyTag, new InsertDependencyComparator(tag.getContent() == null ? emptyList() : tag.getContent(), dependencyTag)));
                 maybeUpdateModel();
 
                 return tag;
@@ -189,26 +193,21 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
             return super.visitTag(tag, ctx);
         }
 
-        private String findVersionToUse(@Nullable VersionComparator versionComparator, String defaultVersion,
-                                @Nullable String versionPattern, @Nullable Boolean releasesOnly, ExecutionContext ctx) throws MavenDownloadingException {
-            if (versionComparator == null || versionComparator instanceof ExactVersion) {
-                return defaultVersion;
-            } else {
-                MavenMetadata mavenMetadata = metadataFailures == null ?
-                        downloadMetadata(groupId, artifactId, ctx) :
-                        metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
-                // TODO This is hacky, but the class structure of LatestRelease is suboptimal, see https://github.com/openrewrite/rewrite/pull/5029
-                // Fix it when we have a chance to refactor the code.
-                if (versionComparator.getClass().getSimpleName().equals("LatestRelease") && mavenMetadata.getVersioning().getRelease() != null) {
-                    return mavenMetadata.getVersioning().getRelease();
-                }
-                LatestRelease latest = new LatestRelease(versionPattern);
-                return mavenMetadata.getVersioning().getVersions().stream()
-                        .filter(v -> versionComparator.isValid(null, v))
-                        .filter(v -> !Boolean.TRUE.equals(releasesOnly) || latest.isValid(null, v))
-                        .max((v1, v2) -> versionComparator.compare(null, v1, v2))
-                        .orElse(defaultVersion);
+        private String findVersionToUse(ExecutionContext ctx) throws MavenDownloadingException {
+            MavenMetadata mavenMetadata = metadataFailures == null ?
+                    downloadMetadata(groupId, artifactId, ctx) :
+                    metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
+            // TODO This is hacky, but the class structure of LatestRelease is suboptimal, see https://github.com/openrewrite/rewrite/pull/5029
+            // Fix it when we have a chance to refactor the code.
+            if (versionComparator.getClass().getSimpleName().equals("LatestRelease") && mavenMetadata.getVersioning().getRelease() != null) {
+                return mavenMetadata.getVersioning().getRelease();
             }
+            LatestRelease latest = new LatestRelease(versionPattern);
+            return mavenMetadata.getVersioning().getVersions().stream()
+                    .filter(v -> versionComparator.isValid(null, v))
+                    .filter(v -> !Boolean.TRUE.equals(releasesOnly) || latest.isValid(null, v))
+                    .max((v1, v2) -> versionComparator.compare(null, v1, v2))
+                    .orElse(version);
         }
     }
 }
