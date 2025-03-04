@@ -53,7 +53,6 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
-import static org.openrewrite.maven.MavenParser.mavenConfig;
 
 class MavenParserTest implements RewriteTest {
 
@@ -3712,6 +3711,7 @@ class MavenParserTest implements RewriteTest {
     @Test
     void propertyFromMavenConfig() {
         rewriteRun(
+          spec -> spec.parser(MavenParser.builder().property("revision", "1.0.0")),
           pomXml(
             """
               <project>
@@ -3725,11 +3725,6 @@ class MavenParserTest implements RewriteTest {
                   assertThat(results.getPom().getVersion()).isEqualTo("${revision}");
                   assertThat(results.getPom().getProperties().get("revision")).isEqualTo("1.0.0");
               }
-            ),
-            mavenConfig(
-              """
-                -Drevision=1.0.0
-                """
             )
           )
         );
@@ -3738,6 +3733,7 @@ class MavenParserTest implements RewriteTest {
     @Test
     void propertyFromMavenConfigFromParentPomCanBeUsedInChild() {
         rewriteRun(
+          spec -> spec.parser(MavenParser.builder().property("revision", "1.0.0")),
           pomXml(
             """
               <project>
@@ -3745,12 +3741,7 @@ class MavenParserTest implements RewriteTest {
                 <artifactId>parent</artifactId>
                 <version>${revision}</version>
               </project>
-              """,
-            mavenConfig(
               """
-                -Drevision=1.0.0
-                """
-            )
           ),
           mavenProject("child",
             //language=xml
@@ -3782,6 +3773,7 @@ class MavenParserTest implements RewriteTest {
     @Test
     void profilesFromMavenConfig() {
         rewriteRun(
+          spec -> spec.parser(MavenParser.builder().activeProfiles("a", "b", "c")),
           pomXml(
             """
               <project>
@@ -3794,28 +3786,7 @@ class MavenParserTest implements RewriteTest {
                   var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
                   assertThat(results.getPom().getActiveProfiles()).contains("a", "b", "c");
               }
-            ),
-            mavenConfig(
-              """
-                -P a,b,c
-                """
             )
-          )
-        );
-    }
-
-    @Test
-    void emptyMavenConfig() {
-        rewriteRun(
-          pomXml(
-            """
-              <project>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>parent</artifactId>
-                <version>1.0.0</version>
-              </project>
-              """,
-            mavenConfig("")
           )
         );
     }

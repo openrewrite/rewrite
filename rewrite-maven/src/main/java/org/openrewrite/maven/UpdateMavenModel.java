@@ -39,14 +39,19 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
         MavenExecutionContextView ctx = MavenExecutionContextView.view((ExecutionContext) p);
         MavenResolutionResult resolutionResult = getResolutionResult();
         Pom requested = resolutionResult.getPom().getRequested();
+        requested.getProperties().clear();
 
         Optional<Xml.Tag> properties = document.getRoot().getChild("properties");
-        requested.getProperties().clear();
         if (properties.isPresent()) {
             for (final Xml.Tag propertyTag : properties.get().getChildren()) {
                 requested.getProperties().put(propertyTag.getName(),
                         propertyTag.getValue().orElse(""));
             }
+        }
+        // for backwards compatibility with ASTs that were serialized before userProperties was added
+        //noinspection ConstantValue
+        if (resolutionResult.getUserProperties() != null) {
+            requested.getProperties().putAll(resolutionResult.getUserProperties());
         }
 
         Optional<Xml.Tag> parent = document.getRoot().getChild("parent");
