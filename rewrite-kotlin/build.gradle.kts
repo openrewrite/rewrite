@@ -1,31 +1,18 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    id("org.openrewrite.build.recipe-library") version "latest.release"
+    id("org.openrewrite.build.language-library")
     kotlin("jvm") version "1.9.25"
-}
-group = "org.openrewrite"
-description = "Rewrite Kotlin"
-
-val latest = if (project.hasProperty("releasing")) {
-    "latest.release"
-} else {
-    "latest.integration"
 }
 
 val kotlinVersion = "1.9.25"
 
 dependencies {
-    annotationProcessor("org.projectlombok:lombok:latest.release")
+    compileOnly(project(":rewrite-core"))
+    compileOnly(project(":rewrite-test"))
+//    compileOnly("com.google.code.findbugs:jsr305:latest.release")
 
-    compileOnly(platform("org.openrewrite:rewrite-bom:${latest}"))
-    compileOnly("org.openrewrite:rewrite-core")
-    compileOnly("org.openrewrite:rewrite-test")
-    compileOnly("org.projectlombok:lombok:latest.release")
-    compileOnly("com.google.code.findbugs:jsr305:latest.release")
-
-    implementation(platform("org.openrewrite:rewrite-bom:${latest}"))
-    implementation("org.openrewrite:rewrite-java")
+    implementation(project(":rewrite-java"))
 
     implementation(platform(kotlin("bom", kotlinVersion)))
     implementation(kotlin("compiler-embeddable"))
@@ -37,9 +24,9 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter-api:latest.release")
     testImplementation("org.junit.jupiter:junit-jupiter-params:latest.release")
     testImplementation("org.junit-pioneer:junit-pioneer:latest.release")
-    testImplementation("org.openrewrite:rewrite-test")
+    testImplementation(project(":rewrite-test"))
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:latest.release")
-    testRuntimeOnly("org.openrewrite:rewrite-java-17")
+    testRuntimeOnly(project(":rewrite-java-17"))
 
     testImplementation("com.github.ajalt.clikt:clikt:3.5.0")
     testImplementation("com.squareup:javapoet:1.13.0")
