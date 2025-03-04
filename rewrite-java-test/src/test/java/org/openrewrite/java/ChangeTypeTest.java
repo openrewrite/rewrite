@@ -2257,4 +2257,16 @@ class ChangeTypeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void changeType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.util.List", "java.util.Set", null)),
+          java(
+            "import java.util.*;\nclass Test { java.util.List<?> l; }",
+            "import java.util.*;\nclass Test { java.util.Set<?> l; }",
+            spec -> spec.path("Test.java")
+          )
+        );
+    }
 }
