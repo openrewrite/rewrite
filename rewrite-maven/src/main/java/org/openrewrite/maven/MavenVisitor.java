@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
@@ -62,6 +63,19 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     public boolean isAcceptable(SourceFile sourceFile, P p) {
         return super.isAcceptable(sourceFile, p) &&
                sourceFile.getMarkers().findFirst(MavenResolutionResult.class).isPresent();
+    }
+
+    @Override
+    public @Nullable Xml preVisit(@NonNull Xml tree, P p) {
+        MavenExecutionContextView ctx = MavenExecutionContextView.view((ExecutionContext) p);
+        if (parentPomWasUpdated(getResolutionResult(), ctx)) {
+            try {
+                resolutionResult = updateResult(ctx, getResolutionResult());
+            } catch (MavenDownloadingExceptions mde) {
+                mde.warn(document);
+            }
+        }
+        return super.preVisit(tree, p);
     }
 
     protected MavenResolutionResult getResolutionResult() {
@@ -426,19 +440,6 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             }
         }
         return null;
-    }
-
-    @Override
-    public Xml visitDocument(Xml.Document document, P p) {
-        MavenExecutionContextView ctx = MavenExecutionContextView.view((ExecutionContext) p);
-        if (parentPomWasUpdated(getResolutionResult(), ctx)) {
-            try {
-                resolutionResult = updateResult(ctx, getResolutionResult());
-            } catch (MavenDownloadingExceptions mde) {
-                mde.warn(document);
-            }
-        }
-        return super.visitDocument(document, p);
     }
 
     private boolean parentPomWasUpdated(@Nullable MavenResolutionResult mrr, MavenExecutionContextView ctx) {

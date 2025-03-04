@@ -26,7 +26,6 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.maven.MavenDownloadingException;
@@ -54,6 +53,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
+import static org.openrewrite.maven.MavenExecutionContextView.mergeProperties;
 
 @SuppressWarnings("OptionalAssignedToNull")
 public class MavenPomDownloader {
@@ -205,44 +205,6 @@ public class MavenPomDownloader {
         } finally {
             this.ctx.recordResolutionTime(Duration.ofNanos(System.nanoTime() - start));
         }
-    }
-
-
-    public static Map<String, String> mergeProperties(final List<Pom> pomAncestry) {
-        Map<String, String> mergedProperties = new HashMap<>();
-        for (Pom pom : pomAncestry) {
-            for (Map.Entry<String, String> property : pom.getProperties().entrySet()) {
-                mergedProperties.putIfAbsent(property.getKey(), property.getValue());
-            }
-        }
-        return mergedProperties;
-    }
-
-    public static List<Pom> getAncestryWithinProject(Pom projectPom, Map<Path, Pom> projectPoms) {
-        Pom parentPom = getParentWithinProject(projectPom, projectPoms);
-        if (parentPom == null) {
-            return Collections.singletonList(projectPom);
-        } else {
-            return ListUtils.concat(projectPom, getAncestryWithinProject(parentPom, projectPoms));
-        }
-    }
-
-    public static @Nullable Pom getParentWithinProject(Pom projectPom, Map<Path, Pom> projectPoms) {
-        Parent parent = projectPom.getParent();
-        if (parent == null || projectPom.getSourcePath() == null) {
-            return null;
-        }
-        String relativePath = parent.getRelativePath();
-        if (StringUtils.isBlank(relativePath)) {
-            relativePath = "../pom.xml";
-        }
-        Path parentPath = projectPom.getSourcePath()
-                .resolve("..")
-                .resolve(Paths.get(relativePath))
-                .normalize();
-        Pom parentPom = projectPoms.get(parentPath);
-        return parentPom != null && parentPom.getGav().getGroupId().equals(parent.getGav().getGroupId()) &&
-               parentPom.getGav().getArtifactId().equals(parent.getGav().getArtifactId()) ? parentPom : null;
     }
 
     public MavenMetadata downloadMetadata(GroupArtifact groupArtifact, @Nullable ResolvedPom containingPom, List<MavenRepository> repositories) throws MavenDownloadingException {
@@ -527,7 +489,7 @@ public class MavenPomDownloader {
                 return projectPom;
             }
 
-            Map<String, String> mergedProperties = mergeProperties(getAncestryWithinProject(projectPom, ctx.getProjectPomsBySourcePath()));
+            Map<String, String> mergedProperties = mergeProperties(ctx.getAncestryWithinProject(projectPom));
             String versionWithReplacements = ResolvedPom.placeholderHelper.replacePlaceholders(gav.getVersion(), mergedProperties::get);
             if (projectPom.getVersion().equals(versionWithReplacements)) {
                 return projectPom;

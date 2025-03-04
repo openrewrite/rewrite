@@ -18,13 +18,15 @@ package org.openrewrite.maven;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.DelegatingExecutionContext;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.maven.cache.InMemoryMavenPomCache;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.MavenParsingException;
-import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -355,11 +357,52 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         return new ArrayList<>(getProjectPomsBySourcePath().values());
     }
 
+    public List<Pom> getAncestryWithinProject(Pom projectPom) {
+        return getAncestryWithinProject(projectPom, getProjectPomsBySourcePath());
+    }
+
+    public static Map<String, String> mergeProperties(final List<Pom> pomAncestry) {
+        Map<String, String> mergedProperties = new HashMap<>();
+        for (Pom pom : pomAncestry) {
+            for (Map.Entry<String, String> property : pom.getProperties().entrySet()) {
+                mergedProperties.putIfAbsent(property.getKey(), property.getValue());
+            }
+        }
+        return mergedProperties;
+    }
+
+    private static List<Pom> getAncestryWithinProject(Pom projectPom, Map<Path, Pom> projectPoms) {
+        Pom parentPom = getParentWithinProject(projectPom, projectPoms);
+        if (parentPom == null) {
+            return Collections.singletonList(projectPom);
+        } else {
+            return ListUtils.concat(projectPom, getAncestryWithinProject(parentPom, projectPoms));
+        }
+    }
+
+    private static @Nullable Pom getParentWithinProject(Pom projectPom, Map<Path, Pom> projectPoms) {
+        Parent parent = projectPom.getParent();
+        if (parent == null || projectPom.getSourcePath() == null) {
+            return null;
+        }
+        String relativePath = parent.getRelativePath();
+        if (StringUtils.isBlank(relativePath)) {
+            relativePath = "../pom.xml";
+        }
+        Path parentPath = projectPom.getSourcePath()
+                .resolve("..")
+                .resolve(Paths.get(relativePath))
+                .normalize();
+        Pom parentPom = projectPoms.get(parentPath);
+        return parentPom != null && parentPom.getGav().getGroupId().equals(parent.getGav().getGroupId()) &&
+                parentPom.getGav().getArtifactId().equals(parent.getGav().getArtifactId()) ? parentPom : null;
+    }
+
     private Map<GroupArtifactVersion, Pom> projectPomsByGav(Map<Path, Pom> projectPoms) {
         Map<GroupArtifactVersion, Pom> result = new HashMap<>();
         for (Pom projectPom : projectPoms.values()) {
-            List<Pom> ancestryWithinProject = MavenPomDownloader.getAncestryWithinProject(projectPom, projectPoms);
-            Map<String, String> mergedProperties = MavenPomDownloader.mergeProperties(ancestryWithinProject);
+            List<Pom> ancestryWithinProject = getAncestryWithinProject(projectPom, projectPoms);
+            Map<String, String> mergedProperties = mergeProperties(ancestryWithinProject);
             GroupArtifactVersion gav = new GroupArtifactVersion(
                     projectPom.getGroupId(),
                     projectPom.getArtifactId(),
