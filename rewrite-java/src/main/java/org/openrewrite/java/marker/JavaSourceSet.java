@@ -323,9 +323,6 @@ public class JavaSourceSet implements SourceSet {
 
     static boolean isDeclarable(String className) {
         int dotIndex = Math.max(className.lastIndexOf("."), className.lastIndexOf('$'));
-        className = className.substring(dotIndex + 1);
-        return !className.isEmpty() &&
-               Character.isJavaIdentifierPart(className.charAt(0)) &&
-               !Character.isDigit(className.charAt(0));
+        return dotIndex != -1 && dotIndex < className.length() -1 && Character.isJavaIdentifierStart(className.charAt(dotIndex + 1));
     }
 }
