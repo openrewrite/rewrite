@@ -99,7 +99,7 @@ public class MavenParser implements Parser {
 
         MavenExecutionContextView mavenCtx = MavenExecutionContextView.view(ctx);
         mavenCtx.setProjectPoms(projectPomsByPath);
-        MavenPomDownloader downloader = new MavenPomDownloader(mavenCtx);
+        MavenPomDownloader downloader = MavenPomDownloader.forExecutionContext(mavenCtx);
 
         MavenSettings sanitizedSettings = mavenCtx.getSettings() == null ? null : mavenCtx.getSettings()
                 .withServers(null);

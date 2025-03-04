@@ -51,6 +51,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
@@ -87,35 +88,8 @@ public class MavenPomDownloader {
     /**
      * @param ctx The execution context, which potentially contain Maven settings customization and {@link HttpSender} customization.
      */
-    public MavenPomDownloader(ExecutionContext ctx) {
-        this(HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
-    }
-
-    /**
-     * A MavenPomDownloader for non-maven contexts where there are no project poms or assumption that maven central
-     * is implicitly added as a repository. In a Maven contexts, the regular constructor should be used instead
-     *
-     * @param ctx The execution context
-     */
-    public static MavenPomDownloader forNonMavenContext(ExecutionContext ctx) {
-        MavenPomDownloader result = new MavenPomDownloader(HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
-        result.addCentralRepository = Boolean.TRUE.equals(MavenExecutionContextView.view(ctx).getAddCentralRepository());
-        result.addLocalRepository = Boolean.TRUE.equals(MavenExecutionContextView.view(ctx).getAddLocalRepository());
-        return result;
-    }
-
-    /**
-     * @param httpSender The HTTP sender.
-     * @param ctx        The execution context.
-     */
-    public MavenPomDownloader(HttpSender httpSender, ExecutionContext ctx) {
-        this.httpSender = httpSender;
-        this.ctx = MavenExecutionContextView.view(ctx);
-        this.mavenSettings = this.ctx.getSettings();
-        this.mavenCache = this.ctx.getPomCache();
-        this.addCentralRepository = !Boolean.FALSE.equals(MavenExecutionContextView.view(ctx).getAddCentralRepository());
-        this.addLocalRepository = !Boolean.FALSE.equals(MavenExecutionContextView.view(ctx).getAddLocalRepository());
-        this.mirrors = this.ctx.getMirrors(this.ctx.getSettings());
+    public static MavenPomDownloader forExecutionContext(ExecutionContext ctx) {
+        return new MavenPomDownloader(emptyMap(), HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
     }
 
     /**
@@ -126,13 +100,39 @@ public class MavenPomDownloader {
      * @param activeProfiles The active profiles to use, if any. This argument overrides any active profiles
      *                       set on the execution context.
      */
-    public MavenPomDownloader(ExecutionContext ctx,
-                              @Nullable MavenSettings mavenSettings,
-                              @Nullable List<String> activeProfiles) {
-        this(HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
-        this.mavenSettings = mavenSettings != null ? mavenSettings : MavenExecutionContextView.view(ctx).getSettings();
-        this.mirrors = this.ctx.getMirrors(mavenSettings);
-        this.activeProfiles = activeProfiles;
+    public static MavenPomDownloader withCustomSettings(ExecutionContext ctx,
+                                                        @Nullable MavenSettings mavenSettings,
+                                                        @Nullable List<String> activeProfiles) {
+        MavenPomDownloader downloader = new MavenPomDownloader(emptyMap(), HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
+        downloader.mavenSettings = mavenSettings != null ? mavenSettings : MavenExecutionContextView.view(ctx).getSettings();
+        downloader.mirrors = downloader.ctx.getMirrors(mavenSettings);
+        downloader.activeProfiles = activeProfiles;
+        return downloader;
+    }
+
+    /**
+     * A MavenPomDownloader for non-maven contexts where there are no project poms or assumption that maven central
+     * is implicitly added as a repository. In a Maven contexts,
+     * {@link MavenPomDownloader#forExecutionContext(ExecutionContext)} should be used
+     *
+     * @param ctx The execution context
+     */
+    public static MavenPomDownloader forNonMavenContext(ExecutionContext ctx) {
+        return new MavenPomDownloader(ctx);
+    }
+
+    /**
+     * A MavenPomDownloader for non-maven contexts where there are no project poms or assumption that maven central
+     * is implicitly added as a repository. In a Maven contexts, the regular constructor should be used instead
+     *
+     * @param ctx The execution context
+     * @deprecated use {@link MavenPomDownloader#forNonMavenContext(ExecutionContext)} instead.
+     */
+    @Deprecated
+    public MavenPomDownloader(ExecutionContext ctx) {
+        this(emptyMap(), HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
+        addCentralRepository = Boolean.TRUE.equals(MavenExecutionContextView.view(ctx).getAddCentralRepository());
+        addLocalRepository = Boolean.TRUE.equals(MavenExecutionContextView.view(ctx).getAddLocalRepository());
     }
 
     /**
@@ -143,13 +143,13 @@ public class MavenPomDownloader {
      *                       set on the execution context.
      * @param activeProfiles The active profiles to use, if any. This argument overrides any active profiles
      *                       set on the execution context.
-     * @Deprecated Use {@link #MavenPomDownloader(ExecutionContext)} instead.
+     * @Deprecated Use {@link MavenPomDownloader#withCustomSettings(ExecutionContext, MavenSettings, List)} instead.
      */
     @Deprecated
     public MavenPomDownloader(Map<Path, Pom> projectPoms, ExecutionContext ctx,
                               @Nullable MavenSettings mavenSettings,
                               @Nullable List<String> activeProfiles) {
-        this(HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
+        this(projectPoms, HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
         this.mavenSettings = mavenSettings != null ? mavenSettings : MavenExecutionContextView.view(ctx).getSettings();
         this.mirrors = this.ctx.getMirrors(mavenSettings);
         this.activeProfiles = activeProfiles;
@@ -159,22 +159,28 @@ public class MavenPomDownloader {
      * @param projectPoms Ignored, project poms are obtained from the context
      * @param ctx         The execution context, which potentially contain Maven settings customization
      *                    and {@link HttpSender} customization.
-     * @deprecated Use {@link #MavenPomDownloader(ExecutionContext)} instead.
+     * @deprecated Use {@link MavenPomDownloader#forExecutionContext(ExecutionContext)} instead.
      */
     @Deprecated
     public MavenPomDownloader(Map<Path, Pom> projectPoms, ExecutionContext ctx) {
-        this(HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
+        this(projectPoms, HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
     }
 
     /**
      * @param projectPoms Project poms on disk.
      * @param httpSender  The HTTP sender.
      * @param ctx         The execution context.
-     * @deprecated Use {@link #MavenPomDownloader(HttpSender, ExecutionContext)} instead.
+     * @deprecated Use {@link MavenPomDownloader#withCustomHttpSender(HttpSender, ExecutionContext)} instead.
      */
     @Deprecated
     public MavenPomDownloader(Map<Path, Pom> projectPoms, HttpSender httpSender, ExecutionContext ctx) {
-        this(httpSender, ctx);
+        this.httpSender = httpSender;
+        this.ctx = MavenExecutionContextView.view(ctx);
+        this.mavenSettings = this.ctx.getSettings();
+        this.mavenCache = this.ctx.getPomCache();
+        this.addCentralRepository = !Boolean.FALSE.equals(MavenExecutionContextView.view(ctx).getAddCentralRepository());
+        this.addLocalRepository = !Boolean.FALSE.equals(MavenExecutionContextView.view(ctx).getAddLocalRepository());
+        this.mirrors = this.ctx.getMirrors(this.ctx.getSettings());
     }
 
     byte[] sendRequest(HttpSender.Request request) throws IOException, HttpSenderResponseException {

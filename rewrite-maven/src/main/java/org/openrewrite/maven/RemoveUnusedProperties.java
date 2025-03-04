@@ -182,7 +182,7 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
 
             private boolean parentHasProperty(MavenResolutionResult resolutionResult, String propertyName,
                                               ExecutionContext ctx) {
-                MavenPomDownloader downloader = new MavenPomDownloader(ctx,
+                MavenPomDownloader downloader = MavenPomDownloader.withCustomSettings(ctx,
                         resolutionResult.getMavenSettings(), resolutionResult.getActiveProfiles());
                 try {
                     ResolvedPom resolvedBarePom = resolutionResult.getPom().getRequested()

@@ -194,7 +194,7 @@ public class ChangeParentPom extends Recipe {
                             }
 
                             // Retain managed versions from the old parent that are not managed in the new parent
-                            MavenPomDownloader mpd = new MavenPomDownloader(ctx, mrr.getMavenSettings(), mrr.getActiveProfiles());
+                            MavenPomDownloader mpd = MavenPomDownloader.withCustomSettings(ctx, mrr.getMavenSettings(), mrr.getActiveProfiles());
                             ResolvedPom newParent = mpd.download(new GroupArtifactVersion(targetGroupId, targetArtifactId, targetVersion.get()), null, resolvedPom, resolvedPom.getRepositories())
                                     .resolve(emptyList(), mpd, ctx);
                             List<ResolvedManagedDependency> dependenciesWithoutExplicitVersions = getDependenciesUnmanagedByNewParent(mrr, newParent);
