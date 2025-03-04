@@ -157,11 +157,7 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
                     }
                     if (versionToUse == null) {
                         try {
-                            if (versionComparator == null || versionComparator instanceof ExactVersion) {
-                                versionToUse = version;
-                            } else {
-                                versionToUse = findVersionToUse(ctx);
-                            }
+                            versionToUse = findVersionToUse(ctx);
                         } catch (MavenDownloadingException e) {
                             return e.warn(tag);
                         }
@@ -194,20 +190,28 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
         }
 
         private String findVersionToUse(ExecutionContext ctx) throws MavenDownloadingException {
-            MavenMetadata mavenMetadata = metadataFailures == null ?
-                    downloadMetadata(groupId, artifactId, ctx) :
-                    metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
-            // TODO This is hacky, but the class structure of LatestRelease is suboptimal, see https://github.com/openrewrite/rewrite/pull/5029
-            // Fix it when we have a chance to refactor the code.
-            if (versionComparator.getClass().getSimpleName().equals("LatestRelease") && mavenMetadata.getVersioning().getRelease() != null) {
-                return mavenMetadata.getVersioning().getRelease();
+            if (resolvedVersion == null) {
+                if (versionComparator == null || versionComparator instanceof ExactVersion) {
+                    resolvedVersion = version;
+                } else {
+                    MavenMetadata mavenMetadata = metadataFailures == null ?
+                            downloadMetadata(groupId, artifactId, ctx) :
+                            metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
+                    // TODO This is hacky, but the class structure of LatestRelease is suboptimal, see https://github.com/openrewrite/rewrite/pull/5029
+                    // Fix it when we have a chance to refactor the code.
+                    if (versionComparator.getClass().getSimpleName().equals("LatestRelease") && mavenMetadata.getVersioning().getRelease() != null) {
+                        return mavenMetadata.getVersioning().getRelease();
+                    }
+                    LatestRelease latest = new LatestRelease(versionPattern);
+                    resolvedVersion =  mavenMetadata.getVersioning().getVersions().stream()
+                            .filter(v -> versionComparator.isValid(null, v))
+                            .filter(v -> !Boolean.TRUE.equals(releasesOnly) || latest.isValid(null, v))
+                            .max((v1, v2) -> versionComparator.compare(null, v1, v2))
+                            .orElse(version);
+                }
             }
-            LatestRelease latest = new LatestRelease(versionPattern);
-            return mavenMetadata.getVersioning().getVersions().stream()
-                    .filter(v -> versionComparator.isValid(null, v))
-                    .filter(v -> !Boolean.TRUE.equals(releasesOnly) || latest.isValid(null, v))
-                    .max((v1, v2) -> versionComparator.compare(null, v1, v2))
-                    .orElse(version);
+
+            return resolvedVersion;
         }
     }
 }
