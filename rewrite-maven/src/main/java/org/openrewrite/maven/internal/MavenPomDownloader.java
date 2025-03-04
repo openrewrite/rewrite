@@ -34,6 +34,7 @@ import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.tree.*;
+import org.openrewrite.semver.Semver;
 
 import java.io.*;
 import java.net.SocketTimeoutException;
@@ -54,6 +55,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
+import static org.openrewrite.internal.ListUtils.concatAll;
 
 @SuppressWarnings("OptionalAssignedToNull")
 public class MavenPomDownloader {
@@ -393,7 +395,7 @@ public class MavenPomDownloader {
                         versions.add(path.getFileName().toString());
                     }
                 }
-                return new MavenMetadata.Versioning(versions, null, null, null);
+                return new MavenMetadata.Versioning(versions, null, null, null, null, null);
             } catch (IOException e) {
                 throw new MavenDownloadingException("Unable to derive metadata from file repository. " + e.getMessage(), null, gav);
             }
@@ -423,7 +425,7 @@ public class MavenPomDownloader {
             return null;
         }
 
-        return new MavenMetadata.Versioning(versions, null, null, null);
+        return new MavenMetadata.Versioning(versions, null, null, null, null, null);
     }
 
     String hrefToVersion(String href, String rootUri) {
@@ -445,10 +447,11 @@ public class MavenPomDownloader {
     protected MavenMetadata mergeMetadata(MavenMetadata m1, MavenMetadata m2) {
         return new MavenMetadata(new MavenMetadata.Versioning(
                 mergeVersions(m1.getVersioning().getVersions(), m2.getVersioning().getVersions()),
-                Stream.concat(m1.getVersioning().getSnapshotVersions() == null ? Stream.empty() : m1.getVersioning().getSnapshotVersions().stream(),
-                        m2.getVersioning().getSnapshotVersions() == null ? Stream.empty() : m2.getVersioning().getSnapshotVersions().stream()).collect(toList()),
+                concatAll(m1.getVersioning().getSnapshotVersions(), m2.getVersioning().getSnapshotVersions()),
                 maxSnapshot(m1.getVersioning().getSnapshot(), m2.getVersioning().getSnapshot()),
-                maxLastUpdated(m1.getVersioning().getLastUpdated(), m2.getVersioning().getLastUpdated())
+                maxLastUpdated(m1.getVersioning().getLastUpdated(), m2.getVersioning().getLastUpdated()),
+                Semver.max(m1.getVersioning().getLatest(), m2.getVersioning().getLatest()),
+                Semver.max(m1.getVersioning().getRelease(), m2.getVersioning().getRelease())
         ));
     }
 

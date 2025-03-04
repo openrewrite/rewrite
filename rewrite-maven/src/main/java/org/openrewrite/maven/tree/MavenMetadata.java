@@ -36,7 +36,7 @@ import static java.util.Collections.emptyList;
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Getter
 public class MavenMetadata {
-    public static final MavenMetadata EMPTY = new MavenMetadata(new MavenMetadata.Versioning(emptyList(), emptyList(), null, null));
+    public static final MavenMetadata EMPTY = new MavenMetadata(new MavenMetadata.Versioning(emptyList(), emptyList(), null, null, null, null));
 
     Versioning versioning;
 
@@ -65,28 +65,29 @@ public class MavenMetadata {
         @Nullable
         String latest;
 
+        @Deprecated
         public Versioning(
                 List<String> versions,
                 @Nullable List<SnapshotVersion> snapshotVersions,
                 @Nullable Snapshot snapshot,
                 @Nullable ZonedDateTime lastUpdated) {
-            this(null, null, versions, snapshotVersions, snapshot, lastUpdated);
+            this(versions, snapshotVersions, snapshot, lastUpdated, null, null);
         }
 
         @JsonCreator
         public Versioning(
-                @Nullable String latest,
-                @Nullable String release,
                 @JacksonXmlElementWrapper(localName = "versions") List<String> versions,
                 @JacksonXmlElementWrapper(localName = "snapshotVersions") @Nullable List<SnapshotVersion> snapshotVersions,
                 @Nullable Snapshot snapshot,
-                @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyyMMddHHmmss", timezone = "UTC") @Nullable ZonedDateTime lastUpdated) {
-            this.latest = latest;
-            this.release = release;
-            this.lastUpdated = lastUpdated;
+                @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyyMMddHHmmss", timezone = "UTC") @Nullable ZonedDateTime lastUpdated,
+                @Nullable String latest,
+                @Nullable String release) {
             this.versions = versions;
             this.snapshotVersions = snapshotVersions;
             this.snapshot = snapshot;
+            this.lastUpdated = lastUpdated;
+            this.latest = latest;
+            this.release = release;
         }
     }
 
@@ -105,7 +106,9 @@ public class MavenMetadata {
                     emptyList(),
                     metadata.getVersioning().getSnapshotVersions(),
                     metadata.getVersioning().getSnapshot(),
-                    metadata.getVersioning().getLastUpdated()));
+                    metadata.getVersioning().getLastUpdated(),
+                    metadata.getVersioning().getRelease(),
+                    metadata.getVersioning().getLatest()));
         }
         return metadata;
     }

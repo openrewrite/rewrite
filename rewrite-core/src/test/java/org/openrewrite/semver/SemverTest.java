@@ -45,4 +45,15 @@ class SemverTest {
         assertThat(Semver.validate("=1.5-1", null).getValue())
           .isInstanceOf(ExactVersion.class);
     }
+
+    @Test
+    void maxVersion() {
+        assertThat(Semver.max(null, null)).isNull();
+        assertThat(Semver.max("3.3.3", null)).isEqualTo("3.3.3");
+        assertThat(Semver.max(null, "3.3.3")).isEqualTo("3.3.3");
+        assertThat(Semver.max("4.3.30", "4.3.30.RELEASE")).isEqualTo("4.3.30"); // No label over label
+        assertThat(Semver.max("1.0.1RC", "1.0.1-release")).isEqualTo("1.0.1-release");
+        assertThat(Semver.max("4.3.30.RELEASE", "4.3.30.RELEASE-2")).isEqualTo("4.3.30.RELEASE"); // Multiple labels with same version takes first label
+        assertThat(Semver.max("4.3.30.RELEASE", "4.3.31.RELEASE")).isEqualTo("4.3.31.RELEASE");
+    }
 }
