@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
@@ -232,7 +231,9 @@ class ChangeTypeTest implements RewriteTest {
             """
               package example
 
-              fun test(original: x.y.Target<String>) { }
+              import x.y.Target
+
+              fun test(original: Target<String>) { }
               """
           )
         );
@@ -253,8 +254,10 @@ class ChangeTypeTest implements RewriteTest {
               }
               """,
             """
+              import x.y.Target
+
               class A {
-                  val type : x.y.Target = x.y.Target()
+                  val type : Target = Target()
               }
               """
           )
@@ -276,7 +279,7 @@ class ChangeTypeTest implements RewriteTest {
               }
               """,
             spec -> spec.path("file.kt").afterRecipe(cu ->
-                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "newFile")).isTrue())
+              assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "newFile")).isTrue())
           )
         );
     }
@@ -392,13 +395,12 @@ class ChangeTypeTest implements RewriteTest {
               }
               """,
             """
-
+              import java.util.LinkedList
 
               fun main() {
-                  val list2 = java.util.LinkedList<String>()
+                  val list2 = LinkedList<String>()
               }
               """
-            , SourceSpec::noTrim
           )
         );
     }
