@@ -1,30 +1,9 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    id("org.openrewrite.build.root") version("latest.release")
-    id("org.openrewrite.build.java-base") version("latest.release")
-    id("org.owasp.dependencycheck") version("latest.release")
-}
-
-configure<org.owasp.dependencycheck.gradle.extension.DependencyCheckExtension> {
-    analyzers.assemblyEnabled = false
-    analyzers.nodeAuditEnabled = false
-    analyzers.nodeEnabled = false
-    failBuildOnCVSS = System.getenv("FAIL_BUILD_ON_CVSS")?.toFloatOrNull() ?: 9.0F
-    format = System.getenv("DEPENDENCY_CHECK_FORMAT") ?: "HTML"
-    nvd.apiKey = System.getenv("NVD_API_KEY")
-    suppressionFile = "suppressions.xml"
     id("org.openrewrite.build.recipe-library") version "latest.release"
     kotlin("jvm") version "1.9.25"
 }
-
-repositories {
-    mavenCentral()
-}
-
-allprojects {
-    group = "org.openrewrite"
-    description = "Eliminate tech-debt. Automatically."
 group = "org.openrewrite"
 description = "Rewrite Kotlin"
 
