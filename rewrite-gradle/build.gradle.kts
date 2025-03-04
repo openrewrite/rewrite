@@ -33,6 +33,7 @@ dependencies {
     api(project(":rewrite-groovy")) {
         exclude("org.codehaus.groovy", "groovy")
     }
+    api(project(":rewrite-kotlin"))
     api(project(":rewrite-maven"))
     api("org.jetbrains:annotations:latest.release")
     compileOnly(project(":rewrite-test"))
