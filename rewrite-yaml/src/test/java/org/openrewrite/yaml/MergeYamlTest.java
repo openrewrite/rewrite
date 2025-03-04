@@ -1011,6 +1011,40 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
+    @Test
+    void mergeMappingIntoNewMapping() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new MergeYaml(
+              "$.testing",
+              //language=yaml
+              """
+                table:
+                  - name: jdk_version
+                    value: 17
+                """,
+              false,
+              "name",
+              null,
+              null,
+              null,
+              true // only for imperative recipes
+            )),
+          yaml(
+            """
+              foo: bar
+              """,
+            """
+              foo: bar
+              testing:
+                table:
+                  - name: jdk_version
+                    value: 17
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2157")
     @Test
     void mergeSequenceMapAddComplexMapping() {
