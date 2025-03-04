@@ -29,7 +29,6 @@ import java.util.Set;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class FindCollidingSourceFiles extends ScanningRecipe<FindCollidingSourceFiles.Accumulator> {
-
     transient CollidingSourceFiles collidingSourceFiles = new CollidingSourceFiles(this);
 
     @Override

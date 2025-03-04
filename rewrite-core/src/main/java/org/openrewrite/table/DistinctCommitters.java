@@ -25,9 +25,7 @@ import java.time.LocalDate;
 public class DistinctCommitters extends DataTable<DistinctCommitters.Row> {
 
     public DistinctCommitters(Recipe recipe) {
-        super(recipe,
-                "Repository committers",
-                "The distinct set of committers per repository.");
+        super(recipe, "Repository committers", "The distinct set of committers per repository.");
     }
 
     @Value

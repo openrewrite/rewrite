@@ -15,15 +15,17 @@
  */
 package org.openrewrite.yaml;
 
-import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.Value;
+import lombok.experimental.NonFinal;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.yaml.tree.Yaml;
+
+import java.util.Optional;
 
 import static org.openrewrite.internal.StringUtils.isBlank;
 import static org.openrewrite.yaml.MergeYaml.InsertMode.*;
@@ -31,7 +33,6 @@ import static org.openrewrite.yaml.MergeYaml.InsertMode.*;
 @Value
 @EqualsAndHashCode(callSuper = false)
 @NoArgsConstructor(force = true) // TODO: remove with @deprecated constructor
-@AllArgsConstructor // TODO: remove with @deprecated constructor
 public class MergeYaml extends Recipe {
     @Option(displayName = "Key path",
             description = "A [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expression used to find matching keys.",
@@ -87,16 +88,30 @@ public class MergeYaml extends Recipe {
         this(key, yaml, acceptTheirs, objectIdentifyingProperty, filePattern, null, insertProperty);
     }
 
+    public MergeYaml(String key, @Language("yml") String yaml, @Nullable Boolean acceptTheirs, @Nullable String objectIdentifyingProperty, @Nullable String filePattern, @Nullable InsertMode insertMode, @Nullable String insertProperty) {
+        this.key = key;
+        this.yaml = yaml;
+        this.acceptTheirs = acceptTheirs;
+        this.objectIdentifyingProperty = objectIdentifyingProperty;
+        this.filePattern = filePattern;
+        this.insertMode = insertMode;
+        this.insertProperty = insertProperty;
+    }
+
     public enum InsertMode { Before, After, Last }
+
+    @Nullable
+    @NonFinal
+    transient Yaml incoming = null;
 
     @Override
     public Validated<Object> validate() {
         return super.validate()
                 .and(Validated.test("yaml", "Must be valid YAML",
-                        yaml, y -> new YamlParser().parse(yaml)
-                                .findFirst()
-                                .map(doc -> !((Yaml.Documents) doc).getDocuments().isEmpty())
-                                .orElse(false)))
+                        yaml, y -> {
+                            MergeYaml.maybeParse(yaml).ifPresent(it -> incoming = it);
+                            return incoming != null;
+                        }))
                 .and(Validated.test("insertProperty", "Insert property must be filed when `insert mode` is either `BeforeProperty` or `AfterProperty`.", insertProperty,
                         s -> insertMode == null || insertMode == Last || !isBlank(s)));
     }
@@ -120,31 +135,18 @@ public class MergeYaml extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+        // When `new MergeYaml(..).getVisitor() is used directly in another recipe, the `validate` function will not be called, thus `incoming` is null
+        if (incoming == null) {
+            incoming = MergeYaml.parse(yaml);
+        }
         return Preconditions.check(new FindSourceFiles(filePattern), new YamlIsoVisitor<ExecutionContext>() {
             final JsonPathMatcher matcher = new JsonPathMatcher(key);
-
-            final Yaml incoming = new YamlParser().parse(yaml)
-                    .findFirst()
-                    .map(Yaml.Documents.class::cast)
-                    .map(docs -> {
-                        // Any comments will have been put on the parent Document node, preserve by copying to the mapping
-                        Yaml.Document doc = docs.getDocuments().get(0);
-                        if (doc.getBlock() instanceof Yaml.Mapping) {
-                            Yaml.Mapping m = (Yaml.Mapping) doc.getBlock();
-                            return m.withEntries(ListUtils.mapFirst(m.getEntries(), entry -> entry.withPrefix(doc.getPrefix())));
-                        } else if (doc.getBlock() instanceof Yaml.Sequence) {
-                            Yaml.Sequence s = (Yaml.Sequence) doc.getBlock();
-                            return s.withEntries(ListUtils.mapFirst(s.getEntries(), entry -> entry.withPrefix(doc.getPrefix())));
-                        }
-                        return doc.getBlock().withPrefix(doc.getPrefix());
-                    })
-                    .orElseThrow(() -> new IllegalArgumentException("Could not parse as YAML"));
 
             @Override
             public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
                 if ("$".equals(key)) {
                     Yaml.Document d = document.withBlock((Yaml.Block)
-                            new MergeYamlVisitor<>(document.getBlock(), yaml, Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty, insertMode, insertProperty)
+                            new MergeYamlVisitor<>(document.getBlock(), incoming, Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty, insertMode, insertProperty)
                                     .visitNonNull(document.getBlock(), ctx, getCursor())
                     );
                     if (getCursor().getMessage(REMOVE_PREFIX, false)) {
@@ -168,7 +170,7 @@ public class MergeYaml extends Recipe {
                     }
                     // No matching element already exists, so it must be constructed
                     //noinspection LanguageMismatch
-                    return d.withBlock((Yaml.Block) new MergeYamlVisitor<>(d.getBlock(), snippet,
+                    return d.withBlock((Yaml.Block) new MergeYamlVisitor<>(d.getBlock(), MergeYaml.parse(snippet),
                             Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty, insertMode, insertProperty).visitNonNull(d.getBlock(),
                             ctx, getCursor()));
                 }
@@ -246,5 +248,29 @@ public class MergeYaml extends Recipe {
                 return super.visitSequence(sequence, ctx);
             }
         });
+    }
+
+    private static Optional<Yaml.Block> maybeParse(@Language("yml") String yaml) {
+        return new YamlParser().parse(yaml)
+                .findFirst()
+                .filter(Yaml.Documents.class::isInstance)
+                .map(Yaml.Documents.class::cast)
+                .map(docs -> {
+                    // Any comments will have been put on the parent Document node, preserve by copying to the mapping
+                    Yaml.Document doc = docs.getDocuments().get(0);
+                    if (doc.getBlock() instanceof Yaml.Mapping) {
+                        Yaml.Mapping m = (Yaml.Mapping) doc.getBlock();
+                        return m.withEntries(ListUtils.mapFirst(m.getEntries(), entry -> entry.withPrefix(doc.getPrefix())));
+                    } else if (doc.getBlock() instanceof Yaml.Sequence) {
+                        Yaml.Sequence s = (Yaml.Sequence) doc.getBlock();
+                        return s.withEntries(ListUtils.mapFirst(s.getEntries(), entry -> entry.withPrefix(doc.getPrefix())));
+                    }
+                    return doc.getBlock().withPrefix(doc.getPrefix());
+                });
+    }
+
+    static Yaml parse(@Language("yml") String yaml) {
+        return maybeParse(yaml)
+                .orElseThrow(() -> new IllegalArgumentException("Could not parse as YAML"));
     }
 }
