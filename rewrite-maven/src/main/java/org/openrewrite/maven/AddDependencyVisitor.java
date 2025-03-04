@@ -203,7 +203,7 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
                         return mavenMetadata.getVersioning().getRelease();
                     }
                     LatestRelease latest = new LatestRelease(versionPattern);
-                    resolvedVersion =  mavenMetadata.getVersioning().getVersions().stream()
+                    resolvedVersion = mavenMetadata.getVersioning().getVersions().stream()
                             .filter(v -> versionComparator.isValid(null, v))
                             .filter(v -> !Boolean.TRUE.equals(releasesOnly) || latest.isValid(null, v))
                             .max((v1, v2) -> versionComparator.compare(null, v1, v2))
