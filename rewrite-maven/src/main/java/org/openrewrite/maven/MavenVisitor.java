@@ -464,6 +464,6 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             return true;
         }
         // parent of parent might be in the project and have been updated
-        return parentPomWasUpdated(parentResolutionResult.getParent(), ctx);
+        return parentPomWasUpdated(parentResolutionResult, ctx);
     }
 }
