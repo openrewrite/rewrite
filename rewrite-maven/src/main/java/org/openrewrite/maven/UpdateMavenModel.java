@@ -160,13 +160,12 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
     }
 
     public static MavenResolutionResult updateResult(MavenExecutionContextView ctx, MavenResolutionResult resolutionResult) throws MavenDownloadingExceptions {
-        MavenPomDownloader downloader = new MavenPomDownloader(ctx, resolutionResult.getMavenSettings(),
-                resolutionResult.getActiveProfiles());
+        MavenPomDownloader downloader = new MavenPomDownloader(ctx, resolutionResult.getMavenSettings(), resolutionResult.getActiveProfiles());
 
-        AtomicReference<MavenDownloadingExceptions> exceptions = new AtomicReference<>();
+        AtomicReference<@Nullable MavenDownloadingExceptions> exceptions = new AtomicReference<>();
         try {
             Pom pom = ctx.getProjectPomsBySourcePath().get(resolutionResult.getPom().getRequested().getSourcePath());
-            if (pom == null){
+            if (pom == null) {
                 pom = resolutionResult.getPom().getRequested();
             }
             ResolvedPom resolved = pom.resolve(ctx.getActiveProfiles(), downloader, ctx);

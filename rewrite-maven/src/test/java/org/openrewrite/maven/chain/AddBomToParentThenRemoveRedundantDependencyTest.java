@@ -36,19 +36,18 @@ class AddBomToParentThenRemoveRedundantDependencyTest implements RewriteTest {
     @Test
     void bomShouldBeAddedToParentPomAndVersionTagShouldBeRemoved() {
         rewriteRun(
-          mavenProject(
-            "my-app-parent",
+          mavenProject("parent",
             //language=xml
             pomXml(
               """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app-parent</artifactId>
+                  <artifactId>parent</artifactId>
                   <version>1</version>
                   <packaging>pom</packaging>
                   <modules>
-                    <module>my-app</module>
+                    <module>child</module>
                   </modules>
                 </project>
                 """,
@@ -56,11 +55,11 @@ class AddBomToParentThenRemoveRedundantDependencyTest implements RewriteTest {
                 <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app-parent</artifactId>
+                  <artifactId>parent</artifactId>
                   <version>1</version>
                   <packaging>pom</packaging>
                   <modules>
-                    <module>my-app</module>
+                    <module>child</module>
                   </modules>
                   <dependencyManagement>
                     <dependencies>
@@ -77,17 +76,16 @@ class AddBomToParentThenRemoveRedundantDependencyTest implements RewriteTest {
                 """
             )
           ),
-          mavenProject(
-            "my-app",
+          mavenProject("child",
             //language=xml
             pomXml("""
               <project>
                 <parent>
                   <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app-parent</artifactId>
+                  <artifactId>parent</artifactId>
                   <version>1</version>
                 </parent>
-              	<artifactId>my-app</artifactId>
+              	<artifactId>child</artifactId>
               	<dependencies>
               		<dependency>
               		   <groupId>org.hibernate.orm</groupId>
@@ -100,10 +98,10 @@ class AddBomToParentThenRemoveRedundantDependencyTest implements RewriteTest {
               <project>
                 <parent>
                   <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app-parent</artifactId>
+                  <artifactId>parent</artifactId>
                   <version>1</version>
                 </parent>
-              	<artifactId>my-app</artifactId>
+              	<artifactId>child</artifactId>
               	<dependencies>
               		<dependency>
               		   <groupId>org.hibernate.orm</groupId>

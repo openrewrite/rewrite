@@ -219,7 +219,7 @@ class MavenPomDownloaderTest implements RewriteTest {
             });
 
             try {
-                Pom download = MavenPomDownloader.forNonMavenContext(ctx)
+                MavenPomDownloader.forNonMavenContext(ctx)
                   .download(new GroupArtifactVersion("org.openrewrite", "rewrite-core", "7.0.0"), null, null, singletonList(nonexistentRepo));
             } catch (Exception e) {
                 // not expected to succeed
