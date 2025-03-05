@@ -180,7 +180,8 @@ public class MergeYaml extends Recipe {
                         // Use two spaces as indent, the `MergeYamlVisitor` recipe will take care for proper indenting by calling `autoformat`,
                         snippet = valueKey + ":\n  " + yaml.replaceAll("\n", "\n  ");
                     } else {
-                        snippet = valueKey + ":" + yaml;
+                        // If there is no space between the colon and the value it will not be interpreted as a mapping
+                        snippet = valueKey + ":" + (yaml.startsWith(" ") ? yaml : " " + yaml);
                     }
                     return d.withBlock((Yaml.Block)
                             new MergeYamlVisitor<>(d.getBlock(), MergeYaml.parse(snippet), accptTheirs, objectIdentifyingProperty, insertMode, insertProperty)
