@@ -72,6 +72,11 @@ public class ChangeMethodTargetToVariable extends Recipe {
     }
 
     @Override
+    public Validated<Object> validate() {
+        return super.validate().and(MethodMatcher.validate(methodPattern));
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(
                 new UsesMethod<>(methodPattern, matchOverrides),

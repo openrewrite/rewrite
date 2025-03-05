@@ -61,6 +61,14 @@ public class ChangeType extends Recipe {
 
     @Override
     public String getInstanceNameSuffix() {
+        // Defensively guard against null values when recipes are first classloaded. This
+        // is a temporary workaround until releases of workers/CLI that include the defensive
+        // coding in Recipe.
+        //noinspection ConstantValue
+        if (oldFullyQualifiedTypeName == null || newFullyQualifiedTypeName == null) {
+            return getDisplayName();
+        }
+        
         String oldShort = oldFullyQualifiedTypeName.substring(oldFullyQualifiedTypeName.lastIndexOf('.') + 1);
         String newShort = newFullyQualifiedTypeName.substring(newFullyQualifiedTypeName.lastIndexOf('.') + 1);
         if (oldShort.equals(newShort)) {
