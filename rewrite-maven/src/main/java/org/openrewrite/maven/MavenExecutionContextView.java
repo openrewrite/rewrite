@@ -32,8 +32,9 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.emptyMap;
+import static java.util.Collections.*;
+import static java.util.stream.Collectors.toList;
+import static org.openrewrite.internal.ListUtils.concat;
 import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
 
 @SuppressWarnings({"unused", "UnusedReturnValue"})
@@ -268,14 +269,14 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
                         settings.getActiveProfiles().getActiveProfiles().stream(),
                         Arrays.stream(activeProfiles))
                 .distinct()
-                .collect(Collectors.toList());
+                .collect(toList());
     }
 
     private static List<MavenRepositoryCredentials> mapCredentials(MavenSettings settings) {
         if (settings.getServers() != null) {
             return settings.getServers().getServers().stream()
                     .map(server -> new MavenRepositoryCredentials(server.getId(), server.getUsername(), server.getPassword()))
-                    .collect(Collectors.toList());
+                    .collect(toList());
         }
         return emptyList();
     }
@@ -284,7 +285,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         if (settings.getMirrors() != null) {
             return settings.getMirrors().getMirrors().stream()
                     .map(mirror -> new MavenRepositoryMirror(mirror.getId(), mirror.getUrl(), mirror.getMirrorOf(), mirror.getReleases(), mirror.getSnapshots(), settings.getServers()))
-                    .collect(Collectors.toList());
+                    .collect(toList());
         }
         return emptyList();
     }
@@ -328,7 +329,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
                     }
                 })
                 .filter(Objects::nonNull)
-                .collect(Collectors.toList());
+                .collect(toList());
     }
 
     public Map<Path, Pom> getProjectPomsBySourcePath() {
@@ -341,7 +342,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
 
     public void setProjectPoms(Map<Path, Pom> projectPoms) {
         putMessage(MAVEN_PROJECT_POMS_BY_SOURCE_PATH, projectPoms);
-        putMessage(MAVEN_PROJECT_POMS_BY_GAV, projectPomsByGav(getProjectPomsBySourcePath()));
+        putMessage(MAVEN_PROJECT_POMS_BY_GAV, projectPomsByGav());
     }
 
     public void updateProjectPom(Pom projectPom) {
@@ -350,7 +351,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
             map.put(pom.getSourcePath(), pom);
             return map;
         });
-        putMessage(MAVEN_PROJECT_POMS_BY_GAV, projectPomsByGav(getProjectPomsBySourcePath()));
+        putMessage(MAVEN_PROJECT_POMS_BY_GAV, projectPomsByGav());
     }
 
     public List<Pom> getProjectPoms() {
@@ -373,11 +374,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
 
     private static List<Pom> getAncestryWithinProject(Pom projectPom, Map<Path, Pom> projectPoms) {
         Pom parentPom = getParentWithinProject(projectPom, projectPoms);
-        if (parentPom == null) {
-            return Collections.singletonList(projectPom);
-        } else {
-            return ListUtils.concat(projectPom, getAncestryWithinProject(parentPom, projectPoms));
-        }
+        return parentPom == null ? singletonList(projectPom) : concat(projectPom, getAncestryWithinProject(parentPom, projectPoms));
     }
 
     private static @Nullable Pom getParentWithinProject(Pom projectPom, Map<Path, Pom> projectPoms) {
@@ -398,11 +395,10 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
                 parentPom.getGav().getArtifactId().equals(parent.getGav().getArtifactId()) ? parentPom : null;
     }
 
-    private Map<GroupArtifactVersion, Pom> projectPomsByGav(Map<Path, Pom> projectPoms) {
+    private Map<GroupArtifactVersion, Pom> projectPomsByGav() {
         Map<GroupArtifactVersion, Pom> result = new HashMap<>();
-        for (Pom projectPom : projectPoms.values()) {
-            List<Pom> ancestryWithinProject = getAncestryWithinProject(projectPom, projectPoms);
-            Map<String, String> mergedProperties = mergeProperties(ancestryWithinProject);
+        for (Pom projectPom : getProjectPoms()) {
+            Map<String, String> mergedProperties = mergeProperties(getAncestryWithinProject(projectPom));
             GroupArtifactVersion gav = new GroupArtifactVersion(
                     projectPom.getGroupId(),
                     projectPom.getArtifactId(),
