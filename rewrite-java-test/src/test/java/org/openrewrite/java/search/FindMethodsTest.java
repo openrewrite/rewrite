@@ -29,6 +29,7 @@ import org.openrewrite.test.TypeValidation;
 
 import java.util.stream.Stream;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
 @SuppressWarnings("RedundantOperationOnEmptyContainer")
@@ -36,6 +37,12 @@ class FindMethodsTest implements RewriteTest {
 
     static Stream<JavaType.FullyQualified> missingTypes() {
         return Stream.of(null, JavaType.Unknown.getInstance());
+    }
+
+    @Test
+    void incorrectMethodPattern() {
+        assertThat(new FindMethods("com.google.common.collect.*", false)
+          .validate().isValid()).isFalse();
     }
 
     @ParameterizedTest
@@ -303,7 +310,7 @@ class FindMethodsTest implements RewriteTest {
             """
               public @interface Example {
                   String name() default "";
-                            
+              
                   String description() default "";
               }
               """
