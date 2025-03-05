@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.AnnotationMatcher;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
@@ -68,6 +69,14 @@ public class FindDeprecatedMethods extends Recipe {
     @Override
     public String getDescription() {
         return "Find uses of deprecated methods in any API.";
+    }
+
+    @Override
+    public Validated<Object> validate() {
+        if (StringUtils.isBlank(methodPattern)) {
+            return super.validate();
+        }
+        return super.validate().and(MethodMatcher.validate(methodPattern));
     }
 
     @Override

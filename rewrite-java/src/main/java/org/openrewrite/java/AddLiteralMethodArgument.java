@@ -26,7 +26,6 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import static org.openrewrite.Tree.randomId;
@@ -83,6 +82,11 @@ public class AddLiteralMethodArgument extends Recipe {
     @Override
     public String getDescription() {
         return "Add a literal `String` or `int` argument to method invocations.";
+    }
+
+    @Override
+    public Validated<Object> validate() {
+        return super.validate().and(MethodMatcher.validate(methodPattern));
     }
 
     @Override
