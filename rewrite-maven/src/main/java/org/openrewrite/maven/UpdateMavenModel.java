@@ -131,6 +131,8 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
             requested = requested.withRepositories(Collections.emptyList());
         }
 
+        // updates HashMap<Path, Pom> and Map<GroupArtifactVersion, Pom> in CTX
+        //ctx.updateProjectPom(requested); // from PR, TODO dive here, here the poms are updated for later use
         try {
             MavenResolutionResult updated = updateResult(ctx, resolutionResult.withPom(resolutionResult.getPom().withRequested(requested))
             );
