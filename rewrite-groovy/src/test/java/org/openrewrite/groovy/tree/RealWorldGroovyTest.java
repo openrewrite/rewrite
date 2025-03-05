@@ -27,6 +27,31 @@ import static org.openrewrite.groovy.Assertions.groovy;
 class RealWorldGroovyTest implements RewriteTest {
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4116")
+    void jenkinsFile() {
+        rewriteRun(
+          groovy(
+            """
+              #!groovy
+              def getEndBuild() {
+                  { steps , config , domain ->
+                      new net.one.gtu.jenkins.helper.ConsoleLogger(steps)
+                          .logInfo("Intentionally exiting the build early. Please disregard subsequent errors; they do not represent real concerns/issues");
+                      throw new org.jenkinsci.plugins.workflow.steps.FlowInterruptedException(hudson.model.Result.SUCCESS);
+                  }
+              }
+              def buildPipeline1() {
+                  pipelineRunner {
+                      yml = 'jenkins_old.yml'
+                      endBuild = getEndBuild();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     @Issue("https://github.com/spring-projects/spring-boot/blob/v3.4.1/settings.gradle")
     void springBootSettingsGradle() {
         rewriteRun(
