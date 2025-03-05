@@ -22,7 +22,6 @@ import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.tree.Xml;
 
-import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
@@ -133,8 +132,8 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
         }
 
         try {
-            MavenResolutionResult updated = updateResult(ctx, resolutionResult.withPom(resolutionResult.getPom().withRequested(requested)),
-                    resolutionResult.getProjectPoms());
+            MavenResolutionResult updated = updateResult(ctx, resolutionResult.withPom(resolutionResult.getPom().withRequested(requested))
+            );
             return document.withMarkers(document.getMarkers().computeByType(getResolutionResult(),
                     (original, ignored) -> updated));
         } catch (MavenDownloadingExceptions e) {
@@ -158,9 +157,9 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                 .orElse(null);
     }
 
-    private MavenResolutionResult updateResult(ExecutionContext ctx, MavenResolutionResult resolutionResult, Map<Path, Pom> projectPoms) throws MavenDownloadingExceptions {
-        MavenPomDownloader downloader = new MavenPomDownloader(projectPoms, ctx, getResolutionResult().getMavenSettings(),
-                getResolutionResult().getActiveProfiles());
+    static MavenResolutionResult updateResult(ExecutionContext ctx, MavenResolutionResult resolutionResult) throws MavenDownloadingExceptions {
+        MavenPomDownloader downloader = new MavenPomDownloader(resolutionResult.getProjectPoms(), ctx, resolutionResult.getMavenSettings(),
+                resolutionResult.getActiveProfiles());
 
         AtomicReference<MavenDownloadingExceptions> exceptions = new AtomicReference<>();
         try {
@@ -169,7 +168,8 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                     .withPom(resolved)
                     .withModules(ListUtils.map(resolutionResult.getModules(), module -> {
                         try {
-                            return updateResult(ctx, module, projectPoms);
+                            Objects.requireNonNull(module);
+                            return updateResult(ctx, module);
                         } catch (MavenDownloadingExceptions e) {
                             exceptions.set(MavenDownloadingExceptions.append(exceptions.get(), e));
                             return module;

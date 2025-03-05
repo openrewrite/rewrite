@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
@@ -61,6 +62,47 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     public boolean isAcceptable(SourceFile sourceFile, P p) {
         return super.isAcceptable(sourceFile, p) &&
                sourceFile.getMarkers().findFirst(MavenResolutionResult.class).isPresent();
+    }
+
+    @Override
+    public @Nullable Xml preVisit(@NonNull Xml tree, P p) {
+        if (p instanceof ExecutionContext) {
+            MavenExecutionContextView ctx = MavenExecutionContextView.view((ExecutionContext) p);
+            if (parentPomWasUpdated(getResolutionResult(), ctx)) {
+                try {
+                    resolutionResult = UpdateMavenModel.updateResult(ctx, getResolutionResult());
+                } catch (MavenDownloadingExceptions mde) {
+                    mde.warn(document);
+                }
+            }
+        }
+        return super.preVisit(tree, p);
+    }
+
+    private boolean parentPomWasUpdated(@Nullable MavenResolutionResult mrr, MavenExecutionContextView ctx) {
+        if (mrr == null) {
+            return false;
+        }
+        MavenResolutionResult parentResolutionResult = mrr.getParent();
+        // pom has no parent
+        if (parentResolutionResult == null) {
+            return false;
+        }
+        Pom parentPom = parentResolutionResult.getPom().getRequested();
+        // parent pom is outside of project
+        if (parentPom.getSourcePath() == null) {
+            return false;
+        }
+        // get eventually updated version of the parent pom from the context
+        Pom fromContext = parentResolutionResult.getProjectPoms().get(parentPom.getSourcePath());
+        if (fromContext == null) {
+            return false;
+        }
+        if (fromContext != parentPom) {
+            return true;
+        }
+        // parent of parent might be in the project and have been updated
+        return parentPomWasUpdated(parentResolutionResult, ctx);
     }
 
     protected MavenResolutionResult getResolutionResult() {
