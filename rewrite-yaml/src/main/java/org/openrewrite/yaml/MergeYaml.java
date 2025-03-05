@@ -169,7 +169,7 @@ public class MergeYaml extends Recipe {
                 }
                 Yaml.Document d = super.visitDocument(document, ctx);
                 if ((createNewKeys == null || Boolean.TRUE.equals(createNewKeys)) && d == document && !getCursor().getMessage(FOUND_MATCHING_ELEMENT, false)) {
-                    // No matching element already exists, attempt to construct one
+                    // No matching element found, but check if the key maybe exists in the json path.
                     String valueKey = maybeKeyFromJsonPath(key);
                     if (valueKey == null) {
                         return d;
