@@ -35,16 +35,25 @@ import static org.openrewrite.java.tree.JavaType.ShallowClass.build;
 
 @SuppressWarnings("ConstantConditions")
 class MethodMatcherTest implements RewriteTest {
+    @SuppressWarnings("deprecation")
     private Pattern typeRegex(String signature) {
         return new MethodMatcher(signature).getTargetTypePattern();
     }
 
+    @SuppressWarnings("deprecation")
     private Pattern nameRegex(String signature) {
         return new MethodMatcher(signature).getMethodNamePattern();
     }
 
+    @SuppressWarnings("deprecation")
     private Pattern argRegex(String signature) {
         return new MethodMatcher(signature).getArgumentPattern();
+    }
+
+    @Test
+    void invalidMethodMatcher() {
+        assertThat(MethodMatcher.validate("com.google.common.collect.*")
+          .isValid()).isFalse();
     }
 
     @Test
@@ -192,7 +201,7 @@ class MethodMatcherTest implements RewriteTest {
             """
               package a;
               import java.util.function.Supplier;
-                            
+              
               class A {
                   Supplier<A> a = A::new;
               }
@@ -208,7 +217,7 @@ class MethodMatcherTest implements RewriteTest {
           java(
             """
               package a;
-
+              
               class A {
                   void setInt(int value) {}
                   int getInt() {}
@@ -226,6 +235,7 @@ class MethodMatcherTest implements RewriteTest {
         );
     }
 
+    @SuppressWarnings("RedundantMethodOverride")
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1215")
     void strictMatchMethodOverride() {
@@ -233,12 +243,12 @@ class MethodMatcherTest implements RewriteTest {
           java(
             """
               package com.abc;
-
+              
               class Parent {
                   public void method(String s) {
                   }
               }
-                          
+              
               class Test extends Parent {
                   @Override
                   public void method(String s) {
@@ -261,7 +271,7 @@ class MethodMatcherTest implements RewriteTest {
           java(
             """
               package a;
-
+              
               class A {
                   void foo() {}
               }
@@ -305,7 +315,7 @@ class MethodMatcherTest implements RewriteTest {
           java(
             """
               package com.yourorg;
-
+              
               class Foo {
                   void bar(int i, String s) {}
                   void other() {
@@ -420,7 +430,7 @@ class MethodMatcherTest implements RewriteTest {
           java(
             """
               package com.yourorg;
-
+              
               class Foo {
                   void bar(String[] s) {}
                   void test() {
