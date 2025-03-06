@@ -125,7 +125,7 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
         if (acc.snippet == null) {
             return TreeVisitor.noop();
         }
-        String filePattern = newFilePath == null ? acc.path.toString() : newFilePath;
-        return new MergeYaml(newKey, acc.snippet, false, null, filePattern, null, null, null).getVisitor();
+        return Preconditions.check(new FindSourceFiles(newFilePath == null ? acc.path.toString() : newFilePath),
+                new MergeYaml(newKey, acc.snippet, false, null, null, null, null, null).getVisitor());
     }
 }
