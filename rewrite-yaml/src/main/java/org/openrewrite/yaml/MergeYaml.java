@@ -80,15 +80,26 @@ public class MergeYaml extends Recipe {
     @Nullable
     String insertProperty;
 
+    @Option(displayName = "Create new keys",
+            description = "When the key path does _not_ match any keys, create new keys on the spot. Default is `true`.",
+            required = false)
+    @Nullable
+    Boolean createNewKeys;
+
     /**
-     * @deprecated Use {@link #MergeYaml(String, String, Boolean, String, String, InsertMode, String)} instead.
+     * @deprecated Use {@link #MergeYaml(String, String, Boolean, String, String, InsertMode, String, Boolean)} instead.
      */
     @Deprecated
     public MergeYaml(String key, @Language("yml") String yaml, @Nullable Boolean acceptTheirs, @Nullable String objectIdentifyingProperty, @Nullable String filePattern, @Nullable String insertProperty) {
-        this(key, yaml, acceptTheirs, objectIdentifyingProperty, filePattern, null, insertProperty);
+        this(key, yaml, acceptTheirs, objectIdentifyingProperty, filePattern, null, insertProperty, true);
     }
 
+    @Deprecated
     public MergeYaml(String key, @Language("yml") String yaml, @Nullable Boolean acceptTheirs, @Nullable String objectIdentifyingProperty, @Nullable String filePattern, @Nullable InsertMode insertMode, @Nullable String insertProperty) {
+        this(key, yaml, acceptTheirs, objectIdentifyingProperty, filePattern, insertMode, insertProperty, true);
+    }
+
+    public MergeYaml(String key, @Language("yml") String yaml, @Nullable Boolean acceptTheirs, @Nullable String objectIdentifyingProperty, @Nullable String filePattern, @Nullable InsertMode insertMode, @Nullable String insertProperty, @Nullable Boolean createNewKeys) {
         this.key = key;
         this.yaml = yaml;
         this.acceptTheirs = acceptTheirs;
@@ -96,6 +107,7 @@ public class MergeYaml extends Recipe {
         this.filePattern = filePattern;
         this.insertMode = insertMode;
         this.insertProperty = insertProperty;
+        this.createNewKeys = createNewKeys;
     }
 
     public enum InsertMode { Before, After, Last }
@@ -140,13 +152,14 @@ public class MergeYaml extends Recipe {
             incoming = MergeYaml.parse(yaml);
         }
         return Preconditions.check(new FindSourceFiles(filePattern), new YamlIsoVisitor<ExecutionContext>() {
-            final JsonPathMatcher matcher = new JsonPathMatcher(key);
+            private final boolean accptTheirs = Boolean.TRUE.equals(acceptTheirs);
+            private final JsonPathMatcher matcher = new JsonPathMatcher(key);
 
             @Override
             public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
                 if ("$".equals(key)) {
                     Yaml.Document d = document.withBlock((Yaml.Block)
-                            new MergeYamlVisitor<>(document.getBlock(), incoming, Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty, insertMode, insertProperty)
+                            new MergeYamlVisitor<>(document.getBlock(), incoming, accptTheirs, objectIdentifyingProperty, insertMode, insertProperty)
                                     .visitNonNull(document.getBlock(), ctx, getCursor())
                     );
                     if (getCursor().getMessage(REMOVE_PREFIX, false)) {
@@ -155,44 +168,26 @@ public class MergeYaml extends Recipe {
                     return d;
                 }
                 Yaml.Document d = super.visitDocument(document, ctx);
-                if (d == document && !getCursor().getMessage(FOUND_MATCHING_ELEMENT, false)) {
-                    // No matching element already exists, attempt to construct one
+                if ((createNewKeys == null || Boolean.TRUE.equals(createNewKeys)) && d == document && !getCursor().getMessage(FOUND_MATCHING_ELEMENT, false)) {
+                    // No matching element found, but check if the key maybe exists in the json path.
                     String valueKey = maybeKeyFromJsonPath(key);
                     if (valueKey == null) {
                         return d;
                     }
-                    // If there is no space between the colon and the value it will not be interpreted as a mapping
-                    String snippet;
+                    // No matching element already exists, so it must be constructed.
+                    @Language("yml") String snippet;
                     if (incoming instanceof Yaml.Mapping) {
-                        snippet = valueKey + ":\n" + indent(yaml);
+                        // Use two spaces as indent, the `MergeYamlVisitor` recipe will take care for proper indenting by calling `autoformat`,
+                        snippet = valueKey + ":\n  " + yaml.replaceAll("\n", "\n  ");
                     } else {
+                        // If there is no space between the colon and the value it will not be interpreted as a mapping
                         snippet = valueKey + ":" + (yaml.startsWith(" ") ? yaml : " " + yaml);
                     }
-                    // No matching element already exists, so it must be constructed
-                    //noinspection LanguageMismatch
-                    return d.withBlock((Yaml.Block) new MergeYamlVisitor<>(d.getBlock(), MergeYaml.parse(snippet),
-                            Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty, insertMode, insertProperty).visitNonNull(d.getBlock(),
-                            ctx, getCursor()));
+                    return d.withBlock((Yaml.Block)
+                            new MergeYamlVisitor<>(d.getBlock(), MergeYaml.parse(snippet), accptTheirs, objectIdentifyingProperty, insertMode, insertProperty)
+                                    .visitNonNull(d.getBlock(), ctx, getCursor()));
                 }
                 return d;
-            }
-
-            private String indent(String text) {
-                int index = text.indexOf('\n');
-                if (index == -1 || index == text.length() - 1) {
-                    return text;
-                }
-                StringBuilder padding = new StringBuilder();
-                for (int i = index + 1; i < text.length(); i++) {
-                    if (!Character.isWhitespace(text.charAt(i))) {
-                        break;
-                    }
-                    padding.append(text.charAt(i));
-                }
-                if (padding.length() == 0) {
-                    padding.append("  ");
-                }
-                return text.replaceAll("(?m)^", padding.toString());
             }
 
             private @Nullable String maybeKeyFromJsonPath(String jsonPath) {
@@ -215,7 +210,7 @@ public class MergeYaml extends Recipe {
                 Yaml.Mapping m = super.visitMapping(mapping, ctx);
                 if (matcher.matches(getCursor())) {
                     getCursor().putMessageOnFirstEnclosing(Yaml.Document.class, FOUND_MATCHING_ELEMENT, true);
-                    m = (Yaml.Mapping) new MergeYamlVisitor<>(mapping, incoming, Boolean.TRUE.equals(acceptTheirs),
+                    m = (Yaml.Mapping) new MergeYamlVisitor<>(mapping, incoming, accptTheirs,
                             objectIdentifyingProperty, insertMode, insertProperty).visitNonNull(mapping, ctx, getCursor().getParentOrThrow());
                 }
                 return m;
@@ -226,7 +221,7 @@ public class MergeYaml extends Recipe {
                 if (matcher.matches(getCursor())) {
                     getCursor().putMessageOnFirstEnclosing(Yaml.Document.class, FOUND_MATCHING_ELEMENT, true);
                     Yaml.Block value = (Yaml.Block) new MergeYamlVisitor<>(entry.getValue(), incoming,
-                            Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty, insertMode, insertProperty).visitNonNull(entry.getValue(),
+                            accptTheirs, objectIdentifyingProperty, insertMode, insertProperty).visitNonNull(entry.getValue(),
                             ctx, getCursor());
                     if (value instanceof Yaml.Scalar && value.getPrefix().isEmpty()) {
                         value = value.withPrefix(" ");
@@ -242,7 +237,7 @@ public class MergeYaml extends Recipe {
                     getCursor().putMessageOnFirstEnclosing(Yaml.Document.class, FOUND_MATCHING_ELEMENT, true);
                     return sequence.withEntries(ListUtils.map(sequence.getEntries(),
                             entry -> entry.withBlock((Yaml.Block) new MergeYamlVisitor<>(entry.getBlock(), incoming,
-                                    Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty, insertMode, insertProperty)
+                                    accptTheirs, objectIdentifyingProperty, insertMode, insertProperty)
                                     .visitNonNull(entry.getBlock(), ctx, new Cursor(getCursor(), entry)))));
                 }
                 return super.visitSequence(sequence, ctx);
