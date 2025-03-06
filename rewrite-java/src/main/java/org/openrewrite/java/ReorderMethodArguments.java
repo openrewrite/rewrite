@@ -93,6 +93,11 @@ public class ReorderMethodArguments extends Recipe {
     }
 
     @Override
+    public Validated<Object> validate() {
+        return super.validate().and(MethodMatcher.validate(methodPattern));
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new JavaVisitor<ExecutionContext>() {
             @Override

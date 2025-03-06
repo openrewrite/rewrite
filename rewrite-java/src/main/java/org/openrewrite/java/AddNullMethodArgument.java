@@ -88,6 +88,11 @@ public class AddNullMethodArgument extends Recipe {
     }
 
     @Override
+    public Validated<Object> validate() {
+        return super.validate().and(MethodMatcher.validate(methodPattern));
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new UsesMethod<>(methodPattern), new AddNullMethodArgumentVisitor(new MethodMatcher(methodPattern)));
     }
