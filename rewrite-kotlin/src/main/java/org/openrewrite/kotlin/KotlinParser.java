@@ -128,7 +128,7 @@ public class KotlinParser implements Parser {
 
     @Override
     public Stream<SourceFile> parse(@Language("kotlin") String... sources) {
-        Pattern packagePattern = Pattern.compile("\bpackage\\s+([`.\\w]+)");
+        Pattern packagePattern = Pattern.compile("\\bpackage\\s+([`.\\w]+)");
         Pattern classPattern = Pattern.compile("(class|interface|enum)\\s*(<[^>]*>)?\\s+(\\w+)");
 
         Function<String, String> simpleName = sourceStr -> {
