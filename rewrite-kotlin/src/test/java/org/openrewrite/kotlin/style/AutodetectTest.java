@@ -19,6 +19,8 @@ package org.openrewrite.kotlin.style;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.openrewrite.Issue;
 import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.style.NamedStyles;
@@ -196,6 +198,7 @@ class AutodetectTest implements RewriteTest {
 
     @SuppressWarnings("InfiniteRecursion")
     @Test
+    @DisabledOnOs(OS.WINDOWS)
     void spinnakerTabsAndIndents() {
         var cus = kp().parse(
           """

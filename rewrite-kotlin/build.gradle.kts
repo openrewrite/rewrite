@@ -27,6 +27,7 @@ dependencies {
     testImplementation(project(":rewrite-test"))
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:latest.release")
     testRuntimeOnly(project(":rewrite-java-17"))
+    testRuntimeOnly("org.antlr:antlr4-runtime:4.13.2")
 
     testImplementation("com.github.ajalt.clikt:clikt:3.5.0")
     testImplementation("com.squareup:javapoet:1.13.0")
