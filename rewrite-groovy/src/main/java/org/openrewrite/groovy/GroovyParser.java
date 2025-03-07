@@ -62,7 +62,7 @@ public class GroovyParser implements Parser {
 
     @Override
     public Stream<SourceFile> parse(@Language("groovy") String... sources) {
-        Pattern packagePattern = Pattern.compile("^package\\s+([^;]+);");
+        Pattern packagePattern = Pattern.compile("\\bpackage\\s+([`.\\w]+)");
         Pattern classPattern = Pattern.compile("(class|interface|enum)\\s*(<[^>]*>)?\\s+(\\w+)");
 
         Function<String, @Nullable String> simpleName = sourceStr -> {
