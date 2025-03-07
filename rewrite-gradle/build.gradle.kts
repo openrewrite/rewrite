@@ -32,7 +32,6 @@ recipeDependencies {
     parserClasspath("org.gradle:gradle-resources:latest.release")
     parserClasspath("org.gradle:gradle-testing-base:latest.release")
     parserClasspath("org.gradle:gradle-testing-jvm:latest.release")
-    parserClasspath("com.gradle:gradle-enterprise-gradle-plugin:latest.release")
 }
 
 //val rewriteVersion = rewriteRecipe.rewriteVersion.get()
