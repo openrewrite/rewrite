@@ -5,8 +5,6 @@ plugins {
     id("groovy")
 }
 
-val parserClasspath = configurations.create("parserClasspath")
-
 repositories {
     maven {
         url = uri("https://repo.gradle.org/gradle/libs-releases/")
@@ -20,6 +18,21 @@ repositories {
             excludeVersionByRegex(".+", ".+", ".+-rc-?[0-9]*")
         }
     }
+}
+
+recipeDependencies {
+    parserClasspath("org.gradle:gradle-base-services:latest.release")
+    parserClasspath("org.gradle:gradle-core-api:latest.release")
+    parserClasspath("org.gradle:gradle-language-groovy:latest.release")
+    parserClasspath("org.gradle:gradle-language-java:latest.release")
+    parserClasspath("org.gradle:gradle-logging:latest.release")
+    parserClasspath("org.gradle:gradle-messaging:latest.release")
+    parserClasspath("org.gradle:gradle-native:latest.release")
+    parserClasspath("org.gradle:gradle-process-services:latest.release")
+    parserClasspath("org.gradle:gradle-resources:latest.release")
+    parserClasspath("org.gradle:gradle-testing-base:latest.release")
+    parserClasspath("org.gradle:gradle-testing-jvm:latest.release")
+    parserClasspath("com.gradle:gradle-enterprise-gradle-plugin:latest.release")
 }
 
 //val rewriteVersion = rewriteRecipe.rewriteVersion.get()
@@ -41,21 +54,7 @@ dependencies {
 
     compileOnly("org.codehaus.groovy:groovy:latest.release")
     compileOnly(gradleApi())
-
     compileOnly("com.gradle:gradle-enterprise-gradle-plugin:latest.release")
-
-    "parserClasspath"("org.gradle:gradle-base-services:latest.release")
-    "parserClasspath"("org.gradle:gradle-core-api:latest.release")
-    "parserClasspath"("org.gradle:gradle-language-groovy:latest.release")
-    "parserClasspath"("org.gradle:gradle-language-java:latest.release")
-    "parserClasspath"("org.gradle:gradle-logging:latest.release")
-    "parserClasspath"("org.gradle:gradle-messaging:latest.release")
-    "parserClasspath"("org.gradle:gradle-native:latest.release")
-    "parserClasspath"("org.gradle:gradle-process-services:latest.release")
-    "parserClasspath"("org.gradle:gradle-resources:latest.release")
-    "parserClasspath"("org.gradle:gradle-testing-base:latest.release")
-    "parserClasspath"("org.gradle:gradle-testing-jvm:latest.release")
-    "parserClasspath"("com.gradle:gradle-enterprise-gradle-plugin:latest.release")
 
     testImplementation(project(":rewrite-test")) {
         // because gradle-api fatjars this implementation already
@@ -70,7 +69,6 @@ dependencies {
     testRuntimeOnly("org.codehaus.groovy:groovy:latest.release")
     testRuntimeOnly("org.gradle:gradle-base-services:latest.release")
     testRuntimeOnly(gradleApi())
-    testRuntimeOnly("com.gradle:gradle-enterprise-gradle-plugin:latest.release")
     testRuntimeOnly("com.google.guava:guava:latest.release")
     testRuntimeOnly(project(":rewrite-java-17"))
     testRuntimeOnly("org.projectlombok:lombok:latest.release")
@@ -82,12 +80,6 @@ tasks.withType<GroovyCompile> {
     this.javaLauncher.set(javaToolchains.launcherFor {
         languageVersion.set(JavaLanguageVersion.of(8))
     })
-}
-
-tasks.named<Copy>("processResources") {
-    from(parserClasspath) {
-        into("META-INF/rewrite/classpath")
-    }
 }
 
 //Javadoc compiler will complain about the use of the internal types.
