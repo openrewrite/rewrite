@@ -18,17 +18,23 @@ package org.openrewrite.maven;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.DelegatingExecutionContext;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.maven.cache.InMemoryMavenPomCache;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.maven.tree.*;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static java.util.Collections.emptyList;
+import static java.util.Collections.*;
+import static java.util.stream.Collectors.toList;
+import static org.openrewrite.internal.ListUtils.concat;
 import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
 
 @SuppressWarnings({"unused", "UnusedReturnValue"})
@@ -47,6 +53,8 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     private static final String MAVEN_POM_CACHE = "org.openrewrite.maven.pomCache";
     private static final String MAVEN_RESOLUTION_LISTENER = "org.openrewrite.maven.resolutionListener";
     private static final String MAVEN_RESOLUTION_TIME = "org.openrewrite.maven.resolutionTime";
+    private static final String MAVEN_PROJECT_POMS_BY_SOURCE_PATH = "org.openrewrite.maven.project.poms.by.source.path";
+    private static final String MAVEN_PROJECT_POMS_BY_GAV = "org.openrewrite.maven.project.poms.by.gav";
 
     public MavenExecutionContextView(ExecutionContext delegate) {
         super(delegate);
@@ -261,14 +269,14 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
                         settings.getActiveProfiles().getActiveProfiles().stream(),
                         Arrays.stream(activeProfiles))
                 .distinct()
-                .collect(Collectors.toList());
+                .collect(toList());
     }
 
     private static List<MavenRepositoryCredentials> mapCredentials(MavenSettings settings) {
         if (settings.getServers() != null) {
             return settings.getServers().getServers().stream()
                     .map(server -> new MavenRepositoryCredentials(server.getId(), server.getUsername(), server.getPassword()))
-                    .collect(Collectors.toList());
+                    .collect(toList());
         }
         return emptyList();
     }
@@ -277,7 +285,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         if (settings.getMirrors() != null) {
             return settings.getMirrors().getMirrors().stream()
                     .map(mirror -> new MavenRepositoryMirror(mirror.getId(), mirror.getUrl(), mirror.getMirrorOf(), mirror.getReleases(), mirror.getSnapshots(), settings.getServers()))
-                    .collect(Collectors.toList());
+                    .collect(toList());
         }
         return emptyList();
     }
@@ -321,6 +329,84 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
                     }
                 })
                 .filter(Objects::nonNull)
-                .collect(Collectors.toList());
+                .collect(toList());
     }
+
+    public Map<Path, Pom> getProjectPomsBySourcePath() {
+        return getMessage(MAVEN_PROJECT_POMS_BY_SOURCE_PATH, emptyMap());
+    }
+
+    public Map<GroupArtifactVersion, Pom> getProjectPomsByGav() {
+        return getMessage(MAVEN_PROJECT_POMS_BY_GAV, emptyMap());
+    }
+
+    public void setProjectPoms(Map<Path, Pom> projectPoms) {
+        putMessage(MAVEN_PROJECT_POMS_BY_SOURCE_PATH, projectPoms);
+        putMessage(MAVEN_PROJECT_POMS_BY_GAV, projectPomsByGav());
+    }
+
+    public void updateProjectPom(Pom projectPom) {
+        Objects.requireNonNull(projectPom.getSourcePath());
+        computeMessage(MAVEN_PROJECT_POMS_BY_SOURCE_PATH, projectPom, () -> new HashMap<Path, Pom>(), (pom, map) -> {
+            map.put(pom.getSourcePath(), pom);
+            return map;
+        });
+        putMessage(MAVEN_PROJECT_POMS_BY_GAV, projectPomsByGav());
+    }
+
+    public List<Pom> getProjectPoms() {
+        return new ArrayList<>(getProjectPomsBySourcePath().values());
+    }
+
+    public List<Pom> getAncestryWithinProject(Pom projectPom) {
+        return getAncestryWithinProject(projectPom, getProjectPomsBySourcePath());
+    }
+
+    public static Map<String, String> mergeProperties(final List<Pom> pomAncestry) {
+        Map<String, String> mergedProperties = new HashMap<>();
+        for (Pom pom : pomAncestry) {
+            for (Map.Entry<String, String> property : pom.getProperties().entrySet()) {
+                mergedProperties.putIfAbsent(property.getKey(), property.getValue());
+            }
+        }
+        return mergedProperties;
+    }
+
+    private static List<Pom> getAncestryWithinProject(Pom projectPom, Map<Path, Pom> projectPoms) {
+        Pom parentPom = getParentWithinProject(projectPom, projectPoms);
+        return parentPom == null ? singletonList(projectPom) : concat(projectPom, getAncestryWithinProject(parentPom, projectPoms));
+    }
+
+    private static @Nullable Pom getParentWithinProject(Pom projectPom, Map<Path, Pom> projectPoms) {
+        Parent parent = projectPom.getParent();
+        if (parent == null || projectPom.getSourcePath() == null) {
+            return null;
+        }
+        String relativePath = parent.getRelativePath();
+        if (StringUtils.isBlank(relativePath)) {
+            relativePath = "../pom.xml";
+        }
+        Path parentPath = projectPom.getSourcePath()
+                .resolve("..")
+                .resolve(Paths.get(relativePath))
+                .normalize();
+        Pom parentPom = projectPoms.get(parentPath);
+        return parentPom != null && parentPom.getGav().getGroupId().equals(parent.getGav().getGroupId()) &&
+                parentPom.getGav().getArtifactId().equals(parent.getGav().getArtifactId()) ? parentPom : null;
+    }
+
+    private Map<GroupArtifactVersion, Pom> projectPomsByGav() {
+        Map<GroupArtifactVersion, Pom> result = new HashMap<>();
+        for (Pom projectPom : getProjectPoms()) {
+            Map<String, String> mergedProperties = mergeProperties(getAncestryWithinProject(projectPom));
+            GroupArtifactVersion gav = new GroupArtifactVersion(
+                    projectPom.getGroupId(),
+                    projectPom.getArtifactId(),
+                    ResolvedPom.placeholderHelper.replacePlaceholders(projectPom.getVersion(), mergedProperties::get)
+            );
+            result.put(gav, projectPom);
+        }
+        return result;
+    }
+
 }

@@ -158,7 +158,7 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
                 resolvedGav = null;
                 transitiveDependencies = Collections.emptyList();
             } else {
-                MavenPomDownloader mpd = new MavenPomDownloader(ctx);
+                MavenPomDownloader mpd = MavenPomDownloader.forNonMavenContext(ctx);
                 Pom pom = mpd.download(gav, null, null, gp.getMavenRepositories());
                 ResolvedPom resolvedPom = pom.resolve(emptyList(), mpd, gp.getMavenRepositories(), ctx);
                 resolvedGav = resolvedPom.getGav();

@@ -175,7 +175,7 @@ public class DependencyVersionSelector {
     }
 
     private MavenMetadata downloadMetadata(String groupId, String artifactId, List<MavenRepository> repositories, ExecutionContext ctx) throws MavenDownloadingException {
-        return new MavenPomDownloader(ctx).downloadMetadata(
+        return MavenPomDownloader.forNonMavenContext(ctx).downloadMetadata(
                 new GroupArtifact(groupId, artifactId), null, repositories);
     }
 
