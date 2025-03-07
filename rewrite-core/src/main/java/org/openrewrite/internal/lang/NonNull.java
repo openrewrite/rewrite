@@ -18,14 +18,13 @@ package org.openrewrite.internal.lang;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
-import javax.annotation.Nonnull;
 import javax.annotation.meta.TypeQualifierNickname;
 import java.lang.annotation.*;
 
 /**
  * A common annotation to declare that annotated elements cannot be {@code null}.
- * Leverages JSR 305 meta-annotations to indicate nullability in Java to common tools with
- * JSR 305 support and used by Kotlin to infer nullability of the API.
+ * Leverages JSpecify meta-annotations to indicate nullability in Java to common tools with
+ * JSpecify support and used by Kotlin to infer nullability of the API.
  * <p>Should be used at parameter, return value, and field level. Method overrides should
  * repeat parent {@code @NonNull} annotations unless they behave differently.
  * <p>Use {@code @NonNullApi} (scope = parameters + return values) and/or {@code @NonNullFields}
@@ -40,7 +39,7 @@ import java.lang.annotation.*;
 @Target({ElementType.METHOD, ElementType.PARAMETER, ElementType.FIELD, ElementType.TYPE, ElementType.TYPE_USE})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
-@Nonnull
+@org.jspecify.annotations.NonNull
 @TypeQualifierNickname
 @Deprecated
 public @interface NonNull {
