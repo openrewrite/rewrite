@@ -60,6 +60,7 @@ dependencies {
         exclude("ch.qos.logback", "logback-classic")
         exclude("org.slf4j", "slf4j-nop")
     }
+    testImplementation("org.junit-pioneer:junit-pioneer:2.0.0")
 
     testImplementation("org.openrewrite.gradle.tooling:model:$latest")
 
