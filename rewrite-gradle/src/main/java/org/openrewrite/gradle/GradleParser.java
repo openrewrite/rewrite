@@ -70,7 +70,7 @@ public class GradleParser implements Parser {
                 }
                 buildscriptClasspath = defaultClasspath;
             }
-            kotlinBuildParser = KotlinParser.builder()
+            kotlinBuildParser = KotlinParser.builder(base.kotlinParser)
                     .classpath(buildscriptClasspath)
                     .build();
         }
@@ -98,7 +98,7 @@ public class GradleParser implements Parser {
                 }
                 settingsClasspath = defaultClasspath;
             }
-            kotlinSettingsParser = KotlinParser.builder()
+            kotlinSettingsParser = KotlinParser.builder(base.kotlinParser)
                     .classpath(settingsClasspath)
                     .build();
         }
@@ -133,6 +133,7 @@ public class GradleParser implements Parser {
 
     public static class Builder extends Parser.Builder {
         protected GroovyParser.Builder groovyParser = GroovyParser.builder();
+        protected KotlinParser.Builder kotlinParser = KotlinParser.builder();
 
         @Nullable
         private Collection<Path> buildscriptClasspath;
@@ -146,6 +147,11 @@ public class GradleParser implements Parser {
 
         public Builder groovyParser(GroovyParser.Builder groovyParser) {
             this.groovyParser = groovyParser;
+            return this;
+        }
+
+        public Builder kotlinParser(KotlinParser.Builder kotlinParser) {
+            this.kotlinParser = kotlinParser;
             return this;
         }
 

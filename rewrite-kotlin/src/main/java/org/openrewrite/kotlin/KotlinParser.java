@@ -250,6 +250,10 @@ public class KotlinParser implements Parser {
         return new Builder();
     }
 
+    public static Builder builder(Builder base) {
+        return new Builder(base);
+    }
+
     @SuppressWarnings("unused")
     public static class Builder extends Parser.Builder {
         @Nullable
@@ -268,6 +272,15 @@ public class KotlinParser implements Parser {
 
         public Builder() {
             super(K.CompilationUnit.class);
+        }
+
+        public Builder(Builder base) {
+            super(K.CompilationUnit.class);
+            this.classpath = base.classpath;
+            this.artifactNames = base.artifactNames;
+            this.typeCache = base.typeCache;
+            this.logCompilationWarningsAndErrors = base.logCompilationWarningsAndErrors;
+            this.styles.addAll(base.styles);
         }
 
         public Builder logCompilationWarningsAndErrors(boolean logCompilationWarningsAndErrors) {
