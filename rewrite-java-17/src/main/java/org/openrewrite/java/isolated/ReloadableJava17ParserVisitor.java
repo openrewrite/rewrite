@@ -516,8 +516,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             );
         } else if (kind.getType() == J.ClassDeclaration.Kind.Type.Enum) {
             if (positionOfNext(";", null) >= 0) {
-                Space prefix = sourceBefore(";");
-                enumSet = padRight(new J.EnumValueSet(randomId(), prefix, Markers.EMPTY, emptyList(), true), EMPTY);
+                enumSet = padRight(new J.EnumValueSet(randomId(), sourceBefore(";"), Markers.EMPTY, emptyList(), true), EMPTY);
             }
         }
 
