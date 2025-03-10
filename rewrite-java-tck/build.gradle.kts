@@ -6,7 +6,7 @@ plugins {
 }
 
 dependencies {
-    implementation("org.assertj:assertj-core:3.+")
+    implementation("org.assertj:assertj-core:latest.release")
     implementation(project(":rewrite-java"))
     implementation(project(":rewrite-java-test"))
     implementation(project(":rewrite-test"))
@@ -15,6 +15,16 @@ dependencies {
             System.getProperty("idea.sync.active") != null) {
         // so we can run tests in the IDE with the IntelliJ IDEA runner
         runtimeOnly(project(":rewrite-java-17"))
+    }
+}
+
+configurations.all {
+    resolutionStrategy {
+        eachDependency {
+            if (requested.group == "org.assertj" && requested.name == "assertj-core") {
+                useVersion("3.+") // Pin to latest 3.+ version as AssertJ 4 requires Java 17
+            }
+        }
     }
 }
 

@@ -26,7 +26,18 @@ dependencies {
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
 
     testImplementation(project(":rewrite-test"))
+    testImplementation("org.assertj:assertj-core:latest.release")
     "javaTck"(project(":rewrite-java-tck"))
+}
+
+configurations.all {
+    resolutionStrategy {
+        eachDependency {
+            if (requested.group == "org.assertj" && requested.name == "assertj-core") {
+                useVersion("3.+") // Pin to latest 3.+ version as AssertJ 4 requires Java 17
+            }
+        }
+    }
 }
 
 java {
@@ -63,7 +74,7 @@ testing {
                 implementation(project(":rewrite-test"))
                 implementation(project(":rewrite-java-tck"))
                 implementation(project(":rewrite-java-test"))
-                implementation("org.assertj:assertj-core:3.+")
+                implementation("org.assertj:assertj-core:latest.release")
             }
 
             targets {
