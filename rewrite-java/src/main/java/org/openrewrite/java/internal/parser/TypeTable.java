@@ -34,8 +34,7 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.zip.DeflaterOutputStream;
-import java.util.zip.InflaterInputStream;
+import java.util.zip.*;
 
 import static java.util.Objects.requireNonNull;
 import static org.objectweb.asm.ClassReader.SKIP_CODE;
@@ -68,9 +67,8 @@ import static org.openrewrite.java.internal.parser.JavaParserCaller.findCaller;
  * There is of course a lot of duplication in the class and GAV columns, but compression cuts down on
  * the disk impact of that and the value is an overall single table representation.
  * <p>
- * To read a compressed type table file (which is compressed with zlib), the following command can be used:
- * <code>printf "\x1f\x8b\x08\x00\x00\x00\x00\x00" |cat - types.tsv.zip |gzip -dc</code>
- * It prepends the gzip magic header onto the zlib data and used gzip to decompress.
+ * To read a compressed type table file (which is compressed with gzip), the following command can be used:
+ * <code>gzcat types.tsv.zip</code>.
  */
 @Incubating(since = "8.44.0")
 @Value
@@ -109,8 +107,15 @@ public class TypeTable implements JavaParserClasspathLoader {
     }
 
     private static void read(URL url, Collection<String> artifactNames, ExecutionContext ctx) {
-        try (InputStream is = url.openStream(); InputStream inflate = new InflaterInputStream(is)) {
+        try (InputStream is = url.openStream(); InputStream inflate = new GZIPInputStream(is)) {
             new Reader(ctx).read(inflate, artifactsNotYetWritten(artifactNames));
+        } catch (ZipException e) {
+            // Fallback to `InflaterInputStream` for older files created as raw zlib data using DeflaterOutputStream
+            try (InputStream is = url.openStream(); InputStream inflate = new InflaterInputStream(is)) {
+                new Reader(ctx).read(inflate, artifactsNotYetWritten(artifactNames));
+            } catch (IOException e1) {
+                throw new UncheckedIOException(e1);
+            }
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -297,7 +302,11 @@ public class TypeTable implements JavaParserClasspathLoader {
     }
 
     public static Writer newWriter(OutputStream out) {
-        return new Writer(out);
+        try {
+            return new Writer(out);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     @Override
@@ -315,10 +324,10 @@ public class TypeTable implements JavaParserClasspathLoader {
 
     public static class Writer implements AutoCloseable {
         private final PrintStream out;
-        private final DeflaterOutputStream deflater;
+        private final GZIPOutputStream deflater;
 
-        public Writer(OutputStream out) {
-            this.deflater = new DeflaterOutputStream(out);
+        public Writer(OutputStream out) throws IOException {
+            this.deflater = new GZIPOutputStream(out);
             this.out = new PrintStream(deflater);
             this.out.println("groupId\tartifactId\tversion\tclassAccess\tclassName\tclassSignature\tclassSuperclassSignature\tclassSuperinterfaceSignatures\taccess\tname\tdescriptor\tsignature\tparameterNames\texceptions");
         }
