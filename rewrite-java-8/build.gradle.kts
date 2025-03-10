@@ -26,7 +26,6 @@ dependencies {
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
 
     testImplementation(project(":rewrite-test"))
-    testImplementation("org.assertj:assertj-core:latest.release")
     "javaTck"(project(":rewrite-java-tck"))
 }
 

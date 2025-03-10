@@ -18,7 +18,6 @@ dependencies {
     implementation("org.ow2.asm:asm:latest.release")
 
     testImplementation(project(":rewrite-test"))
-    testImplementation("org.assertj:assertj-core:latest.release")
     "javaTck"(project(":rewrite-java-tck"))
 }
 
