@@ -213,7 +213,7 @@ public class GradleParser implements Parser {
                     "gradle-resources",
                     "gradle-testing-base",
                     "gradle-testing-jvm",
-                    "gradle-enterprise-gradle-plugin");
+                    "develocity-gradle-plugin");
         }
     }
 }

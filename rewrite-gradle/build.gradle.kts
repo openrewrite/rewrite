@@ -32,7 +32,7 @@ recipeDependencies {
     parserClasspath("org.gradle:gradle-resources:latest.release")
     parserClasspath("org.gradle:gradle-testing-base:latest.release")
     parserClasspath("org.gradle:gradle-testing-jvm:latest.release")
-    parserClasspath("com.gradle:gradle-enterprise-gradle-plugin:latest.release")
+    parserClasspath("com.gradle:develocity-gradle-plugin:latest.release")
 }
 
 //val rewriteVersion = rewriteRecipe.rewriteVersion.get()
@@ -54,7 +54,7 @@ dependencies {
 
     compileOnly("org.codehaus.groovy:groovy:latest.release")
     compileOnly(gradleApi())
-    compileOnly("com.gradle:gradle-enterprise-gradle-plugin:latest.release")
+    compileOnly("com.gradle:develocity-gradle-plugin:latest.release")
 
     testImplementation(project(":rewrite-test")) {
         // because gradle-api fatjars this implementation already
