@@ -456,6 +456,11 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                     ),
                     EMPTY
             );
+        } else if (kind.getType() == J.ClassDeclaration.Kind.Type.Enum) {
+            if (positionOfNext(";", null) >= 0) {
+                Space prefix = sourceBefore(";");
+                enumSet = padRight(new J.EnumValueSet(randomId(), prefix, Markers.EMPTY, emptyList(), true), EMPTY);
+            }
         }
 
         List<Tree> membersMultiVariablesSeparated = new ArrayList<>(node.getMembers().size());
