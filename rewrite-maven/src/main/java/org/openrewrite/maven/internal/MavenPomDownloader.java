@@ -53,7 +53,6 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.internal.ListUtils.concatAll;
-import static java.util.stream.Collectors.toList;
 import static org.openrewrite.maven.MavenExecutionContextView.mergeProperties;
 
 @SuppressWarnings("OptionalAssignedToNull")
