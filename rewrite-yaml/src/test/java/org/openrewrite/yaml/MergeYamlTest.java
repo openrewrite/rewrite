@@ -2984,4 +2984,22 @@ class MergeYamlTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void sourceNull() {
+        assertThrows(AssertionError.class, () ->
+            rewriteRun(
+              spec -> spec
+                .recipe(new MergeYaml(
+                  "$.some.object",
+                  null,
+                  false,
+                  "name",
+                  null,
+                  null,
+                  null,
+                  null
+                ))
+            ));
+    }
 }
