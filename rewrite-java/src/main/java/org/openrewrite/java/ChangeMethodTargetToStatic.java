@@ -93,6 +93,11 @@ public class ChangeMethodTargetToStatic extends Recipe {
     }
 
     @Override
+    public Validated<Object> validate() {
+        return super.validate().and(MethodMatcher.validate(methodPattern));
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         boolean matchUnknown = Boolean.TRUE.equals(matchUnknownTypes);
         ChangeMethodTargetToStaticVisitor visitor = new ChangeMethodTargetToStaticVisitor(new MethodMatcher(methodPattern, matchOverrides), matchUnknown);

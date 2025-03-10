@@ -128,32 +128,37 @@ public abstract class Recipe implements Cloneable {
     @Incubating(since = "8.12.0")
     @Language("markdown")
     public String getInstanceName() {
-        @Language("markdown")
-        String suffix = getInstanceNameSuffix();
-        if (!StringUtils.isBlank(suffix)) {
-            return getDisplayName() + " " + suffix;
-        }
-
-        List<OptionDescriptor> options = new ArrayList<>(getOptionDescriptors());
-        options.removeIf(opt -> !opt.isRequired());
-        if (options.isEmpty()) {
-            return getDisplayName();
-        }
-        if (options.size() == 1) {
-            try {
-                OptionDescriptor option = options.get(0);
-                String name = option.getName();
-                Field optionField = getClass().getDeclaredField(name);
-                optionField.setAccessible(true);
-                Object optionValue = optionField.get(this);
-                if (optionValue != null &&
-                    !Iterable.class.isAssignableFrom(optionValue.getClass()) &&
-                    !optionValue.getClass().isArray()) {
-                    return String.format("%s `%s`", getDisplayName(), optionValue);
-                }
-            } catch (NoSuchFieldException | IllegalAccessException ignore) {
-                // we tried...
+        try {
+            @Language("markdown")
+            String suffix = getInstanceNameSuffix();
+            if (!StringUtils.isBlank(suffix)) {
+                return getDisplayName() + " " + suffix;
             }
+
+            List<OptionDescriptor> options = new ArrayList<>(getOptionDescriptors());
+            options.removeIf(opt -> !opt.isRequired());
+            if (options.isEmpty()) {
+                return getDisplayName();
+            }
+            if (options.size() == 1) {
+                try {
+                    OptionDescriptor option = options.get(0);
+                    String name = option.getName();
+                    Field optionField = getClass().getDeclaredField(name);
+                    optionField.setAccessible(true);
+                    Object optionValue = optionField.get(this);
+                    if (optionValue != null &&
+                        !Iterable.class.isAssignableFrom(optionValue.getClass()) &&
+                        !optionValue.getClass().isArray()) {
+                        return String.format("%s `%s`", getDisplayName(), optionValue);
+                    }
+                } catch (NoSuchFieldException | IllegalAccessException ignore) {
+                    // we tried...
+                }
+            }
+        } catch (Throwable ignored) {
+            // Just in case instance name suffix throws an exception because
+            // of unpopulated options or something similar to this.
         }
         return getDisplayName();
     }
@@ -356,8 +361,8 @@ public abstract class Recipe implements Cloneable {
      * both, as their default implementations are interconnected.
      *
      * @param recipes A recipe list used to build up a series of recipes
-     *             in code in a way that looks fairly declarative and
-     *             therefore is more amenable to AI code completion.
+     *                in code in a way that looks fairly declarative and
+     *                therefore is more amenable to AI code completion.
      */
     @SuppressWarnings("unused")
     public void buildRecipeList(RecipeList recipes) {
