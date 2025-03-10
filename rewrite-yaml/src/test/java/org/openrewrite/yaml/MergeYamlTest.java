@@ -3027,4 +3027,38 @@ class MergeYamlTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void mergeListRespectIndentation() {
+        rewriteRun(spec ->
+            spec.recipe(new MergeYaml(
+              "$",
+              //language=yaml
+              """
+                widget:
+                  list:
+                  - item 2
+                """,
+              false,
+              null,
+              null,
+              null,
+              null,
+              true
+            )),
+          yaml(
+            """
+              widget:
+                list:
+                - item 1
+              """,
+            """
+              widget:
+                list:
+                - item 1
+                - item 2
+              """
+          )
+        );
+    }
 }
