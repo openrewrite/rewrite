@@ -191,6 +191,9 @@ public class MergeYaml extends Recipe {
                             new MergeYamlVisitor<>(d.getBlock(), MergeYaml.parse(snippet), accptTheirs, objectIdentifyingProperty, insertMode, insertProperty)
                                     .visitNonNull(d.getBlock(), ctx, getCursor()));
                 }
+                if (getCursor().getMessage(REMOVE_PREFIX, false)) {
+                    d = d.withEnd(d.getEnd().withPrefix(""));
+                }
                 return d;
             }
 
