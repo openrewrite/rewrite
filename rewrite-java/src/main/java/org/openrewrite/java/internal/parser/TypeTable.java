@@ -67,9 +67,8 @@ import static org.openrewrite.java.internal.parser.JavaParserCaller.findCaller;
  * There is of course a lot of duplication in the class and GAV columns, but compression cuts down on
  * the disk impact of that and the value is an overall single table representation.
  * <p>
- * To read a compressed type table file (which is compressed with zlib), the following command can be used:
- * <code>printf "\x1f\x8b\x08\x00\x00\x00\x00\x00" |cat - types.tsv.zip |gzip -dc</code>
- * It prepends the gzip magic header onto the zlib data and used gzip to decompress.
+ * To read a compressed type table file (which is compressed with gzip), the following command can be used:
+ * <code>gzcat types.tsv.zip</code>.
  */
 @Incubating(since = "8.44.0")
 @Value
