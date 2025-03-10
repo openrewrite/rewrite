@@ -67,12 +67,14 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
 
     @Override
     public @Nullable Xml preVisit(@NonNull Xml tree, P p) {
-        MavenExecutionContextView ctx = MavenExecutionContextView.view((ExecutionContext) p);
-        if (parentPomWasUpdated(getResolutionResult(), ctx)) {
-            try {
-                resolutionResult = updateResult(ctx, getResolutionResult());
-            } catch (MavenDownloadingExceptions mde) {
-                mde.warn(document);
+        if (p instanceof ExecutionContext) {
+            MavenExecutionContextView ctx = MavenExecutionContextView.view((ExecutionContext) p);
+            if (parentPomWasUpdated(getResolutionResult(), ctx)) {
+                try {
+                    resolutionResult = updateResult(ctx, getResolutionResult());
+                } catch (MavenDownloadingExceptions mde) {
+                    mde.warn(document);
+                }
             }
         }
         return super.preVisit(tree, p);
