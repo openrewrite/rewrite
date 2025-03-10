@@ -121,6 +121,9 @@ public class MergeYaml extends Recipe {
         return super.validate()
                 .and(Validated.test("yaml", "Must be valid YAML",
                         yaml, y -> {
+                            if (yaml == null) {
+                                return false;
+                            }
                             MergeYaml.maybeParse(yaml).ifPresent(it -> incoming = it);
                             return incoming != null;
                         }))
