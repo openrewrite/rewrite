@@ -34,7 +34,10 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.zip.*;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
+import java.util.zip.InflaterInputStream;
+import java.util.zip.ZipException;
 
 import static java.util.Objects.requireNonNull;
 import static org.objectweb.asm.ClassReader.SKIP_CODE;
@@ -124,8 +127,9 @@ public class TypeTable implements JavaParserClasspathLoader {
     private static Collection<String> artifactsNotYetWritten(Collection<String> artifactNames) {
         Collection<String> notWritten = new ArrayList<>(artifactNames);
         for (String artifactName : artifactNames) {
+            Pattern artifactPattern = Pattern.compile(artifactName + ".*");
             for (GroupArtifactVersion groupArtifactVersion : classesDirByArtifact.keySet()) {
-                if (Pattern.compile(artifactName + ".*")
+                if (artifactPattern
                         .matcher(groupArtifactVersion.getArtifactId() + "-" + groupArtifactVersion.getVersion())
                         .matches()) {
                     notWritten.remove(artifactName);
