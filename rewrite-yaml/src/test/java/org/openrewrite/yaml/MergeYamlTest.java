@@ -3002,4 +3002,29 @@ class MergeYamlTest implements RewriteTest {
                 ))
             ));
     }
+
+    @Test
+    void lastEntryShouldKeepItsComment() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.",
+            "imagePullPolicy: Always",
+            true,
+            null,
+            null,
+            null,
+            null,
+            true
+          )),
+          yaml(
+            """
+            containers: ALEF # comment
+            """,
+            """
+            containers: ALEF # comment
+            imagePullPolicy: Always
+            """
+          )
+        );
+    }
 }
