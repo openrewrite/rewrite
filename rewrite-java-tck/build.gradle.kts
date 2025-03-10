@@ -6,7 +6,7 @@ plugins {
 }
 
 dependencies {
-    implementation("org.assertj:assertj-core:latest.release")
+    implementation("org.assertj:assertj-core:3.+")
     implementation(project(":rewrite-java"))
     implementation(project(":rewrite-java-test"))
     implementation(project(":rewrite-test"))

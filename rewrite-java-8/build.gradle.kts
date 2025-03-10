@@ -63,7 +63,7 @@ testing {
                 implementation(project(":rewrite-test"))
                 implementation(project(":rewrite-java-tck"))
                 implementation(project(":rewrite-java-test"))
-                implementation("org.assertj:assertj-core:latest.release")
+                implementation("org.assertj:assertj-core:3.+")
             }
 
             targets {
