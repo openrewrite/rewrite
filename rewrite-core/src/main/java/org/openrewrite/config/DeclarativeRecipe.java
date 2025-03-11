@@ -372,7 +372,7 @@ public class DeclarativeRecipe extends Recipe {
         return new RecipeDescriptor(getName(), getDisplayName(), getInstanceName(), getDescription() != null ? getDescription() : "",
                 getTags(), getEstimatedEffortPerOccurrence(),
                 emptyList(), recipeList, getDataTableDescriptors(), getMaintainers(), getContributors(),
-                getExamples(), source);
+                getExamples(), source, getLicense());
     }
 
     @Value

@@ -24,10 +24,7 @@ import lombok.Setter;
 import lombok.experimental.FieldDefaults;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.config.DataTableDescriptor;
-import org.openrewrite.config.OptionDescriptor;
-import org.openrewrite.config.RecipeDescriptor;
-import org.openrewrite.config.RecipeExample;
+import org.openrewrite.config.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NullUtils;
@@ -231,7 +228,7 @@ public abstract class Recipe implements Cloneable {
 
         return new RecipeDescriptor(getName(), getDisplayName(), getInstanceName(), getDescription(), getTags(),
                 getEstimatedEffortPerOccurrence(), options, recipeList1, getDataTableDescriptors(),
-                getMaintainers(), getContributors(), getExamples(), recipeSource);
+                getMaintainers(), getContributors(), getExamples(), recipeSource, getLicense());
     }
 
     private List<OptionDescriptor> getOptionDescriptors() {
@@ -304,6 +301,17 @@ public abstract class Recipe implements Cloneable {
             return new ArrayList<>();
         }
         return examples;
+    }
+
+    @Setter
+    @Nullable
+    protected transient License license;
+
+    public License getLicense() {
+        if (license == null) {
+            return License.Proprietary;
+        }
+        return license;
     }
 
     /**
