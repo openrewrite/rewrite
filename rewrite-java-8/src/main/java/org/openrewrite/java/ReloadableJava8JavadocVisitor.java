@@ -804,28 +804,28 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
 
         if (!node.isEmpty() && Character.isWhitespace(node.charAt(0)) &&
                 !Character.isWhitespace(source.charAt(cursor))) {
-            int i = 0;
-            for (; i < node.length() && Character.isWhitespace(node.charAt(i)); i++) {
-            }
-
-            node = node.substring(i);
+            node = node.stripLeading();
         }
 
         StringBuilder text = new StringBuilder();
         for (int i = 0; i < node.length(); i++) {
             char c = node.charAt(i);
-            cursor++;
             if (c == '\n') {
                 if (text.length() > 0) {
                     texts.add(new Javadoc.Text(randomId(), Markers.EMPTY, text.toString()));
                     text = new StringBuilder();
                 }
 
-                Javadoc.LineBreak lineBreak = lineBreaks.remove(cursor);
+                Javadoc.LineBreak lineBreak = lineBreaks.remove(++cursor);
                 assert lineBreak != null;
                 texts.add(lineBreak);
+            } else if (source.charAt(cursor) != c && (source.startsWith(toUnicodeEscaped(c), cursor) || source.startsWith(toUnicodeEscaped(c).toLowerCase(), cursor) )) {
+                int escapedCharLength = toUnicodeEscaped(c).length();
+                text.append(source, cursor, cursor + escapedCharLength);
+                cursor += escapedCharLength;
             } else {
                 text.append(c);
+                cursor++;
             }
         }
 
@@ -834,6 +834,10 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         }
 
         return texts;
+    }
+
+    private static String toUnicodeEscaped(char c) {
+        return String.format("\\u%04X", (int) c);
     }
 
     @Override
