@@ -30,7 +30,6 @@ import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.*;
 
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 
 import static java.util.Collections.singletonList;
@@ -141,8 +140,7 @@ public class DependencyVersionSelector {
 
             if (versionComparator instanceof ExactVersion) {
                 return versionComparator.upgrade(gav.getVersion(), singletonList(version)).orElse(null);
-            } else if (versionComparator instanceof LatestPatch &&
-                    !versionComparator.isValid(gav.getVersion(), gav.getVersion())) {
+            } else if (versionComparator instanceof LatestPatch && !Semver.isVersion(gav.getVersion())) {
                 // in the case of "latest.patch", a new version can only be derived if the
                 // current version is a semantic version
                 return null;

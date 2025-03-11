@@ -25,6 +25,7 @@ import org.openrewrite.gradle.internal.DefaultImportsCustomizer;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.kotlin.KotlinParser;
 
 import java.nio.file.Path;
 import java.util.Collection;
@@ -37,21 +38,20 @@ import java.util.stream.StreamSupport;
 public class GradleParser implements Parser {
     private final GradleParser.Builder base;
 
-    private Collection<Path> defaultClasspath;
-    private GroovyParser buildParser;
-    private GroovyParser settingsParser;
+    private @Nullable List<Path> defaultClasspath;
+    private @Nullable GroovyParser groovyBuildParser;
+    private @Nullable GroovyParser groovySettingsParser;
+    private @Nullable KotlinParser kotlinBuildParser;
+    private @Nullable KotlinParser kotlinSettingsParser;
 
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
-        if (buildParser == null) {
+        if (groovyBuildParser == null) {
             Collection<Path> buildscriptClasspath = base.buildscriptClasspath;
             if (buildscriptClasspath == null) {
-                if (defaultClasspath == null) {
-                    defaultClasspath = loadDefaultClasspath();
-                }
-                buildscriptClasspath = defaultClasspath;
+                buildscriptClasspath = defaultClasspath(ctx);
             }
-            buildParser = GroovyParser.builder(base.groovyParser)
+            groovyBuildParser = GroovyParser.builder(base.groovyParser)
                     .classpath(buildscriptClasspath)
                     .compilerCustomizers(
                             new DefaultImportsCustomizer(),
@@ -59,15 +59,21 @@ public class GradleParser implements Parser {
                     )
                     .build();
         }
-        if (settingsParser == null) {
+        if (kotlinBuildParser == null) {
+            Collection<Path> buildscriptClasspath = base.buildscriptClasspath;
+            if (buildscriptClasspath == null) {
+                buildscriptClasspath = defaultClasspath(ctx);
+            }
+            kotlinBuildParser = KotlinParser.builder(base.kotlinParser)
+                    .classpath(buildscriptClasspath)
+                    .build();
+        }
+        if (groovySettingsParser == null) {
             Collection<Path> settingsClasspath = base.settingsClasspath;
             if (settingsClasspath == null) {
-                if (defaultClasspath == null) {
-                    defaultClasspath = loadDefaultClasspath();
-                }
-                settingsClasspath = defaultClasspath;
+                settingsClasspath = defaultClasspath(ctx);
             }
-            settingsParser = GroovyParser.builder(base.groovyParser)
+            groovySettingsParser = GroovyParser.builder(base.groovyParser)
                     .classpath(settingsClasspath)
                     .compilerCustomizers(
                             new DefaultImportsCustomizer(),
@@ -75,19 +81,33 @@ public class GradleParser implements Parser {
                     )
                     .build();
         }
+        if (kotlinSettingsParser == null) {
+            Collection<Path> settingsClasspath = base.settingsClasspath;
+            if (settingsClasspath == null) {
+                settingsClasspath = defaultClasspath(ctx);
+            }
+            kotlinSettingsParser = KotlinParser.builder(base.kotlinParser)
+                    .classpath(settingsClasspath)
+                    .build();
+        }
 
         return StreamSupport.stream(sources.spliterator(), false)
                 .flatMap(source -> {
-                    if (source.getPath().endsWith("settings.gradle")) {
-                        return settingsParser.parseInputs(Collections.singletonList(source), relativeTo, ctx);
+                    Path sourcePath = source.getPath();
+                    if (sourcePath.endsWith("settings.gradle.kts")) {
+                        return kotlinSettingsParser.parseInputs(Collections.singletonList(source), relativeTo, ctx);
+                    } else if (sourcePath.endsWith("settings.gradle")) {
+                        return groovySettingsParser.parseInputs(Collections.singletonList(source), relativeTo, ctx);
+                    } else if (sourcePath.toString().endsWith(".gradle.kts")) {
+                        return kotlinBuildParser.parseInputs(Collections.singletonList(source), relativeTo, ctx);
                     }
-                    return buildParser.parseInputs(Collections.singletonList(source), relativeTo, ctx);
+                    return groovyBuildParser.parseInputs(Collections.singletonList(source), relativeTo, ctx);
                 });
     }
 
     @Override
     public boolean accept(Path path) {
-        return path.toString().endsWith(".gradle");
+        return path.toString().endsWith(".gradle") || path.toString().endsWith(".gradle.kts");
     }
 
     @Override
@@ -101,6 +121,7 @@ public class GradleParser implements Parser {
 
     public static class Builder extends Parser.Builder {
         protected GroovyParser.Builder groovyParser = GroovyParser.builder();
+        protected KotlinParser.Builder kotlinParser = KotlinParser.builder();
 
         @Nullable
         private Collection<Path> buildscriptClasspath;
@@ -114,6 +135,11 @@ public class GradleParser implements Parser {
 
         public Builder groovyParser(GroovyParser.Builder groovyParser) {
             this.groovyParser = groovyParser;
+            return this;
+        }
+
+        public Builder kotlinParser(KotlinParser.Builder kotlinParser) {
+            this.kotlinParser = kotlinParser;
             return this;
         }
 
@@ -158,24 +184,27 @@ public class GradleParser implements Parser {
         }
     }
 
-    private static List<Path> loadDefaultClasspath() {
-        try {
-            Class.forName("org.gradle.api.Project");
-            return JavaParser.runtimeClasspath();
-        } catch (ClassNotFoundException e) {
-            return JavaParser.dependenciesFromResources(new InMemoryExecutionContext(),
-                    "gradle-base-services",
-                    "gradle-core-api",
-                    "gradle-language-groovy",
-                    "gradle-language-java",
-                    "gradle-logging",
-                    "gradle-messaging",
-                    "gradle-native",
-                    "gradle-process-services",
-                    "gradle-resources",
-                    "gradle-testing-base",
-                    "gradle-testing-jvm",
-                    "gradle-enterprise-gradle-plugin");
+    private List<Path> defaultClasspath(ExecutionContext ctx) {
+        if (defaultClasspath == null) {
+            try {
+                Class.forName("org.gradle.api.Project");
+                defaultClasspath = JavaParser.runtimeClasspath();
+            } catch (ClassNotFoundException e) {
+                defaultClasspath = JavaParser.dependenciesFromResources(ctx,
+                        "gradle-base-services",
+                        "gradle-core-api",
+                        "gradle-language-groovy",
+                        "gradle-language-java",
+                        "gradle-logging",
+                        "gradle-messaging",
+                        "gradle-native",
+                        "gradle-process-services",
+                        "gradle-resources",
+                        "gradle-testing-base",
+                        "gradle-testing-jvm",
+                        "develocity-gradle-plugin");
+            }
         }
+        return defaultClasspath;
     }
 }

@@ -129,6 +129,19 @@ class JsonParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void multilineCommentWithUrl() {
+        rewriteRun(
+          json(
+            """
+            {
+              /* https://foo.bar */
+            }
+            """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1145")
     @Test
     void longValue() {

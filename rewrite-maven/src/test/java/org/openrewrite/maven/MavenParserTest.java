@@ -1017,7 +1017,7 @@ class MavenParserTest implements RewriteTest {
             assertThat(maven.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getDependencies().get(Scope.Compile))
               .hasSize(1)
               .matches(deps -> deps.get(0).getGroupId().equals("com.foo") &&
-                deps.get(0).getArtifactId().equals("bar"));
+                               deps.get(0).getArtifactId().equals("bar"));
             mockRepo.shutdown();
         }
     }
@@ -1260,7 +1260,7 @@ class MavenParserTest implements RewriteTest {
 
         @Issue("https://github.com/openrewrite/rewrite/issues/4269")
         @DisplayName("activeByDefault=true profiles from a POM should be active " +
-          "unless there is another active profile _from the same POM file_")
+                     "unless there is another active profile _from the same POM file_")
         @Test
         void activeByDefaultWithoutPomLocalActiveProfile() {
             rewriteRun(
@@ -1387,7 +1387,7 @@ class MavenParserTest implements RewriteTest {
 
         @Issue("https://github.com/openrewrite/rewrite/issues/4269")
         @DisplayName("activeByDefault=true profiles from a POM should not be active" +
-          " if there is another active profile _from the same POM file_")
+                     " if there is another active profile _from the same POM file_")
         @Test
         void activeByDefaultWithPomLocalActiveProfile() {
             expectMavenDownloadingException("active-profile-1");
@@ -1395,7 +1395,7 @@ class MavenParserTest implements RewriteTest {
 
         @Issue("https://github.com/openrewrite/rewrite/issues/4269")
         @DisplayName("activeByDefault=true profiles from a POM should not be active" +
-          " if deactivated from the command-line")
+                     " if deactivated from the command-line")
         @Test
         @Disabled
         void activeByDefaultWithProfileDisabled() {
@@ -1744,7 +1744,7 @@ class MavenParserTest implements RewriteTest {
                 assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getDependencies().get(Scope.Compile))
                   .hasSize(7)
                   .matches(deps -> deps.get(0).getArtifactId().equals("guava") &&
-                    deps.get(0).getVersion().equals("29.0-jre"))
+                                   deps.get(0).getVersion().equals("29.0-jre"))
               )
             )
           )
@@ -1818,9 +1818,9 @@ class MavenParserTest implements RewriteTest {
                       .getDependencies().get(Scope.Compile);
                     assertThat(compileDependencies).hasSize(2);
                     assertThat(compileDependencies).anyMatch(it -> it.getArtifactId().equals("b") &&
-                      it.getVersion().equals("0.1.0-SNAPSHOT"));
+                                                                   it.getVersion().equals("0.1.0-SNAPSHOT"));
                     assertThat(compileDependencies).anyMatch(it -> it.getArtifactId().equals("d") &&
-                      it.getVersion().equals("0.1.0-SNAPSHOT"));
+                                                                   it.getVersion().equals("0.1.0-SNAPSHOT"));
                 })
               ),
               mavenProject("b-parent",
@@ -1961,7 +1961,7 @@ class MavenParserTest implements RewriteTest {
                   var compileDependencies = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
                     .getDependencies().get(Scope.Compile);
                   assertThat(compileDependencies).anyMatch(it -> it.getArtifactId().equals("junit") &&
-                    it.getVersion().equals("4.11"));
+                                                                 it.getVersion().equals("4.11"));
                   assertThat(compileDependencies).noneMatch(it -> it.getArtifactId().equals("hamcrest-core"));
               })
             )
@@ -3702,6 +3702,141 @@ class MavenParserTest implements RewriteTest {
                         <version>${hatversion}</version>
                     </dependency>
                 </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void propertyFromMavenConfig() {
+        rewriteRun(
+          spec -> spec.parser(MavenParser.builder().property("revision", "1.0.0")),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>parent</artifactId>
+                <version>${revision}</version>
+              </project>
+              """,
+            spec -> spec.afterRecipe(p -> {
+                  var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                  assertThat(results.getPom().getVersion()).isEqualTo("${revision}");
+                  assertThat(results.getPom().getProperties().get("revision")).isEqualTo("1.0.0");
+              }
+            )
+          )
+        );
+    }
+
+    @Test
+    void propertyFromMavenConfigFromParentPomCanBeUsedInChild() {
+        rewriteRun(
+          spec -> spec.parser(MavenParser.builder().property("revision", "1.0.0")),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>parent</artifactId>
+                <version>${revision}</version>
+              </project>
+              """
+          ),
+          mavenProject("child",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                  <parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>${revision}</version>
+                  </parent>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>child</artifactId>
+                  <version>${revision}</version>
+                </project>
+                """,
+              spec -> spec.afterRecipe(p -> {
+                  var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                  assertThat(results.getPom().getVersion()).isEqualTo("${revision}");
+                  assertThat(results.getPom().getProperties().get("revision")).isEqualTo("1.0.0");
+                  assertThat(results.getParent().getPom().getVersion()).isEqualTo("${revision}");
+                  assertThat(results.getParent().getPom().getProperties().get("revision")).isEqualTo("1.0.0");
+              })
+            )
+          )
+        );
+    }
+
+    @Test
+    void profilesFromMavenConfig() {
+        rewriteRun(
+          spec -> spec.parser(MavenParser.builder().activeProfiles("a", "b", "c")),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>parent</artifactId>
+                <version>1.0.0</version>
+              </project>
+              """,
+            spec -> spec.afterRecipe(p -> {
+                  var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                  assertThat(results.getPom().getActiveProfiles()).contains("a", "b", "c");
+              }
+            )
+          )
+        );
+    }
+
+    /**
+     * Maven successfully resolves this pom, but warns that transitive dependencies are invalid. e.g.:
+     * [WARNING] The POM for com.sun.xml.stream.buffer:streambuffer:jar:0.6 is invalid, transitive dependencies (if any) will not be available, enable debug logging for more details
+     * [WARNING] The POM for org.jvnet.staxex:stax-ex:jar:1.0 is invalid, transitive dependencies (if any) will not be available, enable debug logging for more details
+     * [WARNING] The POM for com.sun.xsom:xsom:jar:20070323 is invalid, transitive dependencies (if any) will not be available, enable debug logging for more details
+     * Looking inside streambuffer's pom it is missing version numbers for its "activation:activation" dependency.
+     * Maven lists these as the dependencies of this pom and we should match its behavior:
+     *   org.jvnet.jax-ws-commons:jaxws-json:jar:1.1:compile
+     *   +- com.sun.xml.ws:jaxws-rt:jar:2.1.2-alpha-20070426:compile
+     *   |  +- javax.xml.ws:jaxws-api:jar:2.1:compile
+     *   |  +- com.sun.xml.messaging.saaj:saaj-impl:jar:1.3:compile
+     *   |  |  \- javax.xml.soap:saaj-api:jar:1.3:compile
+     *   |  +- com.sun.xml.stream:sjsxp:jar:1.0:compile
+     *   |  |  \- javax.xml.stream:stax-api:jar:1.0:compile
+     *   |  \- org.jvnet.staxex:stax-ex:jar:1.0:compile
+     *   +- com.sun.xml.bind:jaxb-impl:jar:2.1.3:compile
+     *   |  \- javax.xml.bind:jaxb-api:jar:2.1:compile
+     *   |     \- javax.activation:activation:jar:1.1:compile
+     *   +- com.sun.xml.stream.buffer:streambuffer:jar:0.6:compile
+     *   +- com.sun.xsom:xsom:jar:20070323:compile
+     *   +- org.codehaus.jettison:jettison:jar:1.0-beta-1:compile
+     *   |  +- junit:junit:jar:3.8.1:compile
+     *   |  \- stax:stax-api:jar:1.0.1:compile
+     *   +- velocity:velocity:jar:1.5:compile
+     *   |  +- commons-collections:commons-collections:jar:3.1:compile
+     *   |  +- commons-lang:commons-lang:jar:2.1:compile
+     *   |  \- oro:oro:jar:2.0.8:compile
+     *   \- com.sun.xml:relaxngDatatype:jar:1.0:compile
+     */
+    @Disabled
+    @Test
+    void invalidTransitives() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>app</artifactId>
+                <version>1.0.0</version>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.jvnet.jax-ws-commons</groupId>
+                      <artifactId>jaxws-json</artifactId>
+                      <version>1.1</version>
+                    </dependency>
+                  </dependencies>
               </project>
               """
           )

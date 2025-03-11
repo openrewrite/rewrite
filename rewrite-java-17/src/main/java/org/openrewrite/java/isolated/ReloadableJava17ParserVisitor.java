@@ -46,6 +46,8 @@ import org.openrewrite.style.NamedStyles;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.Name;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.*;
@@ -62,7 +64,6 @@ import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.StreamSupport.stream;
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.internal.StringUtils.indexOf;
 import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
 import static org.openrewrite.java.tree.Space.EMPTY;
 import static org.openrewrite.java.tree.Space.format;
@@ -513,6 +514,10 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                     ),
                     EMPTY
             );
+        } else if (kind.getType() == J.ClassDeclaration.Kind.Type.Enum) {
+            if (positionOfNext(";", null) >= 0) {
+                enumSet = padRight(new J.EnumValueSet(randomId(), sourceBefore(";"), Markers.EMPTY, emptyList(), true), EMPTY);
+            }
         }
 
         List<Tree> membersMultiVariablesSeparated = new ArrayList<>(node.getMembers().size());
@@ -1744,9 +1749,15 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             // The spacing of initialized enums such as `ONE   (1)` is handled in the `visitNewClass` method, so set it explicitly to “” here.
             String prefix = isEnum(t) ? "" : source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
             cursor += prefix.length();
-            Space p = formatWithCommentTree(prefix, (JCTree) t, docCommentTable.getCommentTree((JCTree) t));
-            @SuppressWarnings("unchecked") J2 j = (J2) scan(t, p);
+            // Java 21 and 23 have a different return type from getCommentTree; with reflection we can support both
+            // Though this is the Java 17 parser, we still need to support it if people use this parser with newer Java versions (e.g. https://github.com/PicnicSupermarket/error-prone-support/pull/1557)
+            Method getCommentTreeMethod = DocCommentTable.class.getMethod("getCommentTree", JCTree.class);
+            DocCommentTree commentTree = (DocCommentTree) getCommentTreeMethod.invoke(docCommentTable, t);
+            @SuppressWarnings("unchecked") J2 j = (J2) scan(t, formatWithCommentTree(prefix, (JCTree) t, commentTree));
             return j;
+        } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException ex) {
+            reportJavaParsingException(ex);
+            throw new IllegalStateException("Failed to invoke getCommentTree method", ex);
         } catch (Throwable ex) {
             reportJavaParsingException(ex);
             throw ex;
@@ -2073,7 +2084,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                         case '/':
                             switch (c2) {
                                 case '/':
-                                    inSingleLineComment = true;
+                                    inSingleLineComment = !inMultiLineComment;
                                     delimIndex++;
                                     break;
                                 case '*':

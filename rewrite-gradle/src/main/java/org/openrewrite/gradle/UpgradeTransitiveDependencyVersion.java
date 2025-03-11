@@ -116,8 +116,24 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
      * it is much faster to produce these LST elements only once then manipulate their arguments.
      * This largely mimics how caching works in JavaTemplate. If we create a Gradle/GroovyTemplate this could be refactored.
      */
-    private static Map<String, Optional<G.CompilationUnit>> snippetCache(Cursor cursor) {
-        return cursor.getRoot().computeMessageIfAbsent(UpgradeTransitiveDependencyVersion.class.getName() + ".snippetCache", k -> new HashMap<>());
+    private static Map<String, Optional<G.CompilationUnit>> snippetCache(ExecutionContext ctx) {
+        //noinspection unchecked
+        return (Map<String, Optional<G.CompilationUnit>>) ctx.getMessages()
+                .computeIfAbsent(UpgradeTransitiveDependencyVersion.class.getName() + ".snippetCache", k -> new HashMap<String, Optional<G.CompilationUnit>>());
+    }
+
+    private static Optional<G.CompilationUnit> parseAsGradle(String snippet, ExecutionContext ctx) {
+        return snippetCache(ctx)
+                .computeIfAbsent(snippet, s -> GradleParser.builder().build().parse(ctx, snippet)
+                        .findFirst()
+                        .map(maybeCu -> {
+                            maybeCu.getMarkers()
+                                    .findFirst(ParseExceptionResult.class)
+                                    .ifPresent(per -> {
+                                        throw new IllegalStateException("Encountered exception " + per.getExceptionType() + " with message " + per.getMessage() + " on snippet:\n" + snippet);
+                                    });
+                            return (G.CompilationUnit) maybeCu;
+                        }));
     }
 
     @Override
@@ -335,18 +351,14 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
             if (DEPENDENCIES_DSL_MATCHER.matches(method)) {
-                G.CompilationUnit withConstraints = snippetCache(getCursor()).computeIfAbsent(
+                G.CompilationUnit withConstraints = parseAsGradle(
                         //language=groovy
                         "plugins { id 'java' }\n" +
                         "dependencies {\n" +
                         "    constraints {\n" +
                         "    }\n" +
-                        "}\n",
-                        snippet -> GradleParser.builder().build()
-                                .parse(snippet)
-                                .findFirst()
-                                .map(G.CompilationUnit.class::cast)
-                ).orElseThrow(() -> new IllegalStateException("Unable to parse constraints block"));
+                        "}\n", ctx)
+                        .orElseThrow(() -> new IllegalStateException("Unable to parse constraints block"));
 
                 Statement constraints = FindMethods.find(withConstraints, "org.gradle.api.artifacts.dsl.DependencyHandler constraints(..)", true)
                         .stream()
@@ -460,20 +472,16 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
 
         @Nullable
         String because;
+
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             if ("version".equals(method.getSimpleName())) {
                 return method;
             }
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            Optional<G.CompilationUnit> withConstraint = snippetCache(getCursor()).computeIfAbsent(
-                        because == null ? INDIVIDUAL_CONSTRAINT_SNIPPET : INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET,
-                        snippet -> GradleParser.builder().build()
-                                .parse(snippet)
-                                .findFirst()
-                                .map(G.CompilationUnit.class::cast));
 
-            J.MethodInvocation constraint = withConstraint.map(it -> (J.MethodInvocation) it.getStatements().get(1))
+            J.MethodInvocation constraint = parseAsGradle(because == null ? INDIVIDUAL_CONSTRAINT_SNIPPET : INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET, ctx)
+                    .map(it -> (J.MethodInvocation) it.getStatements().get(1))
                     .map(dependenciesMethod -> (J.Lambda) dependenciesMethod.getArguments().get(0))
                     .map(dependenciesClosure -> (J.Block)dependenciesClosure.getBody())
                     .map(dependenciesBody -> (J.Return) dependenciesBody.getStatements().get(0))
@@ -499,6 +507,8 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                                 }
                                 return arg;
                             })))
+                    // Assign a unique ID so multiple constraints can be added
+                    .map(it -> it.withId(Tree.randomId()))
                     .orElseThrow(() -> new IllegalStateException("Unable to find constraint"));
 
             m = autoFormat(m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
@@ -623,11 +633,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            J.Lambda becauseArg = snippetCache(getCursor())
-                    .computeIfAbsent(INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET, snippet -> GradleParser.builder().build()
-                    .parse(snippet)
-                    .findFirst()
-                    .map(G.CompilationUnit.class::cast))
+            J.Lambda becauseArg = parseAsGradle(INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET, ctx)
                     .map(cu -> (J.MethodInvocation) cu.getStatements().get(1))
                     .map(J.MethodInvocation.class::cast)
                     .map(dependencies -> (J.Lambda) dependencies.getArguments().get(0))

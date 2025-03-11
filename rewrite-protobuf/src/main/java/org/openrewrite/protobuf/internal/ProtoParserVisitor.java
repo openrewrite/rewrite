@@ -487,7 +487,7 @@ public class ProtoParserVisitor extends Protobuf2ParserBaseVisitor<Proto> {
                 if (source.length() - untilDelim.length() > delimIndex + 1) {
                     switch (source.substring(delimIndex, delimIndex + 2)) {
                         case "//":
-                            inSingleLineComment = true;
+                            inSingleLineComment = !inMultiLineComment;
                             delimIndex++;
                             break;
                         case "/*":

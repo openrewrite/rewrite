@@ -974,11 +974,12 @@ public class GroovyParserVisitor {
             Space staticInitPadding = EMPTY;
             boolean isStaticInit = sourceStartsWith("static");
             Object parent = nodeCursor.getParentOrThrow().getValue();
+            boolean withinClosure = parent instanceof ClosureExpression || (parent instanceof ExpressionStatement && ((ExpressionStatement) parent).getExpression() instanceof ClosureExpression);
             if (isStaticInit) {
                 fmt = sourceBefore("static");
                 staticInitPadding = whitespace();
                 skip("{");
-            } else if (!(parent instanceof ClosureExpression)) {
+            } else if (!withinClosure) {
                 fmt = sourceBefore("{");
             }
             List<JRightPadded<Statement>> statements = new ArrayList<>(block.getStatements().size());
@@ -1010,7 +1011,7 @@ public class GroovyParserVisitor {
                 statements.add(stat);
             }
             queue.add(new J.Block(randomId(), fmt, Markers.EMPTY, new JRightPadded<>(isStaticInit, staticInitPadding, Markers.EMPTY), statements, whitespace()));
-            if (!(parent instanceof ClosureExpression)) {
+            if (!withinClosure) {
                 skip("}");
             }
         }
@@ -2255,7 +2256,7 @@ public class GroovyParserVisitor {
                 if (source.length() - untilDelim.length() > delimIndex + 1) {
                     switch (source.substring(delimIndex, delimIndex + 2)) {
                         case "//":
-                            inSingleLineComment = true;
+                            inSingleLineComment = !inMultiLineComment;
                             delimIndex++;
                             break;
                         case "/*":
