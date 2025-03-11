@@ -428,6 +428,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                                 new ClassReader(inputStream).accept(new ClassVisitor(Opcodes.ASM9) {
                                     @Nullable
                                     ClassDefinition classDefinition;
+
                                     boolean wroteFieldOrMethod;
 
                                     @Override
