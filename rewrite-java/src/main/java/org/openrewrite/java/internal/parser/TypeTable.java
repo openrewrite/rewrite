@@ -42,6 +42,7 @@ import java.util.zip.ZipException;
 
 import static java.util.Collections.emptyList;
 import static org.objectweb.asm.ClassReader.SKIP_CODE;
+import static org.objectweb.asm.ClassWriter.COMPUTE_MAXS;
 import static org.objectweb.asm.Opcodes.V1_8;
 import static org.openrewrite.java.internal.parser.JavaParserCaller.findCaller;
 
@@ -238,7 +239,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                     throw new UncheckedIOException(new IOException("Failed to create directory " + classesDir.getParent()));
                 }
 
-                ClassWriter cw = new ClassWriter(0);
+                ClassWriter cw = new ClassWriter(COMPUTE_MAXS);
                 ClassVisitor classWriter = ctx.getMessage(VERIFY_CLASS_WRITING, false) ?
                         new CheckClassAdapter(cw) : cw;
 
@@ -262,15 +263,17 @@ public class TypeTable implements JavaParserClasspathLoader {
 
                 for (Member member : classDef.getMembers()) {
                     if (member.getDescriptor().contains("(")) {
-                        classWriter
+                        MethodVisitor mv = classWriter
                                 .visitMethod(
                                         member.getAccess(),
                                         member.getName(),
                                         member.getDescriptor(),
                                         member.getSignature(),
                                         member.getExceptions()
-                                )
-                                .visitEnd();
+                                );
+
+                        writeMethodBody(member, mv);
+                        mv.visitEnd();
                     } else {
                         classWriter
                                 .visitField(
@@ -290,6 +293,52 @@ public class TypeTable implements JavaParserClasspathLoader {
                     throw new UncheckedIOException(e);
                 }
             });
+        }
+
+        private void writeMethodBody(Member member, MethodVisitor mv) {
+            if ((member.getAccess() & Opcodes.ACC_ABSTRACT) == 0) {
+                mv.visitCode();
+                Type returnType = Type.getReturnType(member.getDescriptor());
+
+                switch (returnType.getSort()) {
+                    case Type.VOID:
+                        mv.visitInsn(Opcodes.RETURN);
+                        break;
+
+                    case Type.BOOLEAN:
+                    case Type.BYTE:
+                    case Type.CHAR:
+                    case Type.SHORT:
+                    case Type.INT:
+                        mv.visitInsn(Opcodes.ICONST_0); // Push default value (0)
+                        mv.visitInsn(Opcodes.IRETURN);  // Return integer-compatible value
+                        break;
+
+                    case Type.LONG:
+                        mv.visitInsn(Opcodes.LCONST_0); // Push default value (0L)
+                        mv.visitInsn(Opcodes.LRETURN);
+                        break;
+
+                    case Type.FLOAT:
+                        mv.visitInsn(Opcodes.FCONST_0); // Push default value (0.0f)
+                        mv.visitInsn(Opcodes.FRETURN);
+                        break;
+
+                    case Type.DOUBLE:
+                        mv.visitInsn(Opcodes.DCONST_0); // Push default value (0.0d)
+                        mv.visitInsn(Opcodes.DRETURN);
+                        break;
+
+                    case Type.OBJECT:
+                    case Type.ARRAY:
+                        mv.visitInsn(Opcodes.ACONST_NULL); // Push default value (null)
+                        mv.visitInsn(Opcodes.ARETURN);
+                        break;
+
+                    default:
+                        throw new IllegalArgumentException("Unknown return type: " + returnType);
+                }
+            }
         }
     }
 
