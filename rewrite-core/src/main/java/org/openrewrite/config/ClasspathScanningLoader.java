@@ -46,6 +46,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
 
     private final Map<String, List<Contributor>> recipeAttributions = new HashMap<>();
     private final Map<String, List<RecipeExample>> recipeExamples = new HashMap<>();
+    private final Map<String, License> recipeLicense = new HashMap<>();
 
     /**
      * Construct a ClasspathScanningLoader scans the runtime classpath of the current java process for recipes
@@ -126,9 +127,10 @@ public class ClasspathScanningLoader implements ResourceLoader {
                 styles.addAll(resourceLoader.listStyles());
                 recipeAttributions.putAll(resourceLoader.listContributors());
                 recipeExamples.putAll(resourceLoader.listRecipeExamples());
+                recipeLicense.putAll(resourceLoader.listLicenses());
             }
             for (YamlResourceLoader resourceLoader : yamlResourceLoaders) {
-                recipeDescriptors.addAll(resourceLoader.listRecipeDescriptors(recipes, recipeAttributions, recipeExamples));
+                recipeDescriptors.addAll(resourceLoader.listRecipeDescriptors(recipes, recipeAttributions, recipeExamples, recipeLicense));
             }
         }
     }
@@ -205,6 +207,11 @@ public class ClasspathScanningLoader implements ResourceLoader {
     @Override
     public Map<String, List<RecipeExample>> listRecipeExamples() {
         return recipeExamples;
+    }
+
+    @Override
+    public Map<String, License> listLicenses() {
+        return recipeLicense;
     }
 
     @Override

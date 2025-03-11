@@ -2,6 +2,7 @@ package org.openrewrite.config;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
 
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public enum License {

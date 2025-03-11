@@ -75,13 +75,17 @@ public class YamlResourceLoader implements ResourceLoader {
     @Nullable
     private Map<String, List<RecipeExample>> recipeNameToExamples;
 
+    @Nullable
+    private Map<String, License> recipeNameToLicense;
+
     @Getter
     private enum ResourceType {
         Recipe("specs.openrewrite.org/v1beta/recipe"),
         Style("specs.openrewrite.org/v1beta/style"),
         Category("specs.openrewrite.org/v1beta/category"),
         Example("specs.openrewrite.org/v1beta/example"),
-        Attribution("specs.openrewrite.org/v1beta/attribution");
+        Attribution("specs.openrewrite.org/v1beta/attribution"),
+        License("specs.openrewrite.org/v1beta/license");
 
         private final String spec;
 
@@ -371,12 +375,13 @@ public class YamlResourceLoader implements ResourceLoader {
 
     @Override
     public Collection<RecipeDescriptor> listRecipeDescriptors() {
-        return listRecipeDescriptors(emptyList(), listContributors(), listRecipeExamples());
+        return listRecipeDescriptors(emptyList(), listContributors(), listRecipeExamples(), listLicenses());
     }
 
     public Collection<RecipeDescriptor> listRecipeDescriptors(Collection<Recipe> externalRecipes,
                                                               Map<String, List<Contributor>> recipeNamesToContributors,
-                                                              Map<String, List<RecipeExample>> recipeNamesToExamples) {
+                                                              Map<String, List<RecipeExample>> recipeNamesToExamples,
+                                                              Map<String, License> recipeNameToLicense) {
         Collection<Recipe> internalRecipes = listRecipes();
         Collection<Recipe> allRecipes = Stream.concat(
                 Stream.concat(
@@ -392,6 +397,7 @@ public class YamlResourceLoader implements ResourceLoader {
             declarativeRecipe.initialize(allRecipes, recipeNamesToContributors);
             declarativeRecipe.setContributors(recipeNamesToContributors.get(recipe.getName()));
             declarativeRecipe.setExamples(recipeNamesToExamples.get(recipe.getName()));
+            declarativeRecipe.setLicense(recipeNameToLicense.get(recipe.getName()));
             recipeDescriptors.add(declarativeRecipe.getDescriptor());
         }
         return recipeDescriptors;
@@ -592,5 +598,24 @@ public class YamlResourceLoader implements ResourceLoader {
         }
         return contributors;
 
+    }
+
+    @Override
+    public Map<String, License> listLicenses() {
+        if (recipeNameToLicense == null) {
+            Collection<Map<String, Object>> rawAttribution = loadResources(ResourceType.License);
+            if (rawAttribution.isEmpty()) {
+                recipeNameToLicense = Collections.emptyMap();
+            } else {
+                Map<String,License> result = new HashMap<>(rawAttribution.size());
+                for (Map<String, Object> attribution : rawAttribution) {
+                    String recipeName = (String) attribution.get("recipeName");
+                    String recipeLicenseUrl = (String) attribution.get("recipeLicenseUrl");
+                    result.put(recipeName, License.fromUrl(recipeLicenseUrl));
+                }
+                recipeNameToLicense = result;
+            }
+        }
+        return recipeNameToLicense;
     }
 }
