@@ -260,11 +260,12 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
                                "\n}";
             }
 
-            ExecutionContext parseCtx = new InMemoryExecutionContext();
-            parseCtx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
-            SourceFile parsed = GRADLE_PARSER.parse(parseCtx, codeTemplate)
+            Boolean requirePrintEqualsInput = ctx.getMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT);
+            ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
+            SourceFile parsed = GRADLE_PARSER.parse(ctx, codeTemplate)
                     .findFirst()
                     .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"));
+            ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, requirePrintEqualsInput);
 
             if (parsed instanceof ParseError) {
                 throw ((ParseError) parsed).toException();

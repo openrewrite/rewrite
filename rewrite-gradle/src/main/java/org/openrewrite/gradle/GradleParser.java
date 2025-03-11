@@ -38,21 +38,18 @@ import java.util.stream.StreamSupport;
 public class GradleParser implements Parser {
     private final GradleParser.Builder base;
 
-    private Collection<Path> defaultClasspath;
-    private GroovyParser groovyBuildParser;
-    private GroovyParser groovySettingsParser;
-    private KotlinParser kotlinBuildParser;
-    private KotlinParser kotlinSettingsParser;
+    private @Nullable List<Path> defaultClasspath;
+    private @Nullable GroovyParser groovyBuildParser;
+    private @Nullable GroovyParser groovySettingsParser;
+    private @Nullable KotlinParser kotlinBuildParser;
+    private @Nullable KotlinParser kotlinSettingsParser;
 
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
         if (groovyBuildParser == null) {
             Collection<Path> buildscriptClasspath = base.buildscriptClasspath;
             if (buildscriptClasspath == null) {
-                if (defaultClasspath == null) {
-                    defaultClasspath = loadDefaultClasspath();
-                }
-                buildscriptClasspath = defaultClasspath;
+                buildscriptClasspath = defaultClasspath(ctx);
             }
             groovyBuildParser = GroovyParser.builder(base.groovyParser)
                     .classpath(buildscriptClasspath)
@@ -65,10 +62,7 @@ public class GradleParser implements Parser {
         if (kotlinBuildParser == null) {
             Collection<Path> buildscriptClasspath = base.buildscriptClasspath;
             if (buildscriptClasspath == null) {
-                if (defaultClasspath == null) {
-                    defaultClasspath = loadDefaultClasspath();
-                }
-                buildscriptClasspath = defaultClasspath;
+                buildscriptClasspath = defaultClasspath(ctx);
             }
             kotlinBuildParser = KotlinParser.builder(base.kotlinParser)
                     .classpath(buildscriptClasspath)
@@ -77,10 +71,7 @@ public class GradleParser implements Parser {
         if (groovySettingsParser == null) {
             Collection<Path> settingsClasspath = base.settingsClasspath;
             if (settingsClasspath == null) {
-                if (defaultClasspath == null) {
-                    defaultClasspath = loadDefaultClasspath();
-                }
-                settingsClasspath = defaultClasspath;
+                settingsClasspath = defaultClasspath(ctx);
             }
             groovySettingsParser = GroovyParser.builder(base.groovyParser)
                     .classpath(settingsClasspath)
@@ -93,10 +84,7 @@ public class GradleParser implements Parser {
         if (kotlinSettingsParser == null) {
             Collection<Path> settingsClasspath = base.settingsClasspath;
             if (settingsClasspath == null) {
-                if (defaultClasspath == null) {
-                    loadDefaultClasspath();
-                }
-                settingsClasspath = defaultClasspath;
+                settingsClasspath = defaultClasspath(ctx);
             }
             kotlinSettingsParser = KotlinParser.builder(base.kotlinParser)
                     .classpath(settingsClasspath)
@@ -196,24 +184,27 @@ public class GradleParser implements Parser {
         }
     }
 
-    private static List<Path> loadDefaultClasspath() {
-        try {
-            Class.forName("org.gradle.api.Project");
-            return JavaParser.runtimeClasspath();
-        } catch (ClassNotFoundException e) {
-            return JavaParser.dependenciesFromResources(new InMemoryExecutionContext(),
-                    "gradle-base-services",
-                    "gradle-core-api",
-                    "gradle-language-groovy",
-                    "gradle-language-java",
-                    "gradle-logging",
-                    "gradle-messaging",
-                    "gradle-native",
-                    "gradle-process-services",
-                    "gradle-resources",
-                    "gradle-testing-base",
-                    "gradle-testing-jvm",
-                    "develocity-gradle-plugin");
+    private List<Path> defaultClasspath(ExecutionContext ctx) {
+        if (defaultClasspath == null) {
+            try {
+                Class.forName("org.gradle.api.Project");
+                defaultClasspath = JavaParser.runtimeClasspath();
+            } catch (ClassNotFoundException e) {
+                defaultClasspath = JavaParser.dependenciesFromResources(ctx,
+                        "gradle-base-services",
+                        "gradle-core-api",
+                        "gradle-language-groovy",
+                        "gradle-language-java",
+                        "gradle-logging",
+                        "gradle-messaging",
+                        "gradle-native",
+                        "gradle-process-services",
+                        "gradle-resources",
+                        "gradle-testing-base",
+                        "gradle-testing-jvm",
+                        "develocity-gradle-plugin");
+            }
         }
+        return defaultClasspath;
     }
 }
