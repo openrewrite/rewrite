@@ -99,8 +99,7 @@ class CopyValueTest implements RewriteTest {
                 foo: bar
               destination:
                 foo: bar
-              """,
-            spec -> spec.path("a.yml")
+              """
           )
         );
     }

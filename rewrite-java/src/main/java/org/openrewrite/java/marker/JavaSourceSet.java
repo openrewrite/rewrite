@@ -35,6 +35,7 @@ import java.util.*;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
+import static java.util.Collections.emptyMap;
 import static org.openrewrite.Tree.randomId;
 
 @Value
@@ -57,11 +58,11 @@ public class JavaSourceSet implements SourceSet {
     /**
      * Extract type information from the provided classpath.
      * Uses ClassGraph to compute the classpath.
-
+     * <p>
      * Does not support gavToTypes or typeToGav mapping
      *
      * @param fullTypeInformation Not used, does not do anything, to be deleted
-     * @param ignore Not used, does not do anything, to be deleted
+     * @param ignore              Not used, does not do anything, to be deleted
      */
     @Deprecated
     public static JavaSourceSet build(String sourceSetName, Collection<Path> classpath,
@@ -95,7 +96,7 @@ public class JavaSourceSet implements SourceSet {
 
         // Peculiarly, Classgraph will not return a ClassInfo for java.lang.Object, although it does for all other java.lang types
         typeNames.add("java.lang.Object");
-        return new JavaSourceSet(randomId(), sourceSetName, typesFrom(typeNames), null);
+        return new JavaSourceSet(randomId(), sourceSetName, typesFrom(typeNames), emptyMap());
     }
 
 
@@ -192,6 +193,7 @@ public class JavaSourceSet implements SourceSet {
 
 
     // Purely IO-based classpath scanning below this point
+
     /**
      * Extract type information from the provided classpath.
      * Uses file I/O to compute the classpath.
@@ -214,7 +216,6 @@ public class JavaSourceSet implements SourceSet {
     /**
      * Assuming the provided path is to a jar file in a local maven repository or Gradle cache, derive the GAV coordinate from it.
      * If no GAV can be determined returns null.
-     *
      */
     static @Nullable String gavFromPath(Path path) {
         String pathStr = PathUtils.separatorsToUnix(path.toString());
@@ -251,7 +252,7 @@ public class JavaSourceSet implements SourceSet {
         } catch (Exception e) {
             return null;
         }
-        if(groupId == null || artifactId == null || version == null) {
+        if (groupId == null || artifactId == null || version == null) {
             return null;
         }
         return groupId + ":" + artifactId + ":" + version;
@@ -267,11 +268,11 @@ public class JavaSourceSet implements SourceSet {
             if (Files.isRegularFile(path)) {
                 try (JarFile jarFile = new JarFile(path.toFile())) {
                     Enumeration<JarEntry> entries = jarFile.entries();
-                    while(entries.hasMoreElements()) {
+                    while (entries.hasMoreElements()) {
                         String entryName = entries.nextElement().getName();
-                        if(entryName.endsWith(".class")) {
+                        if (entryName.endsWith(".class")) {
                             String s = entryNameToClassName(entryName);
-                            if(isDeclarable(s)) {
+                            if (isDeclarable(s)) {
                                 types.add(JavaType.ShallowClass.build(s));
                             }
                         }
@@ -281,10 +282,10 @@ public class JavaSourceSet implements SourceSet {
                 Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
                     @Override
                     public java.nio.file.FileVisitResult visitFile(Path file, java.nio.file.attribute.BasicFileAttributes attrs) {
-                        String pathStr = file.toString();
+                        String pathStr = file.isAbsolute() ? path.relativize(file).toString() : file.toString();
                         if (pathStr.endsWith(".class")) {
                             String s = entryNameToClassName(pathStr);
-                            if((acceptPackage == null || s.startsWith(acceptPackage)) &&isDeclarable(s)) {
+                            if ((acceptPackage == null || s.startsWith(acceptPackage)) && isDeclarable(s)) {
                                 types.add(JavaType.ShallowClass.build(s));
                             }
                         }
@@ -301,7 +302,7 @@ public class JavaSourceSet implements SourceSet {
     private static List<JavaType.FullyQualified> getJavaStandardLibraryTypes() {
         List<JavaType.FullyQualified> javaStandardLibraryTypes = new ArrayList<>();
         Path toolsJar = Paths.get(System.getProperty("java.home")).resolve("../lib/tools.jar");
-        if(Files.exists(toolsJar)) {
+        if (Files.exists(toolsJar)) {
             javaStandardLibraryTypes.addAll(typesFromPath(toolsJar, "java"));
         } else {
             javaStandardLibraryTypes.addAll(typesFromPath(
@@ -313,7 +314,7 @@ public class JavaSourceSet implements SourceSet {
 
     private static String entryNameToClassName(String entryName) {
         String result = entryName;
-        if(entryName.startsWith("modules/java.base/")) {
+        if (entryName.startsWith("modules/java.base/")) {
             result = entryName.substring("modules/java.base/".length());
         }
         return result.substring(0, result.length() - ".class".length())
@@ -322,9 +323,6 @@ public class JavaSourceSet implements SourceSet {
 
     static boolean isDeclarable(String className) {
         int dotIndex = Math.max(className.lastIndexOf("."), className.lastIndexOf('$'));
-        className = className.substring(dotIndex + 1);
-        return !className.isEmpty() &&
-               Character.isJavaIdentifierPart(className.charAt(0)) &&
-               !Character.isDigit(className.charAt(0));
+        return dotIndex != -1 && dotIndex < className.length() -1 && Character.isJavaIdentifierStart(className.charAt(dotIndex + 1));
     }
 }

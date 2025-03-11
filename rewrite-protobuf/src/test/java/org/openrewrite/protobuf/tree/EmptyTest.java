@@ -33,4 +33,16 @@ class EmptyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void multilineCommentWithUrl() {
+        rewriteRun(
+          proto(
+            """
+              /* https://foo.bar */
+              syntax = 'proto2';
+              """
+          )
+        );
+    }
 }

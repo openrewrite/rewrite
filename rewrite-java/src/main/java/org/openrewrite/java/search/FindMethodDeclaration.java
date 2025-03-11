@@ -50,6 +50,11 @@ public class FindMethodDeclaration extends Recipe {
     }
 
     @Override
+    public Validated<Object> validate() {
+        return super.validate().and(MethodMatcher.validate(methodPattern));
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new DeclaresMethod<>(methodPattern, matchOverrides), new JavaIsoVisitor<ExecutionContext>() {
             final MethodMatcher m = new MethodMatcher(methodPattern, matchOverrides);

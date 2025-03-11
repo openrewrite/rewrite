@@ -432,8 +432,13 @@ public class YamlParser implements org.openrewrite.Parser {
     If the dashes of the sequence do not have an indentation, the end mark will point to the character AFTER the dash.
     */
     private boolean shouldUseYamlParserBugWorkaround(SequenceStartEvent event) {
-        int startChar = event.getStartMark().getBuffer()[event.getStartMark().getPointer()];
-        int endChar = event.getEndMark().getBuffer()[event.getEndMark().getPointer()];
+        int startCharIndex = event.getStartMark().getPointer();
+        int endCharIndex = event.getEndMark().getPointer();
+        if (endCharIndex >= event.getEndMark().getBuffer().length) {
+            return false;
+        }
+        int startChar = event.getStartMark().getBuffer()[startCharIndex];
+        int endChar = event.getEndMark().getBuffer()[endCharIndex];
         return startChar == '-' && endChar != '-';
     }
 
@@ -673,7 +678,7 @@ public class YamlParser implements org.openrewrite.Parser {
                     SequenceWithPrefix sequenceWithPrefix = (SequenceWithPrefix) sequence;
                     if (sequenceWithPrefix.getOpeningBracketPrefix() != null) {
                         // For inline sequence, the prefix got already transferred to the left-hand neighbor
-                        return sequenceWithPrefix.toSequence();
+                        return super.visitSequence(sequenceWithPrefix.toSequence(), p);
                     } else {
                         // For normal sequence with dashes, the prefix of the sequence gets transferred to the first entry
                         return super.visitSequence(

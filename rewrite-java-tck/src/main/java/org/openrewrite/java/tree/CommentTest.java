@@ -65,4 +65,34 @@ class CommentTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void commentAsLastLine() {
+        rewriteRun(
+          java(
+            """
+            class A {
+            }
+            //
+            """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/pull/5090")
+    void multiLineCommentWithUrl() {
+        rewriteRun(
+          java(
+            """
+              package hello;
+              public class Test {
+                public static void test() {
+                  /*addItem("Site A", "https://hello.com/A");*/
+                }
+              }
+              """
+          )
+        );
+    }
 }
