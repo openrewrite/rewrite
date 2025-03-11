@@ -351,14 +351,17 @@ class EnvironmentTest implements RewriteTest {
                 - name: "Jonathan Schneider"
                   email: "jon@moderne.io"
                   lineCount: 5
-              
-              ---
+              """.getBytes()
+          ), URI.create("attribution/test.ChangeTextToHello.yml"), new Properties()))
+          .load(new YamlResourceLoader(new ByteArrayInputStream(
+            //language=yml
+            """
               type: specs.openrewrite.org/v1beta/origin
               recipeName: org.openrewrite.text.ChangeTextToJon
               recipeUrl: "https://github.com/openrewrite/rewrite/blob/main/rewrite-gradle/src/main/java/org/openrewrite/gradle/AddDependencyVisitor.java"
               recipeLicenseUrl: "https://www.apache.org/licenses/LICENSE-2.0"
               """.getBytes()
-          ), URI.create("attribution/test.ChangeTextToHello.yml"), new Properties()))
+          ), URI.create("origin/test.ChangeTextToHello.yml"), new Properties()))
           .build();
 
         Collection<Recipe> recipes = env.listRecipes();
@@ -377,10 +380,10 @@ class EnvironmentTest implements RewriteTest {
           .get();
 
         assertThat(cttj)
-          .satisfies(
-            r -> assertThat(r.getContributors()).containsExactly(new Contributor("Jonathan Schneider", "jon@moderne.io", 5)),
-            r -> assertThat(r.getOrigin()).isEqualTo(new RecipeOrigin(URI.create("https://github.com/openrewrite/rewrite/blob/main/rewrite-gradle/src/main/java/org/openrewrite/gradle/AddDependencyVisitor.java"), License.Apache2))
-          );
+          .hasFieldOrPropertyWithValue("contributors", List.of(new Contributor("Jonathan Schneider", "jon@moderne.io", 5)))
+          .hasFieldOrPropertyWithValue("origin", new RecipeOrigin(
+            URI.create("https://github.com/openrewrite/rewrite/blob/main/rewrite-gradle/src/main/java/org/openrewrite/gradle/AddDependencyVisitor.java"),
+            License.Apache2));
     }
 
     @Test
