@@ -36,5 +36,5 @@ public interface ResourceLoader {
 
     Map<String, List<RecipeExample>> listRecipeExamples();
 
-    Map<String, License> listLicenses();
+    Map<String, RecipeOrigin> listRecipeOrigins();
 }

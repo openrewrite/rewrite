@@ -219,16 +219,10 @@ public abstract class Recipe implements Cloneable {
             recipeList1.add(next.getDescriptor());
         }
         recipeList1.trimToSize();
-        URI recipeSource;
-        try {
-            recipeSource = getClass().getProtectionDomain().getCodeSource().getLocation().toURI();
-        } catch (URISyntaxException e) {
-            throw new RuntimeException(e);
-        }
 
         return new RecipeDescriptor(getName(), getDisplayName(), getInstanceName(), getDescription(), getTags(),
                 getEstimatedEffortPerOccurrence(), options, recipeList1, getDataTableDescriptors(),
-                getMaintainers(), getContributors(), getExamples(), recipeSource, getLicense());
+                getMaintainers(), getContributors(), getExamples(), getOrigin());
     }
 
     private List<OptionDescriptor> getOptionDescriptors() {
@@ -305,13 +299,21 @@ public abstract class Recipe implements Cloneable {
 
     @Setter
     @Nullable
-    protected transient License license;
+    protected transient RecipeOrigin origin;
 
-    public License getLicense() {
-        if (license == null) {
-            return License.Proprietary;
+    public RecipeOrigin getOrigin() {
+        if (origin == null) {
+            origin = new RecipeOrigin(getLocalSource(), License.Proprietary);
         }
-        return license;
+        return origin;
+    }
+
+    protected URI getLocalSource() {
+        try {
+            return getClass().getProtectionDomain().getCodeSource().getLocation().toURI();
+        } catch (URISyntaxException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**
