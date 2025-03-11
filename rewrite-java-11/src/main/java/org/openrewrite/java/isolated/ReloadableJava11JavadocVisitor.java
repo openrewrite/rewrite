@@ -874,8 +874,7 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     public List<Javadoc> visitText(String node) {
         List<Javadoc> texts = new ArrayList<>();
 
-        if (!node.isEmpty() && Character.isWhitespace(node.charAt(0)) &&
-            !Character.isWhitespace(source.charAt(cursor))) {
+        if (!node.isEmpty() && Character.isWhitespace(node.charAt(0)) && !Character.isWhitespace(source.charAt(cursor))) {
             node = node.stripLeading();
         }
 

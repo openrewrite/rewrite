@@ -802,9 +802,12 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
     public List<Javadoc> visitText(String node) {
         List<Javadoc> texts = new ArrayList<>();
 
-        if (!node.isEmpty() && Character.isWhitespace(node.charAt(0)) &&
-            !Character.isWhitespace(source.charAt(cursor))) {
-            node = node.stripLeading();
+        if (!node.isEmpty() && Character.isWhitespace(node.charAt(0)) && !Character.isWhitespace(source.charAt(cursor))) {
+            int i = 0;
+            for (; i < node.length() && Character.isWhitespace(node.charAt(i)); i++) {
+            }
+
+            node = node.substring(i);
         }
 
         StringBuilder text = new StringBuilder();
