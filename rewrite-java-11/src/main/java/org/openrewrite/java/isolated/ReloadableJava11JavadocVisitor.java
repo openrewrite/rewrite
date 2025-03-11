@@ -890,8 +890,8 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 Javadoc.LineBreak lineBreak = lineBreaks.remove(++cursor);
                 assert lineBreak != null;
                 texts.add(lineBreak);
-            } else if (source.charAt(cursor) != c && (source.startsWith(toUnicodeEscaped(c), cursor) || source.startsWith(toUnicodeEscaped(c).toLowerCase(), cursor) )) {
-                int escapedCharLength = toUnicodeEscaped(c).length();
+            } else if (source.charAt(cursor) != c && (source.startsWith(unicodeEscaped(c), cursor) || source.startsWith(unicodeEscaped(c).toLowerCase(), cursor) )) {
+                int escapedCharLength = unicodeEscaped(c).length();
                 text.append(source, cursor, cursor + escapedCharLength);
                 cursor += escapedCharLength;
             } else {
@@ -907,7 +907,7 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         return texts;
     }
 
-    private static String toUnicodeEscaped(char c) {
+    private static String unicodeEscaped(char c) {
         return String.format("\\u%04X", (int) c);
     }
 
