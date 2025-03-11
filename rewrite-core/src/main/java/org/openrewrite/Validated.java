@@ -367,7 +367,7 @@ public interface Validated<T> extends Iterable<Validated<T>> {
         }
 
         @Override
-        public T getValue() {
+        public @Nullable T getValue() {
             return right.getValue();
         }
 

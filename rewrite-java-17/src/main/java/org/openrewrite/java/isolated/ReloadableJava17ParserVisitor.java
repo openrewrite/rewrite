@@ -514,6 +514,10 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                     ),
                     EMPTY
             );
+        } else if (kind.getType() == J.ClassDeclaration.Kind.Type.Enum) {
+            if (positionOfNext(";", null) >= 0) {
+                enumSet = padRight(new J.EnumValueSet(randomId(), sourceBefore(";"), Markers.EMPTY, emptyList(), true), EMPTY);
+            }
         }
 
         List<Tree> membersMultiVariablesSeparated = new ArrayList<>(node.getMembers().size());
@@ -539,6 +543,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             members.add(enumSet);
         }
         members.addAll(convertStatements(membersMultiVariablesSeparated));
+        addPossibleEmptyStatementsBeforeClosingBrace(members);
 
         J.Block body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
                 members, sourceBefore("}"));
@@ -1154,8 +1159,11 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 }
             }
 
+            List<JRightPadded<Statement>> converted = convertStatements(members);
+            addPossibleEmptyStatementsBeforeClosingBrace(converted);
+
             body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
-                    convertStatements(members), sourceBefore("}"));
+                    converted, sourceBefore("}"));
         }
 
         JCNewClass jcNewClass = (JCNewClass) node;
@@ -1741,9 +1749,15 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             // The spacing of initialized enums such as `ONE   (1)` is handled in the `visitNewClass` method, so set it explicitly to “” here.
             String prefix = isEnum(t) ? "" : source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
             cursor += prefix.length();
-            Space p = formatWithCommentTree(prefix, (JCTree) t, docCommentTable.getCommentTree((JCTree) t));
-            @SuppressWarnings("unchecked") J2 j = (J2) scan(t, p);
+            // Java 21 and 23 have a different return type from getCommentTree; with reflection we can support both
+            // Though this is the Java 17 parser, we still need to support it if people use this parser with newer Java versions (e.g. https://github.com/PicnicSupermarket/error-prone-support/pull/1557)
+            Method getCommentTreeMethod = DocCommentTable.class.getMethod("getCommentTree", JCTree.class);
+            DocCommentTree commentTree = (DocCommentTree) getCommentTreeMethod.invoke(docCommentTable, t);
+            @SuppressWarnings("unchecked") J2 j = (J2) scan(t, formatWithCommentTree(prefix, (JCTree) t, commentTree));
             return j;
+        } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException ex) {
+            reportJavaParsingException(ex);
+            throw new IllegalStateException("Failed to invoke getCommentTree method", ex);
         } catch (Throwable ex) {
             reportJavaParsingException(ex);
             throw ex;
@@ -1920,9 +1934,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             case METHOD:
                 JCMethodDecl m = (JCMethodDecl) t;
                 if (m.body == null || m.defaultValue != null) {
-                    String suffix = source.substring(cursor, positionOfNext(";", null));
-                    int idx = findFirstNonWhitespaceChar(suffix);
-                    return sourceBefore(idx >= 0 ? "" : ";");
+                    return sourceBefore(";");
                 } else {
                     return sourceBefore("");
                 }
@@ -1939,7 +1951,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
     private List<JRightPadded<Statement>> convertStatements(@Nullable List<? extends Tree> trees,
                                                             Function<Tree, Space> suffix) {
         if (trees == null || trees.isEmpty()) {
-            return emptyList();
+            return new ArrayList<>();
         }
 
         Map<Integer, List<Tree>> treesGroupedByStartPosition = new LinkedHashMap<>();
@@ -1957,6 +1969,19 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 int startPosition = ((JCTree) t).getStartPosition();
                 if (cursor > startPosition)
                     continue;
+                if (!(t instanceof JCSkip)) {
+                    while (cursor < startPosition) {
+                        int nonWhitespaceIndex = indexOfNextNonWhitespace(cursor, source);
+                        int semicolonIndex = source.charAt(nonWhitespaceIndex) == ';' ? nonWhitespaceIndex : -1;
+                        if (semicolonIndex > -1) {
+                            Space prefix = Space.format(source, cursor, semicolonIndex);
+                            converted.add(new JRightPadded<>(new J.Empty(randomId(), prefix, Markers.EMPTY), Space.EMPTY, Markers.EMPTY));
+                            cursor = semicolonIndex + 1;
+                        } else {
+                            break;
+                        }
+                    }
+                }
                 converted.add(convert(treeGroup.get(0), suffix));
             } else {
                 // multi-variable declarations are split into independent overlapping JCVariableDecl's by the OpenJDK AST
@@ -2059,7 +2084,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                         case '/':
                             switch (c2) {
                                 case '/':
-                                    inSingleLineComment = true;
+                                    inSingleLineComment = !inMultiLineComment;
                                     delimIndex++;
                                     break;
                                 case '*':
@@ -2370,5 +2395,19 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         return fmt;
+    }
+
+    private void addPossibleEmptyStatementsBeforeClosingBrace(List<JRightPadded<Statement>> converted) {
+        while (true) {
+            int closingBracePosition = positionOfNext("}", null);
+            int semicolonPosition = positionOfNext(";", null);
+
+            if (semicolonPosition > -1 && semicolonPosition < closingBracePosition) {
+                converted.add(new JRightPadded<>(new J.Empty(randomId(), sourceBefore(";"), Markers.EMPTY), Space.EMPTY, Markers.EMPTY));
+                cursor = semicolonPosition + 1;
+            } else {
+                break;
+            }
+        }
     }
 }

@@ -20,8 +20,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.gradle.Assertions.settingsGradle;
+import static org.openrewrite.gradle.Assertions.*;
 
 class GradleParserTest implements RewriteTest {
 
@@ -183,6 +182,23 @@ class GradleParserTest implements RewriteTest {
               
               dependencies {
                   testImplementation "junit:junit:4.13"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinDsl() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+              
+              repositories {
+                  mavenCentral()
               }
               """
           )

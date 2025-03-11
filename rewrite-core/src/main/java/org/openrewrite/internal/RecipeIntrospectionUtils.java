@@ -20,7 +20,6 @@ import org.openrewrite.*;
 import org.openrewrite.config.ColumnDescriptor;
 import org.openrewrite.config.DataTableDescriptor;
 import org.openrewrite.config.RecipeIntrospectionException;
-import org.openrewrite.internal.lang.NonNull;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
@@ -148,7 +147,6 @@ public class RecipeIntrospectionUtils {
         return false;
     }
 
-    @NonNull
     private static RecipeIntrospectionException getRecipeIntrospectionException(Class<?> recipeClass, ReflectiveOperationException e) {
         return new RecipeIntrospectionException("Unable to call primary constructor for Recipe " + recipeClass, e);
     }

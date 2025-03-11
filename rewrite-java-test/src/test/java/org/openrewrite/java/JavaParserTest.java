@@ -196,7 +196,7 @@ class JavaParserTest implements RewriteTest {
         package com.example.demo;
         class FooBar {
             public void test(int num string msg) {
-              String a; this.ownerR
+              String a;
               System.out.println();
             }
         }
@@ -204,7 +204,7 @@ class JavaParserTest implements RewriteTest {
       """
         package com.example.demo;
         class FooBar {
-            public void test(int num string s, int b) {
+            public void test() {
               String a; this.ownerR
               System.out.println();
             }
@@ -373,5 +373,4 @@ class JavaParserTest implements RewriteTest {
         assertThat(JavaParser.filterArtifacts("rewrite-java", classpath))
           .containsOnly(Paths.get("/.m2/repository/org/openrewrite/rewrite-java/8.41.1/rewrite-java-8.41.1.jar"));
     }
-
 }

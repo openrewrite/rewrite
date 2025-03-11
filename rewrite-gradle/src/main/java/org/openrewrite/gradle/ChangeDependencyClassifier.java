@@ -76,7 +76,7 @@ public class ChangeDependencyClassifier extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Finds dependencies declared in `build.gradle` files.";
+        return "Changes classifier of an existing dependency declared in `build.gradle` files.";
     }
 
     @Override

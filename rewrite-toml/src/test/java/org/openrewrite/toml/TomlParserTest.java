@@ -337,6 +337,18 @@ class TomlParserTest implements RewriteTest {
     }
 
     @Test
+    void trailingEmptyComment() {
+        rewriteRun(
+          toml(
+              """
+              str = "I'm a string. \\"You can quote me\\". Name\\tJos\\u00E9\\nLocation\\tSF."
+              #
+              """
+          )
+        );
+    }
+
+    @Test
     void multiBytesUnicode() {
         rewriteRun(
           toml(
