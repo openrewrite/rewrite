@@ -122,14 +122,9 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                 .computeIfAbsent(UpgradeTransitiveDependencyVersion.class.getName() + ".snippetCache", k -> new HashMap<String, Optional<G.CompilationUnit>>());
     }
 
-    private static GradleParser gradleParser(ExecutionContext ctx) {
-        return (GradleParser) ctx.getMessages()
-                .computeIfAbsent(UpgradeTransitiveDependencyVersion.class.getName() + ".gradleParser", k -> GradleParser.builder().build());
-    }
-
     private static Optional<G.CompilationUnit> parseAsGradle(String snippet, ExecutionContext ctx) {
         return snippetCache(ctx)
-                .computeIfAbsent(snippet, s -> gradleParser(ctx).parse(snippet)
+                .computeIfAbsent(snippet, s -> GradleParser.builder().build().parse(ctx, snippet)
                         .findFirst()
                         .map(maybeCu -> {
                             maybeCu.getMarkers()

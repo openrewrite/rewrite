@@ -19,7 +19,6 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.gradle.internal.InsertDependencyComparator;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
@@ -102,7 +101,7 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
         }
 
         if (dependenciesBlockMissing) {
-            Statement dependenciesInvocation = GRADLE_PARSER.parse("dependencies {}")
+            Statement dependenciesInvocation = GRADLE_PARSER.parse(ctx, "dependencies {}")
                     .findFirst()
                     .map(G.CompilationUnit.class::cast)
                     .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
