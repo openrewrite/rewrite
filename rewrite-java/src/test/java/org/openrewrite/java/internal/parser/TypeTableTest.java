@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static io.micrometer.core.instrument.util.DoubleFormat.decimalOrNan;
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
@@ -106,6 +107,7 @@ class TypeTableTest implements RewriteTest {
 
         TypeTable table = new TypeTable(ctx, tsv.toUri().toURL(), List.of("junit-jupiter-api"));
         Path classesDir = table.load("junit-jupiter-api");
+        assertThat(Files.walk(requireNonNull(classesDir))).noneMatch(p -> p.getFileName().toString().endsWith("$1.class"));
 
         assertThat(classesDir)
           .isNotNull()

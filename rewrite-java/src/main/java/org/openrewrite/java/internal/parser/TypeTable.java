@@ -41,7 +41,6 @@ import java.util.zip.InflaterInputStream;
 import java.util.zip.ZipException;
 
 import static java.util.Collections.emptyList;
-import static java.util.Objects.requireNonNull;
 import static org.objectweb.asm.ClassReader.SKIP_CODE;
 import static org.objectweb.asm.Opcodes.V1_8;
 import static org.openrewrite.java.internal.parser.JavaParserCaller.findCaller;
@@ -375,26 +374,42 @@ public class TypeTable implements JavaParserClasspathLoader {
 
                                     @Override
                                     public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
-                                        classDefinition = new ClassDefinition(Jar.this, access, name, signature, superName, interfaces);
-                                        wroteFieldOrMethod = false;
-                                        super.visit(version, access, name, signature, superName, interfaces);
-                                        if (!wroteFieldOrMethod && !"module-info".equals(name)) {
-                                            // No fields or methods, which can happen for marker annotations for example
-                                            classDefinition.writeClass();
+                                        int lastIndexOf$ = name.lastIndexOf('$');
+                                        if (lastIndexOf$ != -1 && lastIndexOf$ < name.length() - 1 && Character.isDigit(name.charAt(lastIndexOf$ + 1))) {
+                                            // skip anonymous subclasses
+                                            classDefinition = null;
+                                        } else {
+                                            classDefinition = new ClassDefinition(Jar.this, access, name, signature, superName, interfaces);
+                                            wroteFieldOrMethod = false;
+                                            super.visit(version, access, name, signature, superName, interfaces);
+                                            if (!wroteFieldOrMethod && !"module-info".equals(name)) {
+                                                // No fields or methods, which can happen for marker annotations for example
+                                                classDefinition.writeClass();
+                                            }
                                         }
                                     }
 
                                     @Override
+                                    @Nullable
                                     public FieldVisitor visitField(int access, String name, String descriptor, String signature, Object value) {
-                                        wroteFieldOrMethod |= requireNonNull(classDefinition)
+                                        if (classDefinition == null) {
+                                            return null;
+                                        }
+
+                                        wroteFieldOrMethod |= classDefinition
                                                 .writeField(access, name, descriptor, signature);
                                         return super.visitField(access, name, descriptor, signature, value);
                                     }
 
                                     @Override
+                                    @Nullable
                                     public MethodVisitor visitMethod(int access, String name, String descriptor,
                                                                      String signature, String[] exceptions) {
-                                        wroteFieldOrMethod |= requireNonNull(classDefinition)
+                                        if (classDefinition == null) {
+                                            return null;
+                                        }
+
+                                        wroteFieldOrMethod |= classDefinition
                                                 .writeMethod(access, name, descriptor, signature, null, exceptions);
                                         return super.visitMethod(access, name, descriptor, signature, exceptions);
                                     }
