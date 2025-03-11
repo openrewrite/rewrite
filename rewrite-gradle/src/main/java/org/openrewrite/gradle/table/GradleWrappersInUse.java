@@ -24,10 +24,7 @@ import org.openrewrite.Recipe;
 @JsonIgnoreType
 public class GradleWrappersInUse extends DataTable<GradleWrappersInUse.Row> {
     public GradleWrappersInUse(Recipe recipe) {
-        super(recipe, Row.class,
-                GradleWrappersInUse.class.getName(),
-                "Gradle wrappers in use",
-                "Gradle wrappers in use.");
+        super(recipe, "Gradle wrappers in use", "Gradle wrappers in use.");
     }
 
     @Value

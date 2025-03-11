@@ -29,13 +29,9 @@ import org.openrewrite.tree.ParseError;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.tree.Xml;
 
-import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static java.util.Collections.*;
@@ -81,9 +77,6 @@ public class MavenParser implements Parser {
                 if (pom.getProperties().isEmpty()) {
                     pom = pom.withProperties(new LinkedHashMap<>());
                 }
-                String baseDir = pomPath.toAbsolutePath().getParent().toString();
-                pom.getProperties().put("project.basedir", baseDir);
-                pom.getProperties().put("basedir", baseDir);
                 pom.getProperties().putAll(properties);
 
                 SourceFile sourceFile = new MavenXmlParser()
@@ -113,7 +106,15 @@ public class MavenParser implements Parser {
         for (Map.Entry<Xml.Document, Pom> docToPom : projectPoms.entrySet()) {
             try {
                 ResolvedPom resolvedPom = docToPom.getValue().resolve(activeProfiles, downloader, ctx);
-                MavenResolutionResult model = new MavenResolutionResult(randomId(), null, resolvedPom, emptyList(), null, emptyMap(), sanitizedSettings, mavenCtx.getActiveProfiles());
+                MavenResolutionResult model = new MavenResolutionResult(randomId(),
+                        null,
+                        resolvedPom,
+                        emptyList(),
+                        null,
+                        emptyMap(),
+                        sanitizedSettings,
+                        mavenCtx.getActiveProfiles(),
+                        properties);
                 if (!skipDependencyResolution) {
                     model = model.resolveDependencies(downloader, ctx);
                 }
@@ -210,39 +211,6 @@ public class MavenParser implements Parser {
             //noinspection ConstantConditions
             if (key != null && value != null) {
                 this.properties.put(key, value);
-            }
-            return this;
-        }
-
-        @SuppressWarnings("unused") // Used in `MavenMojoProjectParser.parseMaven(..)`
-        public Builder mavenConfig(@Nullable Path mavenConfig) {
-            if (mavenConfig != null && mavenConfig.toFile().exists()) {
-                try {
-                    String mavenConfigText = new String(Files.readAllBytes(mavenConfig));
-                    return mavenConfig(mavenConfigText);
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-            }
-            return this;
-        }
-
-        public Builder mavenConfig(@Nullable String mavenConfig) {
-            if (mavenConfig != null) {
-                for (String line : mavenConfig.split("\n")) {
-                    if (line.startsWith("-P")) {
-                        Matcher matcher = Pattern.compile("-P\\s+(.*)").matcher(line);
-                        if (matcher.find()) {
-                            String[] profiles = matcher.group(1).split(",");
-                            activeProfiles(Arrays.stream(profiles).map(String::trim).toArray(String[]::new));
-                        }
-                    } else if (line.startsWith("-D")) {
-                        Matcher matcher = Pattern.compile("-D(.*?)=(.*)").matcher(line);
-                        if (matcher.find()) {
-                            property(matcher.group(1).trim(), matcher.group(2).trim());
-                        }
-                    }
-                }
             }
             return this;
         }

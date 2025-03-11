@@ -17,11 +17,7 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Preconditions;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.java.search.UsesMethod;
 
 import static java.util.Collections.singletonList;
@@ -42,6 +38,11 @@ public class RemoveMethodInvocations extends Recipe {
     @Override
     public String getDescription() {
         return "Remove method invocations if syntactically safe.";
+    }
+
+    @Override
+    public Validated<Object> validate() {
+        return super.validate().and(MethodMatcher.validate(methodPattern));
     }
 
     @Override

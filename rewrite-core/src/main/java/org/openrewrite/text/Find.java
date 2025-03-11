@@ -98,6 +98,11 @@ public class Find extends Recipe {
     Boolean description;
 
     @Override
+    public String getInstanceName() {
+        return String.format("Find text `%s`", find);
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
 
         TreeVisitor<?, ExecutionContext> visitor = new TreeVisitor<Tree, ExecutionContext>() {
