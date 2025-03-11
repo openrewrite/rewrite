@@ -16,6 +16,7 @@
 package org.openrewrite.java.internal.parser;
 
 import lombok.RequiredArgsConstructor;
+import lombok.ToString;
 import lombok.Value;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
@@ -175,7 +176,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                     GroupArtifactVersion rowGav = new GroupArtifactVersion(fields[0], fields[1], fields[2]);
 
                     if (!Objects.equals(rowGav, lastGav.get())) {
-                        writeClassesDir(matchedGav.get(), classesByName.values(), nestedTypesByOwner);
+                        writeClassesDir(matchedGav.get(), classesByName, nestedTypesByOwner);
                         matchedGav.set(null);
                         classesByName.clear();
                         nestedTypesByOwner.clear();
@@ -222,10 +223,10 @@ public class TypeTable implements JavaParserClasspathLoader {
                 });
             }
 
-            writeClassesDir(matchedGav.get(), classesByName.values(), nestedTypesByOwner);
+            writeClassesDir(matchedGav.get(), classesByName, nestedTypesByOwner);
         }
 
-        private void writeClassesDir(@Nullable GroupArtifactVersion gav, Collection<ClassDefinition> classes, Map<String, List<ClassDefinition>> nestedTypesByOwner) {
+        private void writeClassesDir(@Nullable GroupArtifactVersion gav, Map<String, ClassDefinition> classes, Map<String, List<ClassDefinition>> nestedTypesByOwner) {
             if (gav == null) {
                 return;
             }
@@ -233,7 +234,7 @@ public class TypeTable implements JavaParserClasspathLoader {
             Path classesDir = getClassesDir(ctx, gav);
             classesDirByArtifact.put(gav, classesDir);
 
-            classes.forEach(classDef -> {
+            classes.values().forEach(classDef -> {
                 Path classFile = classesDir.resolve(classDef.getName() + ".class");
                 if (!Files.exists(classFile.getParent()) && !classFile.getParent().toFile().mkdirs()) {
                     throw new UncheckedIOException(new IOException("Failed to create directory " + classesDir.getParent()));
@@ -298,6 +299,13 @@ public class TypeTable implements JavaParserClasspathLoader {
         private void writeMethodBody(Member member, MethodVisitor mv) {
             if ((member.getAccess() & Opcodes.ACC_ABSTRACT) == 0) {
                 mv.visitCode();
+
+                if ("<init>".equals(member.getName())) {
+                    // constructors: the called super constructor doesn't need to exist; we only need to pass JVM class verification
+                    mv.visitVarInsn(Opcodes.ALOAD, 0);
+                    mv.visitMethodInsn(Opcodes.INVOKESPECIAL, member.getClassDefinition().getSuperclassSignature(), "<init>", "()V", false);
+                }
+
                 Type returnType = Type.getReturnType(member.getDescriptor());
 
                 switch (returnType.getSort()) {
@@ -338,6 +346,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                     default:
                         throw new IllegalArgumentException("Unknown return type: " + returnType);
                 }
+                mv.visitMaxs(0, 0);
             }
         }
     }
@@ -549,6 +558,7 @@ public class TypeTable implements JavaParserClasspathLoader {
 
         @NonFinal
         @Nullable
+        @ToString.Exclude
         List<Member> members;
 
         public List<Member> getMembers() {
