@@ -17,6 +17,7 @@ package org.openrewrite.java.internal.parser;
 
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
+import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.objectweb.asm.*;
 import org.objectweb.asm.util.CheckClassAdapter;
@@ -39,6 +40,7 @@ import java.util.zip.GZIPOutputStream;
 import java.util.zip.InflaterInputStream;
 import java.util.zip.ZipException;
 
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static org.objectweb.asm.ClassReader.SKIP_CODE;
 import static org.objectweb.asm.Opcodes.V1_8;
@@ -144,6 +146,11 @@ public class TypeTable implements JavaParserClasspathLoader {
      */
     @RequiredArgsConstructor
     static class Reader {
+        private static final int NESTED_TYPE_ACCESS_MASK = Opcodes.ACC_PUBLIC | Opcodes.ACC_PRIVATE | Opcodes.ACC_PROTECTED |
+                                                           Opcodes.ACC_STATIC | Opcodes.ACC_FINAL | Opcodes.ACC_INTERFACE |
+                                                           Opcodes.ACC_ABSTRACT | Opcodes.ACC_SYNTHETIC | Opcodes.ACC_ANNOTATION |
+                                                           Opcodes.ACC_ENUM;
+
         private final ExecutionContext ctx;
 
         public void read(InputStream is, Collection<String> artifactNames) throws IOException {
@@ -157,7 +164,9 @@ public class TypeTable implements JavaParserClasspathLoader {
                     .collect(Collectors.toSet());
 
             AtomicReference<@Nullable GroupArtifactVersion> matchedGav = new AtomicReference<>();
-            Map<ClassDefinition, List<Member>> membersByClassName = new HashMap<>();
+            Map<String, ClassDefinition> classesByName = new HashMap<>();
+            // nested types appear first in type tables and therefore not stored in a `ClassDefinition` field
+            Map<String, List<ClassDefinition>> nestedTypesByOwner = new HashMap<>();
 
             try (BufferedReader in = new BufferedReader(new InputStreamReader(is))) {
                 AtomicReference<@Nullable GroupArtifactVersion> lastGav = new AtomicReference<>();
@@ -166,9 +175,10 @@ public class TypeTable implements JavaParserClasspathLoader {
                     GroupArtifactVersion rowGav = new GroupArtifactVersion(fields[0], fields[1], fields[2]);
 
                     if (!Objects.equals(rowGav, lastGav.get())) {
-                        writeClassesDir(matchedGav.get(), membersByClassName);
+                        writeClassesDir(matchedGav.get(), classesByName.values(), nestedTypesByOwner);
                         matchedGav.set(null);
-                        membersByClassName.clear();
+                        classesByName.clear();
+                        nestedTypesByOwner.clear();
 
                         String artifactVersion = fields[1] + "-" + fields[2];
 
@@ -182,17 +192,24 @@ public class TypeTable implements JavaParserClasspathLoader {
                     lastGav.set(rowGav);
 
                     if (matchedGav.get() != null) {
-                        ClassDefinition classDefinition = new ClassDefinition(
-                                Integer.parseInt(fields[3]),
-                                fields[4],
-                                fields[5].isEmpty() ? null : fields[5],
-                                fields[6].isEmpty() ? null : fields[6],
-                                fields[7].isEmpty() ? null : fields[7].split("\\|")
-                        );
-                        List<Member> classMembers = membersByClassName.computeIfAbsent(classDefinition, cd -> new ArrayList<>());
+                        String className = fields[4];
+                        ClassDefinition classDefinition = classesByName.computeIfAbsent(className, name ->
+                                new ClassDefinition(
+                                        Integer.parseInt(fields[3]),
+                                        name,
+                                        fields[5].isEmpty() ? null : fields[5],
+                                        fields[6].isEmpty() ? null : fields[6],
+                                        fields[7].isEmpty() ? null : fields[7].split("\\|")
+                                ));
+                        int lastIndexOf$ = classDefinition.getName().lastIndexOf('$');
+                        if (lastIndexOf$ != -1) {
+                            String ownerName = classDefinition.getName().substring(0, lastIndexOf$);
+                            nestedTypesByOwner.computeIfAbsent(ownerName, k -> new ArrayList<>(4))
+                                    .add(classDefinition);
+                        }
                         int memberAccess = Integer.parseInt(fields[8]);
                         if (memberAccess != -1) {
-                            classMembers.add(new Member(
+                            classDefinition.addMember(new Member(
                                     classDefinition,
                                     memberAccess,
                                     fields[9],
@@ -205,10 +222,10 @@ public class TypeTable implements JavaParserClasspathLoader {
                 });
             }
 
-            writeClassesDir(matchedGav.get(), membersByClassName);
+            writeClassesDir(matchedGav.get(), classesByName.values(), nestedTypesByOwner);
         }
 
-        private void writeClassesDir(@Nullable GroupArtifactVersion gav, Map<ClassDefinition, List<Member>> membersByClassName) {
+        private void writeClassesDir(@Nullable GroupArtifactVersion gav, Collection<ClassDefinition> classes, Map<String, List<ClassDefinition>> nestedTypesByOwner) {
             if (gav == null) {
                 return;
             }
@@ -216,7 +233,7 @@ public class TypeTable implements JavaParserClasspathLoader {
             Path classesDir = getClassesDir(ctx, gav);
             classesDirByArtifact.put(gav, classesDir);
 
-            membersByClassName.forEach((classDef, members) -> {
+            classes.forEach(classDef -> {
                 Path classFile = classesDir.resolve(classDef.getName() + ".class");
                 if (!Files.exists(classFile.getParent()) && !classFile.getParent().toFile().mkdirs()) {
                     throw new UncheckedIOException(new IOException("Failed to create directory " + classesDir.getParent()));
@@ -235,24 +252,17 @@ public class TypeTable implements JavaParserClasspathLoader {
                         classDef.getSuperinterfaceSignatures()
                 );
 
-                Set<ClassDefinition> innerClasses = new HashSet<>();
-                for (ClassDefinition innerClassDef : membersByClassName.keySet()) {
-                    if (innerClassDef.getName().contains("$")) {
-                        innerClasses.add(innerClassDef);
-                    }
-                }
-
-                for (ClassDefinition innerClass : innerClasses) {
-                    int lastIndexOf$ = innerClass.getName().lastIndexOf('$');
+                for (ClassDefinition innerClassDef : nestedTypesByOwner.getOrDefault(classDef.getName(), emptyList())) {
+                    int lastIndexOf$ = innerClassDef.getName().lastIndexOf('$');
                     classWriter.visitInnerClass(
-                            innerClass.getName(),
-                            innerClass.getName().substring(0, lastIndexOf$),
-                            innerClass.getName().substring(lastIndexOf$ + 1),
-                            innerClass.getAccess() & 30239
+                            innerClassDef.getName(),
+                            classDef.getName(),
+                            innerClassDef.getName().substring(lastIndexOf$ + 1),
+                            innerClassDef.getAccess() & NESTED_TYPE_ACCESS_MASK
                     );
                 }
 
-                for (Member member : members) {
+                for (Member member : classDef.getMembers()) {
                     if (member.getDescriptor().contains("(")) {
                         classWriter
                                 .visitMethod(
@@ -461,6 +471,7 @@ public class TypeTable implements JavaParserClasspathLoader {
     }
 
     @Value
+    @RequiredArgsConstructor
     private static class ClassDefinition {
         int access;
         String name;
@@ -472,6 +483,21 @@ public class TypeTable implements JavaParserClasspathLoader {
         String superclassSignature;
 
         String @Nullable [] superinterfaceSignatures;
+
+        @NonFinal
+        @Nullable
+        List<Member> members;
+
+        public List<Member> getMembers() {
+            return members != null ? members : emptyList();
+        }
+
+        public void addMember(Member member) {
+            if (members == null) {
+                members = new ArrayList<>();
+            }
+            members.add(member);
+        }
     }
 
     @Value
