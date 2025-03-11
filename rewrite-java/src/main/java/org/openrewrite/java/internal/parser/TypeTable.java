@@ -253,11 +253,10 @@ public class TypeTable implements JavaParserClasspathLoader {
                 );
 
                 for (ClassDefinition innerClassDef : nestedTypesByOwner.getOrDefault(classDef.getName(), emptyList())) {
-                    int lastIndexOf$ = innerClassDef.getName().lastIndexOf('$');
                     classWriter.visitInnerClass(
                             innerClassDef.getName(),
                             classDef.getName(),
-                            innerClassDef.getName().substring(lastIndexOf$ + 1),
+                            innerClassDef.getName().substring(classDef.getName().length() + 1),
                             innerClassDef.getAccess() & NESTED_TYPE_ACCESS_MASK
                     );
                 }
