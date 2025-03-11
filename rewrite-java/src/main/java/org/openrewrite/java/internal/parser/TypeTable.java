@@ -375,7 +375,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                                     @Override
                                     public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
                                         int lastIndexOf$ = name.lastIndexOf('$');
-                                        if (lastIndexOf$ != -1 && lastIndexOf$ < name.length() - 1 && Character.isDigit(name.charAt(lastIndexOf$ + 1))) {
+                                        if (lastIndexOf$ != -1 && lastIndexOf$ < name.length() - 1 && !Character.isJavaIdentifierStart(name.charAt(lastIndexOf$ + 1))) {
                                             // skip anonymous subclasses
                                             classDefinition = null;
                                         } else {
