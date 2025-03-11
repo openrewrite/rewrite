@@ -201,9 +201,9 @@ public class TypeTable implements JavaParserClasspathLoader {
                                         fields[6].isEmpty() ? null : fields[6],
                                         fields[7].isEmpty() ? null : fields[7].split("\\|")
                                 ));
-                        int lastIndexOf$ = classDefinition.getName().lastIndexOf('$');
+                        int lastIndexOf$ = className.lastIndexOf('$');
                         if (lastIndexOf$ != -1) {
-                            String ownerName = classDefinition.getName().substring(0, lastIndexOf$);
+                            String ownerName = className.substring(0, lastIndexOf$);
                             nestedTypesByOwner.computeIfAbsent(ownerName, k -> new ArrayList<>(4))
                                     .add(classDefinition);
                         }
