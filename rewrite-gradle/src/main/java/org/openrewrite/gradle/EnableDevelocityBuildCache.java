@@ -68,7 +68,7 @@ public class EnableDevelocityBuildCache extends Recipe {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 if ("develocity".equals(method.getSimpleName()) && !hasBuildCache(method)) {
-                    J.MethodInvocation buildCache = createBuildCache();
+                    J.MethodInvocation buildCache = createBuildCache(ctx);
                     return maybeAutoFormat(method, method.withArguments(ListUtils.mapFirst(method.getArguments(), arg -> {
                         if (arg instanceof J.Lambda) {
                             J.Lambda lambda = (J.Lambda) arg;
@@ -96,7 +96,7 @@ public class EnableDevelocityBuildCache extends Recipe {
         });
     }
 
-    private J.MethodInvocation createBuildCache() {
+    private J.MethodInvocation createBuildCache(ExecutionContext ctx) {
         String conf = "buildCache {\n" +
                 "    remote(develocity.buildCache) {\n";
         if (!StringUtils.isBlank(remoteEnabled)) {
@@ -108,7 +108,7 @@ public class EnableDevelocityBuildCache extends Recipe {
         conf += "    }" +
                 "}";
         return (J.MethodInvocation) GradleParser.builder().build()
-                .parse(conf)
+                .parse(ctx, conf)
                 .map(G.CompilationUnit.class::cast)
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))

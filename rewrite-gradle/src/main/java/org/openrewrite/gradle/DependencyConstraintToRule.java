@@ -15,8 +15,7 @@
  */
 package org.openrewrite.gradle;
 
-import lombok.EqualsAndHashCode;
-import lombok.Value;
+import lombok.*;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -69,8 +68,8 @@ public class DependencyConstraintToRule extends Recipe {
                 if (gavs.isEmpty()) {
                     return compilationUnit;
                 }
-                cu = (G.CompilationUnit) new MaybeAddEachDependency().visitNonNull(cu, 0, parent);
-                cu = (G.CompilationUnit) new UpdateEachDependency().visitNonNull(cu, gavs, parent);
+                cu = (G.CompilationUnit) new MaybeAddEachDependency().visitNonNull(cu, ctx, parent);
+                cu = (G.CompilationUnit) new UpdateEachDependency(gavs).visitNonNull(cu, ctx, parent);
                 return cu;
             }
         });
@@ -92,9 +91,9 @@ public class DependencyConstraintToRule extends Recipe {
 
     static class RemoveConstraints extends GroovyIsoVisitor<List<GroupArtifactVersionBecause>> {
 
-        @SuppressWarnings("DataFlowIssue")
+        @SuppressWarnings({"DataFlowIssue", "NullableProblems"})
         @Override
-        public  J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, List<GroupArtifactVersionBecause> groupArtifactVersions) {
+        public J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, List<GroupArtifactVersionBecause> groupArtifactVersions) {
             J.MethodInvocation m = super.visitMethodInvocation(method, groupArtifactVersions);
             if ("constraints".equals(m.getSimpleName()) && isInDependenciesBlock(getCursor())) {
                 if (!(m.getArguments().get(0) instanceof J.Lambda)) {
@@ -148,28 +147,35 @@ public class DependencyConstraintToRule extends Recipe {
         }
     }
 
-    static class UpdateEachDependency extends GroovyIsoVisitor<List<GroupArtifactVersionBecause>> {
+    @Value
+    @EqualsAndHashCode(callSuper = false)
+    static class UpdateEachDependency extends GroovyIsoVisitor<ExecutionContext> {
+        List<GroupArtifactVersionBecause> groupArtifactVersions;
         @Override
-        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, List<GroupArtifactVersionBecause> groupArtifactVersions) {
-            J.MethodInvocation m = super.visitMethodInvocation(method, groupArtifactVersions);
+        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+            J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
             if (isEachDependency(m)) {
                 Cursor parent = requireNonNull(getCursor().getParent());
                 for (GroupArtifactVersionBecause gav : groupArtifactVersions) {
-                    m = (J.MethodInvocation) new MaybeAddIf().visitNonNull(m, gav, parent);
-                    m = (J.MethodInvocation) new UpdateIf().visitNonNull(m, gav, parent);
+                    m = (J.MethodInvocation) new MaybeAddIf(gav).visitNonNull(m, ctx, parent);
+                    m = (J.MethodInvocation) new UpdateIf(gav).visitNonNull(m, ctx, parent);
                 }
             }
             return m;
         }
     }
 
-    static class MaybeAddIf extends GroovyIsoVisitor<GroupArtifactVersionBecause> {
+    @RequiredArgsConstructor
+    static class MaybeAddIf extends GroovyIsoVisitor<ExecutionContext> {
+        @NonNull
+        GroupArtifactVersionBecause groupArtifactVersion;
+
         boolean containsAnyIfStatement;
         boolean containsMatchingIfStatement;
 
         @Override
-        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, GroupArtifactVersionBecause groupArtifactVersion) {
-            J.MethodInvocation m = super.visitMethodInvocation(method, groupArtifactVersion);
+        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+            J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
             if (containsMatchingIfStatement) {
                 return m;
             }
@@ -193,7 +199,7 @@ public class DependencyConstraintToRule extends Recipe {
                              "if (" + p + ".requested.group == '" + groupArtifactVersion.getGroupId() + "' && " +
                              p + ".requested.name == '" + groupArtifactVersion.getArtifactId() + "') {\n}";
             J.If newIf = GroovyParser.builder().build()
-                    .parse(snippet)
+                    .parse(ctx, snippet)
                     .map(G.CompilationUnit.class::cast)
                     .map(cu -> cu.getStatements().get(1))
                     .map(J.If.class::cast)
@@ -219,7 +225,7 @@ public class DependencyConstraintToRule extends Recipe {
                     }
                 }.visitNonNull(m, 0, requireNonNull(getCursor().getParent()));
             } else {
-                J.Block newBody = autoFormat(closureBody.withStatements(ListUtils.concat(newIf, closureBody.getStatements())), groupArtifactVersion, getCursor());
+                J.Block newBody = autoFormat(closureBody.withStatements(ListUtils.concat(newIf, closureBody.getStatements())), ctx, getCursor());
                 m = m.withArguments(singletonList(closure.withBody(newBody)));
             }
             return m;
@@ -227,9 +233,9 @@ public class DependencyConstraintToRule extends Recipe {
 
 
         @Override
-        public J.If visitIf(J.If iff, GroupArtifactVersionBecause groupArtifactVersion) {
+        public J.If visitIf(J.If iff, ExecutionContext ctx) {
             containsAnyIfStatement = true;
-            J.If f = super.visitIf(iff, groupArtifactVersion);
+            J.If f = super.visitIf(iff, ctx);
             if (predicateRelatesToGav(f, groupArtifactVersion)) {
                 containsMatchingIfStatement = true;
             }
@@ -237,19 +243,22 @@ public class DependencyConstraintToRule extends Recipe {
         }
 
         @Override
-        public @Nullable J visit(@Nullable Tree tree, GroupArtifactVersionBecause groupArtifactVersion) {
+        public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
             // Avoid wasting time if we've already found it
             if (containsMatchingIfStatement) {
                 return (J) tree;
             }
-            return super.visit(tree, groupArtifactVersion);
+            return super.visit(tree, ctx);
         }
     }
 
-    static class UpdateIf extends GroovyIsoVisitor<GroupArtifactVersionBecause> {
+    @AllArgsConstructor
+    static class UpdateIf extends GroovyIsoVisitor<ExecutionContext> {
+        GroupArtifactVersionBecause groupArtifactVersionBecause;
+
         @Override
-        public J.If visitIf(J.If iff, GroupArtifactVersionBecause groupArtifactVersionBecause) {
-            J.If anIf = super.visitIf(iff, groupArtifactVersionBecause);
+        public J.If visitIf(J.If iff, ExecutionContext ctx) {
+            J.If anIf = super.visitIf(iff, ctx);
             if (predicateRelatesToGav(anIf, groupArtifactVersionBecause)) {
                 // The predicate of the if condition will already contain the relevant variable name
                 AtomicReference<String> variableName = new AtomicReference<>();
@@ -271,26 +280,26 @@ public class DependencyConstraintToRule extends Recipe {
                 }
                 List<Statement> newStatements = GroovyParser.builder()
                         .build()
-                        .parse(snippet)
+                        .parse(ctx, snippet)
                         .map(G.CompilationUnit.class::cast)
                         .map(G.CompilationUnit::getStatements)
                         .findFirst()
                         .orElseThrow(() -> new IllegalStateException("Unable to produce a new block statement"));
                 J.Block block = (J.Block) anIf.getThenPart();
                 block = block.withStatements(newStatements);
-                block = autoFormat(block, groupArtifactVersionBecause, getCursor());
+                block = autoFormat(block, ctx, getCursor());
                 anIf = anIf.withThenPart(block);
             }
             return anIf;
         }
     }
 
-    static class MaybeAddEachDependency extends GroovyIsoVisitor<Integer> {
+    static class MaybeAddEachDependency extends GroovyIsoVisitor<ExecutionContext> {
         boolean alreadyExists;
 
         @Override
-        public G.CompilationUnit visitCompilationUnit(G.CompilationUnit compilationUnit, Integer integer) {
-            G.CompilationUnit cu = super.visitCompilationUnit(compilationUnit, integer);
+        public G.CompilationUnit visitCompilationUnit(G.CompilationUnit compilationUnit, ExecutionContext ctx) {
+            G.CompilationUnit cu = super.visitCompilationUnit(compilationUnit, ctx);
             if (alreadyExists) {
                 return cu;
             }
@@ -305,7 +314,8 @@ public class DependencyConstraintToRule extends Recipe {
             }
             J.MethodInvocation m = GradleParser.builder()
                     .build()
-                    .parse("\n" +
+                    .parse(ctx,
+                           "\n" +
                            "configurations.all {\n" +
                            "    resolutionStrategy.eachDependency { details ->\n" +
                            "    }\n" +
@@ -321,8 +331,8 @@ public class DependencyConstraintToRule extends Recipe {
         }
 
         @Override
-        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer integer) {
-            J.MethodInvocation m = super.visitMethodInvocation(method, integer);
+        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+            J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
             if (isEachDependency(m)) {
                 alreadyExists = true;
             }
@@ -330,12 +340,12 @@ public class DependencyConstraintToRule extends Recipe {
         }
 
         @Override
-        public @Nullable J visit(@Nullable Tree tree, Integer integer) {
+        public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
             // Avoid wasting time if we've already found it
             if (alreadyExists) {
                 return (J) tree;
             }
-            return super.visit(tree, integer);
+            return super.visit(tree, ctx);
         }
     }
 

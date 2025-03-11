@@ -21,6 +21,7 @@ import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.groovy.tree.G;
+import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.test.UncheckedConsumer;
@@ -101,6 +102,31 @@ public class Assertions {
         return gradle;
     }
 
+    public static SourceSpecs buildGradleKts(@Language("kotlin") @Nullable String before) {
+        return buildGradleKts(before, s -> {
+        });
+    }
+
+    public static SourceSpecs buildGradleKts(@Language("kotlin") @Nullable String before, Consumer<SourceSpec<K.CompilationUnit>> spec) {
+        SourceSpec<K.CompilationUnit> gradle = new SourceSpec<>(K.CompilationUnit.class, "gradle", gradleParser, before, null);
+        gradle.path(Paths.get("build.gradle.kts"));
+        spec.accept(gradle);
+        return gradle;
+    }
+
+    public static SourceSpecs buildGradleKts(@Language("kotlin") @Nullable String before, @Language("kotlin") @Nullable String after) {
+        return buildGradleKts(before, after, s -> {
+        });
+    }
+
+    public static SourceSpecs buildGradleKts(@Language("kotlin") @Nullable String before, @Language("kotlin") @Nullable String after,
+                                          Consumer<SourceSpec<K.CompilationUnit>> spec) {
+        SourceSpec<K.CompilationUnit> gradle = new SourceSpec<>(K.CompilationUnit.class, "gradle", gradleParser, before, s -> after);
+        gradle.path("build.gradle.kts");
+        spec.accept(gradle);
+        return gradle;
+    }
+
     public static SourceSpecs settingsGradle(@Language("groovy") @Nullable String before) {
         return settingsGradle(before, s -> {
         });
@@ -122,6 +148,31 @@ public class Assertions {
                                              Consumer<SourceSpec<G.CompilationUnit>> spec) {
         SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", gradleParser, before, s -> after);
         gradle.path("settings.gradle");
+        spec.accept(gradle);
+        return gradle;
+    }
+
+    public static SourceSpecs settingsGradleKts(@Language("kotlin") @Nullable String before) {
+        return settingsGradleKts(before, s -> {
+        });
+    }
+
+    public static SourceSpecs settingsGradleKts(@Language("kotlin") @Nullable String before, Consumer<SourceSpec<K.CompilationUnit>> spec) {
+        SourceSpec<K.CompilationUnit> gradle = new SourceSpec<>(K.CompilationUnit.class, "gradle", gradleParser, before, null);
+        gradle.path(Paths.get("settings.gradle.kts"));
+        spec.accept(gradle);
+        return gradle;
+    }
+
+    public static SourceSpecs settingsGradleKts(@Language("kotlin") @Nullable String before, @Language("kotlin") @Nullable String after) {
+        return settingsGradleKts(before, after, s -> {
+        });
+    }
+
+    public static SourceSpecs settingsGradleKts(@Language("kotlin") @Nullable String before, @Language("kotlin") @Nullable String after,
+                                             Consumer<SourceSpec<K.CompilationUnit>> spec) {
+        SourceSpec<K.CompilationUnit> gradle = new SourceSpec<>(K.CompilationUnit.class, "gradle", gradleParser, before, s -> after);
+        gradle.path("settings.gradle.kts");
         spec.accept(gradle);
         return gradle;
     }

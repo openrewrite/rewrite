@@ -178,4 +178,24 @@ class EnumTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5146")
+    void noValuesJustSemicolon() {
+        rewriteRun(
+          java(
+            """
+             public enum A {
+                 ;
+                 public static final String X = "receipt-id";
+             }
+             """,
+            spec -> spec.afterRecipe( cu -> {
+                J.EnumValueSet enumValueStatement = (J.EnumValueSet) cu.getClasses().get(0).getBody().getStatements().get(0);
+                assert enumValueStatement.getEnums().isEmpty();
+                assert enumValueStatement.isTerminatedWithSemicolon();
+            })
+          )
+        );
+    }
 }

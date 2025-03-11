@@ -45,4 +45,35 @@ class SemverTest {
         assertThat(Semver.validate("=1.5-1", null).getValue())
           .isInstanceOf(ExactVersion.class);
     }
+
+    @Test
+    void majorVersion() {
+        assertThat(Semver.majorVersion("")).isEqualTo("");
+        assertThat(Semver.majorVersion("1")).isEqualTo("1");
+        assertThat(Semver.majorVersion("1.2")).isEqualTo("1");
+        assertThat(Semver.majorVersion("1.2.3")).isEqualTo("1");
+    }
+
+    @Test
+    void minorVersion() {
+        assertThat(Semver.minorVersion("")).isEqualTo("");
+        assertThat(Semver.minorVersion("1")).isEqualTo("1"); // takes the major also as minor
+        assertThat(Semver.minorVersion("1.2")).isEqualTo("2");
+        assertThat(Semver.minorVersion("1.2.3")).isEqualTo("2");
+    }
+
+    @Test
+    void maxVersion() {
+        assertThat(Semver.max(null, null)).isNull();
+        assertThat(Semver.max(null, "")).isNull();
+        assertThat(Semver.max("",  null)).isNull();
+        assertThat(Semver.max("3.3.3", null)).isEqualTo("3.3.3");
+        assertThat(Semver.max("3.3.3", "")).isEqualTo("3.3.3");
+        assertThat(Semver.max(null, "3.3.3")).isEqualTo("3.3.3");
+        assertThat(Semver.max("", "3.3.3")).isEqualTo("3.3.3");
+        assertThat(Semver.max("4.3.30", "4.3.30.RELEASE")).isEqualTo("4.3.30"); // No label over label
+        assertThat(Semver.max("1.0.1RC", "1.0.1-release")).isEqualTo("1.0.1-release");
+        assertThat(Semver.max("4.3.30.RELEASE", "4.3.30.RELEASE-2")).isEqualTo("4.3.30.RELEASE"); // Multiple labels with same version takes first label
+        assertThat(Semver.max("4.3.30.RELEASE", "4.3.31.RELEASE")).isEqualTo("4.3.31.RELEASE");
+    }
 }

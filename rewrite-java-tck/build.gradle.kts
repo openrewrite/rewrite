@@ -18,6 +18,16 @@ dependencies {
     }
 }
 
+configurations.all {
+    resolutionStrategy {
+        eachDependency {
+            if (requested.group == "org.assertj" && requested.name == "assertj-core") {
+                useVersion("3.+") // Pin to latest 3.+ version as AssertJ 4 requires Java 17
+            }
+        }
+    }
+}
+
 infoBroker {
     // Prevent cache misses due to unstable attributes, e.g. "Build-Date"
     includedManifestProperties = listOf(
