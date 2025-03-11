@@ -1818,8 +1818,7 @@ class JavadocTest implements RewriteTest {
               	/**
               	 * <p>Ř\\u00e9t\\u00FBrn:</p>
               	 * 
-              	 * {@code
-                 * \\u0040Override
+              	 * {@code \\u0040Override
                  * public void method() {}
                  * }
               	 */
