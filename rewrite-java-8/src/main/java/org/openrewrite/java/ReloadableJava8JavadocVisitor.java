@@ -819,9 +819,9 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                     text = new StringBuilder();
                 }
 
-                Javadoc.LineBreak lineBreak = lineBreaks.remove(cursor + 1);
-                texts.add(lineBreak);
                 cursor++;
+                Javadoc.LineBreak lineBreak = lineBreaks.remove(cursor);
+                texts.add(lineBreak);
             } else if (source.charAt(cursor) != c && (source.startsWith(unicodeEscaped(c), cursor) || source.startsWith(unicodeEscaped(c).toLowerCase(), cursor) )) {
                 int escapedCharLength = unicodeEscaped(c).length();
                 text.append(source, cursor, cursor + escapedCharLength);
