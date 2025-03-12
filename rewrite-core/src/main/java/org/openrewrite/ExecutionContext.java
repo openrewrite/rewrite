@@ -54,7 +54,7 @@ public interface ExecutionContext extends RpcCodec<ExecutionContext> {
         return getMessage("org.openrewrite.internal.treeObservers", Collections.emptySet());
     }
 
-    Map<String, Object> getMessages();
+    Map<String, @Nullable Object> getMessages();
 
     void putMessage(String key, @Nullable Object value);
 

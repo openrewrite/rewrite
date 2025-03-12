@@ -22,8 +22,8 @@ import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
+@Getter
 public class DelegatingExecutionContext implements ExecutionContext {
-    @Getter
     private final ExecutionContext delegate;
 
     public DelegatingExecutionContext(ExecutionContext delegate) {
@@ -31,7 +31,7 @@ public class DelegatingExecutionContext implements ExecutionContext {
     }
 
     @Override
-    public @Nullable Map<String, Object> getMessages() {
+    public Map<String, @Nullable Object> getMessages() {
         return delegate.getMessages();
     }
 

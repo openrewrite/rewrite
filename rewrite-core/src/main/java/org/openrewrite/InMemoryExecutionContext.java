@@ -15,7 +15,6 @@
  */
 package org.openrewrite;
 
-import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
@@ -25,7 +24,6 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 public class InMemoryExecutionContext implements ExecutionContext, Cloneable {
-    @Getter
     @Nullable
     private Map<String, Object> messages;
 
@@ -53,32 +51,32 @@ public class InMemoryExecutionContext implements ExecutionContext, Cloneable {
     }
 
     @Override
+    public Map<String, @Nullable Object> getMessages() {
+        if (messages == null) {
+            messages = new ConcurrentHashMap<>();
+        }
+        return messages;
+    }
+
+    @Override
     public void putMessage(String key, @Nullable Object value) {
-        if (value == null && messages != null) {
-            messages.remove(key);
+        if (value == null) {
+            getMessages().remove(key);
         } else {
-            if (messages == null) {
-                messages = new ConcurrentHashMap<>();
-            }
-            if (value != null) {
-                messages.put(key, value);
-            }
+            getMessages().put(key, value);
         }
     }
 
     @Override
     public <T> @Nullable T getMessage(String key) {
-        if (messages == null) {
-            messages = new ConcurrentHashMap<>();
-        }
         //noinspection unchecked
-        return (T) messages.get(key);
+        return (T) getMessages().get(key);
     }
 
     @Override
     public <T> @Nullable T pollMessage(String key) {
         //noinspection unchecked
-        return (T) (messages == null ? null : messages.remove(key));
+        return (T) getMessages().remove(key);
     }
 
     @Override
