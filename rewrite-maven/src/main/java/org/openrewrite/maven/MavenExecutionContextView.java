@@ -33,8 +33,6 @@ import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
 
 @SuppressWarnings({"unused", "UnusedReturnValue"})
 public class MavenExecutionContextView extends DelegatingExecutionContext {
-    private static final MavenPomCache DEFAULT_POM_CACHE = new InMemoryMavenPomCache();
-
     private static final String MAVEN_SETTINGS = "org.openrewrite.maven.settings";
     private static final String MAVEN_ACTIVE_PROFILES = "org.openrewrite.maven.activeProfiles";
     private static final String MAVEN_MIRRORS = "org.openrewrite.maven.mirrors";
@@ -60,6 +58,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     }
 
     public MavenExecutionContextView recordResolutionTime(Duration time) {
+        //noinspection DataFlowIssue
         this.computeMessage(MAVEN_RESOLUTION_TIME, time.toMillis(), () -> 0L, Long::sum);
         return this;
     }
@@ -93,7 +92,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
      * @return The mirrors to use for dependency resolution.
      */
     public Collection<MavenRepositoryMirror> getMirrors(@Nullable MavenSettings mavenSettings) {
-        if (mavenSettings != null && !mavenSettings.equals(getSettings())) {
+        if (mavenSettings != null && !Objects.equals(mavenSettings, getSettings())) {
             return mapMirrors(mavenSettings);
         }
         return getMirrors();
@@ -132,7 +131,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     }
 
     public MavenPomCache getPomCache() {
-        return getMessage(MAVEN_POM_CACHE, DEFAULT_POM_CACHE);
+        return (MavenPomCache) getMessages().computeIfAbsent(MAVEN_POM_CACHE, k -> new InMemoryMavenPomCache());
     }
 
     public MavenExecutionContextView setLocalRepository(MavenRepository localRepository) {
@@ -313,6 +312,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
                             );
                         }
                     } catch (Exception exception) {
+                        //noinspection DataFlowIssue
                         this.getOnError().accept(new MavenParsingException(
                                 "Unable to parse URL %s for Maven settings repository id %s",
                                 exception,
