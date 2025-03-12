@@ -113,12 +113,18 @@ public class TypeTable implements JavaParserClasspathLoader {
     }
 
     private static void read(URL url, Collection<String> artifactNames, ExecutionContext ctx) {
+        Collection<String> missingArtifacts = artifactsNotYetWritten(artifactNames);
+        if (missingArtifacts.isEmpty()) {
+            // all artifacts have already been extracted
+            return;
+        }
+
         try (InputStream is = url.openStream(); InputStream inflate = new GZIPInputStream(is)) {
-            new Reader(ctx).read(inflate, artifactsNotYetWritten(artifactNames));
+            new Reader(ctx).read(inflate, missingArtifacts);
         } catch (ZipException e) {
             // Fallback to `InflaterInputStream` for older files created as raw zlib data using DeflaterOutputStream
             try (InputStream is = url.openStream(); InputStream inflate = new InflaterInputStream(is)) {
-                new Reader(ctx).read(inflate, artifactsNotYetWritten(artifactNames));
+                new Reader(ctx).read(inflate, missingArtifacts);
             } catch (IOException e1) {
                 throw new UncheckedIOException(e1);
             }
@@ -216,7 +222,8 @@ public class TypeTable implements JavaParserClasspathLoader {
                                     fields[9],
                                     fields[10],
                                     fields[11].isEmpty() ? null : fields[11],
-                                    fields[12].isEmpty() ? null : fields[12].split("\\|")
+                                    fields[12].isEmpty() ? null : fields[12].split("\\|"),
+                                    fields[13].isEmpty() ? null : fields[13].split("\\|")
                             ));
                         }
                     }
@@ -272,7 +279,12 @@ public class TypeTable implements JavaParserClasspathLoader {
                                         member.getSignature(),
                                         member.getExceptions()
                                 );
-
+                        String[] parameterNames = member.getParameterNames();
+                        if (parameterNames != null) {
+                            for (String parameterName : parameterNames) {
+                                mv.visitParameter(parameterName, 0);
+                            }
+                        }
                         writeMethodBody(member, mv);
                         mv.visitEnd();
                     } else {
@@ -430,6 +442,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                                     ClassDefinition classDefinition;
 
                                     boolean wroteFieldOrMethod;
+                                    final List<String> collectedParameterNames = new ArrayList<>();
 
                                     @Override
                                     public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
@@ -449,28 +462,38 @@ public class TypeTable implements JavaParserClasspathLoader {
                                     }
 
                                     @Override
-                                    @Nullable
-                                    public FieldVisitor visitField(int access, String name, String descriptor, String signature, Object value) {
-                                        if (classDefinition == null) {
-                                            return null;
+                                    public @Nullable FieldVisitor visitField(int access, String name, String descriptor, String signature, Object value) {
+                                        if (classDefinition != null) {
+                                            wroteFieldOrMethod |= classDefinition
+                                                    .writeField(access, name, descriptor, signature);
                                         }
 
-                                        wroteFieldOrMethod |= classDefinition
-                                                .writeField(access, name, descriptor, signature);
-                                        return super.visitField(access, name, descriptor, signature, value);
+                                        return null;
                                     }
 
                                     @Override
-                                    @Nullable
-                                    public MethodVisitor visitMethod(int access, String name, String descriptor,
-                                                                     String signature, String[] exceptions) {
-                                        if (classDefinition == null) {
-                                            return null;
-                                        }
+                                    public @Nullable MethodVisitor visitMethod(int access, @Nullable String name, String descriptor,
+                                                                               String signature, String[] exceptions) {
+                                        // Repeating check from `writeMethod()` for performance reasons
+                                        if (classDefinition != null && ((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & access) == 0 &&
+                                            name != null && !"<clinit>".equals(name)) {
+                                            return new MethodVisitor(Opcodes.ASM9) {
+                                                @Override
+                                                public void visitParameter(@Nullable String name, int access) {
+                                                    if (name != null) {
+                                                        collectedParameterNames.add(name);
+                                                    }
+                                                }
 
-                                        wroteFieldOrMethod |= classDefinition
-                                                .writeMethod(access, name, descriptor, signature, null, exceptions);
-                                        return super.visitMethod(access, name, descriptor, signature, exceptions);
+                                                @Override
+                                                public void visitEnd() {
+                                                    wroteFieldOrMethod |= classDefinition
+                                                            .writeMethod(access, name, descriptor, signature, collectedParameterNames.isEmpty() ? null : collectedParameterNames, exceptions);
+                                                    collectedParameterNames.clear();
+                                                }
+                                            };
+                                        }
+                                        return null;
                                     }
                                 }, SKIP_CODE);
                             }
@@ -503,15 +526,15 @@ public class TypeTable implements JavaParserClasspathLoader {
                             classSignature == null ? "" : classSignature,
                             classSuperclassName,
                             classSuperinterfaceSignatures == null ? "" : String.join("|", classSuperinterfaceSignatures),
-                            -1, null, null, null, null, null);
+                            -1, "", "", "", "", "");
                 }
             }
 
-            public boolean writeMethod(int access, String name, String descriptor,
+            public boolean writeMethod(int access, @Nullable String name, String descriptor,
                                        @Nullable String signature,
-                                       String @Nullable [] parameterNames,
+                                       @Nullable List<String> parameterNames,
                                        String @Nullable [] exceptions) {
-                if (((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & access) == 0 && !name.equals("<clinit>")) {
+                if (((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & access) == 0 && name != null && !name.equals("<clinit>")) {
                     out.printf(
                             "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s%n",
                             jar.groupId, jar.artifactId, jar.version,
@@ -584,6 +607,7 @@ public class TypeTable implements JavaParserClasspathLoader {
         @Nullable
         String signature;
 
+        String @Nullable [] parameterNames;
         String @Nullable [] exceptions;
     }
 }
