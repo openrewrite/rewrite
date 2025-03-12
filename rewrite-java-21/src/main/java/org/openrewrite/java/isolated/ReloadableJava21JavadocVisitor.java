@@ -735,34 +735,6 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         return null;
     }
 
-    private JavaType.@Nullable Variable xx(DCTree.DCReference ref, @Nullable JavaType type) {
-        JavaType.Class classType = TypeUtils.asClass(type);
-        if (classType == null) {
-            return null;
-        }
-
-        for (JavaType.Variable member : classType.getMembers()) {
-            if (member.getName().equals(ref.memberName.toString())) {
-                return member;
-            }
-        }
-
-        // Superclass fields takes presence over interface fields
-        JavaType.@Nullable Variable refType = xx(ref, classType.getSupertype());
-
-        if (refType == null) {
-            for (JavaType.FullyQualified interface_ : classType.getInterfaces()) {
-                for (JavaType.Variable member : interface_.getMembers()) {
-                    if (member.getName().equals(ref.memberName.toString())) {
-                        return member;
-                    }
-                }
-            }
-        }
-
-        return refType;
-    }
-
     private boolean paramTypeMatches(JavaType parameterType, Type javadocType) {
         return paramTypeMatches(parameterType, typeMapping.type(javadocType));
     }
