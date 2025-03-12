@@ -751,8 +751,20 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             }
         }
 
-        // a member reference, but not matching anything on type attribution
-        return null;
+        // Superclass fields takes presence over interface fields
+        JavaType.@Nullable Variable refType = fieldReferenceType(ref, classType.getSupertype());
+
+        if (refType == null) {
+            for (JavaType.FullyQualified interface_ : classType.getInterfaces()) {
+                for (JavaType.Variable member : interface_.getMembers()) {
+                    if (member.getName().equals(ref.memberName.toString())) {
+                        return member;
+                    }
+                }
+            }
+        }
+
+        return refType;
     }
 
     @Override
@@ -877,26 +889,29 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     public List<Javadoc> visitText(String node) {
         List<Javadoc> texts = new ArrayList<>();
 
-        if (!node.isEmpty() && Character.isWhitespace(node.charAt(0)) &&
-                !Character.isWhitespace(source.charAt(cursor))) {
+        if (!node.isEmpty() && Character.isWhitespace(node.charAt(0)) && !Character.isWhitespace(source.charAt(cursor))) {
             node = node.stripLeading();
         }
 
         StringBuilder text = new StringBuilder();
         for (int i = 0; i < node.length(); i++) {
             char c = node.charAt(i);
-            cursor++;
             if (c == '\n') {
                 if (text.length() > 0) {
                     texts.add(new Javadoc.Text(randomId(), Markers.EMPTY, text.toString()));
                     text = new StringBuilder();
                 }
 
+                cursor++;
                 Javadoc.LineBreak lineBreak = lineBreaks.remove(cursor);
-                assert lineBreak != null;
                 texts.add(lineBreak);
+            } else if (source.charAt(cursor) != c && (source.startsWith(unicodeEscaped(c), cursor) || source.startsWith(unicodeEscaped(c).toLowerCase(), cursor) )) {
+                int escapedCharLength = unicodeEscaped(c).length();
+                text.append(source, cursor, cursor + escapedCharLength);
+                cursor += escapedCharLength;
             } else {
                 text.append(c);
+                cursor++;
             }
         }
 
@@ -905,6 +920,10 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         }
 
         return texts;
+    }
+
+    private static String unicodeEscaped(char c) {
+        return String.format("\\u%04X", (int) c);
     }
 
     @Override
