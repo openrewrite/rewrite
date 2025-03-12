@@ -18,7 +18,6 @@ package org.openrewrite.gradle;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.gradle.internal.DefaultImportsCustomizer;
@@ -186,24 +185,19 @@ public class GradleParser implements Parser {
 
     private List<Path> defaultClasspath(ExecutionContext ctx) {
         if (defaultClasspath == null) {
-            try {
-                Class.forName("org.gradle.api.Project");
-                defaultClasspath = JavaParser.runtimeClasspath();
-            } catch (ClassNotFoundException e) {
-                defaultClasspath = JavaParser.dependenciesFromResources(ctx,
-                        "gradle-base-services",
-                        "gradle-core-api",
-                        "gradle-language-groovy",
-                        "gradle-language-java",
-                        "gradle-logging",
-                        "gradle-messaging",
-                        "gradle-native",
-                        "gradle-process-services",
-                        "gradle-resources",
-                        "gradle-testing-base",
-                        "gradle-testing-jvm",
-                        "develocity-gradle-plugin");
-            }
+            defaultClasspath = JavaParser.dependenciesFromResources(ctx,
+                    "gradle-base-services",
+                    "gradle-core-api",
+                    "gradle-language-groovy",
+                    "gradle-language-java",
+                    "gradle-logging",
+                    "gradle-messaging",
+                    "gradle-native",
+                    "gradle-process-services",
+                    "gradle-resources",
+                    "gradle-testing-base",
+                    "gradle-testing-jvm",
+                    "develocity-gradle-plugin");
         }
         return defaultClasspath;
     }

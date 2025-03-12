@@ -46,7 +46,7 @@ class TypeTableTest implements RewriteTest {
 
     @BeforeEach
     void before() {
-        //TODO ctx.putMessage(TypeTable.VERIFY_CLASS_WRITING, true);
+        ctx.putMessage(TypeTable.VERIFY_CLASS_WRITING, true);
         JavaParserExecutionContextView.view(ctx).setParserClasspathDownloadTarget(temp.toFile());
         tsv = temp.resolve("types.tsv.zip");
         System.out.println(tsv);
