@@ -277,6 +277,7 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
             """
               package org.openrewrite.java;
               
+              /** @noinspection ALL*/
               class Test {
                   void foo(String bar) {
                       int i = 0;
@@ -299,12 +300,20 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
     void replaceAnnotationValue() {
         rewriteRun(
           spec -> spec.recipe(new ReplaceStringLiteralWithConstant(EXAMPLE_STRING_CONSTANT, EXAMPLE_STRING_FQN)),
+          java("""
+            package org.openrewrite.java;
+            
+            @interface Foo {
+                String bar();
+                String baz();
+            }
+            """),
           java(
             """
               package org.openrewrite.java;
               
               class Test {
-                  @Deprecated(since = "Hello World!")
+                  @Foo(bar = "Goodbye World!", baz = "Hello World!")
                   void foo(String bar) {
                   }
               }
@@ -313,7 +322,7 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
               package org.openrewrite.java;
               
               class Test {
-                  @Deprecated(since = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT)
+                  @Foo(bar = "Goodbye World!", baz = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT)
                   void foo(String bar) {
                   }
               }
