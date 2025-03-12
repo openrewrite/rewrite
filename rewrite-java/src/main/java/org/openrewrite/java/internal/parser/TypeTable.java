@@ -456,8 +456,7 @@ public class TypeTable implements JavaParserClasspathLoader {
                                     }
 
                                     @Override
-                                    @Nullable
-                                    public FieldVisitor visitField(int access, String name, String descriptor, String signature, Object value) {
+                                    public @Nullable FieldVisitor visitField(int access, String name, String descriptor, String signature, Object value) {
                                         if (classDefinition != null) {
                                             wroteFieldOrMethod |= classDefinition
                                                     .writeField(access, name, descriptor, signature);
@@ -467,9 +466,8 @@ public class TypeTable implements JavaParserClasspathLoader {
                                     }
 
                                     @Override
-                                    @Nullable
-                                    public MethodVisitor visitMethod(int access, @Nullable String name, String descriptor,
-                                                                     String signature, String[] exceptions) {
+                                    public @Nullable MethodVisitor visitMethod(int access, @Nullable String name, String descriptor,
+                                                                               String signature, String[] exceptions) {
                                         // Repeating check from `writeMethod()` for performance reasons
                                         if (classDefinition != null && ((Opcodes.ACC_PRIVATE | Opcodes.ACC_SYNTHETIC) & access) == 0 &&
                                             name != null && !"<clinit>".equals(name)) {
