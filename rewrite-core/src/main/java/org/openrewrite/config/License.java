@@ -15,32 +15,57 @@
  */
 package org.openrewrite.config;
 
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
+import java.util.Objects;
 
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
-public enum License {
-    Apache2("Apache License Version 2.0","https://www.apache.org/licenses/LICENSE-2.0"),
-    MSAL("Moderne Source Available", "https://docs.moderne.io/licensing/moderne-source-available-license"),
-    Proprietary("Moderne Proprietary","https://docs.moderne.io/licensing/overview");
+public class License {
+    private static final String APACHEV2 = "https://www.apache.org/licenses/LICENSE-2.0";
+    private static final String MSAL = "https://docs.moderne.io/licensing/moderne-source-available-license";
+    private static final String MOD_PROPRITARY = "https://docs.moderne.io/licensing/overview";
+
+    public static final License apache2 = new License("Apache License Version 2.0", APACHEV2);
+    public static final License msal = new License("Moderne Source Available", MSAL);
+    public static final License moderneProprietary = new License("Moderne Proprietary", MOD_PROPRITARY);
+
     private final String fullName;
     private final String url;
 
-    public static License fromFullName(String name) {
-        for (License license : values()) {
-            if (license.fullName.equalsIgnoreCase(name)) {
-                return license;
-            }
-        }
-        throw new IllegalArgumentException("Invalid license name: " + name);
+    private License(String fullName, String url) {
+        this.fullName = fullName;
+        this.url = url;
     }
 
-    public static License fromUrl(String url) {
-        for (License license : values()) {
-            if (license.url.equalsIgnoreCase(url)) {
-                return license;
-            }
+    public static License representing(String fullName, String url) {
+        switch (url) {
+            case APACHEV2:
+                return apache2;
+            case MSAL:
+                return msal;
+            case MOD_PROPRITARY:
+                return moderneProprietary;
+            default:
+                return new License(fullName, url);
         }
-        throw new IllegalArgumentException("Invalid license url: " + url);
+    }
+
+    public String fullName() {
+        return fullName;
+    }
+
+    public String url() {
+        return url;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        License license = (License) o;
+        return Objects.equals(url, license.url);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(url);
     }
 }

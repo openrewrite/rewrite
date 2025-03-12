@@ -318,21 +318,22 @@ class YamlResourceLoaderTest implements RewriteTest {
               recipeName: test.ChangeTextToHello
               recipeUrl: "https://github.com/openrewrite/rewrite/blob/main/rewrite-gradle/src/main/java/org/openrewrite/gradle/AddDependencyVisitor.java"
               recipeLicenseUrl: "https://www.apache.org/licenses/LICENSE-2.0"
+              recipeLicenseName: "Apache License Version 2.0"
               """.getBytes()
           ), URI.create("origin/test.ChangeTextToHello.yml"), new Properties()))
           .build();
 
         Collection<Recipe> recipes = env.listRecipes();
         assertThat(recipes).singleElement().satisfies(r ->
-            assertThat(r.getOrigin()).isEqualTo(new RecipeOrigin(
-              URI.create("https://github.com/openrewrite/rewrite/blob/main/rewrite-gradle/src/main/java/org/openrewrite/gradle/AddDependencyVisitor.java"),
-              License.Apache2)));
+          assertThat(r.getOrigin()).isEqualTo(new RecipeOrigin(
+            URI.create("https://github.com/openrewrite/rewrite/blob/main/rewrite-gradle/src/main/java/org/openrewrite/gradle/AddDependencyVisitor.java"),
+            License.apache2)));
 
         Collection<RecipeDescriptor> recipeDescriptors = env.listRecipeDescriptors();
         assertThat(recipeDescriptors).singleElement().satisfies(d ->
-            assertThat(d.getOrigin()).isEqualTo(new RecipeOrigin(
-              URI.create("https://github.com/openrewrite/rewrite/blob/main/rewrite-gradle/src/main/java/org/openrewrite/gradle/AddDependencyVisitor.java"),
-              License.Apache2)));
+          assertThat(d.getOrigin()).isEqualTo(new RecipeOrigin(
+            URI.create("https://github.com/openrewrite/rewrite/blob/main/rewrite-gradle/src/main/java/org/openrewrite/gradle/AddDependencyVisitor.java"),
+            License.apache2)));
     }
 
     @Test

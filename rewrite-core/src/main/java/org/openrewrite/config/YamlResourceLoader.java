@@ -481,7 +481,7 @@ public class YamlResourceLoader implements ResourceLoader {
                     @Language("markdown")
                     String packageName = (String) c.get("packageName");
                     if (packageName.endsWith("." + CategoryTree.CORE) ||
-                        packageName.contains("." + CategoryTree.CORE + ".")) {
+                            packageName.contains("." + CategoryTree.CORE + ".")) {
                         throw new IllegalArgumentException("The package name 'core' is reserved.");
                     }
 
@@ -600,12 +600,14 @@ public class YamlResourceLoader implements ResourceLoader {
             if (rawAttribution.isEmpty()) {
                 recipeOrigins = Collections.emptyMap();
             } else {
-                Map<String,RecipeOrigin> result = new HashMap<>(rawAttribution.size());
+                Map<String, RecipeOrigin> result = new HashMap<>(rawAttribution.size());
                 for (Map<String, Object> attribution : rawAttribution) {
                     String recipeName = (String) attribution.get("recipeName");
                     result.put(recipeName, new RecipeOrigin(
                             URI.create((String) attribution.get("recipeUrl")),
-                            License.fromUrl((String) attribution.get("recipeLicenseUrl"))));
+                            License.representing(
+                                    (String) attribution.get("recipeLicenseName"),
+                                    (String) attribution.get("recipeLicenseUrl"))));
                 }
                 recipeOrigins = result;
             }

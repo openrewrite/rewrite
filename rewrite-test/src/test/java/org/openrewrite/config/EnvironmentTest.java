@@ -360,6 +360,7 @@ class EnvironmentTest implements RewriteTest {
               recipeName: org.openrewrite.text.ChangeTextToJon
               recipeUrl: "https://github.com/openrewrite/rewrite/blob/main/rewrite-gradle/src/main/java/org/openrewrite/gradle/AddDependencyVisitor.java"
               recipeLicenseUrl: "https://www.apache.org/licenses/LICENSE-2.0"
+              recipeLicenseName: "Apache License Version 2.0"
               """.getBytes()
           ), URI.create("origin/test.ChangeTextToHello.yml"), new Properties()))
           .build();
@@ -383,7 +384,7 @@ class EnvironmentTest implements RewriteTest {
           .hasFieldOrPropertyWithValue("contributors", List.of(new Contributor("Jonathan Schneider", "jon@moderne.io", 5)))
           .hasFieldOrPropertyWithValue("origin", new RecipeOrigin(
             URI.create("https://github.com/openrewrite/rewrite/blob/main/rewrite-gradle/src/main/java/org/openrewrite/gradle/AddDependencyVisitor.java"),
-            License.Apache2));
+            License.apache2));
     }
 
     @Test

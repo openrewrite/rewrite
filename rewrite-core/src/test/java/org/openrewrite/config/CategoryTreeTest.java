@@ -112,7 +112,7 @@ class CategoryTreeTest {
     private static RecipeDescriptor recipeDescriptor(String packageName) {
         return new RecipeDescriptor(packageName + ".MyRecipe",
           "My recipe", "", "", emptySet(), null, emptyList(),
-          emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), new RecipeOrigin(URI.create("https://openrewrite.org"), License.Apache2));
+          emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), new RecipeOrigin(URI.create("https://openrewrite.org"), License.apache2));
     }
 
     @Test

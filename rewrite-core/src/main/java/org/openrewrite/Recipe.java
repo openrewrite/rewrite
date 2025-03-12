@@ -145,8 +145,8 @@ public abstract class Recipe implements Cloneable {
                     optionField.setAccessible(true);
                     Object optionValue = optionField.get(this);
                     if (optionValue != null &&
-                        !Iterable.class.isAssignableFrom(optionValue.getClass()) &&
-                        !optionValue.getClass().isArray()) {
+                            !Iterable.class.isAssignableFrom(optionValue.getClass()) &&
+                            !optionValue.getClass().isArray()) {
                         return String.format("%s `%s`", getDisplayName(), optionValue);
                     }
                 } catch (NoSuchFieldException | IllegalAccessException ignore) {
@@ -303,7 +303,7 @@ public abstract class Recipe implements Cloneable {
 
     public RecipeOrigin getOrigin() {
         if (origin == null) {
-            origin = new RecipeOrigin(getLocalSource(), License.Proprietary);
+            origin = new RecipeOrigin(getLocalSource(), License.moderneProprietary);
         }
         return origin;
     }
