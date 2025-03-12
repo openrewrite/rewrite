@@ -1091,7 +1091,7 @@ class JavadocTest implements RewriteTest {
                   /**
                    * @see #H1
                    */
-                  void onSectionTitle();
+                  void onSectionTitle() {}
               }
               """
           )
