@@ -15,13 +15,13 @@
  */
 package org.openrewrite.java.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.java.MinimumJava11;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.java.Assertions.java;
 
@@ -1056,7 +1056,7 @@ class JavadocTest implements RewriteTest {
             """
                 import javax.swing.text.html.HTML.Tag;
                 
-                public interface HtmlMarkup {
+                interface HtmlMarkup {
                     Tag H1 = Tag.H1;
                 }
                 """
@@ -1081,7 +1081,7 @@ class JavadocTest implements RewriteTest {
             """
                 import javax.swing.text.html.HTML.Tag;
                 
-                public abstract class HtmlMarkup {
+                abstract class HtmlMarkup {
                     Tag H1 = Tag.H1;
                 }
                 """
@@ -1106,15 +1106,15 @@ class JavadocTest implements RewriteTest {
             """
                 import javax.swing.text.html.HTML.Tag;
                 
-                public interface HtmlMarkupI {
+                interface HtmlMarkupI {
                     Tag H1 = Tag.H1;
                 }
                 
-                public abstract class HtmlMarkup2 implements HtmlMarkupI {
+                abstract class HtmlMarkup2 implements HtmlMarkupI {
                     String H1 = "aa";
                 }
                 
-                public abstract class HtmlMarkup extends HtmlMarkup2 implements HtmlMarkupI {
+                abstract class HtmlMarkup extends HtmlMarkup2 implements HtmlMarkupI {
                 }
                 """
           ),
@@ -1144,6 +1144,88 @@ class JavadocTest implements RewriteTest {
                   boolean test();
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void methodFoundInInterface() {
+        rewriteRun(
+          java(
+            """
+                interface SomeInterface {
+                  boolean test();
+                }
+                """
+          ),
+          java(
+            """
+              interface Test extends SomeInterface {
+                  /**
+                   * @see #test()
+                   */
+                 void method();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodFoundInSuperclass() {
+        rewriteRun(
+          java(
+            """
+                class SomeParent {
+                    boolean test() {}
+                }
+                """
+          ),
+          java(
+            """
+              class Test extends SomeParent {
+                  /**
+                   * @see #test()
+                   */
+                  void method() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodFoundInSuperclassBecauseSuperclassFieldsTakesPresenceOverInterfaceFields() {
+        rewriteRun(
+          java(
+            """
+                import javax.swing.text.html.HTML.Tag;
+                
+                interface SomeInterface {
+                    int test();
+                }
+                
+                abstract class SomeParent2 implements SomeInterface {
+                    abstract boolean test();
+                }
+                
+                abstract class SomeParent extends SomeParent2 implements SomeInterface {
+                }
+                """
+          ),
+          java(
+            """
+              class Test extends SomeParent implements SomeInterface {
+                  /**
+                    * @see #test()
+                    */
+                    void method() {}
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                assertEquals("test", cu.getTypesInUse().getUsedMethods().iterator().next().getName());
+                assertEquals("SomeParent2", cu.getTypesInUse().getUsedMethods().iterator().next().getDeclaringType().getFullyQualifiedName());
+            })
           )
         );
     }
