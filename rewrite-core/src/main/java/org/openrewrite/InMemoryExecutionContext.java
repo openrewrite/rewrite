@@ -61,7 +61,9 @@ public class InMemoryExecutionContext implements ExecutionContext, Cloneable {
     @Override
     public void putMessage(String key, @Nullable Object value) {
         if (value == null) {
-            getMessages().remove(key);
+            if (messages != null) {
+                getMessages().remove(key);
+            }
         } else {
             getMessages().put(key, value);
         }
