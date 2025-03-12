@@ -417,7 +417,7 @@ public class ChangeType extends Recipe {
 
                 if (type.getOwningClass() == null) {
                     // just a performance shortcut when this isn't an inner class
-                    typeTree.withType(updateType(targetType));
+                    return typeTree.withType(updateType(targetType));
                 }
 
                 Stack<Expression> typeStack = new Stack<>();
