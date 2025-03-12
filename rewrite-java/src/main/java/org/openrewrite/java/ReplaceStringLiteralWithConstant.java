@@ -139,7 +139,6 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
             maybeAddImport(owningType, false);
             return JavaTemplate.builder(template)
                     .contextSensitive()
-                    .doBeforeParseTemplate(System.out::println)
                     .imports(owningType)
                     .build()
                     .apply(getCursor(), literal.getCoordinates().replace())
