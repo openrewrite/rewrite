@@ -1064,11 +1064,9 @@ class JavadocTest implements RewriteTest {
             """
               interface Test extends HtmlMarkup {
                   /**
-                    * Starts a section title.
-                    *
-                    * @see #H1
-                    */
-                    void onSectionTitle();
+                   * @see #H1
+                   */
+                 void onSectionTitle();
               }
               """
           )
@@ -1091,11 +1089,9 @@ class JavadocTest implements RewriteTest {
             """
               class Test extends HtmlMarkup {
                   /**
-                    * Starts a section title.
-                    *
-                    * @see #H1
-                    */
-                    void onSectionTitle();
+                   * @see #H1
+                   */
+                  void onSectionTitle();
               }
               """
           )
