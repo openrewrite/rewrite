@@ -748,8 +748,20 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             }
         }
 
-        // a member reference, but not matching anything on type attribution
-        return null;
+        // Superclass fields takes presence over interface fields
+        JavaType.@Nullable Variable refType = fieldReferenceType(ref, classType.getSupertype());
+
+        if (refType == null) {
+            for (JavaType.FullyQualified interface_ : classType.getInterfaces()) {
+                for (JavaType.Variable member : interface_.getMembers()) {
+                    if (member.getName().equals(ref.memberName.toString())) {
+                        return member;
+                    }
+                }
+            }
+        }
+
+        return refType;
     }
 
     @Override

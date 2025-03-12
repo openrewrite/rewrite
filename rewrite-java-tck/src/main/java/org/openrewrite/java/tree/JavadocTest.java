@@ -22,6 +22,7 @@ import org.openrewrite.java.MinimumJava11;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.java.Assertions.java;
 
 @SuppressWarnings({"JavadocDeclaration", "TrailingWhitespacesInTextBlock", "TextBlockMigration", "RedundantThrows", "ConcatenationWithEmptyString"})
@@ -1044,6 +1045,89 @@ class JavadocTest implements RewriteTest {
                   void method() {}
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void seeWithRefInInterface() {
+        rewriteRun(
+          java(
+            """
+                import javax.swing.text.html.HTML.Tag;
+                
+                public interface HtmlMarkup {
+                    Tag H1 = Tag.H1;
+                }
+                """
+          ),
+          java(
+            """
+              interface Test extends HtmlMarkup {
+                  /**
+                   * @see #H1
+                   */
+                 void onSectionTitle();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void seeWithRefInSuperclass() {
+        rewriteRun(
+          java(
+            """
+                import javax.swing.text.html.HTML.Tag;
+                
+                public abstract class HtmlMarkup {
+                    Tag H1 = Tag.H1;
+                }
+                """
+          ),
+          java(
+            """
+              class Test extends HtmlMarkup {
+                  /**
+                   * @see #H1
+                   */
+                  void onSectionTitle() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void seeWithRefInSuperclassBecauseSuperclassFieldsTakesPresenceOverInterfaceFields() {
+        rewriteRun(
+          java(
+            """
+                import javax.swing.text.html.HTML.Tag;
+                
+                public interface HtmlMarkupI {
+                    Tag H1 = Tag.H1;
+                }
+                
+                public abstract class HtmlMarkup2 implements HtmlMarkupI {
+                    String H1 = "aa";
+                }
+                
+                public abstract class HtmlMarkup extends HtmlMarkup2 implements HtmlMarkupI {
+                }
+                """
+          ),
+          java(
+            """
+              class Test extends HtmlMarkup implements HtmlMarkupI {
+                  /**
+                    * @see #H1
+                    */
+                    void onSectionTitle() {}
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> assertTrue(TypeUtils.isAssignableTo("java.lang.String", cu.getTypesInUse().getVariables().iterator().next().getType())))
           )
         );
     }
