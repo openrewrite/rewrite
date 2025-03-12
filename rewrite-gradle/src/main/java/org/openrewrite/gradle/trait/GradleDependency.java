@@ -99,7 +99,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
 
                 org.openrewrite.gradle.internal.Dependency dependency = null;
                 Expression argument = methodInvocation.getArguments().get(0);
-                if (argument instanceof J.Literal || argument instanceof G.GString || argument instanceof G.MapEntry || argument instanceof G.MapLiteral) {
+                if (argument instanceof J.Literal || argument instanceof G.GString || argument instanceof G.MapEntry || argument instanceof G.MapLiteral || argument instanceof J.Assignment) {
                     dependency = parseDependency(methodInvocation.getArguments());
                 } else if (argument instanceof J.MethodInvocation) {
                     if (((J.MethodInvocation) argument).getSimpleName().equals("platform") ||
@@ -221,6 +221,36 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 return getMapEntriesDependency(mapEntryExpressions);
             } else if (argument instanceof G.MapEntry) {
                 return getMapEntriesDependency(arguments);
+            } else if (argument instanceof J.Assignment) {
+                String group = null;
+                String artifact = null;
+
+                for (Expression e : arguments) {
+                    if (!(e instanceof J.Assignment)) {
+                        continue;
+                    }
+                    J.Assignment arg = (J.Assignment) e;
+                    if (!(arg.getVariable() instanceof J.Identifier) || !(arg.getAssignment() instanceof J.Literal)) {
+                        continue;
+                    }
+                    J.Identifier identifier = (J.Identifier) arg.getVariable();
+                    J.Literal value = (J.Literal) arg.getAssignment();
+                    if (!(value.getValue() instanceof String)) {
+                        continue;
+                    }
+                    String name = identifier.getSimpleName();
+                    if ("group".equals(name)) {
+                        group = (String) value.getValue();
+                    } else if ("name".equals(name)) {
+                        artifact = (String) value.getValue();
+                    }
+                }
+
+                if (group == null || artifact == null) {
+                    return null;
+                }
+
+                return new org.openrewrite.gradle.internal.Dependency(group, artifact, null, null, null);
             }
 
             return null;

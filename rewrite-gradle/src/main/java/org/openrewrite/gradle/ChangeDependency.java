@@ -27,12 +27,14 @@ import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindGradleProject;
 import org.openrewrite.gradle.trait.GradleDependency;
-import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
@@ -140,25 +142,34 @@ public class ChangeDependency extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new FindGradleProject(FindGradleProject.SearchCriteria.Marker).getVisitor(), new GroovyIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new FindGradleProject(FindGradleProject.SearchCriteria.Marker).getVisitor(), new JavaIsoVisitor<ExecutionContext>() {
             final DependencyMatcher depMatcher = requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
 
             GradleProject gradleProject;
 
             @Override
-            public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
-                Optional<GradleProject> maybeGp = cu.getMarkers().findFirst(GradleProject.class);
-                if (!maybeGp.isPresent()) {
-                    return cu;
-                }
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return sourceFile instanceof G.CompilationUnit || sourceFile instanceof K.CompilationUnit;
+            }
 
-                gradleProject = maybeGp.get();
+            @Override
+            public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    JavaSourceFile sourceFile = (JavaSourceFile) tree;
+                    Optional<GradleProject> maybeGp = sourceFile.getMarkers().findFirst(GradleProject.class);
+                    if (!maybeGp.isPresent()) {
+                        return sourceFile;
+                    }
 
-                G.CompilationUnit g = super.visitCompilationUnit(cu, ctx);
-                if (g != cu) {
-                    g = g.withMarkers(g.getMarkers().setByType(updateGradleModel(gradleProject)));
+                    gradleProject = maybeGp.get();
+
+                    sourceFile = (JavaSourceFile) super.visit(sourceFile, ctx);
+                    if (sourceFile != tree) {
+                        sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().setByType(updateGradleModel(gradleProject)));
+                    }
+                    return sourceFile;
                 }
-                return g;
+                return super.visit(tree, ctx);
             }
 
             @Override
@@ -174,7 +185,7 @@ public class ChangeDependency extends Recipe {
                 }
 
                 List<Expression> depArgs = m.getArguments();
-                if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry || depArgs.get(0) instanceof G.MapLiteral) {
+                if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry || depArgs.get(0) instanceof G.MapLiteral || depArgs.get(0) instanceof J.Assignment) {
                     m = updateDependency(m, ctx);
                 } else if (depArgs.get(0) instanceof J.MethodInvocation &&
                            (((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("platform") ||
@@ -423,6 +434,91 @@ public class ChangeDependency extends Recipe {
                                 }
                                 return e;
                             }));
+                        }));
+                    }
+                } else if (m.getArguments().get(0) instanceof J.Assignment) {
+                    J.Assignment groupAssignment = null;
+                    J.Assignment artifactAssignment = null;
+                    J.Assignment versionAssignment = null;
+                    String groupId = null;
+                    String artifactId = null;
+                    String version = null;
+
+                    for (Expression e : depArgs) {
+                        if (!(e instanceof J.Assignment)) {
+                            continue;
+                        }
+                        J.Assignment arg = (J.Assignment) e;
+                        if (!(arg.getVariable() instanceof J.Identifier) || !(arg.getAssignment() instanceof J.Literal)) {
+                            continue;
+                        }
+                        J.Identifier identifier = (J.Identifier) arg.getVariable();
+                        J.Literal assignment = (J.Literal) arg.getAssignment();
+                        if (!(assignment.getValue() instanceof String)) {
+                            continue;
+                        }
+                        String valueValue = (String) assignment.getValue();
+                        switch (identifier.getSimpleName()) {
+                            case "group":
+                                groupAssignment = arg;
+                                groupId = valueValue;
+                                break;
+                            case "name":
+                                artifactAssignment = arg;
+                                artifactId = valueValue;
+                                break;
+                            case "version":
+                                versionAssignment = arg;
+                                version = valueValue;
+                                break;
+                        }
+                    }
+                    if (groupId == null || artifactId == null) {
+                        return m;
+                    }
+                    if (!depMatcher.matches(groupId, artifactId)) {
+                        return m;
+                    }
+                    String updatedGroupId = groupId;
+                    if (!StringUtils.isBlank(newGroupId) && !updatedGroupId.equals(newGroupId)) {
+                        updatedGroupId = newGroupId;
+                    }
+                    String updatedArtifactId = artifactId;
+                    if (!StringUtils.isBlank(newArtifactId) && !updatedArtifactId.equals(newArtifactId)) {
+                        updatedArtifactId = newArtifactId;
+                    }
+                    String updatedVersion = version;
+                    if (!StringUtils.isBlank(newVersion) && (!StringUtils.isBlank(version) || Boolean.TRUE.equals(overrideManagedVersion))) {
+                        String resolvedVersion;
+                        try {
+                            resolvedVersion = new DependencyVersionSelector(null, gradleProject, null)
+                                    .select(new GroupArtifact(updatedGroupId, updatedArtifactId), m.getSimpleName(), newVersion, versionPattern, ctx);
+                        } catch (MavenDownloadingException e) {
+                            return e.warn(m);
+                        }
+                        if (resolvedVersion != null && !resolvedVersion.equals(updatedVersion)) {
+                            updatedVersion = resolvedVersion;
+                        }
+                    }
+
+                    if (!updatedGroupId.equals(groupId) || !updatedArtifactId.equals(artifactId) || updatedVersion != null && !updatedVersion.equals(version)) {
+                        J.Assignment finalGroup = groupAssignment;
+                        String finalGroupIdValue = updatedGroupId;
+                        J.Assignment finalArtifact = artifactAssignment;
+                        String finalArtifactIdValue = updatedArtifactId;
+                        J.Assignment finalVersion = versionAssignment;
+                        String finalVersionValue = updatedVersion;
+                        m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
+                            if (arg == finalGroup) {
+                                return finalGroup.withAssignment(ChangeStringLiteral.withStringValue((J.Literal) finalGroup.getAssignment(), finalGroupIdValue));
+                            }
+                            if (arg == finalArtifact) {
+                                return finalArtifact.withAssignment(ChangeStringLiteral.withStringValue((J.Literal) finalArtifact.getAssignment(), finalArtifactIdValue));
+                            }
+                            if (arg == finalVersion) {
+                                return finalVersion.withAssignment(ChangeStringLiteral.withStringValue((J.Literal) finalVersion.getAssignment(), finalVersionValue));
+                            }
+                            return arg;
                         }));
                     }
                 }
