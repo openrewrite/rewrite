@@ -748,8 +748,15 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             }
         }
 
-        // a member reference, but not matching anything on type attribution
-        return null;
+        for (JavaType.FullyQualified interface_ : classType.getInterfaces()) {
+            for (JavaType.Variable member : interface_.getMembers()) {
+                if (member.getName().equals(ref.memberName.toString())) {
+                    return member;
+                }
+            }
+        }
+
+        return fieldReferenceType(ref, classType.getSupertype());
     }
 
     @Override

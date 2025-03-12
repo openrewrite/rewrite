@@ -1049,6 +1049,60 @@ class JavadocTest implements RewriteTest {
     }
 
     @Test
+    void seeWithRefInInterface() {
+        rewriteRun(
+          java(
+            """
+                import javax.swing.text.html.HTML.Tag;
+                
+                public interface HtmlMarkup {
+                    Tag H1 = Tag.H1;
+                }
+                """
+          ),
+          java(
+            """
+              interface Test extends HtmlMarkup {
+                  /**
+                    * Starts a section title.
+                    *
+                    * @see #H1
+                    */
+                    void onSectionTitle();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void seeWithRefInSuperclass() {
+        rewriteRun(
+          java(
+            """
+                import javax.swing.text.html.HTML.Tag;
+                
+                public abstract class HtmlMarkup {
+                    Tag H1 = Tag.H1;
+                }
+                """
+          ),
+          java(
+            """
+              class Test extends HtmlMarkup {
+                  /**
+                    * Starts a section title.
+                    *
+                    * @see #H1
+                    */
+                    void onSectionTitle();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void methodFound() {
         rewriteRun(
           java(
