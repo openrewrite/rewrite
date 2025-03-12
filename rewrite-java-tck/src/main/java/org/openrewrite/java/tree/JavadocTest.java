@@ -1808,7 +1808,6 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3650")
     void unicodeEscape() {
@@ -1817,7 +1816,11 @@ class JavadocTest implements RewriteTest {
             """
               interface Test {
               	/**
-              	 * Return the {@code \\u0000} codepoint.
+              	 * <p>Ř\\u00e9t\\u00FBrn:</p>
+              	 * 
+              	 * {@code \\u0040Override
+                 * public void method() {}
+                 * }
               	 */
               	int foo();
               }
