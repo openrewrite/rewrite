@@ -116,6 +116,11 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
         }
 
         @Override
+        public J visitCase(J.Case case_, ExecutionContext ctx) {
+            return case_; // Ignore while we see index out of bounds exceptions extracting from the generated template
+        }
+
+        @Override
         public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
             // Only handle String literals
             if (!TypeUtils.isString(literal.getType()) ||
@@ -134,6 +139,7 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
             maybeAddImport(owningType, false);
             return JavaTemplate.builder(template)
                     .contextSensitive()
+                    .doBeforeParseTemplate(System.out::println)
                     .imports(owningType)
                     .build()
                     .apply(getCursor(), literal.getCoordinates().replace())
