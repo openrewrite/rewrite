@@ -113,12 +113,18 @@ public class TypeTable implements JavaParserClasspathLoader {
     }
 
     private static void read(URL url, Collection<String> artifactNames, ExecutionContext ctx) {
+        Collection<String> missingArtifacts = artifactsNotYetWritten(artifactNames);
+        if (missingArtifacts.isEmpty()) {
+            // all artifacts have already been extracted
+            return;
+        }
+
         try (InputStream is = url.openStream(); InputStream inflate = new GZIPInputStream(is)) {
-            new Reader(ctx).read(inflate, artifactsNotYetWritten(artifactNames));
+            new Reader(ctx).read(inflate, missingArtifacts);
         } catch (ZipException e) {
             // Fallback to `InflaterInputStream` for older files created as raw zlib data using DeflaterOutputStream
             try (InputStream is = url.openStream(); InputStream inflate = new InflaterInputStream(is)) {
-                new Reader(ctx).read(inflate, artifactsNotYetWritten(artifactNames));
+                new Reader(ctx).read(inflate, missingArtifacts);
             } catch (IOException e1) {
                 throw new UncheckedIOException(e1);
             }
