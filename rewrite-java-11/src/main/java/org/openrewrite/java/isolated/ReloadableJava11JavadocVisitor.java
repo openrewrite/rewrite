@@ -748,15 +748,20 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             }
         }
 
-        for (JavaType.FullyQualified interface_ : classType.getInterfaces()) {
-            for (JavaType.Variable member : interface_.getMembers()) {
-                if (member.getName().equals(ref.memberName.toString())) {
-                    return member;
+        // Superclass fields takes presence over interface fields
+        JavaType.@Nullable Variable refType = fieldReferenceType(ref, classType.getSupertype());
+
+        if (refType == null) {
+            for (JavaType.FullyQualified interface_ : classType.getInterfaces()) {
+                for (JavaType.Variable member : interface_.getMembers()) {
+                    if (member.getName().equals(ref.memberName.toString())) {
+                        return member;
+                    }
                 }
             }
         }
 
-        return fieldReferenceType(ref, classType.getSupertype());
+        return refType;
     }
 
     @Override
