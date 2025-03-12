@@ -249,7 +249,7 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
     @Test
     void missingFieldNoError() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaVisitor<>(){
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaVisitor<>() {
               @Override
               public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                   // Circumvent validation to match use in rewrite-spring's ReplaceStringLiteralsWithMediaTypeConstants
@@ -263,6 +263,59 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
               
               class Test {
                   Object o = "Hello World!";
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNothingForSwitchCase() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceStringLiteralWithConstant(EXAMPLE_STRING_CONSTANT, EXAMPLE_STRING_FQN)),
+          java(
+            """
+              package org.openrewrite.java;
+              
+              class Test {
+                  void foo(String bar) {
+                      int i = 0;
+                      switch (bar) {
+                          case "Hello World!":
+                              i = 1;
+                              break;
+                          default:
+                              i = 2;
+                              break;
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceAnnotationValue() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceStringLiteralWithConstant(EXAMPLE_STRING_CONSTANT, EXAMPLE_STRING_FQN)),
+          java(
+            """
+              package org.openrewrite.java;
+              
+              class Test {
+                  @Deprecated(since = "Hello World!")
+                  void foo(String bar) {
+                  }
+              }
+              """,
+            """
+              package org.openrewrite.java;
+              
+              class Test {
+                  @Deprecated(since = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT)
+                  void foo(String bar) {
+                  }
               }
               """
           )
