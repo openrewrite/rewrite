@@ -38,6 +38,7 @@ import java.util.function.UnaryOperator;
 
 import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
+import static org.openrewrite.ExecutionContext.SCANNING_MUTATION_VALIDATION;
 import static org.openrewrite.Recipe.PANIC;
 
 @RequiredArgsConstructor
@@ -91,7 +92,12 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                             recipeRunStats.recordScan(recipe, () -> {
                                 TreeVisitor<?, ExecutionContext> scanner = scanningRecipe.getScanner(acc);
                                 if (scanner.isAcceptable(source, ctx)) {
-                                    scanner.visit(source, ctx, rootCursor);
+                                    Tree maybeMutated = scanner.visit(source, ctx, rootCursor);
+                                    if (maybeMutated != source && ctx.getMessage(SCANNING_MUTATION_VALIDATION, false)) {
+                                        throw new AssertionError("ScanningRecipe.getScanner() may not edit source files. " +
+                                                                 "The purpose of a scanner is to aggregate information for use in subsequent phases. " +
+                                                                 "Use ScanningRecipe.getVisitor() for making edits.");
+                                    }
                                 }
                                 return source;
                             });
