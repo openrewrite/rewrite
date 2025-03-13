@@ -27,6 +27,7 @@ import java.util.Objects;
 public class ResolvedManagedDependency {
     GroupArtifactVersion gav;
 
+    @Nullable
     Scope scope;
 
     @Nullable
@@ -35,6 +36,7 @@ public class ResolvedManagedDependency {
     @Nullable
     String classifier;
 
+    @Nullable
     List<GroupArtifact> exclusions;
 
     ManagedDependency requested;

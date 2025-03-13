@@ -37,8 +37,8 @@ dependencies {
     api("io.micrometer:micrometer-core:1.9.+")
     api("org.jetbrains:annotations:latest.release")
 
-    antlrGeneration("org.antlr:antlr4:4.11.1")
-    implementation("org.antlr:antlr4-runtime:4.11.1")
+    antlrGeneration("org.antlr:antlr4:4.13.2")
+    implementation("org.antlr:antlr4-runtime:4.13.2")
     // Pinned to 9.+ because 10.x does not support Java 8: https://checkstyle.sourceforge.io/#JRE_and_JDK
     checkstyle("com.puppycrawl.tools:checkstyle:9.+") {
         isTransitive = false
@@ -49,8 +49,6 @@ dependencies {
     implementation("org.apache.commons:commons-lang3:latest.release")
     implementation("org.apache.commons:commons-text:latest.release")
     implementation("io.github.classgraph:classgraph:latest.release")
-
-    implementation("org.xerial.snappy:snappy-java:1.1.10.+")
 
     api("com.fasterxml.jackson.core:jackson-annotations")
 

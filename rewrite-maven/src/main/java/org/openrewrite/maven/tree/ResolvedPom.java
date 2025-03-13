@@ -60,26 +60,29 @@ public class ResolvedPom {
     // https://maven.apache.org/ref/3.6.3/maven-model-builder/super-pom.html
     private static final ResolvedPom SUPER_POM = ResolvedPom.builder()
             .repositories(singletonList(MavenRepository.MAVEN_CENTRAL))
+            .pluginRepositories(singletonList(MavenRepository.MAVEN_CENTRAL))
             .build();
 
     @With
     Pom requested;
 
     @With
-    Iterable<String> activeProfiles;
+    @Builder.Default
+    Iterable<String> activeProfiles = emptyList();
 
     public ResolvedPom(Pom requested, Iterable<String> activeProfiles) {
-        this(requested, activeProfiles, emptyMap(), emptyList(), null, emptyList(), emptyList(), emptyList(), emptyList(), emptyList());
+        this(requested, activeProfiles, emptyMap(), emptyList(), null, emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList());
     }
 
     @JsonCreator
-    ResolvedPom(Pom requested, Iterable<String> activeProfiles, Map<String, String> properties, List<ResolvedManagedDependency> dependencyManagement, @Nullable List<MavenRepository> initialRepositories, List<MavenRepository> repositories, List<Dependency> requestedDependencies, List<Plugin> plugins, List<Plugin> pluginManagement, List<String> subprojects) {
+    ResolvedPom(Pom requested, Iterable<String> activeProfiles, Map<String, String> properties, List<ResolvedManagedDependency> dependencyManagement, @Nullable List<MavenRepository> initialRepositories, List<MavenRepository> repositories, List<MavenRepository> pluginRepositories, List<Dependency> requestedDependencies, List<Plugin> plugins, List<Plugin> pluginManagement, List<String> subprojects) {
         this.requested = requested;
         this.activeProfiles = activeProfiles;
         this.properties = properties;
         this.dependencyManagement = dependencyManagement;
         this.initialRepositories = initialRepositories;
         this.repositories = repositories;
+        this.pluginRepositories = pluginRepositories;
         this.requestedDependencies = requestedDependencies;
         this.plugins = plugins;
         this.pluginManagement = pluginManagement;
@@ -101,6 +104,10 @@ public class ResolvedPom {
     @NonFinal
     @Builder.Default
     List<MavenRepository> repositories = emptyList();
+
+    @NonFinal
+    @Builder.Default
+    List<MavenRepository> pluginRepositories = emptyList();
 
     @NonFinal
     @Builder.Default
@@ -174,6 +181,7 @@ public class ResolvedPom {
                 emptyMap(),
                 emptyList(),
                 initialRepositories,
+                emptyList(),
                 emptyList(),
                 emptyList(),
                 emptyList(),
@@ -882,7 +890,7 @@ public class ResolvedPom {
                         throw new MavenDownloadingException("No version provided", null, dd.getDependency().getGav());
                     }
 
-                    if (d.getType() != null && (!"jar".equals(d.getType()) && !"pom".equals(d.getType()))) {
+                    if (d.getType() != null && (!"jar".equals(d.getType()) && !"pom".equals(d.getType()) && !"zip".equals(d.getType()))) {
                         continue;
                     }
 
@@ -934,7 +942,7 @@ public class ResolvedPom {
                     ResolvedPom resolvedPom = cache.getResolvedDependencyPom(dPom.getGav());
                     if (resolvedPom == null) {
                         resolvedPom = new ResolvedPom(dPom, getActiveProfiles(), emptyMap(),
-                                emptyList(), initialRepositories, emptyList(), emptyList(), emptyList(), emptyList(), emptyList());
+                                emptyList(), initialRepositories, emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList());
                         resolvedPom.resolver(ctx, downloader).resolveParentsRecursively(dPom);
                         cache.putResolvedDependencyPom(dPom.getGav(), resolvedPom);
                     }

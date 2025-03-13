@@ -389,6 +389,15 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                 .downloadMetadata(new GroupArtifact(groupId, artifactId), containingPom, getResolutionResult().getPom().getRepositories());
     }
 
+    public MavenMetadata downloadPluginMetadata(String groupId, String artifactId, ExecutionContext ctx) throws MavenDownloadingException {
+        return downloadPluginMetadata(groupId, artifactId, null, ctx);
+    }
+
+    public MavenMetadata downloadPluginMetadata(String groupId, String artifactId, @Nullable ResolvedPom containingPom, ExecutionContext ctx) throws MavenDownloadingException {
+        return new MavenPomDownloader(emptyMap(), ctx, getResolutionResult().getMavenSettings(), getResolutionResult().getActiveProfiles())
+                .downloadMetadata(new GroupArtifact(groupId, artifactId), containingPom, getResolutionResult().getPom().getPluginRepositories());
+    }
+
     /**
      * Does the current tag can contain groupId, artifactId and version?
      */

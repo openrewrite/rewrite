@@ -58,7 +58,7 @@ public class AddCommentToMethod extends Recipe {
     String comment;
 
     @Option(displayName = "Method pattern",
-            description = "A pattern to match methods to add the comment to.",
+            description = "A pattern to match methods to add the comment to. " + MethodMatcher.METHOD_PATTERN_DESCRIPTION,
             example = "java.util.List add*(..)")
     String methodPattern;
 
@@ -69,6 +69,11 @@ public class AddCommentToMethod extends Recipe {
     Boolean isMultiline;
 
     private static final Pattern NEWLINE = Pattern.compile("\\R");
+
+    @Override
+    public Validated<Object> validate() {
+        return super.validate().and(MethodMatcher.validate(methodPattern));
+    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

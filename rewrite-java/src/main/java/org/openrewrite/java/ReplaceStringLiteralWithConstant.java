@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.experimental.NonFinal;
@@ -47,17 +46,6 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
     @Option(displayName = "Fully qualified name of the constant to use in place of String literal", example = "org.springframework.http.MediaType.APPLICATION_JSON_VALUE")
     @Nullable
     String fullyQualifiedConstantName;
-
-    public ReplaceStringLiteralWithConstant(@Nullable String fullyQualifiedConstantName) {
-        this.literalValue = null;
-        this.fullyQualifiedConstantName = fullyQualifiedConstantName;
-    }
-
-    @JsonCreator
-    public ReplaceStringLiteralWithConstant(String literalValue, @Nullable String fullyQualifiedConstantName) {
-        this.literalValue = literalValue;
-        this.fullyQualifiedConstantName = fullyQualifiedConstantName;
-    }
 
     @Override
     public String getDisplayName() {
@@ -112,7 +100,12 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         String value = getLiteralValue();
-        return value == null ? TreeVisitor.noop() : new ReplaceStringLiteralVisitor(value, fullyQualifiedConstantName);
+        if (value == null) {
+            return TreeVisitor.noop();
+        } else {
+            assert fullyQualifiedConstantName != null : "Validation should have failed if constant name is null";
+            return new ReplaceStringLiteralVisitor(value, fullyQualifiedConstantName);
+        }
     }
 
     private static class ReplaceStringLiteralVisitor extends JavaVisitor<ExecutionContext> {
@@ -145,7 +138,6 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
 
             maybeAddImport(owningType, false);
             return JavaTemplate.builder(template)
-                    .contextSensitive()
                     .imports(owningType)
                     .build()
                     .apply(getCursor(), literal.getCoordinates().replace())

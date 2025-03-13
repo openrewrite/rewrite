@@ -25,7 +25,7 @@ class FindLiteralsTest implements RewriteTest {
 
     @DocumentExample
     @Test
-    void findLiterals() {
+    void string() {
         rewriteRun(
           spec -> spec.recipe(new FindLiterals("Hello.*")),
           java(
@@ -37,6 +37,50 @@ class FindLiteralsTest implements RewriteTest {
             """
               class Test {
                   String s = /*~~>*/"Hello Jonathan";
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void textBlock() {
+        rewriteRun(
+          spec -> spec.recipe(new FindLiterals("(?s)Hello.*")),
+          java(
+            """
+              class Test {
+                  String s = \"""
+                      Hello Jonathan
+                      \""";
+              }
+              """,
+            """
+              class Test {
+                  String s = /*~~>*/\"""
+                      Hello Jonathan
+                      \""";
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void number() {
+        rewriteRun(
+          spec -> spec.recipe(new FindLiterals("1000")),
+          java(
+            """
+              class Test {
+                  int i1 = 1000;
+                  int i2 = 1_000;
+              }
+              """,
+            """
+              class Test {
+                  int i1 = /*~~>*/1000;
+                  int i2 = /*~~>*/1_000;
               }
               """
           )

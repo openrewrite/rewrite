@@ -56,8 +56,9 @@ public interface ShellExecutor {
             builder.redirectError(ProcessBuilder.Redirect.to(stdErr.toFile()));
             Process process = builder.start();
 
-            process.waitFor(timeout.getSeconds(), TimeUnit.SECONDS);
-            if (process.exitValue() != 0) {
+            if (!process.waitFor(timeout.getSeconds(), TimeUnit.SECONDS)) {
+                throw new RuntimeException(String.format("Command '%s' timed out after %d seconds", String.join(" ", command), timeout.getSeconds()));
+            } else if (process.exitValue() != 0) {
                 String error = "Command failed:" + String.join(" ", command);
                 if (Files.exists(stdErr)) {
                     error += "\n" + new String(Files.readAllBytes(stdErr));

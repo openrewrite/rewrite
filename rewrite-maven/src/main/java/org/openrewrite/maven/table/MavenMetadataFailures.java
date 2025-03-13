@@ -31,8 +31,7 @@ import java.util.Map;
 @JsonIgnoreType
 public class MavenMetadataFailures extends DataTable<MavenMetadataFailures.Row> {
     public MavenMetadataFailures(Recipe recipe) {
-        super(recipe, Row.class, MavenMetadataFailures.class.getName(),
-                "Maven metadata failures",
+        super(recipe, "Maven metadata failures",
                 "Attempts to resolve maven metadata that failed.");
     }
 
