@@ -20,7 +20,6 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.trait.MavenDependency;
 import org.openrewrite.maven.tree.*;
@@ -162,7 +161,7 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
                     }
                 });
                 if (acc.usingType) {
-                    return SearchResult.found(document);
+                    return document;
                 }
                 super.visitDocument(document, ctx);
                 return document;
