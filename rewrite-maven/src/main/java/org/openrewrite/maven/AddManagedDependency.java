@@ -24,7 +24,6 @@ import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.trait.MavenDependency;
 import org.openrewrite.maven.tree.*;
-import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.tree.Xml;
@@ -165,8 +164,8 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
                 if (acc.usingType) {
                     return SearchResult.found(document);
                 }
-
-                return super.visitDocument(document, ctx);
+                super.visitDocument(document, ctx);
+                return document;
             }
 
             @Override
