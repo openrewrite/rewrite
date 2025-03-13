@@ -44,9 +44,9 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
     }
 
     public void recordSourceFileChanged(@Nullable SourceFile before, @Nullable SourceFile after) {
-        if(after != null) {
+        if (after != null) {
             sourceFileChanged.add(after.getSourcePath());
-        } else if(before != null) {
+        } else if (before != null) {
             sourceFileChanged.add(before.getSourcePath());
         }
     }
@@ -80,15 +80,40 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
                     scanner == null ? 0 : (long) scanner.max(TimeUnit.NANOSECONDS),
                     (long) editor.totalTime(TimeUnit.NANOSECONDS),
                     editor.takeSnapshot().percentileValues()[0].percentile(),
-                    (long) editor.max(TimeUnit.NANOSECONDS));
-            //noinspection DuplicatedCode
-            ctx.computeMessage(ExecutionContext.DATA_TABLES, row, ConcurrentHashMap::new, (extract, allDataTables) -> {
-                //noinspection unchecked
-                List<Row> dataTablesOfType = (List<Row>) allDataTables.computeIfAbsent(this, c -> new ArrayList<>());
-                dataTablesOfType.add(row);
-                return allDataTables;
-            });
+                    (long) editor.max(TimeUnit.NANOSECONDS)
+            );
+            addRowToDataTable(ctx, row);
         }
+
+        // find scanners that never finished their edit phase
+        for (Timer scanner : registry.find("rewrite.recipe.scan").timers()) {
+            String recipeName = requireNonNull(scanner.getId().getTag("name"));
+            if (registry.find("rewrite.recipe.edit").tag("name", recipeName).timer() == null) {
+                Row row = new Row(
+                        recipeName,
+                        Long.valueOf(scanner.count()).intValue(),
+                        sourceFileChanged.size(),
+                        (long) scanner.totalTime(TimeUnit.NANOSECONDS),
+                        scanner.takeSnapshot().percentileValues()[0].percentile(),
+                        (long) scanner.max(TimeUnit.NANOSECONDS),
+                        0L,
+                        0.0,
+                        0L
+                );
+
+                addRowToDataTable(ctx, row);
+            }
+        }
+    }
+
+    private void addRowToDataTable(ExecutionContext ctx, Row row) {
+        //noinspection DuplicatedCode
+        ctx.computeMessage(ExecutionContext.DATA_TABLES, row, ConcurrentHashMap::new, (extract, allDataTables) -> {
+            //noinspection unchecked
+            List<Row> dataTablesOfType = (List<Row>) allDataTables.computeIfAbsent(this, c -> new ArrayList<>());
+            dataTablesOfType.add(row);
+            return allDataTables;
+        });
     }
 
     @Value
