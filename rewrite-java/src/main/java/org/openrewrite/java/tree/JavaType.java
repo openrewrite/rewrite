@@ -1390,8 +1390,8 @@ public interface JavaType {
                 return null;
             }
             String className = ((JavaType.Class) getReturnType()).getClassName();
-            String[] parts = className.split("\\.");
-            return parts[parts.length - 1];
+            int beginIndex = className.lastIndexOf(".");
+            return beginIndex == -1 ? className : className.substring(beginIndex);
         }
 
         public FullyQualified getDeclaringType() {
