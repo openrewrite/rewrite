@@ -270,7 +270,7 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
     }
 
     @Test
-    void doNothingForSwitchCase() {
+    void switchCase() {
         rewriteRun(
           spec -> spec.recipe(new ReplaceStringLiteralWithConstant(EXAMPLE_STRING_CONSTANT, EXAMPLE_STRING_FQN)),
           java(
@@ -283,6 +283,24 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
                       int i = 0;
                       switch (bar) {
                           case "Hello World!":
+                              i = 1;
+                              break;
+                          default:
+                              i = 2;
+                              break;
+                      }
+                  }
+              }
+              """,
+            """
+              package org.openrewrite.java;
+              
+              /** @noinspection ALL*/
+              class Test {
+                  void foo(String bar) {
+                      int i = 0;
+                      switch (bar) {
+                          case ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT:
                               i = 1;
                               break;
                           default:
