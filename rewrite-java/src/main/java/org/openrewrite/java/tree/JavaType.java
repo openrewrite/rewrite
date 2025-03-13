@@ -1391,7 +1391,7 @@ public interface JavaType {
             }
             String className = ((JavaType.Class) getReturnType()).getClassName();
             int beginIndex = className.lastIndexOf(".");
-            return beginIndex == -1 ? className : className.substring(beginIndex);
+            return beginIndex == -1 ? className : className.substring(beginIndex + 1);
         }
 
         public FullyQualified getDeclaringType() {
