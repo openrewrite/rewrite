@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.maven.tree.Plugin;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
@@ -86,7 +87,22 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                 Xml.Document d = super.visitDocument(document, ctx);
 
                 // Return early if the parent appears to be within the current repository, as properties defined there will be updated
-                if (getResolutionResult().parentPomIsProjectPom()) {
+                if (getResolutionResult().getParent() != null && getResolutionResult().parentPomIsProjectPom()) {
+                    // Unless the plugin config in the parent defines source/target/release with a property
+                    for (Plugin plugin : getResolutionResult().getParent().getPom().getPlugins()) {
+                        if (plugin.getGroupId().equals("org.apache.maven.plugins") && plugin.getArtifactId().equals("maven-compiler-plugin") && plugin.getConfiguration() != null) {
+                            for (String property : JAVA_VERSION_PROPERTIES) {
+                                if (getResolutionResult().getPom().getProperties().get(property) != null && Float.parseFloat(getResolutionResult().getPom().getProperties().get(property)) < version &&
+                                    (plugin.getConfiguration().get("source") != null && plugin.getConfiguration().get("source").textValue().contains(property)) ||
+                                    (plugin.getConfiguration().get("target") != null && plugin.getConfiguration().get("target").textValue().contains(property)) ||
+                                    (plugin.getConfiguration().get("release") != null && plugin.getConfiguration().get("release").textValue().contains(property))) {
+                                    d = (Xml.Document) new AddPropertyVisitor(property, String.valueOf(version), null)
+                                            .visitNonNull(d, ctx);
+                                    maybeUpdateModel();
+                                }
+                            }
+                        }
+                    }
                     return d;
                 }
 
