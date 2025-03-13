@@ -83,6 +83,16 @@ public interface TemplateParameterParserListener extends ParseTreeListener {
 	 */
 	void exitVariance(TemplateParameterParser.VarianceContext ctx);
 	/**
+	 * Enter a parse tree produced by {@link TemplateParameterParser#typeArray}.
+	 * @param ctx the parse tree
+	 */
+	void enterTypeArray(TemplateParameterParser.TypeArrayContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link TemplateParameterParser#typeArray}.
+	 * @param ctx the parse tree
+	 */
+	void exitTypeArray(TemplateParameterParser.TypeArrayContext ctx);
+	/**
 	 * Enter a parse tree produced by {@link TemplateParameterParser#parameterName}.
 	 * @param ctx the parse tree
 	 */
