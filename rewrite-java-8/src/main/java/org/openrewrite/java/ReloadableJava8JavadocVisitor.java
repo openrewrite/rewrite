@@ -671,7 +671,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
     private JavaType.@Nullable Method methodReferenceType(DCTree.DCReference ref, List<JavaType.Method> methods) {
         nextMethod:
         for (JavaType.Method method : methods) {
-            if (method.getName().equals(ref.memberName.toString())) {
+            if (ref.memberName.toString().equals(method.getName()) || ref.memberName.toString().equals(method.getConstructorName())) {
                 if (ref.paramTypes != null) {
                     List<JavaType> parameterTypes = method.getParameterTypes();
                     if (ref.paramTypes.size() != parameterTypes.size()) {

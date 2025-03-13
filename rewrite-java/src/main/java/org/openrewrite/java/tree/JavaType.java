@@ -1385,6 +1385,15 @@ public interface JavaType {
             return "<constructor>".equals(name);
         }
 
+        public @Nullable String getConstructorName() {
+            if (!isConstructor()) {
+                return null;
+            }
+            String className = ((JavaType.Class) getReturnType()).getClassName();
+            int beginIndex = className.lastIndexOf(".");
+            return beginIndex == -1 ? className : className.substring(beginIndex + 1);
+        }
+
         public FullyQualified getDeclaringType() {
             return declaringType;
         }
