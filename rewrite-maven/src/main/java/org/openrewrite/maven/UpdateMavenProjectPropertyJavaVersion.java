@@ -89,6 +89,7 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                 // Return early if the parent appears to be within the current repository, as properties defined there will be updated
                 outer:
                 if (getResolutionResult().parentPomIsProjectPom()) {
+                    // Unless the plugin config in the parent defines source/target/release with a property
                     if (getResolutionResult().getParent() != null) {
                         for (Plugin plugin : getResolutionResult().getParent().getPom().getPlugins()) {
                             if (plugin.getGroupId().equals("org.apache.maven.plugins") && plugin.getArtifactId().equals("maven-compiler-plugin") && plugin.getConfiguration() != null) {
