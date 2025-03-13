@@ -318,14 +318,16 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
     void replaceAnnotationValue() {
         rewriteRun(
           spec -> spec.recipe(new ReplaceStringLiteralWithConstant(EXAMPLE_STRING_CONSTANT, EXAMPLE_STRING_FQN)),
-          java("""
-            package org.openrewrite.java;
-            
-            @interface Foo {
-                String bar();
-                String baz();
-            }
-            """),
+          java(
+            """
+              package org.openrewrite.java;
+              
+              @interface Foo {
+                  String bar();
+                  String baz();
+              }
+              """
+          ),
           java(
             """
               package org.openrewrite.java;

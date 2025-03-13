@@ -68,14 +68,15 @@ class DependencyInsightTest implements RewriteTest {
     @Test
     void findPluginDependencyAndAddToDependencyClosure() {
         rewriteRun(
-          buildGradle("""
-            plugins {
-                id 'groovy-gradle-plugin'
-            }
-            repositories {
-                gradlePluginPortal()
-            }
-            """, spec -> spec.path("buildSrc/build.gradle")),
+          buildGradle(
+            """
+              plugins {
+                  id 'groovy-gradle-plugin'
+              }
+              repositories {
+                  gradlePluginPortal()
+              }
+              """, spec -> spec.path("buildSrc/build.gradle")),
           groovy(
             """
               plugins{
@@ -115,14 +116,15 @@ class DependencyInsightTest implements RewriteTest {
     @Test
     void findPluginDependencyAndAddToRoot() {
         rewriteRun(
-          buildGradle("""
-            plugins {
-                id 'groovy-gradle-plugin'
-            }
-            repositories {
-                gradlePluginPortal()
-            }
-            """, spec -> spec.path("buildSrc/build.gradle")),
+          buildGradle(
+            """
+              plugins {
+                  id 'groovy-gradle-plugin'
+              }
+              repositories {
+                  gradlePluginPortal()
+              }
+              """, spec -> spec.path("buildSrc/build.gradle")),
           groovy(
             """
               plugins{
