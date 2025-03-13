@@ -656,10 +656,45 @@ class JavadocTest implements RewriteTest {
           java(
             """
               /**
-               *   {@link #test() }
+               *   {@link #test(Integer) }
                */
               class Test {
-                  void test() {}
+                  void test(Integer a) {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void thisConstructorLink() {
+        rewriteRun(
+          java(
+            """
+              /**
+               * {@link #Test(Integer) }
+               */
+              class Test {
+                  Test(Integer a) {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void thisConstructorLinkInnerClass() {
+        rewriteRun(
+          java(
+            """
+              class Outer {
+                  class Test {
+                      Test(Integer a) {}
+                      /**
+                       * Use: {@link #Test(Integer) }
+                       */
+                      Test of(Integer a) {}
+                  }
               }
               """
           )
