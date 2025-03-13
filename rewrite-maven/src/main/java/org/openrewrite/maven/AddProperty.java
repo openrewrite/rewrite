@@ -75,14 +75,18 @@ public class AddProperty extends Recipe {
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
-                String parentValue = getResolutionResult().getParent() != null ? getResolutionResult().getParent().getPom().getRequested().getProperties().get(key) : null;
-                if ((Boolean.TRUE.equals(trustParent) && parentValue != null) ||
+                String parentValue = getResolutionResult().getPom().getRequested().getProperties().get(key);
+                if ((Boolean.TRUE.equals(trustParent) && (parentValue == null || value.equals(parentValue))) ||
                         value.equals(getResolutionResult().getPom().getProperties().get(key))) {
                     return document;
                 }
 
                 // If there is a parent pom in the same project, update the property there instead
-                if (getResolutionResult().parentPomIsProjectPom() && parentValue != null) {
+                if (document.getRoot().getChild("parent")
+                        .flatMap(tag -> tag.getChild("relativePath"))
+                        .flatMap(Xml.Tag::getValue)
+                        .flatMap(v -> v.trim().isEmpty() ? Optional.empty() : Optional.of(v))
+                        .isPresent()) {
                     if (Boolean.TRUE.equals(preserveExistingValue)) {
                         return document;
                     }
