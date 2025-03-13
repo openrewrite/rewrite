@@ -89,16 +89,18 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                 // Return early if the parent appears to be within the current repository, as properties defined there will be updated
                 outer:
                 if (getResolutionResult().parentPomIsProjectPom()) {
-                    for (Plugin plugin : getResolutionResult().getParent().getPom().getPlugins()) {
-                        if (plugin.getGroupId().equals("org.apache.maven.plugins") && plugin.getArtifactId().equals("maven-compiler-plugin")) {
-                            for (String property : JAVA_VERSION_PROPERTIES) {
-                                if ((plugin.getConfiguration().get("source") != null && plugin.getConfiguration().get("source").textValue().contains(property)) ||
-                                    (plugin.getConfiguration().get("target") != null && plugin.getConfiguration().get("target").textValue().contains(property)) ||
-                                    (plugin.getConfiguration().get("release") != null && plugin.getConfiguration().get("release").textValue().contains(property))) {
-                                    break outer;
+                    if (getResolutionResult().getParent() != null) {
+                        for (Plugin plugin : getResolutionResult().getParent().getPom().getPlugins()) {
+                            if (plugin.getGroupId().equals("org.apache.maven.plugins") && plugin.getArtifactId().equals("maven-compiler-plugin") && plugin.getConfiguration() != null) {
+                                for (String property : JAVA_VERSION_PROPERTIES) {
+                                    if ((plugin.getConfiguration().get("source") != null && plugin.getConfiguration().get("source").textValue().contains(property)) ||
+                                        (plugin.getConfiguration().get("target") != null && plugin.getConfiguration().get("target").textValue().contains(property)) ||
+                                        (plugin.getConfiguration().get("release") != null && plugin.getConfiguration().get("release").textValue().contains(property))) {
+                                        break outer;
+                                    }
                                 }
-                            }
 
+                            }
                         }
                     }
                     return d;
