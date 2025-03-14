@@ -24,7 +24,6 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
-@Deprecated(forRemoval = true)
 class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
 
     @Override
@@ -181,6 +180,72 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                       """
                 )
             )
+        );
+    }
+
+
+    @Test
+    void UpdateChildProperty() {
+        rewriteRun(
+          //language=xml
+          pomXml(
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>example-parent</artifactId>
+                  <version>1.0.0</version>
+                  <modelVersion>4.0</modelVersion>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.apache.maven.plugins</groupId>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <version>3.8.0</version>
+                              <configuration>
+                                  <source>${java.version}</source>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """),
+          mavenProject("example-child",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                    <parent>
+                        <groupId>com.example</groupId>
+                        <artifactId>example-parent</artifactId>
+                        <version>1.0.0</version>
+                    </parent>
+                    <groupId>com.example</groupId>
+                    <artifactId>example-child</artifactId>
+                    <version>1.0.0</version>
+                    <modelVersion>4.0</modelVersion>
+                    <properties>
+                        <java.version>11</java.version>
+                    </properties>
+                </project>
+                """,
+              """
+                <project>
+                    <parent>
+                        <groupId>com.example</groupId>
+                        <artifactId>example-parent</artifactId>
+                        <version>1.0.0</version>
+                    </parent>
+                    <groupId>com.example</groupId>
+                    <artifactId>example-child</artifactId>
+                    <version>1.0.0</version>
+                    <modelVersion>4.0</modelVersion>
+                    <properties>
+                        <java.version>17</java.version>
+                    </properties>
+                </project>
+                """
+            )
+          )
         );
     }
 

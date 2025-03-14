@@ -1046,7 +1046,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
 
         // aroundOperatorsBeforeMethodReferenceDoubleColon is defaulted to `false` in IntelliJ's Kotlin formatting.
         if (m.getPadding().getTypeParameters() != null) {
-            m.getPadding().withTypeParameters(spaceBefore(m.getPadding().getTypeParameters(), false, true));
+            m = m.getPadding().withTypeParameters(spaceBefore(m.getPadding().getTypeParameters(), false, true));
         } else {
             m = m.getPadding().withReference(
                     spaceBefore(m.getPadding().getReference(), false)
