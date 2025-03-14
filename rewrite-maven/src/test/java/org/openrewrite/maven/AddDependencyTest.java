@@ -212,14 +212,14 @@ class AddDependencyTest implements RewriteTest {
               """
                 <project>
                     <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
+                    <artifactId>uses</artifactId>
                     <version>1</version>
                 </project>
                 """,
               """
                 <project>
                     <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
+                    <artifactId>uses</artifactId>
                     <version>1</version>
                     <dependencies>
                         <dependency>
@@ -237,7 +237,7 @@ class AddDependencyTest implements RewriteTest {
               """
                 <project>
                     <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
+                    <artifactId>nouses</artifactId>
                     <version>1</version>
                 </project>
                 """)
