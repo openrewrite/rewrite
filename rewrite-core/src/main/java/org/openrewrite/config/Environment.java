@@ -45,10 +45,12 @@ public class Environment {
         }
         Map<String, List<Contributor>> recipeToContributors = new HashMap<>();
         Map<String, List<RecipeExample>> recipeExamples = new HashMap<>();
+        Map<String, RecipeOrigin> recipeOrigins = new HashMap<>();
         for (ResourceLoader r : resourceLoaders) {
             if (r instanceof YamlResourceLoader) {
                 recipeExamples.putAll(r.listRecipeExamples());
                 recipeToContributors.putAll(r.listContributors());
+                recipeOrigins.putAll(r.listRecipeOrigins());
             }
         }
 
@@ -63,6 +65,7 @@ public class Environment {
         }
         for (Recipe recipe : recipes) {
             recipe.setContributors(recipeToContributors.get(recipe.getName()));
+            recipe.setOrigin(recipeOrigins.get(recipe.getName()));
 
             if (recipeExamples.containsKey(recipe.getName())) {
                 recipe.setExamples(recipeExamples.get(recipe.getName()));
@@ -87,10 +90,12 @@ public class Environment {
     public Collection<RecipeDescriptor> listRecipeDescriptors() {
         Map<String, List<Contributor>> recipeToContributors = new HashMap<>();
         Map<String, List<RecipeExample>> recipeToExamples = new HashMap<>();
+        Map<String, RecipeOrigin> recipeToLicense = new HashMap<>();
         for (ResourceLoader r : resourceLoaders) {
             if (r instanceof YamlResourceLoader) {
                 recipeToContributors.putAll(r.listContributors());
                 recipeToExamples.putAll(r.listRecipeExamples());
+                recipeToLicense.putAll(r.listRecipeOrigins());
             } else if (r instanceof ClasspathScanningLoader) {
                 ClasspathScanningLoader classpathScanningLoader = (ClasspathScanningLoader) r;
 
@@ -111,13 +116,17 @@ public class Environment {
                         recipeToExamples.put(key, examplesMap.get(key));
                     }
                 }
+
+                // because we have a 1-1 relation between recipe name and license, we can just put all
+                // we could add a check here to verify that the licenses are the same
+                recipeToLicense.putAll(classpathScanningLoader.listRecipeOrigins());
             }
         }
 
         List<RecipeDescriptor> result = new ArrayList<>();
         for (ResourceLoader r : resourceLoaders) {
             if (r instanceof YamlResourceLoader) {
-                result.addAll((((YamlResourceLoader) r).listRecipeDescriptors(emptyList(), recipeToContributors, recipeToExamples)));
+                result.addAll((((YamlResourceLoader) r).listRecipeDescriptors(emptyList(), recipeToContributors, recipeToExamples, recipeToLicense)));
             } else {
                 Collection<RecipeDescriptor> descriptors = r.listRecipeDescriptors();
                 for (RecipeDescriptor descriptor : descriptors) {

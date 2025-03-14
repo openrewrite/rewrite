@@ -15,14 +15,8 @@
  */
 package org.openrewrite.config;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
 import com.fasterxml.jackson.databind.exc.InvalidTypeIdException;
-import com.fasterxml.jackson.databind.json.JsonMapper;
-import com.fasterxml.jackson.databind.type.TypeFactory;
-import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import lombok.Getter;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
@@ -75,13 +69,17 @@ public class YamlResourceLoader implements ResourceLoader {
     @Nullable
     private Map<String, List<RecipeExample>> recipeNameToExamples;
 
+    @Nullable
+    private Map<String, RecipeOrigin> recipeOrigins;
+
     @Getter
     private enum ResourceType {
         Recipe("specs.openrewrite.org/v1beta/recipe"),
         Style("specs.openrewrite.org/v1beta/style"),
         Category("specs.openrewrite.org/v1beta/category"),
         Example("specs.openrewrite.org/v1beta/example"),
-        Attribution("specs.openrewrite.org/v1beta/attribution");
+        Attribution("specs.openrewrite.org/v1beta/attribution"),
+        Origin("specs.openrewrite.org/v1beta/origin");
 
         private final String spec;
 
@@ -371,12 +369,13 @@ public class YamlResourceLoader implements ResourceLoader {
 
     @Override
     public Collection<RecipeDescriptor> listRecipeDescriptors() {
-        return listRecipeDescriptors(emptyList(), listContributors(), listRecipeExamples());
+        return listRecipeDescriptors(emptyList(), listContributors(), listRecipeExamples(), listRecipeOrigins());
     }
 
     public Collection<RecipeDescriptor> listRecipeDescriptors(Collection<Recipe> externalRecipes,
                                                               Map<String, List<Contributor>> recipeNamesToContributors,
-                                                              Map<String, List<RecipeExample>> recipeNamesToExamples) {
+                                                              Map<String, List<RecipeExample>> recipeNamesToExamples,
+                                                              Map<String, RecipeOrigin> recipeNameToLicense) {
         Collection<Recipe> internalRecipes = listRecipes();
         Collection<Recipe> allRecipes = Stream.concat(
                 Stream.concat(
@@ -392,6 +391,7 @@ public class YamlResourceLoader implements ResourceLoader {
             declarativeRecipe.initialize(allRecipes, recipeNamesToContributors);
             declarativeRecipe.setContributors(recipeNamesToContributors.get(recipe.getName()));
             declarativeRecipe.setExamples(recipeNamesToExamples.get(recipe.getName()));
+            declarativeRecipe.setOrigin(recipeNameToLicense.get(recipe.getName()));
             recipeDescriptors.add(declarativeRecipe.getDescriptor());
         }
         return recipeDescriptors;
@@ -481,7 +481,7 @@ public class YamlResourceLoader implements ResourceLoader {
                     @Language("markdown")
                     String packageName = (String) c.get("packageName");
                     if (packageName.endsWith("." + CategoryTree.CORE) ||
-                        packageName.contains("." + CategoryTree.CORE + ".")) {
+                            packageName.contains("." + CategoryTree.CORE + ".")) {
                         throw new IllegalArgumentException("The package name 'core' is reserved.");
                     }
 
@@ -573,7 +573,6 @@ public class YamlResourceLoader implements ResourceLoader {
                 Map<String, List<Contributor>> result = new HashMap<>(rawAttribution.size());
                 for (Map<String, Object> attribution : rawAttribution) {
                     String recipeName = (String) attribution.get("recipeName");
-
                     //noinspection unchecked
                     List<Map<String, Object>> rawContributors = (List<Map<String, Object>>) attribution.get(
                             "contributors");
@@ -592,5 +591,27 @@ public class YamlResourceLoader implements ResourceLoader {
         }
         return contributors;
 
+    }
+
+    @Override
+    public Map<String, RecipeOrigin> listRecipeOrigins() {
+        if (recipeOrigins == null) {
+            Collection<Map<String, Object>> rawAttribution = loadResources(ResourceType.Origin);
+            if (rawAttribution.isEmpty()) {
+                recipeOrigins = Collections.emptyMap();
+            } else {
+                Map<String, RecipeOrigin> result = new HashMap<>(rawAttribution.size());
+                for (Map<String, Object> attribution : rawAttribution) {
+                    String recipeName = (String) attribution.get("recipeName");
+                    result.put(recipeName, new RecipeOrigin(
+                            URI.create((String) attribution.get("recipeUrl")),
+                            License.representing(
+                                    (String) attribution.get("recipeLicenseName"),
+                                    (String) attribution.get("recipeLicenseUrl"))));
+                }
+                recipeOrigins = result;
+            }
+        }
+        return recipeOrigins;
     }
 }
