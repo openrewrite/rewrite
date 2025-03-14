@@ -418,7 +418,7 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
 
     private String getLatestVersion(ExecutionContext ctx) {
         MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
-        MavenPomDownloader pomDownloader = new MavenPomDownloader(Collections.emptyMap(), ctx, mctx.getSettings(), mctx.getActiveProfiles());
+        MavenPomDownloader pomDownloader = MavenPomDownloader.withCustomSettings(ctx, mctx.getSettings(), mctx.getActiveProfiles());
         VersionComparator versionComparator = new LatestRelease(null);
         GroupArtifact develocityExtension = new GroupArtifact("com.gradle", DEVELOCITY_MAVEN_EXTENSION_ARTIFACT_ID);
         try {
