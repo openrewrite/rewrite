@@ -65,6 +65,24 @@ class SwitchPatternMatchingTest implements RewriteTest {
     }
 
     @Test
+    void shouldSupportParsingNullSwitchCombined() {
+        rewriteRun(
+          java(
+            //language=java
+            """
+              class Test {
+                void fooBarWithNull(String s) {
+                    switch (s) {
+                        case "Foo", "Bar" -> System.out.println("Great");
+                        case null, default -> System.out.println("Ok");
+                    }
+                }
+              }
+              """
+          ));
+    }
+
+    @Test
     void shouldParseJava21EnumSupportInSwitch() {
         rewriteRun(
           java(
