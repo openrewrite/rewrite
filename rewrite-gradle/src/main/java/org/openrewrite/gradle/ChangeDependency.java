@@ -185,7 +185,7 @@ public class ChangeDependency extends Recipe {
                 }
 
                 List<Expression> depArgs = m.getArguments();
-                if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry || depArgs.get(0) instanceof G.MapLiteral || depArgs.get(0) instanceof J.Assignment) {
+                if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry || depArgs.get(0) instanceof G.MapLiteral || depArgs.get(0) instanceof J.Assignment || depArgs.get(0) instanceof K.StringTemplate) {
                     m = updateDependency(m, ctx);
                 } else if (depArgs.get(0) instanceof J.MethodInvocation &&
                            (((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("platform") ||
@@ -520,6 +520,42 @@ public class ChangeDependency extends Recipe {
                             }
                             return arg;
                         }));
+                    }
+                } else if (depArgs.get(0) instanceof K.StringTemplate) {
+                    K.StringTemplate template = (K.StringTemplate) depArgs.get(0);
+                    List<J> strings = template.getStrings();
+                    if (strings.size() >= 2 && strings.get(0) instanceof J.Literal &&
+                            ((J.Literal) strings.get(0)).getValue() != null) {
+
+                        J.Literal literal = (J.Literal) strings.get(0);
+                        Dependency original = DependencyStringNotationConverter.parse((String) requireNonNull(literal.getValue()));
+                        if (original != null) {
+                            Dependency updated = original;
+                            if (!StringUtils.isBlank(newGroupId) && !updated.getGroupId().equals(newGroupId)) {
+                                updated = updated.withGroupId(newGroupId);
+                            }
+                            if (!StringUtils.isBlank(newArtifactId) && !updated.getArtifactId().equals(newArtifactId)) {
+                                updated = updated.withArtifactId(newArtifactId);
+                            }
+                            if (!StringUtils.isBlank(newVersion)) {
+                                String resolvedVersion;
+                                try {
+                                    resolvedVersion = new DependencyVersionSelector(null, gradleProject, null)
+                                            .select(new GroupArtifact(updated.getGroupId(), updated.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
+                                } catch (MavenDownloadingException e) {
+                                    return e.warn(m);
+                                }
+                                if (resolvedVersion != null && !resolvedVersion.equals(updated.getVersion())) {
+                                    updated = updated.withVersion(resolvedVersion);
+                                }
+                            }
+                            if (original != updated) {
+                                String replacement = updated.toStringNotation();
+                                J.Literal newLiteral = literal.withValue(replacement)
+                                        .withValueSource(template.getDelimiter() + replacement + template.getDelimiter());
+                                m = m.withArguments(Collections.singletonList(newLiteral));
+                            }
+                        }
                     }
                 }
 

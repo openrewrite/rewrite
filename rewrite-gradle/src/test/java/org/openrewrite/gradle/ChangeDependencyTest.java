@@ -483,4 +483,41 @@ class ChangeDependencyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void kotlinDslStringInterpolation() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null)),
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  val commonsLangVersion = "2.6"
+                  implementation("commons-lang:commons-lang:${commonsLangVersion}")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  val commonsLangVersion = "2.6"
+                  implementation("org.apache.commons:commons-lang3:3.11")
+              }
+              """
+          )
+        );
+    }
 }

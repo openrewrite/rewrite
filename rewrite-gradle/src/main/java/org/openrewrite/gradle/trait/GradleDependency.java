@@ -27,6 +27,7 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedDependency;
@@ -99,7 +100,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
 
                 org.openrewrite.gradle.internal.Dependency dependency = null;
                 Expression argument = methodInvocation.getArguments().get(0);
-                if (argument instanceof J.Literal || argument instanceof G.GString || argument instanceof G.MapEntry || argument instanceof G.MapLiteral || argument instanceof J.Assignment) {
+                if (argument instanceof J.Literal || argument instanceof G.GString || argument instanceof G.MapEntry || argument instanceof G.MapLiteral || argument instanceof J.Assignment || argument instanceof K.StringTemplate) {
                     dependency = parseDependency(methodInvocation.getArguments());
                 } else if (argument instanceof J.MethodInvocation) {
                     if (((J.MethodInvocation) argument).getSimpleName().equals("platform") ||
@@ -251,6 +252,12 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 }
 
                 return new org.openrewrite.gradle.internal.Dependency(group, artifact, null, null, null);
+            } else if (argument instanceof K.StringTemplate) {
+                K.StringTemplate template = (K.StringTemplate) argument;
+                List<J> strings = template.getStrings();
+                if (strings.size() >= 2 && strings.get(0) instanceof J.Literal && ((J.Literal) strings.get(0)).getValue() != null) {
+                    return DependencyStringNotationConverter.parse((String) ((J.Literal) strings.get(0)).getValue());
+                }
             }
 
             return null;
