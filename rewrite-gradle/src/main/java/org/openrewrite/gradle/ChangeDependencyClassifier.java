@@ -19,12 +19,12 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.gradle.internal.ChangeStringLiteral;
+import org.openrewrite.gradle.internal.Dependency;
+import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.trait.GradleDependency;
-import org.openrewrite.gradle.util.ChangeStringLiteral;
-import org.openrewrite.gradle.util.Dependency;
-import org.openrewrite.gradle.util.DependencyStringNotationConverter;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
@@ -76,7 +76,7 @@ public class ChangeDependencyClassifier extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Finds dependencies declared in `build.gradle` files.";
+        return "Changes classifier of an existing dependency declared in `build.gradle` files.";
     }
 
     @Override
@@ -214,11 +214,7 @@ public class ChangeDependencyClassifier extends Recipe {
                     G.MapEntry mapEntry = null;
                     String classifierStringDelimiter = null;
                     int index = 0;
-                    for (Expression e : depArgs) {
-                        if (!(e instanceof G.MapEntry)) {
-                            continue;
-                        }
-                        G.MapEntry arg = (G.MapEntry) e;
+                    for (G.MapEntry arg : map.getElements()) {
                         if (!(arg.getKey() instanceof J.Literal) || !(arg.getValue() instanceof J.Literal)) {
                             continue;
                         }

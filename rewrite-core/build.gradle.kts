@@ -15,15 +15,14 @@ dependencies {
 
     api("org.jspecify:jspecify:latest.release")
 
-    // Pinning okhttp while waiting on 5.0.0
-    // https://github.com/openrewrite/rewrite/issues/1479
-    compileOnly("com.squareup.okhttp3:okhttp:4.9.3")
-
-    implementation("org.apache.commons:commons-compress:latest.release")
+    implementation("org.apache.commons:commons-lang3:latest.release")
 
     implementation("io.micrometer:micrometer-core:1.9.+")
     implementation("io.github.classgraph:classgraph:latest.release")
     implementation("org.yaml:snakeyaml:latest.release")
+
+    implementation("io.moderne:jsonrpc:latest.release")
+    implementation("org.objenesis:objenesis:latest.release")
 
     testImplementation("org.assertj:assertj-core:latest.release")
     testImplementation(project(":rewrite-test"))

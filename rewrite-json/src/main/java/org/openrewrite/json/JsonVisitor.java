@@ -20,6 +20,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.json.format.AutoFormatVisitor;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonRightPadded;
 import org.openrewrite.json.tree.JsonValue;
@@ -35,6 +36,35 @@ public class JsonVisitor<P> extends TreeVisitor<Json, P> {
     @Override
     public String getLanguage() {
         return "json";
+    }
+
+    public <Y2 extends Json> Y2 maybeAutoFormat(Y2 before, Y2 after, P p) {
+        return maybeAutoFormat(before, after, p, getCursor());
+    }
+
+    public <Y2 extends Json> Y2 maybeAutoFormat(Y2 before, Y2 after, P p, Cursor cursor) {
+        return maybeAutoFormat(before, after, null, p, cursor);
+    }
+
+    @SuppressWarnings({"unchecked", "ConstantConditions"})
+    public <Y2 extends Json> Y2 maybeAutoFormat(Y2 before, Y2 after, @Nullable Json stopAfter, P p, Cursor cursor) {
+        if (before != after) {
+            return (Y2) new AutoFormatVisitor<>(stopAfter).visit(after, p, cursor);
+        }
+        return after;
+    }
+
+    public <Y2 extends Json> Y2 autoFormat(Y2 y, P p) {
+        return autoFormat(y, p, getCursor());
+    }
+
+    public <Y2 extends Json> Y2 autoFormat(Y2 y, P p, Cursor cursor) {
+        return autoFormat(y, null, p, cursor);
+    }
+
+    @SuppressWarnings({"ConstantConditions", "unchecked"})
+    public <Y2 extends Json> Y2 autoFormat(Y2 y, @Nullable Json stopAfter, P p, Cursor cursor) {
+        return (Y2) new AutoFormatVisitor<>(stopAfter).visit(y, p, cursor);
     }
 
     public Json visitArray(Json.Array array, P p) {

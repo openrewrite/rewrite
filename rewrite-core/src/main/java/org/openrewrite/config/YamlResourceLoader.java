@@ -27,7 +27,9 @@ import lombok.Getter;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.internal.ObjectMappers;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
+import org.openrewrite.internal.RecipeLoader;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 import org.yaml.snakeyaml.LoaderOptions;
@@ -127,10 +129,10 @@ public class YamlResourceLoader implements ResourceLoader {
      * Load a declarative recipe, optionally using the specified classloader and optionally including resource loaders
      * for recipes from dependencies.
      *
-     * @param yamlInput   Declarative recipe yaml input stream
-     * @param source      Declarative recipe source
-     * @param properties  Placeholder properties
-     * @param classLoader Optional classloader to use with jackson. If not specified, the runtime classloader will be used.
+     * @param yamlInput                 Declarative recipe yaml input stream
+     * @param source                    Declarative recipe source
+     * @param properties                Placeholder properties
+     * @param classLoader               Optional classloader to use with jackson. If not specified, the runtime classloader will be used.
      * @param dependencyResourceLoaders Optional resource loaders for recipes from dependencies
      * @throws UncheckedIOException On unexpected IOException
      */
@@ -161,24 +163,12 @@ public class YamlResourceLoader implements ResourceLoader {
                               Consumer<ObjectMapper> mapperCustomizer) {
         this.source = source;
         this.dependencyResourceLoaders = dependencyResourceLoaders;
-
-        mapper = JsonMapper.builder()
-                .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES)
-                .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
-                .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
-                .build()
-                .registerModule(new ParameterNamesModule())
-                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+        this.mapper = ObjectMappers.propertyBasedMapper(classLoader);
+        this.classLoader = classLoader;
 
         mapperCustomizer.accept(mapper);
         maybeAddKotlinModule(mapper);
 
-        this.classLoader = classLoader;
-
-        if (classLoader != null) {
-            TypeFactory tf = TypeFactory.defaultInstance().withClassLoader(classLoader);
-            mapper.setTypeFactory(tf);
-        }
 
         try {
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
@@ -200,7 +190,7 @@ public class YamlResourceLoader implements ResourceLoader {
         for (Object resource : yaml.loadAll(yamlSource)) {
             if (resource instanceof Map) {
                 @SuppressWarnings("unchecked") Map<String, Object> resourceMap = (Map<String, Object>) resource;
-                if (resourceType.equals(ResourceType.fromSpec((String) resourceMap.get("type")))) {
+                if (resourceType == ResourceType.fromSpec((String) resourceMap.get("type"))) {
                     resources.add(resourceMap);
                 }
             }
@@ -279,7 +269,8 @@ public class YamlResourceLoader implements ResourceLoader {
                         recipeList.get(i),
                         recipe::addUninitialized,
                         recipe::addUninitialized,
-                        recipe::addValidation);
+                        recipe::addValidation
+                );
             }
             List<Object> preconditions = (List<Object>) r.get("preconditions");
             if (preconditions != null) {
@@ -310,19 +301,10 @@ public class YamlResourceLoader implements ResourceLoader {
         if (recipeData instanceof String) {
             String recipeName = (String) recipeData;
             try {
-                // first try an explicitly-declared zero-arg constructor
-                addRecipe.accept((Recipe) Class.forName(recipeName, true,
-                                classLoader == null ? this.getClass().getClassLoader() : classLoader)
-                        .getDeclaredConstructor()
-                        .newInstance());
-            } catch (ReflectiveOperationException e) {
-                try {
-                    // then try jackson
-                    addRecipe.accept(instantiateRecipe(recipeName, new HashMap<>()));
-                } catch (IllegalArgumentException ignored) {
-                    // else, it's probably declarative
-                    addLazyLoadRecipe.accept(recipeName);
-                }
+                addRecipe.accept(new RecipeLoader(classLoader).load(recipeName, null));
+            } catch (IllegalArgumentException ignored) {
+                // it's probably declarative
+                addLazyLoadRecipe.accept(recipeName);
             } catch (NoClassDefFoundError e) {
                 addInvalidRecipeValidation(
                         addValidation,
@@ -337,7 +319,7 @@ public class YamlResourceLoader implements ResourceLoader {
             try {
                 if (recipeArgs instanceof Map) {
                     try {
-                        addRecipe.accept(instantiateRecipe(recipeName, (Map<String, Object>) recipeArgs));
+                        addRecipe.accept(new RecipeLoader(classLoader).load(recipeName, (Map<String, Object>) recipeArgs));
                     } catch (IllegalArgumentException e) {
                         if (e.getCause() instanceof InvalidTypeIdException) {
                             addInvalidRecipeValidation(
@@ -382,14 +364,8 @@ public class YamlResourceLoader implements ResourceLoader {
         }
     }
 
-    private Recipe instantiateRecipe(String recipeName, Map<String, Object> args) throws IllegalArgumentException {
-        Map<Object, Object> withJsonType = new HashMap<>(args);
-        withJsonType.put("@c", recipeName);
-        return mapper.convertValue(withJsonType, Recipe.class);
-    }
-
     private void addInvalidRecipeValidation(Consumer<Validated<Object>> addValidation, String recipeName,
-                                            Object recipeArgs, String message) {
+                                            @Nullable Object recipeArgs, String message) {
         addValidation.accept(Validated.invalid(recipeName, recipeArgs, message));
     }
 

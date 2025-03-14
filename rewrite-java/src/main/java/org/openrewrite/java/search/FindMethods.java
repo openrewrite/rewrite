@@ -45,7 +45,7 @@ public class FindMethods extends Recipe {
      * See {@link MethodMatcher} for details on the expression's syntax.
      */
     @Option(displayName = "Method pattern",
-            description = "A method pattern that is used to find matching method invocations.",
+            description = MethodMatcher.METHOD_PATTERN_DESCRIPTION,
             example = "java.util.List add(..)")
     String methodPattern;
 
@@ -66,6 +66,22 @@ public class FindMethods extends Recipe {
     }
 
     @Override
+    public String getInstanceName() {
+        //noinspection ConstantValue
+        if (methodPattern == null) {
+            // Temporary while the defensive coding in Recipe is percolating to all
+            // deployed environments.
+            return getDisplayName();
+        }
+        return super.getInstanceName();
+    }
+
+    @Override
+    public Validated<Object> validate() {
+        return super.validate().and(MethodMatcher.validate(methodPattern));
+    }
+
+    @Override
     @SuppressWarnings("ConstantConditions")
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new UsesMethod<>(methodPattern, matchOverrides), new JavaIsoVisitor<ExecutionContext>() {
@@ -75,11 +91,11 @@ public class FindMethods extends Recipe {
             public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
                 // In an annotation @Example(value = "") the identifier "value" may have a method type
                 J.Identifier i = super.visitIdentifier(identifier, ctx);
-                if(i.getType() instanceof JavaType.Method && methodMatcher.matches((JavaType.Method) i.getType()) &&
-                   !(getCursor().getParentTreeCursor().getValue() instanceof J.MethodInvocation)) {
+                if (i.getType() instanceof JavaType.Method && methodMatcher.matches((JavaType.Method) i.getType()) &&
+                    !(getCursor().getParentTreeCursor().getValue() instanceof J.MethodInvocation)) {
                     JavaType.Method m = (JavaType.Method) i.getType();
                     JavaSourceFile javaSourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-                    if(javaSourceFile != null) {
+                    if (javaSourceFile != null) {
                         methodCalls.insertRow(ctx, new MethodCalls.Row(
                                 javaSourceFile.getSourcePath().toString(),
                                 m.getName(),

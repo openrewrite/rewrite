@@ -80,21 +80,34 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
-    void emptyArguments() {
+    void genericTypeParameterReturn() {
         rewriteRun(
-          groovy("def foo( ) {}")
+          groovy(
+            """
+              interface Foo {
+                  <T extends Task> T task(Class<T> type)
+              }
+              """
+          )
         );
     }
 
     @Test
-    void methodThrows() {
+    void modifiersReturn() {
         rewriteRun(
           groovy(
             """
-              def foo(int a) throws Exception , RuntimeException {
+              public final accept(Map m) {
               }
               """
           )
+        );
+    }
+
+    @Test
+    void emptyArguments() {
+        rewriteRun(
+          groovy("def foo( ) {}")
         );
     }
 
@@ -111,11 +124,48 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void varargsArguments() {
+        rewriteRun(
+          groovy(
+            """
+              def foo(String... messages) {
+                  println(messages[0])
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void defaultArgumentValues() {
         rewriteRun(
           groovy(
             """
               def confirmNextStepWithCredentials(String message /* = prefix */ = /* hello prefix */ "Hello" ) {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void modifiersArguments() {
+        rewriteRun(
+          groovy(
+            """
+              def accept(final def Map m) {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodThrows() {
+        rewriteRun(
+          groovy(
+            """
+              def foo(int a) throws Exception , RuntimeException {
               }
               """
           )
@@ -188,9 +238,45 @@ class MethodDeclarationTest implements RewriteTest {
             """
               class A {
                   def /*int*/ int one() { 1 }
-                  def /*Object*/ Object two() { 2 }
+                  @Foo def /*Object*/ Object two() { 2 }
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void parameterWithConflictingTypeName() {
+        rewriteRun(
+          groovy(
+            """
+              class variable {}
+              def accept(final def variable m) {}
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodDeclaration accept = (J.MethodDeclaration) cu.getStatements().get(1);
+                J.VariableDeclarations m = (J.VariableDeclarations) accept.getParameters().get(0);
+                assertThat(m.getModifiers()).satisfiesExactly(
+                  mod -> assertThat(mod.getType()).isEqualTo(J.Modifier.Type.Final),
+                  mod -> assertThat(mod.getKeyword()).isEqualTo("def")
+                );
+            })
+          )
+        );
+    }
+
+    @Test
+    void defIsNotReturnType() {
+        rewriteRun(
+          groovy(
+            """
+              final def accept(final def Object m) {
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.MethodDeclaration accept = (J.MethodDeclaration) cu.getStatements().get(0);
+                assertThat(accept.getReturnTypeExpression()).isNull();
+            })
           )
         );
     }

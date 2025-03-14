@@ -90,9 +90,9 @@ public class ChangeStaticFieldToMethod extends Recipe {
             @Override
             public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
                 if (getCursor().firstEnclosing(J.Import.class) == null &&
-                    TypeUtils.isOfClassType(fieldAccess.getTarget().getType(), oldClassName) &&
-                    fieldAccess.getSimpleName().equals(oldFieldName)) {
-                    return useNewMethod(fieldAccess);
+                        TypeUtils.isOfClassType(fieldAccess.getTarget().getType(), oldClassName) &&
+                        fieldAccess.getSimpleName().equals(oldFieldName)) {
+                    return useNewMethod(fieldAccess, fieldAccess.getCoordinates().replace());
                 }
                 return super.visitFieldAccess(fieldAccess, ctx);
             }
@@ -101,43 +101,18 @@ public class ChangeStaticFieldToMethod extends Recipe {
             public J visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
                 JavaType.Variable varType = ident.getFieldType();
                 if (varType != null &&
-                    TypeUtils.isOfClassType(varType.getOwner(), oldClassName) &&
-                    varType.getName().equals(oldFieldName)) {
-                    return useNewMethod(ident);
+                        TypeUtils.isOfClassType(varType.getOwner(), oldClassName) &&
+                        varType.getName().equals(oldFieldName)) {
+                    return useNewMethod(ident, ident.getCoordinates().replace());
                 }
                 return ident;
             }
 
-            private J useNewMethod(TypeTree tree) {
+            private J useNewMethod(TypeTree tree, JavaCoordinates coordinates) {
                 String newClass = newClassName == null ? oldClassName : newClassName;
-
                 maybeRemoveImport(oldClassName);
                 maybeAddImport(newClass);
-
-                Cursor statementCursor = getCursor().dropParentUntil(Statement.class::isInstance);
-                Statement statement = statementCursor.getValue();
-                J applied = makeNewMethod(newClass).apply(statementCursor, statement.getCoordinates().replace());
-
-                J.MethodInvocation method = null;
-                if (applied instanceof J.Block) {
-                    J.Block block = (J.Block) applied;
-                    method = block.getStatements().get(0).withPrefix(tree.getPrefix());
-                } else if (applied instanceof J.NewArray) {
-                    J.NewArray newArray = (J.NewArray) applied;
-                    method = (J.MethodInvocation) newArray.getInitializer().get(0);
-                }
-                if (method == null || method.getMethodType() == null) {
-                    throw new IllegalArgumentException("Error while changing a static field to a method. The generated template using a the new class [" +
-                                                       newClass + "] and the method [" + newMethodName + "] resulted in a null method type.");
-                }
-                if (tree.getType() != null) {
-                    JavaType.Method mt = method.getMethodType().withReturnType(tree.getType());
-                    method = method.withMethodType(mt);
-                    if (method.getName().getType() != null) {
-                        method = method.withName(method.getName().withType(mt));
-                    }
-                }
-                return method;
+                return makeNewMethod(newClass).apply(getCursor(), coordinates);
             }
 
             @NonNull
@@ -145,7 +120,8 @@ public class ChangeStaticFieldToMethod extends Recipe {
 
                 String packageName = StringUtils.substringBeforeLast(newClass, ".");
                 String simpleClassName = StringUtils.substringAfterLast(newClass, ".");
-                String methodInvocationTemplate = "{" + simpleClassName + (newTarget != null ? "." + newTarget + "." : ".") + newMethodName + "();}";
+
+                String methodInvocationTemplate = simpleClassName + (newTarget != null ? "." + newTarget + "." : ".") + newMethodName + "()";
 
                 @Language("java") String methodStub;
                 if (newTarget == null) {

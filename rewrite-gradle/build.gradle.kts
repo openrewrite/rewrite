@@ -1,9 +1,9 @@
+import nl.javadude.gradle.plugins.license.LicenseExtension
+
 plugins {
     id("org.openrewrite.build.language-library")
     id("groovy")
 }
-
-val parserClasspath = configurations.create("parserClasspath")
 
 repositories {
     maven {
@@ -20,6 +20,21 @@ repositories {
     }
 }
 
+recipeDependencies {
+    parserClasspath("org.gradle:gradle-base-services:latest.release")
+    parserClasspath("org.gradle:gradle-core-api:latest.release")
+    parserClasspath("org.gradle:gradle-language-groovy:latest.release")
+    parserClasspath("org.gradle:gradle-language-java:latest.release")
+    parserClasspath("org.gradle:gradle-logging:latest.release")
+    parserClasspath("org.gradle:gradle-messaging:latest.release")
+    parserClasspath("org.gradle:gradle-native:latest.release")
+    parserClasspath("org.gradle:gradle-process-services:latest.release")
+    parserClasspath("org.gradle:gradle-resources:latest.release")
+    parserClasspath("org.gradle:gradle-testing-base:latest.release")
+    parserClasspath("org.gradle:gradle-testing-jvm:latest.release")
+    parserClasspath("com.gradle:develocity-gradle-plugin:latest.release")
+}
+
 //val rewriteVersion = rewriteRecipe.rewriteVersion.get()
 val latest = if (project.hasProperty("releasing")) {
     "latest.release"
@@ -31,6 +46,7 @@ dependencies {
     api(project(":rewrite-groovy")) {
         exclude("org.codehaus.groovy", "groovy")
     }
+    api(project(":rewrite-kotlin"))
     api(project(":rewrite-maven"))
     api("org.jetbrains:annotations:latest.release")
     compileOnly(project(":rewrite-test"))
@@ -38,25 +54,12 @@ dependencies {
 
     compileOnly("org.codehaus.groovy:groovy:latest.release")
     compileOnly(gradleApi())
-
-    compileOnly("com.gradle:gradle-enterprise-gradle-plugin:latest.release")
-
-    "parserClasspath"("org.gradle:gradle-base-services:latest.release")
-    "parserClasspath"("org.gradle:gradle-core-api:latest.release")
-    "parserClasspath"("org.gradle:gradle-language-groovy:latest.release")
-    "parserClasspath"("org.gradle:gradle-language-java:latest.release")
-    "parserClasspath"("org.gradle:gradle-logging:latest.release")
-    "parserClasspath"("org.gradle:gradle-messaging:latest.release")
-    "parserClasspath"("org.gradle:gradle-native:latest.release")
-    "parserClasspath"("org.gradle:gradle-process-services:latest.release")
-    "parserClasspath"("org.gradle:gradle-resources:latest.release")
-    "parserClasspath"("org.gradle:gradle-testing-base:latest.release")
-    "parserClasspath"("org.gradle:gradle-testing-jvm:latest.release")
-    "parserClasspath"("com.gradle:gradle-enterprise-gradle-plugin:latest.release")
+    compileOnly("com.gradle:develocity-gradle-plugin:latest.release")
 
     testImplementation(project(":rewrite-test")) {
         // because gradle-api fatjars this implementation already
         exclude("ch.qos.logback", "logback-classic")
+        exclude("org.slf4j", "slf4j-nop")
     }
 
     testImplementation("org.openrewrite.gradle.tooling:model:$latest")
@@ -66,7 +69,6 @@ dependencies {
     testRuntimeOnly("org.codehaus.groovy:groovy:latest.release")
     testRuntimeOnly("org.gradle:gradle-base-services:latest.release")
     testRuntimeOnly(gradleApi())
-    testRuntimeOnly("com.gradle:gradle-enterprise-gradle-plugin:latest.release")
     testRuntimeOnly("com.google.guava:guava:latest.release")
     testRuntimeOnly(project(":rewrite-java-17"))
     testRuntimeOnly("org.projectlombok:lombok:latest.release")
@@ -80,16 +82,14 @@ tasks.withType<GroovyCompile> {
     })
 }
 
-tasks.named<Copy>("processResources") {
-    from(parserClasspath) {
-        into("META-INF/rewrite/classpath")
-    }
-}
-
 //Javadoc compiler will complain about the use of the internal types.
 tasks.withType<Javadoc> {
     exclude(
         "**/GradleProject**",
         "**/GradleSettings**"
     )
+}
+
+configure<LicenseExtension> {
+    excludePatterns.add("**/gradle-wrapper/*")
 }

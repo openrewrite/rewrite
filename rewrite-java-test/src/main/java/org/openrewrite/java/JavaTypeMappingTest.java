@@ -25,9 +25,7 @@ import java.util.List;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.CONTRAVARIANT;
-import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.COVARIANT;
-import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.INVARIANT;
+import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 
 /**
  * Based on type attribution mappings of [JavaTypeGoat].
@@ -51,6 +49,43 @@ public interface JavaTypeMappingTest {
 
     default JavaType firstMethodParameter(String methodName) {
         return methodType(methodName).getParameterTypes().get(0);
+    }
+
+    @Test
+    default void declaredFields() {
+        JavaType.Parameterized goat = goatType();
+        assertThat(goat.getMembers().stream().filter(m -> m.getName().equals("parameterizedField"))).anySatisfy(field ->
+                assertThat(field).isInstanceOfSatisfying(JavaType.Variable.class, variable ->
+                        assertThat(variable.getType()).isInstanceOfSatisfying(JavaType.Parameterized.class, param ->
+                                assertThat(param.getTypeParameters()).hasOnlyElementsOfType(JavaType.FullyQualified.class)
+                        )
+                )
+        );
+    }
+
+    @Test
+    default void declaringTypeRefersToParameterizedClass() {
+        JavaType.FullyQualified declaringType = methodType("nameShadow").getDeclaringType();
+        assertThat(declaringType.getTypeParameters())
+                .describedAs("If it points to the raw class, " +
+                             "method level name shadowing of generic " +
+                             "type variables cannot be detected.")
+                .isNotEmpty();
+    }
+
+    @Test
+    default void shadowedDeclaredFormalTypeParameters() {
+        // this method overrides the class definition of the type variable T
+        assertThat(methodType("nameShadow").getDeclaredFormalTypeNames())
+                .containsExactly("T");
+
+        // this method provides an unshadowed definition of U
+        assertThat(methodType("genericUnbounded").getDeclaredFormalTypeNames())
+                .containsExactly("U");
+
+        // this method uses the definition of T from the class level
+        assertThat(methodType("genericT").getDeclaredFormalTypeNames())
+                .isEmpty();
     }
 
     @Test
@@ -107,6 +142,11 @@ public interface JavaTypeMappingTest {
     @Test
     default void generic() {
         JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(firstMethodParameter("generic")).getTypeParameters().get(0);
+        assertThat(generic.getName()).isEqualTo("?");
+        assertThat(generic.getVariance()).isEqualTo(COVARIANT);
+        assertThat(TypeUtils.asFullyQualified(generic.getBounds().get(0)).getFullyQualifiedName()).isEqualTo("org.openrewrite.java.C");
+
+        generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(methodType("generic").getReturnType()).getTypeParameters().get(0);
         assertThat(generic.getName()).isEqualTo("?");
         assertThat(generic.getVariance()).isEqualTo(COVARIANT);
         assertThat(TypeUtils.asFullyQualified(generic.getBounds().get(0)).getFullyQualifiedName()).isEqualTo("org.openrewrite.java.C");
@@ -221,14 +261,18 @@ public interface JavaTypeMappingTest {
     }
 
     @Test
-    default void ignoreSourceRetentionAnnotations() {
+    default void includeSourceRetentionAnnotations() {
         JavaType.Parameterized goat = goatType();
-        assertThat(goat.getAnnotations().size()).isEqualTo(1);
-        assertThat(goat.getAnnotations().get(0).getClassName()).isEqualTo("AnnotationWithRuntimeRetention");
+        assertThat(goat.getAnnotations()).satisfiesExactlyInAnyOrder(
+                a -> assertThat(a.getClassName()).isEqualTo("AnnotationWithRuntimeRetention"),
+                a -> assertThat(a.getClassName()).isEqualTo("AnnotationWithSourceRetention")
+        );
 
         JavaType.Method clazzMethod = methodType("clazz");
-        assertThat(clazzMethod.getAnnotations().size()).isEqualTo(1);
-        assertThat(clazzMethod.getAnnotations().get(0).getClassName()).isEqualTo("AnnotationWithRuntimeRetention");
+        assertThat(clazzMethod.getAnnotations()).satisfiesExactlyInAnyOrder(
+                a -> assertThat(a.getClassName()).isEqualTo("AnnotationWithRuntimeRetention"),
+                a -> assertThat(a.getClassName()).isEqualTo("AnnotationWithSourceRetention")
+        );
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1367")
@@ -236,5 +280,19 @@ public interface JavaTypeMappingTest {
     default void recursiveIntersection() {
         JavaType.GenericTypeVariable clazz = TypeUtils.asGeneric(firstMethodParameter("recursiveIntersection"));
         assertThat(clazz.toString()).isEqualTo("Generic{U extends org.openrewrite.java.JavaTypeGoat$Extension<Generic{U}> & org.openrewrite.java.Intersection<Generic{U}>}");
+    }
+
+    @Test
+    default void throwsGenericExceptions() {
+        JavaType.Method method = methodType("throwsGenericException");
+        JavaType ex = method.getThrownExceptions().get(0);
+
+        assertThat(ex).isInstanceOf(JavaType.GenericTypeVariable.class);
+
+        JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) ex;
+        assertThat(generic.getName()).isEqualTo("T");
+        assertThat(generic.getVariance()).isEqualTo(COVARIANT);
+        assertThat(TypeUtils.asFullyQualified(generic.getBounds().get(0))
+                .getFullyQualifiedName()).isEqualTo("java.io.FileNotFoundException");
     }
 }

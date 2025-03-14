@@ -97,8 +97,8 @@ class JsonPathMatcherTest implements RewriteTest {
               }
               """,
             spec -> spec.beforeRecipe(configFile -> {
-                assertThat(anyAttributeMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(@.purge_soft_delete_on_destroy == 'true')]"))).isTrue();
-                assertThat(anyAttributeMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(@.purge_soft_delete_on_destroy == 'false')]"))).isFalse();
+                assertThat(anyAttributeMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(@.purge_soft_delete_on_destroy == true)]"))).isTrue();
+                assertThat(anyAttributeMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(@.purge_soft_delete_on_destroy == false)]"))).isFalse();
             })
           )
         );

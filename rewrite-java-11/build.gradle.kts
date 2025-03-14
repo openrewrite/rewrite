@@ -9,6 +9,7 @@ val javaTck = configurations.create("javaTck") {
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))
+    implementation(project(":rewrite-java-lombok"))
 
     compileOnly("org.slf4j:slf4j-api:1.7.+")
 
@@ -18,6 +19,16 @@ dependencies {
 
     testImplementation(project(":rewrite-test"))
     "javaTck"(project(":rewrite-java-tck"))
+}
+
+configurations.all {
+    resolutionStrategy {
+        eachDependency {
+            if (requested.group == "org.assertj" && requested.name == "assertj-core") {
+                useVersion("3.+") // Pin to latest 3.+ version as AssertJ 4 requires Java 17
+            }
+        }
+    }
 }
 
 java {

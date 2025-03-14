@@ -71,6 +71,35 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Test
+    void okWithTopLevelType() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.util.Map$Entry", "java.util.List", true)),
+          java(
+            """
+              import java.util.Map;
+              
+              public class TestController {
+              
+                  public Map.Entry respond() {
+                     return null;
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              
+              public class TestController {
+              
+                  public List respond() {
+                     return null;
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Disabled("A bug fix reported by the community but not yet fixed")
     @Test
     void conflictingImports() {
@@ -209,7 +238,7 @@ class ChangeTypeTest implements RewriteTest {
               class Test {
                   List p;
                   List p2;
-                  java.util.List p3;
+                  List p3;
               }
               """
           )
@@ -353,7 +382,11 @@ class ChangeTypeTest implements RewriteTest {
           java(a2),
           java(
             "public class B extends a.A1 {}",
-            "public class B extends a.A2 {}"
+            """
+              import a.A2;
+              
+              public class B extends A2 {}
+              """
           )
         );
     }
@@ -365,8 +398,14 @@ class ChangeTypeTest implements RewriteTest {
           java("package a.b.c;\npublic @interface A1 {}"),
           java("package a.b.d;\npublic @interface A2 {}"),
           java(
-            "@a.b.c.A1 public class B {}",
-            "@a.b.d.A2 public class B {}"
+            """
+              @a.b.c.A1 public class B {}
+              """,
+            """
+              import a.b.d.A2;
+              
+              @A2 public class B {}
+              """
           )
         );
     }
@@ -2072,10 +2111,12 @@ class ChangeTypeTest implements RewriteTest {
           properties(
             """
               a.property=java.lang.String
+              c.property=java.lang.StringBuilder
               b.property=String
               """,
             """
               a.property=java.lang.Integer
+              c.property=java.lang.StringBuilder
               b.property=String
               """, spec -> spec.path("application.properties"))
         );
@@ -2101,6 +2142,118 @@ class ChangeTypeTest implements RewriteTest {
                   d: String
               """,
             spec -> spec.path("application.yaml")
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4773")
+    void noRenameOfTypeWithMatchingPrefix() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("org.codehaus.jackson.annotate.JsonIgnoreProperties", "com.fasterxml.jackson.annotation.JsonIgnoreProperties", false))
+            .parser(JavaParser.fromJavaVersion()
+              .dependsOn(
+                """
+                  package org.codehaus.jackson.annotate;
+                  public @interface JsonIgnoreProperties {
+                      boolean ignoreUnknown() default false;
+                  }
+                  """,
+                """
+                  package org.codehaus.jackson.annotate;
+                  public @interface JsonIgnore {
+                  }
+                  """
+              )
+            ),
+          java(
+            """
+              import org.codehaus.jackson.annotate.JsonIgnore;
+              import org.codehaus.jackson.annotate.JsonIgnoreProperties;
+              
+              @JsonIgnoreProperties(ignoreUnknown = true)
+              public class myClass {
+                  @JsonIgnore
+                  public boolean isDirty() {
+                      return false;
+                  }
+              }
+              """,
+            """
+              import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+              import org.codehaus.jackson.annotate.JsonIgnore;
+              
+              @JsonIgnoreProperties(ignoreUnknown = true)
+              public class myClass {
+                  @JsonIgnore
+                  public boolean isDirty() {
+                      return false;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4764")
+    void changeTypeOfInnerClass() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("foo.A$Builder", "bar.A$Builder", true))
+            .parser(JavaParser.fromJavaVersion().dependsOn(
+                """
+                  package foo;
+                  
+                  public class A {
+                    public A.Builder builder() {
+                      return new A.Builder();
+                    }
+                  
+                    public static class Builder {
+                      public A build() {
+                        return new A();
+                      }
+                    }
+                  }
+                  """,
+                """
+                  package bar;
+                  
+                  public class A {
+                    public A.Builder builder() {
+                      return new A.Builder();
+                    }
+                  
+                    public static class Builder {
+                      public A build() {
+                        return new A();
+                      }
+                    }
+                  }
+                  """
+              )
+            ),
+          java(
+            """
+              import foo.A;
+              import foo.A.Builder;
+              
+              class Test {
+                A test() {
+                    A.Builder b = A.builder();
+                    return b.build();
+                }
+              }
+              """, """
+              import foo.A;
+              
+              class Test {
+                A test() {
+                    bar.A.Builder b = A.builder();
+                    return b.build();
+                }
+              }
+              """
           )
         );
     }

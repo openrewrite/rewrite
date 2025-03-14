@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.Module;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
@@ -47,6 +48,7 @@ public class RecipeSerializer {
                 // to be able to construct classes that have @Data and a single field
                 // see https://cowtowncoder.medium.com/jackson-2-12-most-wanted-3-5-246624e2d3d0
                 .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
+                .configure(MapperFeature.PROPAGATE_TRANSIENT_MARKER, true)
                 .build()
                 .registerModules(new ParameterNamesModule(), new JavaTimeModule())
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)

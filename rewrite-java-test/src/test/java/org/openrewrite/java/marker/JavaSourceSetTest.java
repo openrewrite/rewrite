@@ -57,6 +57,7 @@ class JavaSourceSetTest {
           .stream().filter(it -> it.getFullyQualifiedName().contains("org.openrewrite"))
           .toList();
         assertThat(jss).isNotEmpty();
+        assertThat(jss).allSatisfy(c -> assertThat(c.getFullyQualifiedName()).startsWith("org.openrewrite"));
     }
 
     @Test

@@ -251,7 +251,7 @@ public class ChangePropertyKey extends Recipe {
                         newEntryPrefix,
                         Markers.EMPTY,
                         new Yaml.Scalar(randomId(), "", Markers.EMPTY,
-                                Yaml.Scalar.Style.PLAIN, null, subproperty),
+                                Yaml.Scalar.Style.PLAIN, null, null, subproperty),
                         scope.getBeforeMappingValueIndicator(),
                         removeExclusions(entryToReplace.getValue().copyPaste()));
 
@@ -268,7 +268,7 @@ public class ChangePropertyKey extends Recipe {
                     } else {
                         m = (Yaml.Mapping) new DeletePropertyVisitor<>(entryToReplace).visitNonNull(m, p);
                         Yaml.Mapping newMapping = m.withEntries(Collections.singletonList(newEntry));
-                        Yaml.Mapping mergedMapping = (Yaml.Mapping) new MergeYamlVisitor<>(m, newMapping, true, null, false).visitMapping(m, p);
+                        Yaml.Mapping mergedMapping = (Yaml.Mapping) new MergeYamlVisitor<>(m, newMapping, true, null, false, null, null).visitMapping(m, p);
                         m = maybeAutoFormat(m, mergedMapping, p, getCursor().getParentOrThrow());
                     }
                 }

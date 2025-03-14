@@ -25,6 +25,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.SourceFile;
+import org.openrewrite.java.search.FindCompileErrors;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
@@ -39,6 +40,7 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.test.TypeValidation.all;
 
 /**
  * @author Alex Boyko
@@ -48,6 +50,7 @@ class JavaParserTest implements RewriteTest {
     @Test
     void incompleteAssignment() {
         rewriteRun(
+          spec -> spec.typeValidationOptions(all().erroneous(false)),
           java(
             """
               @Deprecated(since=)
@@ -105,6 +108,16 @@ class JavaParserTest implements RewriteTest {
           .matches(path -> path.endsWith("guava-31.0-jre.jar"),
             "classpathFromResources should return guava-31.0-jre.jar from resources, even when the target " +
             "directory contains guava-30.0-jre.jar which has the same prefix");
+    }
+
+    @Test
+    void getParserClasspathDownloadCreateRequiredFolder(@TempDir Path temp) throws Exception {
+        Path updatedTemp = Path.of(temp.toString(), "someFolder");
+        assertThat(updatedTemp.toFile().exists()).isFalse();
+        JavaParserExecutionContextView ctx = JavaParserExecutionContextView.view(new InMemoryExecutionContext());
+        ctx.setParserClasspathDownloadTarget(updatedTemp.toFile());
+        ctx.getParserClasspathDownloadTarget();
+        assertThat(updatedTemp.toFile().exists()).isTrue();
     }
 
     @Test
@@ -166,6 +179,132 @@ class JavaParserTest implements RewriteTest {
     void moduleInfo() {
         // Ignored until properly handled: https://github.com/openrewrite/rewrite/issues/4054#issuecomment-2267605739
         assertFalse(JavaParser.fromJavaVersion().build().accept(Path.of("src/main/java/foo/module-info.java")));
+    }
+
+    @ParameterizedTest
+    //language=java
+    @ValueSource(strings = {
+      """
+        package com.example.demo;
+        class FooBar {
+            public void test() {
+              ownerR
+            }
+        }
+        """,
+      """
+        package com.example.demo;
+        class FooBar {
+            public void test(int num string msg) {
+              String a;
+              System.out.println();
+            }
+        }
+        """,
+      """
+        package com.example.demo;
+        class FooBar {
+            public void test() {
+              String a; this.ownerR
+              System.out.println();
+            }
+        }
+        """,
+      """
+        package com.example.demo;
+        class FooBar {
+            public void test(int num) {
+              String a; this.ownerR // comment
+              System.out.println();
+            }
+        }
+        """,
+      """
+        package com.example.demo;
+        class FooBar {
+            public void test(int num) {
+              // comment
+              this.ownerR
+            }
+        }
+        """,
+      """
+        package com.example.demo;
+        class FooBar {
+            public void test(int param ) {
+              this.ownerR
+              // comment
+            }
+        }
+        """
+    })
+    void erroneousExpressionStatements(@Language("java") String source) {
+        rewriteRun(
+          spec -> spec.typeValidationOptions(all().erroneous(false)),
+          java(source)
+        );
+    }
+
+    @Test
+    void erroneousVariableDeclarations() {
+        rewriteRun(
+          spec -> spec.recipe(new FindCompileErrors())
+            .typeValidationOptions(all().erroneous(false)),
+          java(
+            """
+              package com.example.demo;
+              class Foo {
+                  /pet
+                  public void test() {
+                  }
+              }
+              """,
+            """
+              package com.example.demo;
+              class Foo {
+                  /*~~>*///*~~>*/pet
+                  public void test() {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example.demo;
+              class Bar {
+                  pet
+                  public void test() {
+                  }
+              }
+              """,
+            """
+              package com.example.demo;
+              class Bar {
+                  /*~~>*/pet
+                  public void test() {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.example.demo;
+              class Baz {
+                  -pet
+                  public void test() {
+                  }
+              }
+              """,
+            """
+              package com.example.demo;
+              class Baz {
+                  /*~~>*/-/*~~>*/pet
+                  public void test() {
+                  }
+              }
+              """
+          )
+        );
     }
 
     @Test

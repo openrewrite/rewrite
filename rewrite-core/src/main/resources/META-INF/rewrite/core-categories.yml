@@ -20,6 +20,11 @@ packageName: org.openrewrite
 root: true
 ---
 type: specs.openrewrite.org/v1beta/category
+name: Moderne
+packageName: io.moderne
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
 packageName: io
 root: true
 ---
@@ -29,5 +34,9 @@ root: true
 ---
 type: specs.openrewrite.org/v1beta/category
 packageName: org
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: ai
 root: true
 ---

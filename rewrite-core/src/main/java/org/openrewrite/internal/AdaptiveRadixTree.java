@@ -23,123 +23,122 @@ import java.util.Arrays;
 
 @Incubating(since = "8.38.0")
 public class AdaptiveRadixTree<V> {
-    private transient int size = 0;
+
+    private final KeyTable keyTable;
 
     @Nullable
     private Node<V> root;
 
-    private static abstract class Node<V> {
-        protected byte[] partialKey;
+    public AdaptiveRadixTree() {
+        this.keyTable = new KeyTable();
+    }
 
-        protected Node(byte[] partialKey) {
-            this.partialKey = partialKey;
+    private AdaptiveRadixTree(KeyTable keyTable) {
+        this.keyTable = keyTable;
+    }
+
+    private static abstract class Node<V> {
+        protected int keyOffset;
+        protected int keyLength;
+
+        protected Node(int keyOffset, int keyLength) {
+            this.keyOffset = keyOffset;
+            this.keyLength = keyLength;
         }
 
-        abstract @Nullable V search(byte[] key, int depth);
+        abstract @Nullable V search(byte[] key, int depth, KeyTable keyTable);
 
-        abstract Node<V> insert(byte[] key, int depth, V value);
+        abstract Node<V> insert(byte[] key, int depth, V value, KeyTable keyTable);
 
         abstract Node<V> copy(); // New abstract method
 
-        protected boolean matchesPartialKey(byte[] key, int depth) {
-            int len = partialKey.length;
-            if (depth + len > key.length) return false;
-            switch (len) {
-                case 0:
-                    return true;
-                case 1:
-                    return key[depth] == partialKey[0];
-                case 2:
-                    return key[depth] == partialKey[0] && key[depth + 1] == partialKey[1];
-                default:
-                    for (int i = 0; i < len; i++) {
-                        if (key[depth + i] != partialKey[i]) return false;
-                    }
-                    return true;
-            }
-        }
-
-        // Helper method to find common prefix length
-        protected static int findCommonPrefixLength(byte[] key1, int start1, byte[] key2) {
-            int maxLength = Math.min(key1.length - start1, key2.length);
-            int i = 0;
-            while (i < maxLength && key1[start1 + i] == key2[i]) {
-                i++;
-            }
-            return i;
+        protected boolean matchesPartialKey(byte[] key, int depth, KeyTable keyTable) {
+            return keyTable.matches(key, depth, keyOffset, keyLength);
         }
     }
 
     private static class LeafNode<V> extends Node<V> {
-        private static final byte[] EMPTY_BYTES = new byte[0];
         private final V value;
 
-        LeafNode(byte[] partialKey, V value) {
-            super(partialKey);
+        LeafNode(int keyOffset, int keyLength, V value) {
+            super(keyOffset, keyLength);
             this.value = value;
+        }
+
+        static <V> LeafNode<V> create(byte[] key, int offset, int length, V value, KeyTable keyTable) {
+            if (length <= 0) {
+                return new LeafNode<>(-1, 0, value);
+            }
+            int keyOffset = keyTable.store(key, offset, length);
+            return new LeafNode<>(keyOffset, length, value);
         }
 
         @Override
         @Nullable
-        V search(byte[] key, int depth) {
+        V search(byte[] key, int depth, KeyTable keyTable) {
             // Fast path for empty and single-byte partial key
-            switch (partialKey.length) {
+            switch (keyLength) {
                 case 0:
                     return depth == key.length ? value : null;
                 case 1:
-                    return depth < key.length && key[depth] == partialKey[0] &&
+                    return depth < key.length && key[depth] == keyTable.get(keyOffset) &&
                            depth + 1 == key.length ? value : null;
             }
 
             // Standard implementation for longer keys
-            if (!matchesPartialKey(key, depth)) return null;
-            return depth + partialKey.length == key.length ? value : null;
+            if (!matchesPartialKey(key, depth, keyTable)) return null;
+            return depth + keyLength == key.length ? value : null;
         }
 
         @Override
-        Node<V> insert(byte[] key, int depth, V value) {
+        Node<V> insert(byte[] key, int depth, V value, KeyTable keyTable) {
             // Fast path for empty partial key
-            if (partialKey.length == 0) {
+            if (keyLength == 0) {
                 if (depth == key.length) {
-                    return new LeafNode<>(partialKey, value);
+                    return new LeafNode<>(-1, 0, value);
                 }
-                Node4<V> newNode = new Node4<>(partialKey);
+                Node4<V> newNode = new Node4<>(-1, 0);
                 newNode.value = this.value;
-
-                // Optimize this common case - we know the exact length needed
-                int remainingLength = key.length - (depth + 1);
-                byte[] remainingKey = remainingLength == 0 ? EMPTY_BYTES :
-                        Arrays.copyOfRange(key, depth + 1, key.length);
-                newNode.addChild(key[depth], new LeafNode<>(remainingKey, value));
+                Node<V> newChild = create(key, depth + 1, key.length - (depth + 1), value, keyTable);
+                newNode.addChild(key[depth], newChild, keyTable);
                 return newNode;
             }
 
-            if (matchesPartialKey(key, depth) && depth + partialKey.length == key.length) {
-                return new LeafNode<>(partialKey, value);
+            if (depth + keyLength == key.length && keyTable.matches(key, depth, keyOffset, keyLength)) {
+                return new LeafNode<>(keyOffset, keyLength, value);
             }
 
-            int commonPrefix = findCommonPrefixLength(key, depth, partialKey);
-            byte[] commonKey = Arrays.copyOfRange(key, depth, depth + commonPrefix);
-            Node4<V> newNode = new Node4<>(commonKey);
+            // Find common prefix without creating arrays
+            int commonPrefix = 0;
+            int maxLength = Math.min(key.length - depth, keyLength);
+            while (commonPrefix < maxLength && key[depth + commonPrefix] == keyTable.get(keyOffset + commonPrefix)) {
+                commonPrefix++;
+            }
 
-            int remainingOldLength = partialKey.length - commonPrefix;
+            // Create new node with common prefix
+            Node4<V> newNode = new Node4<>(keyOffset, commonPrefix);
+
+            // Handle remaining parts of old key
+            int remainingOldLength = keyLength - commonPrefix;
             if (remainingOldLength > 0) {
-                byte firstByte = partialKey[commonPrefix];
-                newNode.addChild(firstByte, new LeafNode<>(
-                        Arrays.copyOfRange(partialKey, commonPrefix + 1, partialKey.length),
-                        this.value
-                ));
+                byte firstByte = keyTable.get(keyOffset + commonPrefix);
+                LeafNode<V> oldChild = new LeafNode<>(
+                        keyOffset + commonPrefix + 1,
+                        remainingOldLength - 1,
+                        this.value);
+                newNode.addChild(firstByte, oldChild, keyTable);
             } else {
                 newNode.value = this.value;
             }
 
+            // Handle remaining parts of new key
             int remainingNewLength = key.length - (depth + commonPrefix);
             if (remainingNewLength > 0) {
                 byte firstByte = key[depth + commonPrefix];
-                newNode.addChild(firstByte, new LeafNode<>(
-                        Arrays.copyOfRange(key, depth + commonPrefix + 1, key.length),
-                        value
-                ));
+                LeafNode<V> newChild = create(
+                        key, depth + commonPrefix + 1, remainingNewLength - 1,
+                        value, keyTable);
+                newNode.addChild(firstByte, newChild, keyTable);
             } else {
                 newNode.value = value;
             }
@@ -149,7 +148,7 @@ public class AdaptiveRadixTree<V> {
 
         @Override
         Node<V> copy() {
-            return new LeafNode<>(Arrays.copyOf(partialKey, partialKey.length), value);
+            return new LeafNode<>(keyOffset, keyLength, value);
         }
     }
 
@@ -157,29 +156,34 @@ public class AdaptiveRadixTree<V> {
     private static abstract class InternalNode<V> extends Node<V> {
         protected @Nullable V value; // Value stored at this node (if any)
 
-        protected InternalNode(byte[] partialKey) {
-            super(partialKey);
+        protected InternalNode(int keyOffset, int keyLength) {
+            super(keyOffset, keyLength);
         }
 
         abstract @Nullable Node<V> getChild(byte key);
 
         // Return the new node if growth occurred, otherwise null
-        abstract @Nullable InternalNode<V> addChild(byte key, Node<V> child);
+        abstract @Nullable InternalNode<V> addChild(byte key, Node<V> child, KeyTable keyTable);
+
+        void adjustKey(int newKeyOffset, int newKeyLength) {
+            this.keyOffset = newKeyOffset;
+            this.keyLength = newKeyLength;
+        }
 
         @Override
         @Nullable
-        V search(byte[] key, int depth) {
+        V search(byte[] key, int depth, KeyTable keyTable) {
             // Fast path for empty partial key
-            if (partialKey.length == 0) {
+            if (keyLength == 0) {
                 if (depth == key.length) {
                     return value;
                 }
                 Node<V> child = getChild(key[depth]);
-                return child != null ? child.search(key, depth + 1) : null;
+                return child != null ? child.search(key, depth + 1, keyTable) : null;
             }
 
-            if (!matchesPartialKey(key, depth)) return null;
-            depth += partialKey.length;
+            if (!matchesPartialKey(key, depth, keyTable)) return null;
+            depth += keyLength;
 
             // We've reached the end of the search key
             if (depth == key.length) {
@@ -188,48 +192,29 @@ public class AdaptiveRadixTree<V> {
 
             // If there's more key to search but we've found a value, keep searching
             Node<V> child = getChild(key[depth]);
-            return child != null ? child.search(key, depth + 1) : null;
+            return child != null ? child.search(key, depth + 1, keyTable) : null;
         }
 
         @Override
-        Node<V> insert(byte[] key, int depth, V value) {
-            if (!matchesPartialKey(key, depth)) {
-                int commonPrefix = findCommonPrefixLength(key, depth, partialKey);
-
-                byte[] commonKey = Arrays.copyOfRange(key, depth, depth + commonPrefix);
-                Node4<V> newNode = new Node4<>(commonKey);
-
-                int remainingCurrentLength = partialKey.length - commonPrefix;
-                if (remainingCurrentLength > 0) {
-                    byte firstByte = partialKey[commonPrefix];
-                    InternalNode<V> currentNodeCopy = this.cloneWithNewKey(
-                            Arrays.copyOfRange(partialKey, commonPrefix + 1, partialKey.length)
-                    );
-                    InternalNode<V> grown = newNode.addChild(firstByte, currentNodeCopy);
-                    if (grown != null) {
-                        newNode = (Node4<V>)grown;
-                    }
-                } else {
-                    newNode.value = this.value;
-                    for (int i = 0; i < 256; i++) {
-                        Node<V> child = getChild((byte) i);
-                        if (child != null) {
-                            InternalNode<V> grown = newNode.addChild((byte)i, child);
-                            if (grown != null) {
-                                newNode = (Node4<V>)grown;
-                            }
-                        }
-                    }
+        Node<V> insert(byte[] key, int depth, V value, KeyTable keyTable) {
+            if (!matchesPartialKey(key, depth, keyTable)) {
+                // Find common prefix length
+                int commonPrefix = 0;
+                int maxLength = Math.min(key.length - depth, keyLength);
+                while (commonPrefix < maxLength && key[depth + commonPrefix] == keyTable.get(keyOffset + commonPrefix)) {
+                    commonPrefix++;
                 }
 
+                Node4<V> newNode = split(commonPrefix, keyTable);
+
+                // Handle remaining parts of new key
                 int remainingNewLength = key.length - (depth + commonPrefix);
                 if (remainingNewLength > 0) {
                     byte firstByte = key[depth + commonPrefix];
-                    Node<V> leafNode = new LeafNode<>(
-                            Arrays.copyOfRange(key, depth + commonPrefix + 1, key.length),
-                            value
-                    );
-                    InternalNode<V> grown = newNode.addChild(firstByte, leafNode);
+                    Node<V> leafNode = LeafNode.create(
+                            key, depth + commonPrefix + 1, remainingNewLength - 1,
+                            value, keyTable);
+                    InternalNode<V> grown = newNode.addChild(firstByte, leafNode, keyTable);
                     return grown != null ? grown : newNode;
                 } else {
                     newNode.value = value;
@@ -237,36 +222,44 @@ public class AdaptiveRadixTree<V> {
                 }
             }
 
-            depth += partialKey.length;
+            depth += keyLength;
 
+            // We've reached the end of the key
             if (depth == key.length) {
                 this.value = value;
                 return this;
             }
 
+            // Continue with child node
             byte nextByte = key[depth];
             Node<V> child = getChild(nextByte);
 
             if (child == null) {
-                byte[] remainingKey = Arrays.copyOfRange(key, depth + 1, key.length);
-                Node<V> newChild = new LeafNode<>(remainingKey, value);
-                InternalNode<V> grown = addChild(nextByte, newChild);
+                // Create new leaf node
+                Node<V> newChild = LeafNode.create(key, depth + 1, key.length - (depth + 1), value, keyTable);
+                InternalNode<V> grown = addChild(nextByte, newChild, keyTable);
                 return grown != null ? grown : this;
             }
 
-            Node<V> newChild = child.insert(key, depth + 1, value);
+            // Recursively insert into child node
+            Node<V> newChild = child.insert(key, depth + 1, value, keyTable);
             if (newChild != child) {
-                InternalNode<V> grown = addChild(nextByte, newChild);
-                if (grown != null) {
-                    grown.partialKey = this.partialKey;
-                    grown.value = this.value;
-                    return grown;
-                }
+                InternalNode<V> grown = addChild(nextByte, newChild, keyTable);
+                return grown != null ? grown : this;
             }
             return this;
         }
 
-        abstract InternalNode<V> cloneWithNewKey(byte[] newKey);
+        private Node4<V> split(int commonPrefix, KeyTable keyTable) {
+            Node4<V> newParent = new Node4<>(keyOffset, commonPrefix);
+            newParent.value = commonPrefix == keyLength ? this.value : null;
+
+            assert commonPrefix < keyLength;
+            byte splitByte = keyTable.get(keyOffset + commonPrefix);
+            adjustKey(keyOffset + commonPrefix + 1, keyLength - commonPrefix - 1);
+            newParent.addChild(splitByte, this, keyTable);
+            return newParent;
+        }
     }
 
     private static class Node4<V> extends InternalNode<V> {
@@ -275,45 +268,62 @@ public class AdaptiveRadixTree<V> {
         private @Nullable Node<V> c0, c1, c2, c3;
         private byte size;
 
-        Node4(byte[] partialKey) {
-            super(partialKey);
+        Node4(int keyOffset, int keyLength) {
+            super(keyOffset, keyLength);
             this.size = 0;
         }
 
         @Override
-        @Nullable Node<V> getChild(byte key) {
-            // Unrolled loop, testing one at a time for best branch prediction
-            if (size > 0 && k0 == key) return c0;
-            if (size > 1 && k1 == key) return c1;
-            if (size > 2 && k2 == key) return c2;
-            if (size > 3 && k3 == key) return c3;
-            return null;
+        @Nullable
+        Node<V> getChild(byte key) {
+            int mask = (1 << size) - 1; // Creates mask like 0001, 0011, 0111, 1111
+            return ((mask & 1) != 0 && k0 == key) ? c0 :
+                    ((mask & 2) != 0 && k1 == key) ? c1 :
+                            ((mask & 4) != 0 && k2 == key) ? c2 :
+                                    ((mask & 8) != 0 && k3 == key) ? c3 : null;
         }
 
         @SuppressWarnings("DataFlowIssue")
         @Override
-        @Nullable InternalNode<V> addChild(byte key, Node<V> child) {
+        @Nullable
+        InternalNode<V> addChild(byte key, Node<V> child, KeyTable keyTable) {
             // Check if we're replacing an existing child
-            if (size > 0 && k0 == key) { c0 = child; return null; }
-            if (size > 1 && k1 == key) { c1 = child; return null; }
-            if (size > 2 && k2 == key) { c2 = child; return null; }
-            if (size > 3 && k3 == key) { c3 = child; return null; }
+            if (size > 0) {
+                if (k0 == key) {
+                    c0 = child;
+                    return null;
+                }
+                if (size > 1) {
+                    if (k1 == key) {
+                        c1 = child;
+                        return null;
+                    }
+                    if (size > 2 && k2 == key) {
+                        c2 = child;
+                        return null;
+                    }
+                    if (size > 3 && k3 == key) {
+                        c3 = child;
+                        return null;
+                    }
+                }
+            }
 
             // If we're at capacity, grow to Node16
             if (size == 4) {
-                Node16<V> node = new Node16<>(partialKey);
+                Node16<V> node = new Node16<>(keyOffset, keyLength);
                 node.value = this.value;
                 // Add existing children in sorted order
-                node.addChild(k0, c0);
-                node.addChild(k1, c1);
-                node.addChild(k2, c2);
-                node.addChild(k3, c3);
-                node.addChild(key, child);
+                node.addChild(k0, c0, keyTable);
+                node.addChild(k1, c1, keyTable);
+                node.addChild(k2, c2, keyTable);
+                node.addChild(k3, c3, keyTable);
+                node.addChild(key, child, keyTable);
                 return node;
             }
 
             // Find insertion point while maintaining sorted order
-            byte keyByte = (byte)(key & 0xFF);
+            byte keyByte = (byte) (key & 0xFF);
             if (size == 0) {
                 k0 = keyByte;
                 c0 = child;
@@ -375,26 +385,10 @@ public class AdaptiveRadixTree<V> {
             return null;
         }
 
-        @Override
-        InternalNode<V> cloneWithNewKey(byte[] newKey) {
-            Node4<V> clone = new Node4<>(newKey);
-            clone.value = this.value;
-            clone.size = this.size;
-            clone.k0 = this.k0;
-            clone.k1 = this.k1;
-            clone.k2 = this.k2;
-            clone.k3 = this.k3;
-            clone.c0 = this.c0;
-            clone.c1 = this.c1;
-            clone.c2 = this.c2;
-            clone.c3 = this.c3;
-            return clone;
-        }
-
         @SuppressWarnings("DataFlowIssue")
         @Override
         Node<V> copy() {
-            Node4<V> clone = new Node4<>(Arrays.copyOf(partialKey, partialKey.length));
+            Node4<V> clone = new Node4<>(keyOffset, keyLength);
             clone.value = this.value;
             clone.size = this.size;
             clone.k0 = this.k0;
@@ -410,14 +404,14 @@ public class AdaptiveRadixTree<V> {
     }
 
     private static class Node16<V> extends InternalNode<V> {
-        private static final int LINEAR_SEARCH_THRESHOLD = 8;
+        private static final int LINEAR_SEARCH_THRESHOLD = 12;
         private byte[] keys;
         private @Nullable Node<V>[] children;
         private int size;
 
         @SuppressWarnings("unchecked")
-        Node16(byte[] partialKey) {
-            super(partialKey);
+        Node16(int keyOffset, int keyLength) {
+            super(keyOffset, keyLength);
             this.keys = new byte[16];
             this.children = (Node<V>[]) new Node[16];
             this.size = 0;
@@ -459,7 +453,7 @@ public class AdaptiveRadixTree<V> {
 
         @Override
         @Nullable
-        InternalNode<V> addChild(byte key, Node<V> child) {
+        InternalNode<V> addChild(byte key, Node<V> child, KeyTable keyTable) {
             // Check if we're replacing an existing child
             for (int i = 0; i < size; i++) {
                 if (keys[i] == key) {
@@ -470,13 +464,13 @@ public class AdaptiveRadixTree<V> {
 
             // If we're at capacity, grow
             if (size >= 16) {
-                Node48<V> node = new Node48<>(partialKey);
+                Node48<V> node = new Node48<>(keyOffset, keyLength);
                 node.value = this.value;
                 for (int i = 0; i < size; i++) {
                     //noinspection DataFlowIssue
-                    node.addChild(keys[i], children[i]);
+                    node.addChild(keys[i], children[i], keyTable);
                 }
-                node.addChild(key, child);
+                node.addChild(key, child, keyTable);
                 return node;
             }
 
@@ -496,18 +490,8 @@ public class AdaptiveRadixTree<V> {
         }
 
         @Override
-        InternalNode<V> cloneWithNewKey(byte[] newKey) {
-            Node16<V> clone = new Node16<>(newKey);
-            clone.value = this.value;
-            System.arraycopy(this.keys, 0, clone.keys, 0, this.size);
-            System.arraycopy(this.children, 0, clone.children, 0, this.size);
-            clone.size = this.size;
-            return clone;
-        }
-
-        @Override
         Node<V> copy() {
-            Node16<V> clone = new Node16<>(Arrays.copyOf(partialKey, partialKey.length));
+            Node16<V> clone = new Node16<>(keyOffset, keyLength);
             clone.value = this.value;
             clone.size = this.size;
             clone.keys = Arrays.copyOf(this.keys, this.keys.length);
@@ -527,8 +511,8 @@ public class AdaptiveRadixTree<V> {
         private int size;
 
         @SuppressWarnings("unchecked")
-        Node48(byte[] partialKey) {
-            super(partialKey);
+        Node48(int keyOffset, int keyLength) {
+            super(keyOffset, keyLength);
             this.index = new byte[256];
             Arrays.fill(this.index, (byte) -1);
             this.children = (Node<V>[]) new Node[48];
@@ -538,13 +522,13 @@ public class AdaptiveRadixTree<V> {
         @Override
         @Nullable
         Node<V> getChild(byte key) {
-            int idx = index[key] & 0xFF;
-            return idx < size ? children[idx] : null;
+            byte idx = index[key & 0xFF];
+            return idx >= 0 ? children[idx] : null;
         }
 
         @Override
         @Nullable
-        InternalNode<V> addChild(byte key, Node<V> child) {
+        InternalNode<V> addChild(byte key, Node<V> child, KeyTable keyTable) {
             int idx = key & 0xFF;
             if (index[idx] >= 0) {
                 children[index[idx]] = child;
@@ -552,15 +536,15 @@ public class AdaptiveRadixTree<V> {
             }
 
             if (size >= 48) {
-                Node256<V> node = new Node256<>(partialKey);
+                Node256<V> node = new Node256<>(-1, 0);
                 node.value = this.value;
                 for (int i = 0; i < 256; i++) {
                     if (index[i] >= 0) {
                         //noinspection DataFlowIssue
-                        node.addChild((byte) i, children[index[i]]);
+                        node.addChild((byte) i, children[index[i]], keyTable);
                     }
                 }
-                node.addChild(key, child);
+                node.addChild(key, child, keyTable);
                 return node;
             }
 
@@ -571,18 +555,8 @@ public class AdaptiveRadixTree<V> {
         }
 
         @Override
-        InternalNode<V> cloneWithNewKey(byte[] newKey) {
-            Node48<V> clone = new Node48<>(newKey);
-            clone.value = this.value;
-            System.arraycopy(this.index, 0, clone.index, 0, this.index.length);
-            System.arraycopy(this.children, 0, clone.children, 0, this.size);
-            clone.size = this.size;
-            return clone;
-        }
-
-        @Override
         Node<V> copy() {
-            Node48<V> clone = new Node48<>(Arrays.copyOf(partialKey, partialKey.length));
+            Node48<V> clone = new Node48<>(keyOffset, keyLength);
             clone.value = this.value;
             clone.size = this.size;
             clone.index = Arrays.copyOf(this.index, this.index.length);
@@ -597,12 +571,18 @@ public class AdaptiveRadixTree<V> {
     }
 
     private static class Node256<V> extends InternalNode<V> {
-        private final @Nullable Node<V> [] children;
+        private final @Nullable Node<V>[] children;
 
         @SuppressWarnings("unchecked")
-        Node256(byte[] partialKey) {
-            super(partialKey);
+        Node256(int keyOffset, int keyLength) {
+            super(keyOffset, keyLength);
             this.children = (Node<V>[]) new Node[256];
+        }
+
+        @SuppressWarnings("unchecked")
+        Node256(int keyOffset, int keyLength, @Nullable Node<V>[] children) {
+            super(keyOffset, keyLength);
+            this.children = children;
         }
 
         @Override
@@ -613,23 +593,15 @@ public class AdaptiveRadixTree<V> {
 
         @Override
         @Nullable
-        InternalNode<V> addChild(byte key, Node<V> child) {
+        InternalNode<V> addChild(byte key, Node<V> child, KeyTable keyTable) {
             int idx = key & 0xFF;
             children[idx] = child;
             return null;
         }
 
         @Override
-        InternalNode<V> cloneWithNewKey(byte[] newKey) {
-            Node256<V> clone = new Node256<>(newKey);
-            clone.value = this.value;
-            System.arraycopy(this.children, 0, clone.children, 0, this.children.length);
-            return clone;
-        }
-
-        @Override
         Node<V> copy() {
-            Node256<V> clone = new Node256<>(Arrays.copyOf(partialKey, partialKey.length));
+            Node256<V> clone = new Node256<>(keyOffset, keyLength);
             clone.value = this.value;
             System.arraycopy(this.children, 0, clone.children, 0, this.children.length);
             // Deep copy children
@@ -649,9 +621,9 @@ public class AdaptiveRadixTree<V> {
 
     public void insert(byte[] keyBytes, V value) {
         if (root == null) {
-            root = new LeafNode<>(keyBytes, value);
+            root = LeafNode.create(keyBytes, 0, keyBytes.length, value, keyTable);
         } else {
-            root = root.insert(keyBytes, 0, value);
+            root = root.insert(keyBytes, 0, value, keyTable);
         }
     }
 
@@ -662,11 +634,11 @@ public class AdaptiveRadixTree<V> {
 
     public @Nullable V search(byte[] bytes) {
         if (root == null) return null;
-        return root.search(bytes, 0);
+        return root.search(bytes, 0, keyTable);
     }
 
     public AdaptiveRadixTree<V> copy() {
-        AdaptiveRadixTree<V> newTree = new AdaptiveRadixTree<>();
+        AdaptiveRadixTree<V> newTree = new AdaptiveRadixTree<>(keyTable.copy());
         if (root != null) {
             newTree.root = root.copy();
         }
@@ -675,5 +647,74 @@ public class AdaptiveRadixTree<V> {
 
     public void clear() {
         root = null;
+        keyTable.clear();
+    }
+
+    private static class KeyTable {
+        private static final int INITIAL_CAPACITY = 128 * 1024; // 128KiB
+        private static final int MAX_SMALL_GROWTH_SIZE = 1024 * 1024; // 1MiB
+        private static final double LARGE_GROWTH_FACTOR = 1.3;
+
+        private byte[] storage;
+        private int size;
+
+        KeyTable() {
+            this.storage = new byte[INITIAL_CAPACITY];
+            this.size = 0;
+        }
+
+        KeyTable copy() {
+            KeyTable copy = new KeyTable();
+            copy.storage = Arrays.copyOf(storage, storage.length);
+            copy.size = size;
+            return copy;
+        }
+
+        // Returns offset where the key was stored
+        int store(byte[] key, int offset, int length) {
+            ensureCapacity(length);
+            int startOffset = size;
+            System.arraycopy(key, offset, storage, size, length);
+            size += length;
+            return startOffset;
+        }
+
+        boolean matches(byte[] key, int keyOffset, int storedOffset, int length) {
+            if (length <= 0) return true;
+            if (keyOffset + length > key.length) return false;
+
+            for (int i = 0; i < length; i++) {
+                if (key[keyOffset + i] != storage[storedOffset + i]) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private void ensureCapacity(int additional) {
+            int required = size + additional;
+            if (required <= storage.length) {
+                return;
+            }
+
+            int newCapacity;
+            if (storage.length < MAX_SMALL_GROWTH_SIZE) {
+                // Double the size for small arrays
+                newCapacity = Math.max(storage.length * 2, required);
+            } else {
+                // Grow by 10% for large arrays
+                newCapacity = Math.max((int) (storage.length * LARGE_GROWTH_FACTOR), required);
+            }
+            storage = Arrays.copyOf(storage, newCapacity);
+        }
+
+        public byte get(int offset) {
+            return storage[offset];
+        }
+
+        public void clear() {
+            storage = new byte[INITIAL_CAPACITY];
+            size = 0;
+        }
     }
 }

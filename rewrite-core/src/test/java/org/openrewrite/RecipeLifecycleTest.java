@@ -42,9 +42,7 @@ import java.util.Properties;
 import java.util.UUID;
 
 import static java.util.Objects.requireNonNull;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
-import static org.assertj.core.api.Assertions.fail;
+import static org.assertj.core.api.Assertions.*;
 import static org.openrewrite.Recipe.noop;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
@@ -89,21 +87,21 @@ class RecipeLifecycleTest implements RewriteTest {
     @Test
     void twoGeneratingRecipesCreateOnlyOneFile() {
         rewriteRun(spec -> spec.recipeFromYaml("""
-                ---
-                type: specs.openrewrite.org/v1beta/recipe
-                name: test.recipe
-                displayName: Create twice
-                description: Scanning recipes later in the stack should scan files created by earlier recipes, avoiding duplicate file creation.
-                recipeList:
-                  - org.openrewrite.text.CreateTextFile:
-                      fileContents: first
-                      relativeFileName: test.txt
-                      overwriteExisting: false
-                  - org.openrewrite.text.CreateTextFile:
-                      fileContents: second
-                      relativeFileName: test.txt
-                      overwriteExisting: false
-                """,
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.recipe
+              displayName: Create twice
+              description: Scanning recipes later in the stack should scan files created by earlier recipes, avoiding duplicate file creation.
+              recipeList:
+                - org.openrewrite.text.CreateTextFile:
+                    fileContents: first
+                    relativeFileName: test.txt
+                    overwriteExisting: false
+                - org.openrewrite.text.CreateTextFile:
+                    fileContents: second
+                    relativeFileName: test.txt
+                    overwriteExisting: false
+              """,
             "test.recipe"
           ),
           text(null, "first", spec -> spec.path("test.txt")));
@@ -122,7 +120,7 @@ class RecipeLifecycleTest implements RewriteTest {
               .as("Exception thrown in the scanning phase should record the responsible recipe")
               .matches(m -> "org.openrewrite.RecipeLifecycleTest$ErrorDuringScanningPhase".equals(m.getRecipes().iterator().next().get(0).getDescriptor().getName()))
             )
-        ));
+          ));
     }
 
     @Value
@@ -366,21 +364,21 @@ class RecipeLifecycleTest implements RewriteTest {
     }
 
     @Test
-    void canNotCallImperativeRecipeWithUnnecessaryArgsFromDeclarativeInTests() {
-        assertThatExceptionOfType(AssertionError.class).isThrownBy(() ->
-          rewriteRun(spec -> spec.recipeFromYaml("""
-                ---
-                type: specs.openrewrite.org/v1beta/recipe
-                name: test.recipe
-                displayName: Test Recipe
-                description: Test Recipe.
-                recipeList:
-                  - org.openrewrite.NoArgRecipe:
-                      foo: bar
-                """,
-              "test.recipe"
-            ),
-            text("Hi", "NoArgRecipeHi")));
+    void canCallImperativeRecipeWithUnnecessaryArgsFromDeclarativeInTests() {
+        rewriteRun(spec -> spec.recipeFromYaml("""
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.recipe
+              displayName: Test Recipe
+              description: Test Recipe.
+              recipeList:
+                - org.openrewrite.NoArgRecipe:
+                    foo: bar
+              """,
+            "test.recipe"
+          ),
+          text("Hi", "NoArgRecipeHi")
+        );
     }
 
     @Test

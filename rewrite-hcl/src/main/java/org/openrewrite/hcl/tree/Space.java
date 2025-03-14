@@ -156,20 +156,20 @@ public class Space {
         for (char c : charArray) {
             switch (c) {
                 case '#':
-                    if (Comment.Style.LINE_SLASH.equals(inLineSlashOrHashComment)) {
+                    if (Comment.Style.LINE_SLASH == inLineSlashOrHashComment) {
+                        comment.append(c);
+                    } else if (inSingleLineComment) {
+                        comment.append(c);
+                    } else if (inMultiLineComment) {
                         comment.append(c);
                     } else {
-                        if (inSingleLineComment) {
-                            comment.append(c);
-                        } else {
-                            inSingleLineComment = true;
-                            inLineSlashOrHashComment = Comment.Style.LINE_HASH;
-                            comment = new StringBuilder();
-                        }
+                        inSingleLineComment = true;
+                        inLineSlashOrHashComment = Comment.Style.LINE_HASH;
+                        comment = new StringBuilder();
                     }
                     break;
                 case '/':
-                    if (Comment.Style.LINE_HASH.equals(inLineSlashOrHashComment)) {
+                    if (Comment.Style.LINE_HASH == inLineSlashOrHashComment) {
                         comment.append(c);
                     } else {
                         if (inSingleLineComment) {
@@ -223,6 +223,11 @@ public class Space {
                     }
             }
             last = c;
+        }
+
+        if ((comment.length() > 0) || inSingleLineComment) {
+            comments.add(new Comment(inLineSlashOrHashComment, comment.toString(), prefix.toString(), Markers.EMPTY));
+            prefix = new StringBuilder();
         }
 
         // Shift the whitespace on each comment forward to be a suffix of the comment before it, and the
@@ -323,6 +328,8 @@ public class Space {
         INDEX_POSITION,
         INDEX_POSITION_SUFFIX,
         IDENTIFIER,
+        LEGACY_INDEX_ATTRIBUTE_ACCESS,
+        LEGACY_INDEX_ATTRIBUTE_ACCESS_BASE,
         LITERAL,
         OBJECT_VALUE,
         OBJECT_VALUE_ATTRIBUTES,

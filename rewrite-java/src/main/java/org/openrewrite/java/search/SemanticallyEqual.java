@@ -366,7 +366,13 @@ public class SemanticallyEqual {
                 J.Case compareTo = (J.Case) j;
                 this.visitList(_case.getStatements(), compareTo.getStatements());
                 visit(_case.getBody(), compareTo.getBody());
-                this.visitList(_case.getExpressions(), compareTo.getExpressions());
+                this.visitList(_case.getCaseLabels(), compareTo.getCaseLabels());
+                if (_case.getGuard() != null && compareTo.getGuard() != null) {
+                    visit(_case.getGuard(), compareTo.getGuard());
+                } else if (nullMissMatch(_case.getGuard(), compareTo.getGuard())) {
+                    isEqual.set(false);
+                    return _case;
+                }
             }
             return _case;
         }
@@ -811,6 +817,25 @@ public class SemanticallyEqual {
         }
 
         @Override
+        public J.DeconstructionPattern visitDeconstructionPattern(J.DeconstructionPattern deconstructionPattern, J j) {
+            if (isEqual.get()) {
+                if (!(j instanceof J.DeconstructionPattern)) {
+                    isEqual.set(false);
+                    return deconstructionPattern;
+                }
+
+                J.DeconstructionPattern compareTo = (J.DeconstructionPattern) j;
+                if (!TypeUtils.isOfType(deconstructionPattern.getType(), compareTo.getType())) {
+                    isEqual.set(false);
+                    return deconstructionPattern;
+                }
+                visit(deconstructionPattern.getDeconstructor(), compareTo.getDeconstructor());
+                this.visitList(deconstructionPattern.getNested(), compareTo.getNested());
+            }
+            return deconstructionPattern;
+        }
+
+        @Override
         public J.Label visitLabel(J.Label label, J j) {
             if (isEqual.get()) {
                 if (!(j instanceof J.Label)) {
@@ -951,8 +976,7 @@ public class SemanticallyEqual {
                       !nullMissMatch(method.getSelect(), compareTo.getSelect())) ||
                     method.getMethodType() == null ||
                     compareTo.getMethodType() == null ||
-                    !TypeUtils.isAssignableTo(method.getMethodType().getReturnType(), compareTo.getMethodType().getReturnType()) ||
-                    nullListSizeMissMatch(method.getTypeParameters(), compareTo.getTypeParameters())) {
+                    !TypeUtils.isAssignableTo(method.getMethodType().getReturnType(), compareTo.getMethodType().getReturnType())) {
                     isEqual.set(false);
                     return method;
                 }
@@ -994,7 +1018,6 @@ public class SemanticallyEqual {
                 if (compareMethodArguments || containsLiteral) {
                     this.visitList(method.getArguments(), compareTo.getArguments());
                 }
-                this.visitList(method.getTypeParameters(), compareTo.getTypeParameters());
             }
             return method;
         }

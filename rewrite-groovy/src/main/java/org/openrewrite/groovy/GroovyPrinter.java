@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
+import org.openrewrite.groovy.internal.Delimiter;
 import org.openrewrite.groovy.marker.*;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.groovy.tree.GContainer;
@@ -33,6 +34,8 @@ import org.openrewrite.marker.Markers;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.UnaryOperator;
+
+import static org.openrewrite.groovy.internal.Delimiter.DOUBLE_QUOTE_STRING;
 
 public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     private final GroovyJavaPrinter delegate = new GroovyJavaPrinter();
@@ -57,6 +60,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         JRightPadded<J.Package> pkg = cu.getPadding().getPackageDeclaration();
         if (pkg != null) {
             visit(pkg.getElement(), p);
+            visitMarkers(pkg.getMarkers(), p);
             visitSpace(pkg.getAfter(), Space.Location.PACKAGE_SUFFIX, p);
         }
 
@@ -72,18 +76,14 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     @Override
     public J visitGString(G.GString gString, PrintOutputCapture<P> p) {
         beforeSyntax(gString, GSpace.Location.GSTRING, p);
-        String delimiter = gString.getDelimiter();
+        Delimiter delimiter = Delimiter.of(gString.getDelimiter());
         if (delimiter == null) {
             // For backwards compatibility with ASTs before we collected this field
-            delimiter = "\"";
+            delimiter = DOUBLE_QUOTE_STRING;
         }
-        p.append(delimiter);
+        p.append(delimiter.open);
         visit(gString.getStrings(), p);
-        if ("$/".equals(delimiter)) {
-            p.append("/$");
-        } else {
-            p.append(delimiter);
-        }
+        p.append(delimiter.close);
         afterSyntax(gString, p);
         return gString;
     }
@@ -265,12 +265,16 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             beforeSyntax(multiVariable, Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
             visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
             visit(multiVariable.getLeadingAnnotations(), p);
-            for (J.Modifier m : multiVariable.getModifiers()) {
-                visitModifier(m, p);
-            }
             multiVariable.getMarkers().findFirst(RedundantDef.class).ifPresent(def -> {
                 visitSpace(def.getPrefix(), Space.Location.LANGUAGE_EXTENSION, p);
                 p.append("def");
+            });
+            for (J.Modifier m : multiVariable.getModifiers()) {
+                visitModifier(m, p);
+            }
+            multiVariable.getMarkers().findFirst(MultiVariable.class).ifPresent(multiVar -> {
+                visitSpace(multiVar.getPrefix(), Space.Location.NAMED_VARIABLE_SUFFIX, p);
+                p.append(",");
             });
             visit(multiVariable.getTypeExpression(), p);
             // For backwards compatibility.
@@ -295,16 +299,16 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             LambdaStyle ls = lambda.getMarkers().findFirst(LambdaStyle.class)
                     .orElse(new LambdaStyle(null, false, !lambda.getParameters().getParameters().isEmpty()));
             boolean parenthesized = lambda.getParameters().isParenthesized();
-            if(!ls.isJavaStyle()) {
+            if (!ls.isJavaStyle()) {
                 p.append('{');
             }
             visitMarkers(lambda.getParameters().getMarkers(), p);
             visitSpace(lambda.getParameters().getPrefix(), Space.Location.LAMBDA_PARAMETERS_PREFIX, p);
-            if(parenthesized) {
+            if (parenthesized) {
                 p.append('(');
             }
             visitRightPadded(lambda.getParameters().getPadding().getParameters(), JRightPadded.Location.LAMBDA_PARAM, ",", p);
-            if(parenthesized) {
+            if (parenthesized) {
                 p.append(')');
             }
             if (ls.isArrow()) {
@@ -318,7 +322,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             } else {
                 visit(lambda.getBody(), p);
             }
-            if(!ls.isJavaStyle()) {
+            if (!ls.isJavaStyle()) {
                 p.append('}');
             }
             afterSyntax(lambda, p);
@@ -358,6 +362,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             afterSyntax(forEachLoop, p);
             return forEachLoop;
         }
+
         @Override
         public J visitMethodDeclaration(J.MethodDeclaration method, PrintOutputCapture<P> p) {
             beforeSyntax(method, Space.Location.METHOD_DECLARATION_PREFIX, p);
@@ -417,29 +422,32 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
 
             visitSpace(argContainer.getBefore(), Space.Location.METHOD_INVOCATION_ARGUMENTS, p);
             List<JRightPadded<Expression>> args = argContainer.getPadding().getElements();
+            boolean argsAreAllClosures = args.stream().allMatch(it -> it.getElement() instanceof J.Lambda);
+            boolean hasParentheses = true;
+            boolean applyTrailingLambdaParenthese = true;
             for (int i = 0; i < args.size(); i++) {
                 JRightPadded<Expression> arg = args.get(i);
-                boolean omitParens = arg.getElement().getMarkers()
-                                             .findFirst(OmitParentheses.class)
-                                             .isPresent() ||
-                                     arg.getElement().getMarkers()
-                                             .findFirst(org.openrewrite.java.marker.OmitParentheses.class)
-                                             .isPresent();
+                boolean omitParensCurrElem = arg.getElement().getMarkers().findFirst(OmitParentheses.class).isPresent() ||
+                        arg.getElement().getMarkers().findFirst(org.openrewrite.java.marker.OmitParentheses.class).isPresent();
 
-                if (i == 0 && !omitParens) {
-                    p.append('(');
-                } else if (i > 0 && omitParens && (
-                        !args.get(0).getElement().getMarkers().findFirst(OmitParentheses.class).isPresent() &&
-                        !args.get(0).getElement().getMarkers().findFirst(org.openrewrite.java.marker.OmitParentheses.class).isPresent()
-                )) {
-                    p.append(')');
-                } else if (i > 0) {
+                if (i == 0) {
+                    if (omitParensCurrElem) {
+                        hasParentheses = false;
+                    } else {
+                        p.append('(');
+                    }
+                }  else if (hasParentheses && omitParensCurrElem) { // first trailing lambda, eg: `stage('Build..') {}`, should close the method
+                    if (applyTrailingLambdaParenthese) { // apply once, to support multiple closures: `foo("baz") {} {}
+                        p.append(')');
+                        applyTrailingLambdaParenthese = false;
+                    }
+                } else if (hasParentheses || !argsAreAllClosures) {
                     p.append(',');
                 }
 
                 visitRightPadded(arg, JRightPadded.Location.METHOD_INVOCATION_ARGUMENT, p);
 
-                if (i == args.size() - 1 && !omitParens) {
+                if (i == args.size() - 1 && !omitParensCurrElem) {
                     p.append(')');
                 }
             }

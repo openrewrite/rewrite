@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven.tree;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.jspecify.annotations.Nullable;
@@ -30,10 +31,12 @@ import java.util.*;
 import java.util.function.Predicate;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @SuppressWarnings("unused")
+@NoArgsConstructor(access = AccessLevel.PRIVATE, onConstructor_ = @JsonCreator)
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 @Getter
@@ -67,10 +70,19 @@ public class MavenResolutionResult implements Marker {
     @With
     List<String> activeProfiles;
 
+    @With
+    Map<String, String> userProperties;
+
     public List<String> getActiveProfiles() {
         // for backwards compatibility with ASTs that were serialized before activeProfiles was added
         //noinspection ConstantValue
         return activeProfiles == null ? emptyList() : activeProfiles;
+    }
+
+    public Map<String, String> getUserProperties() {
+        // for backwards compatibility with ASTs that were serialized before userProperties was added
+        //noinspection ConstantValue
+        return userProperties == null ? emptyMap() : userProperties;
     }
 
     public MavenResolutionResult unsafeSetManagedReference(Integer id) {

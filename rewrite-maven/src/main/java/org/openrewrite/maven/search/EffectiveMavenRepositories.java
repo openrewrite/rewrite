@@ -22,11 +22,18 @@ import org.openrewrite.*;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenIsoVisitor;
+import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.tree.MavenRepository;
+import org.openrewrite.maven.tree.MavenRepositoryMirror;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.StringJoiner;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.openrewrite.PathUtils.separatorsToUnix;
 
@@ -60,24 +67,39 @@ public class EffectiveMavenRepositories extends Recipe {
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 MavenResolutionResult mrr = getResolutionResult();
+                MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
+                MavenSettings settings = mctx.effectiveSettings(mrr);
+
                 StringJoiner repositories = new StringJoiner("\n");
-                for (MavenRepository repository : mrr.getPom().getRepositories()) {
-                    repositories.add(repository.getUri());
+                if (settings == null) {
+                    for (MavenRepository repository : mrr.getPom().getRepositories()) {
+                        repositories.add(repository.getUri());
+                        table.insertRow(ctx, new EffectiveMavenRepositoriesTable.Row(
+                                separatorsToUnix(document.getSourcePath().toString()),
+                                repository.getUri()));
+                    }
+                    repositories.add(MavenRepository.MAVEN_CENTRAL.getUri());
                     table.insertRow(ctx, new EffectiveMavenRepositoriesTable.Row(
                             separatorsToUnix(document.getSourcePath().toString()),
-                            repository.getUri()));
+                            MavenRepository.MAVEN_CENTRAL.getUri()));
+                } else {
+                    Collection<MavenRepositoryMirror> mirrors = mctx.getMirrors(settings);
+                    List<MavenRepository> effectiveRepositories = Stream.concat(
+                                    settings.getActiveRepositories(settings.getActiveProfiles() == null ? Collections.emptyList() : settings.getActiveProfiles().getActiveProfiles())
+                                            .stream()
+                                            .map(rawRepo -> MavenRepository.builder().uri(rawRepo.getUrl()).build()),
+                                    Stream.concat(mrr.getPom().getRepositories().stream(), Stream.of(MavenRepository.MAVEN_CENTRAL)))
+                            .map(repository -> MavenRepositoryMirror.apply(mirrors, repository))
+                            .collect(Collectors.toList());
+
+                    for (MavenRepository repository : effectiveRepositories) {
+                        repositories.add(repository.getUri());
+                        table.insertRow(ctx, new EffectiveMavenRepositoriesTable.Row(
+                                separatorsToUnix(document.getSourcePath().toString()),
+                                repository.getUri()));
+                    }
                 }
-                for (MavenRepository repository : MavenExecutionContextView.view(ctx)
-                        .getRepositories(mrr.getMavenSettings(), mrr.getActiveProfiles())) {
-                    repositories.add(repository.getUri());
-                    table.insertRow(ctx, new EffectiveMavenRepositoriesTable.Row(
-                            separatorsToUnix(document.getSourcePath().toString()),
-                            repository.getUri()));
-                }
-                repositories.add(MavenRepository.MAVEN_CENTRAL.getUri());
-                table.insertRow(ctx, new EffectiveMavenRepositoriesTable.Row(
-                        separatorsToUnix(document.getSourcePath().toString()),
-                        MavenRepository.MAVEN_CENTRAL.getUri()));
+
                 if (Boolean.TRUE.equals(useMarkers)) {
                     return SearchResult.found(document, repositories.toString());
                 }
