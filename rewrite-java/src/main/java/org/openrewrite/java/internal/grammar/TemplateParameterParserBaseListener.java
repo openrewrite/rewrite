@@ -104,6 +104,18 @@ public class TemplateParameterParserBaseListener implements TemplateParameterPar
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
+	@Override public void enterTypeArray(TemplateParameterParser.TypeArrayContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitTypeArray(TemplateParameterParser.TypeArrayContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
 	@Override public void enterParameterName(TemplateParameterParser.ParameterNameContext ctx) { }
 	/**
 	 * {@inheritDoc}

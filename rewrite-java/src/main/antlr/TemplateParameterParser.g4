@@ -16,7 +16,7 @@ patternType
     ;
 
 type
-    : typeName (LBRACK (typeParameter COMMA)* typeParameter RBRACK)?
+    : typeName (LBRACK (typeParameter COMMA)* typeParameter RBRACK)? typeArray*
     ;
 
 typeParameter
@@ -26,6 +26,10 @@ typeParameter
 
 variance
     : WILDCARD Variance
+    ;
+
+typeArray
+    : LSBRACK RSBRACK
     ;
 
 parameterName

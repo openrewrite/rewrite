@@ -47,6 +47,9 @@ public class TypeParameter {
                     }
                     type1 = new JavaType.Parameterized(null, (JavaType.FullyQualified) type1, typeParameters);
                 }
+                for (TemplateParameterParser.TypeArrayContext unused : ctx.typeArray()) {
+                    type1 = new JavaType.Array(null, type1, null);
+                }
                 return type1;
             }
 

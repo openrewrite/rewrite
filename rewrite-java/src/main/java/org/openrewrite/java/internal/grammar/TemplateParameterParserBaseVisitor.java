@@ -75,6 +75,13 @@ public class TemplateParameterParserBaseVisitor<T> extends AbstractParseTreeVisi
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
+	@Override public T visitTypeArray(TemplateParameterParser.TypeArrayContext ctx) { return visitChildren(ctx); }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation returns the result of calling
+	 * {@link #visitChildren} on {@code ctx}.</p>
+	 */
 	@Override public T visitParameterName(TemplateParameterParser.ParameterNameContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}

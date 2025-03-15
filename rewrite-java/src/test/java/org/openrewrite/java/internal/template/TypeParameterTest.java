@@ -63,6 +63,28 @@ class TypeParameterTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
+      "boolean[]",
+      "byte[][]",
+      "char[]",
+      "int[]",
+      "long[]",
+      "float[][]",
+      "double[]",
+      "short[]",
+      "java.util.function.Function[]",
+      "java.lang.String[][][]",
+      "java.util.List<java.lang.String>[]",
+    })
+    void arrays(String name) {
+        TemplateParameterParser parser = new TemplateParameterParser(new CommonTokenStream(new TemplateParameterLexer(
+          CharStreams.fromString(name))));
+        JavaType type = TypeParameter.toFullyQualifiedName(parser.type());
+        assertThat(type).isInstanceOf(JavaType.Array.class);
+        assertThat(TypeUtils.toString(type)).isEqualTo(name);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
       "java.util.List",
     })
     void qualified(String name) {
@@ -77,8 +99,10 @@ class TypeParameterTest {
     @ValueSource(strings = {
       "java.util.List<java.lang.String>",
       "java.util.Map<java.lang.String, java.lang.Integer>",
+      "java.util.Map<java.lang.String, int[]>",
       "java.util.List<? extends java.lang.Object>",
       "java.util.List<? super java.lang.Integer>",
+      "java.util.List<? super java.lang.Integer[]>",
       "java.util.List<java.util.List<? super java.lang.Integer>>",
     })
     void parameterized(String name) {

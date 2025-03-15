@@ -8,6 +8,8 @@ COMMA           : ',';
 LBRACK          : '<';
 RBRACK          : '>';
 WILDCARD        : '?';
+LSBRACK         : '[';
+RSBRACK         : ']';
 
 Variance
     :   'extends'
