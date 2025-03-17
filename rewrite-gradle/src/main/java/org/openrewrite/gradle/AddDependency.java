@@ -143,7 +143,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     }
 
     public static class Scanned {
-        boolean usingType;
+        Map<JavaProject, Boolean> usingType = new HashMap<>();
         Map<JavaProject, Set<String>> configurationsByProject = new HashMap<>();
         Map<JavaProject, Set<String>> customJvmTestSuitesWithDependencies = new HashMap<>();
     }
@@ -177,10 +177,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                 }
                 SourceFile sourceFile = (SourceFile) tree;
                 sourceFile.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject -> {
-                    if (usesType(sourceFile, ctx)) {
-                        acc.usingType = true;
-                    }
-
+                    acc.usingType.compute(javaProject, (jp, usingType) -> Boolean.TRUE.equals(usingType) || usesType(sourceFile, ctx));
                     acc.customJvmTestSuitesWithDependencies
                             .computeIfAbsent(javaProject, ignored -> new HashSet<>())
                             .addAll(FindJVMTestSuites.jvmTestSuiteNames(tree, true));
@@ -196,7 +193,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Scanned acc) {
-        return Preconditions.check((onlyIfUsing == null || acc.usingType) && !acc.configurationsByProject.isEmpty(),
+        return Preconditions.check(!acc.configurationsByProject.isEmpty(),
                 Preconditions.check(new IsBuildGradle<>(), new GroovyIsoVisitor<ExecutionContext>() {
 
                     @Override
@@ -205,7 +202,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                             return (J) tree;
                         }
                         JavaSourceFile s = (JavaSourceFile) tree;
-                        if (!s.getSourcePath().toString().endsWith(".gradle") || s.getSourcePath().getFileName().toString().equals("settings.gradle")) {
+                        if (!isAcceptable(s, ctx) || !s.getSourcePath().toString().endsWith(".gradle") || s.getSourcePath().getFileName().toString().equals("settings.gradle")) {
                             return s;
                         }
 
@@ -215,7 +212,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         }
 
                         JavaProject jp = maybeJp.get();
-                        if (!acc.configurationsByProject.containsKey(jp)) {
+                        if ((onlyIfUsing != null && !acc.usingType.getOrDefault(jp, false)) || !acc.configurationsByProject.containsKey(jp)) {
                             return s;
                         }
 
