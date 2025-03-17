@@ -708,4 +708,85 @@ class JavaTemplateMatchTest implements RewriteTest {
               """)
         );
     }
+
+    @Test
+    void matchPrimitiveArrays() {
+        rewriteRun(
+          spec -> spec
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                final JavaTemplate before = JavaTemplate
+                  .builder("Arrays.binarySearch(#{a:any(int[])}, #{key:any(int)})")
+                  .imports("java.util.Arrays")
+                  .build();
+
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                    return before.matches(getCursor()) ? SearchResult.found(mi) : mi;
+                }
+            })),
+          //language=java
+          java(
+            """
+              import java.util.Arrays;
+              class Foo {
+                  void test() {
+                      Arrays.binarySearch(new int[]{1, 2, 3}, 2);
+                      Arrays.binarySearch(new short[]{1, 2, 3}, (short) 2);
+                  }
+              }
+              """,
+            """
+              import java.util.Arrays;
+              class Foo {
+                  void test() {
+                      /*~~>*/Arrays.binarySearch(new int[]{1, 2, 3}, 2);
+                      Arrays.binarySearch(new short[]{1, 2, 3}, (short) 2);
+                  }
+              }
+              """
+          )
+        );
+
+    }
+
+    @Test
+    void matchClassArrays() {
+        rewriteRun(
+          spec -> spec
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                final JavaTemplate before = JavaTemplate
+                  .builder("Objects.hash(#{a:any(java.lang.Object[])})")
+                  .imports("java.util.Objects")
+                  .build();
+
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                    return before.matches(getCursor()) ? SearchResult.found(mi) : mi;
+                }
+            })),
+          //language=java
+          java(
+            """
+              import java.util.Objects;
+              class Foo {
+                  void test() {
+                      Objects.hash(new Object[5]);
+                      Objects.hash(new Object(), new Object()); // varargs not yet supported
+                  }
+              }
+              """,
+            """
+              import java.util.Objects;
+              class Foo {
+                  void test() {
+                      /*~~>*/Objects.hash(new Object[5]);
+                      Objects.hash(new Object(), new Object()); // varargs not yet supported
+                  }
+              }
+              """
+          )
+        );
+    }
 }
