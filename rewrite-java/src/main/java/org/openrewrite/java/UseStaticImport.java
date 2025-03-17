@@ -28,7 +28,9 @@ import org.openrewrite.java.tree.Javadoc;
 import org.openrewrite.marker.SearchResult;
 
 import java.lang.reflect.Method;
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @ToString
@@ -104,7 +106,7 @@ public class UseStaticImport extends Recipe {
     }
 
     private boolean importConflicts(J.Import _import, String methodNameMatcher, String typeName) {
-        return (_import.getQualid().getSimpleName().equals(methodNameMatcher) && !_import.getTypeName().equals(typeName));
+        return _import.getQualid().getSimpleName().equals(methodNameMatcher) && !_import.getTypeName().equals(typeName);
     }
 
     private class UseStaticImportVisitor extends JavaIsoVisitor<ExecutionContext> {

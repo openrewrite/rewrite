@@ -356,8 +356,8 @@ class UseStaticImportTest implements RewriteTest {
             """
               import static org.hamcrest.core.IsEqual.equalTo;
               
-              public class TestIssueClass {
-                  public static void testIssue() {
+              class TestIssueClass {
+                  void testIssue() {
                       equalTo("foo");
                       org.hamcrest.Matchers.equalTo("bar");
                   }
@@ -376,8 +376,8 @@ class UseStaticImportTest implements RewriteTest {
             """
               import static org.hamcrest.Matchers.equalTo;
               
-              public class TestIssueClass {
-                  public static void testIssue() {
+              class TestIssueClass {
+                  void testIssue() {
                       equalTo("foo");
                       org.hamcrest.Matchers.equalTo("bar");
                   }
@@ -386,8 +386,8 @@ class UseStaticImportTest implements RewriteTest {
             """
               import static org.hamcrest.Matchers.equalTo;
               
-              public class TestIssueClass {
-                  public static void testIssue() {
+              class TestIssueClass {
+                  void testIssue() {
                       equalTo("foo");
                       equalTo("bar");
                   }
