@@ -220,23 +220,23 @@ public interface HttpSender {
             /**
              * Set the request body.
              *
-             * @param type    The value of the "Content-Type" header to add.
+             * @param contentType    The value of the "Content-Type" header to add.
              * @param content The request body.
              * @return This request builder.
              */
-            public final Builder withContent(String type, String content) {
-                return withContent(type, content.getBytes(StandardCharsets.UTF_8));
+            public final Builder withContent(String contentType, String content) {
+                return withContent(contentType, content.getBytes(StandardCharsets.UTF_8));
             }
 
             /**
              * Set the request body.
              *
-             * @param type    The value of the "Content-Type" header to add.
+             * @param contentType    The value of the "Content-Type" header to add.
              * @param content The request body.
              * @return This request builder.
              */
-            public final Builder withContent(String type, byte[] content) {
-                withHeader("Content-Type", type);
+            public final Builder withContent(String contentType, byte[] content) {
+                withHeader("Content-Type", contentType);
                 entity = content;
                 return this;
             }
@@ -253,11 +253,11 @@ public interface HttpSender {
             /**
              * Add accept header.
              *
-             * @param type The value of the "Accept" header to add.
+             * @param contentType The value of the "Accept" header to add.
              * @return This request builder.
              */
-            public Builder accept(String type) {
-                return withHeader("Accept", type);
+            public Builder accept(String contentType) {
+                return withHeader("Accept", contentType);
             }
 
             /**
@@ -301,15 +301,15 @@ public interface HttpSender {
             /**
              * Adds a part to a multipart/form-data request body.
              *
-             * @param type      The "Content-Type" of the part.
+             * @param contentType      The "Content-Type" of the part.
              * @param name      The name of the part.
              * @param content   The part contents.
              * @return This request builder.
              */
-            public final Builder withMultipartContent(String type, String name, String content) throws IOException {
+            public final Builder withMultipartContent(String contentType, String name, String content) throws IOException {
                 StringBuilder builder = new StringBuilder(1024);
                 builder.append("Content-Disposition: form-data; name=\"").append(name).append("\"").append(CRLF);
-                builder.append("Content-Type: ").append(type).append(CRLF).append(CRLF);
+                builder.append("Content-Type: ").append(contentType).append(CRLF).append(CRLF);
                 builder.append(content);
                 return withMultipartContent(builder.toString().getBytes());
             }
