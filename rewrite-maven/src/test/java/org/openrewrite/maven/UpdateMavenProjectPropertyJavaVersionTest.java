@@ -185,7 +185,7 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
 
 
     @Test
-    void UpdateChildProperty() {
+    void updateChildProperty() {
         rewriteRun(
           //language=xml
           pomXml(
@@ -244,6 +244,131 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                     </properties>
                 </project>
                 """
+            )
+          )
+        );
+    }
+
+    @Test
+    void doNotCrashOnImplicitVersion() {
+        rewriteRun(
+          mavenProject("spring-cloud-kubernetes",
+            pomXml(
+              """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <!--
+                  ~ Copyright 2013-2020 the original author or authors.
+                  ~
+                  ~ Licensed under the Apache License, Version 2.0 (the "License");
+                  ~ you may not use this file except in compliance with the License.
+                  ~ You may obtain a copy of the License at
+                  ~
+                  ~      https://www.apache.org/licenses/LICENSE-2.0
+                  ~
+                  ~ Unless required by applicable law or agreed to in writing, software
+                  ~ distributed under the License is distributed on an "AS IS" BASIS,
+                  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+                  ~ See the License for the specific language governing permissions and
+                  ~ limitations under the License.
+                  ~
+                  -->
+                
+                <project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                         xmlns="http://maven.apache.org/POM/4.0.0"
+                         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+                
+                    <modelVersion>4.0.0</modelVersion>
+                
+                    <parent>
+                        <groupId>org.springframework.cloud</groupId>
+                        <artifactId>spring-cloud-build</artifactId>
+                        <version>4.1.5</version>
+                        <relativePath/>
+                    </parent>
+                
+                    <artifactId>spring-cloud-kubernetes</artifactId>
+                    <version>3.1.5</version>
+                    <packaging>pom</packaging>
+                    <name>Spring Cloud Kubernetes</name>
+                
+                    <url>https://cloud.spring.io</url>
+                    <inceptionYear>2017</inceptionYear>
+                
+                    <organization>
+                        <name>Pivotal Software, Inc.</name>
+                        <url>https://www.spring.io</url>
+                    </organization>
+                
+                    <licenses>
+                        <license>
+                            <name>Apache License, Version 2.0</name>
+                            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+                            <distribution>repo</distribution>
+                        </license>
+                    </licenses>
+                
+                    <modules>
+                        <module>spring-cloud-kubernetes-integration-tests</module>
+                    </modules>
+                
+                    <build>
+                        <plugins>
+                            <plugin>
+                                <groupId>org.apache.maven.plugins</groupId>
+                                <artifactId>maven-compiler-plugin</artifactId>
+                                <inherited>true</inherited>
+                                <configuration>
+                                    <source>17</source>
+                                    <target>17</target>
+                                </configuration>
+                            </plugin>
+                        </plugins>
+                    </build>
+                </project>""")
+          ),
+          mavenProject("spring-cloud-kubernetes-integration-tests",
+            pomXml(
+              """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                         xmlns="http://maven.apache.org/POM/4.0.0"
+                         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>org.springframework.cloud</groupId>
+                        <artifactId>spring-cloud-kubernetes</artifactId>
+                        <version>3.1.5</version>
+                    </parent>
+                
+                    <artifactId>spring-cloud-kubernetes-integration-tests</artifactId>
+                    <packaging>pom</packaging>
+                
+                    <name>Spring Cloud Kubernetes :: Integration Tests</name>
+                    <description>Integration tests where SCK applications are run inside a Kubernetes cluster</description>
+                
+                    <modules>
+                        <module>spring-cloud-kubernetes-k8s-client-discovery-server</module>
+                    </modules>
+                </project>""")
+          ),
+          mavenProject("spring-cloud-kubernetes-k8s-client-discovery-server",
+            //language=xml
+            pomXml(
+              """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0"
+                         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                    <parent>
+                        <artifactId>spring-cloud-kubernetes-integration-tests</artifactId>
+                        <groupId>org.springframework.cloud</groupId>
+                        <version>3.1.5</version>
+                    </parent>
+                    <modelVersion>4.0.0</modelVersion>
+                
+                    <artifactId>spring-cloud-kubernetes-k8s-client-discovery-server</artifactId>
+                
+                </project>"""
             )
           )
         );
