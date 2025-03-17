@@ -3820,7 +3820,6 @@ class MavenParserTest implements RewriteTest {
      *   |  \- oro:oro:jar:2.0.8:compile
      *   \- com.sun.xml:relaxngDatatype:jar:1.0:compile
      */
-    @Disabled
     @Test
     void invalidTransitives() {
         rewriteRun(
