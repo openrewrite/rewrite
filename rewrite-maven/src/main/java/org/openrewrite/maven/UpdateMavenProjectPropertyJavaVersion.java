@@ -92,13 +92,19 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                     for (Plugin plugin : getResolutionResult().getParent().getPom().getPlugins()) {
                         if (plugin.getGroupId().equals("org.apache.maven.plugins") && plugin.getArtifactId().equals("maven-compiler-plugin") && plugin.getConfiguration() != null) {
                             for (String property : JAVA_VERSION_PROPERTIES) {
-                                if (getResolutionResult().getPom().getProperties().get(property) != null && Float.parseFloat(getResolutionResult().getPom().getProperties().get(property)) < version &&
-                                    (plugin.getConfiguration().get("source") != null && plugin.getConfiguration().get("source").textValue().contains(property)) ||
-                                    (plugin.getConfiguration().get("target") != null && plugin.getConfiguration().get("target").textValue().contains(property)) ||
-                                    (plugin.getConfiguration().get("release") != null && plugin.getConfiguration().get("release").textValue().contains(property))) {
-                                    d = (Xml.Document) new AddPropertyVisitor(property, String.valueOf(version), null)
-                                            .visitNonNull(d, ctx);
-                                    maybeUpdateModel();
+                                if (getResolutionResult().getPom().getProperties().get(property) != null) {
+                                    try {
+                                        int parsed = Integer.parseInt(getResolutionResult().getPom().getProperties().get(property));
+                                        if (parsed < version &&
+                                            (plugin.getConfiguration().get("source") != null && plugin.getConfiguration().get("source").textValue().contains(property)) ||
+                                            (plugin.getConfiguration().get("target") != null && plugin.getConfiguration().get("target").textValue().contains(property)) ||
+                                            (plugin.getConfiguration().get("release") != null && plugin.getConfiguration().get("release").textValue().contains(property))) {
+                                            d = (Xml.Document) new AddPropertyVisitor(property, String.valueOf(version), null)
+                                                    .visitNonNull(d, ctx);
+                                            maybeUpdateModel();
+                                        }
+                                    } catch (NumberFormatException ignored) {
+                                    }
                                 }
                             }
                         }
