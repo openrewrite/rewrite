@@ -20,7 +20,7 @@ import java.util.Objects;
 public class License {
     private static final String APACHEV2 = "https://www.apache.org/licenses/LICENSE-2.0";
     private static final String MSAL = "https://docs.moderne.io/licensing/moderne-source-available-license";
-    private static final String MOD_PROPRITARY = "https://docs.moderne.io/licensing/overview";
+    private static final String MOD_PROPRIETARY = "https://docs.moderne.io/licensing/overview";
 
     public static final License apache2 = new License("Apache License Version 2.0", APACHEV2);
     public static final License msal = new License("Moderne Source Available", MSAL);
