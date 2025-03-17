@@ -16,11 +16,14 @@
 package org.openrewrite.config;
 
 import lombok.Value;
-
 import java.net.URI;
 
 @Value
 public class RecipeOrigin {
     URI sourceLocation;
     License license;
+
+    public RecipeOrigin withInnerPath(String sourceFile) {
+        return new RecipeOrigin(sourceLocation.resolve(sourceFile), license);
+    }
 }
