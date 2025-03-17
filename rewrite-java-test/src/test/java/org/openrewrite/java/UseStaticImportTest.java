@@ -346,4 +346,60 @@ class UseStaticImportTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4776")
+    void doNotImportDuplicateMethod() {
+        rewriteRun(
+          spec -> spec.recipe(new UseStaticImport("org.hamcrest.Matchers *(..)")),
+          java(
+            """
+                package com.helloworld;
+                
+                import static org.hamcrest.core.IsEqual.equalTo;
+                
+                public class TestIssueClass {
+                    public static void testIssue() {
+                        equalTo("foo");
+                        org.hamcrest.Matchers.equalTo("bar");
+                    }
+                }
+                """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4776")
+    void useAlreadyImportedMethod() {
+        rewriteRun(
+          spec -> spec.recipe(new UseStaticImport("org.hamcrest.Matchers *(..)")),
+          java(
+            """
+            package com.helloworld;
+            
+            import static org.hamcrest.Matchers.equalTo;
+            
+            public class TestIssueClass {
+                public static void testIssue() {
+                    equalTo("foo");
+                    org.hamcrest.Matchers.equalTo("bar");
+                }
+            }
+            """,
+            """
+            package com.helloworld;
+            
+            import static org.hamcrest.Matchers.equalTo;
+            
+            public class TestIssueClass {
+                public static void testIssue() {
+                    equalTo("foo");
+                    equalTo("bar");
+                }
+            }
+            """
+          )
+        );
+    }
 }

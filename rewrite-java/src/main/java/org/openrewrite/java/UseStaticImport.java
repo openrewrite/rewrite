@@ -27,6 +27,10 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Javadoc;
 import org.openrewrite.marker.SearchResult;
 
+import java.lang.reflect.Method;
+import java.util.*;
+import java.util.stream.Collectors;
+
 @ToString
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Getter
@@ -61,16 +65,34 @@ public class UseStaticImport extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         TreeVisitor<?, ExecutionContext> preconditions = new UsesMethod<>(methodPattern);
-        if (!methodPattern.contains(" *(")) {
-            int indexSpace = methodPattern.indexOf(' ');
+
+        Set<String> methodNameMatchers = new HashSet<>();
+
+        int indexSpace = methodPattern.indexOf(' ');
+        String typeNamePattern = methodPattern.substring(0, indexSpace);
+
+        if (methodPattern.contains(" *(")) {
+            try {
+                Class<?> cls = Class.forName(typeNamePattern);
+                Set<String> methodNames = Arrays.stream(cls.getMethods())
+                        .map(Method::getName)
+                        .collect(Collectors.toSet());
+                methodNameMatchers.addAll(methodNames);
+            } catch (ClassNotFoundException e) {
+                // ignore
+            }
+        } else {
             int indexBrace = methodPattern.indexOf('(', indexSpace);
-            String methodNameMatcher = methodPattern.substring(indexSpace, indexBrace);
+            methodNameMatchers.add(methodPattern.substring(indexSpace + 1, indexBrace));
+        }
+
+        for (String methodNameMatcher: methodNameMatchers) {
             preconditions = Preconditions.and(preconditions,
                     Preconditions.not(new DeclaresMethod<>("*..* " + methodNameMatcher + "(..)")),
                     Preconditions.not(new JavaIsoVisitor<ExecutionContext>() {
                         @Override
                         public J.Import visitImport(J.Import _import, ExecutionContext ctx) {
-                            if (_import.isStatic() && _import.getQualid().getSimpleName().equals(methodNameMatcher.substring(1))) {
+                            if (_import.isStatic() && importConflicts(_import, methodNameMatcher, typeNamePattern)) {
                                 return SearchResult.found(_import);
                             }
                             return _import;
@@ -79,6 +101,10 @@ public class UseStaticImport extends Recipe {
             );
         }
         return Preconditions.check(preconditions, new UseStaticImportVisitor());
+    }
+
+    private boolean importConflicts(J.Import _import, String methodNameMatcher, String typeName) {
+        return (_import.getQualid().getSimpleName().equals(methodNameMatcher) && !_import.getTypeName().equals(typeName));
     }
 
     private class UseStaticImportVisitor extends JavaIsoVisitor<ExecutionContext> {
