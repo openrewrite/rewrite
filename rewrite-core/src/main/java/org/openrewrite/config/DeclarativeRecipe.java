@@ -112,7 +112,7 @@ public class DeclarativeRecipe extends Recipe {
                 } else {
                     initValidation = initValidation.and(
                             invalid(name + ".recipeList" +
-                                    "[" + i + "] (in " + getLocalSource() + ")",
+                                    "[" + i + "] (in " + source + ")",
                                     recipeFqn,
                                     "recipe '" + recipeFqn + "' does not exist.",
                                     null));
@@ -373,7 +373,7 @@ public class DeclarativeRecipe extends Recipe {
         return new RecipeDescriptor(getName(), getDisplayName(), getInstanceName(), getDescription() != null ? getDescription() : "",
                 getTags(), getEstimatedEffortPerOccurrence(),
                 emptyList(), recipeList, getDataTableDescriptors(), getMaintainers(), getContributors(),
-                getExamples(), getOrigin());
+                getExamples(), source, null);
     }
 
     @Value
