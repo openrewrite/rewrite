@@ -136,13 +136,27 @@ public enum Scope {
     }
 
     /**
-     * It is sometimes convenient for recipes that operate on both Gradle and Maven files to translate a Maven scope
-     * into a Gradle dependency configuration with a similar meaning.
-     * Gradle dependency configurations are more varied and have different semantics than Maven scopes, so this should
-     * be used deliberately and in contexts sufficiently general that the differences are not important.
+     * There are more, and more complex, gradle dependency configurations than there are maven scopes.
+     * <p/>
+     * In Maven you place a dependency that should be available at runtime but not at compile time into the "runtime" scope.
+     * In Gradle you place a dependency that should be available at runtime but not at compile time into the "runtimeOnly" configuration.
+     * In this situation you should use {@link Scope#asConsumableGradleConfigurationName}.
+     * <p/>
+     * In Maven you read the runtime classpath from the "runtime" scope.
+     * In Gradle you read the runtime classpath from the "runtimeClasspath" configuration.
+     * In this situation you should use {@link Scope#asResolvableGradleConfigurationName}.
+     * <p/>
+     * This method is deprecated because its name is ambiguous about which of these possible mappings it is referring to.
      */
-    @SuppressWarnings("unused")
+    @Deprecated
     public static @Nullable String asGradleConfigurationName(@Nullable Scope scope) {
+        return asConsumableGradleConfigurationName(scope);
+    }
+
+    /**
+     * Use when you want to know which Gradle configuration you should *add* an entry to in order to most closely match a given Maven scope.
+     */
+    public static @Nullable String asConsumableGradleConfigurationName(@Nullable Scope scope) {
         if(scope == null) {
             return null;
         }
@@ -152,9 +166,33 @@ public enum Scope {
             case Provided:
                 return "compileOnly";
             case Runtime:
-                return "runtimeClasspath";
+                return "runtimeOnly";
             case Test:
                 return "testImplementation";
+            case System:
+                return "system";
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * Use when you want to know which Gradle configuration you should *read* to get contents similar to a given Maven scope.
+     */
+    @SuppressWarnings("unused")
+    public static @Nullable String asResolvableGradleConfigurationName(@Nullable Scope scope) {
+        if(scope == null) {
+            return null;
+        }
+        switch (scope) {
+            case Compile:
+                return "compileClasspath";
+            case Provided:
+                return "compileOnly";
+            case Runtime:
+                return "runtimeClasspath";
+            case Test:
+                return "testRuntimeClasspath";
             case System:
                 return "system";
             default:
