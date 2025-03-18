@@ -384,7 +384,7 @@ class EnvironmentTest implements RewriteTest {
           .hasFieldOrPropertyWithValue("contributors", List.of(new Contributor("Jonathan Schneider", "jon@moderne.io", 5)))
           .hasFieldOrPropertyWithValue("origin", new RecipeOrigin(
             URI.create("https://github.com/openrewrite/rewrite/blob/main/rewrite-gradle/src/main/java/org/openrewrite/gradle/AddDependencyVisitor.java"),
-            License.apache2));
+            License.APACHE_V2));
     }
 
     @Test

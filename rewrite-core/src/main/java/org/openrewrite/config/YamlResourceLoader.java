@@ -39,6 +39,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.jar.Attributes;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
@@ -69,9 +70,6 @@ public class YamlResourceLoader implements ResourceLoader {
 
     @Nullable
     private Map<String, List<RecipeExample>> recipeNameToExamples;
-
-    @Nullable
-    private Map<String, RecipeOrigin> artifactOrigins;
 
     @Getter
     private enum ResourceType {
@@ -283,7 +281,7 @@ public class YamlResourceLoader implements ResourceLoader {
                 }
             }
             recipe.setContributors(contributors.get(recipe.getName()));
-            recipe.setOrigin(artifactOrigins.get(recipe.getName()).withInnerPath(recipe.getName()));
+            //TODO Set license and source
             recipes.add(recipe);
         }
 
@@ -370,17 +368,13 @@ public class YamlResourceLoader implements ResourceLoader {
 
     @Override
     public Collection<RecipeDescriptor> listRecipeDescriptors() {
-        return listRecipeDescriptors(emptyList(), listContributors(), listRecipeExamples(), listArtifactOrigins());
-    }
-
-    private Map<String, RecipeOrigin> listArtifactOrigins() {
-        return emptyMap();// FIXME
+        return listRecipeDescriptors(emptyList(), listContributors(), listRecipeExamples(), emptyMap());
     }
 
     public Collection<RecipeDescriptor> listRecipeDescriptors(Collection<Recipe> externalRecipes,
                                                               Map<String, List<Contributor>> recipeNamesToContributors,
                                                               Map<String, List<RecipeExample>> recipeNamesToExamples,
-                                                              Map<String, RecipeOrigin> artifactOrigins) {
+                                                              Map<URI, Attributes> artifactManifestAttributes) {
         Collection<Recipe> internalRecipes = listRecipes();
         Collection<Recipe> allRecipes = Stream.concat(
                 Stream.concat(
@@ -396,7 +390,7 @@ public class YamlResourceLoader implements ResourceLoader {
             declarativeRecipe.initialize(allRecipes, recipeNamesToContributors);
             declarativeRecipe.setContributors(recipeNamesToContributors.get(recipe.getName()));
             declarativeRecipe.setExamples(recipeNamesToExamples.get(recipe.getName()));
-            declarativeRecipe.setOrigin(artifactOrigins.get(recipe.getName()));
+            // TODO Set license & source
             recipeDescriptors.add(declarativeRecipe.getDescriptor());
         }
         return recipeDescriptors;

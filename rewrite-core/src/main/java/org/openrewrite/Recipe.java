@@ -24,7 +24,10 @@ import lombok.Setter;
 import lombok.experimental.FieldDefaults;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.config.*;
+import org.openrewrite.config.DataTableDescriptor;
+import org.openrewrite.config.OptionDescriptor;
+import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.config.RecipeExample;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NullUtils;
@@ -219,10 +222,16 @@ public abstract class Recipe implements Cloneable {
             recipeList1.add(next.getDescriptor());
         }
         recipeList1.trimToSize();
+        URI recipeSource;
+        try {
+            recipeSource = getClass().getProtectionDomain().getCodeSource().getLocation().toURI();
+        } catch (URISyntaxException e) {
+            throw new RuntimeException(e);
+        }
 
         return new RecipeDescriptor(getName(), getDisplayName(), getInstanceName(), getDescription(), getTags(),
                 getEstimatedEffortPerOccurrence(), options, recipeList1, getDataTableDescriptors(),
-                getMaintainers(), getContributors(), getExamples(), getOrigin());
+                getMaintainers(), getContributors(), getExamples(), recipeSource, null);
     }
 
     private List<OptionDescriptor> getOptionDescriptors() {
@@ -295,25 +304,6 @@ public abstract class Recipe implements Cloneable {
             return new ArrayList<>();
         }
         return examples;
-    }
-
-    @Setter
-    @Nullable
-    protected transient RecipeOrigin origin;
-
-    public RecipeOrigin getOrigin() {
-        if (origin == null) {
-            origin = new RecipeOrigin(getLocalSource(), License.moderneProprietary);
-        }
-        return origin;
-    }
-
-    protected URI getLocalSource() {
-        try {
-            return getClass().getProtectionDomain().getCodeSource().getLocation().toURI();
-        } catch (URISyntaxException e) {
-            throw new RuntimeException(e);
-        }
     }
 
     /**

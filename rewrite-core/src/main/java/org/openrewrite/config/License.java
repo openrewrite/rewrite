@@ -15,57 +15,43 @@
  */
 package org.openrewrite.config;
 
-import java.util.Objects;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
+import org.jspecify.annotations.Nullable;
 
+@Value
+@EqualsAndHashCode(of = "url")
 public class License {
-    private static final String APACHEV2 = "https://www.apache.org/licenses/LICENSE-2.0";
-    private static final String MSAL = "https://docs.moderne.io/licensing/moderne-source-available-license";
-    private static final String MOD_PROPRIETARY = "https://docs.moderne.io/licensing/overview";
+    private static final String APACHEV2_URL = "https://www.apache.org/licenses/LICENSE-2.0";
+    private static final String MSAL_URL = "https://docs.moderne.io/licensing/moderne-source-available-license";
+    private static final String MOD_PROPRIETARY_URL = "https://docs.moderne.io/licensing/overview";
 
-    public static final License apache2 = new License("Apache License Version 2.0", APACHEV2);
-    public static final License msal = new License("Moderne Source Available", MSAL);
-    public static final License moderneProprietary = new License("Moderne Proprietary", MOD_PROPRIETARY);
+    public static final License APACHE_V2 = new License("Apache License Version 2.0", APACHEV2_URL);
+    public static final License MODERNE_SOURCE_AVAILABLE = new License("Moderne Source Available", MSAL_URL);
+    public static final License MODERNE_PROPRIETARY = new License("Moderne Proprietary", MOD_PROPRIETARY_URL);
 
-    private final String fullName;
-    private final String url;
+    String fullName;
+    String url;
 
     private License(String fullName, String url) {
         this.fullName = fullName;
         this.url = url;
     }
 
-    public static License representing(String fullName, String url) {
-        switch (url) {
-            case APACHEV2:
-                return apache2;
-            case MSAL:
-                return msal;
-            case MOD_PROPRIETARY:
-                return moderneProprietary;
-            default:
+    public static @Nullable License of(@Nullable String fullName, @Nullable String url) {
+        if (url != null) {
+            switch (url) {
+                case APACHEV2_URL:
+                    return APACHE_V2;
+                case MSAL_URL:
+                    return MODERNE_SOURCE_AVAILABLE;
+                case MOD_PROPRIETARY_URL:
+                    return MODERNE_PROPRIETARY;
+            }
+            if (fullName != null) {
                 return new License(fullName, url);
+            }
         }
-    }
-
-    public String fullName() {
-        return fullName;
-    }
-
-    public String url() {
-        return url;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        License license = (License) o;
-        return Objects.equals(url, license.url);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hashCode(url);
+        return null;
     }
 }

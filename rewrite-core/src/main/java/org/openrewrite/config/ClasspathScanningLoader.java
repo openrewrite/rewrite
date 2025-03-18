@@ -50,7 +50,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
 
     private final Map<String, List<Contributor>> recipeAttributions = new HashMap<>();
     private final Map<String, List<RecipeExample>> recipeExamples = new HashMap<>();
-    private final Map<String, RecipeOrigin> artifactOrigins = new HashMap<>();
+    private final Map<URI, Attributes> artifactManifestAttributes = new HashMap<>();
 
     /**
      * Construct a ClasspathScanningLoader scans the runtime classpath of the current java process for recipes
@@ -59,7 +59,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
      * @param acceptPackages Limit scan to specified packages
      */
     public ClasspathScanningLoader(Properties properties, String[] acceptPackages) {
-        scanOrigins(new ClassGraph().acceptPackages(acceptPackages), getClass().getClassLoader());
+        scanManifests(new ClassGraph().acceptPackages(acceptPackages), getClass().getClassLoader());
         scanClasses(new ClassGraph().acceptPackages(acceptPackages), getClass().getClassLoader());
         scanYaml(new ClassGraph().acceptPaths("META-INF/rewrite"),
                 properties,
@@ -74,7 +74,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
      * @param classLoader Limit scan to classes loadable by this classloader
      */
     public ClasspathScanningLoader(Properties properties, ClassLoader classLoader) {
-        scanOrigins(new ClassGraph().ignoreParentClassLoaders().overrideClassLoaders(classLoader), classLoader);
+        scanManifests(new ClassGraph().ignoreParentClassLoaders().overrideClassLoaders(classLoader), classLoader);
 
         scanClasses(new ClassGraph()
                 .ignoreParentClassLoaders()
@@ -92,7 +92,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
     public ClasspathScanningLoader(Path jar, Properties properties, Collection<? extends ResourceLoader> dependencyResourceLoaders, ClassLoader classLoader) {
         String jarName = jar.toFile().getName();
 
-        scanOrigins(new ClassGraph().acceptJars(jarName).ignoreParentClassLoaders().overrideClassLoaders(classLoader), classLoader);
+        scanManifests(new ClassGraph().acceptJars(jarName).ignoreParentClassLoaders().overrideClassLoaders(classLoader), classLoader);
 
         scanClasses(new ClassGraph()
                 .acceptJars(jarName)
@@ -119,25 +119,16 @@ public class ClasspathScanningLoader implements ResourceLoader {
     /**
      * Must be called prior to scanClasses and scanYaml to ensure that recipeOrigins is populated
      */
-    private void scanOrigins(ClassGraph classGraph, ClassLoader classLoader) {
+    private void scanManifests(ClassGraph classGraph, ClassLoader classLoader) {
         try (ScanResult result = classGraph
                 .ignoreClassVisibility()
                 .overrideClassLoaders(classLoader)
                 .scan()) {
             result.getResourcesWithPath("META-INF/MANIFEST.MF").forEachInputStreamIgnoringIOException((r, is) -> {
                 try {
-                    Manifest mf = new Manifest(is);
-                    Attributes mfAtr = mf.getMainAttributes();
-                    String gitHubBase = mfAtr.containsKey("Module-Origin") ? mfAtr.getValue("Module-Origin") : "https://github.com/openrewrite";
-                    String gitHubDir = mfAtr.containsKey("Module-Source") ? mfAtr.getValue("Module-Source") : "";
-                    String licenseName = mfAtr.containsKey("License") ? mfAtr.getValue("License") : "UNLICENSED";
-                    String licenseUrl = mfAtr.containsKey("License-URL") ? mfAtr.getValue("License-URL") : "UNLICENSED";
-
-                    artifactOrigins.put(r.getClasspathElementURI().toString(), new RecipeOrigin(
-                            URI.create(gitHubBase.replace(".git", "") + "/tree/main/" + gitHubDir),
-                            License.representing(licenseName, licenseUrl)));
+                    artifactManifestAttributes.put(r.getClasspathElementURI(), new Manifest(is).getMainAttributes());
                 } catch (IOException e) {
-                    throw new RuntimeException(e);
+                    // Silently ignore, as seen for `forEachInputStreamIgnoringIOException`
                 }
             });
         }
@@ -165,7 +156,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
                 recipeExamples.putAll(resourceLoader.listRecipeExamples());
             }
             for (YamlResourceLoader resourceLoader : yamlResourceLoaders) {
-                recipeDescriptors.addAll(resourceLoader.listRecipeDescriptors(recipes, recipeAttributions, recipeExamples, artifactOrigins));
+                recipeDescriptors.addAll(resourceLoader.listRecipeDescriptors(recipes, recipeAttributions, recipeExamples, artifactManifestAttributes));
             }
         }
     }
@@ -208,8 +199,21 @@ public class ClasspathScanningLoader implements ResourceLoader {
             Timer.Sample sample = Timer.start();
             try {
                 Recipe recipe = constructRecipe(recipeClass);
-                recipe.setOrigin(artifactOrigins.get(classInfo.getClasspathElementURI().toString()).withInnerPath(classInfo.getSourceFile()));
-                recipeDescriptors.add(recipe.getDescriptor());
+                RecipeDescriptor descriptor = recipe.getDescriptor();
+
+                // Populate license & source from manifest attributes
+                Attributes attributes = artifactManifestAttributes.get(classInfo.getClasspathElementURI());
+                if (attributes != null) {
+                    descriptor = descriptor.withLicense(License.of(
+                            attributes.getValue("License-Name"),
+                            attributes.getValue("License-Url")));
+
+                    String gitHubBase = attributes.containsKey("Module-Origin") ? attributes.getValue("Module-Origin") : "https://github.com/openrewrite";
+                    String gitHubDir = attributes.containsKey("Module-Source") ? attributes.getValue("Module-Source") : "";
+                    descriptor = descriptor.withSource(URI.create(gitHubBase + "/" + gitHubDir));
+                }
+
+                recipeDescriptors.add(descriptor);
                 recipes.add(recipe);
                 MetricsHelper.successTags(builder.tags("recipe", "elided"));
             } catch (Throwable e) {

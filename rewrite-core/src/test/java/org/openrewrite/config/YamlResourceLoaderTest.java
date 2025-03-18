@@ -327,13 +327,13 @@ class YamlResourceLoaderTest implements RewriteTest {
         assertThat(recipes).singleElement().satisfies(r ->
           assertThat(r.getOrigin()).isEqualTo(new RecipeOrigin(
             URI.create("https://github.com/openrewrite/rewrite/blob/main/rewrite-gradle/src/main/java/org/openrewrite/gradle/AddDependencyVisitor.java"),
-            License.apache2)));
+            License.APACHE_V2)));
 
         Collection<RecipeDescriptor> recipeDescriptors = env.listRecipeDescriptors();
         assertThat(recipeDescriptors).singleElement().satisfies(d ->
           assertThat(d.getOrigin()).isEqualTo(new RecipeOrigin(
             URI.create("https://github.com/openrewrite/rewrite/blob/main/rewrite-gradle/src/main/java/org/openrewrite/gradle/AddDependencyVisitor.java"),
-            License.apache2)));
+            License.APACHE_V2)));
     }
 
     @Test
