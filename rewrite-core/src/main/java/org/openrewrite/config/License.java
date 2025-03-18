@@ -24,7 +24,7 @@ public class License {
 
     public static final License apache2 = new License("Apache License Version 2.0", APACHEV2);
     public static final License msal = new License("Moderne Source Available", MSAL);
-    public static final License moderneProprietary = new License("Moderne Proprietary", MOD_PROPRITARY);
+    public static final License moderneProprietary = new License("Moderne Proprietary", MOD_PROPRIETARY);
 
     private final String fullName;
     private final String url;
@@ -40,7 +40,7 @@ public class License {
                 return apache2;
             case MSAL:
                 return msal;
-            case MOD_PROPRITARY:
+            case MOD_PROPRIETARY:
                 return moderneProprietary;
             default:
                 return new License(fullName, url);

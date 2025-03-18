@@ -370,7 +370,11 @@ public class YamlResourceLoader implements ResourceLoader {
 
     @Override
     public Collection<RecipeDescriptor> listRecipeDescriptors() {
-        return listRecipeDescriptors(emptyList(), listContributors(), listRecipeExamples());
+        return listRecipeDescriptors(emptyList(), listContributors(), listRecipeExamples(), listArtifactOrigins());
+    }
+
+    private Map<String, RecipeOrigin> listArtifactOrigins() {
+        return emptyMap();// FIXME
     }
 
     public Collection<RecipeDescriptor> listRecipeDescriptors(Collection<Recipe> externalRecipes,
@@ -392,9 +396,7 @@ public class YamlResourceLoader implements ResourceLoader {
             declarativeRecipe.initialize(allRecipes, recipeNamesToContributors);
             declarativeRecipe.setContributors(recipeNamesToContributors.get(recipe.getName()));
             declarativeRecipe.setExamples(recipeNamesToExamples.get(recipe.getName()));
-
-            recipe.getClass().getProtectionDomain().getCodeSource().getLocation()
-            declarativeRecipe.setOrigin(artifacOrigins.get(recipe.getName()));
+            declarativeRecipe.setOrigin(artifactOrigins.get(recipe.getName()));
             recipeDescriptors.add(declarativeRecipe.getDescriptor());
         }
         return recipeDescriptors;
@@ -596,14 +598,3 @@ public class YamlResourceLoader implements ResourceLoader {
 
     }
 }
-
-
-//private Map<String, RecipeOrigin> listArtifactOrigins() {
-//    return null;
-//}
-//
-//public Collection<RecipeDescriptor> listRecipeDescriptors(Collection<Recipe> externalRecipes,
-//                                                          Map<String, List<Contributor>> recipeNamesToContributors,
-//                                                          Map<String, List<RecipeExample>> recipeNamesToExamples) {
-//    return listRecipeDescriptors(externalRecipes, recipeNamesToContributors, recipeNamesToExamples, listArtifactOrigins());
-//}
