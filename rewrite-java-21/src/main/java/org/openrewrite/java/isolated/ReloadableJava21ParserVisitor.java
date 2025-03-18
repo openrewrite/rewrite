@@ -339,6 +339,11 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     @Override
+    public J visitDefaultCaseLabel(DefaultCaseLabelTree node, Space space) {
+        return new J.Identifier(randomId(), space, Markers.EMPTY, emptyList(), skip("default"), null, null);
+    }
+
+    @Override
     public J visitCase(CaseTree node, Space fmt) {
         J.Case.Type type = node.getCaseKind() == CaseTree.CaseKind.RULE ? J.Case.Type.Rule : J.Case.Type.Statement;
         return new J.Case(
@@ -351,9 +356,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 JContainer.build(
                         node.getLabels().isEmpty() || node.getLabels().getFirst() instanceof DefaultCaseLabelTree ?
                                 EMPTY : sourceBefore("case"),
-                        node.getLabels().isEmpty() || node.getLabels().getFirst() instanceof DefaultCaseLabelTree ?
-                                List.of(JRightPadded.build(new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), skip("default"), null, null))) :
-                                convertAll(node.getLabels(), commaDelim, ignored -> node.getGuard() != null ? sourceBefore("when", '-') : EMPTY),
+                        convertAll(node.getLabels(), commaDelim, ignored -> node.getGuard() != null ? sourceBefore("when", '-') : EMPTY),
                         Markers.EMPTY
                 ),
                 convert(node.getGuard()),
