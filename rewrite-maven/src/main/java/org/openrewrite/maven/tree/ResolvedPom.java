@@ -886,6 +886,9 @@ public class ResolvedPom {
                 // The dependency may be modified by the current pom's dependency management
                 d = getValues(d, depth);
                 try {
+                    if (depth == 0 && d.getVersion() == null) {
+                        throw new MavenDownloadingException("No version provided for direct dependency", null, dd.getDependency().getGav());
+                    }
                     if (d.getVersion() == null || (d.getType() != null && (!"jar".equals(d.getType()) && !"pom".equals(d.getType()) && !"zip".equals(d.getType())))) {
                         continue;
                     }

@@ -46,8 +46,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import static java.util.stream.Collectors.groupingBy;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.assertj.core.api.Assertions.*;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
@@ -3785,5 +3784,29 @@ class MavenParserTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void invalidDirect() {
+        assertThatThrownBy(() -> rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>app</artifactId>
+                <version>1.0.0</version>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.jvnet.jax-ws-commons</groupId>
+                      <artifactId>jaxws-json</artifactId>
+                    </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        )).isInstanceOf(AssertionError.class)
+          .cause()
+            .isInstanceOf(MavenDownloadingException.class)
+            .hasMessage("No version provided for direct dependency");
     }
 }
