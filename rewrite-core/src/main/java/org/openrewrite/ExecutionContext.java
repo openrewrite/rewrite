@@ -41,6 +41,7 @@ public interface ExecutionContext extends RpcCodec<ExecutionContext> {
     String DATA_TABLES = "org.openrewrite.dataTables";
     String RUN_TIMEOUT = "org.openrewrite.runTimeout";
     String REQUIRE_PRINT_EQUALS_INPUT = "org.openrewrite.requirePrintEqualsInput";
+    String SCANNING_MUTATION_VALIDATION = "org.openrewrite.test.scanningMutationValidation";
 
     @Incubating(since = "7.20.0")
     default ExecutionContext addObserver(TreeObserver.Subscription observer) {
@@ -54,7 +55,7 @@ public interface ExecutionContext extends RpcCodec<ExecutionContext> {
         return getMessage("org.openrewrite.internal.treeObservers", Collections.emptySet());
     }
 
-    Map<String, Object> getMessages();
+    Map<String, @Nullable Object> getMessages();
 
     void putMessage(String key, @Nullable Object value);
 

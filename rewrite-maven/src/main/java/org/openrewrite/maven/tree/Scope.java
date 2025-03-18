@@ -152,7 +152,7 @@ public enum Scope {
             case Provided:
                 return "compileOnly";
             case Runtime:
-                return "runtimeOnly";
+                return "runtimeClasspath";
             case Test:
                 return "testImplementation";
             case System:

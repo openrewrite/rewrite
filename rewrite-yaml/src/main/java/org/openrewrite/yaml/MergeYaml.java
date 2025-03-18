@@ -121,9 +121,13 @@ public class MergeYaml extends Recipe {
         return super.validate()
                 .and(Validated.test("yaml", "Must be valid YAML",
                         yaml, y -> {
+                            if (yaml == null) {
+                                return false;
+                            }
                             MergeYaml.maybeParse(yaml).ifPresent(it -> incoming = it);
                             return incoming != null;
                         }))
+                .and(Validated.required("key", key))
                 .and(Validated.test("insertProperty", "Insert property must be filed when `insert mode` is either `BeforeProperty` or `AfterProperty`.", insertProperty,
                         s -> insertMode == null || insertMode == Last || !isBlank(s)));
     }
@@ -186,6 +190,9 @@ public class MergeYaml extends Recipe {
                     return d.withBlock((Yaml.Block)
                             new MergeYamlVisitor<>(d.getBlock(), MergeYaml.parse(snippet), accptTheirs, objectIdentifyingProperty, insertMode, insertProperty)
                                     .visitNonNull(d.getBlock(), ctx, getCursor()));
+                }
+                if (getCursor().getMessage(REMOVE_PREFIX, false)) {
+                    d = d.withEnd(d.getEnd().withPrefix(""));
                 }
                 return d;
             }

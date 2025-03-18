@@ -118,6 +118,16 @@ public class TypeValidation {
     private boolean immutableExecutionContext = true;
 
     /**
+     * If ScanningRecipe.getScanner() attempts an edit during normal recipe execution it will be silently ignored.
+     * This can be a source of confusion for new recipe authors that don't understand the difference between the
+     * scanning and editing phases of the recipe lifecycle.
+     * This validation raises an error if a scanner attempts an edit. You can disable this validation if your recipe
+     * deliberately attempts an edit during scanning, and you don't care that this edit is ultimately ignored.
+     */
+    @Builder.Default
+    private boolean immutableScanning = true;
+
+    /**
      * Enable all invariant validation checks.
      */
     public static TypeValidation all() {
@@ -128,7 +138,7 @@ public class TypeValidation {
      * Skip all invariant validation checks.
      */
     public static TypeValidation none() {
-        return new TypeValidation(false, false, false, false, false, false, false, false, o -> false, false, false, false);
+        return new TypeValidation(false, false, false, false, false, false, false, false, o -> false, false, false, false, false);
     }
 
     static TypeValidation before(RecipeSpec testMethodSpec, RecipeSpec testClassSpec) {

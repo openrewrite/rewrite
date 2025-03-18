@@ -458,6 +458,10 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                     ),
                     EMPTY
             );
+        } else if (kind.getType() == J.ClassDeclaration.Kind.Type.Enum) {
+            if (positionOfNext(";", null) >= 0) {
+                enumSet = padRight(new J.EnumValueSet(randomId(), sourceBefore(";"), Markers.EMPTY, emptyList(), true), EMPTY);
+            }
         }
 
         List<Tree> membersMultiVariablesSeparated = new ArrayList<>(node.getMembers().size());
@@ -2281,20 +2285,16 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
             }
 
             AtomicReference<Javadoc.DocComment> javadoc = new AtomicReference<>();
-            int commentCursor = cursor - prefix.length() + fmt.getWhitespace().length();
             for (int j = 0; j < comments.size(); j++) {
-                Comment comment = comments.get(j);
                 if (i == j) {
                     javadoc.set((Javadoc.DocComment) new ReloadableJava11JavadocVisitor(
                             context,
                             getCurrentPath(),
                             typeMapping,
-                            source.substring(commentCursor, source.indexOf("*/", commentCursor + 1)),
+                            "/*" + ((TextComment) comments.get(j)).getText(),
                             tree
                     ).scan(commentTree, new ArrayList<>(1)));
                     break;
-                } else {
-                    commentCursor += comment.printComment(new Cursor(null, "root")).length() + comment.getSuffix().length();
                 }
             }
 

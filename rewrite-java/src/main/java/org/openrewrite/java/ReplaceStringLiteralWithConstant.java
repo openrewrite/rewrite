@@ -100,7 +100,12 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         String value = getLiteralValue();
-        return value == null ? TreeVisitor.noop() : new ReplaceStringLiteralVisitor(value, fullyQualifiedConstantName);
+        if (value == null) {
+            return TreeVisitor.noop();
+        } else {
+            assert fullyQualifiedConstantName != null : "Validation should have failed if constant name is null";
+            return new ReplaceStringLiteralVisitor(value, fullyQualifiedConstantName);
+        }
     }
 
     private static class ReplaceStringLiteralVisitor extends JavaVisitor<ExecutionContext> {
@@ -133,7 +138,6 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
 
             maybeAddImport(owningType, false);
             return JavaTemplate.builder(template)
-                    .contextSensitive()
                     .imports(owningType)
                     .build()
                     .apply(getCursor(), literal.getCoordinates().replace())

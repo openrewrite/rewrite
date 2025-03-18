@@ -339,6 +339,11 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     @Override
+    public J visitDefaultCaseLabel(DefaultCaseLabelTree node, Space space) {
+        return new J.Identifier(randomId(), space, Markers.EMPTY, emptyList(), skip("default"), null, null);
+    }
+
+    @Override
     public J visitCase(CaseTree node, Space fmt) {
         J.Case.Type type = node.getCaseKind() == CaseTree.CaseKind.RULE ? J.Case.Type.Rule : J.Case.Type.Statement;
         return new J.Case(
@@ -351,9 +356,7 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                 JContainer.build(
                         node.getLabels().isEmpty() || node.getLabels().getFirst() instanceof DefaultCaseLabelTree ?
                                 EMPTY : sourceBefore("case"),
-                        node.getLabels().isEmpty() || node.getLabels().getFirst() instanceof DefaultCaseLabelTree ?
-                                List.of(JRightPadded.build(new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), skip("default"), null, null))) :
-                                convertAll(node.getLabels(), commaDelim, ignored -> node.getGuard() != null ? sourceBefore("when", '-') : EMPTY),
+                        convertAll(node.getLabels(), commaDelim, ignored -> node.getGuard() != null ? sourceBefore("when", '-') : EMPTY),
                         Markers.EMPTY
                 ),
                 convert(node.getGuard()),
@@ -515,6 +518,10 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                     ),
                     EMPTY
             );
+        } else if (kind.getType() == J.ClassDeclaration.Kind.Type.Enum) {
+            if (positionOfNext(";", null) >= 0) {
+                enumSet = padRight(new J.EnumValueSet(randomId(), sourceBefore(";"), Markers.EMPTY, emptyList(), true), EMPTY);
+            }
         }
 
         List<Tree> membersMultiVariablesSeparated = new ArrayList<>(node.getMembers().size());
@@ -2394,20 +2401,16 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
             }
 
             AtomicReference<Javadoc.DocComment> javadoc = new AtomicReference<>();
-            int commentCursor = cursor - prefix.length() + fmt.getWhitespace().length();
             for (int j = 0; j < comments.size(); j++) {
-                Comment comment = comments.get(j);
                 if (i == j) {
                     javadoc.set((Javadoc.DocComment) new ReloadableJava21JavadocVisitor(
                             context,
                             getCurrentPath(),
                             typeMapping,
-                            source.substring(commentCursor, source.indexOf("*/", commentCursor + 1)),
+                            "/*" + ((TextComment) comments.get(j)).getText(),
                             tree
                     ).scan(commentTree, new ArrayList<>(1)));
                     break;
-                } else {
-                    commentCursor += comment.printComment(new Cursor(null, "root")).length() + comment.getSuffix().length();
                 }
             }
 
