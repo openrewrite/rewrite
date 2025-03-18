@@ -1381,72 +1381,7 @@ class MavenParserTest implements RewriteTest {
             );
         }
 
-        @Issue("https://github.com/openrewrite/rewrite/issues/4269")
-        @DisplayName("activeByDefault=true profiles from a POM should not be active" +
-                     " if deactivated from the command-line")
         @Test
-        @Disabled("This context might be available if we go through the MavenMojoProjectParser in the rewrite-maven-plugin")
-        void activeByDefaultWithProfileDisabled() {
-            rewriteRun(
-              recipeSpec -> recipeSpec
-                .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext()))
-                .parser(MavenParser.builder().activeProfiles("!active-profile-1")),
-              mavenProject("c",
-                pomXml(
-                  parent
-                )
-              ),
-              pomXml(
-                child, spec -> spec.afterRecipe(pomXml -> {
-                      Map<String, List<ResolvedDependency>> deps =
-                        pomXml.getMarkers()
-                          .findFirst(MavenResolutionResult.class)
-                          .orElseThrow()
-                          .getDependencies()
-                          .get(Scope.Compile)
-                          .stream()
-                          .collect(groupingBy(ResolvedDependency::getArtifactId));
-
-                      assertThat(deps)
-                        .hasEntrySatisfying("commons-io", rds -> assertThat(rds)
-                          .singleElement().extracting(ResolvedDependency::getVersion).isEqualTo("2.11.0"))
-                        .doesNotContainKey("slf4j-api");
-                  }
-                )
-              )
-            );
-            rewriteRun(
-              recipeSpec -> recipeSpec
-                .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext()))
-                .parser(MavenParser.builder().activeProfiles("-active-profile-1")),
-              mavenProject("c",
-                pomXml(
-                  parent
-                )
-              ),
-              pomXml(
-                child, spec -> spec.afterRecipe(pomXml -> {
-                      Map<String, List<ResolvedDependency>> deps =
-                        pomXml.getMarkers()
-                          .findFirst(MavenResolutionResult.class)
-                          .orElseThrow()
-                          .getDependencies()
-                          .get(Scope.Compile)
-                          .stream()
-                          .collect(groupingBy(ResolvedDependency::getArtifactId));
-
-                      assertThat(deps)
-                        .hasEntrySatisfying("commons-io", rds -> assertThat(rds)
-                          .singleElement().extracting(ResolvedDependency::getVersion).isEqualTo("2.11.0"))
-                        .doesNotContainKey("slf4j-api");
-                  }
-                )
-              )
-            );
-        }
-
-        @Test
-        @Disabled("This context might be available if we go through the MavenMojoProjectParser in the rewrite-maven-plugin")
         void settingsActiveProfiles() {
             var mavenCtx = MavenExecutionContextView.view(new InMemoryExecutionContext(t -> {
                 throw new RuntimeException(t);
