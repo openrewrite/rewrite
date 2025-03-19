@@ -34,7 +34,7 @@ public class LatestRelease implements VersionComparator {
 
     @Override
     public boolean isValid(@Nullable String currentVersion, String version) {
-        return VersionComparator.checkVersion(version, metadataPattern, false);
+        return VersionComparator.checkVersion(version, metadataPattern, true);
     }
 
     static String normalizeVersion(String version) {
@@ -119,8 +119,8 @@ public class LatestRelease implements VersionComparator {
         Matcher v1Gav = VersionComparator.RELEASE_PATTERN.matcher(nv1);
         Matcher v2Gav = VersionComparator.RELEASE_PATTERN.matcher(nv2);
 
-        v1Gav.matches();
-        v2Gav.matches();
+        v1Gav.find();
+        v2Gav.find();
 
         // Remove the metadata pattern from the normalized versions, this only impacts the comparison when all version
         // parts are the same:

@@ -29,7 +29,7 @@ public class LatestIntegration extends LatestRelease {
 
     @Override
     public boolean isValid(@Nullable String currentVersion, String version) {
-        return VersionComparator.checkVersion(version, getMetadataPattern(), true);
+        return VersionComparator.checkVersion(version, getMetadataPattern(), false);
     }
 
     @Override

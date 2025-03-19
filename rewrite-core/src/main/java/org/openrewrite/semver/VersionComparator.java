@@ -56,13 +56,12 @@ public interface VersionComparator extends Comparator<String> {
                 .filter(v -> !v.equals(currentVersion));
     }
 
-    static boolean checkVersion(String version, @Nullable String metadataPattern, boolean allowPreRelease) {
+    static boolean checkVersion(String version, @Nullable String metadataPattern, boolean requireRelease) {
         Matcher matcher = VersionComparator.RELEASE_PATTERN.matcher(version);
         if (!matcher.matches()) {
             return false;
         }
-        boolean matchesPreRelease = PRE_RELEASE_ENDING.matcher(version).find();
-        if (!allowPreRelease && matchesPreRelease) {
+        if (requireRelease && PRE_RELEASE_ENDING.matcher(version).find()) {
             return false;
         }
 
@@ -72,14 +71,16 @@ public interface VersionComparator extends Comparator<String> {
             return versionMeta != null && versionMeta.matches(metadataPattern);
         } else if (versionMeta == null) {
             return true;
-        }
-        String lowercaseVersionMeta = versionMeta.toLowerCase();
-        for (String suffix : RELEASE_SUFFIXES) {
-            if (suffix.equals(lowercaseVersionMeta)) {
-                return true;
+        } else if (requireRelease) {
+            String lowercaseVersionMeta = versionMeta.toLowerCase();
+            for (String suffix : RELEASE_SUFFIXES) {
+                if (suffix.equals(lowercaseVersionMeta)) {
+                    return true;
+                }
             }
+            return false;
         }
-        return matchesPreRelease;
+        return true;
     }
 
 }
