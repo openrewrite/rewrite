@@ -92,14 +92,20 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                     for (Plugin plugin : getResolutionResult().getParent().getPom().getPlugins()) {
                         if (plugin.getGroupId().equals("org.apache.maven.plugins") && plugin.getArtifactId().equals("maven-compiler-plugin") && plugin.getConfiguration() != null) {
                             for (String property : JAVA_VERSION_PROPERTIES) {
-                                if (getResolutionResult().getPom().getProperties().get(property) != null) {
+                                String propValue = getResolutionResult().getPom().getProperties().get(property);
+                                if (propValue != null) {
+                                    String deepestPropKey = property;
+                                    if (isPropertyReference(propValue)) {
+                                        deepestPropKey = resolvePropertyReference(propValue);
+                                        propValue = getResolutionResult().getPom().getProperties().get(deepestPropKey);
+                                    }
                                     try {
-                                        float parsed = Float.parseFloat(getResolutionResult().getPom().getProperties().get(property));
+                                        float parsed = Float.parseFloat(propValue);
                                         if (parsed < version &&
                                             (plugin.getConfiguration().get("source") != null && plugin.getConfiguration().get("source").textValue().contains(property)) ||
                                             (plugin.getConfiguration().get("target") != null && plugin.getConfiguration().get("target").textValue().contains(property)) ||
                                             (plugin.getConfiguration().get("release") != null && plugin.getConfiguration().get("release").textValue().contains(property))) {
-                                            d = (Xml.Document) new AddPropertyVisitor(property, String.valueOf(version), null)
+                                            d = (Xml.Document) new AddPropertyVisitor(deepestPropKey, String.valueOf(version), null)
                                                     .visitNonNull(d, ctx);
                                             maybeUpdateModel();
                                         }
@@ -119,9 +125,14 @@ public class UpdateMavenProjectPropertyJavaVersion extends Recipe {
                     String propertyValue = currentProperties.get(property);
                     if (propertyValue != null) {
                         foundProperty = true;
+                        String deepestPropKey = property;
+                        if (isPropertyReference(propertyValue)) {
+                            deepestPropKey = resolvePropertyReference(propertyValue);
+                            propertyValue = currentProperties.get(deepestPropKey);
+                        }
                         try {
                             if (Float.parseFloat(propertyValue) < version) {
-                                d = (Xml.Document) new AddProperty(property, String.valueOf(version), null, false)
+                                d = (Xml.Document) new AddProperty(deepestPropKey, String.valueOf(version), null, false)
                                         .getVisitor()
                                         .visitNonNull(d, ctx);
                                 maybeUpdateModel();

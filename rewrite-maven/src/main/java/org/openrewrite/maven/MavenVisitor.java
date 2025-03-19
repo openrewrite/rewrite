@@ -88,6 +88,19 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         return PROPERTY_MATCHER.matches(getCursor());
     }
 
+    public boolean isPropertyReference(String value) {
+        return value.startsWith("${") && value.endsWith("}");
+    }
+
+    public String resolvePropertyReference(String propertyReference) {
+        String propKey = propertyReference.replace("${", "").replace("}", "");
+        String propValue = getResolutionResult().getPom().getProperties().get(propKey);
+        if (propValue != null && isPropertyReference(propValue)) {
+            return resolvePropertyReference(propValue);
+        }
+        return propKey;
+    }
+
     public boolean isDependencyTag() {
         return isTag("dependency") && DEPENDENCY_MATCHER.matches(getCursor());
     }
