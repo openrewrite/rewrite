@@ -56,7 +56,7 @@ public interface VersionComparator extends Comparator<String> {
                 .filter(v -> !v.equals(currentVersion));
     }
 
-    static boolean isValid(String version, @Nullable String metadataPattern, boolean allowPreRelease) {
+    static boolean checkVersion(String version, @Nullable String metadataPattern, boolean allowPreRelease) {
         Matcher matcher = VersionComparator.RELEASE_PATTERN.matcher(version);
         if (!matcher.matches()) {
             return false;

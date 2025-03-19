@@ -34,7 +34,7 @@ public class LatestRelease implements VersionComparator {
 
     @Override
     public boolean isValid(@Nullable String currentVersion, String version) {
-        return VersionComparator.isValid(version, metadataPattern, false);
+        return VersionComparator.checkVersion(version, metadataPattern, false);
     }
 
     static String normalizeVersion(String version) {
