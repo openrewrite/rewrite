@@ -519,7 +519,9 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
                     EMPTY
             );
         } else if (kind.getType() == J.ClassDeclaration.Kind.Type.Enum) {
-            if (positionOfNext(";", null) >= 0) {
+            int nextSemicolonPosition = positionOfNext(";", null);
+            int nextClosingBracePosition = positionOfNext("}", null);
+            if (nextSemicolonPosition >= 0 && nextSemicolonPosition < nextClosingBracePosition) {
                 enumSet = padRight(new J.EnumValueSet(randomId(), sourceBefore(";"), Markers.EMPTY, emptyList(), true), EMPTY);
             }
         }
