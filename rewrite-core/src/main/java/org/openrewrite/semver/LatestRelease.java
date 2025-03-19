@@ -17,7 +17,6 @@ package org.openrewrite.semver;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
-import org.openrewrite.internal.StringUtils;
 
 import java.util.regex.Matcher;
 
@@ -29,26 +28,13 @@ public class LatestRelease implements VersionComparator {
         this.metadataPattern = metadataPattern;
     }
 
+    protected @Nullable String getMetadataPattern() {
+        return metadataPattern;
+    }
+
     @Override
     public boolean isValid(@Nullable String currentVersion, String version) {
-        Matcher matcher = VersionComparator.RELEASE_PATTERN.matcher(version);
-        if (!matcher.matches() || PRE_RELEASE_ENDING.matcher(version).find()) {
-            return false;
-        }
-        boolean requireMeta = !StringUtils.isNullOrEmpty(metadataPattern);
-        String versionMeta = matcher.group(6);
-        if (requireMeta) {
-            return versionMeta != null && versionMeta.matches(metadataPattern);
-        } else if (versionMeta == null) {
-            return true;
-        }
-        String lowercaseVersionMeta = versionMeta.toLowerCase();
-        for (String suffix : RELEASE_SUFFIXES) {
-            if (suffix.equals(lowercaseVersionMeta)) {
-                return true;
-            }
-        }
-        return false;
+        return VersionComparator.isValid(version, metadataPattern, false);
     }
 
     static String normalizeVersion(String version) {

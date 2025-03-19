@@ -16,10 +16,12 @@
 package org.openrewrite.semver;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.internal.StringUtils;
 
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Optional;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public interface VersionComparator extends Comparator<String> {
@@ -53,4 +55,31 @@ public interface VersionComparator extends Comparator<String> {
         return (seen ? Optional.of(best) : Optional.<String>empty())
                 .filter(v -> !v.equals(currentVersion));
     }
+
+    static boolean isValid(String version, @Nullable String metadataPattern, boolean allowPreRelease) {
+        Matcher matcher = VersionComparator.RELEASE_PATTERN.matcher(version);
+        if (!matcher.matches()) {
+            return false;
+        }
+        boolean matchesPreRelease = PRE_RELEASE_ENDING.matcher(version).find();
+        if (!allowPreRelease && matchesPreRelease) {
+            return false;
+        }
+
+        boolean requireMeta = !StringUtils.isNullOrEmpty(metadataPattern);
+        String versionMeta = matcher.group(6);
+        if (requireMeta) {
+            return versionMeta != null && versionMeta.matches(metadataPattern);
+        } else if (versionMeta == null) {
+            return true;
+        }
+        String lowercaseVersionMeta = versionMeta.toLowerCase();
+        for (String suffix : RELEASE_SUFFIXES) {
+            if (suffix.equals(lowercaseVersionMeta)) {
+                return true;
+            }
+        }
+        return matchesPreRelease;
+    }
+
 }

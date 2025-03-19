@@ -41,7 +41,7 @@ public class TildeRange extends LatestRelease {
 
     @Override
     public boolean isValid(@Nullable String currentVersion, String version) {
-        return super.isValid(currentVersion, version) &&
+        return VersionComparator.isValid(version, getMetadataPattern(), true) &&
                 super.compare(currentVersion, version, upperExclusive) < 0 &&
                 super.compare(currentVersion, version, lower) >= 0;
     }
