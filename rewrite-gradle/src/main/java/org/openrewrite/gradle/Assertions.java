@@ -21,6 +21,7 @@ import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.groovy.tree.G;
+import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
@@ -36,7 +37,8 @@ public class Assertions {
     }
 
     private static final Parser.Builder gradleParser = GradleParser.builder()
-            .groovyParser(GroovyParser.builder().logCompilationWarningsAndErrors(true));
+            .groovyParser(GroovyParser.builder().logCompilationWarningsAndErrors(true))
+            .kotlinParser(KotlinParser.builder().logCompilationWarningsAndErrors(true));
 
     /**
      * @param version      The Gradle version to use.

@@ -20,6 +20,7 @@ import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ThrowingConsumer;
+import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.marker.Extension;
@@ -106,6 +107,13 @@ public final class Assertions {
         return out.toString();
     }
 
+    private static KotlinParser.Builder kotlinParser = KotlinParser.builder()
+            .classpath(JavaParser.runtimeClasspath())
+            .logCompilationWarningsAndErrors(true);
+
+    private static KotlinParser.Builder ktsParser = KotlinParser.builder(kotlinParser)
+            .isKotlinScript(true);
+
     public static SourceSpecs kotlin(@Language("kotlin") @Nullable String before) {
         // Change `before` to `adjustSpaces(before)` to test spaces locally here
         return kotlin(before, s -> {
@@ -119,7 +127,7 @@ public final class Assertions {
 
     public static SourceSpecs kotlin(@Language("kotlin") @Nullable String before, Consumer<SourceSpec<K.CompilationUnit>> spec) {
         SourceSpec<K.CompilationUnit> kotlin = new SourceSpec<>(
-                K.CompilationUnit.class, null, KotlinParser.builder(), before,
+                K.CompilationUnit.class, null, kotlinParser, before,
                 Assertions::validateTypes,
                 Assertions::customizeExecutionContext
         );
@@ -129,7 +137,7 @@ public final class Assertions {
 
     public static SourceSpecs kotlinScript(@Language("kts") @Nullable String before, Consumer<SourceSpec<K.CompilationUnit>> spec) {
         SourceSpec<K.CompilationUnit> kotlinScript = new SourceSpec<>(
-                K.CompilationUnit.class, null, KotlinParser.builder().isKotlinScript(true), before,
+                K.CompilationUnit.class, null, ktsParser, before,
                 Assertions::validateTypes,
                 Assertions::customizeExecutionContext
         );
@@ -144,7 +152,7 @@ public final class Assertions {
 
     public static SourceSpecs kotlin(@Language("kotlin") @Nullable String before, @Language("kotlin") String after,
                                      Consumer<SourceSpec<K.CompilationUnit>> spec) {
-        SourceSpec<K.CompilationUnit> kotlin = new SourceSpec<>(K.CompilationUnit.class, null, KotlinParser.builder(), before,
+        SourceSpec<K.CompilationUnit> kotlin = new SourceSpec<>(K.CompilationUnit.class, null, kotlinParser, before,
                 Assertions::validateTypes,
                 Assertions::customizeExecutionContext).after(s -> after);
         acceptSpec(spec, kotlin);
