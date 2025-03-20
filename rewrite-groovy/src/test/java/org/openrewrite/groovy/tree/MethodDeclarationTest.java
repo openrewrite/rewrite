@@ -236,7 +236,7 @@ class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              class A {
+              class B {
                   def /*int*/ int one() { 1 }
                   @Foo def /*Object*/ Object two() { 2 }
               }
