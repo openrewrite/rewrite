@@ -1255,7 +1255,7 @@ public class GroovyParserVisitor {
                         value = "@" + value;
                         text = "@" + text;
                     } else {
-                        Delimiter delimiter = getDelimiter(cursor);
+                        Delimiter delimiter = getDelimiter(expression, cursor);
                         if (delimiter != null) {
                             // Get the string literal from the source, so escaping of newlines and the like works out of the box
                             value = sourceSubstring(cursor + delimiter.open.length(), delimiter.close);
@@ -1508,7 +1508,7 @@ public class GroovyParserVisitor {
         @Override
         public void visitGStringExpression(GStringExpression gstring) {
             Space fmt = whitespace();
-            Delimiter delimiter = getDelimiter(cursor);
+            Delimiter delimiter = getDelimiter(gstring, cursor);
             skip(delimiter.open);
 
             NavigableMap<LineColumn, org.codehaus.groovy.ast.expr.Expression> sortedByPosition = new TreeMap<>();
@@ -2462,22 +2462,23 @@ public class GroovyParserVisitor {
         } else if (node instanceof MethodCallExpression && !isOlderThanGroovy3()) {
             // Only for groovy 3+, because lower versions do always return `-1` for objectExpression.lineNumber / objectExpression.columnNumber
             MethodCallExpression expr = (MethodCallExpression) node;
-            return determineParenthesisLevel(expr.getObjectExpression().getLineNumber(), expr.getLineNumber(), expr.getObjectExpression().getColumnNumber(), expr.getColumnNumber());
+            return determineParenthesisLevel(expr, expr.getObjectExpression().getLineNumber(), expr.getLineNumber(), expr.getObjectExpression().getColumnNumber(), expr.getColumnNumber());
         } else if (node instanceof BinaryExpression) {
             BinaryExpression expr = (BinaryExpression) node;
-            return determineParenthesisLevel(expr.getLeftExpression().getLineNumber(), expr.getLineNumber(), expr.getLeftExpression().getColumnNumber(), expr.getColumnNumber());
+            return determineParenthesisLevel(expr, expr.getLeftExpression().getLineNumber(), expr.getLineNumber(), expr.getLeftExpression().getColumnNumber(), expr.getColumnNumber());
         }
         return null;
     }
 
     /**
+     * @param node             the node to determine the parenthesis level of
      * @param childLineNumber  the beginning line number of the first sub node
      * @param parentLineNumber the beginning line number of the parent node
      * @param childColumn      the column on the {@code childLineNumber} line where the sub node starts
      * @param parentColumn     the column on the {@code parentLineNumber} line where the parent node starts
      * @return the level of parenthesis parsed from the source
      */
-    private int determineParenthesisLevel(int childLineNumber, int parentLineNumber, int childColumn, int parentColumn) {
+    private int determineParenthesisLevel(ASTNode node, int childLineNumber, int parentLineNumber, int childColumn, int parentColumn) {
         // Map the coordinates
         int startingLineNumber;
         int startingColumn;
@@ -2509,7 +2510,7 @@ public class GroovyParserVisitor {
         Delimiter delimiter = null;
         for (int i = start; i < end; i++) {
             if (delimiter == null) {
-                delimiter = getDelimiter(i);
+                delimiter = getDelimiter(node, i);
                 if (delimiter == null) {
                     if (source.charAt(i) == '(') {
                         count++;
@@ -2531,7 +2532,7 @@ public class GroovyParserVisitor {
      * Grabs a {@link Delimiter} from source if cursor is right in front of a delimiter.
      * Whitespace characters are NOT excluded, the cursor will not be moved.
      */
-    private @Nullable Delimiter getDelimiter(int cursor) {
+    private @Nullable Delimiter getDelimiter(ASTNode node, int cursor) {
         boolean isPatternOperator = source.startsWith("~", cursor);
         int c = cursor;
         if (isPatternOperator) {
@@ -2548,7 +2549,7 @@ public class GroovyParserVisitor {
             return SINGLE_LINE_COMMENT;
         } else if (source.startsWith("/*", c)) {
             return MULTILINE_COMMENT;
-        } else if (source.startsWith("/", c)) {
+        } else if (source.startsWith("/", c) && validateIsDelimiter(node, c)) {
             return isPatternOperator ? PATTERN_SLASHY_STRING : SLASHY_STRING;
         } else if (source.startsWith("\"", c)) {
             return isPatternOperator ? PATTERN_DOUBLE_QUOTE_STRING : DOUBLE_QUOTE_STRING;
@@ -2559,6 +2560,12 @@ public class GroovyParserVisitor {
         }
 
         return null;
+    }
+
+    private boolean validateIsDelimiter(ASTNode node, int c) {
+        FindTokenVisitor visitor = new FindTokenVisitor(source.substring(c, c+1), c, sourceLineNumberOffsets);
+        node.visit(visitor);
+        return !visitor.isFound();
     }
 
     private TypeTree visitTypeTree(ClassNode classNode) {
@@ -2832,7 +2839,7 @@ public class GroovyParserVisitor {
 
         int startX = indexOfNextNonWhitespace( equalsIndex + 1, str);
         int endX = startX;
-        Delimiter delim = getDelimiter(endX);
+        Delimiter delim = getDelimiter(expression, endX);
         if (delim != null) {
             endX = str.indexOf(delim.close, endX + delim.open.length()) + 1;
         } else {
