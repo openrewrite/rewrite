@@ -121,7 +121,9 @@ public class MethodMatcher {
                     targetTypePattern = Pattern.compile(StringUtils.aspectjNameToPattern(pattern));
                 }
 
-                if (isPlainIdentifier(ctx.simpleNamePattern())) {
+                if (ctx.simpleNamePattern().CONSTRUCTOR() != null) {
+                    methodName = "<constructor>";
+                } else if (isPlainIdentifier(ctx.simpleNamePattern())) {
                     StringBuilder builder = new StringBuilder();
                     for (ParseTree child : ctx.simpleNamePattern().children) {
                         builder.append(child.getText());

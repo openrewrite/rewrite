@@ -15,6 +15,7 @@
  */
 // Generated from ~/git/rewrite/rewrite-java/src/main/antlr/MethodSignatureParser.g4 by ANTLR 4.13.2
 package org.openrewrite.java.internal.grammar;
+
 import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.atn.ATN;
 import org.antlr.v4.runtime.atn.ATNDeserializer;
@@ -35,18 +36,18 @@ public class MethodSignatureParser extends Parser {
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		CONSTRUCTOR=1, LPAREN=2, RPAREN=3, LBRACK=4, RBRACK=5, COMMA=6, DOT=7,
-		BANG=8, WILDCARD=9, AND=10, OR=11, ELLIPSIS=12, DOTDOT=13, POUND=14, SPACE=15,
+		CONSTRUCTOR=1, LPAREN=2, RPAREN=3, LBRACK=4, RBRACK=5, COMMA=6, DOT=7, 
+		BANG=8, WILDCARD=9, AND=10, OR=11, ELLIPSIS=12, DOTDOT=13, POUND=14, SPACE=15, 
 		Identifier=16;
 	public static final int
-		RULE_methodPattern = 0, RULE_formalParametersPattern = 1, RULE_formalsPattern = 2,
-		RULE_dotDot = 3, RULE_formalsPatternAfterDotDot = 4, RULE_optionalParensTypePattern = 5,
-		RULE_targetTypePattern = 6, RULE_formalTypePattern = 7, RULE_classNameOrInterface = 8,
+		RULE_methodPattern = 0, RULE_formalParametersPattern = 1, RULE_formalsPattern = 2, 
+		RULE_dotDot = 3, RULE_formalsPatternAfterDotDot = 4, RULE_optionalParensTypePattern = 5, 
+		RULE_targetTypePattern = 6, RULE_formalTypePattern = 7, RULE_classNameOrInterface = 8, 
 		RULE_simpleNamePattern = 9;
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"methodPattern", "formalParametersPattern", "formalsPattern", "dotDot",
-			"formalsPatternAfterDotDot", "optionalParensTypePattern", "targetTypePattern",
+			"methodPattern", "formalParametersPattern", "formalsPattern", "dotDot", 
+			"formalsPatternAfterDotDot", "optionalParensTypePattern", "targetTypePattern", 
 			"formalTypePattern", "classNameOrInterface", "simpleNamePattern"
 		};
 	}
@@ -54,15 +55,15 @@ public class MethodSignatureParser extends Parser {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, "'<constructor>'", "'('", "')'", "'['", "']'", "','", "'.'", "'!'",
-			"'*'", "'&&'", "'||'", "'...'", "'..'", "'#'", "' '"
+			null, null, "'('", "')'", "'['", "']'", "','", "'.'", "'!'", "'*'", "'&&'", 
+			"'||'", "'...'", "'..'", "'#'", "' '"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "CONSTRUCTOR", "LPAREN", "RPAREN", "LBRACK", "RBRACK", "COMMA",
-			"DOT", "BANG", "WILDCARD", "AND", "OR", "ELLIPSIS", "DOTDOT", "POUND",
+			null, "CONSTRUCTOR", "LPAREN", "RPAREN", "LBRACK", "RBRACK", "COMMA", 
+			"DOT", "BANG", "WILDCARD", "AND", "OR", "ELLIPSIS", "DOTDOT", "POUND", 
 			"SPACE", "Identifier"
 		};
 	}
@@ -704,6 +705,7 @@ public class MethodSignatureParser extends Parser {
 		ParserRuleContext _parentctx = _ctx;
 		int _parentState = getState();
 		TargetTypePatternContext _localctx = new TargetTypePatternContext(_ctx, _parentState);
+		TargetTypePatternContext _prevctx = _localctx;
 		int _startState = 12;
 		enterRecursionRule(_localctx, 12, RULE_targetTypePattern, _p);
 		try {
@@ -740,6 +742,7 @@ public class MethodSignatureParser extends Parser {
 			while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 				if ( _alt==1 ) {
 					if ( _parseListeners!=null ) triggerExitRuleEvent();
+					_prevctx = _localctx;
 					{
 					setState(113);
 					_errHandler.sync(this);
@@ -829,6 +832,7 @@ public class MethodSignatureParser extends Parser {
 		ParserRuleContext _parentctx = _ctx;
 		int _parentState = getState();
 		FormalTypePatternContext _localctx = new FormalTypePatternContext(_ctx, _parentState);
+		FormalTypePatternContext _prevctx = _localctx;
 		int _startState = 14;
 		enterRecursionRule(_localctx, 14, RULE_formalTypePattern, _p);
 		try {
@@ -865,6 +869,7 @@ public class MethodSignatureParser extends Parser {
 			while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 				if ( _alt==1 ) {
 					if ( _parseListeners!=null ) triggerExitRuleEvent();
+					_prevctx = _localctx;
 					{
 					setState(130);
 					_errHandler.sync(this);
