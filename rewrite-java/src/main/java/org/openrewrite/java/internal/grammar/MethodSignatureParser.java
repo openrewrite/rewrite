@@ -370,7 +370,7 @@ public class MethodSignatureParser extends Parser {
 						setState(48);
 						formalsPatternAfterDotDot();
 						}
-						} 
+						}
 					}
 					setState(53);
 					_errHandler.sync(this);
@@ -409,7 +409,7 @@ public class MethodSignatureParser extends Parser {
 						setState(62);
 						formalsPattern();
 						}
-						} 
+						}
 					}
 					setState(67);
 					_errHandler.sync(this);
@@ -564,7 +564,7 @@ public class MethodSignatureParser extends Parser {
 						setState(83);
 						formalsPatternAfterDotDot();
 						}
-						} 
+						}
 					}
 					setState(88);
 					_errHandler.sync(this);
@@ -772,7 +772,7 @@ public class MethodSignatureParser extends Parser {
 						}
 						break;
 					}
-					} 
+					}
 				}
 				setState(117);
 				_errHandler.sync(this);
@@ -899,7 +899,7 @@ public class MethodSignatureParser extends Parser {
 						}
 						break;
 					}
-					} 
+					}
 				}
 				setState(134);
 				_errHandler.sync(this);
@@ -971,7 +971,7 @@ public class MethodSignatureParser extends Parser {
 			int _alt;
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(136); 
+			setState(136);
 			_errHandler.sync(this);
 			_alt = 1;
 			do {
@@ -995,7 +995,7 @@ public class MethodSignatureParser extends Parser {
 				default:
 					throw new NoViableAltException(this);
 				}
-				setState(138); 
+				setState(138);
 				_errHandler.sync(this);
 				_alt = getInterpreter().adaptivePredict(_input,18,_ctx);
 			} while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER );
@@ -1011,7 +1011,7 @@ public class MethodSignatureParser extends Parser {
 					setState(141);
 					match(RBRACK);
 					}
-					} 
+					}
 				}
 				setState(146);
 				_errHandler.sync(this);
@@ -1086,7 +1086,7 @@ public class MethodSignatureParser extends Parser {
 						setState(149);
 						match(Identifier);
 						}
-						} 
+						}
 					}
 					setState(154);
 					_errHandler.sync(this);
@@ -1121,7 +1121,7 @@ public class MethodSignatureParser extends Parser {
 						setState(160);
 						match(WILDCARD);
 						}
-						} 
+						}
 					}
 					setState(165);
 					_errHandler.sync(this);
@@ -1161,7 +1161,8 @@ public class MethodSignatureParser extends Parser {
 		return _localctx;
 	}
 
-	public boolean sempred(RuleContext _localctx, int ruleIndex, int predIndex) {
+    @Override
+    public boolean sempred(RuleContext _localctx, int ruleIndex, int predIndex) {
 		switch (ruleIndex) {
 		case 6:
 			return targetTypePattern_sempred((TargetTypePatternContext)_localctx, predIndex);
