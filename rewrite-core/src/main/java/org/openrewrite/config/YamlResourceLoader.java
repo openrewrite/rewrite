@@ -58,6 +58,7 @@ public class YamlResourceLoader implements ResourceLoader {
 
     @Nullable
     private final Attributes attributes;
+    
     private final URI source;
     private final String yamlSource;
 
