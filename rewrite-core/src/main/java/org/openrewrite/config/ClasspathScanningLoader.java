@@ -32,7 +32,6 @@ import org.openrewrite.style.NamedStyles;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Modifier;
-import java.net.URI;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.jar.Attributes;
@@ -44,6 +43,7 @@ import static org.openrewrite.internal.RecipeIntrospectionUtils.constructRecipe;
 
 @NoArgsConstructor(access = PRIVATE)
 public class ClasspathScanningLoader implements ResourceLoader {
+    private static final String META_INF_REWRITE = "META-INF/rewrite";
 
     private final LinkedHashSet<Recipe> recipes = new LinkedHashSet<>();
     private final List<NamedStyles> styles = new ArrayList<>();
@@ -53,7 +53,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
 
     private final Map<String, List<Contributor>> recipeAttributions = new HashMap<>();
     private final Map<String, List<RecipeExample>> recipeExamples = new HashMap<>();
-    private final Map<URI, Attributes> artifactManifestAttributes = new HashMap<>();
+    private final Map<String, Attributes> artifactManifestAttributes = new HashMap<>();
 
     /**
      * Construct a ClasspathScanningLoader scans the runtime classpath of the current java process for recipes
@@ -64,8 +64,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
     public ClasspathScanningLoader(Properties properties, String[] acceptPackages) {
         scanManifests(new ClassGraph().acceptPackages(acceptPackages), getClass().getClassLoader());
         scanClasses(new ClassGraph().acceptPackages(acceptPackages), getClass().getClassLoader());
-        scanYaml(new ClassGraph().acceptPaths("META-INF/rewrite"),
-                properties, emptyList(), null);
+        scanYaml(new ClassGraph().acceptPaths(META_INF_REWRITE), properties, emptyList(), null);
     }
 
     /**
@@ -77,7 +76,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
     public ClasspathScanningLoader(Properties properties, ClassLoader classLoader) {
         scanManifests(new ClassGraph().ignoreParentClassLoaders().overrideClassLoaders(classLoader), classLoader);
         scanClasses(new ClassGraph().ignoreParentClassLoaders().overrideClassLoaders(classLoader), classLoader);
-        scanYaml(new ClassGraph().ignoreParentClassLoaders().overrideClassLoaders(classLoader).acceptPaths("META-INF/rewrite"),
+        scanYaml(new ClassGraph().ignoreParentClassLoaders().overrideClassLoaders(classLoader).acceptPaths(META_INF_REWRITE),
                 properties, emptyList(), classLoader);
     }
 
@@ -86,14 +85,13 @@ public class ClasspathScanningLoader implements ResourceLoader {
 
         scanManifests(new ClassGraph().acceptJars(jarName).ignoreParentClassLoaders().overrideClassLoaders(classLoader), classLoader);
         scanClasses(new ClassGraph().acceptJars(jarName).ignoreParentClassLoaders().overrideClassLoaders(classLoader), classLoader);
-        scanYaml(new ClassGraph().acceptJars(jarName).ignoreParentClassLoaders().overrideClassLoaders(classLoader).acceptPaths("META-INF/rewrite"),
+        scanYaml(new ClassGraph().acceptJars(jarName).ignoreParentClassLoaders().overrideClassLoaders(classLoader).acceptPaths(META_INF_REWRITE),
                 properties, dependencyResourceLoaders, classLoader);
     }
 
     public static ClasspathScanningLoader onlyYaml(Properties properties) {
         ClasspathScanningLoader classpathScanningLoader = new ClasspathScanningLoader();
-        classpathScanningLoader.scanYaml(new ClassGraph().acceptPaths("META-INF/rewrite"),
-                properties, emptyList(), null);
+        classpathScanningLoader.scanYaml(new ClassGraph().acceptPaths(META_INF_REWRITE), properties, emptyList(), null);
         return classpathScanningLoader;
     }
 
@@ -104,7 +102,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
         try (ScanResult result = classGraph.ignoreClassVisibility().overrideClassLoaders(classLoader).scan()) {
             result.getResourcesWithPath("META-INF/MANIFEST.MF").forEachInputStreamIgnoringIOException((r, is) -> {
                 try {
-                    artifactManifestAttributes.put(r.getClasspathElementURI(), new Manifest(is).getMainAttributes());
+                    artifactManifestAttributes.put(r.getClasspathElementURI().toString(), new Manifest(is).getMainAttributes());
                 } catch (IOException e) {
                     // Silently ignore, as seen for `forEachInputStreamIgnoringIOException`
                 }
@@ -120,10 +118,20 @@ public class ClasspathScanningLoader implements ResourceLoader {
         try (ScanResult scanResult = classGraph.enableMemoryMapping().scan()) {
             List<YamlResourceLoader> yamlResourceLoaders = new ArrayList<>();
 
-            scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) ->
-                    yamlResourceLoaders.add(new YamlResourceLoader(input, artifactManifestAttributes.get(res.getClasspathElementURI()), res.getURI(), properties, classLoader, dependencyResourceLoaders, it -> {})));
-            scanResult.getResourcesWithExtension("yaml").forEachInputStreamIgnoringIOException((res, input) ->
-                    yamlResourceLoaders.add(new YamlResourceLoader(input, artifactManifestAttributes.get(res.getClasspathElementURI()), res.getURI(), properties, classLoader, dependencyResourceLoaders, it -> {})));
+            scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) -> {
+                String key = res.getURI().toString().replaceFirst("^jar:", "").split("!/", 2)[0];
+
+                // TODO REMOVE THIS AND FIX WHY TEST `listRecipeDescriptors` FAILS!
+                if (artifactManifestAttributes.containsKey(key)) {
+                    System.out.println(res + " has license: " + artifactManifestAttributes.get(key).getValue("License-Name"));
+                }
+
+                yamlResourceLoaders.add(new YamlResourceLoader(input, artifactManifestAttributes.get(key), res.getURI(), properties, classLoader, dependencyResourceLoaders, it -> {}));
+            });
+            scanResult.getResourcesWithExtension("yaml").forEachInputStreamIgnoringIOException((res, input) -> {
+                String key = res.getURI().toString().replaceFirst("^jar:", "").split("!/", 2)[0];
+                yamlResourceLoaders.add(new YamlResourceLoader(input, artifactManifestAttributes.get(key), res.getURI(), properties, classLoader, dependencyResourceLoaders, it -> {}));
+            });
             // Extract in two passes so that the full list of recipes from all sources are known when computing recipe descriptors
             // Otherwise recipes which include recipes from other sources in their recipeList will have incomplete descriptors
             for (YamlResourceLoader resourceLoader : yamlResourceLoaders) {
@@ -176,7 +184,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
             Timer.Builder builder = Timer.builder("rewrite.scan.configure.recipe");
             Timer.Sample sample = Timer.start();
             try {
-                Recipe recipe = constructRecipe(recipeClass).augmentRecipeDescriptor(artifactManifestAttributes.get(classInfo.getClasspathElementURI()));
+                Recipe recipe = constructRecipe(recipeClass).augmentRecipeDescriptor(artifactManifestAttributes.get(classInfo.getClasspathElementURI().toString()));
                 recipeDescriptors.add(recipe.getDescriptor());
                 recipes.add(recipe);
                 MetricsHelper.successTags(builder.tags("recipe", "elided"));
