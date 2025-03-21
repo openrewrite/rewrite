@@ -784,21 +784,16 @@ public class AdaptiveRadixTree<V> {
     }
 
     private static class KeyTable {
-        private static final int INITIAL_CAPACITY = 8 * 1024; // 8KiB
+        private static final int INITIAL_CAPACITY = 16 * 1024; // 16KiB
         private static final int MAX_SMALL_GROWTH_SIZE = 1024 * 1024; // 1MiB
         private static final double LARGE_GROWTH_FACTOR = 1.3;
 
-        private byte[] storage;
+        private byte @Nullable [] storage;
         private int size;
-
-        KeyTable() {
-            this.storage = new byte[INITIAL_CAPACITY];
-            this.size = 0;
-        }
 
         KeyTable copy() {
             KeyTable copy = new KeyTable();
-            copy.storage = Arrays.copyOf(storage, storage.length);
+            copy.storage = storage != null ? Arrays.copyOf(storage, storage.length) : null;
             copy.size = size;
             return copy;
         }
@@ -807,6 +802,7 @@ public class AdaptiveRadixTree<V> {
         int store(byte[] key, int offset, int length) {
             ensureCapacity(length);
             int startOffset = size;
+            assert storage != null;
             System.arraycopy(key, offset, storage, size, length);
             size += length;
             return startOffset;
@@ -816,6 +812,7 @@ public class AdaptiveRadixTree<V> {
             if (length <= 0) return true;
             if (keyOffset + length > key.length) return false;
 
+            assert storage != null;
             for (int i = 0; i < length; i++) {
                 if (key[keyOffset + i] != storage[storedOffset + i]) {
                     return false;
@@ -825,6 +822,11 @@ public class AdaptiveRadixTree<V> {
         }
 
         private void ensureCapacity(int additional) {
+            if (storage == null) {
+                storage = new byte[INITIAL_CAPACITY];
+                size = 0;
+            }
+
             int required = size + additional;
             if (required <= storage.length) {
                 return;
@@ -842,11 +844,12 @@ public class AdaptiveRadixTree<V> {
         }
 
         public byte get(int offset) {
+            assert storage != null;
             return storage[offset];
         }
 
         public void clear() {
-            storage = new byte[INITIAL_CAPACITY];
+            storage = null;
             size = 0;
         }
     }
