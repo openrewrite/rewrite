@@ -30,7 +30,7 @@ class FindMissingTypesTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new FindMissingTypes())
+        spec.recipe(new FindMissingTypes(false))
           .parser(JavaParser.fromJavaVersion())
           .typeValidationOptions(TypeValidation.none());
     }
@@ -186,6 +186,55 @@ class FindMissingTypesTest implements RewriteTest {
 
               abstract class Foo2 {
                   /*~~(MethodDeclaration type is missing or malformed)~~>*/public abstract GenClass1 withArg(String a);
+              }
+              """
+          )
+        );
+    }
+
+    @SuppressWarnings("JavadocDeclaration")
+    @Test
+    void missingJavadocReference() {
+        rewriteRun(
+          spec -> spec.recipe(new FindMissingTypes(true)),
+          java(
+            """
+              /**
+               * See {@code #baz}.
+               * 
+               * @see #baz() 
+               */
+              interface Foo {
+                  void bar();
+              }
+              """,
+            """
+              /**
+               * See {@code #baz}.
+               * 
+               * @see ~~(MethodInvocation type is missing or malformed)~~>#baz() 
+               */
+              interface Foo {
+                  void bar();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void noMissingJavadocReference() {
+        rewriteRun(
+          spec -> spec.recipe(new FindMissingTypes(true)),
+          java(
+            """
+              /**
+               * See {@code #baz}.
+               * 
+               * @see #bar() 
+               */
+              interface Foo {
+                  void bar();
               }
               """
           )
