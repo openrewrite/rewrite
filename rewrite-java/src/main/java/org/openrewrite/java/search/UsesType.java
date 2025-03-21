@@ -23,7 +23,6 @@ import org.openrewrite.SourceFileWithReferences;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.java.TypeMatcher;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
@@ -46,7 +45,7 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
     @Getter
     private final Predicate<JavaType> typePattern;
 
-    private final Reference.@Nullable Matcher typeMatcher;
+    private final Reference.Matcher referenceMatcher;
 
     @Nullable
     private final Boolean includeImplicit;
@@ -59,25 +58,25 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
                 if (dotdot == -1 && fullyQualifiedType.charAt(fullyQualifiedType.length() - 2) == '.') {
                     PackagePattern packagePattern = new PackagePattern(fullyQualifiedType.substring(0, fullyQualifiedType.length() - 2));
                     this.typePattern = packagePattern;
-                    this.typeMatcher = packagePattern;
+                    this.referenceMatcher = packagePattern;
                 } else if (dotdot == fullyQualifiedType.length() - 3) {
                     PackagePrefixPattern packagePrefixPattern = new PackagePrefixPattern(fullyQualifiedType.substring(0, dotdot));
                     this.typePattern = packagePrefixPattern;
-                    this.typeMatcher = packagePrefixPattern;
+                    this.referenceMatcher = packagePrefixPattern;
                 } else {
                     GenericPattern genericPattern = new GenericPattern(Pattern.compile(StringUtils.aspectjNameToPattern(fullyQualifiedType)));
                     this.typePattern = genericPattern;
-                    this.typeMatcher = genericPattern;
+                    this.referenceMatcher = genericPattern;
                 }
             } else {
                 GenericPattern genericPattern = new GenericPattern(Pattern.compile(StringUtils.aspectjNameToPattern(fullyQualifiedType)));
                 this.typePattern = genericPattern;
-                this.typeMatcher = genericPattern;
+                this.referenceMatcher = genericPattern;
             }
         } else {
             this.fullyQualifiedType = fullyQualifiedType;
             this.typePattern = null;
-            this.typeMatcher = null;
+            this.referenceMatcher = new ExactMatch(fullyQualifiedType);
         }
         this.includeImplicit = includeImplicit;
     }
@@ -129,8 +128,7 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
         } else if (tree instanceof SourceFileWithReferences) {
             SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
             SourceFileWithReferences.References references = sourceFile.getReferences();
-            Reference.Matcher matcher = typeMatcher != null ? typeMatcher : new TypeMatcher(fullyQualifiedType);
-            for (Reference ignored : references.findMatches(matcher)) {
+            for (Reference ignored : references.findMatches(referenceMatcher)) {
                 return SearchResult.found(sourceFile);
             }
         }
@@ -220,6 +218,21 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
         @Override
         public boolean matchesReference(Reference reference) {
             return reference.getKind() == Reference.Kind.TYPE && pattern.matcher(reference.getValue()).matches();
+        }
+
+        @Override
+        public Reference.Renamer createRenamer(String newName) {
+            return reference -> newName;
+        }
+    }
+
+    @Value
+    private static class ExactMatch implements Reference.Matcher {
+        String qualifiedName;
+
+        @Override
+        public boolean matchesReference(Reference reference) {
+            return reference.getKind() == Reference.Kind.TYPE && qualifiedName.equals(reference.getValue());
         }
 
         @Override
