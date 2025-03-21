@@ -20,6 +20,7 @@ import io.github.classgraph.ClassInfo;
 import io.github.classgraph.ScanResult;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
+import lombok.NoArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Contributor;
 import org.openrewrite.Recipe;
@@ -38,8 +39,10 @@ import java.util.jar.Attributes;
 import java.util.jar.Manifest;
 
 import static java.util.Collections.emptyList;
+import static lombok.AccessLevel.PRIVATE;
 import static org.openrewrite.internal.RecipeIntrospectionUtils.constructRecipe;
 
+@NoArgsConstructor(access = PRIVATE)
 public class ClasspathScanningLoader implements ResourceLoader {
 
     private final LinkedHashSet<Recipe> recipes = new LinkedHashSet<>();
@@ -62,9 +65,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
         scanManifests(new ClassGraph().acceptPackages(acceptPackages), getClass().getClassLoader());
         scanClasses(new ClassGraph().acceptPackages(acceptPackages), getClass().getClassLoader());
         scanYaml(new ClassGraph().acceptPaths("META-INF/rewrite"),
-                properties,
-                emptyList(),
-                null);
+                properties, emptyList(), null);
     }
 
     /**
@@ -75,35 +76,18 @@ public class ClasspathScanningLoader implements ResourceLoader {
      */
     public ClasspathScanningLoader(Properties properties, ClassLoader classLoader) {
         scanManifests(new ClassGraph().ignoreParentClassLoaders().overrideClassLoaders(classLoader), classLoader);
-
-        scanClasses(new ClassGraph()
-                .ignoreParentClassLoaders()
-                .overrideClassLoaders(classLoader), classLoader);
-
-        scanYaml(new ClassGraph()
-                        .ignoreParentClassLoaders()
-                        .overrideClassLoaders(classLoader)
-                        .acceptPaths("META-INF/rewrite"),
-                properties,
-                emptyList(),
-                classLoader);
+        scanClasses(new ClassGraph().ignoreParentClassLoaders().overrideClassLoaders(classLoader), classLoader);
+        scanYaml(new ClassGraph().ignoreParentClassLoaders().overrideClassLoaders(classLoader).acceptPaths("META-INF/rewrite"),
+                properties, emptyList(), classLoader);
     }
 
     public ClasspathScanningLoader(Path jar, Properties properties, Collection<? extends ResourceLoader> dependencyResourceLoaders, ClassLoader classLoader) {
         String jarName = jar.toFile().getName();
 
         scanManifests(new ClassGraph().acceptJars(jarName).ignoreParentClassLoaders().overrideClassLoaders(classLoader), classLoader);
-
-        scanClasses(new ClassGraph()
-                .acceptJars(jarName)
-                .ignoreParentClassLoaders()
-                .overrideClassLoaders(classLoader), classLoader);
-
-        scanYaml(new ClassGraph()
-                .acceptJars(jarName)
-                .ignoreParentClassLoaders()
-                .overrideClassLoaders(classLoader)
-                .acceptPaths("META-INF/rewrite"), properties, dependencyResourceLoaders, classLoader);
+        scanClasses(new ClassGraph().acceptJars(jarName).ignoreParentClassLoaders().overrideClassLoaders(classLoader), classLoader);
+        scanYaml(new ClassGraph().acceptJars(jarName).ignoreParentClassLoaders().overrideClassLoaders(classLoader).acceptPaths("META-INF/rewrite"),
+                properties, dependencyResourceLoaders, classLoader);
     }
 
     public static ClasspathScanningLoader onlyYaml(Properties properties) {
@@ -113,17 +97,11 @@ public class ClasspathScanningLoader implements ResourceLoader {
         return classpathScanningLoader;
     }
 
-    private ClasspathScanningLoader() {
-    }
-
     /**
      * Must be called prior to scanClasses and scanYaml to ensure that recipeOrigins is populated
      */
     private void scanManifests(ClassGraph classGraph, ClassLoader classLoader) {
-        try (ScanResult result = classGraph
-                .ignoreClassVisibility()
-                .overrideClassLoaders(classLoader)
-                .scan()) {
+        try (ScanResult result = classGraph.ignoreClassVisibility().overrideClassLoaders(classLoader).scan()) {
             result.getResourcesWithPath("META-INF/MANIFEST.MF").forEachInputStreamIgnoringIOException((r, is) -> {
                 try {
                     artifactManifestAttributes.put(r.getClasspathElementURI(), new Manifest(is).getMainAttributes());
@@ -143,9 +121,9 @@ public class ClasspathScanningLoader implements ResourceLoader {
             List<YamlResourceLoader> yamlResourceLoaders = new ArrayList<>();
 
             scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) ->
-                    yamlResourceLoaders.add(new YamlResourceLoader(input, res.getURI(), properties, classLoader, dependencyResourceLoaders)));
+                    yamlResourceLoaders.add(new YamlResourceLoader(input, res.getClasspathElementURI(), res.getURI(), properties, classLoader, dependencyResourceLoaders, it -> {})));
             scanResult.getResourcesWithExtension("yaml").forEachInputStreamIgnoringIOException((res, input) ->
-                    yamlResourceLoaders.add(new YamlResourceLoader(input, res.getURI(), properties, classLoader, dependencyResourceLoaders)));
+                    yamlResourceLoaders.add(new YamlResourceLoader(input, res.getClasspathElementURI(), res.getURI(), properties, classLoader, dependencyResourceLoaders, it -> {})));
             // Extract in two passes so that the full list of recipes from all sources are known when computing recipe descriptors
             // Otherwise recipes which include recipes from other sources in their recipeList will have incomplete descriptors
             for (YamlResourceLoader resourceLoader : yamlResourceLoaders) {
@@ -167,10 +145,10 @@ public class ClasspathScanningLoader implements ResourceLoader {
                 .overrideClassLoaders(classLoader)
                 .scan()) {
 
-            configureRecipes(result, Recipe.class.getName());
-            configureRecipes(result, ScanningRecipe.class.getName());
+            configureRecipes(result, Recipe.class);
+            configureRecipes(result, ScanningRecipe.class);
 
-            for (ClassInfo classInfo : result.getSubclasses(NamedStyles.class.getName())) {
+            for (ClassInfo classInfo : result.getSubclasses(NamedStyles.class)) {
                 Class<?> styleClass = classInfo.loadClass();
                 Constructor<?> constructor = RecipeIntrospectionUtils.getZeroArgsConstructor(styleClass);
                 if (constructor != null) {
@@ -186,10 +164,10 @@ public class ClasspathScanningLoader implements ResourceLoader {
         }
     }
 
-    private void configureRecipes(ScanResult result, String className) {
-        for (ClassInfo classInfo : result.getSubclasses(className)) {
+    private void configureRecipes(ScanResult result, Class<?> superclass) {
+        for (ClassInfo classInfo : result.getSubclasses(superclass)) {
             Class<?> recipeClass = classInfo.loadClass();
-            if (recipeClass.getName().equals(DeclarativeRecipe.class.getName()) ||
+            if (DeclarativeRecipe.class.isAssignableFrom(recipeClass) ||
                     (recipeClass.getModifiers() & Modifier.PUBLIC) == 0 ||
                     // `ScanningRecipe` is an example of an abstract `Recipe` subtype
                     (recipeClass.getModifiers() & Modifier.ABSTRACT) != 0) {
@@ -204,13 +182,12 @@ public class ClasspathScanningLoader implements ResourceLoader {
                 // Populate license & source from manifest attributes
                 Attributes attributes = artifactManifestAttributes.get(classInfo.getClasspathElementURI());
                 if (attributes != null) {
-                    descriptor = descriptor.withLicense(License.of(
-                            attributes.getValue("License-Name"),
-                            attributes.getValue("License-Url")));
-
                     String gitHubBase = attributes.containsKey("Module-Origin") ? attributes.getValue("Module-Origin") : "https://github.com/openrewrite";
                     String gitHubDir = attributes.containsKey("Module-Source") ? attributes.getValue("Module-Source") : "";
-                    descriptor = descriptor.withSource(URI.create(gitHubBase + "/" + gitHubDir));
+                    License license = License.of(attributes.getValue("License-Name"), attributes.getValue("License-Url"));
+                    descriptor = descriptor
+                            .withLicense(license)
+                            .withSource(URI.create(gitHubBase + "/" + gitHubDir));
                 }
 
                 recipeDescriptors.add(descriptor);

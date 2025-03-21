@@ -33,11 +33,6 @@ public class License {
     String fullName;
     String url;
 
-    private License(String fullName, String url) {
-        this.fullName = fullName;
-        this.url = url;
-    }
-
     public static @Nullable License of(@Nullable String fullName, @Nullable String url) {
         if (url != null) {
             switch (url) {
