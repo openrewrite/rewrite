@@ -784,7 +784,7 @@ public class AdaptiveRadixTree<V> {
     }
 
     private static class KeyTable {
-        private static final int INITIAL_CAPACITY = 16 * 1024; // 16KiB
+        private static final int INITIAL_CAPACITY = 8 * 1024; // 8KiB
         private static final int MAX_SMALL_GROWTH_SIZE = 1024 * 1024; // 1MiB
         private static final double LARGE_GROWTH_FACTOR = 1.3;
 
