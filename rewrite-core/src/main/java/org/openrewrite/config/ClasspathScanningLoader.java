@@ -168,17 +168,15 @@ public class ClasspathScanningLoader implements ResourceLoader {
         for (ClassInfo classInfo : result.getSubclasses(superclass)) {
             Class<?> recipeClass = classInfo.loadClass();
             if (DeclarativeRecipe.class.isAssignableFrom(recipeClass) ||
-                    (recipeClass.getModifiers() & Modifier.PUBLIC) == 0 ||
-                    // `ScanningRecipe` is an example of an abstract `Recipe` subtype
-                    (recipeClass.getModifiers() & Modifier.ABSTRACT) != 0) {
+                (recipeClass.getModifiers() & Modifier.PUBLIC) == 0 ||
+                // `ScanningRecipe` is an example of an abstract `Recipe` subtype
+                (recipeClass.getModifiers() & Modifier.ABSTRACT) != 0) {
                 continue;
             }
             Timer.Builder builder = Timer.builder("rewrite.scan.configure.recipe");
             Timer.Sample sample = Timer.start();
             try {
-                Recipe recipe = constructRecipe(recipeClass);
-                recipe.augmentRecipeDescriptor(artifactManifestAttributes.get(classInfo.getClasspathElementURI()));
-
+                Recipe recipe = constructRecipe(recipeClass).augmentRecipeDescriptor(artifactManifestAttributes.get(classInfo.getClasspathElementURI()));
                 recipeDescriptors.add(recipe.getDescriptor());
                 recipes.add(recipe);
                 MetricsHelper.successTags(builder.tags("recipe", "elided"));

@@ -146,8 +146,8 @@ public abstract class Recipe implements Cloneable {
                     optionField.setAccessible(true);
                     Object optionValue = optionField.get(this);
                     if (optionValue != null &&
-                            !Iterable.class.isAssignableFrom(optionValue.getClass()) &&
-                            !optionValue.getClass().isArray()) {
+                        !Iterable.class.isAssignableFrom(optionValue.getClass()) &&
+                        !optionValue.getClass().isArray()) {
                         return String.format("%s `%s`", getDisplayName(), optionValue);
                     }
                 } catch (NoSuchFieldException | IllegalAccessException ignore) {
@@ -213,7 +213,7 @@ public abstract class Recipe implements Cloneable {
         return descriptor;
     }
 
-    public final void augmentRecipeDescriptor(@Nullable Attributes attributes) {
+    public final Recipe augmentRecipeDescriptor(@Nullable Attributes attributes) {
         if (attributes != null) {
             String gitHubBase = attributes.containsKey("Module-Origin") ? attributes.getValue("Module-Origin") : "https://github.com/openrewrite";
             String gitHubDir = attributes.containsKey("Module-Source") ? attributes.getValue("Module-Source") : "";
@@ -222,6 +222,7 @@ public abstract class Recipe implements Cloneable {
                     .withLicense(license)
                     .withSource(URI.create(gitHubBase + "/" + gitHubDir));
         }
+        return this;
     }
 
     protected RecipeDescriptor createRecipeDescriptor() {

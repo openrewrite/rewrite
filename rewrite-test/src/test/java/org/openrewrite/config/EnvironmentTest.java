@@ -369,6 +369,9 @@ class EnvironmentTest implements RewriteTest {
           .filter(it -> "org.openrewrite.text.ChangeTextToJon".equals(it.getName()))
           .findAny()
           .get();
+
+        assertThat(cttj.getContributors())
+          .isNotEmpty();
     }
 
     @Test

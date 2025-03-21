@@ -122,12 +122,12 @@ public class Environment {
                 Collection<RecipeDescriptor> descriptors = r.listRecipeDescriptors();
                 for (RecipeDescriptor descriptor : descriptors) {
                     if (descriptor.getContributors() != null &&
-                            recipeToContributors.containsKey(descriptor.getName())) {
+                        recipeToContributors.containsKey(descriptor.getName())) {
                         descriptor.getContributors().addAll(recipeToContributors.get(descriptor.getName()));
                     }
 
                     if (descriptor.getExamples() != null &&
-                            recipeToExamples.containsKey(descriptor.getName())) {
+                        recipeToExamples.containsKey(descriptor.getName())) {
                         descriptor.getExamples().addAll(recipeToExamples.get(descriptor.getName()));
                     }
                 }
