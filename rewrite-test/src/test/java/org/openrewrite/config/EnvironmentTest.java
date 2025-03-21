@@ -231,13 +231,14 @@ class EnvironmentTest implements RewriteTest {
           )
           .load(
             new YamlResourceLoader(
-              new ByteArrayInputStream("""
-                    type: specs.openrewrite.org/v1beta/recipe
-                    name: test.ChangeTextToHello
-                    displayName: Change text to hello
-                    recipeList:
-                        - org.openrewrite.text.ChangeText:
-                            toText: Hello
+              new ByteArrayInputStream(
+                """
+                type: specs.openrewrite.org/v1beta/recipe
+                name: test.ChangeTextToHello
+                displayName: Change text to hello
+                recipeList:
+                    - org.openrewrite.text.ChangeText:
+                        toText: Hello
                 """.getBytes()
               ),
               URI.create("text.yml"),
@@ -379,12 +380,15 @@ class EnvironmentTest implements RewriteTest {
         var env = Environment.builder().scanRuntimeClasspath().build();
         var recipeDescriptors = env.listRecipeDescriptors();
         assertThat(recipeDescriptors).isNotNull().isNotEmpty();
-        var changeTextDescriptor = recipeDescriptors.stream().filter(rd -> rd.getName().equals("org.openrewrite.text.ChangeText"))
+        var recipeDescriptor = recipeDescriptors.stream().filter(rd -> rd.getName().equals("org.openrewrite.java.search.FindMethodDeclaration")) // recipe from another jar
           .findAny().orElse(null);
-        assertThat(changeTextDescriptor).isNotNull();
-        assertThat(changeTextDescriptor.getOptions()).hasSize(1);
-        assertThat(changeTextDescriptor.getOptions().get(0).getName()).isEqualTo("toText");
-        assertThat(changeTextDescriptor.getOptions().get(0).getType()).isEqualTo("String");
+        assertThat(recipeDescriptor).isNotNull();
+        assertThat(recipeDescriptor.getOptions()).hasSize(2);
+        assertThat(recipeDescriptor.getOptions().get(0).getName()).isEqualTo("methodPattern");
+        assertThat(recipeDescriptor.getOptions().get(0).getType()).isEqualTo("String");
+        assertThat(recipeDescriptor.getOptions().get(1).getName()).isEqualTo("matchOverrides");
+        assertThat(recipeDescriptor.getOptions().get(1).getType()).isEqualTo("Boolean");
+        assertThat(recipeDescriptor.getLicense()).isNotNull();
     }
 
     @Test

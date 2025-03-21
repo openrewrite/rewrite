@@ -145,7 +145,7 @@ public class RecipeSpec {
 
     private static Recipe recipeFromInputStream(InputStream yaml, String... activeRecipes) {
         return Environment.builder()
-                .load(new YamlResourceLoader(yaml, URI.create("rewrite.yml"), new Properties(), null, Collections.emptyList(),
+                .load(new YamlResourceLoader(yaml, null, URI.create("rewrite.yml"), new Properties(), null, Collections.emptyList(),
                         mapper -> mapper.enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)))
                 .build()
                 .activateRecipes(activeRecipes);
