@@ -98,9 +98,10 @@ public class MavenParser implements Parser {
             }
         }
 
-        MavenPomDownloader downloader = new MavenPomDownloader(projectPomsByPath, ctx);
-
         MavenExecutionContextView mavenCtx = MavenExecutionContextView.view(ctx);
+        mavenCtx.setProjectPoms(projectPomsByPath);
+        MavenPomDownloader downloader = MavenPomDownloader.forExecutionContext(mavenCtx);
+
         MavenSettings sanitizedSettings = mavenCtx.getSettings() == null ? null : mavenCtx.getSettings()
                 .withServers(null);
         List<String> effectivelyActiveProfiles = Stream.concat(mavenCtx.getActiveProfiles().stream(), activeProfiles.stream()).collect(Collectors.toList());

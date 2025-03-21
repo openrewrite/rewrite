@@ -648,7 +648,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                 return gp;
             }
 
-            MavenPomDownloader mpd = new MavenPomDownloader(ctx);
+            MavenPomDownloader mpd = MavenPomDownloader.forNonMavenContext(ctx);
             Pom pom = mpd.download(gav, null, null, gp.getMavenRepositories());
             ResolvedPom resolvedPom = pom.resolve(emptyList(), mpd, gp.getMavenRepositories(), ctx);
             List<ResolvedDependency> transitiveDependencies = resolvedPom.resolveDependencies(Scope.Runtime, mpd, ctx);
