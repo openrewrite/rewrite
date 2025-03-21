@@ -48,6 +48,7 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.RecipeSerializer.maybeAddKotlinModule;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.invalid;
+import static org.openrewrite.config.CategoryTree.CORE;
 
 public class YamlResourceLoader implements ResourceLoader {
     int refCount = 0;
@@ -56,7 +57,7 @@ public class YamlResourceLoader implements ResourceLoader {
             new PropertyPlaceholderHelper("${", "}", ":");
 
     @Nullable
-    private final URI resourceUri;
+    private final Attributes attributes;
     private final URI source;
     private final String yamlSource;
 
@@ -169,7 +170,7 @@ public class YamlResourceLoader implements ResourceLoader {
      * for recipes from dependencies.
      *
      * @param yamlInput                 Declarative recipe yaml input stream
-     * @param resourceUri               Declarative recipe resourceUri
+     * @param attributes                Declarative recipe extra attributes
      * @param source                    Declarative recipe source
      * @param properties                Placeholder properties
      * @param classLoader               Optional classloader to use with jackson. If not specified, the runtime classloader will be used.
@@ -177,11 +178,11 @@ public class YamlResourceLoader implements ResourceLoader {
      * @param mapperCustomizer          Customizer for the ObjectMapper
      * @throws UncheckedIOException     On unexpected IOException
      */
-    public YamlResourceLoader(InputStream yamlInput, @Nullable URI resourceUri, URI source, Properties properties,
+    public YamlResourceLoader(InputStream yamlInput, @Nullable Attributes attributes, URI source, Properties properties,
                               @Nullable ClassLoader classLoader,
                               Collection<? extends ResourceLoader> dependencyResourceLoaders,
                               Consumer<ObjectMapper> mapperCustomizer) {
-        this.resourceUri = resourceUri;
+        this.attributes = attributes;
         this.source = source;
         this.dependencyResourceLoaders = dependencyResourceLoaders;
         this.mapper = ObjectMappers.propertyBasedMapper(classLoader);
@@ -280,15 +281,7 @@ public class YamlResourceLoader implements ResourceLoader {
                 }
             }
             recipe.setContributors(contributors.get(recipe.getName()));
-            //TODO Set license and source
-
-
-            /*License license = License.of(attributes.getValue("License-Name"), attributes.getValue("License-Url"));
-            descriptor = descriptor
-                    .withLicense(license)
-                    .withSource(URI.create(gitHubBase + "/" + gitHubDir));*/
-
-
+            recipe.augmentRecipeDescriptor(attributes);
             recipes.add(recipe);
         }
 
@@ -350,38 +343,24 @@ public class YamlResourceLoader implements ResourceLoader {
 
     @Override
     public Collection<RecipeDescriptor> listRecipeDescriptors() {
-        return listRecipeDescriptors(emptyList(), listContributors(), listRecipeExamples(), emptyMap());
+        return listRecipeDescriptors(emptyList(), listContributors(), listRecipeExamples());
     }
 
     public Collection<RecipeDescriptor> listRecipeDescriptors(Collection<Recipe> externalRecipes,
                                                               Map<String, List<Contributor>> recipeNamesToContributors,
-                                                              Map<String, List<RecipeExample>> recipeNamesToExamples,
-                                                              Map<URI, Attributes> artifactManifestAttributes) {
+                                                              Map<String, List<RecipeExample>> recipeNamesToExamples) {
         Collection<DeclarativeRecipe> internalRecipes = listRecipes();
         Collection<Recipe> allRecipes = Stream.concat(
-                Stream.concat(
-                        externalRecipes.stream(),
-                        internalRecipes.stream()
-                ),
+                Stream.concat(externalRecipes.stream(), internalRecipes.stream()),
                 dependencyResourceLoaders.stream().flatMap(rl -> rl.listRecipes().stream())
         ).collect(toList());
 
         List<RecipeDescriptor> recipeDescriptors = new ArrayList<>();
         for (DeclarativeRecipe recipe : internalRecipes) {
             recipe.initialize(allRecipes, recipeNamesToContributors);
+            recipe.setContributors(recipeNamesToContributors.get(recipe.getName()));
             recipe.setExamples(recipeNamesToExamples.get(recipe.getName()));
-            RecipeDescriptor descriptor = recipe.getDescriptor();
-
-            Attributes attributes = artifactManifestAttributes.get(resourceUri);
-            if (attributes != null) {
-                String gitHubBase = attributes.containsKey("Module-Origin") ? attributes.getValue("Module-Origin") : "https://github.com/openrewrite";
-                String gitHubDir = attributes.containsKey("Module-Source") ? attributes.getValue("Module-Source") : "";
-                License license = License.of(attributes.getValue("License-Name"), attributes.getValue("License-Url"));
-                descriptor = descriptor
-                        .withLicense(license)
-                        .withSource(URI.create(gitHubBase + "/" + gitHubDir));
-            }
-            recipeDescriptors.add(descriptor);
+            recipeDescriptors.add(recipe.getDescriptor());
         }
         return recipeDescriptors;
     }
@@ -469,8 +448,7 @@ public class YamlResourceLoader implements ResourceLoader {
 
                     @Language("markdown")
                     String packageName = (String) c.get("packageName");
-                    if (packageName.endsWith("." + CategoryTree.CORE) ||
-                            packageName.contains("." + CategoryTree.CORE + ".")) {
+                    if (packageName.endsWith("." + CORE) || packageName.contains("." + CORE + ".")) {
                         throw new IllegalArgumentException("The package name 'core' is reserved.");
                     }
 

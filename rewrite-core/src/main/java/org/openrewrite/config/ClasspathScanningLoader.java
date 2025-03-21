@@ -121,9 +121,9 @@ public class ClasspathScanningLoader implements ResourceLoader {
             List<YamlResourceLoader> yamlResourceLoaders = new ArrayList<>();
 
             scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) ->
-                    yamlResourceLoaders.add(new YamlResourceLoader(input, res.getClasspathElementURI(), res.getURI(), properties, classLoader, dependencyResourceLoaders, it -> {})));
+                    yamlResourceLoaders.add(new YamlResourceLoader(input, artifactManifestAttributes.get(res.getClasspathElementURI()), res.getURI(), properties, classLoader, dependencyResourceLoaders, it -> {})));
             scanResult.getResourcesWithExtension("yaml").forEachInputStreamIgnoringIOException((res, input) ->
-                    yamlResourceLoaders.add(new YamlResourceLoader(input, res.getClasspathElementURI(), res.getURI(), properties, classLoader, dependencyResourceLoaders, it -> {})));
+                    yamlResourceLoaders.add(new YamlResourceLoader(input, artifactManifestAttributes.get(res.getClasspathElementURI()), res.getURI(), properties, classLoader, dependencyResourceLoaders, it -> {})));
             // Extract in two passes so that the full list of recipes from all sources are known when computing recipe descriptors
             // Otherwise recipes which include recipes from other sources in their recipeList will have incomplete descriptors
             for (YamlResourceLoader resourceLoader : yamlResourceLoaders) {
@@ -134,7 +134,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
                 recipeExamples.putAll(resourceLoader.listRecipeExamples());
             }
             for (YamlResourceLoader resourceLoader : yamlResourceLoaders) {
-                recipeDescriptors.addAll(resourceLoader.listRecipeDescriptors(recipes, recipeAttributions, recipeExamples, artifactManifestAttributes));
+                recipeDescriptors.addAll(resourceLoader.listRecipeDescriptors(recipes, recipeAttributions, recipeExamples));
             }
         }
     }
@@ -177,20 +177,9 @@ public class ClasspathScanningLoader implements ResourceLoader {
             Timer.Sample sample = Timer.start();
             try {
                 Recipe recipe = constructRecipe(recipeClass);
-                RecipeDescriptor descriptor = recipe.getDescriptor();
+                recipe.augmentRecipeDescriptor(artifactManifestAttributes.get(classInfo.getClasspathElementURI()));
 
-                // Populate license & source from manifest attributes
-                Attributes attributes = artifactManifestAttributes.get(classInfo.getClasspathElementURI());
-                if (attributes != null) {
-                    String gitHubBase = attributes.containsKey("Module-Origin") ? attributes.getValue("Module-Origin") : "https://github.com/openrewrite";
-                    String gitHubDir = attributes.containsKey("Module-Source") ? attributes.getValue("Module-Source") : "";
-                    License license = License.of(attributes.getValue("License-Name"), attributes.getValue("License-Url"));
-                    descriptor = descriptor
-                            .withLicense(license)
-                            .withSource(URI.create(gitHubBase + "/" + gitHubDir));
-                }
-
-                recipeDescriptors.add(descriptor);
+                recipeDescriptors.add(recipe.getDescriptor());
                 recipes.add(recipe);
                 MetricsHelper.successTags(builder.tags("recipe", "elided"));
             } catch (Throwable e) {

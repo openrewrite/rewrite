@@ -298,45 +298,6 @@ class YamlResourceLoaderTest implements RewriteTest {
     }
 
     @Test
-    void recipeOrigin() {
-        Environment env = Environment.builder()
-          .load(new YamlResourceLoader(new ByteArrayInputStream(
-            //language=yml
-            """
-              type: specs.openrewrite.org/v1beta/recipe
-              name: test.ChangeTextToHello
-              displayName: Change text to hello
-              recipeList:
-                  - org.openrewrite.text.ChangeText:
-                      toText: Hello!
-              """.getBytes()
-          ), URI.create("rewrite.yml"), new Properties()))
-          .load(new YamlResourceLoader(new ByteArrayInputStream(
-            //language=yml
-            """
-              type: specs.openrewrite.org/v1beta/origin
-              recipeName: test.ChangeTextToHello
-              recipeUrl: "https://github.com/openrewrite/rewrite/blob/main/rewrite-gradle/src/main/java/org/openrewrite/gradle/AddDependencyVisitor.java"
-              recipeLicenseUrl: "https://www.apache.org/licenses/LICENSE-2.0"
-              recipeLicenseName: "Apache License Version 2.0"
-              """.getBytes()
-          ), URI.create("origin/test.ChangeTextToHello.yml"), new Properties()))
-          .build();
-
-        Collection<Recipe> recipes = env.listRecipes();
-        assertThat(recipes).singleElement().satisfies(r ->
-          assertThat(r.getOrigin()).isEqualTo(new RecipeOrigin(
-            URI.create("https://github.com/openrewrite/rewrite/blob/main/rewrite-gradle/src/main/java/org/openrewrite/gradle/AddDependencyVisitor.java"),
-            License.APACHE_V2)));
-
-        Collection<RecipeDescriptor> recipeDescriptors = env.listRecipeDescriptors();
-        assertThat(recipeDescriptors).singleElement().satisfies(d ->
-          assertThat(d.getOrigin()).isEqualTo(new RecipeOrigin(
-            URI.create("https://github.com/openrewrite/rewrite/blob/main/rewrite-gradle/src/main/java/org/openrewrite/gradle/AddDependencyVisitor.java"),
-            License.APACHE_V2)));
-    }
-
-    @Test
     void caseInsensitiveEnums() {
         rewriteRun(
           spec -> spec.recipeFromYaml(
