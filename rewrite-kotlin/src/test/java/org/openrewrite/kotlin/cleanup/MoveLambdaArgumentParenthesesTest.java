@@ -23,7 +23,7 @@ import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
-class RemoveLambdaArgumentParenthesesTest implements RewriteTest {
+class MoveLambdaArgumentParenthesesTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
