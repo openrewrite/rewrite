@@ -2068,4 +2068,95 @@ class RemoveUnusedImportsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void testLombokValInLambda() {
+        rewriteRun(
+          java(
+            """
+            import lombok.val;
+            import java.util.List;
+            import java.util.ArrayList;
+            import java.util.stream.Collectors;
+            
+            public class Foo {
+                
+                List<String> names = new ArrayList<>();
+                
+                public String method() {
+                    return names.stream()
+                    .map(n -> {
+                        val name = "";
+                        return n + name;
+                    })
+                    .collect(Collectors.joining(""));
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void testImportAnnotation() {
+        rewriteRun(
+          java("""
+                  package org.springframework.context.annotation;
+                  import java.lang.annotation.*;
+                  
+                  @Target({ElementType.TYPE})
+                  @Retention(RetentionPolicy.RUNTIME)
+                  @Documented
+                  public @interface Import {
+                      Class<?>[] value();
+                  }
+                  """,
+            SourceSpec::skip),
+          java(
+            """
+              package a;
+              
+              public class A {
+              }
+              """,
+            SourceSpec::skip),
+          java(
+            """
+                import a.A;
+                import org.springframework.context.annotation.Import;
+                
+                @Import({
+                  A.class
+                })
+                public class SomeClass {
+                
+                }
+              """
+          )
+        );
+    }
+
+    @Disabled("Source file was parsed into an LST that contains non-whitespace characters in its whitespace. This is indicative of a bug in the parser.")
+    @DocumentExample
+    @Test
+    void removeUnusedImportsImportUsageEnum() {
+        rewriteRun(
+          java("""
+              package a;
+              
+              public class A {
+              }
+              """,
+            SourceSpec::skip),
+          java(
+            """
+                    import a.A;
+                    
+                    public enum SomeEnum { 
+                        private A a;
+                    }
+                    """
+          )
+        );
+    }
 }
