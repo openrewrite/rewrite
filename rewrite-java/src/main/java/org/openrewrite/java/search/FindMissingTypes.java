@@ -16,9 +16,13 @@
 package org.openrewrite.java.search;
 
 import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavadocVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.SearchResult;
@@ -31,7 +35,15 @@ import java.util.stream.Collectors;
 
 import static org.openrewrite.java.tree.TypeUtils.isWellFormedType;
 
+@Value
+@EqualsAndHashCode(callSuper = false)
 public class FindMissingTypes extends Recipe {
+
+    @Option(displayName = "Check documentation",
+            description = "When set to `true` any references in documentation (i.e. Javadoc for Java) will also be checked. Default is `false`.",
+            required = false
+    )
+    boolean checkDocumentation;
 
     @Override
     public String getDisplayName() {
@@ -45,11 +57,11 @@ public class FindMissingTypes extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new FindMissingTypesVisitor();
+        return new FindMissingTypesVisitor(checkDocumentation);
     }
 
     public static List<MissingTypeResult> findMissingTypes(J j) {
-        J j1 = new FindMissingTypesVisitor().visit(j, new InMemoryExecutionContext());
+        J j1 = new FindMissingTypesVisitor(false).visit(j, new InMemoryExecutionContext());
         List<MissingTypeResult> results = new ArrayList<>();
         if (j1 != j) {
             new JavaIsoVisitor<List<MissingTypeResult>>() {
@@ -86,9 +98,12 @@ public class FindMissingTypes extends Recipe {
         J j;
     }
 
+    @Value
+    @EqualsAndHashCode(callSuper = true)
     static class FindMissingTypesVisitor extends JavaIsoVisitor<ExecutionContext> {
 
-        private final Set<JavaType> seenTypes = new HashSet<>();
+        boolean checkDocumentation;
+        Set<JavaType> seenTypes = new HashSet<>();
 
         @Override
         public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
@@ -240,6 +255,16 @@ public class FindMissingTypes extends Recipe {
                 p = SearchResult.found(p, "ParameterizedType#clazz is J.Identifier and the type is is not JavaType$Class.");
             }
             return p;
+        }
+
+        @Override
+        protected JavadocVisitor<ExecutionContext> getJavadocVisitor() {
+            return new JavadocVisitor<ExecutionContext>(this) {
+                @Override
+                public @Nullable Javadoc visit(@Nullable Tree tree, ExecutionContext ctx) {
+                    return checkDocumentation ? super.visit(tree, ctx) : (Javadoc) tree;
+                }
+            };
         }
 
         private boolean isAllowedToHaveNullType(J.Identifier ident) {
