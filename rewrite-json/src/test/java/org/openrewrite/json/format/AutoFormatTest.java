@@ -112,4 +112,35 @@ class AutoFormatTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void emptyObjectsToCollapse() {
+        rewriteRun(
+          json(
+            """
+            {
+              "a": 1,
+              "b": 2,
+              "o": {
+
+              },
+              "s": [
+
+
+
+
+              ]
+            }
+            """,
+            """
+            {
+              "a": 1,
+              "b": 2,
+              "o": {},
+              "s": []
+            }
+            """
+          )
+        );
+    }
 }

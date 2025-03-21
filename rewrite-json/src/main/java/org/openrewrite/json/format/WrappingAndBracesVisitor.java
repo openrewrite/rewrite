@@ -28,6 +28,7 @@ import org.openrewrite.json.tree.Space;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.LineWrapSetting;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -62,6 +63,7 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
 
         members = ensureCollectionHasIndents(members, wrappingSetting);
         members = applyWrappingStyleToSuffixes(members, wrappingSetting, getCurrentIndent());
+        members = collapseToNoSpaceIfEmpty(members);
         return ret.getPadding().withMembers(members);
     }
 
@@ -73,6 +75,7 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
 
         members = ensureCollectionHasIndents(members, wrappingSetting);
         members = applyWrappingStyleToSuffixes(members, wrappingSetting, getCurrentIndent());
+        members = collapseToNoSpaceIfEmpty(members);
         return ret.getPadding().withValues(members);
     }
 
@@ -153,5 +156,13 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
             return containingNode.map(node -> node.getPrefix().getWhitespaceIndent()).orElse("");
         }
         return ret;
+    }
+
+    private <JS extends Json> List<JsonRightPadded<JS>> collapseToNoSpaceIfEmpty(List<JsonRightPadded<JS>> list) {
+        if (list.size() == 1 && (list.get(0).getElement() instanceof Json.Empty)) {
+            return Collections.emptyList();
+        } else {
+            return list;
+        }
     }
 }
