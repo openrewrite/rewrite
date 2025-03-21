@@ -373,4 +373,22 @@ class JavaParserTest implements RewriteTest {
         assertThat(JavaParser.filterArtifacts("rewrite-java", classpath))
           .containsOnly(Paths.get("/.m2/repository/org/openrewrite/rewrite-java/8.41.1/rewrite-java-8.41.1.jar"));
     }
+
+    @Test
+    void emptyEnum() {
+        rewriteRun(
+          // language=java
+          java(
+            """
+            package com.helloworld;
+            import java.time.Instant;
+            public class InstallationStatus {
+              public enum InstallationFeatures {}
+              public InstallationStatus create(Instant updateTime) {
+                return null;
+              }
+            }
+            """));
+    }
+
 }

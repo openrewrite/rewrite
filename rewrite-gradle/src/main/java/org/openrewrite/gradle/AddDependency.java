@@ -202,7 +202,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                             return (J) tree;
                         }
                         JavaSourceFile s = (JavaSourceFile) tree;
-                        if (!s.getSourcePath().toString().endsWith(".gradle") || s.getSourcePath().getFileName().toString().equals("settings.gradle")) {
+                        if (!isAcceptable(s, ctx) || !s.getSourcePath().toString().endsWith(".gradle") || s.getSourcePath().getFileName().toString().equals("settings.gradle")) {
                             return s;
                         }
 

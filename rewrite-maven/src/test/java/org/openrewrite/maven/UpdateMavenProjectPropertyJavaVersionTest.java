@@ -185,7 +185,7 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
 
 
     @Test
-    void UpdateChildProperty() {
+    void updateChildProperty() {
         rewriteRun(
           //language=xml
           pomXml(
@@ -244,6 +244,86 @@ class UpdateMavenProjectPropertyJavaVersionTest implements RewriteTest {
                     </properties>
                 </project>
                 """
+            )
+          )
+        );
+    }
+
+    @Test
+    void doNotCrashOnImplicitVersion() {
+        rewriteRun(
+          mavenProject("spring-cloud-kubernetes",
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                
+                    <parent>
+                        <groupId>org.springframework.cloud</groupId>
+                        <artifactId>spring-cloud-build</artifactId>
+                        <version>4.1.5</version>
+                        <relativePath/>
+                    </parent>
+                
+                    <artifactId>spring-cloud-kubernetes</artifactId>
+                    <version>3.1.5</version>
+                    <packaging>pom</packaging>
+                    <modules>
+                        <module>spring-cloud-kubernetes-integration-tests</module>
+                    </modules>
+                
+                    <build>
+                        <plugins>
+                            <plugin>
+                                <groupId>org.apache.maven.plugins</groupId>
+                                <artifactId>maven-compiler-plugin</artifactId>
+                                <inherited>true</inherited>
+                                <configuration>
+                                    <source>17</source>
+                                    <target>17</target>
+                                </configuration>
+                            </plugin>
+                        </plugins>
+                    </build>
+                </project>""")
+          ),
+          mavenProject("spring-cloud-kubernetes-integration-tests",
+            pomXml(
+              """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>org.springframework.cloud</groupId>
+                        <artifactId>spring-cloud-kubernetes</artifactId>
+                        <version>3.1.5</version>
+                    </parent>
+                
+                    <artifactId>spring-cloud-kubernetes-integration-tests</artifactId>
+                    <packaging>pom</packaging>
+                
+                    <name>Spring Cloud Kubernetes :: Integration Tests</name>
+                    <description>Integration tests where SCK applications are run inside a Kubernetes cluster</description>
+                
+                    <modules>
+                        <module>spring-cloud-kubernetes-k8s-client-discovery-server</module>
+                    </modules>
+                </project>""")
+          ),
+          mavenProject("spring-cloud-kubernetes-k8s-client-discovery-server",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                    <parent>
+                        <artifactId>spring-cloud-kubernetes-integration-tests</artifactId>
+                        <groupId>org.springframework.cloud</groupId>
+                        <version>3.1.5</version>
+                    </parent>
+                    <modelVersion>4.0.0</modelVersion>
+                
+                    <artifactId>spring-cloud-kubernetes-k8s-client-discovery-server</artifactId>
+                
+                </project>"""
             )
           )
         );

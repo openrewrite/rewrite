@@ -243,7 +243,7 @@ public class TypeTable implements JavaParserClasspathLoader {
 
             classes.values().forEach(classDef -> {
                 Path classFile = classesDir.resolve(classDef.getName() + ".class");
-                if (!Files.exists(classFile.getParent()) && !classFile.getParent().toFile().mkdirs()) {
+                if (!classFile.getParent().toFile().mkdirs() && !Files.exists(classFile.getParent())) {
                     throw new UncheckedIOException(new IOException("Failed to create directory " + classesDir.getParent()));
                 }
 
@@ -366,7 +366,7 @@ public class TypeTable implements JavaParserClasspathLoader {
     private static Path getClassesDir(ExecutionContext ctx, GroupArtifactVersion gav) {
         Path jarsFolder = JavaParserExecutionContextView.view(ctx)
                 .getParserClasspathDownloadTarget().toPath().resolve(".tt");
-        if (!Files.exists(jarsFolder) && !jarsFolder.toFile().mkdirs()) {
+        if (!jarsFolder.toFile().mkdirs() && !Files.exists(jarsFolder)) {
             throw new UncheckedIOException(new IOException("Failed to create directory " + jarsFolder));
         }
 
@@ -376,7 +376,7 @@ public class TypeTable implements JavaParserClasspathLoader {
         }
         classesDir = classesDir.resolve(gav.getArtifactId()).resolve(gav.getVersion());
 
-        if (!Files.exists(classesDir) && !classesDir.toFile().mkdirs()) {
+        if (!classesDir.toFile().mkdirs() && !Files.exists(classesDir)) {
             throw new UncheckedIOException(new IOException("Failed to create directory " + classesDir));
         }
 
