@@ -60,8 +60,8 @@ public class FindMissingTypes extends Recipe {
         return new FindMissingTypesVisitor(checkDocumentation);
     }
 
-    public static List<MissingTypeResult> findMissingTypes(J j) {
-        J j1 = new FindMissingTypesVisitor(false).visit(j, new InMemoryExecutionContext());
+    public static List<MissingTypeResult> findMissingTypes(J j, boolean checkDocumentation) {
+        J j1 = new FindMissingTypesVisitor(checkDocumentation).visit(j, new InMemoryExecutionContext());
         List<MissingTypeResult> results = new ArrayList<>();
         if (j1 != j) {
             new JavaIsoVisitor<List<MissingTypeResult>>() {
