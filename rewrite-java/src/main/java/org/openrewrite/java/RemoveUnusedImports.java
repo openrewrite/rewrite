@@ -23,12 +23,27 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.Flag;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JRightPadded;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.Style;
 
 import java.time.Duration;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -77,55 +92,9 @@ public class RemoveUnusedImports extends Recipe {
 
         @Override
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-            ImportLayoutStyle layoutStyle = Optional.ofNullable(Style.from(ImportLayoutStyle.class, cu))
-                    .orElse(IntelliJ.importLayout());
-            String sourcePackage = cu.getPackageDeclaration() == null ? "" :
-                    cu.getPackageDeclaration().getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");
-            Map<String, TreeSet<String>> methodsAndFieldsByTypeName = new HashMap<>();
-            Map<String, Set<JavaType.FullyQualified>> typesByPackage = new HashMap<>();
-
-            for (JavaType.Method method : cu.getTypesInUse().getUsedMethods()) {
-                if (method.hasFlags(Flag.Static)) {
-                    methodsAndFieldsByTypeName.computeIfAbsent(method.getDeclaringType().getFullyQualifiedName(), t -> new TreeSet<>())
-                            .add(method.getName());
-                }
-            }
-
-            for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
-                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getOwner());
-                if (fq != null) {
-                    methodsAndFieldsByTypeName.computeIfAbsent(fq.getFullyQualifiedName(), f -> new TreeSet<>())
-                            .add(variable.getName());
-                }
-            }
-
-            for (JavaType javaType : cu.getTypesInUse().getTypesInUse()) {
-                if (javaType instanceof JavaType.Parameterized) {
-                    JavaType.Parameterized parameterized = (JavaType.Parameterized) javaType;
-                    typesByPackage.computeIfAbsent(parameterized.getType().getPackageName(), f -> new HashSet<>())
-                            .add(parameterized.getType());
-                    for (JavaType typeParameter : parameterized.getTypeParameters()) {
-                        JavaType.FullyQualified fq = TypeUtils.asFullyQualified(typeParameter);
-                        if (fq != null) {
-                            typesByPackage.computeIfAbsent(
-                                    fq.getOwningClass() == null ?
-                                            fq.getPackageName() :
-                                            toFullyQualifiedName(fq.getOwningClass().getFullyQualifiedName()),
-                                    f -> new HashSet<>()).add(fq);
-                        }
-                    }
-                } else if (javaType instanceof JavaType.FullyQualified) {
-                    JavaType.FullyQualified fq = (JavaType.FullyQualified) javaType;
-                    typesByPackage.computeIfAbsent(
-                            fq.getOwningClass() == null ?
-                                    fq.getPackageName() :
-                                    toFullyQualifiedName(fq.getOwningClass().getFullyQualifiedName()),
-                            f -> new HashSet<>()).add(fq);
-                }
-            }
-
+            Map<String, TreeSet<String>> methodsAndFieldsByTypeName = methodsAndFieldsByTypeName(cu);
+            Map<String, Set<JavaType.FullyQualified>> typesByPackage = typesByPackage(cu);
             boolean changed = false;
-
             // the key is a list because a star import may get replaced with multiple unfolded imports
             List<ImportUsage> importUsage = new ArrayList<>(cu.getPadding().getImports().size());
             for (JRightPadded<J.Import> anImport : cu.getPadding().getImports()) {
@@ -134,11 +103,12 @@ public class RemoveUnusedImports extends Recipe {
                 singleUsage.imports.add(anImport);
                 importUsage.add(singleUsage);
             }
-
             // whenever an import statement is found to be used and not already in use it should be marked true
             Set<String> checkedImports = new HashSet<>();
             Set<String> usedWildcardImports = new HashSet<>();
             Set<String> usedStaticWildcardImports = new HashSet<>();
+            ImportLayoutStyle layoutStyle =
+                    Optional.ofNullable(Style.from(ImportLayoutStyle.class, cu)).orElse(IntelliJ.importLayout());
             for (ImportUsage anImport : importUsage) {
                 J.Import elem = anImport.imports.get(0).getElement();
                 J.FieldAccess qualid = elem.getQualid();
@@ -178,7 +148,7 @@ public class RemoveUnusedImports extends Recipe {
                             anImport.used = true;
                             usedStaticWildcardImports.add(elem.getTypeName());
                         } else if (((methodsAndFields == null ? 0 : methodsAndFields.size()) +
-                                    (staticClasses == null ? 0 : staticClasses.size())) < layoutStyle.getNameCountToUseStarImport()) {
+                                (staticClasses == null ? 0 : staticClasses.size())) < layoutStyle.getNameCountToUseStarImport()) {
                             // replacing the star with a series of unfolded imports
                             anImport.imports.clear();
 
@@ -208,8 +178,8 @@ public class RemoveUnusedImports extends Recipe {
                             usedStaticWildcardImports.add(elem.getTypeName());
                         }
                     } else if (staticClasses != null && staticClasses.stream().anyMatch(c -> elem.getTypeName().equals(c.getFullyQualifiedName())) ||
-                               (methodsAndFields != null && methodsAndFields.contains(qualid.getSimpleName())) ||
-                               (targetMethodsAndFields != null && targetMethodsAndFields.contains(qualid.getSimpleName()))) {
+                            (methodsAndFields != null && methodsAndFields.contains(qualid.getSimpleName())) ||
+                            (targetMethodsAndFields != null && targetMethodsAndFields.contains(qualid.getSimpleName()))) {
                         anImport.used = true;
                     } else {
                         anImport.used = false;
@@ -218,10 +188,16 @@ public class RemoveUnusedImports extends Recipe {
                 } else {
                     String target = qualid.getTarget().toString();
                     Set<JavaType.FullyQualified> types = typesByPackage.getOrDefault(target, new HashSet<>());
-                    Set<JavaType.FullyQualified> typesByFullyQualifiedClassPath = typesByPackage.getOrDefault(toFullyQualifiedName(target), new HashSet<>());
-                    Set<JavaType.FullyQualified> combinedTypes = Stream.concat(types.stream(), typesByFullyQualifiedClassPath.stream())
+                    Set<JavaType.FullyQualified> typesByFullyQualifiedClassPath =
+                            typesByPackage.getOrDefault(toFullyQualifiedName(target), new HashSet<>());
+                    Set<JavaType.FullyQualified> combinedTypes = Stream.concat(types.stream(),
+                                    typesByFullyQualifiedClassPath.stream())
                             .collect(Collectors.toSet());
                     JavaType.FullyQualified qualidType = TypeUtils.asFullyQualified(elem.getQualid().getType());
+                    String sourcePackage = cu.getPackageDeclaration() == null
+                            ? ""
+                            : cu.getPackageDeclaration().getExpression().printTrimmed(getCursor())
+                            .replaceAll("\\s", "");
                     if (combinedTypes.isEmpty() || sourcePackage.equals(elem.getPackageName()) && qualidType != null && !qualidType.getFullyQualifiedName().contains("$")) {
                         anImport.used = false;
                         changed = true;
@@ -268,7 +244,7 @@ public class RemoveUnusedImports extends Recipe {
                 if (!"*".equals(elem.getQualid().getSimpleName())) {
                     if (elem.isStatic()) {
                         if (usedStaticWildcardImports.contains(elem.getTypeName()) &&
-                            !ambiguousStaticImportNames.contains(elem.getQualid().getSimpleName())) {
+                                !ambiguousStaticImportNames.contains(elem.getQualid().getSimpleName())) {
                             anImport.used = false;
                             changed = true;
                         }
@@ -290,8 +266,9 @@ public class RemoveUnusedImports extends Recipe {
                         for (int i = 0; i < importGroup.size(); i++) {
                             JRightPadded<J.Import> anImport = importGroup.get(i);
                             if (i == 0 && lastUnusedImportSpace != null && anImport.getElement().getPrefix().getLastWhitespace()
-                                                                                   .chars().filter(c -> c == '\n').count() <= 1) {
-                                anImport = anImport.withElement(anImport.getElement().withPrefix(lastUnusedImportSpace));
+                                    .chars().filter(c -> c == '\n').count() <= 1) {
+                                anImport =
+                                        anImport.withElement(anImport.getElement().withPrefix(lastUnusedImportSpace));
                             }
                             imports.add(anImport);
                         }
@@ -309,146 +286,195 @@ public class RemoveUnusedImports extends Recipe {
 
             return cu;
         }
+    }
 
-        private static Set<String> getAmbiguousStaticImportNames(J.CompilationUnit cu) {
-            Set<String> typesWithWildcardImport = new HashSet<>();
-            for (J.Import elem : cu.getImports()) {
-                if ("*".equals(elem.getQualid().getSimpleName())) {
-                    typesWithWildcardImport.add(elem.getTypeName());
-                }
-            }
-            Set<JavaType.FullyQualified> qualifiedTypes = new HashSet<>();
-            for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
-                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getOwner());
-                if (fq != null && typesWithWildcardImport.contains(fq.getFullyQualifiedName())) {
-                    qualifiedTypes.add(fq);
-                }
-            }
-            Set<String> seen = new HashSet<>();
-            Set<String> ambiguous = new HashSet<>();
-            for (JavaType.FullyQualified fq : qualifiedTypes) {
-                for (JavaType.Variable member : fq.getMembers()) {
-                    if (!seen.add(member.getName())) {
-                        ambiguous.add(member.getName());
+    private static Map<String, Set<JavaType.FullyQualified>> typesByPackage(final J.CompilationUnit cu) {
+        Map<String, Set<JavaType.FullyQualified>> typesByPackage = new HashMap<>();
+        for (JavaType javaType : cu.getTypesInUse().getTypesInUse()) {
+            if (javaType instanceof JavaType.Parameterized) {
+                JavaType.Parameterized parameterized = (JavaType.Parameterized) javaType;
+                typesByPackage.computeIfAbsent(parameterized.getType().getPackageName(), f -> new HashSet<>())
+                        .add(parameterized.getType());
+                for (JavaType typeParameter : parameterized.getTypeParameters()) {
+                    JavaType.FullyQualified fq = TypeUtils.asFullyQualified(typeParameter);
+                    if (fq != null) {
+                        typesByPackage.computeIfAbsent(
+                                fq.getOwningClass() == null ?
+                                        fq.getPackageName() :
+                                        toFullyQualifiedName(fq.getOwningClass().getFullyQualifiedName()),
+                                f -> new HashSet<>()).add(fq);
                     }
                 }
+            } else if (javaType instanceof JavaType.FullyQualified) {
+                JavaType.FullyQualified fq = (JavaType.FullyQualified) javaType;
+                typesByPackage.computeIfAbsent(
+                        fq.getOwningClass() == null ?
+                                fq.getPackageName() :
+                                toFullyQualifiedName(fq.getOwningClass().getFullyQualifiedName()),
+                        f -> new HashSet<>()).add(fq);
             }
-            return ambiguous;
+        }
+        return typesByPackage;
+    }
+
+    private static Map<String, TreeSet<String>> methodsAndFieldsByTypeName(final J.CompilationUnit cu) {
+        Map<String, TreeSet<String>> methodsAndFieldsByTypeName = new HashMap<>();
+        for (JavaType.Method method : cu.getTypesInUse().getUsedMethods()) {
+            if (method.hasFlags(Flag.Static)) {
+                methodsAndFieldsByTypeName.computeIfAbsent(method.getDeclaringType().getFullyQualifiedName(),
+                                t -> new TreeSet<>())
+                        .add(method.getName());
+            }
         }
 
-        private static final Set<String> JAVA_LANG_CLASS_NAMES = new HashSet<>(Arrays.asList(
-                "AbstractMethodError",
-                "Appendable",
-                "ArithmeticException",
-                "ArrayIndexOutOfBoundsException",
-                "ArrayStoreException",
-                "AssertionError",
-                "AutoCloseable",
-                "Boolean",
-                "BootstrapMethodError",
-                "Byte",
-                "Character",
-                "CharSequence",
-                "Class",
-                "ClassCastException",
-                "ClassCircularityError",
-                "ClassFormatError",
-                "ClassLoader",
-                "ClassNotFoundException",
-                "ClassValue",
-                "Cloneable",
-                "CloneNotSupportedException",
-                "Comparable",
-                "Deprecated",
-                "Double",
-                "Enum",
-                "EnumConstantNotPresentException",
-                "Error",
-                "Exception",
-                "ExceptionInInitializerError",
-                "Float",
-                "FunctionalInterface",
-                "IllegalAccessError",
-                "IllegalAccessException",
-                "IllegalArgumentException",
-                "IllegalCallerException",
-                "IllegalMonitorStateException",
-                "IllegalStateException",
-                "IllegalThreadStateException",
-                "IncompatibleClassChangeError",
-                "IndexOutOfBoundsException",
-                "InheritableThreadLocal",
-                "InstantiationError",
-                "InstantiationException",
-                "Integer",
-                "InternalError",
-                "InterruptedException",
-                "Iterable",
-                "LayerInstantiationException",
-                "LinkageError",
-                "Long",
-                "MatchException",
-                "Math",
-                "Module",
-                "ModuleLayer",
-                "NegativeArraySizeException",
-                "NoClassDefFoundError",
-                "NoSuchFieldError",
-                "NoSuchFieldException",
-                "NoSuchMethodError",
-                "NoSuchMethodException",
-                "NullPointerException",
-                "Number",
-                "NumberFormatException",
-                "Object",
-                "OutOfMemoryError",
-                "Override",
-                "Package",
-                "Process",
-                "ProcessBuilder",
-                "ProcessHandle",
-                "Readable",
-                "Record",
-                "ReflectiveOperationException",
-                "Runnable",
-                "Runtime",
-                "RuntimeException",
-                "RuntimePermission",
-                "SafeVarargs",
-                "ScopedValue",
-                "SecurityException",
-                "SecurityManager",
-                "Short",
-                "StackOverflowError",
-                "StackTraceElement",
-                "StackWalker",
-                "StrictMath",
-                "String",
-                "StringBuffer",
-                "StringBuilder",
-                "StringIndexOutOfBoundsException",
-                "StringTemplate",
-                "SuppressWarnings",
-                "System",
-                "Thread",
-                "ThreadDeath",
-                "ThreadGroup",
-                "ThreadLocal",
-                "Throwable",
-                "TypeNotPresentException",
-                "UnknownError",
-                "UnsatisfiedLinkError",
-                "UnsupportedClassVersionError",
-                "UnsupportedOperationException",
-                "VerifyError",
-                "VirtualMachineError",
-                "Void",
-                "WrongThreadException"
-        ));
-
-        private static boolean conflictsWithJavaLang(J.Import elem) {
-            return JAVA_LANG_CLASS_NAMES.contains(elem.getClassName());
+        for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
+            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getOwner());
+            if (fq != null) {
+                methodsAndFieldsByTypeName.computeIfAbsent(fq.getFullyQualifiedName(), f -> new TreeSet<>())
+                        .add(variable.getName());
+            }
         }
+        return methodsAndFieldsByTypeName;
+    }
+
+    private static Set<String> getAmbiguousStaticImportNames(J.CompilationUnit cu) {
+        Set<String> typesWithWildcardImport = new HashSet<>();
+        for (J.Import elem : cu.getImports()) {
+            if ("*".equals(elem.getQualid().getSimpleName())) {
+                typesWithWildcardImport.add(elem.getTypeName());
+            }
+        }
+        Set<JavaType.FullyQualified> qualifiedTypes = new HashSet<>();
+        for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
+            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getOwner());
+            if (fq != null && typesWithWildcardImport.contains(fq.getFullyQualifiedName())) {
+                qualifiedTypes.add(fq);
+            }
+        }
+        Set<String> seen = new HashSet<>();
+        Set<String> ambiguous = new HashSet<>();
+        for (JavaType.FullyQualified fq : qualifiedTypes) {
+            for (JavaType.Variable member : fq.getMembers()) {
+                if (!seen.add(member.getName())) {
+                    ambiguous.add(member.getName());
+                }
+            }
+        }
+        return ambiguous;
+    }
+
+    private static final Set<String> JAVA_LANG_CLASS_NAMES = new HashSet<>(Arrays.asList(
+            "AbstractMethodError",
+            "Appendable",
+            "ArithmeticException",
+            "ArrayIndexOutOfBoundsException",
+            "ArrayStoreException",
+            "AssertionError",
+            "AutoCloseable",
+            "Boolean",
+            "BootstrapMethodError",
+            "Byte",
+            "Character",
+            "CharSequence",
+            "Class",
+            "ClassCastException",
+            "ClassCircularityError",
+            "ClassFormatError",
+            "ClassLoader",
+            "ClassNotFoundException",
+            "ClassValue",
+            "Cloneable",
+            "CloneNotSupportedException",
+            "Comparable",
+            "Deprecated",
+            "Double",
+            "Enum",
+            "EnumConstantNotPresentException",
+            "Error",
+            "Exception",
+            "ExceptionInInitializerError",
+            "Float",
+            "FunctionalInterface",
+            "IllegalAccessError",
+            "IllegalAccessException",
+            "IllegalArgumentException",
+            "IllegalCallerException",
+            "IllegalMonitorStateException",
+            "IllegalStateException",
+            "IllegalThreadStateException",
+            "IncompatibleClassChangeError",
+            "IndexOutOfBoundsException",
+            "InheritableThreadLocal",
+            "InstantiationError",
+            "InstantiationException",
+            "Integer",
+            "InternalError",
+            "InterruptedException",
+            "Iterable",
+            "LayerInstantiationException",
+            "LinkageError",
+            "Long",
+            "MatchException",
+            "Math",
+            "Module",
+            "ModuleLayer",
+            "NegativeArraySizeException",
+            "NoClassDefFoundError",
+            "NoSuchFieldError",
+            "NoSuchFieldException",
+            "NoSuchMethodError",
+            "NoSuchMethodException",
+            "NullPointerException",
+            "Number",
+            "NumberFormatException",
+            "Object",
+            "OutOfMemoryError",
+            "Override",
+            "Package",
+            "Process",
+            "ProcessBuilder",
+            "ProcessHandle",
+            "Readable",
+            "Record",
+            "ReflectiveOperationException",
+            "Runnable",
+            "Runtime",
+            "RuntimeException",
+            "RuntimePermission",
+            "SafeVarargs",
+            "ScopedValue",
+            "SecurityException",
+            "SecurityManager",
+            "Short",
+            "StackOverflowError",
+            "StackTraceElement",
+            "StackWalker",
+            "StrictMath",
+            "String",
+            "StringBuffer",
+            "StringBuilder",
+            "StringIndexOutOfBoundsException",
+            "StringTemplate",
+            "SuppressWarnings",
+            "System",
+            "Thread",
+            "ThreadDeath",
+            "ThreadGroup",
+            "ThreadLocal",
+            "Throwable",
+            "TypeNotPresentException",
+            "UnknownError",
+            "UnsatisfiedLinkError",
+            "UnsupportedClassVersionError",
+            "UnsupportedOperationException",
+            "VerifyError",
+            "VirtualMachineError",
+            "Void",
+            "WrongThreadException"
+    ));
+
+    private static boolean conflictsWithJavaLang(J.Import elem) {
+        return JAVA_LANG_CLASS_NAMES.contains(elem.getClassName());
     }
 
     private static class ImportUsage {
