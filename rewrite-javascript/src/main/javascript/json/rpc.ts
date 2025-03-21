@@ -20,25 +20,25 @@ import {Draft} from "immer";
 class JsonSender extends JsonVisitor<RpcSendQueue> {
 
     protected async preVisit(j: Json, q: RpcSendQueue): Promise<Json | undefined> {
-        q.getAndSend(j, j2 => j2.id);
-        q.getAndSend(j, j2 => asRef(j2.prefix), space => this.visitSpace(space, q));
-        q.sendMarkers(j, j2 => j2.markers);
+        await q.getAndSend(j, j2 => j2.id);
+        await q.getAndSend(j, j2 => asRef(j2.prefix), space => this.visitSpace(space, q));
+        await q.sendMarkers(j, j2 => j2.markers);
         return j;
     }
 
     protected async visitDocument(document: Document, q: RpcSendQueue): Promise<Json | undefined> {
-        q.getAndSend(document, d => d.sourcePath);
-        q.getAndSend(document, d => d.charsetName);
-        q.getAndSend(document, d => d.charsetBomMarked);
-        q.getAndSend(document, d => d.checksum);
-        q.getAndSend(document, d => d.fileAttributes);
-        q.getAndSend(document, d => d.value, j => this.visit(j, q));
-        q.getAndSend(document, d => asRef(d.eof));
+        await q.getAndSend(document, d => d.sourcePath);
+        await q.getAndSend(document, d => d.charsetName);
+        await q.getAndSend(document, d => d.charsetBomMarked);
+        await q.getAndSend(document, d => d.checksum);
+        await q.getAndSend(document, d => d.fileAttributes);
+        await q.getAndSend(document, d => d.value, j => this.visit(j, q));
+        await q.getAndSend(document, d => asRef(d.eof));
         return document;
     }
 
     protected async visitArray(array: JsonArray, q: RpcSendQueue): Promise<Json | undefined> {
-        q.getAndSendList(array, a => a.values, j => j.element.id, j => this.visitRightPadded(j, q));
+        await q.getAndSendList(array, a => a.values, j => j.element.id, j => this.visitRightPadded(j, q));
         return array;
     }
 
@@ -47,42 +47,42 @@ class JsonSender extends JsonVisitor<RpcSendQueue> {
     }
 
     protected async visitIdentifier(identifier: Identifier, q: RpcSendQueue): Promise<Json | undefined> {
-        q.getAndSend(identifier, id => id.name);
+        await q.getAndSend(identifier, id => id.name);
         return identifier;
     }
 
     protected async visitLiteral(literal: Literal, q: RpcSendQueue): Promise<Json | undefined> {
-        q.getAndSend(literal, lit => lit.source);
-        q.getAndSend(literal, lit => lit.value);
+        await q.getAndSend(literal, lit => lit.source);
+        await q.getAndSend(literal, lit => lit.value);
         return literal;
     }
 
     protected async visitMember(member: Member, q: RpcSendQueue): Promise<Json | undefined> {
-        q.getAndSend(member, m => m.key, j => this.visitRightPadded(j, q));
-        q.getAndSend(member, m => m.value, j => this.visit(j, q));
+        await q.getAndSend(member, m => m.key, j => this.visitRightPadded(j, q));
+        await q.getAndSend(member, m => m.value, j => this.visit(j, q));
         return member;
     }
 
     protected async visitObject(obj: JsonObject, q: RpcSendQueue): Promise<Json | undefined> {
-        q.getAndSendList(obj, o => o.members, j => j.element.id, j => this.visitRightPadded(j, q));
+        await q.getAndSendList(obj, o => o.members, j => j.element.id, j => this.visitRightPadded(j, q));
         return obj;
     }
 
     protected async visitSpace(space: Space, q: RpcSendQueue): Promise<Space> {
-        q.getAndSendList(space, s => s.comments, c => c.text + c.suffix, c => {
-            q.getAndSend(c, c2 => c2.multiline);
-            q.getAndSend(c, c2 => c2.text);
-            q.getAndSend(c, c2 => c2.suffix);
-            q.sendMarkers(c, c2 => c2.markers);
+        await q.getAndSendList(space, s => s.comments, c => c.text + c.suffix, async c => {
+            await q.getAndSend(c, c2 => c2.multiline);
+            await q.getAndSend(c, c2 => c2.text);
+            await q.getAndSend(c, c2 => c2.suffix);
+            await q.sendMarkers(c, c2 => c2.markers);
         });
-        q.getAndSend(space, s => s.whitespace);
+        await q.getAndSend(space, s => s.whitespace);
         return space;
     }
 
     protected async visitRightPadded<T extends Json>(right: JsonRightPadded<T>, q: RpcSendQueue): Promise<JsonRightPadded<T> | undefined> {
-        q.getAndSend(right, r => r.element, j => this.visit(j, q));
-        q.getAndSend(right, r => asRef(r.after), space => this.visitSpace(space, q));
-        q.sendMarkers(right, r => r.markers);
+        await q.getAndSend(right, r => r.element, j => this.visit(j, q));
+        await q.getAndSend(right, r => asRef(r.after), space => this.visitSpace(space, q));
+        await q.sendMarkers(right, r => r.markers);
         return right;
     }
 }

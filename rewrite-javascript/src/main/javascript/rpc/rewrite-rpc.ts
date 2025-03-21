@@ -21,7 +21,7 @@ export class RewriteRpc {
     private readonly remoteObjects: Map<string, any> = new Map();
     private readonly remoteRefs: Map<number, any> = new Map();
 
-    constructor() {
+    constructor(batchSize: number = 10) {
         const preparedRecipes: Map<String, Recipe> = new Map();
         const recipeCursors: WeakMap<Recipe, Cursor> = new WeakMap()
 
@@ -30,7 +30,7 @@ export class RewriteRpc {
             this.getCursor);
         Generate.handle(this.connection, this.localObjects,
             preparedRecipes, recipeCursors, this.getObject);
-        GetObject.handle(this.connection, this.remoteObjects, this.localObjects);
+        GetObject.handle(this.connection, this.remoteObjects, this.localObjects, batchSize);
         getRecipes(this.connection);
         PrepareRecipe.handle(this.connection, preparedRecipes);
         Print.handle(this.connection, this.getObject, this.getCursor);
@@ -47,7 +47,7 @@ export class RewriteRpc {
         });
 
         let remoteObject = q.receive(this.localObjects.get(id), (before: any) => {
-            return RpcCodecs.getCodecForInstance(before)?.rpcReceive(before, q) ?? before;
+            return RpcCodecs.forInstance(before)?.rpcReceive(before, q) ?? before;
         });
 
         if ((await q.take()).state !== RpcObjectState.END_OF_OBJECT) {
@@ -72,13 +72,12 @@ export class RewriteRpc {
         return cursor;
     }
 
-    visit(tree: Tree, visitorName: string, p: any, cursor: Cursor | undefined): Promise<Tree> {
-        return this.scan(tree, visitorName, p, cursor).then(response => {
-            if (response.modified) {
-                return this.getObject(tree.id.toString());
-            }
-            return tree;
-        });
+    async visit(tree: Tree, visitorName: string, p: any, cursor: Cursor | undefined): Promise<Tree> {
+        let response = await this.scan(tree, visitorName, p, cursor);
+        if (response.modified) {
+            return this.getObject(tree.id.toString());
+        }
+        return tree;
     }
 
     scan(tree: Tree, visitorName: string, p: any, cursor: Cursor | undefined): Promise<VisitResponse> {

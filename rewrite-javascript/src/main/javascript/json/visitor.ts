@@ -71,15 +71,15 @@ export class JsonVisitor<P> extends TreeVisitor<Json, P> {
     }
 
     protected async produceJson<J extends Json>(
-        before: J,
+        before: Json | undefined,
         p: P,
         recipe?: (draft: Draft<J>) =>
             ValidImmerRecipeReturnType<Draft<J>> |
             PromiseLike<ValidImmerRecipeReturnType<Draft<J>>>
     ): Promise<J> {
-        const draft: Draft<J> = createDraft(before);
-        (draft as Draft<Json>).prefix = await this.visitSpace(before.prefix, p);
-        (draft as Draft<Json>).markers = await this.visitMarkers(before.markers, p);
+        const draft: Draft<J> = createDraft(before as J);
+        (draft as Draft<Json>).prefix = await this.visitSpace(before!.prefix, p);
+        (draft as Draft<Json>).markers = await this.visitMarkers(before!.markers, p);
         if (recipe) {
             await recipe(draft);
         }

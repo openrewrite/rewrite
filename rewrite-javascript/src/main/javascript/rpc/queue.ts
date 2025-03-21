@@ -1,4 +1,6 @@
 import {Marker} from "../markers";
+import {RpcCodecs} from "./codec";
+import {Queue} from "async-await-queue";
 
 const REFERENCE_KEY = Symbol("org.openrewrite.rpc.Reference");
 
@@ -15,82 +17,86 @@ function isRef(obj?: any): obj is Reference {
 }
 
 export class RpcSendQueue {
-    private readonly batchSize: number
-    private batch: RpcObjectData[] = [];
-    private readonly drain: (batch: RpcObjectData[]) => void;
-
+    private readonly batch = new Queue(2, 100);
     private readonly refs: WeakMap<Object, number>;
-    private refCount = 1
 
+    private resolver?: (d: RpcObjectData) => void;
+    private next?: Promise<RpcObjectData>;
+
+    private refCount = 1
     private before?: any;
 
-    constructor(batchSize: number,
-                drain: (batch: RpcObjectData[]) => void,
-                refs: WeakMap<Object, number>) {
-        this.batchSize = batchSize
-        this.drain = drain;
+    constructor(refs: WeakMap<Object, number>) {
         this.refs = refs;
     }
 
-    put(rpcObjectData: RpcObjectData): void {
-        this.batch.push(rpcObjectData);
-        if (this.batch.length === this.batchSize) {
-            this.flush();
+    async* generate(after: any, before: any): AsyncGenerator<RpcObjectData> {
+        const afterCodec = RpcCodecs.forInstance(after);
+        const onChange = afterCodec ? async () => {
+            afterCodec?.rpcSend(after, this);
+        } : undefined;
+        const top: Promise<void> = this.send(after, before, onChange);
+
+        let data;
+        while(/*!top.resolved ||*/ (data = await this.next)) {
+            yield data;
         }
+
+        await top;
+        return {state: RpcObjectState.END_OF_OBJECT};
     }
 
-    flush(): void {
-        if (this.batch.length === 0) {
-            return;
-        }
-        this.drain([...this.batch]);
-        this.batch = [];
+    private put(d: RpcObjectData): void {
+        // await next is undefined
+
+        // What do I do here to make d available to the generator?
+        this.next = Promise.resolve(this.resolver);
     }
 
-    sendMarkers<T>(parent: T, markersFn: (parent: T) => any): void {
-        this.getAndSend(parent, markersFn, (markersRef) => {
-            this.getAndSendList(markersRef,
+    async sendMarkers<T>(parent: T, markersFn: (parent: T) => any): Promise<void> {
+        await this.getAndSend(parent, markersFn, async (markersRef) => {
+            await this.getAndSendList(markersRef,
                 (m) => m.getMarkers(),
                 (marker: Marker) => marker.id
             );
         });
     }
 
-    getAndSend<T, U>(parent: T,
-                     value: (parent: T) => U | undefined,
-                     onChange?: (value: U) => void): void {
+    async getAndSend<T, U>(parent: T,
+                           value: (parent: T) => U | undefined,
+                           onChange?: (value: U) => Promise<any>): Promise<void> {
         const after = value(parent);
         const before = this.before === undefined ? undefined : value(this.before as T);
-        this.send(after, before, onChange ? () => onChange(after!) : undefined);
+        await this.send(after, before, onChange ? () => onChange(after!) : undefined);
     }
 
-    getAndSendList<T, U>(parent: T,
-                         values: (parent: T) => U[] | undefined,
-                         id: (value: U) => any,
-                         onChange?: (value: U) => void): void {
+    async getAndSendList<T, U>(parent: T,
+                               values: (parent: T) => U[] | undefined,
+                               id: (value: U) => any,
+                               onChange?: (value: U) => Promise<any>): Promise<void> {
         const after = values(parent);
         const before = this.before === undefined ? undefined : values(this.before as T);
-        this.sendList(after, before, id, onChange);
+        await this.sendList(after, before, id, onChange);
     }
 
-    send<T>(after: T | undefined, before: T | undefined, onChange: (() => void) | undefined): void {
+    async send<T>(after: T | undefined, before: T | undefined, onChange: (() => Promise<any>) | undefined): Promise<void> {
         if (before === after) {
             this.put({state: RpcObjectState.NO_CHANGE});
         } else if (before === undefined) {
-            this.add(after, onChange);
+            await this.add(after, onChange);
         } else if (after === undefined) {
             this.put({state: RpcObjectState.DELETE});
         } else {
             this.put({state: RpcObjectState.CHANGE, value: onChange ? after : undefined});
-            this.doChange(after, before, onChange);
+            await this.doChange(after, before, onChange);
         }
     }
 
-    sendList<T>(after: T[] | undefined,
-                before: T[] | undefined,
-                id: (value: T) => any,
-                onChange?: (value: T) => void): void {
-        this.send(after, before, () => {
+    async sendList<T>(after: T[] | undefined,
+                      before: T[] | undefined,
+                      id: (value: T) => any,
+                      onChange?: (value: T) => Promise<any>): Promise<void> {
+        await this.send(after, before, async () => {
             if (!after) {
                 throw new Error("A DELETE event should have been sent.");
             }
@@ -101,14 +107,14 @@ export class RpcSendQueue {
                 const beforePos = beforeIdx.get(id(anAfter));
                 const onChangeRun = onChange ? () => onChange(anAfter) : undefined;
                 if (!beforePos) {
-                    this.add(anAfter, onChangeRun);
+                    await this.add(anAfter, onChangeRun);
                 } else {
                     const aBefore = before ? before[beforePos] : undefined;
                     if (aBefore === anAfter) {
                         this.put({state: RpcObjectState.NO_CHANGE});
                     } else {
                         this.put({state: RpcObjectState.CHANGE});
-                        this.doChange(anAfter, aBefore, onChangeRun);
+                        await this.doChange(anAfter, aBefore, onChangeRun);
                     }
                 }
             }
@@ -133,7 +139,7 @@ export class RpcSendQueue {
         return beforeIdx;
     }
 
-    private add(after: any, onChange: (() => void) | undefined): void {
+    private async add(after: any, onChange: (() => Promise<any>) | undefined): Promise<void> {
         let ref: number | undefined;
         if (isRef(after)) {
             if (this.refs.has(after)) {
@@ -153,15 +159,15 @@ export class RpcSendQueue {
             value: onChange ? undefined : after,
             ref: ref
         });
-        this.doChange(after, undefined, onChange);
+        await this.doChange(after, undefined, onChange);
     }
 
-    private doChange(after: any, before: any, onChange: (() => void) | undefined): void {
+    private async doChange(after: any, before: any, onChange: (() => Promise<void>) | undefined): Promise<void> {
         if (onChange) {
             const lastBefore = this.before;
             this.before = before;
             if (after !== undefined) {
-                onChange();
+                await onChange();
             }
             this.before = lastBefore;
         }
@@ -181,7 +187,6 @@ export class RpcSendQueue {
         return type.name;
     }
 }
-
 
 export class RpcReceiveQueue {
     private batch: RpcObjectData[] = [];

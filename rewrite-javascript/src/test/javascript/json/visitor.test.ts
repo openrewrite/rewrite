@@ -4,9 +4,9 @@ import {EmptyMarkers, randomId} from "../../../main/javascript";
 class SetEmptySpace extends JsonVisitor<number> {
     protected async visitEmpty(empty: Empty, p: number): Promise<Json | undefined> {
         return this.produceJson<Empty>(
-            await super.visitEmpty(empty, p) as Empty, p,
+            await super.visitEmpty(empty, p), p,
             draft => {
-                draft.prefix = space(" ")
+                draft.prefix.whitespace = " "
             }
         )
     }
