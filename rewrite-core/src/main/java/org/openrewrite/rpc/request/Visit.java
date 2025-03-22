@@ -70,14 +70,12 @@ public class Visit implements RpcRequest {
         @Override
         protected Object handle(Visit request) throws Exception {
             Tree before = (Tree) getObject.apply(request.getTreeId());
-            localObjects.put(before.getId().toString(), before);
-
             Object p = getVisitorP(request);
 
             //noinspection unchecked
             TreeVisitor<?, Object> visitor = (TreeVisitor<?, Object>) instantiateVisitor(request, p);
 
-            SourceFile after = (SourceFile) visitor.visit(before, p, getCursor.apply(
+            Tree after = visitor.visit(before, p, getCursor.apply(
                     request.getCursor()));
             if (after == null) {
                 localObjects.remove(before.getId().toString());
@@ -120,8 +118,6 @@ public class Visit implements RpcRequest {
 
         private Object getVisitorP(Visit request) {
             Object p = getObject.apply(request.getP());
-            // This is likely to be reused in subsequent visits, so we keep it.
-            localObjects.put(request.getP(), p);
 
             if (p instanceof ExecutionContext) {
                 String visitorName = request.getVisitor();
