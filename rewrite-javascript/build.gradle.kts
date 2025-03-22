@@ -17,3 +17,4 @@ dependencies {
     testImplementation(project(":rewrite-yaml"))
     testImplementation("io.moderne:jsonrpc:latest.release")
 }
+

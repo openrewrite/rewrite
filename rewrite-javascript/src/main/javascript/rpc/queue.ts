@@ -20,37 +20,47 @@ export class RpcSendQueue {
     private readonly batch = new Queue(2, 100);
     private readonly refs: WeakMap<Object, number>;
 
-    private resolver?: (d: RpcObjectData) => void;
-    private next?: Promise<RpcObjectData>;
+    private next: Promise<RpcObjectData>;
+    private resolveNext!: (value: RpcObjectData) => void;
 
     private refCount = 1
     private before?: any;
 
     constructor(refs: WeakMap<Object, number>) {
         this.refs = refs;
+        this.next = new Promise<RpcObjectData>(resolve => {
+            this.resolveNext = resolve;
+        });
     }
 
     async* generate(after: any, before: any): AsyncGenerator<RpcObjectData> {
         const afterCodec = RpcCodecs.forInstance(after);
         const onChange = afterCodec ? async () => {
-            afterCodec?.rpcSend(after, this);
+            await afterCodec?.rpcSend(after, this);
         } : undefined;
+
         const top: Promise<void> = this.send(after, before, onChange);
-
-        let data;
-        while(/*!top.resolved ||*/ (data = await this.next)) {
-            yield data;
+        while (true) {
+            // Race between waiting for the next data and the resolution of 'top'
+            const result = await Promise.race([
+                this.next,
+                top.then(() => ({state: RpcObjectState.END_OF_OBJECT}))
+            ]);
+            if (result.state === RpcObjectState.END_OF_OBJECT) {
+                break;
+            }
+            yield result;
         }
-
-        await top;
-        return {state: RpcObjectState.END_OF_OBJECT};
     }
 
     private put(d: RpcObjectData): void {
-        // await next is undefined
+        // Resolve this existing promise
+        this.resolveNext(d);
 
-        // What do I do here to make d available to the generator?
-        this.next = Promise.resolve(this.resolver);
+        // Create a new promise for the next value
+        this.next = new Promise<RpcObjectData>(resolve => {
+            this.resolveNext = resolve;
+        });
     }
 
     async sendMarkers<T>(parent: T, markersFn: (parent: T) => any): Promise<void> {

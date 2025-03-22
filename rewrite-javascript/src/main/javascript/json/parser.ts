@@ -1,6 +1,7 @@
-import {EmptyMarkers, ExecutionContext, Parser, ParserSourceReader, randomId, SourceFile} from "../";
+import {emptyMarkers, ExecutionContext, Parser, ParserSourceReader, randomId} from "../";
 import {
-    Document, EmptySpace,
+    Document,
+    emptySpace,
     Json,
     JsonArray,
     JsonKind,
@@ -15,7 +16,7 @@ import {relative} from "path";
 
 export class JsonParser extends Parser {
 
-    parse(ctx: ExecutionContext, relativeTo?: string, ...sourcePaths: string[]): SourceFile[] {
+    parse(ctx: ExecutionContext, relativeTo?: string, ...sourcePaths: string[]): Document[] {
         return sourcePaths.map(sourcePath => {
             return new ParseJsonReader(sourcePath, ctx, relativeTo).parse();
         });
@@ -39,7 +40,7 @@ class ParseJsonReader extends ParserSourceReader {
             kind: JsonKind.Document,
             id: randomId(),
             prefix: this.prefix(),
-            markers: EmptyMarkers,
+            markers: emptyMarkers,
             sourcePath: relative(this.relativeTo || "", this.sourcePath),
             value: this.json(JSON.parse(this.source)) as JsonValue,
             eof: space(this.source.slice(this.cursor))
@@ -50,7 +51,7 @@ class ParseJsonReader extends ParserSourceReader {
         const base = {
             id: randomId(),
             prefix: this.prefix(),
-            markers: EmptyMarkers
+            markers: emptyMarkers
         }
         if (Array.isArray(parsed)) {
             this.cursor++; // skip '['
@@ -107,11 +108,11 @@ class ParseJsonReader extends ParserSourceReader {
         return {
             kind: JsonKind.Member,
             id: randomId(),
-            prefix: EmptySpace,
-            markers: EmptyMarkers,
+            prefix: emptySpace,
+            markers: emptyMarkers,
             key: {
                 kind: JsonKind.RightPadded,
-                markers: EmptyMarkers,
+                markers: emptyMarkers,
                 element: this.json(key),
                 after: space(this.sourceBefore(":")),
             },
@@ -119,3 +120,4 @@ class ParseJsonReader extends ParserSourceReader {
         } as Member;
     }
 }
+

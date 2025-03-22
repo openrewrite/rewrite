@@ -1,4 +1,4 @@
-import {EmptyMarkers, Markers} from "./markers";
+import {emptyMarkers, Markers} from "./markers";
 import {Cursor, isSourceFile, rootCursor, SourceFile, Tree} from "./tree";
 import {createDraft, Draft, finishDraft, Objectish} from "immer";
 import {mapAsync} from "./util";
@@ -100,8 +100,8 @@ export abstract class TreeVisitor<T extends Tree, P> {
     }
 
     protected async visitMarkers(markers: Markers, p: P): Promise<Markers> {
-        if (markers === EmptyMarkers) {
-            return EmptyMarkers;
+        if (markers === emptyMarkers) {
+            return emptyMarkers;
         } else if (markers.markers.length === 0) {
             return markers;
         }

@@ -73,7 +73,7 @@ class MyRecipe extends Recipe {
 export abstract class ScanningRecipe<P> extends Recipe {
     private recipeAccMessage: string = `org.openrewrite.recipe.acc.${randomId()}`;
 
-    private accumulator(cursor: Cursor, ctx: ExecutionContext): P {
+    accumulator(cursor: Cursor, ctx: ExecutionContext): P {
         const ms = cursor.root.messages;
         if (!ms.has(this.recipeAccMessage)) {
             ms.set(this.recipeAccMessage, this.initialValue(ctx));

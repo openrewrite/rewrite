@@ -1,6 +1,7 @@
-import {Markers, SourceFile, Tree} from "../";
+import {Markers, SourceFile, Tree, TreeKind} from "../";
 
 export const JsonKind = {
+    ...TreeKind,
     Array: "org.openrewrite.json.tree.Json$Array",
     Document: "org.openrewrite.json.tree.Json$Document",
     Empty: "org.openrewrite.json.tree.Json$Empty",
@@ -37,7 +38,7 @@ export function space(whitespace: string): Space {
     }
 }
 
-export const EmptySpace: Space = {
+export const emptySpace: Space = {
     kind: JsonKind.Space,
     comments: [],
     whitespace: ""

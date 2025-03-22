@@ -16,7 +16,7 @@ export interface Markers {
     readonly markers: Marker[]
 }
 
-export const EmptyMarkers: Markers = {
+export const emptyMarkers: Markers = {
     kind: MarkersKind.Markers,
     id: randomId(),
     markers: []

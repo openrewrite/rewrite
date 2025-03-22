@@ -1,6 +1,6 @@
 import * as rpc from "vscode-jsonrpc/node";
-import {Recipe} from "../../recipe";
-import {Cursor, Tree} from "../../tree";
+import {Recipe, ScanningRecipe} from "../../recipe";
+import {Cursor, rootCursor, Tree} from "../../tree";
 import {TreeVisitor} from "../../visitor";
 
 export interface VisitResponse {
@@ -29,15 +29,12 @@ export class Visit {
                   getObject: (id: string) => any,
                   getCursor: (cursorIds: string[] | undefined) => Promise<Cursor>): void {
         connection.onRequest(new rpc.RequestType<Visit, VisitResponse, Error>("Visit"), async (request) => {
+            const p = getObject(request.p);
             const before: Tree = getObject(request.treeId);
             localObjects.set(before.id.toString(), before);
 
-            const visitor: TreeVisitor<any, any> = Reflect.construct(
-                // "as any" bypasses strict type checking
-                (globalThis as any)[request.visitor],
-                request.visitorOptions ? Array.from(request.visitorOptions.values()) : [])
-
-            const after = await visitor.visit(before, getObject(request.p), await getCursor(request.cursor));
+            const visitor = Visit.instantiateVisitor(request, preparedRecipes, recipeCursors, p);
+            const after = await visitor.visit(before, p, await getCursor(request.cursor));
             if (!after) {
                 localObjects.delete(before.id.toString());
             } else {
@@ -47,4 +44,38 @@ export class Visit {
             return {modified: before !== after}
         });
     }
+
+    private static instantiateVisitor(request: Visit,
+                                      preparedRecipes: Map<String, Recipe>,
+                                      recipeCursors: WeakMap<Recipe, Cursor>,
+                                      p: any): TreeVisitor<any, any> {
+        const visitorName = request.visitor;
+        if (visitorName.startsWith("scan:")) {
+            const recipeKey = visitorName.substring("scan:".length);
+            const recipe = preparedRecipes.get(recipeKey) as ScanningRecipe<any>;
+            if (!recipe) {
+                throw new Error(`No scanning recipe found for key: ${recipeKey}`);
+            }
+            let cursor = recipeCursors.get(recipe);
+            if (!cursor) {
+                cursor = rootCursor();
+                recipeCursors.set(recipe, cursor);
+            }
+            const acc = recipe.accumulator(cursor, p);
+            return recipe.scanner(acc);
+        } else if (visitorName.startsWith("edit:")) {
+            const recipeKey = visitorName.substring("edit:".length);
+            const recipe = preparedRecipes.get(recipeKey) as Recipe;
+            if (!recipe) {
+                throw new Error(`No editing recipe found for key: ${recipeKey}`);
+            }
+            return recipe.editor;
+        } else {
+            return Reflect.construct(
+                // "as any" bypasses strict type checking
+                (globalThis as any)[visitorName],
+                request.visitorOptions ? Array.from(request.visitorOptions.values()) : [])
+        }
+    }
+
 }

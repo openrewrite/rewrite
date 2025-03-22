@@ -177,8 +177,8 @@ const jsonCodec: RpcCodec<Json> = {
         return (await new JsonReceiver().visit(before, q))!;
     },
 
-    rpcSend(after: Json, q: RpcSendQueue): void {
-        new JsonSender().visit(after, q).then();
+    async rpcSend(after: Json, q: RpcSendQueue): Promise<void> {
+        await new JsonSender().visit(after, q);
     }
 }
 

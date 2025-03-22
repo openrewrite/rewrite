@@ -11,7 +11,7 @@ export interface RpcCodec<T> {
      * @param after - The object to be sent.
      * @param q - The RPC send queue where the object will be enqueued.
      */
-    rpcSend(after: T, q: RpcSendQueue): void;
+    rpcSend(after: T, q: RpcSendQueue): Promise<void>;
 
     /**
      * Receives and deserializes an object from an RPC receive queue.

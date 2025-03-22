@@ -1,5 +1,5 @@
-import {Document, Empty, EmptySpace, Json, JsonKind, JsonVisitor, space} from "../../../main/javascript/json";
-import {EmptyMarkers, randomId} from "../../../main/javascript";
+import {Document, Empty, emptySpace, Json, JsonKind, JsonVisitor} from "../../../main/javascript/json";
+import {emptyMarkers, randomId} from "../../../main/javascript";
 
 class SetEmptySpace extends JsonVisitor<number> {
     protected async visitEmpty(empty: Empty, p: number): Promise<Json | undefined> {
@@ -17,18 +17,18 @@ describe('visiting JSON', () => {
         const empty: Empty = {
             kind: JsonKind.Empty,
             id: randomId(),
-            prefix: EmptySpace,
-            markers: EmptyMarkers,
+            prefix: emptySpace,
+            markers: emptyMarkers,
         }
 
         const json: Document = {
             kind: JsonKind.Document,
             id: randomId(),
-            prefix: EmptySpace,
-            markers: EmptyMarkers,
+            prefix: emptySpace,
+            markers: emptyMarkers,
             sourcePath: "test.json",
             value: empty,
-            eof: EmptySpace,
+            eof: emptySpace,
         }
 
         const after = await new SetEmptySpace().visit<Document>(json, 0)
