@@ -1,6 +1,6 @@
 import {emptyMarkers, ExecutionContext, Parser, ParserSourceReader, randomId} from "../";
 import {
-    Document,
+    JsonDocument,
     emptySpace,
     Json,
     JsonArray,
@@ -16,7 +16,7 @@ import {relative} from "path";
 
 export class JsonParser extends Parser {
 
-    parse(ctx: ExecutionContext, relativeTo?: string, ...sourcePaths: string[]): Document[] {
+    parse(ctx: ExecutionContext, relativeTo?: string, ...sourcePaths: string[]): JsonDocument[] {
         return sourcePaths.map(sourcePath => {
             return new ParseJsonReader(sourcePath, ctx, relativeTo).parse();
         });
@@ -35,7 +35,7 @@ class ParseJsonReader extends ParserSourceReader {
         return space(this.whitespace());
     }
 
-    parse(): Document {
+    parse(): JsonDocument {
         return {
             kind: JsonKind.Document,
             id: randomId(),

@@ -3,15 +3,16 @@ import {createExecutionContext, ExecutionContext} from "../execution";
 import {noopVisitor, TreeVisitor} from "../visitor";
 import {Parser, readSourceSync} from "../parser";
 import {TreePrinters} from "../print";
-import {SourceFile} from "../tree";
+import {isSourceFile, SourceFile} from "../tree";
 import dedent from "dedent";
 
-export interface SourceSpec {
+export interface SourceSpec<T extends SourceFile> {
     before?: string
     after?: AfterRecipe
     path?: string,
     parser: () => Parser,
     executionContext?: ExecutionContext,
+    beforeRecipe?: (sourceFile: T) => T | void | Promise<T>
 }
 
 export class RecipeSpec {
@@ -28,7 +29,7 @@ export class RecipeSpec {
      */
     recipeExecutionContext: ExecutionContext = this.executionContext;
 
-    async rewriteRun(...sourceSpecs: SourceSpec[]): Promise<void> {
+    async rewriteRun(...sourceSpecs: SourceSpec<any>[]): Promise<void> {
         for (const spec of sourceSpecs) {
             // TODO more validation to implement here, along with grouping source specs for execution
             //  by a single parser when there are interdependencies, etc.
@@ -41,7 +42,7 @@ export class RecipeSpec {
             ]) : this.executionContext) as ExecutionContext
 
             let beforeSource = readSourceSync(parserCtx, spec.before!);
-            const beforeParsed = spec.parser().parse(parserCtx, spec.before, spec.before!)[0];
+            let beforeParsed = spec.parser().parse(parserCtx, spec.before, spec.before!)[0];
 
             expect(await TreePrinters.print(beforeParsed)).toEqual(beforeSource);
 
@@ -54,6 +55,13 @@ export class RecipeSpec {
                 }
             } else {
                 afterFn = () => beforeSource
+            }
+
+            if (spec.beforeRecipe) {
+                const beforeParsed1: SourceFile | void = await spec.beforeRecipe(beforeParsed);
+                if (isSourceFile(beforeParsed1)) {
+                    beforeParsed = beforeParsed1;
+                }
             }
 
             const after: SourceFile | undefined = await this.recipe.editor.visit(beforeParsed, this.recipeExecutionContext);

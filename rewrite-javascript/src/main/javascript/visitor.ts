@@ -87,6 +87,10 @@ export abstract class TreeVisitor<T extends Tree, P> {
         return t
     }
 
+    protected stopAfterPreVisit(): void {
+        this.cursor.messages.set("STOP_AFTER_PRE_VISIT", true);
+    }
+
     isAcceptable(sourceFile: SourceFile, p: P): boolean {
         return true;
     }

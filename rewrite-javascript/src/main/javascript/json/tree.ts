@@ -61,7 +61,7 @@ export interface JsonArray extends Json {
     readonly values: JsonRightPadded<JsonValue>[]
 }
 
-export interface Document extends SourceFile, Json {
+export interface JsonDocument extends SourceFile, Json {
     readonly kind: typeof JsonKind.Document
     readonly value: JsonValue
     readonly eof: Space

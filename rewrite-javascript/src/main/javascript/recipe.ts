@@ -1,17 +1,13 @@
 import {noopVisitor, TreeVisitor} from "./visitor";
 import {Cursor, SourceFile, Tree} from "./tree";
 import {ExecutionContext} from "./execution";
-import {Duration, TimeDuration} from "typed-duration";
 import {randomId} from "./uuid";
 
-export abstract class Recipe {
-    /**
-     * A unique name for the recipe consisting of a dot separated sequence of category
-     * names in which the recipe should appear followed by a name. For example,
-     * "org.openrewrite.typescript.find-methods-by-pattern".
-     */
-    readonly abstract name: string
+const OPTIONS_KEY = "__recipe_options__";
 
+export type Minutes = number;
+
+export abstract class Recipe {
     /**
      * A human-readable display name for the recipe, initial capped with no period.
      * For example, "Find text". The display name can be assumed to be rendered in
@@ -22,6 +18,23 @@ export abstract class Recipe {
      * @language Markdown
      */
     readonly abstract displayName: string
+
+    /**
+     * A human-readable description for the recipe, consisting of one or more full
+     * sentences ending with a period.
+     *
+     * "Find methods by pattern." is an example. The description can be assumed to be rendered in
+     * documentation and other places where markdown is understood, so it is possible
+     * to use stylistic markers like backticks to indicate types. For example,
+     * "Find uses of `console.log`.".
+     *
+     * @language Markdown.
+     */
+    readonly abstract description: string
+
+    readonly tags: string[] = []
+
+    readonly estimatedEffortPerOccurrence: Minutes = 5
 
     /**
      * A human-readable display name for this recipe instance, including some descriptive
@@ -39,35 +52,40 @@ export abstract class Recipe {
         return this.displayName
     }
 
-    /**
-     * A human-readable description for the recipe, consisting of one or more full
-     * sentences ending with a period.
-     *
-     * "Find methods by pattern." is an example. The description can be assumed to be rendered in
-     * documentation and other places where markdown is understood, so it is possible
-     * to use stylistic markers like backticks to indicate types. For example,
-     * "Find uses of `console.log`.".
-     *
-     * @language Markdown.
-     */
-    readonly abstract description: string
-
-    readonly tags: string[] = []
-
-    readonly estimatedEffortPerOccurrence: TimeDuration = Duration.minutes.of(5)
-
-    abstract get editor(): TreeVisitor<any, ExecutionContext>
-}
-
-class MyRecipe extends Recipe {
-    name: string = "org.openrewrite.typescript.my-recipe";
-    displayName: string = `My recipe [this](https://hi.com).`;
-    description: string = `My description.`;
-    tags: string[] = ["tag1", "tag2"];
+    get descriptor(): RecipeDescriptor {
+        const optionRecord: Record<string, OptionDescriptor> = (this as any).constructor[OPTIONS_KEY] || {}
+        return {
+            displayName: this.displayName,
+            instanceName: this.instanceName(),
+            description: this.description,
+            tags: this.tags,
+            estimatedEffortPerOccurrence: this.estimatedEffortPerOccurrence,
+            options: Object.entries(optionRecord).map(([key, descriptor]) => ({
+                name: key,
+                ...descriptor
+            }))
+        }
+    }
 
     get editor(): TreeVisitor<any, ExecutionContext> {
-        return noopVisitor();
+        return noopVisitor()
     }
+}
+
+export interface RecipeDescriptor {
+    readonly displayName: string
+    readonly instanceName: string
+    readonly description: string
+    readonly tags: string[]
+    readonly estimatedEffortPerOccurrence: Minutes
+    readonly options: ({ name: string } & OptionDescriptor)[]
+}
+
+export interface OptionDescriptor {
+    readonly displayName: string
+    readonly description: string
+    readonly example?: string
+    readonly valid?: string[],
 }
 
 export abstract class ScanningRecipe<P> extends Recipe {
@@ -124,3 +142,45 @@ export abstract class ScanningRecipe<P> extends Recipe {
  * Do not permit overriding of editor()
  */
 Object.freeze(ScanningRecipe.prototype.editor);
+
+export class RecipeRegistry {
+    // The registry map stores recipe constructors keyed by their instance name.
+    static all = new Map<string, { new(): Recipe }>();
+
+    public static register(name: string, recipeClass: { new(): Recipe }): void {
+        RecipeRegistry.all.set(name, recipeClass);
+    }
+}
+
+/**
+ * @param recipeName A unique name for the recipe consisting of a dot separated sequence of category
+ * names in which the recipe should appear followed by a name. For example,
+ * "org.openrewrite.typescript.find-methods-by-pattern".
+ */
+export function Registered(recipeName: string) {
+    return function <T extends { new(...args: any[]): Recipe }>(constructor: T): T {
+        try {
+            new constructor();
+            RecipeRegistry.register(recipeName, constructor);
+            return constructor;
+        } catch (e) {
+            throw new Error(`Failed to register recipe ${recipeName}. Ensure the constructor can be called without any arguments.`);
+        }
+    }
+}
+
+export function Option(descriptor: OptionDescriptor) {
+    return function (target: any, propertyKey: string) {
+        // Ensure the constructor has options storage.
+        if (!target.constructor.hasOwnProperty(OPTIONS_KEY)) {
+            Object.defineProperty(target.constructor, OPTIONS_KEY, {
+                value: {},
+                writable: true,
+                configurable: true,
+            });
+        }
+
+        // Register the option metadata under the property key.
+        target.constructor[OPTIONS_KEY][propertyKey] = descriptor;
+    };
+}

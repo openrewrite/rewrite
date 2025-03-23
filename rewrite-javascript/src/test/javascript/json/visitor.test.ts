@@ -1,4 +1,4 @@
-import {Document, Empty, emptySpace, Json, JsonKind, JsonVisitor} from "../../../main/javascript/json";
+import {JsonDocument, Empty, emptySpace, Json, JsonKind, JsonVisitor} from "../../../main/javascript/json";
 import {emptyMarkers, randomId} from "../../../main/javascript";
 
 class SetEmptySpace extends JsonVisitor<number> {
@@ -21,7 +21,7 @@ describe('visiting JSON', () => {
             markers: emptyMarkers,
         }
 
-        const json: Document = {
+        const json: JsonDocument = {
             kind: JsonKind.Document,
             id: randomId(),
             prefix: emptySpace,
@@ -31,7 +31,7 @@ describe('visiting JSON', () => {
             eof: emptySpace,
         }
 
-        const after = await new SetEmptySpace().visit<Document>(json, 0)
+        const after = await new SetEmptySpace().visit<JsonDocument>(json, 0)
         expect(after!.value.prefix.whitespace).toBe(' ')
     });
 });

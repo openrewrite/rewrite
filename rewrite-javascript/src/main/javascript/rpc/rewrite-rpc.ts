@@ -1,27 +1,39 @@
 import * as rpc from "vscode-jsonrpc/node";
 import {MessageConnection} from "vscode-jsonrpc/node";
-import {Cursor, isTree, rootCursor, Tree} from "../tree";
-import {Recipe} from "../recipe";
+import {Cursor, isSourceFile, isTree, rootCursor, SourceFile, Tree} from "../tree";
+import {Recipe, RecipeDescriptor} from "../recipe";
 import {SnowflakeId} from "@akashrajpurohit/snowflake-id";
-import {Generate, GetObject, getRecipes, PrepareRecipe, Print, Visit, VisitResponse} from "./request";
+import {
+    Generate,
+    GetObject,
+    getRecipes,
+    PrepareRecipe,
+    PrepareRecipeResponse,
+    Print,
+    Visit,
+    VisitResponse
+} from "./request";
 import {RpcObjectData, RpcObjectState, RpcReceiveQueue} from "./queue";
 import {RpcCodecs} from "./codec";
+import {RpcRecipe} from "./recipe";
 
 export class RewriteRpc {
     private readonly snowflake = SnowflakeId();
+    private readonly connection: MessageConnection;
 
-    private readonly connection: MessageConnection = rpc.createMessageConnection(
-        new rpc.StreamMessageReader(process.stdin),
-        new rpc.StreamMessageWriter(process.stdout))
-
-    private readonly localObjects: Map<string, any> = new Map();
+    readonly localObjects: Map<string, any> = new Map();
     /* A reverse map of the objects back to their IDs */
     private readonly localObjectIds: WeakMap<any, string> = new WeakMap()
 
     private readonly remoteObjects: Map<string, any> = new Map();
     private readonly remoteRefs: Map<number, any> = new Map();
 
-    constructor(batchSize: number = 10) {
+    constructor(connection: MessageConnection = rpc.createMessageConnection(
+        new rpc.StreamMessageReader(process.stdin),
+        new rpc.StreamMessageWriter(process.stdout)
+    ), batchSize: number = 10) {
+        this.connection = connection;
+
         const preparedRecipes: Map<String, Recipe> = new Map();
         const recipeCursors: WeakMap<Recipe, Cursor> = new WeakMap()
 
@@ -38,7 +50,17 @@ export class RewriteRpc {
         this.connection.listen();
     }
 
-    async getObject(id: string): Promise<any> {
+    listen(): RewriteRpc {
+        this.connection.listen();
+        return this;
+    }
+
+    end(): RewriteRpc {
+        this.connection.end();
+        return this;
+    }
+
+    async getObject<P>(id: string): Promise<P> {
         const q = new RpcReceiveQueue(this.remoteRefs, () => {
             return this.connection.sendRequest(
                 new rpc.RequestType<GetObject, RpcObjectData[], Error>("GetObject"),
@@ -46,7 +68,7 @@ export class RewriteRpc {
             );
         });
 
-        let remoteObject = q.receive(this.localObjects.get(id), (before: any) => {
+        let remoteObject = q.receive<P>(this.localObjects.get(id), (before: any) => {
             return RpcCodecs.forInstance(before)?.rpcReceive(before, q) ?? before;
         });
 
@@ -66,13 +88,40 @@ export class RewriteRpc {
             for (let i = cursorIds.length - 1; i >= 0; i--) {
                 const cursorObject = await this.getObject(cursorIds[i]);
                 this.remoteObjects.set(cursorIds[i], cursorObject);
-                cursor = new Cursor(cursor, cursorObject);
+                cursor = new Cursor(cursorObject, cursor);
             }
         }
         return cursor;
     }
 
-    async visit(tree: Tree, visitorName: string, p: any, cursor: Cursor | undefined): Promise<Tree> {
+    async print(tree: SourceFile): Promise<string>;
+    async print<T extends Tree>(tree: T, cursor?: Cursor): Promise<string> {
+        if (!cursor && !isSourceFile(tree)) {
+            throw new Error("Cursor is required for non-SourceFile trees");
+        }
+        return await this.connection.sendRequest(
+            new rpc.RequestType<Print, string, Error>("Print"),
+            new Print(tree.id, this.getCursorIds(cursor))
+        );
+    }
+
+    async recipes(): Promise<({ name: string } & RecipeDescriptor)[]> {
+        return await this.connection.sendRequest(
+            new rpc.RequestType<{}, ({ name: string } & RecipeDescriptor)[], Error>("GetRecipes"),
+            {}
+        );
+    }
+
+    async prepareRecipe(id: string, options: any): Promise<Recipe> {
+        const response = await this.connection.sendRequest(
+            new rpc.RequestType<PrepareRecipe, PrepareRecipeResponse, Error>("PrepareRecipe"),
+            new PrepareRecipe(id, options)
+        );
+        return new RpcRecipe(this, response.id, response.descriptor, response.editVisitor,
+            response.scanVisitor);
+    }
+
+    async visit(tree: Tree, visitorName: string, p: any, cursor?: Cursor): Promise<Tree> {
         let response = await this.scan(tree, visitorName, p, cursor);
         if (response.modified) {
             return this.getObject(tree.id.toString());
@@ -100,7 +149,7 @@ export class RewriteRpc {
         return id
     }
 
-    private getCursorIds(cursor: Cursor | undefined): string[] | undefined {
+    getCursorIds(cursor: Cursor | undefined): string[] | undefined {
         if (cursor) {
             const cursorIds = [];
             for (const c of cursor.asArray()) {

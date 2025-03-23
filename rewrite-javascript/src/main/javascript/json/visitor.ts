@@ -1,6 +1,6 @@
 import {mapAsync, produceAsync, SourceFile, TreeVisitor, ValidImmerRecipeReturnType} from "../";
 import {
-    Document,
+    JsonDocument,
     Empty,
     Identifier,
     isJson,
@@ -26,8 +26,8 @@ export class JsonVisitor<P> extends TreeVisitor<Json, P> {
         })
     }
 
-    protected async visitDocument(document: Document, p: P): Promise<Json | undefined> {
-        return this.produceJson<Document>(document, p, async draft => {
+    protected async visitDocument(document: JsonDocument, p: P): Promise<Json | undefined> {
+        return this.produceJson<JsonDocument>(document, p, async draft => {
             draft.value = await this.visitDefined(document.value, p);
             draft.eof = await this.visitSpace(document.eof, p);
         })
@@ -91,7 +91,7 @@ export class JsonVisitor<P> extends TreeVisitor<Json, P> {
             case JsonKind.Array:
                 return this.visitArray(t as JsonArray, p);
             case JsonKind.Document:
-                return this.visitDocument(t as Document, p);
+                return this.visitDocument(t as JsonDocument, p);
             case JsonKind.Empty:
                 return this.visitEmpty(t as Empty, p);
             case JsonKind.Identifier:

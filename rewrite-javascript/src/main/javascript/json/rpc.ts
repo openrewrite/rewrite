@@ -1,7 +1,7 @@
 import {JsonVisitor} from "./visitor";
 import {asRef, RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {
-    Document,
+    JsonDocument,
     Empty,
     Identifier,
     Json,
@@ -26,7 +26,7 @@ class JsonSender extends JsonVisitor<RpcSendQueue> {
         return j;
     }
 
-    protected async visitDocument(document: Document, q: RpcSendQueue): Promise<Json | undefined> {
+    protected async visitDocument(document: JsonDocument, q: RpcSendQueue): Promise<Json | undefined> {
         await q.getAndSend(document, d => d.sourcePath);
         await q.getAndSend(document, d => d.charsetName);
         await q.getAndSend(document, d => d.charsetBomMarked);
@@ -98,8 +98,8 @@ class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
         });
     }
 
-    protected async visitDocument(document: Document, q: RpcReceiveQueue): Promise<Json | undefined> {
-        return this.produceJson<Document>(document, q, async draft => {
+    protected async visitDocument(document: JsonDocument, q: RpcReceiveQueue): Promise<Json | undefined> {
+        return this.produceJson<JsonDocument>(document, q, async draft => {
             draft.sourcePath = await q.receiveAndGet(document.sourcePath, (path: string) => path);
             draft.charsetName = await q.receiveAndGet(document.charsetName, (name: string) => name);
             draft.charsetBomMarked = await q.receive(document.charsetBomMarked);

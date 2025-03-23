@@ -1,7 +1,7 @@
 import {PrintOutputCapture, TreePrinters} from "../print";
 import {JsonVisitor} from "./visitor";
 import {
-    Document,
+    JsonDocument,
     Empty,
     Identifier,
     Json,
@@ -26,7 +26,7 @@ class JsonPrinter extends JsonVisitor<PrintOutputCapture> {
         return array;
     }
 
-    protected async visitDocument(document: Document, p: PrintOutputCapture): Promise<Json | undefined> {
+    protected async visitDocument(document: JsonDocument, p: PrintOutputCapture): Promise<Json | undefined> {
         this.beforeSyntax(document, p);
         await this.visit(document.value, p);
         await this.visitSpace(document.eof, p);
