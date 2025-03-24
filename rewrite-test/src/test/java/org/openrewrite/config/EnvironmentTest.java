@@ -388,7 +388,7 @@ class EnvironmentTest implements RewriteTest {
         assertThat(recipeDescriptor.getOptions().get(0).getType()).isEqualTo("String");
         assertThat(recipeDescriptor.getOptions().get(1).getName()).isEqualTo("matchOverrides");
         assertThat(recipeDescriptor.getOptions().get(1).getType()).isEqualTo("Boolean");
-        assertThat(recipeDescriptor.getLicense()).isEqualTo("Apache License Version 2.0"); // Won't work locally, as the `out` folder will be on the classpath instead of the jar
+        assertThat(recipeDescriptor.getLicense()).isEqualTo(new License("Apache License Version 2.0", "https://www.apache.org/licenses/LICENSE-2.0"));
     }
 
     @Test
