@@ -213,7 +213,7 @@ public abstract class Recipe implements Cloneable {
         return descriptor;
     }
 
-    public final Recipe augmentRecipeDescriptor(@Nullable Attributes attributes) {
+    public final void augmentRecipeDescriptor(@Nullable Attributes attributes) {
         if (attributes != null) {
             String gitHubBase = attributes.containsKey("Module-Origin") ? attributes.getValue("Module-Origin") : "https://github.com/openrewrite";
             String gitHubDir = attributes.containsKey("Module-Source") ? attributes.getValue("Module-Source") : "";
@@ -222,7 +222,6 @@ public abstract class Recipe implements Cloneable {
                     .withLicense(license)
                     .withSource(URI.create(gitHubBase + "/" + gitHubDir));
         }
-        return this;
     }
 
     protected RecipeDescriptor createRecipeDescriptor() {

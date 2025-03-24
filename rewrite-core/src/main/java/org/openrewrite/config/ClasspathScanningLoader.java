@@ -175,7 +175,8 @@ public class ClasspathScanningLoader implements ResourceLoader {
             Timer.Builder builder = Timer.builder("rewrite.scan.configure.recipe");
             Timer.Sample sample = Timer.start();
             try {
-                Recipe recipe = constructRecipe(recipeClass).augmentRecipeDescriptor(artifactManifestAttributes.get(classInfo.getClasspathElementURI().toString()));
+                Recipe recipe = constructRecipe(recipeClass);
+                recipe.augmentRecipeDescriptor(artifactManifestAttributes.get(classInfo.getClasspathElementURI().toString()));
                 recipeDescriptors.add(recipe.getDescriptor());
                 recipes.add(recipe);
                 MetricsHelper.successTags(builder.tags("recipe", "elided"));
