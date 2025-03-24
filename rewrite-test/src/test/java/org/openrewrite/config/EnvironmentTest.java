@@ -380,15 +380,12 @@ class EnvironmentTest implements RewriteTest {
         var env = Environment.builder().scanRuntimeClasspath().build();
         var recipeDescriptors = env.listRecipeDescriptors();
         assertThat(recipeDescriptors).isNotNull().isNotEmpty();
-        var recipeDescriptor = recipeDescriptors.stream().filter(rd -> rd.getName().equals("org.openrewrite.java.search.FindMethodDeclaration"))
+        var changeTextDescriptor = recipeDescriptors.stream().filter(rd -> rd.getName().equals("org.openrewrite.text.ChangeText"))
           .findAny().orElse(null);
-        assertThat(recipeDescriptor).isNotNull();
-        assertThat(recipeDescriptor.getOptions()).hasSize(2);
-        assertThat(recipeDescriptor.getOptions().get(0).getName()).isEqualTo("methodPattern");
-        assertThat(recipeDescriptor.getOptions().get(0).getType()).isEqualTo("String");
-        assertThat(recipeDescriptor.getOptions().get(1).getName()).isEqualTo("matchOverrides");
-        assertThat(recipeDescriptor.getOptions().get(1).getType()).isEqualTo("Boolean");
-        assertThat(recipeDescriptor.getLicense()).isEqualTo(new License("Apache License Version 2.0", "https://www.apache.org/licenses/LICENSE-2.0"));
+        assertThat(changeTextDescriptor).isNotNull();
+        assertThat(changeTextDescriptor.getOptions()).hasSize(1);
+        assertThat(changeTextDescriptor.getOptions().get(0).getName()).isEqualTo("toText");
+        assertThat(changeTextDescriptor.getOptions().get(0).getType()).isEqualTo("String");
     }
 
     @Test

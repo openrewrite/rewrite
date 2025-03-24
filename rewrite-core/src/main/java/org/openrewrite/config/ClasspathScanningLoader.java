@@ -175,18 +175,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
             Timer.Builder builder = Timer.builder("rewrite.scan.configure.recipe");
             Timer.Sample sample = Timer.start();
             try {
-                Recipe recipe = constructRecipe(recipeClass);
-                Attributes attributes = artifactManifestAttributes.get(classInfo.getClasspathElementURI().toString());
-                if (attributes == null) {
-                    // A recipe in a rewrite module
-                    String possibleModule = recipe.getClass().getName().replaceFirst("org.openrewrite.", "").split("\\.")[0];
-                    attributes = artifactManifestAttributes.entrySet().stream()
-                            .filter(it -> it.getKey().contains("rewrite-" + possibleModule))
-                            .findFirst()
-                            .map(Map.Entry::getValue)
-                            .orElse(null);
-                }
-                recipe.augmentRecipeDescriptor(attributes);
+                Recipe recipe = constructRecipe(recipeClass).augmentRecipeDescriptor(artifactManifestAttributes.get(classInfo.getClasspathElementURI().toString()));
                 recipeDescriptors.add(recipe.getDescriptor());
                 recipes.add(recipe);
                 MetricsHelper.successTags(builder.tags("recipe", "elided"));
