@@ -120,8 +120,8 @@ public class ClasspathScanningLoader implements ResourceLoader {
         try (ScanResult scanResult = classGraph.enableMemoryMapping().scan()) {
             List<YamlResourceLoader> yamlResourceLoaders = new ArrayList<>();
             scanResult.getResourcesMatchingPattern(YAML).forEachInputStreamIgnoringIOException((res, input) -> {
-                String key = res.getURI().toString().replaceFirst("^jar:", "").split("!/", 2)[0];
-                yamlResourceLoaders.add(new YamlResourceLoader(input, artifactManifestAttributes.get(key), res.getURI(), properties, classLoader, dependencyResourceLoaders, it -> {}));
+                Attributes attributes = artifactManifestAttributes.get(res.getURI().toString().replaceFirst("^jar:", "").split("!/", 2)[0]);
+                yamlResourceLoaders.add(new YamlResourceLoader(input, attributes, res.getURI(), properties, classLoader, dependencyResourceLoaders, it -> {}));
             });
             // Extract in two passes so that the full list of recipes from all sources are known when computing recipe descriptors
             // Otherwise recipes which include recipes from other sources in their recipeList will have incomplete descriptors
