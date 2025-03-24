@@ -31,7 +31,6 @@ dependencies {
     implementation("org.apache.commons:commons-text:1.11.+")
 
     testImplementation(project(":rewrite-test"))
-    testImplementation(project(":rewrite-maven"))
 }
 
 //Javadoc compiler will complain about the use of the internal types.
