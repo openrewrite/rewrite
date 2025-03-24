@@ -15,12 +15,16 @@
  */
 package org.openrewrite.config;
 
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.Nullable;
 
 @Value
 @EqualsAndHashCode(of = "url")
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 public class License {
     private static final String APACHEV2_URL = "https://www.apache.org/licenses/LICENSE-2.0";
     private static final String MSAL_URL = "https://docs.moderne.io/licensing/moderne-source-available-license";
@@ -33,6 +37,7 @@ public class License {
     String fullName;
     String url;
 
+    @Contract(value = "_, null -> null; !null, !null -> new; null, !null -> _", pure = true)
     public static @Nullable License of(@Nullable String fullName, @Nullable String url) {
         if (url != null) {
             switch (url) {

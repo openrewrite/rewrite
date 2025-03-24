@@ -57,7 +57,7 @@ public class YamlResourceLoader implements ResourceLoader {
             new PropertyPlaceholderHelper("${", "}", ":");
 
     @Nullable
-    private final Attributes attributes;
+    private final Attributes manifestAttributes;
     
     private final URI source;
     private final String yamlSource;
@@ -171,7 +171,7 @@ public class YamlResourceLoader implements ResourceLoader {
      * for recipes from dependencies.
      *
      * @param yamlInput                 Declarative recipe yaml input stream
-     * @param attributes                Declarative recipe extra attributes
+     * @param manifestAttributes                Declarative recipe extra attributes
      * @param source                    Declarative recipe source
      * @param properties                Placeholder properties
      * @param classLoader               Optional classloader to use with jackson. If not specified, the runtime classloader will be used.
@@ -179,11 +179,11 @@ public class YamlResourceLoader implements ResourceLoader {
      * @param mapperCustomizer          Customizer for the ObjectMapper
      * @throws UncheckedIOException     On unexpected IOException
      */
-    public YamlResourceLoader(InputStream yamlInput, @Nullable Attributes attributes, URI source, Properties properties,
+    public YamlResourceLoader(InputStream yamlInput, @Nullable Attributes manifestAttributes, URI source, Properties properties,
                               @Nullable ClassLoader classLoader,
                               Collection<? extends ResourceLoader> dependencyResourceLoaders,
                               Consumer<ObjectMapper> mapperCustomizer) {
-        this.attributes = attributes;
+        this.manifestAttributes = manifestAttributes;
         this.source = source;
         this.dependencyResourceLoaders = dependencyResourceLoaders;
         this.mapper = ObjectMappers.propertyBasedMapper(classLoader);
@@ -282,7 +282,7 @@ public class YamlResourceLoader implements ResourceLoader {
                 }
             }
             recipe.setContributors(contributors.get(recipe.getName()));
-            recipe.augmentRecipeDescriptor(attributes);
+            recipe.augmentRecipeDescriptor(manifestAttributes);
             recipes.add(recipe);
         }
 
