@@ -36,6 +36,7 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.jar.Attributes;
 import java.util.jar.Manifest;
+import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
 import static lombok.AccessLevel.PRIVATE;
@@ -44,6 +45,7 @@ import static org.openrewrite.internal.RecipeIntrospectionUtils.constructRecipe;
 @NoArgsConstructor(access = PRIVATE)
 public class ClasspathScanningLoader implements ResourceLoader {
     private static final String META_INF_REWRITE = "META-INF/rewrite";
+    private static final Pattern YAML = Pattern.compile(".*\\.ya?ml");
 
     private final LinkedHashSet<Recipe> recipes = new LinkedHashSet<>();
     private final List<NamedStyles> styles = new ArrayList<>();
@@ -118,14 +120,14 @@ public class ClasspathScanningLoader implements ResourceLoader {
         try (ScanResult scanResult = classGraph.enableMemoryMapping().scan()) {
             List<YamlResourceLoader> yamlResourceLoaders = new ArrayList<>();
 
-            scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) -> {
+            scanResult.getResourcesMatchingPattern(YAML).forEachInputStreamIgnoringIOException((res, input) -> {
                 String key = res.getURI().toString().replaceFirst("^jar:", "").split("!/", 2)[0];
                 yamlResourceLoaders.add(new YamlResourceLoader(input, artifactManifestAttributes.get(key), res.getURI(), properties, classLoader, dependencyResourceLoaders, it -> {}));
             });
-            scanResult.getResourcesWithExtension("yaml").forEachInputStreamIgnoringIOException((res, input) -> {
+            /*scanResult.getResourcesWithExtension("yaml").forEachInputStreamIgnoringIOException((res, input) -> {
                 String key = res.getURI().toString().replaceFirst("^jar:", "").split("!/", 2)[0];
                 yamlResourceLoaders.add(new YamlResourceLoader(input, artifactManifestAttributes.get(key), res.getURI(), properties, classLoader, dependencyResourceLoaders, it -> {}));
-            });
+            });*/
             // Extract in two passes so that the full list of recipes from all sources are known when computing recipe descriptors
             // Otherwise recipes which include recipes from other sources in their recipeList will have incomplete descriptors
             for (YamlResourceLoader resourceLoader : yamlResourceLoaders) {
