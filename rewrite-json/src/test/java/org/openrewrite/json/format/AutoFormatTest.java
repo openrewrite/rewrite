@@ -114,6 +114,21 @@ class AutoFormatTest implements RewriteTest {
     }
 
     @Test
+    void emptyObjectWithJustAComment() {
+        rewriteRun(
+          json(
+            """
+            {
+               "ocomment": {
+                   // intentionally blank page
+               }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void emptyObjectsToCollapse() {
         rewriteRun(
           json(
@@ -129,7 +144,10 @@ class AutoFormatTest implements RewriteTest {
 
 
 
-              ]
+              ],
+              "ocomment": {
+                 // intentionally blank page
+              }
             }
             """,
             """
@@ -137,7 +155,10 @@ class AutoFormatTest implements RewriteTest {
               "a": 1,
               "b": 2,
               "o": {},
-              "s": []
+              "s": [],
+              "ocomment": {
+                 // intentionally blank page
+              }
             }
             """
           )

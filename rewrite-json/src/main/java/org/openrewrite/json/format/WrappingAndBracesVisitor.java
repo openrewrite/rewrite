@@ -114,7 +114,7 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
             } else {
                 throw new UnsupportedOperationException("Unknown LineWrapSetting: " + wrapping);
             }
-            if (!newPrefixString.equals(prefix.getWhitespace())) {
+            if (!newPrefixString.equals(prefix.getWhitespace()) && elem.getAfter().getComments().isEmpty()) {
                 return elem.withElement(elem.getElement().withPrefix(prefix.withWhitespace((newPrefixString))));
             } else {
                 return elem;
@@ -137,8 +137,8 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
             } else {
                 newAfter = "";
             }
-            if (!newAfter.equals(currentAfter)) {
-                return elem.withAfter(Space.build(newAfter, emptyList()));
+            if (!newAfter.equals(currentAfter) && elem.getAfter().getComments().isEmpty()) {
+                return elem.withAfter(Space.build(newAfter, elem.getAfter().getComments()));
             } else {
                 return elem;
             }
@@ -159,7 +159,11 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
     }
 
     private <JS extends Json> List<JsonRightPadded<JS>> collapseToNoSpaceIfEmpty(List<JsonRightPadded<JS>> list) {
-        if (list.size() == 1 && (list.get(0).getElement() instanceof Json.Empty)) {
+        if (list.size() == 1 &&
+                (list.get(0).getElement() instanceof Json.Empty) &&
+                (list.get(0).getElement().getPrefix().getComments().isEmpty()) &&
+                (list.get(0).getAfter().getComments().isEmpty())
+        ) {
             return Collections.emptyList();
         } else {
             return list;
