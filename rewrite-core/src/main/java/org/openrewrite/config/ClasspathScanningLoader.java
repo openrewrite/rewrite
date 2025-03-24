@@ -120,12 +120,6 @@ public class ClasspathScanningLoader implements ResourceLoader {
 
             scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) -> {
                 String key = res.getURI().toString().replaceFirst("^jar:", "").split("!/", 2)[0];
-
-                // TODO REMOVE THIS AND FIX WHY TEST `listRecipeDescriptors` FAILS!
-                if (artifactManifestAttributes.containsKey(key)) {
-                    System.out.println(res + " has license: " + artifactManifestAttributes.get(key).getValue("License-Name"));
-                }
-
                 yamlResourceLoaders.add(new YamlResourceLoader(input, artifactManifestAttributes.get(key), res.getURI(), properties, classLoader, dependencyResourceLoaders, it -> {}));
             });
             scanResult.getResourcesWithExtension("yaml").forEachInputStreamIgnoringIOException((res, input) -> {

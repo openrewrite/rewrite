@@ -380,7 +380,7 @@ class EnvironmentTest implements RewriteTest {
         var env = Environment.builder().scanRuntimeClasspath().build();
         var recipeDescriptors = env.listRecipeDescriptors();
         assertThat(recipeDescriptors).isNotNull().isNotEmpty();
-        var recipeDescriptor = recipeDescriptors.stream().filter(rd -> rd.getName().equals("org.openrewrite.java.search.FindMethodDeclaration")) // recipe from another jar
+        var recipeDescriptor = recipeDescriptors.stream().filter(rd -> rd.getName().equals("org.openrewrite.java.search.FindMethodDeclaration"))
           .findAny().orElse(null);
         assertThat(recipeDescriptor).isNotNull();
         assertThat(recipeDescriptor.getOptions()).hasSize(2);
@@ -388,7 +388,7 @@ class EnvironmentTest implements RewriteTest {
         assertThat(recipeDescriptor.getOptions().get(0).getType()).isEqualTo("String");
         assertThat(recipeDescriptor.getOptions().get(1).getName()).isEqualTo("matchOverrides");
         assertThat(recipeDescriptor.getOptions().get(1).getType()).isEqualTo("Boolean");
-        assertThat(recipeDescriptor.getLicense()).isNotNull();
+        assertThat(recipeDescriptor.getLicense()).isEqualTo("Apache License Version 2.0"); // Won't work locally, as the `out` folder will be on the classpath instead of the jar
     }
 
     @Test
