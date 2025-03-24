@@ -638,14 +638,40 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
     }
 
     private JavaType.@Nullable Method methodReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
-        JavaType.Class classType = TypeUtils.asClass(type);
-        if (classType == null) {
-            return null;
-        }
+        if (type instanceof JavaType.Class) {
+            JavaType.Class classType = (JavaType.Class) type;
 
+            JavaType.@Nullable Method method = methodReferenceType(ref, classType.getMethods());
+            if (method != null) return method;
+
+            // Superclass fields takes presence over interface fields
+            method = methodReferenceType(ref, classType.getSupertype());
+
+            if (method == null) {
+                for (JavaType.FullyQualified interface_ : classType.getInterfaces()) {
+                    method = methodReferenceType(ref, interface_.getMethods());
+                    if (method != null) return method;
+                }
+            }
+
+            return method;
+        } else if (type instanceof JavaType.GenericTypeVariable) {
+            JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) type;
+            for (JavaType bound : generic.getBounds()) {
+                JavaType.Method method = methodReferenceType(ref, bound);
+                if (method != null) {
+                    return method;
+                }
+            }
+        }
+        // a member reference, but not matching anything on type attribution
+        return null;
+    }
+
+    private JavaType.@Nullable Method methodReferenceType(DCTree.DCReference ref, List<JavaType.Method> methods) {
         nextMethod:
-        for (JavaType.Method method : classType.getMethods()) {
-            if (method.getName().equals(ref.memberName.toString())) {
+        for (JavaType.Method method : methods) {
+            if (ref.memberName.toString().equals(method.getName()) || ref.memberName.toString().equals(method.getConstructorName())) {
                 if (ref.paramTypes != null) {
                     List<JavaType> parameterTypes = method.getParameterTypes();
                     if (ref.paramTypes.size() != parameterTypes.size()) {
@@ -660,12 +686,9 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                         }
                     }
                 }
-
                 return method;
             }
         }
-
-        // a member reference, but not matching anything on type attribution
         return null;
     }
 

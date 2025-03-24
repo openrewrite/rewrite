@@ -288,5 +288,12 @@ public class GroovyParser implements Parser {
         public String getDslName() {
             return "groovy";
         }
+
+        @Override
+        public GroovyParser.Builder clone() {
+            GroovyParser.Builder clone = (GroovyParser.Builder) super.clone();
+            clone.typeCache = this.typeCache.clone();
+            return clone;
+        }
     }
 }

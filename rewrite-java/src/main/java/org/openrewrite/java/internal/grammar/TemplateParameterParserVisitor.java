@@ -62,6 +62,12 @@ public interface TemplateParameterParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitVariance(TemplateParameterParser.VarianceContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link TemplateParameterParser#typeArray}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitTypeArray(TemplateParameterParser.TypeArrayContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link TemplateParameterParser#parameterName}.
 	 * @param ctx the parse tree
 	 * @return the visitor result

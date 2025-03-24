@@ -178,7 +178,7 @@ class MethodMatcherTest implements RewriteTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"a.A <constructor>()", "a.A *()"})
+    @ValueSource(strings = {"a.A <constructor>()", "a.A <init>()", "a.A *()"})
     void matchesConstructorUsage(String methodPattern) {
         rewriteRun(
           java(

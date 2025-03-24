@@ -684,27 +684,20 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         if (type instanceof JavaType.Class) {
             JavaType.Class classType = (JavaType.Class) type;
 
-            nextMethod:
-            for (JavaType.Method method : classType.getMethods()) {
-                if (method.getName().equals(ref.memberName.toString())) {
-                    if (ref.paramTypes != null) {
-                        List<JavaType> parameterTypes = method.getParameterTypes();
-                        if (ref.paramTypes.size() != parameterTypes.size()) {
-                            continue;
-                        }
-                        for (int i = 0; i < ref.paramTypes.size(); i++) {
-                            JCTree param = ref.paramTypes.get(i);
-                            JavaType testParamType = parameterTypes.get(i);
-                            Type paramType = attr.attribType(param, symbol);
-                            if (!paramTypeMatches(testParamType, paramType)) {
-                                continue nextMethod;
-                            }
-                        }
-                    }
+            JavaType.@Nullable Method method = methodReferenceType(ref, classType.getMethods());
+            if (method != null) return method;
 
-                    return method;
+            // Superclass fields takes presence over interface fields
+            method = methodReferenceType(ref, classType.getSupertype());
+
+            if (method == null) {
+                for (JavaType.FullyQualified interface_ : classType.getInterfaces()) {
+                    method = methodReferenceType(ref, interface_.getMethods());
+                    if (method != null) return method;
                 }
             }
+
+            return method;
         } else if (type instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) type;
             for (JavaType bound : generic.getBounds()) {
@@ -715,6 +708,30 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             }
         }
         // a member reference, but not matching anything on type attribution
+        return null;
+    }
+
+    private JavaType.@Nullable Method methodReferenceType(DCTree.DCReference ref, List<JavaType.Method> methods) {
+        nextMethod:
+        for (JavaType.Method method : methods) {
+            if (ref.memberName.toString().equals(method.getName()) || ref.memberName.toString().equals(method.getConstructorName())) {
+                if (ref.paramTypes != null) {
+                    List<JavaType> parameterTypes = method.getParameterTypes();
+                    if (ref.paramTypes.size() != parameterTypes.size()) {
+                        continue;
+                    }
+                    for (int i = 0; i < ref.paramTypes.size(); i++) {
+                        JCTree param = ref.paramTypes.get(i);
+                        JavaType testParamType = parameterTypes.get(i);
+                        Type paramType = attr.attribType(param, symbol);
+                        if (!paramTypeMatches(testParamType, paramType)) {
+                            continue nextMethod;
+                        }
+                    }
+                }
+                return method;
+            }
+        }
         return null;
     }
 

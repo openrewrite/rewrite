@@ -43,6 +43,7 @@ import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.openrewrite.ExecutionContext.SCANNING_MUTATION_VALIDATION;
 import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
 
 @SuppressWarnings("unused")
@@ -298,7 +299,9 @@ public interface RewriteTest extends SourceSpecs {
                 sourceFile = sourceFile.withMarkers(markers);
 
                 // Validate before source
-                nextSpec.validateSource.accept(sourceFile, TypeValidation.before(testMethodSpec, testClassSpec));
+                TypeValidation beforeValidations = TypeValidation.before(testMethodSpec, testClassSpec);
+                nextSpec.validateSource.accept(sourceFile, beforeValidations);
+                ctx.putMessage(SCANNING_MUTATION_VALIDATION, beforeValidations.immutableScanning());
 
                 // Validate that printing the LST yields the same source text
                 // Validate that the LST whitespace do not contain any non-whitespace characters
