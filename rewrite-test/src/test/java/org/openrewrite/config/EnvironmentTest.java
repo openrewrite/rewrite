@@ -231,13 +231,14 @@ class EnvironmentTest implements RewriteTest {
           )
           .load(
             new YamlResourceLoader(
-              new ByteArrayInputStream("""
-                    type: specs.openrewrite.org/v1beta/recipe
-                    name: test.ChangeTextToHello
-                    displayName: Change text to hello
-                    recipeList:
-                        - org.openrewrite.text.ChangeText:
-                            toText: Hello
+              new ByteArrayInputStream(
+                """
+                type: specs.openrewrite.org/v1beta/recipe
+                name: test.ChangeTextToHello
+                displayName: Change text to hello
+                recipeList:
+                    - org.openrewrite.text.ChangeText:
+                        toText: Hello
                 """.getBytes()
               ),
               URI.create("text.yml"),

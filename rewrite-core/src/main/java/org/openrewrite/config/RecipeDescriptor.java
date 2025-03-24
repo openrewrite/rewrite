@@ -63,5 +63,10 @@ public class RecipeDescriptor {
 
     List<RecipeExample> examples;
 
+    @With
     URI source;
+
+    @With
+    @Nullable
+    License license;
 }
