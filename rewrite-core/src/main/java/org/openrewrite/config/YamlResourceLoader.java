@@ -223,9 +223,9 @@ public class YamlResourceLoader implements ResourceLoader {
 
     @SuppressWarnings("unchecked")
     @Override
-    public Collection<DeclarativeRecipe> listRecipes() {
+    public Collection<Recipe> listRecipes() {
         Collection<Map<String, Object>> resources = loadResources(ResourceType.Recipe);
-        List<DeclarativeRecipe> recipes = new ArrayList<>(resources.size());
+        List<Recipe> recipes = new ArrayList<>(resources.size());
         Map<String, List<Contributor>> contributors = listContributors();
         for (Map<String, Object> r : resources) {
             if (!r.containsKey("name")) {
@@ -350,18 +350,19 @@ public class YamlResourceLoader implements ResourceLoader {
     public Collection<RecipeDescriptor> listRecipeDescriptors(Collection<Recipe> externalRecipes,
                                                               Map<String, List<Contributor>> recipeNamesToContributors,
                                                               Map<String, List<RecipeExample>> recipeNamesToExamples) {
-        Collection<DeclarativeRecipe> internalRecipes = listRecipes();
+        Collection<Recipe> internalRecipes = listRecipes();
         Collection<Recipe> allRecipes = Stream.concat(
                 Stream.concat(externalRecipes.stream(), internalRecipes.stream()),
                 dependencyResourceLoaders.stream().flatMap(rl -> rl.listRecipes().stream())
         ).collect(toList());
 
         List<RecipeDescriptor> recipeDescriptors = new ArrayList<>();
-        for (DeclarativeRecipe recipe : internalRecipes) {
-            recipe.initialize(allRecipes, recipeNamesToContributors);
-            recipe.setContributors(recipeNamesToContributors.get(recipe.getName()));
-            recipe.setExamples(recipeNamesToExamples.get(recipe.getName()));
-            recipeDescriptors.add(recipe.getDescriptor());
+        for (Recipe recipe : internalRecipes) {
+            DeclarativeRecipe declarativeRecipe = (DeclarativeRecipe) recipe;
+            declarativeRecipe.initialize(allRecipes, recipeNamesToContributors);
+            declarativeRecipe.setContributors(recipeNamesToContributors.get(recipe.getName()));
+            declarativeRecipe.setExamples(recipeNamesToExamples.get(recipe.getName()));
+            recipeDescriptors.add(declarativeRecipe.getDescriptor());
         }
         return recipeDescriptors;
     }

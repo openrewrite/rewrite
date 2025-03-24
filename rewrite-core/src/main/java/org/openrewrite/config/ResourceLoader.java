@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 
 public interface ResourceLoader {
-    Collection<? extends Recipe> listRecipes();
+    Collection<Recipe> listRecipes();
 
     Collection<RecipeDescriptor> listRecipeDescriptors();
 
