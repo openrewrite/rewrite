@@ -18,8 +18,7 @@ package org.openrewrite.java.internal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.AdaptiveRadixTree;
 
-import java.lang.reflect.Field;
-import java.nio.charset.StandardCharsets;
+import static org.openrewrite.internal.StringUtils.getBytes;
 
 public class JavaTypeCache implements Cloneable {
 
@@ -27,11 +26,11 @@ public class JavaTypeCache implements Cloneable {
 
     public <T> @Nullable T get(String signature) {
         //noinspection unchecked
-        return (T) typeCache.search(getKeyBytes(signature));
+        return (T) typeCache.search(getBytes(signature));
     }
 
     public void put(String signature, Object o) {
-        typeCache.insert(getKeyBytes(signature), o);
+        typeCache.insert(getBytes(signature), o);
     }
 
     public void clear() {
@@ -47,67 +46,5 @@ public class JavaTypeCache implements Cloneable {
         } catch (CloneNotSupportedException e) {
             throw new RuntimeException(e);
         }
-    }
-
-    private static final @Nullable Field STRING_VALUE;
-    private static final @Nullable Field STRING_CODER;
-    private static final boolean USE_REFLECTION;
-
-    static {
-        Field value;
-        Field coder;
-        boolean hasCompactStrings = false;
-
-        try {
-            // requires: --add-opens java.base/java.lang=ALL-UNNAMED
-            value = String.class.getDeclaredField("value");
-            value.setAccessible(true);
-
-            try {
-                coder = String.class.getDeclaredField("coder");
-                coder.setAccessible(true);
-                Field compactStrings = String.class.getDeclaredField("COMPACT_STRINGS");
-                compactStrings.setAccessible(true);
-                hasCompactStrings = compactStrings.getBoolean(null);
-            } catch (NoSuchFieldException e) {
-                // Java 8 - field doesn't exist
-                coder = null;
-            }
-        } catch (Exception e) {
-            value = null;
-            coder = null;
-        }
-
-        STRING_VALUE = value;
-        STRING_CODER = coder;
-        USE_REFLECTION = STRING_VALUE != null && STRING_CODER != null && hasCompactStrings;
-    }
-
-    /**
-     * For ASCII and Latin-1 strings this operation is allocation-free.
-     */
-    static byte[] getKeyBytes(String s) {
-        // Try to get internal representation first
-        if (USE_REFLECTION) {
-            try {
-                //noinspection DataFlowIssue
-                byte[] bytes = (byte[]) STRING_VALUE.get(s);
-                //noinspection DataFlowIssue
-                byte coder = (byte) STRING_CODER.get(s);
-                if (coder == 0) {
-                    // Latin1, use directly
-                    return bytes;
-                } else {
-                    // UTF-8: append NUL byte to avoid collisions
-                    byte[] prefixed = new byte[bytes.length + 1];
-                    System.arraycopy(bytes, 0, prefixed, 0, bytes.length);
-                    prefixed[bytes.length] = 0;
-                    return prefixed;
-                }
-            } catch (Exception ignored) {
-            }
-        }
-
-        return s.getBytes(StandardCharsets.UTF_8);
     }
 }

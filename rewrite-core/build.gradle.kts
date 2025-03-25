@@ -23,6 +23,7 @@ dependencies {
 
     implementation("io.moderne:jsonrpc:latest.release")
     implementation("org.objenesis:objenesis:latest.release")
+    implementation("net.jpountz.lz4:lz4:latest.release")
 
     testImplementation("org.assertj:assertj-core:latest.release")
     testImplementation(project(":rewrite-test"))

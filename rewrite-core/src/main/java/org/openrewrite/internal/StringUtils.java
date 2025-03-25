@@ -22,6 +22,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Field;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -31,12 +32,73 @@ import java.util.regex.Pattern;
 public class StringUtils {
     private static final Pattern LINE_BREAK = Pattern.compile("\\R");
 
+    private static final @Nullable Field STRING_VALUE;
+    private static final @Nullable Field STRING_CODER;
+    private static final boolean USE_REFLECTION;
+
+    static {
+        Field value;
+        Field coder;
+        boolean hasCompactStrings = false;
+
+        try {
+            // requires: --add-opens java.base/java.lang=ALL-UNNAMED
+            value = String.class.getDeclaredField("value");
+            value.setAccessible(true);
+
+            try {
+                coder = String.class.getDeclaredField("coder");
+                coder.setAccessible(true);
+                Field compactStrings = String.class.getDeclaredField("COMPACT_STRINGS");
+                compactStrings.setAccessible(true);
+                hasCompactStrings = compactStrings.getBoolean(null);
+            } catch (NoSuchFieldException e) {
+                // Java 8 - field doesn't exist
+                coder = null;
+            }
+        } catch (Exception e) {
+            value = null;
+            coder = null;
+        }
+
+        STRING_VALUE = value;
+        STRING_CODER = coder;
+        USE_REFLECTION = STRING_VALUE != null && STRING_CODER != null && hasCompactStrings;
+    }
+
     private StringUtils() {
+    }
+
+    /**
+     * For ASCII and Latin-1 strings this operation is allocation-free.
+     */
+    public static byte[] getBytes(String s) {
+        // Try to get internal representation first
+        if (USE_REFLECTION) {
+            try {
+                //noinspection DataFlowIssue
+                byte[] bytes = (byte[]) STRING_VALUE.get(s);
+                //noinspection DataFlowIssue
+                byte coder = (byte) STRING_CODER.get(s);
+                if (coder == 0) {
+                    // Latin1, use directly
+                    return bytes;
+                } else {
+                    // UTF-8: append NUL byte to avoid collisions
+                    byte[] prefixed = new byte[bytes.length + 1];
+                    System.arraycopy(bytes, 0, prefixed, 0, bytes.length);
+                    prefixed[bytes.length] = 0;
+                    return prefixed;
+                }
+            } catch (Exception ignored) {
+            }
+        }
+
+        return s.getBytes(StandardCharsets.UTF_8);
     }
 
     public static @Nullable String trimIndentPreserveCRLF(@Nullable String text) {
         if (text == null) {
-            //noinspection DataFlowIssue
             return null;
         }
         return trimIndent((text.endsWith("\r\n") ? text.substring(0, text.length() - 2) : text)
