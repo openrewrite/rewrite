@@ -45,10 +45,10 @@ export class Cursor {
         const path: any[] = [];
         let current: Cursor | undefined = this;
         while (current !== undefined) {
-            path.push(current.value());
+            path.push(current.value);
             current = current.parent;
         }
-        return path.reverse();
+        return path;
     }
 
     firstEnclosing<T>(match: (value: any) => value is T): T | undefined {

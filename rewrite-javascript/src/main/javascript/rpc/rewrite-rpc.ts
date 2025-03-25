@@ -22,7 +22,7 @@ export class RewriteRpc {
 
     readonly localObjects: Map<string, any> = new Map();
     /* A reverse map of the objects back to their IDs */
-    private readonly localObjectIds: WeakMap<any, string> = new WeakMap()
+    private readonly localObjectIds = new IdentityMap()
 
     private readonly remoteObjects: Map<string, any> = new Map();
     private readonly remoteRefs: Map<number, any> = new Map();
@@ -62,7 +62,7 @@ export class RewriteRpc {
             );
         });
 
-        let remoteObject = q.receive<P>(this.localObjects.get(id), (before: any) => {
+        let remoteObject = await q.receive<P>(this.localObjects.get(id), (before: any) => {
             return RpcCodecs.forInstance(before)?.rpcReceive(before, q) ?? before;
         });
 
@@ -157,6 +157,36 @@ export class RewriteRpc {
                 cursorIds.push(id);
             }
             return cursorIds
+        }
+    }
+}
+
+class IdentityMap {
+    constructor(private readonly objectMap = new WeakMap<any, string>(),
+                private readonly primitiveMap = new Map<any, string>()) {
+    }
+
+    set(key: any, value: any): void {
+        if (typeof key === 'object' && key !== null) {
+            this.objectMap.set(key, value);
+        } else {
+            this.primitiveMap.set(key, value);
+        }
+    }
+
+    get(key: any): string | undefined {
+        if (typeof key === 'object' && key !== null) {
+            return this.objectMap.get(key);
+        } else {
+            return this.primitiveMap.get(key);
+        }
+    }
+
+    has(key: any): boolean {
+        if (typeof key === 'object' && key !== null) {
+            return this.objectMap.has(key);
+        } else {
+            return this.primitiveMap.has(key);
         }
     }
 }

@@ -110,12 +110,12 @@ describe("RewriteRpcTest", () => {
 
     test("getCursor", async () => {
         const parent = rootCursor();
-        const c1 = new Cursor(0, parent);
-        const c2 = new Cursor(1, c1);
+        const c1 = new Cursor({k: 0}, parent);
+        const c2 = new Cursor({k: 1}, c1);
 
         const clientC2 = await client.getCursor(server.getCursorIds(c2));
-        expect(clientC2.value).toEqual(1);
-        expect(clientC2.parent!.value).toEqual(0);
-        expect(clientC2.parent!.value).toEqual(parent);
+        expect(clientC2.value).toEqual({k: 1});
+        expect(clientC2.parent!.value).toEqual({k: 0});
+        expect(clientC2.parent!.parent!.value).toEqual("root");
     });
 });

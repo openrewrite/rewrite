@@ -34,13 +34,13 @@ export class GetObject {
             const batch: RpcObjectData[] = [];
             for (let i = 0; i < batchSize; i++) {
                 const {value, done} = await generator.next();
+                batch.push(value);
                 if (done) {
                     break;
                 }
-                batch.push(value);
             }
 
-            if (batch[-1].state === RpcObjectState.END_OF_OBJECT) {
+            if (batch[batch.length - 1].state === RpcObjectState.END_OF_OBJECT) {
                 generators.delete(request.id);
                 remoteObjects.set(request.id, after);
             }

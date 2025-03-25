@@ -34,18 +34,22 @@ export class RpcSendQueue {
             await afterCodec?.rpcSend(after, this);
         } : undefined;
 
+        let next = this.next;
         const top: Promise<void> = this.send(after, before, onChange);
-        while (true) {
+        let sendComplete = false
+        while (!sendComplete) {
             // Race between waiting for the next data and the resolution of 'top'
             const result = await Promise.race([
-                this.next,
-                top.then(() => ({state: RpcObjectState.END_OF_OBJECT}))
+                next,
+                top.then(() => {
+                    sendComplete = true;
+                    return next;
+                })
             ]);
-            if (result.state === RpcObjectState.END_OF_OBJECT) {
-                break;
-            }
             yield result;
+            next = this.next;
         }
+        return {state: RpcObjectState.END_OF_OBJECT};
     }
 
     private put(d: RpcObjectData): void {
@@ -183,13 +187,10 @@ export class RpcSendQueue {
             return undefined;
         }
         const type = after.constructor;
-        if (/* is primitive */ ((typeof type !== "object" && typeof type !== "function") || type === undefined) ||
-            type.name.startsWith("java.lang") ||
-            type instanceof Uint8Array ||
-            Array.isArray(after)) {
-            return undefined;
+        if (typeof type === "object" && "kind" in after) {
+            return after["kind"];
         }
-        return type.name;
+        return undefined;
     }
 }
 
@@ -233,7 +234,9 @@ export class RpcReceiveQueue {
                 if (ref !== undefined && this.refs.has(ref)) {
                     return this.refs.get(ref);
                 }
-                before = !onChange || message.valueType === undefined ? message.value : this.newObj(message.valueType);
+                before = !onChange || message.valueType === undefined ?
+                    message.value :
+                    this.newObj(message.valueType);
             // Intentional fall-through...
             case RpcObjectState.CHANGE:
                 const after = onChange ? onChange(before!) : message.value;
@@ -282,8 +285,9 @@ export class RpcReceiveQueue {
     }
 
     private newObj<T>(type: string): T {
-        const clazz = require(type);
-        return new clazz();
+        return {
+            kind: type
+        } as T;
     }
 }
 
@@ -295,9 +299,9 @@ export interface RpcObjectData {
 }
 
 export enum RpcObjectState {
-    NO_CHANGE,
-    ADD,
-    DELETE,
-    CHANGE,
-    END_OF_OBJECT
+    NO_CHANGE = "NO_CHANGE",
+    ADD = "ADD",
+    DELETE = "DELETE",
+    CHANGE = "CHANGE",
+    END_OF_OBJECT = "END_OF_OBJECT"
 }
