@@ -16,19 +16,33 @@
 package org.openrewrite.groovy;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.tree.ParseError;
+import org.openrewrite.test.RewriteTest;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.groovy.Assertions.groovy;
 
-class GroovyParserTest {
+class GroovyParserTest implements RewriteTest {
 
     @Test
-    void souldNotTreatDivisionAsDelimiter() {
-        assertThat(GroovyParser.builder().build()
-                    .parse(
+    void shouldNotTreatDivisionAsDelimiter() {
+        rewriteRun(
+                groovy(
+                        """
+                                def x = (1 / 1) * 2
+                                System.out.println("test")
+                                """
+                )
+        );
+    }
 
-                            "def x = (1 / 1) * 2 \n" +
-                                    "System.out.println(\"test\")"
-                    ).findFirst().get()).isNotInstanceOf(ParseError.class);
+    @Test
+    void shouldHandleUsingSlashyStringsWithDivision() {
+        rewriteRun(
+                groovy(
+                        """
+                                def x = (Integer.parseInt(/3/) / Integer.parseInt(/2/)) * Integer.parseInt(/5/)
+                                System.out.println("test")
+                                """
+                )
+        );
     }
 }

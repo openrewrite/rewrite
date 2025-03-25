@@ -1683,7 +1683,7 @@ public class GroovyParserVisitor {
                 MethodNode methodNode = (MethodNode) call.getNodeMetaData().get(StaticTypesMarker.DIRECT_METHOD_CALL_TARGET);
                 JavaType.Method methodType = null;
                 if (methodNode == null && call.getObjectExpression() instanceof VariableExpression &&
-                    ((VariableExpression) call.getObjectExpression()).getAccessedVariable() != null) {
+                        ((VariableExpression) call.getObjectExpression()).getAccessedVariable() != null) {
                     // Groovy doesn't know what kind of object this method is being invoked on
                     // But if this invocation is inside a Closure we may have already enriched its parameters with types from the static type checker
                     // Use any such type information to attempt to find a matching method
@@ -2563,7 +2563,7 @@ public class GroovyParserVisitor {
     }
 
     private boolean validateIsDelimiter(ASTNode node, int c) {
-        FindTokenVisitor visitor = new FindTokenVisitor(source.substring(c, c+1), c, sourceLineNumberOffsets);
+        FindBinaryOperationVisitor visitor = new FindBinaryOperationVisitor(source.substring(c, c + 1), c, sourceLineNumberOffsets);
         node.visit(visitor);
         return !visitor.isFound();
     }
@@ -2837,7 +2837,7 @@ public class GroovyParserVisitor {
             start--;
         }
 
-        int startX = indexOfNextNonWhitespace( equalsIndex + 1, str);
+        int startX = indexOfNextNonWhitespace(equalsIndex + 1, str);
         int endX = startX;
         Delimiter delim = getDelimiter(expression, endX);
         if (delim != null) {
