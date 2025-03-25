@@ -23,7 +23,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.time.Duration;
 import java.util.*;
 import java.util.function.Supplier;
@@ -373,7 +372,7 @@ public class DeclarativeRecipe extends Recipe {
         return new RecipeDescriptor(getName(), getDisplayName(), getInstanceName(), getDescription() != null ? getDescription() : "",
                 getTags(), getEstimatedEffortPerOccurrence(),
                 emptyList(), recipeList, getDataTableDescriptors(), getMaintainers(), getContributors(),
-                getExamples(), source, null);
+                getExamples(), source);
     }
 
     @Value
