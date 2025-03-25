@@ -99,7 +99,7 @@ public class FindMissingTypes extends Recipe {
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = true)
+    @EqualsAndHashCode(callSuper = false)
     static class FindMissingTypesVisitor extends JavaIsoVisitor<ExecutionContext> {
 
         boolean checkDocumentation;
