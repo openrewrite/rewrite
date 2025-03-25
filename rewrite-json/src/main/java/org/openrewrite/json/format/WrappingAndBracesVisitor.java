@@ -33,6 +33,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static java.util.Collections.emptyList;
 
@@ -178,8 +180,10 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
                     (Json.Empty) list.get(0).getElement()
                     .withPrefix(Space.EMPTY));
             boolean anythingChanged =
-                    ! oldEmpty.getElement().getPrefix().toString().equals(newEmpty.getElement().getPrefix().toString())
-                    || !oldEmpty.getAfter().toString().equals(newEmpty.getAfter().toString());
+                    !oldEmpty.getAfter().getWhitespace().isEmpty() ||
+                    !oldEmpty.getAfter().getComments().isEmpty() ||
+                    !oldEmpty.getElement().getPrefix().getComments().isEmpty() ||
+                    !oldEmpty.getElement().getPrefix().getWhitespace().isEmpty();
             if (anythingChanged) {
                  return Collections.singletonList(newEmpty);
             }
