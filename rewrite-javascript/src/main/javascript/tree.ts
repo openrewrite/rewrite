@@ -24,7 +24,7 @@ export function isTree(tree: any): tree is Tree {
     return (
         typeof tree === "object" &&
         tree !== null &&
-        "id" in tree && "prefix" in tree && "markers" in tree
+        "id" in tree && "markers" in tree
     );
 }
 

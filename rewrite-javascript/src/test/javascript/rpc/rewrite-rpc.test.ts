@@ -22,12 +22,12 @@ describe("RewriteRpcTest", () => {
         client = new RewriteRpc(rpc.createMessageConnection(
             new rpc.StreamMessageReader(serverToClient),
             new rpc.StreamMessageWriter(clientToServer)
-        ), 1).listen();
+        ), 1);
 
         server = new RewriteRpc(rpc.createMessageConnection(
             new rpc.StreamMessageReader(clientToServer),
             new rpc.StreamMessageWriter(serverToClient)
-        )).listen();
+        ));
     });
 
     afterEach(() => {
@@ -44,28 +44,26 @@ describe("RewriteRpcTest", () => {
         expect(received.get("key")).toEqual("value");
     });
 
-    test("print", () => {
-        spec.rewriteRun(
-            text(
-                "Hello Jon!",
-                (spec: SourceSpec<PlainText>) => {
-                    spec.beforeRecipe = (text: PlainText) => {
-                        expect(server.print(text)).toEqual("Hello Jon!");
-                        return text;
-                    }
+    test("print", () => spec.rewriteRun(
+        text(
+            "Hello Jon!",
+            (spec: SourceSpec<PlainText>) => {
+                spec.beforeRecipe = (text: PlainText) => {
+                    expect(server.print(text)).toEqual("Hello Jon!");
+                    return text;
                 }
-            )
-        );
-    });
+            }
+        )
+    ));
 
-    test("getRecipes", async () => {
-        expect(await server.recipes()).not.toEqual([]);
-    });
-
+    test("getRecipes", async () =>
+        expect((await server.recipes()).length).toBeGreaterThan(0)
+    );
 
     test("prepareRecipe", async () => {
         const recipe = await server.prepareRecipe("org.openrewrite.text.change-text", {text: "hello"});
         expect(recipe.displayName).toEqual("Change text");
+        expect(recipe.instanceName()).toEqual("Change text to 'hello'");
     });
 
     test("runRecipe", async () => {

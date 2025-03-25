@@ -21,6 +21,10 @@ export class RpcRecipe extends Recipe {
         return this._descriptor;
     }
 
+    instanceName(): string {
+        return this._descriptor.instanceName;
+    }
+
     get editor(): TreeVisitor<any, ExecutionContext> {
         const rpc = this.rpc;
         const editVisitor = this.editVisitor;

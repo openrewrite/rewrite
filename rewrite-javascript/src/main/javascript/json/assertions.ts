@@ -29,7 +29,7 @@ export function json(
     let sourcePath = undefined;
     let executionContext = createExecutionContext();
     if (before) {
-        const sourcePath = `${SnowflakeId().generate()}.json`;
+        sourcePath = `${SnowflakeId().generate()}.json`;
         const vol = memfs().vol
         vol.mkdirSync(process.cwd(), {recursive: true});
         vol.writeFileSync(`${process.cwd()}/${sourcePath}`, dedent(before));

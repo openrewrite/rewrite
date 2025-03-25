@@ -150,9 +150,9 @@ Object.freeze(ScanningRecipe.prototype.editor);
 
 export class RecipeRegistry {
     // The registry map stores recipe constructors keyed by their instance name.
-    static all = new Map<string, { new(): Recipe }>();
+    static all = new Map<string, { new(options?: {}): Recipe }>();
 
-    public static register(name: string, recipeClass: { new(): Recipe }): void {
+    public static register(name: string, recipeClass: { new(options?: {}): Recipe }): void {
         RecipeRegistry.all.set(name, recipeClass);
     }
 }
@@ -165,7 +165,9 @@ export class RecipeRegistry {
 export function Registered(recipeName: string) {
     return function <T extends { new(...args: any[]): Recipe }>(constructor: T): T {
         try {
+            // Validate that the constructor can be called without arguments.
             new constructor();
+
             RecipeRegistry.register(recipeName, constructor);
             return constructor;
         } catch (e) {

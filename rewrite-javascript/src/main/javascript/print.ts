@@ -82,7 +82,6 @@ export class TreePrinters {
 
         if (!this._registry.has(sourceFileKind)) {
             throw new Error(`No printer registered for ${sourceFileKind}`)
-
         }
         return this._registry.get(sourceFileKind)!;
     }

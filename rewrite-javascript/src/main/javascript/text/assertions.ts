@@ -28,7 +28,7 @@ export function text(
     let sourcePath = undefined;
     let executionContext = createExecutionContext();
     if (before) {
-        const sourcePath = `${SnowflakeId().generate()}.txt`;
+        sourcePath = `${SnowflakeId().generate()}.txt`;
         const vol = memfs().vol
         vol.mkdirSync(process.cwd(), {recursive: true});
         vol.writeFileSync(`${process.cwd()}/${sourcePath}`, dedent(before));

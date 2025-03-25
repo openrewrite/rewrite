@@ -49,11 +49,6 @@ export class RewriteRpc {
         this.connection.listen();
     }
 
-    listen(): RewriteRpc {
-        this.connection.listen();
-        return this;
-    }
-
     end(): RewriteRpc {
         this.connection.end();
         return this;

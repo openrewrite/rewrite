@@ -67,6 +67,10 @@ export class ChangeText extends Recipe {
     @Transient
     replacedText = ReplacedText.dataTable;
 
+    instanceName(): string {
+        return `Change text to '${this.text}'`;
+    }
+
     get editor(): TreeVisitor<any, ExecutionContext> {
         let visitor = new ChangeTextVisitor<ExecutionContext>();
         visitor.text = this.text;
