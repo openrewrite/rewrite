@@ -143,13 +143,8 @@ export function noopVisitor<T extends Tree, P>() {
 }
 
 export class RecipeRunError extends Error {
-    readonly cause: Error;
-    readonly cursor?: Cursor;
-
-    constructor(cause: Error, cursor?: Cursor) {
+    constructor(public readonly cause: Error, public readonly cursor?: Cursor) {
         super();
-        this.cause = cause;
-        this.cursor = cursor;
     }
 }
 

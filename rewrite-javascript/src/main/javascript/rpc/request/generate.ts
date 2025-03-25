@@ -3,12 +3,7 @@ import {Recipe} from "../../recipe";
 import {Cursor, SourceFile} from "../../tree";
 
 export class Generate {
-    id: String
-    p: String
-
-    constructor(id: String, p: String) {
-        this.id = id
-        this.p = p
+    constructor(private readonly id: String, private readonly p: String) {
     }
 
     static handle(connection: rpc.MessageConnection,

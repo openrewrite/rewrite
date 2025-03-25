@@ -25,11 +25,9 @@ const defaultMarkerPrinter: MarkerPrinter = {
 }
 
 export class PrintOutputCapture {
-    readonly markerPrinter: MarkerPrinter;
     private _out: string = "";
 
-    constructor(markerPrinter: MarkerPrinter = defaultMarkerPrinter) {
-        this.markerPrinter = markerPrinter;
+    constructor(public readonly markerPrinter: MarkerPrinter = defaultMarkerPrinter) {
     }
 
     get out(): string {

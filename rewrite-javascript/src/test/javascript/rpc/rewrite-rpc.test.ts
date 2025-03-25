@@ -1,54 +1,14 @@
 import {afterEach, beforeEach, describe, expect, test} from "@jest/globals";
-import {
-    createExecutionContext,
-    Cursor,
-    ExecutionContext, Option,
-    Recipe, Registered,
-    rootCursor,
-    TreeVisitor
-} from "../../../main/javascript";
+import {createExecutionContext, Cursor, ExecutionContext, rootCursor} from "../../../main/javascript";
 import {RewriteRpc} from "../../../main/javascript/rpc";
-import {PlainText, PlainTextVisitor, text} from "../../../main/javascript/text";
+import {PlainText, text} from "../../../main/javascript/text";
 import {RecipeSpec, SourceSpec} from "../../../main/javascript/test";
 import {PassThrough} from "node:stream";
 import * as rpc from "vscode-jsonrpc/node";
+import "../example-recipe";
+import {ReplacedText} from "../example-recipe";
 
 describe("RewriteRpcTest", () => {
-    class ChangeTextVisitor<P> extends PlainTextVisitor<P> {
-        text: string = "Hello world!";
-
-        visitText(text: PlainText, p: P): Promise<PlainText> {
-            return this.produceTree(text, p, draft => {
-                draft.text = "Hello World!";
-            })
-        }
-    }
-
-    @Registered("org.openrewrite.text.change-text")
-    class ChangeText extends Recipe {
-        displayName = "Change text";
-        description = "Change the text of a file.";
-
-        @Option({
-            displayName: "Text",
-            description: "Text to change to"
-        })
-        text: string = "Hello World!"
-
-        get editor(): TreeVisitor<any, ExecutionContext> {
-            let visitor = new ChangeTextVisitor<ExecutionContext>();
-            visitor.text = this.text;
-            return visitor
-        }
-    }
-
-    @Registered("org.openrewrite.text.with-recipe-list")
-    class RecipeWithRecipeList extends Recipe {
-        displayName = "A recipe that has a recipe list";
-        description = "To verify that it is possible for a recipe list to be called over RPC.";
-        recipeList = [new ChangeText()]
-    }
-
     const spec = new RecipeSpec();
 
     let server: RewriteRpc;
@@ -108,26 +68,22 @@ describe("RewriteRpcTest", () => {
         expect(recipe.displayName).toEqual("Change text");
     });
 
-    // test("runRecipe", () => {
-    //     const latch = new CountDownLatch(1);
-    //     spec.rewriteRun(
-    //         spec => spec
-    //             .recipe(server.prepareRecipe("org.openrewrite.text.Find", {find: "hello"}))
-    //             .validateRecipeSerialization(false)
-    //             .dataTable(TextMatches.Row, rows => {
-    //                 expect(rows).toContainEqual(new TextMatches.Row("hello.txt", "~~>Hello Jon!"));
-    //                 latch.countDown();
-    //             }),
-    //         text(
-    //             "Hello Jon!",
-    //             "~~>Hello Jon!",
-    //             spec => spec.path("hello.txt")
-    //         )
-    //     );
-    //
-    //     expect(latch.getCount()).toEqual(0);
-    // });
-    //
+    test("runRecipe", async () => {
+        spec.recipe = await server.prepareRecipe("org.openrewrite.text.change-text", {text: "hello"});
+        spec.dataTable("org.openrewrite.text.replaced-text", (rows: ReplacedText[]) => {
+            expect(rows).toContain(new ReplacedText("hello.txt", "hello"));
+        });
+        await spec.rewriteRun(
+            text(
+                "Hello Jon!",
+                "hello",
+                spec => {
+                    spec.path = "hello.txt";
+                }
+            )
+        );
+    });
+
     // test("runScanningRecipeThatGenerates", () => {
     //     spec.rewriteRun(
     //         spec => spec
@@ -143,16 +99,16 @@ describe("RewriteRpcTest", () => {
     //         )
     //     );
     // });
-    //
-    // test("runRecipeWithRecipeList", () => {
-    //     spec.recipe = server.prepareRecipe("org.openrewrite.rpc.RewriteRpcTest$RecipeWithRecipeList", {});
-    //     spec.rewriteRun(
-    //         text(
-    //             "hi",
-    //             "hello"
-    //         )
-    //     );
-    // });
+
+    test("runRecipeWithRecipeList", async () => {
+        spec.recipe = await server.prepareRecipe("org.openrewrite.text.with-recipe-list");
+        await spec.rewriteRun(
+            text(
+                "hi",
+                "hello"
+            )
+        );
+    });
 
     test("getCursor", async () => {
         const parent = rootCursor();

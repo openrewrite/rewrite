@@ -5,6 +5,7 @@ import {Parser, readSourceSync} from "../parser";
 import {TreePrinters} from "../print";
 import {isSourceFile, SourceFile} from "../tree";
 import dedent from "dedent";
+import {getRows} from "../data-table";
 
 export interface SourceSpec<T extends SourceFile> {
     before?: string
@@ -29,6 +30,12 @@ export class RecipeSpec {
      */
     recipeExecutionContext: ExecutionContext = this.executionContext;
 
+    private dataTableAssertions: { [key: string]: (rows: any[]) => void } = {}
+
+    dataTable<Row>(name: string, allRows: (rows: Row[]) => void) {
+        this.dataTableAssertions[name] = allRows;
+    }
+
     async rewriteRun(...sourceSpecs: SourceSpec<any>[]): Promise<void> {
         for (const spec of sourceSpecs) {
             // TODO more validation to implement here, along with grouping source specs for execution
@@ -37,9 +44,10 @@ export class RecipeSpec {
             // TODO also need to implement when scanning recipes generate files
             expect(spec.before).toBeDefined();
 
-            const parserCtx: ExecutionContext = (spec.executionContext ? new Map<string | symbol, any>([
-                ...Array.from(this.executionContext.entries()), ...Array.from(spec.executionContext.entries())
-            ]) : this.executionContext) as ExecutionContext
+            const parserCtx: ExecutionContext = spec.executionContext ? {
+                ...this.executionContext,
+                ...spec.executionContext
+            } : this.executionContext
 
             let beforeSource = readSourceSync(parserCtx, spec.before!);
             let beforeParsed = spec.parser().parse(parserCtx, spec.before, spec.before!)[0];
@@ -64,7 +72,14 @@ export class RecipeSpec {
                 }
             }
 
-            const after: SourceFile | undefined = await this.recipe.editor.visit(beforeParsed, this.recipeExecutionContext);
+            // TODO substitute for LargeSourceSet and a real RecipeScheduler for now
+            let after: SourceFile | undefined = await this.recipe.editor.visit(beforeParsed, this.recipeExecutionContext);
+            for (const subRecipe of this.recipe.recipeList) {
+                if (after) {
+                    after = await subRecipe.editor.visit(after, this.recipeExecutionContext);
+                }
+            }
+
             if (!after) {
                 if (spec.after) {
                     fail(`${spec.path} was deleted unexpectedly`)
@@ -75,6 +90,10 @@ export class RecipeSpec {
                 }
                 const afterSource = afterFn();
                 expect(await TreePrinters.print(after)).toEqual(afterSource);
+            }
+
+            for (const [name, assertion] of Object.entries(this.dataTableAssertions)) {
+                assertion(getRows(name, this.recipeExecutionContext));
             }
         }
     }

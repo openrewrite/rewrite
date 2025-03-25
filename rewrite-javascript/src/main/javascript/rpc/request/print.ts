@@ -4,12 +4,8 @@ import {printer} from "../../print";
 import {UUID} from "../../uuid";
 
 export class Print {
-    id: UUID
-    cursor?: string[]
-
-    constructor(id: UUID, cursor?: string[]) {
-        this.id = id
-        this.cursor = cursor
+    constructor(private readonly id: UUID,
+                private readonly cursor?: string[]) {
     }
 
     static handle(connection: rpc.MessageConnection,

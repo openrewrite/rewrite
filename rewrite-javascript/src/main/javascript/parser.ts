@@ -15,12 +15,10 @@ export abstract class Parser {
  */
 export class ParserSourceReader {
     readonly source: string
-    readonly sourcePath: string
     cursor: number = 0;
 
-    constructor(sourcePath: string, ctx: ExecutionContext) {
+    constructor(public readonly sourcePath: string, ctx: ExecutionContext) {
         this.source = readSourceSync(ctx, sourcePath)
-        this.sourcePath = sourcePath;
     }
 
     whitespace(): string {

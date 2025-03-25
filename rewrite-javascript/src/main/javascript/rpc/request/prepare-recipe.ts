@@ -4,12 +4,7 @@ import {Recipe, RecipeDescriptor} from "../../recipe";
 import {SnowflakeId} from "@akashrajpurohit/snowflake-id";
 
 export class PrepareRecipe {
-    id: string
-    options: any
-
-    constructor(id: string, options: any) {
-        this.id = id;
-        this.options = options;
+    constructor(private readonly id: string, private readonly options?: any) {
     }
 
     static handle(connection: MessageConnection,

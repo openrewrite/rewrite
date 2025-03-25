@@ -1,6 +1,5 @@
 import {Marker} from "../markers";
 import {RpcCodecs} from "./codec";
-import {Queue} from "async-await-queue";
 
 const REFERENCE_KEY = Symbol("org.openrewrite.rpc.Reference");
 
@@ -17,17 +16,13 @@ function isRef(obj?: any): obj is Reference {
 }
 
 export class RpcSendQueue {
-    private readonly batch = new Queue(2, 100);
-    private readonly refs: WeakMap<Object, number>;
-
     private next: Promise<RpcObjectData>;
     private resolveNext!: (value: RpcObjectData) => void;
 
     private refCount = 1
     private before?: any;
 
-    constructor(refs: WeakMap<Object, number>) {
-        this.refs = refs;
+    constructor(private readonly refs: WeakMap<Object, number>) {
         this.next = new Promise<RpcObjectData>(resolve => {
             this.resolveNext = resolve;
         });
@@ -200,10 +195,9 @@ export class RpcSendQueue {
 
 export class RpcReceiveQueue {
     private batch: RpcObjectData[] = [];
-    private refs: Map<number, any>;
     private readonly pull: () => Promise<RpcObjectData[]>;
 
-    constructor(refs: Map<number, any>, pull: () => Promise<RpcObjectData[]>) {
+    constructor(private readonly refs: Map<number, any>, pull: () => Promise<RpcObjectData[]>) {
         this.refs = refs;
         this.pull = pull;
     }

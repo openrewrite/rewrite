@@ -4,25 +4,17 @@ import {TreeVisitor} from "../visitor";
 import {ExecutionContext} from "../execution";
 
 export class RpcRecipe extends Recipe {
-    private readonly remoteId: string;
-    private readonly rpc: RewriteRpc;
-    private readonly _descriptor: RecipeDescriptor;
-    private readonly editVisitor: string
-    private readonly scanVisitor?: string;
-
     displayName: string = this.descriptor.displayName;
     description: string = this.descriptor.description;
     tags: string[] = this.descriptor.tags;
     estimatedEffortPerOccurrence: Minutes = this.descriptor.estimatedEffortPerOccurrence;
 
-    constructor(rpc: RewriteRpc, remoteId: string, descriptor: RecipeDescriptor,
-                editVisitor: string, scanVisitor?: string) {
+    constructor(private readonly rpc: RewriteRpc,
+                private readonly remoteId: string,
+                private readonly _descriptor: RecipeDescriptor,
+                private readonly editVisitor: string,
+                private readonly scanVisitor?: string) {
         super();
-        this.rpc = rpc;
-        this.remoteId = remoteId;
-        this._descriptor = descriptor;
-        this.editVisitor = editVisitor;
-        this.scanVisitor = scanVisitor;
     }
 
     get descriptor(): RecipeDescriptor {

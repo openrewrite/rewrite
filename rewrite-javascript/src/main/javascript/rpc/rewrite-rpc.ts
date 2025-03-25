@@ -19,7 +19,6 @@ import {RpcRecipe} from "./recipe";
 
 export class RewriteRpc {
     private readonly snowflake = SnowflakeId();
-    private readonly connection: MessageConnection;
 
     readonly localObjects: Map<string, any> = new Map();
     /* A reverse map of the objects back to their IDs */
@@ -28,7 +27,7 @@ export class RewriteRpc {
     private readonly remoteObjects: Map<string, any> = new Map();
     private readonly remoteRefs: Map<number, any> = new Map();
 
-    constructor(connection: MessageConnection = rpc.createMessageConnection(
+    constructor(private readonly connection: MessageConnection = rpc.createMessageConnection(
         new rpc.StreamMessageReader(process.stdin),
         new rpc.StreamMessageWriter(process.stdout)
     ), batchSize: number = 10) {
@@ -112,7 +111,7 @@ export class RewriteRpc {
         );
     }
 
-    async prepareRecipe(id: string, options: any): Promise<Recipe> {
+    async prepareRecipe(id: string, options?: any): Promise<Recipe> {
         const response = await this.connection.sendRequest(
             new rpc.RequestType<PrepareRecipe, PrepareRecipeResponse, Error>("PrepareRecipe"),
             new PrepareRecipe(id, options)

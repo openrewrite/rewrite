@@ -2,10 +2,7 @@ import * as rpc from "vscode-jsonrpc/node";
 import {RpcObjectData, RpcObjectState, RpcSendQueue} from "../queue";
 
 export class GetObject {
-    id: string;
-
-    constructor(id: string) {
-        this.id = id;
+    constructor(private readonly id: string) {
     }
 
     static handle(

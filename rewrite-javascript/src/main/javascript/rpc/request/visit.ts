@@ -8,18 +8,11 @@ export interface VisitResponse {
 }
 
 export class Visit {
-    private readonly visitor: string
-    private readonly visitorOptions: Map<string, any> | undefined
-    private readonly treeId: string
-    private readonly p: string
-    private readonly cursor: string[] | undefined
-
-    constructor(visitor: string, visitorOptions: Map<string, any> | undefined, treeId: string, p: string, cursor: string[] | undefined) {
-        this.visitor = visitor
-        this.visitorOptions = visitorOptions
-        this.treeId = treeId
-        this.p = p
-        this.cursor = cursor
+    constructor(private readonly visitor: string,
+                private readonly visitorOptions: Map<string, any> | undefined,
+                private readonly treeId: string,
+                private readonly p: string,
+                private readonly cursor: string[] | undefined) {
     }
 
     static handle(connection: rpc.MessageConnection,

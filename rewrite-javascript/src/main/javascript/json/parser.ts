@@ -24,11 +24,8 @@ export class JsonParser extends Parser {
 }
 
 class ParseJsonReader extends ParserSourceReader {
-    private readonly relativeTo?: string;
-
-    constructor(sourcePath: string, ctx: ExecutionContext, relativeTo?: string) {
+    constructor(sourcePath: string, ctx: ExecutionContext, private relativeTo?: string) {
         super(sourcePath, ctx);
-        this.relativeTo = relativeTo;
     }
 
     private prefix() {

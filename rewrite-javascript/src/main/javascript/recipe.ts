@@ -2,6 +2,7 @@ import {noopVisitor, TreeVisitor} from "./visitor";
 import {Cursor, SourceFile, Tree} from "./tree";
 import {ExecutionContext} from "./execution";
 import {randomId} from "./uuid";
+import {DataTableDescriptor} from "./data-table";
 
 const OPTIONS_KEY = "__recipe_options__";
 
@@ -36,6 +37,10 @@ export abstract class Recipe {
 
     readonly estimatedEffortPerOccurrence: Minutes = 5
 
+    readonly dataTables: DataTableDescriptor[] = []
+
+    readonly recipeList: Recipe[] = []
+
     /**
      * A human-readable display name for this recipe instance, including some descriptive
      * text about the recipe options that are supplied, if any. The name must be
@@ -53,14 +58,14 @@ export abstract class Recipe {
     }
 
     get descriptor(): RecipeDescriptor {
-        const optionRecord: Record<string, OptionDescriptor> = (this as any).constructor[OPTIONS_KEY] || {}
+        const optionsRecord: Record<string, OptionDescriptor> = (this as any).constructor[OPTIONS_KEY] || {}
         return {
             displayName: this.displayName,
             instanceName: this.instanceName(),
             description: this.description,
             tags: this.tags,
             estimatedEffortPerOccurrence: this.estimatedEffortPerOccurrence,
-            options: Object.entries(optionRecord).map(([key, descriptor]) => ({
+            options: Object.entries(optionsRecord).map(([key, descriptor]) => ({
                 name: key,
                 ...descriptor
             }))
@@ -183,4 +188,22 @@ export function Option(descriptor: OptionDescriptor) {
         // Register the option metadata under the property key.
         target.constructor[OPTIONS_KEY][propertyKey] = descriptor;
     };
+}
+
+/**
+ * Mark a property as transient, meaning it should not be part of the serialized form of
+ * a recipe.
+ *
+ * @param target
+ * @param propertyKey
+ * @constructor
+ */
+export function Transient(target: any, propertyKey: string) {
+    // Get the property descriptor, if any, then redefine it as non-enumerable.
+    const descriptor = Object.getOwnPropertyDescriptor(target, propertyKey) || {
+        configurable: true,
+        writable: true,
+    };
+    descriptor.enumerable = false;
+    Object.defineProperty(target, propertyKey, descriptor);
 }
