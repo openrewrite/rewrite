@@ -24,7 +24,10 @@ import lombok.Setter;
 import lombok.experimental.FieldDefaults;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.config.*;
+import org.openrewrite.config.DataTableDescriptor;
+import org.openrewrite.config.OptionDescriptor;
+import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.config.RecipeExample;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NullUtils;
@@ -37,7 +40,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Duration;
 import java.util.*;
-import java.util.jar.Attributes;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.internal.RecipeIntrospectionUtils.dataTableDescriptorFromDataTable;
@@ -213,17 +215,6 @@ public abstract class Recipe implements Cloneable {
         return descriptor;
     }
 
-    public final void augmentRecipeDescriptor(@Nullable Attributes attributes) {
-        if (attributes != null) {
-            String gitHubBase = attributes.containsKey("Module-Origin") ? attributes.getValue("Module-Origin") : "https://github.com/openrewrite";
-            String gitHubDir = attributes.containsKey("Module-Source") ? attributes.getValue("Module-Source") : "";
-            License license = License.of(attributes.getValue("License-Name"), attributes.getValue("License-Url"));
-            descriptor = getDescriptor()
-                    .withLicense(license)
-                    .withSource(URI.create(gitHubBase + "/" + gitHubDir));
-        }
-    }
-
     protected RecipeDescriptor createRecipeDescriptor() {
         List<OptionDescriptor> options = getOptionDescriptors();
         ArrayList<RecipeDescriptor> recipeList1 = new ArrayList<>();
@@ -240,7 +231,7 @@ public abstract class Recipe implements Cloneable {
 
         return new RecipeDescriptor(getName(), getDisplayName(), getInstanceName(), getDescription(), getTags(),
                 getEstimatedEffortPerOccurrence(), options, recipeList1, getDataTableDescriptors(),
-                getMaintainers(), getContributors(), getExamples(), recipeSource, null);
+                getMaintainers(), getContributors(), getExamples(), recipeSource);
     }
 
     private List<OptionDescriptor> getOptionDescriptors() {
