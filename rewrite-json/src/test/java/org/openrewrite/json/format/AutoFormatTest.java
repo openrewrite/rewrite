@@ -114,16 +114,14 @@ class AutoFormatTest implements RewriteTest {
     }
 
     @Test
-    void emptyObjectWithJustAComment() {
+    void emptyObjectWithSpace() {
         rewriteRun(
           json(
             """
             {
-               "ocomment": {
-                   // intentionally blank page
-               }
             }
-            """
+            """,
+            "{}"
           )
         );
     }

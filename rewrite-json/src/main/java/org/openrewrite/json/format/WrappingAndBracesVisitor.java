@@ -61,9 +61,12 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
         List<JsonRightPadded<Json>> members = ret.getPadding().getMembers();
         LineWrapSetting wrappingSetting = this.wrappingAndBracesStyle.getWrapObjects();
 
-        members = ensureCollectionHasIndents(members, wrappingSetting);
-        members = applyWrappingStyleToSuffixes(members, wrappingSetting, getCurrentIndent());
-        members = collapseToNoSpaceIfEmpty(members);
+        if (!isEmpty(members)) {
+            members = ensureCollectionHasIndents(members, wrappingSetting);
+            members = applyWrappingStyleToSuffixes(members, wrappingSetting, getCurrentIndent());
+        } else {
+            members = collapseToNoSpaceIfEmpty(members);
+        }
         return ret.getPadding().withMembers(members);
     }
 
@@ -73,9 +76,12 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
         List<JsonRightPadded<JsonValue>> members = ret.getPadding().getValues();
         LineWrapSetting wrappingSetting = this.wrappingAndBracesStyle.getWrapArrays();
 
-        members = ensureCollectionHasIndents(members, wrappingSetting);
-        members = applyWrappingStyleToSuffixes(members, wrappingSetting, getCurrentIndent());
-        members = collapseToNoSpaceIfEmpty(members);
+        if (!isEmpty(members)) {
+            members = ensureCollectionHasIndents(members, wrappingSetting);
+            members = applyWrappingStyleToSuffixes(members, wrappingSetting, getCurrentIndent());
+        } else {
+            members = collapseToNoSpaceIfEmpty(members);
+        }
         return ret.getPadding().withValues(members);
     }
 
@@ -158,15 +164,26 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
         return ret;
     }
 
-    private <JS extends Json> List<JsonRightPadded<JS>> collapseToNoSpaceIfEmpty(List<JsonRightPadded<JS>> list) {
-        if (list.size() == 1 &&
+    public static <JS extends Json> boolean isEmpty(List<JsonRightPadded<JS>> list) {
+        return list.size() == 1 &&
                 (list.get(0).getElement() instanceof Json.Empty) &&
                 (list.get(0).getElement().getPrefix().getComments().isEmpty()) &&
-                (list.get(0).getAfter().getComments().isEmpty())
-        ) {
-            return Collections.emptyList();
-        } else {
-            return list;
+                (list.get(0).getAfter().getComments().isEmpty());
+    }
+
+    private <JS extends Json> List<JsonRightPadded<JS>> collapseToNoSpaceIfEmpty(List<JsonRightPadded<JS>> list) {
+        if (isEmpty(list)) {
+            JsonRightPadded<JS> oldEmpty = list.get(0);
+            JsonRightPadded<JS> newEmpty = (JsonRightPadded<JS>) JsonRightPadded.build(
+                    (Json.Empty) list.get(0).getElement()
+                    .withPrefix(Space.EMPTY));
+            boolean anythingChanged =
+                    ! oldEmpty.getElement().getPrefix().toString().equals(newEmpty.getElement().getPrefix().toString())
+                    || !oldEmpty.getAfter().toString().equals(newEmpty.getAfter().toString());
+            if (anythingChanged) {
+                 return Collections.singletonList(newEmpty);
+            }
         }
+        return list;
     }
 }
