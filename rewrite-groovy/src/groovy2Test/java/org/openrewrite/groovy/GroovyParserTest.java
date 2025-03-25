@@ -27,9 +27,9 @@ class GroovyParserTest implements RewriteTest {
         rewriteRun(
                 groovy(
                         """
-                                def x = (1 / 1) * 2
-                                System.out.println("test")
-                                """
+                        def x = (1 / 1) * 2
+                        System.out.println("test")
+                        """
                 )
         );
     }
@@ -39,9 +39,9 @@ class GroovyParserTest implements RewriteTest {
         rewriteRun(
                 groovy(
                         """
-                                def x = (Integer.parseInt(/3/) / Integer.parseInt(/2/)) * Integer.parseInt(/5/)
-                                System.out.println("test")
-                                """
+                        def x = (Integer.parseInt(/3/) / Integer.parseInt(/2/)) * Integer.parseInt(/5/)
+                        System.out.println("test")
+                        """
                 )
         );
     }
