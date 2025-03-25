@@ -15,6 +15,7 @@
  */
 package org.openrewrite.internal;
 
+import net.jpountz.xxhash.XXHash32;
 import net.jpountz.xxhash.XXHashFactory;
 import org.jspecify.annotations.Nullable;
 
@@ -24,19 +25,19 @@ import static org.openrewrite.internal.StringUtils.getBytes;
 
 /**
  * A memory-efficient hash map implementation that stores String keys as byte arrays.
- * Uses open addressing with linear probing for collision resolution.
+ * Uses open addressing with quadratic probing for collision resolution.
  * Does not implement the Map interface to minimize overhead due to `Map.Entry` API.
  *
  * @param <V> The type of values stored in the map
  */
 public class CompactStringHashMap<V> {
-    private static final float DEFAULT_LOAD_FACTOR = 0.85f;
+    private static final float DEFAULT_LOAD_FACTOR = 0.8f;
     private static final int DEFAULT_INITIAL_CAPACITY = 256;
 
     // Marker for deleted entries
     private static final byte[] TOMBSTONE = new byte[0];
 
-    private final XXHashFactory factory = XXHashFactory.fastestInstance();
+    private final XXHash32 hasher = XXHashFactory.fastestInstance().hash32();
 
     private byte[][] keys;
     private @Nullable Object[] values;
@@ -53,7 +54,7 @@ public class CompactStringHashMap<V> {
      * Constructs a ByteHashMap with specified initial capacity and load factor.
      *
      * @param initialCapacity the initial capacity
-     * @param loadFactor the load factor
+     * @param loadFactor      the load factor
      */
     public CompactStringHashMap(int initialCapacity, float loadFactor) {
         if (initialCapacity < 0) {
@@ -88,7 +89,7 @@ public class CompactStringHashMap<V> {
      * Inserts a mapping from the specified key to the specified value.
      * If the map previously contained a mapping for the key, the old value is replaced.
      *
-     * @param key the key to insert
+     * @param key   the key to insert
      * @param value the value to insert
      * @return the previous value associated with the key, or null if there was no mapping
      */
@@ -101,7 +102,7 @@ public class CompactStringHashMap<V> {
      * Inserts a mapping using a byte array key directly.
      *
      * @param keyBytes the key as a byte array
-     * @param value the value to insert
+     * @param value    the value to insert
      * @return the previous value associated with the key, or null if there was no mapping
      */
     public @Nullable V insert(byte[] keyBytes, V value) {
@@ -115,11 +116,22 @@ public class CompactStringHashMap<V> {
         }
 
         int hash = hash(keyBytes);
-        int index = hash & (keys.length - 1);
+        int capacity = keys.length;
         int tombstoneIndex = -1;
 
-        // Linear probing to find the insertion point
-        while (keys[index] != null) {
+        for (int probe = 0; probe < capacity; probe++) {
+            // Calculate index using quadratic formula: (hash + probe*(probe+1)/2) % capacity
+            int index = (int) (hash + (long) probe * (probe + 1) / 2) & (capacity - 1);
+
+            if (keys[index] == null) {
+                // Found empty slot
+                int insertionIndex = (tombstoneIndex != -1) ? tombstoneIndex : index;
+                keys[insertionIndex] = keyBytes;
+                values[insertionIndex] = value;
+                size++;
+                return null; // New key inserted
+            }
+
             if (keys[index] == TOMBSTONE) {
                 // Remember the first tombstone for possible reuse
                 if (tombstoneIndex == -1) {
@@ -128,25 +140,24 @@ public class CompactStringHashMap<V> {
             } else if (keyEquals(keys[index], keyBytes)) {
                 // Key found, replace value
                 V oldValue = (V) values[index];
+                // Even if we found a tombstone earlier, update in place where key was found
                 values[index] = value;
                 return oldValue;
             }
-
-            index = (index + 1) & (keys.length - 1);
+            // Collision, continue to next probe step
         }
 
-        // Insert at tombstone if found
+        // If loop finishes, we should have found an empty slot or reused a tombstone if load factor < 1
+        // If a tombstone was found, insert there. This path might be hit if the table is full of tombstones.
         if (tombstoneIndex != -1) {
             keys[tombstoneIndex] = keyBytes;
             values[tombstoneIndex] = value;
-        } else {
-            // Insert at empty slot
-            keys[index] = keyBytes;
-            values[index] = value;
+            size++;
+            return null;
         }
 
-        size++;
-        return null;
+        // Should not be reached if load factor < 1 and resize works
+        throw new IllegalStateException("Hash table full or probing failed unexpectedly.");
     }
 
     /**
@@ -174,13 +185,20 @@ public class CompactStringHashMap<V> {
     @SuppressWarnings("unchecked")
     private @Nullable V search0(byte[] keyBytes) {
         int hash = hash(keyBytes);
-        int index = hash & (keys.length - 1);
+        int capacity = keys.length;
 
-        while (keys[index] != null) {
+        for (int probe = 0; probe < capacity; probe++) {
+            // Calculate index using quadratic formula
+            int index = (int) (hash + (long) probe * (probe + 1) / 2) & (capacity - 1);
+
+            if (keys[index] == null) {
+                return null;
+            }
+
             if (keys[index] != TOMBSTONE && keyEquals(keys[index], keyBytes)) {
                 return (V) values[index];
             }
-            index = (index + 1) & (keys.length - 1);
+            // Collision or Tombstone, continue probing
         }
 
         return null;
@@ -192,22 +210,36 @@ public class CompactStringHashMap<V> {
      * @param key the key whose mapping is to be removed from the map
      * @return the previous value associated with the key, or null if not found
      */
-    @SuppressWarnings("unchecked")
     public @Nullable V remove(String key) {
         byte[] keyBytes = getBytes(key);
 
-        int hash = hash(keyBytes);
-        int index = hash & (keys.length - 1);
+        return remove0(keyBytes);
+    }
 
-        while (keys[index] != null) {
+    @SuppressWarnings("unchecked")
+    private @Nullable V remove0(byte[] keyBytes) {
+        int hash = hash(keyBytes);
+        int capacity = keys.length;
+
+        for (int probe = 0; probe < capacity; probe++) {
+            // Calculate index using quadratic formula
+            int index = (int) (hash + (long)probe * (probe + 1) / 2) & (capacity - 1);
+
+            if (keys[index] == null) {
+                // Found empty slot, key cannot exist further
+                return null;
+            }
+
             if (keys[index] != TOMBSTONE && keyEquals(keys[index], keyBytes)) {
+                // Key found, mark as deleted
                 V oldValue = (V) values[index];
-                keys[index] = TOMBSTONE;
-                values[index] = null;
+                keys[index] = TOMBSTONE; // Mark with tombstone
+                values[index] = null;   // Clear value reference
                 size--;
+                // Optional: Add tombstone counting logic here
                 return oldValue;
             }
-            index = (index + 1) & (keys.length - 1);
+            // Collision or Tombstone, continue probing
         }
 
         return null;
@@ -241,7 +273,7 @@ public class CompactStringHashMap<V> {
     }
 
     private int hash(byte[] bytes) {
-        return factory.hash32().hash(bytes, 0, bytes.length, 0);
+        return hasher.hash(bytes, 0, bytes.length, 0);
     }
 
     private boolean keyEquals(byte[] a, byte[] b) {
