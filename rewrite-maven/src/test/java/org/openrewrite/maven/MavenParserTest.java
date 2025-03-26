@@ -149,6 +149,49 @@ class MavenParserTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2603")
+    void repositoryWithPropertyPlaceholders() {
+        rewriteRun(
+          mavenProject("parent", pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-parent</artifactId>
+                  <version>1</version>
+                  <properties>
+                        <my.artifact.repo.url>https://my.artifact.repo.com</my.artifact.repo.url>
+                  </properties>
+              </project>
+              """
+          )),
+          mavenProject("child", pomXml(
+            """
+              <project>
+                  <parent>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-parent</artifactId>
+                      <version>1</version>
+                  </parent>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-child</artifactId>
+                  <version>1</version>
+                  <repositories>
+                      <repository>
+                          <id>my-artifact-repo</id>
+                          <url>${my.artifact.repo.url}</url>
+                      </repository>
+                  </repositories>
+              </project>
+              """,
+            spec -> spec.afterRecipe(p -> {
+                var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                results.getPom().getRepositories().forEach(repo -> assertThat(repo.getUri()).doesNotStartWith("${"));
+            })
+          ))
+        );
+    }
+
+    @Test
     void invalidRange() {
         assertThatExceptionOfType(MavenParsingException.class).isThrownBy(() ->
           rewriteRun(

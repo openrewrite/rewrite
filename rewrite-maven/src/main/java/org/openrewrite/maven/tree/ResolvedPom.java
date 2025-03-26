@@ -416,6 +416,7 @@ public class ResolvedPom {
                 mergeProperties(profile.getProperties(), pom);
             }
             mergeProperties(pom.getProperties(), pom);
+            updateRepositories();
 
             //Resolve repositories (which may rely on properties ^^^)
             for (Profile profile : effectiveProfiles) {
@@ -747,6 +748,25 @@ public class ResolvedPom {
                     pluginManagement = new ArrayList<>();
                 }
                 mergePlugins(pluginManagement, incomingPlugins);
+            }
+        }
+
+        private void updateRepositories() {
+            if (repositories != null && !repositories.isEmpty()) {
+                repositories = ListUtils.map(repositories, repo -> {
+                            if (repo.getId() != null && ResolvedPom.placeholderHelper.hasPlaceholders(repo.getUri())) {
+                                repo = repo.withId(ResolvedPom.placeholderHelper.replacePlaceholders(
+                                        repo.getId(),
+                                        properties::get));
+                            }
+                            if (ResolvedPom.placeholderHelper.hasPlaceholders(repo.getUri())) {
+                                repo = repo.withUri(ResolvedPom.placeholderHelper.replacePlaceholders(
+                                        repo.getUri(),
+                                        properties::get));
+                            }
+                            return repo;
+                        }
+                );
             }
         }
 
