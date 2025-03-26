@@ -63,12 +63,16 @@ public class Result {
         this.recipes = recipes;
 
         Duration timeSavings = null;
-        for (List<Recipe> recipesStack : recipes) {
-            if (recipesStack != null && !recipesStack.isEmpty()) {
-                Duration perOccurrence = recipesStack.get(recipesStack.size() - 1).getEstimatedEffortPerOccurrence();
-                if (perOccurrence != null) {
-                    timeSavings = perOccurrence;
-                    break;
+        if ((before == after) || (before != null && after != null && before.printAllTrimmed().equals(after.printAllTrimmed()))) {
+            timeSavings = Duration.ZERO;
+        } else {
+            for (List<Recipe> recipesStack : recipes) {
+                if (recipesStack != null && !recipesStack.isEmpty()) {
+                    Duration perOccurrence = recipesStack.get(recipesStack.size() - 1).getEstimatedEffortPerOccurrence();
+                    if (perOccurrence != null) {
+                        timeSavings = perOccurrence;
+                        break;
+                    }
                 }
             }
         }

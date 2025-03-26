@@ -225,7 +225,13 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         String beforePath = (before == null) ? "" : before.getSourcePath().toString();
         String afterPath = (after == null) ? "" : after.getSourcePath().toString();
         Recipe recipe = recipeStack.peek();
-        Long effortSeconds = (recipe.getEstimatedEffortPerOccurrence() == null) ? 0L : recipe.getEstimatedEffortPerOccurrence().getSeconds();
+        Long effortSeconds;
+        if ((before == after) || (before != null && after != null && before.printAllTrimmed().equals(after.printAllTrimmed()))) {
+            effortSeconds = 0L;
+        } else {
+            effortSeconds = recipe.getEstimatedEffortPerOccurrence() == null ? 0L : recipe.getEstimatedEffortPerOccurrence().getSeconds();
+        }
+
         String parentName = "";
         boolean hierarchical = recipeStack.size() > 1;
         if (hierarchical) {
