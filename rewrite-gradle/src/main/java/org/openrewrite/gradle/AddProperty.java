@@ -52,6 +52,7 @@ public class AddProperty extends ScanningRecipe<AddProperty.NeedsProperty> {
     @Option(displayName = "File pattern",
             description = "A glob expression that can be used to constrain which directories or source files should be searched. " +
                           "When not set, all source files are searched.",
+            required = false,
             example = "**/*.properties")
     @Nullable
     String filePattern;
