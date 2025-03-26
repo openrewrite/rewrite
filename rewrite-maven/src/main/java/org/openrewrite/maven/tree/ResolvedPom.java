@@ -752,22 +752,20 @@ public class ResolvedPom {
         }
 
         private void updateRepositories() {
-            if (repositories != null && !repositories.isEmpty()) {
-                repositories = ListUtils.map(repositories, repo -> {
-                            if (repo.getId() != null && ResolvedPom.placeholderHelper.hasPlaceholders(repo.getUri())) {
-                                repo = repo.withId(ResolvedPom.placeholderHelper.replacePlaceholders(
-                                        repo.getId(),
-                                        properties::get));
-                            }
-                            if (ResolvedPom.placeholderHelper.hasPlaceholders(repo.getUri())) {
-                                repo = repo.withUri(ResolvedPom.placeholderHelper.replacePlaceholders(
-                                        repo.getUri(),
-                                        properties::get));
-                            }
-                            return repo;
+            repositories = ListUtils.map(repositories, repo -> {
+                        if (ResolvedPom.placeholderHelper.hasPlaceholders(repo.getId())) {
+                            repo = repo.withId(ResolvedPom.placeholderHelper.replacePlaceholders(
+                                    repo.getId(),
+                                    properties::get));
                         }
-                );
-            }
+                        if (ResolvedPom.placeholderHelper.hasPlaceholders(repo.getUri())) {
+                            repo = repo.withUri(ResolvedPom.placeholderHelper.replacePlaceholders(
+                                    repo.getUri(),
+                                    properties::get));
+                        }
+                        return repo;
+                    }
+            );
         }
 
         private void mergeRepositories(List<MavenRepository> incomingRepositories) {
