@@ -56,6 +56,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
 
     private final ReloadableJava8TypeMapping typeMapping;
     private final TreeScanner<J, Space> javaVisitor = new JavaVisitor();
+    
     private final Map<Integer, Javadoc.LineBreak> lineBreaks = new HashMap<>();
 
     /**
