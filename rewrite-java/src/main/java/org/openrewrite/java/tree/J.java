@@ -3028,6 +3028,18 @@ public interface J extends Tree {
             return p;
         }
 
+        @Deprecated
+        public InstanceOf(UUID id, Space prefix, Markers markers, JRightPadded<Expression> expression, J clazz, @Nullable J pattern, @Nullable JavaType type) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            this.expression = expression;
+            this.clazz = clazz;
+            this.pattern = pattern;
+            this.type = type;
+            this.modifier = null;
+        }
+
         @RequiredArgsConstructor
         public static class Padding {
             private final InstanceOf t;
