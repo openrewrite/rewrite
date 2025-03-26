@@ -2,7 +2,7 @@ lexer grammar MethodSignatureLexer;
 
 // §3.11 Separators
 
-CONSTRUCTOR     : '<constructor>';
+CONSTRUCTOR     : '<constructor>' | '<init>';
 
 LPAREN          : '(';
 RPAREN          : ')';

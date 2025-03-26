@@ -999,7 +999,6 @@ public class ResolvedPom {
                             d2 = d2.withGav(d2.getGav().withGroupId(resolvedPom.getGroupId()));
                         }
 
-                        //noinspection ConstantValue
                         if (d.getExclusions() != null) {
                             d2 = d2.withExclusions(ListUtils.concatAll(d2.getExclusions(), d.getExclusions()));
                             for (GroupArtifact exclusion : d.getExclusions()) {
@@ -1008,7 +1007,7 @@ public class ResolvedPom {
                                     if (resolved.getEffectiveExclusions().isEmpty()) {
                                         resolved.unsafeSetEffectiveExclusions(new ArrayList<>());
                                     }
-                                    resolved.getEffectiveExclusions().add(exclusion);
+                                    resolved.getEffectiveExclusions().add(d2.getGav().asGroupArtifact());
                                     continue nextDependency;
                                 }
                             }

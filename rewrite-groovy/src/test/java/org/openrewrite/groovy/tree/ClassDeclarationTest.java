@@ -311,7 +311,7 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              class A {
+              class B {
                   List<String> a
                   Map<Object, Object> b
               }

@@ -783,14 +783,21 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitInstanceOf(InstanceOfTree node, Space fmt) {
+        J pattern = null;
+        J.Modifier modifier = null;
         JavaType type = typeMapping.type(node);
-        return new J.InstanceOf(randomId(), fmt, Markers.EMPTY,
-                convert(node.getExpression(), t -> sourceBefore("instanceof")),
-                convert(node.getType()),
-                node.getPattern() instanceof JCBindingPattern b ?
-                        new J.Identifier(randomId(), sourceBefore(b.getVariable().getName().toString()), Markers.EMPTY, emptyList(), b.getVariable().getName().toString(),
-                                type, typeMapping.variableType(b.var.sym)) : null,
-                type);
+
+        JRightPadded<Expression> expression = convert(node.getExpression(), t -> sourceBefore("instanceof"));
+        //Handling final modifier in instance of pattern matching
+        if (node.getPattern() instanceof JCBindingPattern b && b.var.mods.flags == Flags.FINAL) {
+             modifier = new J.Modifier(randomId(), sourceBefore("final"), Markers.EMPTY, null, J.Modifier.Type.Final, emptyList());
+        }
+        J clazz = convert(node.getType());
+        if (node.getPattern() instanceof JCBindingPattern b) {
+            pattern = new J.Identifier(randomId(), sourceBefore(b.getVariable().getName().toString()), Markers.EMPTY, emptyList(), b.getVariable().getName().toString(),
+                    type, typeMapping.variableType(b.var.sym));
+        }
+        return new J.InstanceOf(randomId(), fmt, Markers.EMPTY, expression, clazz, pattern, type, modifier);
     }
 
     @Override

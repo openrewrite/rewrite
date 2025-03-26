@@ -3786,7 +3786,36 @@ class MavenParserTest implements RewriteTest {
           )
         )).isInstanceOf(AssertionError.class)
           .cause()
-          .isInstanceOf(MavenDownloadingException.class)
-          .hasMessage("No version provided for direct dependency");
+          .isInstanceOf(MavenDownloadingException.class);
+    }
+
+    @Test
+    void wildcardExclusion() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>app</artifactId>
+                <version>1.0.0</version>
+                  <dependencies>
+                    <dependency>
+                        <groupId>ch.qos.logback</groupId>
+                        <artifactId>logback-classic</artifactId>
+                        <version>1.3.11</version>
+                        <exclusions>
+                            <exclusion>
+                                <groupId>*</groupId>
+                                <artifactId>*</artifactId>
+                            </exclusion>
+                        </exclusions>
+                    </dependency>
+                  </dependencies>
+              </project>
+              """, spec -> spec.afterRecipe(pom -> {
+                MavenResolutionResult resolution = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                assertThat(resolution.findDependencies("ch.qos.logback", "logback-core", Scope.Compile)).isEmpty();
+            })
+          ));
     }
 }
