@@ -183,10 +183,12 @@ class MavenParserTest implements RewriteTest {
                   </repositories>
               </project>
               """,
-            spec -> spec.afterRecipe(p -> {
-                var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                results.getPom().getRepositories().forEach(repo -> assertThat(repo.getUri()).doesNotStartWith("${"));
-            })
+            spec -> spec.afterRecipe(p ->
+              assertThat(p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getRepositories())
+                .map(MavenRepository::getUri)
+                .describedAs("Property placeholder in repository URL resolved")
+                .singleElement()
+                .isEqualTo("https://my.artifact.repo.com"))
           ))
         );
     }
@@ -1056,7 +1058,7 @@ class MavenParserTest implements RewriteTest {
             assertThat(maven.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getDependencies().get(Scope.Compile))
               .hasSize(1)
               .matches(deps -> deps.get(0).getGroupId().equals("com.foo") &&
-                               deps.get(0).getArtifactId().equals("bar"));
+                deps.get(0).getArtifactId().equals("bar"));
             mockRepo.shutdown();
         }
     }
@@ -1359,7 +1361,7 @@ class MavenParserTest implements RewriteTest {
 
         @Issue("https://github.com/openrewrite/rewrite/issues/4269")
         @DisplayName("activeByDefault=true profiles from a POM should be active " +
-                     "unless there is another active profile _from the same POM file_")
+          "unless there is another active profile _from the same POM file_")
         @Test
         void activeByDefaultWithoutPomLocalActiveProfile() {
             rewriteRun(
@@ -1391,7 +1393,7 @@ class MavenParserTest implements RewriteTest {
 
         @Issue("https://github.com/openrewrite/rewrite/issues/4269")
         @DisplayName("activeByDefault=true profiles from a POM should not be active" +
-                     " if there is another active profile _from the same POM file_")
+          " if there is another active profile _from the same POM file_")
         @Test
         void activeByDefaultWithPomLocalActiveProfile() {
             rewriteRun(
@@ -1666,7 +1668,7 @@ class MavenParserTest implements RewriteTest {
                 assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getDependencies().get(Scope.Compile))
                   .hasSize(7)
                   .matches(deps -> deps.get(0).getArtifactId().equals("guava") &&
-                                   deps.get(0).getVersion().equals("29.0-jre"))
+                    deps.get(0).getVersion().equals("29.0-jre"))
               )
             )
           )
@@ -1740,9 +1742,9 @@ class MavenParserTest implements RewriteTest {
                       .getDependencies().get(Scope.Compile);
                     assertThat(compileDependencies).hasSize(2);
                     assertThat(compileDependencies).anyMatch(it -> it.getArtifactId().equals("b") &&
-                                                                   it.getVersion().equals("0.1.0-SNAPSHOT"));
+                      it.getVersion().equals("0.1.0-SNAPSHOT"));
                     assertThat(compileDependencies).anyMatch(it -> it.getArtifactId().equals("d") &&
-                                                                   it.getVersion().equals("0.1.0-SNAPSHOT"));
+                      it.getVersion().equals("0.1.0-SNAPSHOT"));
                 })
               ),
               mavenProject("b-parent",
@@ -1883,7 +1885,7 @@ class MavenParserTest implements RewriteTest {
                   var compileDependencies = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
                     .getDependencies().get(Scope.Compile);
                   assertThat(compileDependencies).anyMatch(it -> it.getArtifactId().equals("junit") &&
-                                                                 it.getVersion().equals("4.11"));
+                    it.getVersion().equals("4.11"));
                   assertThat(compileDependencies).noneMatch(it -> it.getArtifactId().equals("hamcrest-core"));
               })
             )
@@ -3784,7 +3786,7 @@ class MavenParserTest implements RewriteTest {
           )
         )).isInstanceOf(AssertionError.class)
           .cause()
-            .isInstanceOf(MavenDownloadingException.class)
-            .hasMessage("No version provided for direct dependency");
+          .isInstanceOf(MavenDownloadingException.class)
+          .hasMessage("No version provided for direct dependency");
     }
 }
