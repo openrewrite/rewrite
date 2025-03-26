@@ -755,7 +755,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 padRight(element, prefix(expression.getOperationReference())),
                 clazz,
                 null,
-                type(expression)
+                type(expression),
+                null
         );
     }
 
@@ -1534,7 +1535,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 expr,
                 clazz,
                 null,
-                type(condition)
+                type(condition),
+                null
         );
     }
 

@@ -946,7 +946,7 @@ public class GroovyParserVisitor {
                 } else if (instanceOf) {
                     return new J.InstanceOf(randomId(), fmt, Markers.EMPTY,
                             JRightPadded.build(left).withAfter(opPrefix), right, null,
-                            typeMapping.type(binary.getType()));
+                            typeMapping.type(binary.getType()), null);
                 } else if (assignOp != null) {
                     return new J.AssignmentOperation(randomId(), fmt, Markers.EMPTY,
                             left, JLeftPadded.build(assignOp).withBefore(opPrefix),

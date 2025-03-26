@@ -67,4 +67,23 @@ class InstanceOfTest implements RewriteTest {
           )
         );
     }
+
+    @MinimumJava17
+    @Test
+    void instanceofPatternMatchWithFinalModifier() {
+        rewriteRun(
+          java(
+            """
+              public class Main {
+                public static void main(String[] argv) {
+                  String s = "a";
+                  if (s instanceof String s2) {
+                      System.out.println(s2);
+                  }
+                }
+              }
+              """
+          )
+        );
+    }
 }

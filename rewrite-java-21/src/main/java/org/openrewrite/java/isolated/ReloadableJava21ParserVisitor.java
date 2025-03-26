@@ -787,12 +787,16 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitInstanceOf(InstanceOfTree node, Space fmt) {
+        J.Modifier modifier = null;
         JavaType type = typeMapping.type(node);
-        return new J.InstanceOf(randomId(), fmt, Markers.EMPTY,
-                convert(node.getExpression(), t -> sourceBefore("instanceof")),
-                convert(node.getType()),
-                getNodePattern(node.getPattern(), type),
-                type);
+        JRightPadded<Expression> expression = convert(node.getExpression(), t -> sourceBefore("instanceof"));
+        //Handling final modifier in instance of pattern matching
+        if (node.getPattern() instanceof JCBindingPattern b && b.var.mods.flags == Flags.FINAL) {
+            modifier = new J.Modifier(randomId(), sourceBefore("final"), Markers.EMPTY, null, J.Modifier.Type.Final, emptyList());
+        }
+        J clazz = convert(node.getType());
+        J pattern = getNodePattern(node.getPattern(), type);
+        return new J.InstanceOf(randomId(), fmt, Markers.EMPTY, expression, clazz, pattern, type, modifier);
     }
 
     @Override

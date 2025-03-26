@@ -2986,6 +2986,11 @@ public interface J extends Tree {
         @Getter
         JavaType type;
 
+        @With
+        @Nullable
+        @Getter
+        Modifier modifier;
+
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitInstanceOf(this, p);
@@ -3032,7 +3037,7 @@ public interface J extends Tree {
             }
 
             public InstanceOf withExpression(JRightPadded<Expression> expression) {
-                return t.expression == expression ? t : new InstanceOf(t.id, t.prefix, t.markers, expression, t.clazz, t.pattern, t.type);
+                return t.expression == expression ? t : new InstanceOf(t.id, t.prefix, t.markers, expression, t.clazz, t.pattern, t.type, t.modifier);
             }
 
             @Deprecated
@@ -3042,7 +3047,7 @@ public interface J extends Tree {
 
             @Deprecated
             public InstanceOf withExpr(JRightPadded<Expression> expression) {
-                return t.expression == expression ? t : new InstanceOf(t.id, t.prefix, t.markers, expression, t.clazz, t.pattern, t.type);
+                return t.expression == expression ? t : new InstanceOf(t.id, t.prefix, t.markers, expression, t.clazz, t.pattern, t.type, t.modifier);
             }
         }
     }
