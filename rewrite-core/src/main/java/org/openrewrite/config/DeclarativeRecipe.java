@@ -69,12 +69,9 @@ public class DeclarativeRecipe extends Recipe {
 
     private final List<Recipe> uninitializedPreconditions = new ArrayList<>();
 
+    @Getter
     @Setter
     private List<Recipe> preconditions = new ArrayList<>();
-
-    public List<Recipe> getPreconditions() {
-        return this.preconditions;
-    }
 
     public void addPrecondition(Recipe recipe) {
         uninitializedPreconditions.add(recipe);
