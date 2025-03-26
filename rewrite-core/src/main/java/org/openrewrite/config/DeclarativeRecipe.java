@@ -72,6 +72,10 @@ public class DeclarativeRecipe extends Recipe {
     @Setter
     private List<Recipe> preconditions = new ArrayList<>();
 
+    public List<Recipe> getPreconditions() {
+        return this.preconditions;
+    }
+
     public void addPrecondition(Recipe recipe) {
         uninitializedPreconditions.add(recipe);
     }
