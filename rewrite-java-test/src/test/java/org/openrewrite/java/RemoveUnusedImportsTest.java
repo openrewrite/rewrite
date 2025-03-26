@@ -2070,7 +2070,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
     }
 
     @Test
-    void testLombokValInLambda() {
+    void lombokValInLambda() {
         rewriteRun(
           java(
             """
@@ -2100,7 +2100,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void testImportAnnotation() {
         rewriteRun(
-          java("""
+          java(
+            """
                   package org.springframework.context.annotation;
                   import java.lang.annotation.*;
                   
@@ -2122,15 +2123,15 @@ class RemoveUnusedImportsTest implements RewriteTest {
             SourceSpec::skip),
           java(
             """
-                import a.A;
-                import org.springframework.context.annotation.Import;
-                
-                @Import({
-                  A.class
-                })
-                public class SomeClass {
-                
-                }
+              import a.A;
+              import org.springframework.context.annotation.Import;
+              
+              @Import({
+                A.class
+              })
+              public class SomeClass {
+              
+              }
               """
           )
         );
@@ -2141,7 +2142,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void removeUnusedImportsImportUsageEnum() {
         rewriteRun(
-          java("""
+          java(
+                """
               package a;
               
               public class A {

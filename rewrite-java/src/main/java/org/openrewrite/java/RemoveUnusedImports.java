@@ -370,7 +370,7 @@ public class RemoveUnusedImports extends Recipe {
             cu.getTypesInUse().getTypesInUse().stream().forEach(type -> {
                 if (type instanceof JavaType.Class) {
                     JavaType.Class aClass = (JavaType.Class) type;
-                    if (aClass.getKind().equals(JavaType.FullyQualified.Kind.Annotation)) {
+                    if (aClass.getKind() == JavaType.FullyQualified.Kind.Annotation) {
                         FindAnnotations.find(cu, aClass.getFullyQualifiedName()).forEach(annotations::add);
                     }
                 }
