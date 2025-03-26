@@ -6,7 +6,7 @@ import {SnowflakeId} from "@akashrajpurohit/snowflake-id";
 import {
     Generate,
     GetObject,
-    getRecipes,
+    GetRecipes,
     PrepareRecipe,
     PrepareRecipeResponse,
     Print,
@@ -31,20 +31,19 @@ export class RewriteRpc {
         new rpc.StreamMessageReader(process.stdin),
         new rpc.StreamMessageWriter(process.stdout)
     ), batchSize: number = 10) {
-        this.connection = connection;
-
         const preparedRecipes: Map<String, Recipe> = new Map();
         const recipeCursors: WeakMap<Recipe, Cursor> = new WeakMap()
 
-        Visit.handle(this.connection, this.localObjects,
-            preparedRecipes, recipeCursors, this.getObject,
-            this.getCursor);
-        Generate.handle(this.connection, this.localObjects,
-            preparedRecipes, recipeCursors, this.getObject);
+        // Need this indirection, otherwise `this` will be undefined when executed in the handlers.
+        const getObject = (id: string) => this.getObject(id);
+        const getCursor = (cursorIds: string[] | undefined) => this.getCursor(cursorIds);
+
+        Visit.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject, getCursor);
+        Generate.handle(this.connection, this.localObjects, preparedRecipes, recipeCursors, getObject);
         GetObject.handle(this.connection, this.remoteObjects, this.localObjects, batchSize);
-        getRecipes(this.connection);
+        GetRecipes.handle(this.connection);
         PrepareRecipe.handle(this.connection, preparedRecipes);
-        Print.handle(this.connection, this.getObject, this.getCursor);
+        Print.handle(this.connection, getObject, getCursor);
 
         this.connection.listen();
     }
@@ -93,6 +92,7 @@ export class RewriteRpc {
         if (!cursor && !isSourceFile(tree)) {
             throw new Error("Cursor is required for non-SourceFile trees");
         }
+        this.localObjects.set(tree.id.toString(), tree);
         return await this.connection.sendRequest(
             new rpc.RequestType<Print, string, Error>("Print"),
             new Print(tree.id, this.getCursorIds(cursor))

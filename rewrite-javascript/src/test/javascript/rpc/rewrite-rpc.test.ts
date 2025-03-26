@@ -1,5 +1,11 @@
 import {afterEach, beforeEach, describe, expect, test} from "@jest/globals";
-import {createExecutionContext, Cursor, ExecutionContext, rootCursor} from "../../../main/javascript";
+import {
+    createExecutionContext,
+    Cursor,
+    ExecutionContext,
+    isExecutionContext,
+    rootCursor
+} from "../../../main/javascript";
 import {RewriteRpc} from "../../../main/javascript/rpc";
 import {PlainText, text} from "../../../main/javascript/text";
 import {RecipeSpec, SourceSpec} from "../../../main/javascript/test";
@@ -37,19 +43,19 @@ describe("RewriteRpcTest", () => {
 
     test("sendReceiveExecutionContext", async () => {
         const ctx = createExecutionContext();
-        ctx.set("key", "value");
-
+        ctx["key"] = "value";
         client.localObjects.set("123", ctx);
         const received = await server.getObject<ExecutionContext>("123");
-        expect(received.get("key")).toEqual("value");
+        expect(received["key"]).toEqual("value");
+        expect(isExecutionContext(received));
     });
 
     test("print", () => spec.rewriteRun(
         text(
             "Hello Jon!",
             (spec: SourceSpec<PlainText>) => {
-                spec.beforeRecipe = (text: PlainText) => {
-                    expect(server.print(text)).toEqual("Hello Jon!");
+                spec.beforeRecipe = async (text: PlainText) => {
+                    expect(await server.print(text)).toEqual("Hello Jon!");
                     return text;
                 }
             }

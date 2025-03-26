@@ -1,5 +1,7 @@
-import {Marker} from "../markers";
+import {Marker, Markers, MarkersKind} from "../markers";
 import {RpcCodecs} from "./codec";
+import {produceAsync} from "../visitor";
+import {randomId} from "../uuid";
 
 const REFERENCE_KEY = Symbol("org.openrewrite.rpc.Reference");
 
@@ -16,14 +18,15 @@ function isRef(obj?: any): obj is Reference {
 }
 
 export class RpcSendQueue {
-    private next: Promise<RpcObjectData>;
-    private resolveNext!: (value: RpcObjectData) => void;
+    private q: RpcObjectData[] = [];
+    private next: Promise<void>;
+    private resolveNext!: (value: void) => void;
 
     private refCount = 1
     private before?: any;
 
     constructor(private readonly refs: WeakMap<Object, number>) {
-        this.next = new Promise<RpcObjectData>(resolve => {
+        this.next = new Promise<void>(resolve => {
             this.resolveNext = resolve;
         });
     }
@@ -39,33 +42,37 @@ export class RpcSendQueue {
         let sendComplete = false
         while (!sendComplete) {
             // Race between waiting for the next data and the resolution of 'top'
-            const result = await Promise.race([
+            await Promise.race([
                 next,
                 top.then(() => {
                     sendComplete = true;
-                    return next;
                 })
             ]);
-            yield result;
+            while (this.q.length !== 0) {
+                let result = this.q.shift()!;
+                yield result;
+            }
             next = this.next;
         }
         return {state: RpcObjectState.END_OF_OBJECT};
     }
 
     private put(d: RpcObjectData): void {
+        this.q.push(d);
         // Resolve this existing promise
-        this.resolveNext(d);
+        this.resolveNext();
 
         // Create a new promise for the next value
-        this.next = new Promise<RpcObjectData>(resolve => {
+        this.next = new Promise<void>(resolve => {
             this.resolveNext = resolve;
         });
     }
 
-    async sendMarkers<T>(parent: T, markersFn: (parent: T) => any): Promise<void> {
-        await this.getAndSend(parent, markersFn, async (markersRef) => {
+    async sendMarkers<T extends { markers: Markers }>(parent: T, markersFn: (parent: T) => any): Promise<void> {
+        await this.getAndSend(parent, t2 => asRef(markersFn(t2)), async (markersRef: Markers & Reference) => {
+            await this.getAndSend(markersRef, m => m.id);
             await this.getAndSendList(markersRef,
-                (m) => m.getMarkers(),
+                (m) => m.markers,
                 (marker: Marker) => marker.id
             );
         });
@@ -183,24 +190,17 @@ export class RpcSendQueue {
     }
 
     private getValueType(after?: any): string | undefined {
-        if (after === undefined) {
-            return undefined;
-        }
-        const type = after.constructor;
-        if (typeof type === "object" && "kind" in after) {
+        if (after !== undefined && typeof after === "object" && "kind" in after) {
             return after["kind"];
         }
-        return undefined;
     }
 }
 
 export class RpcReceiveQueue {
     private batch: RpcObjectData[] = [];
-    private readonly pull: () => Promise<RpcObjectData[]>;
 
-    constructor(private readonly refs: Map<number, any>, pull: () => Promise<RpcObjectData[]>) {
-        this.refs = refs;
-        this.pull = pull;
+    constructor(private readonly refs: Map<number, any>,
+                private readonly pull: () => Promise<RpcObjectData[]>) {
     }
 
     async take(): Promise<RpcObjectData> {
@@ -214,8 +214,14 @@ export class RpcReceiveQueue {
         return await this.receive(before === undefined ? undefined : apply(before)) as U;
     }
 
-    async receiveMarkers(markers: any): Promise<any> {
-        return this.receive(markers, (m: any) => m.withMarkers(this.receiveList(m.getMarkers())));
+    async receiveMarkers(markers?: Markers): Promise<any> {
+        if (markers === undefined) {
+            markers = {kind: MarkersKind.Markers, id: randomId(), markers: []};
+        }
+        return this.receive(markers, m => produceAsync(markers, async (draft) => {
+            draft.id = await this.receive(m.id);
+            draft.markers = (await this.receiveList(m.markers, m2 => this.receive(m2)))!;
+        }))
     }
 
     async receive<T extends any | undefined>(
@@ -234,9 +240,7 @@ export class RpcReceiveQueue {
                 if (ref !== undefined && this.refs.has(ref)) {
                     return this.refs.get(ref);
                 }
-                before = !onChange || message.valueType === undefined ?
-                    message.value :
-                    this.newObj(message.valueType);
+                before = message.value ?? this.newObj(message.valueType!);
             // Intentional fall-through...
             case RpcObjectState.CHANGE:
                 const after = onChange ? onChange(before!) : message.value;
@@ -270,7 +274,9 @@ export class RpcReceiveQueue {
                 before = [];
             // Intentional fall-through...
             case RpcObjectState.CHANGE:
-                const positions = (await this.take()).value as number[];
+                // The next message should be a CHANGE with a list of positions
+                const d = await this.take();
+                const positions = d.value as number[];
                 const after: T[] = new Array(positions.length);
                 for (let i = 0; i < positions.length; i++) {
                     const beforeIdx = positions[i];

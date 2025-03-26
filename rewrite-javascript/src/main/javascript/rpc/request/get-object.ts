@@ -12,7 +12,7 @@ export class GetObject {
         batchSize: number
     ): void {
         const generators = new Map<string, AsyncGenerator<RpcObjectData>>();
-        const localRefs = new Map<any, number>();
+        const localRefs = new WeakMap<any, number>();
 
         connection.onRequest(new rpc.RequestType<GetObject, any, Error>("GetObject"), async (request) => {
             if (!localObjects.has(request.id)) {

@@ -1,9 +1,7 @@
-import {v4 as uuidv4} from "uuid";
+import {randomUUID} from "crypto";
 
-export type UUID = Uint8Array;
+export type UUID = string;
 
 export function randomId(): UUID {
-    const buffer = new Uint8Array(16);
-    uuidv4({}, buffer);
-    return buffer;
+    return randomUUID();
 }

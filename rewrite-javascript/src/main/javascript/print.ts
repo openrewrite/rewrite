@@ -91,6 +91,6 @@ export class TreePrinters {
     }
 }
 
-export function printer(cursor: Cursor): TreePrinter {
-    return TreePrinters.printer(cursor);
+export function printer(target: Cursor | SourceFile): TreePrinter {
+    return TreePrinters.printer(target);
 }

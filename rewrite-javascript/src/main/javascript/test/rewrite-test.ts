@@ -50,7 +50,7 @@ export class RecipeSpec {
             } : this.executionContext
 
             let beforeSource = readSourceSync(parserCtx, spec.before!);
-            let beforeParsed = spec.parser().parse(parserCtx, spec.before, spec.before!)[0];
+            let beforeParsed = spec.parser().parse(parserCtx, undefined, spec.before!)[0];
 
             expect(await TreePrinters.print(beforeParsed)).toEqual(beforeSource);
 
