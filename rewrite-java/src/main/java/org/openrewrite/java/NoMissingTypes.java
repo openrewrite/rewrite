@@ -33,7 +33,7 @@ public class NoMissingTypes extends JavaVisitor<ExecutionContext> {
     @Override
     public J visit(@Nullable Tree tree, ExecutionContext ctx) {
         if (tree instanceof JavaSourceFile) {
-            JavaSourceFile cu = (JavaSourceFile) new FindMissingTypes().getVisitor().visitNonNull(tree, ctx);
+            JavaSourceFile cu = (JavaSourceFile) new FindMissingTypes(false).getVisitor().visitNonNull(tree, ctx);
             if (tree == cu) {
                 return SearchResult.found(cu, "All AST elements have type information");
             }

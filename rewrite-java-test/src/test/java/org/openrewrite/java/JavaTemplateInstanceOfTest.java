@@ -531,7 +531,7 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
 
     @SuppressWarnings("SuspiciousMethodCalls")
     static void assertTypeAttribution(J sf) {
-        List<FindMissingTypes.MissingTypeResult> missingTypes = FindMissingTypes.findMissingTypes(sf);
+        List<FindMissingTypes.MissingTypeResult> missingTypes = FindMissingTypes.findMissingTypes(sf, false);
         Map<J, Cursor> expectedMissing = new LinkedHashMap<>();
         Map<J, Cursor> actualMissing = new LinkedHashMap<>();
         new JavaIsoVisitor<Integer>() {
