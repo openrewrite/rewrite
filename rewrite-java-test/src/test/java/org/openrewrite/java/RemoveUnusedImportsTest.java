@@ -2098,7 +2098,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
     }
 
     @Test
-    void testImportAnnotation() {
+    void importAnnotation() {
         rewriteRun(
           java(
             """
