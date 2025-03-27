@@ -21,18 +21,18 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.java.Assertions.java;
 
 class ModifierTest implements RewriteTest {
-    void modifierNoSpaceThenAnnotation() {
+
     @Test
-    public void modifierNoSpaceThenAnnotation() {
+    void modifierNoSpaceThenAnnotation() {
         rewriteRun(
                 java(
                         """
-                          public class Main {
-                              public@jdk.jfr.Name("A") void test() {
-                                  System.out.println("A");
-                              }
-                          }
-                          """
+                                public class Main {
+                                    public@jdk.jfr.Name("A") void test() {
+                                        System.out.println("A");
+                                    }
+                                }
+                                """
                 )
         );
 
@@ -43,12 +43,12 @@ class ModifierTest implements RewriteTest {
         rewriteRun(
                 java(
                         """
-                          public class Main {
-                              public@jdk.jfr.Name("A") static@jdk.jfr.Label("2nd") void test() {
-                                  System.out.println("A");
-                              }
-                          }
-                          """
+                                public class Main {
+                                    public@jdk.jfr.Name("A") static@jdk.jfr.Label("2nd") void test() {
+                                        System.out.println("A");
+                                    }
+                                }
+                                """
                 )
         );
 
@@ -59,12 +59,12 @@ class ModifierTest implements RewriteTest {
         rewriteRun(
                 java(
                         """
-                          public class Main {
-                              public@jdk.jfr.Name("A")@jdk.jfr.Label("test") void test() {
-                                  System.out.println("A");
-                              }
-                          }
-                          """
+                                public class Main {
+                                    public@jdk.jfr.Name("A")@jdk.jfr.Label("test") void test() {
+                                        System.out.println("A");
+                                    }
+                                }
+                                """
                 )
         );
 
@@ -75,12 +75,12 @@ class ModifierTest implements RewriteTest {
         rewriteRun(
                 java(
                         """
-                          public class Main {
-                              public static@jdk.jfr.Name("A") void test() {
-                                  System.out.println("A");
-                              }
-                          }
-                          """
+                                public class Main {
+                                    public static@jdk.jfr.Name("A") void test() {
+                                        System.out.println("A");
+                                    }
+                                }
+                                """
                 )
         );
     }
@@ -90,12 +90,12 @@ class ModifierTest implements RewriteTest {
         rewriteRun(
                 java(
                         """
-                          public class Main {
-                              public static @jdk.jfr.Name("A") void test() {
-                                  System.out.println("A");
-                              }
-                          }
-                          """
+                                public class Main {
+                                    public static @jdk.jfr.Name("A") void test() {
+                                        System.out.println("A");
+                                    }
+                                }
+                                """
                 )
         );
     }
