@@ -23,6 +23,7 @@ import org.openrewrite.jgit.lib.FileMode;
 import org.openrewrite.marker.DeserializationError;
 import org.openrewrite.marker.RecipesThatMadeChanges;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.remote.Remote;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -63,7 +64,7 @@ public class Result {
         this.recipes = recipes;
 
         Duration timeSavings = null;
-        if ((before == after) || (before != null && after != null && before.printAllTrimmed().equals(after.printAllTrimmed()))) {
+        if (isLocalAndHasNoChanges(before, after)) {
             timeSavings = Duration.ZERO;
         } else {
             for (List<Recipe> recipesStack : recipes) {
@@ -258,5 +259,14 @@ public class Result {
     @Override
     public String toString() {
         return diff();
+    }
+
+    public static boolean isLocalAndHasNoChanges(@Nullable SourceFile before, @Nullable SourceFile after) {
+        return (before == after) ||
+                (before != null && after != null &&
+                        // Remote source files are fetched on `printAll`, let's avoid that cost.
+                        !(before instanceof Remote) &&
+                        !(after instanceof Remote) &&
+                        before.printAll().equals(after.printAll()));
     }
 }
