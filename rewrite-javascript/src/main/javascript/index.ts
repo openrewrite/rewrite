@@ -9,4 +9,4 @@ export * from "./parse-error";
 export * from "./uuid";
 export * from "./util";
 export * from "./recipe";
-export * from "./diff";
+export * from "./run";

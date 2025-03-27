@@ -22,8 +22,8 @@ export class Visit {
                   getObject: (id: string) => any,
                   getCursor: (cursorIds: string[] | undefined) => Promise<Cursor>): void {
         connection.onRequest(new rpc.RequestType<Visit, VisitResponse, Error>("Visit"), async (request) => {
-            const p = getObject(request.p);
-            const before: Tree = getObject(request.treeId);
+            const p = await getObject(request.p);
+            const before: Tree = await getObject(request.treeId);
             localObjects.set(before.id.toString(), before);
 
             const visitor = Visit.instantiateVisitor(request, preparedRecipes, recipeCursors, p);

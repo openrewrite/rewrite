@@ -20,6 +20,8 @@ export async function produceAsync<Base extends Objectish>(
     return finishDraft(draft) as Base;
 }
 
+const stopAfterPreVisit = Symbol("STOP_AFTER_PRE_VISIT")
+
 export abstract class TreeVisitor<T extends Tree, P> {
     protected cursor: Cursor = rootCursor();
     private visitCount: number = 0;
@@ -49,7 +51,7 @@ export abstract class TreeVisitor<T extends Tree, P> {
         try {
             if (isAcceptable) {
                 t = await this.preVisit(tree as T, p)
-                if (this.cursor.messages.get("STOP_AFTER_PRE_VISIT") !== true) {
+                if (this.cursor.messages.get(stopAfterPreVisit) !== true) {
                     if (t !== undefined) {
                         t = await this.accept(t, p)
                     }
@@ -88,7 +90,7 @@ export abstract class TreeVisitor<T extends Tree, P> {
     }
 
     protected stopAfterPreVisit(): void {
-        this.cursor.messages.set("STOP_AFTER_PRE_VISIT", true);
+        this.cursor.messages.set(stopAfterPreVisit, true);
     }
 
     isAcceptable(sourceFile: SourceFile, p: P): boolean {
@@ -144,7 +146,7 @@ export function noopVisitor<T extends Tree, P>() {
 
 export class RecipeRunError extends Error {
     constructor(public readonly cause: Error, public readonly cursor?: Cursor) {
-        super();
+        super(cause.message);
     }
 }
 

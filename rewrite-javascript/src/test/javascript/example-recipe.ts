@@ -36,16 +36,6 @@ export class ReplacedText {
     );
 }
 
-export class ChangeTextVisitor<P> extends PlainTextVisitor<P> {
-    text: string = "Hello world!";
-
-    visitText(text: PlainText, p: P): Promise<PlainText> {
-        return this.produceTree(text, p, draft => {
-            draft.text = "Hello World!";
-        })
-    }
-}
-
 @Registered("org.openrewrite.text.change-text")
 export class ChangeText extends Recipe {
     displayName = "Change text";
@@ -72,9 +62,18 @@ export class ChangeText extends Recipe {
     }
 
     get editor(): TreeVisitor<any, ExecutionContext> {
-        let visitor = new ChangeTextVisitor<ExecutionContext>();
-        visitor.text = this.text;
-        return visitor
+        const toText = this.text;
+        const replacedText = this.replacedText;
+        return new class extends PlainTextVisitor<ExecutionContext> {
+            visitText(text: PlainText, ctx: ExecutionContext): Promise<PlainText> {
+                return this.produceTree(text, ctx, draft => {
+                    if (draft.text != toText) {
+                        replacedText.insertRow(ctx, new ReplacedText(text.sourcePath, draft.text));
+                    }
+                    draft.text = toText;
+                })
+            }
+        }
     }
 }
 

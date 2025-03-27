@@ -75,6 +75,16 @@ export abstract class Recipe {
     get editor(): TreeVisitor<any, ExecutionContext> {
         return noopVisitor()
     }
+
+    /**
+     * At the end of a recipe run, a {@link RecipeScheduler} will call this method to allow the
+     * recipe to perform any cleanup or finalization tasks. This method is guaranteed to be called
+     * only once per run.
+     *
+     * @param ctx The recipe run execution context.
+     */
+    async onComplete(ctx: ExecutionContext): Promise<void> {
+    }
 }
 
 export interface RecipeDescriptor {
@@ -94,7 +104,7 @@ export interface OptionDescriptor {
 }
 
 export abstract class ScanningRecipe<P> extends Recipe {
-    private recipeAccMessage: string = `org.openrewrite.recipe.acc.${randomId()}`;
+    private readonly recipeAccMessage = Symbol("org.openrewrite.recipe.acc");
 
     accumulator(cursor: Cursor, ctx: ExecutionContext): P {
         const ms = cursor.root.messages;

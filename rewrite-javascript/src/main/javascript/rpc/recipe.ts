@@ -36,4 +36,17 @@ export class RpcRecipe extends Recipe {
             }
         };
     }
+
+    async onComplete(ctx: ExecutionContext): Promise<void> {
+        // This will merge data tables from the remote into the local context.
+        //
+        // When multiple recipes ran on the same RPC peer, they will all have been
+        // adding to the same ExecutionContext instance on that peer, and so really
+        // a CHANGE will only be returned for the first of any recipes on that peer.
+        // It doesn't matter which one added data table entries, because they all share
+        // the same view of the data tables.
+        if ("org.openrewrite.rpc.id" in ctx) {
+            await this.rpc.getObject(ctx["org.openrewrite.rpc.id"]);
+        }
+    }
 }

@@ -29,12 +29,12 @@ export function isTree(tree: any): tree is Tree {
 }
 
 export class Cursor {
-    private _messages?: Map<string, any>;
+    private _messages?: Map<string | symbol, any>;
 
     constructor(public readonly value: any, public readonly parent?: Cursor) {
     }
 
-    get messages(): Map<string, any> {
+    get messages(): Map<string | symbol, any> {
         if (!this._messages) {
             this._messages = new Map<string, any>();
         }

@@ -1,10 +1,6 @@
 import {AfterRecipe, dedentAfter, SourceSpec} from "../test";
 import {JsonParser} from "./parser";
-import {memfs} from "memfs";
-import {createExecutionContext, ExecutionContext, PARSER_VOLUME} from "../";
-import {SnowflakeId} from "@akashrajpurohit/snowflake-id";
-import dedent from "dedent";
-import {JsonDocument} from "./tree";
+import {JsonDocument, JsonKind} from "./tree";
 
 export function json(before: string): SourceSpec<JsonDocument>;
 export function json(before: string | undefined, after: AfterRecipe): SourceSpec<JsonDocument>;
@@ -25,21 +21,11 @@ export function json(
         after = arg2;
         spec = arg3;
     }
-
-    let sourcePath = undefined;
-    let executionContext = createExecutionContext();
-    if (before) {
-        sourcePath = `${SnowflakeId().generate()}.json`;
-        const vol = memfs().vol
-        vol.mkdirSync(process.cwd(), {recursive: true});
-        vol.writeFileSync(`${process.cwd()}/${sourcePath}`, dedent(before));
-        executionContext[PARSER_VOLUME] = vol;
-    }
     const s: SourceSpec<JsonDocument> = {
-        before: sourcePath,
+        kind: JsonKind.Document,
+        before: before,
         after: dedentAfter(after),
-        parser: () => new JsonParser(),
-        executionContext: executionContext
+        parser: () => new JsonParser()
     };
     if (spec) {
         spec(s);

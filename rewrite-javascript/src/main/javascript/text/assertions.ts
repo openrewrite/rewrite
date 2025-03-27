@@ -1,9 +1,5 @@
 import {AfterRecipe, dedentAfter, SourceSpec} from "../test";
-import {memfs} from "memfs";
-import {createExecutionContext, PARSER_VOLUME} from "../";
-import {SnowflakeId} from "@akashrajpurohit/snowflake-id";
-import dedent from "dedent";
-import {PlainText, PlainTextParser} from ".";
+import {PlainText, PlainTextKind, PlainTextParser} from ".";
 
 export function text(before: string): SourceSpec<PlainText>;
 export function text(before: string | undefined, after: AfterRecipe): SourceSpec<PlainText>;
@@ -24,21 +20,11 @@ export function text(
         after = arg2;
         spec = arg3;
     }
-
-    let sourcePath = undefined;
-    let executionContext = createExecutionContext();
-    if (before) {
-        sourcePath = `${SnowflakeId().generate()}.txt`;
-        const vol = memfs().vol
-        vol.mkdirSync(process.cwd(), {recursive: true});
-        vol.writeFileSync(`${process.cwd()}/${sourcePath}`, dedent(before));
-        executionContext[PARSER_VOLUME] = vol;
-    }
     const s: SourceSpec<PlainText> = {
-        before: sourcePath,
+        kind: PlainTextKind.PlainText,
+        before: before,
         after: dedentAfter(after),
-        parser: () => new PlainTextParser(),
-        executionContext: executionContext
+        parser: () => new PlainTextParser()
     };
     if (spec) {
         spec(s);

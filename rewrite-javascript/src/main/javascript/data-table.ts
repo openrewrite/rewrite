@@ -1,5 +1,5 @@
 import {ExecutionContext} from "./execution";
-import {OptionDescriptor} from "./recipe";
+import {OptionDescriptor, Recipe} from "./recipe";
 
 const DATA_TABLES_KEY = "org.openrewrite.dataTables";
 const COLUMNS_KEY = Symbol("org.openrewrite.dataTables.columns");
@@ -53,8 +53,15 @@ export class DataTable<Row> {
     }
 }
 
+export function getRowsByDataTableName(ctx: ExecutionContext): [string, any[]][] {
+    if (!(DATA_TABLES_KEY in ctx)) {
+        return [];
+    }
+    return Object.entries(ctx[DATA_TABLES_KEY]);
+}
+
 export function getRows<Row>(dataTableName: string, ctx: ExecutionContext): Row[] {
-    return ctx[DATA_TABLES_KEY][dataTableName] ?? [];
+    return ctx[DATA_TABLES_KEY]?.[dataTableName] ?? [];
 }
 
 export interface DataTableDescriptor {

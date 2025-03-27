@@ -75,6 +75,8 @@ describe("RewriteRpcTest", () => {
     test("runRecipe", async () => {
         spec.recipe = await server.prepareRecipe("org.openrewrite.text.change-text", {text: "hello"});
         spec.dataTable("org.openrewrite.text.replaced-text", (rows: ReplacedText[]) => {
+            // Prove that data tables can flow back over the RPC connection to the controlling
+            // processes' ExecutionContext.
             expect(rows).toContain(new ReplacedText("hello.txt", "hello"));
         });
         await spec.rewriteRun(

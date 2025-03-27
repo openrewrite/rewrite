@@ -1,18 +1,21 @@
 import {Recipe} from "../recipe";
 import {createExecutionContext, ExecutionContext} from "../execution";
 import {noopVisitor, TreeVisitor} from "../visitor";
-import {Parser, readSourceSync} from "../parser";
+import {Parser, PARSER_VOLUME, readSourceSync} from "../parser";
 import {TreePrinters} from "../print";
-import {isSourceFile, SourceFile} from "../tree";
+import {SourceFile} from "../tree";
 import dedent from "dedent";
+import {scheduleRun} from "../run";
 import {getRows} from "../data-table";
+import {SnowflakeId} from "@akashrajpurohit/snowflake-id";
+import {memfs} from "memfs";
 
 export interface SourceSpec<T extends SourceFile> {
+    kind: string,
     before?: string
     after?: AfterRecipe
     path?: string,
     parser: () => Parser,
-    executionContext?: ExecutionContext,
     beforeRecipe?: (sourceFile: T) => T | void | Promise<T>
 }
 
@@ -37,65 +40,66 @@ export class RecipeSpec {
     }
 
     async rewriteRun(...sourceSpecs: SourceSpec<any>[]): Promise<void> {
-        for (const spec of sourceSpecs) {
-            // TODO more validation to implement here, along with grouping source specs for execution
-            //  by a single parser when there are interdependencies, etc.
+        const specsByKind = sourceSpecs.reduce((groups, spec) => {
+            const kind = spec.kind;
+            if (!groups[kind]) {
+                groups[kind] = [];
+            }
+            groups[kind].push(spec);
+            return groups;
+        }, {} as { [kind: string]: SourceSpec<any>[] });
 
-            // TODO also need to implement when scanning recipes generate files
-            expect(spec.before).toBeDefined();
+        for (const kind in specsByKind) {
+            const specs = specsByKind[kind];
+            const parsed = this.parse(specs);
 
-            const parserCtx: ExecutionContext = spec.executionContext ? {
-                ...this.executionContext,
-                ...spec.executionContext
-            } : this.executionContext
-
-            let beforeSource = readSourceSync(parserCtx, spec.before!);
-            let beforeParsed = spec.parser().parse(parserCtx, undefined, spec.before!)[0];
-
-            expect(await TreePrinters.print(beforeParsed)).toEqual(beforeSource);
-
-            let afterFn: () => string
-            if (spec.after) {
-                if (typeof spec.after === "function") {
-                    afterFn = () => (spec.after as () => string)();
-                } else {
-                    afterFn = () => spec.after as string;
-                }
-            } else {
-                afterFn = () => beforeSource
+            for (const [_, sourceFile] of parsed) {
+                const beforeSource = readSourceSync(this.recipeExecutionContext, sourceFile.sourcePath);
+                expect(await TreePrinters.print(sourceFile)).toEqual(beforeSource);
             }
 
-            if (spec.beforeRecipe) {
-                const beforeParsed1: SourceFile | void = await spec.beforeRecipe(beforeParsed);
-                if (isSourceFile(beforeParsed1)) {
-                    beforeParsed = beforeParsed1;
-                }
-            }
+            const before = parsed.map(([_, sourceFile]) => sourceFile);
+            const changeset = (await scheduleRun(this.recipe, before, this.recipeExecutionContext)).changeset;
 
-            // TODO substitute for LargeSourceSet and a real RecipeScheduler for now
-            let after: SourceFile | undefined = await this.recipe.editor.visit(beforeParsed, this.recipeExecutionContext);
-            for (const subRecipe of this.recipe.recipeList) {
-                if (after) {
-                    after = await subRecipe.editor.visit(after, this.recipeExecutionContext);
-                }
-            }
+            for (const spec of specs) {
+                const after = changeset.find(c => {
+                    if (c.before) {
+                        let matchingSpec = parsed.find(([s, _]) => s === spec);
+                        return c.before === matchingSpec![1];
+                    }
+                })?.after;
 
-            if (!after) {
-                if (spec.after) {
-                    fail(`${spec.path} was deleted unexpectedly`)
+                if (!spec.after) {
+                    expect(after).not.toBeDefined();
                 }
-            } else {
-                if (spec.after === null) {
-                    fail(`Expected ${spec.path} to be deleted`)
-                }
-                const afterSource = afterFn();
-                expect(await TreePrinters.print(after)).toEqual(afterSource);
-            }
-
-            for (const [name, assertion] of Object.entries(this.dataTableAssertions)) {
-                assertion(getRows(name, this.recipeExecutionContext));
+                const afterSource = typeof spec.after === "function" ?
+                    (spec.after as () => string)() : spec.after as string;
+                expect(await TreePrinters.print(after!)).toEqual(afterSource);
             }
         }
+
+        for (const [name, assertion] of Object.entries(this.dataTableAssertions)) {
+            assertion(getRows(name, this.recipeExecutionContext));
+        }
+    }
+
+    /**
+     * Parse the whole group together so the sources can reference once another.
+     */
+    private parse(specs: SourceSpec<any>[]): [SourceSpec<any>, SourceFile][] {
+        const before: [SourceSpec<any>, string][] = [];
+        const vol = memfs().vol
+        vol.mkdirSync(process.cwd(), {recursive: true});
+        this.executionContext[PARSER_VOLUME] = vol;
+        for (const spec of specs) {
+            if (spec.before) {
+                const sourcePath = `${SnowflakeId().generate()}.txt`;
+                vol.writeFileSync(`${process.cwd()}/${sourcePath}`, dedent(spec.before));
+                before.push([spec, sourcePath]);
+            }
+        }
+        const parsed = specs[0].parser().parse(this.executionContext, undefined, ...before.map(([_, sourcePath]) => sourcePath));
+        return before.map(([spec, _], i) => [spec, parsed[i]]);
     }
 }
 

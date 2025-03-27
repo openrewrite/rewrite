@@ -21,7 +21,8 @@ class JsonSender extends JsonVisitor<RpcSendQueue> {
 
     protected async preVisit(j: Json, q: RpcSendQueue): Promise<Json | undefined> {
         await q.getAndSend(j, j2 => j2.id);
-        await q.getAndSend(j, j2 => asRef(j2.prefix), space => this.visitSpace(space, q));
+        await q.getAndSend(j, j2 => asRef(j2.prefix),
+            async space => await this.visitSpace(space, q));
         await q.sendMarkers(j, j2 => j2.markers);
         return j;
     }
@@ -32,13 +33,15 @@ class JsonSender extends JsonVisitor<RpcSendQueue> {
         await q.getAndSend(document, d => d.charsetBomMarked);
         await q.getAndSend(document, d => d.checksum);
         await q.getAndSend(document, d => d.fileAttributes);
-        await q.getAndSend(document, d => d.value, j => this.visit(j, q));
+        await q.getAndSend(document, d => d.value,
+            async j => await this.visit(j, q));
         await q.getAndSend(document, d => asRef(d.eof));
         return document;
     }
 
     protected async visitArray(array: JsonArray, q: RpcSendQueue): Promise<Json | undefined> {
-        await q.getAndSendList(array, a => a.values, j => j.element.id, j => this.visitRightPadded(j, q));
+        await q.getAndSendList(array, a => a.values, j => j.element.id,
+            async j => await this.visitRightPadded(j, q));
         return array;
     }
 
@@ -58,13 +61,14 @@ class JsonSender extends JsonVisitor<RpcSendQueue> {
     }
 
     protected async visitMember(member: Member, q: RpcSendQueue): Promise<Json | undefined> {
-        await q.getAndSend(member, m => m.key, j => this.visitRightPadded(j, q));
-        await q.getAndSend(member, m => m.value, j => this.visit(j, q));
+        await q.getAndSend(member, m => m.key, async j => await this.visitRightPadded(j, q));
+        await q.getAndSend(member, m => m.value, async j => await this.visit(j, q));
         return member;
     }
 
     protected async visitObject(obj: JsonObject, q: RpcSendQueue): Promise<Json | undefined> {
-        await q.getAndSendList(obj, o => o.members, j => j.element.id, j => this.visitRightPadded(j, q));
+        await q.getAndSendList(obj, o => o.members, j => j.element.id,
+            async j => await this.visitRightPadded(j, q));
         return obj;
     }
 
@@ -81,7 +85,7 @@ class JsonSender extends JsonVisitor<RpcSendQueue> {
 
     protected async visitRightPadded<T extends Json>(right: JsonRightPadded<T>, q: RpcSendQueue): Promise<JsonRightPadded<T> | undefined> {
         await q.getAndSend(right, r => r.element, j => this.visit(j, q));
-        await q.getAndSend(right, r => asRef(r.after), space => this.visitSpace(space, q));
+        await q.getAndSend(right, r => asRef(r.after), async space => await this.visitSpace(space, q));
         await q.sendMarkers(right, r => r.markers);
         return right;
     }
@@ -93,26 +97,27 @@ class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
     protected async preVisit(j: Json, q: RpcReceiveQueue): Promise<Json | undefined> {
         return this.produceJson<Json>(j, q, async draft => {
             draft.id = await q.receive(j.id);
-            draft.prefix = await q.receive(j.prefix, space => this.visitSpace(space, q));
+            draft.prefix = await q.receive(j.prefix, async space => await this.visitSpace(space, q));
             draft.markers = await q.receiveMarkers(j.markers);
         });
     }
 
     protected async visitDocument(document: JsonDocument, q: RpcReceiveQueue): Promise<Json | undefined> {
         return this.produceJson<JsonDocument>(document, q, async draft => {
-            draft.sourcePath = await q.receiveAndGet(document.sourcePath, (path: string) => path);
-            draft.charsetName = await q.receiveAndGet(document.charsetName, (name: string) => name);
+            draft.sourcePath = await q.receive(document.sourcePath);
+            draft.charsetName = await q.receive(document.charsetName);
             draft.charsetBomMarked = await q.receive(document.charsetBomMarked);
             draft.checksum = await q.receive(document.checksum);
             draft.fileAttributes = await q.receive(document.fileAttributes);
-            draft.value = await q.receive<JsonValue>(document.value, j => this.visit(j, q)!);
+            draft.value = await q.receive<JsonValue>(document.value, async j => await this.visit(j, q)!);
             draft.eof = await q.receive(document.eof);
         });
     }
 
     protected async visitArray(array: JsonArray, q: RpcReceiveQueue): Promise<Json | undefined> {
         return this.produceJson<JsonArray>(array, q, async draft => {
-            draft.values = await q.receiveListDefined(array.values, j => this.visitRightPadded(j, q)!)!;
+            draft.values = await q.receiveListDefined(array.values,
+                async j => await this.visitRightPadded(j, q)!)!;
         });
     }
 
@@ -135,14 +140,17 @@ class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
 
     protected async visitMember(member: Member, q: RpcReceiveQueue): Promise<Json | undefined> {
         return this.produceJson<Member>(member, q, async draft => {
-            draft.key = await q.receive(member.key, j => this.visitRightPadded(j, q)!)!;
-            draft.value = await q.receive<JsonValue>(member.value, j => this.visit(j, q)!);
+            draft.key = await q.receive(member.key,
+                async j => await this.visitRightPadded(j, q)!)!;
+            draft.value = await q.receive<JsonValue>(member.value,
+                async j => await this.visit(j, q)!);
         });
     }
 
     protected async visitObject(obj: JsonObject, q: RpcReceiveQueue): Promise<Json | undefined> {
         return this.produceJson<JsonObject>(obj, q, async draft => {
-            draft.members = await q.receiveListDefined(obj.members, j => this.visitRightPadded(j, q));
+            draft.members = await q.receiveListDefined(obj.members,
+                async j => await this.visitRightPadded(j, q));
         });
     }
 
@@ -165,8 +173,8 @@ class JsonReceiver extends JsonVisitor<RpcReceiveQueue> {
             throw new Error("TreeDataReceiveQueue should have instantiated an empty padding")
         }
         return produceAsync<JsonRightPadded<T>>(right, async draft => {
-            draft.element = await p.receive(right.element, j => this.visit(j, p)!) as Draft<T>;
-            draft.after = await p.receive(right.after, space => this.visitSpace(space, p));
+            draft.element = await p.receive(right.element,  async j => await this.visit(j, p)!) as Draft<T>;
+            draft.after = await p.receive(right.after, async space => await this.visitSpace(space, p));
             draft.markers = await p.receiveMarkers(right.markers);
         });
     }

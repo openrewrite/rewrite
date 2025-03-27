@@ -103,7 +103,7 @@ export class RpcSendQueue {
         } else if (after === undefined) {
             this.put({state: RpcObjectState.DELETE});
         } else {
-            this.put({state: RpcObjectState.CHANGE, value: onChange ? after : undefined});
+            this.put({state: RpcObjectState.CHANGE, value: onChange ? undefined : after});
             await this.doChange(after, before, onChange);
         }
     }
