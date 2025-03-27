@@ -753,19 +753,14 @@ public class ResolvedPom {
 
         private void updateRepositories() {
             repositories = ListUtils.map(repositories, repo -> {
-                        if (ResolvedPom.placeholderHelper.hasPlaceholders(repo.getId())) {
-                            repo = repo.withId(ResolvedPom.placeholderHelper.replacePlaceholders(
-                                    repo.getId(),
-                                    properties::get));
-                        }
-                        if (ResolvedPom.placeholderHelper.hasPlaceholders(repo.getUri())) {
-                            repo = repo.withUri(ResolvedPom.placeholderHelper.replacePlaceholders(
-                                    repo.getUri(),
-                                    properties::get));
-                        }
-                        return repo;
-                    }
-            );
+                if (ResolvedPom.placeholderHelper.hasPlaceholders(repo.getId())) {
+                    repo = repo.withId(ResolvedPom.placeholderHelper.replacePlaceholders(repo.getId(), properties::get));
+                }
+                if (ResolvedPom.placeholderHelper.hasPlaceholders(repo.getUri())) {
+                    repo = repo.withUri(ResolvedPom.placeholderHelper.replacePlaceholders(repo.getUri(), properties::get));
+                }
+                return repo;
+            });
         }
 
         private void mergeRepositories(List<MavenRepository> incomingRepositories) {
