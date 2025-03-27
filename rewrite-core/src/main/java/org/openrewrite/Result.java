@@ -265,8 +265,7 @@ public class Result {
         return (before == after) ||
                 (before != null && after != null &&
                         // Remote source files are fetched on `printAll`, let's avoid that cost.
-                        !(before instanceof Remote) &&
-                        !(after instanceof Remote) &&
+                        !(before instanceof Remote) && !(after instanceof Remote) &&
                         before.printAll().equals(after.printAll()));
     }
 }
