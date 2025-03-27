@@ -1577,6 +1577,51 @@ class AddDependencyTest implements RewriteTest {
                     """.formatted(gradleConfiguration)
                 )));
         }
+
+        @Test
+        void onlyNonDependenciesInDirectDependencyBlock() {
+            rewriteRun(
+              spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre")),
+              mavenProject("project",
+                srcMainJava(
+                  java(usingGuavaIntMath)
+                ),
+                buildGradle(
+                  """
+                    plugins {
+                        id "java-library"
+                    }
+                    
+                    repositories {
+                        mavenCentral()
+                    }
+                    
+                    dependencies {
+                        if (project.hasProperty('x')) {
+                            implementation "commons-lang:commons-lang:1.0"
+                        }
+                    }
+                    """,
+                  """
+                    plugins {
+                        id "java-library"
+                    }
+                    
+                    repositories {
+                        mavenCentral()
+                    }
+                    
+                    dependencies {
+                        if (project.hasProperty('x')) {
+                            implementation "commons-lang:commons-lang:1.0"
+                        }
+                        implementation "com.google.guava:guava:29.0-jre"
+                    }
+                    """
+                )
+              )
+            );
+        }
     }
 
     @ParameterizedTest
