@@ -27,14 +27,31 @@ public class ModifierTest implements RewriteTest {
         rewriteRun(
                 java(
                         """
-                                public class Main {
-                                    public@jdk.jfr.Name("A") void test() {
-                                        System.out.println("A");
-                                    }
-                                }
-                                """
+                          public class Main {
+                              public@jdk.jfr.Name("A") void test() {
+                                  System.out.println("A");
+                              }
+                          }
+                          """
                 )
         );
+
+    }
+
+    @Test
+    public void modifierNoSpaceThenMultipleAnnotation() {
+        rewriteRun(
+                java(
+                        """
+                          public class Main {
+                              public@jdk.jfr.Name("A")@jdk.jfr.Label("test") void test() {
+                                  System.out.println("A");
+                              }
+                          }
+                          """
+                )
+        );
+
     }
 
     @Test
@@ -42,12 +59,12 @@ public class ModifierTest implements RewriteTest {
         rewriteRun(
                 java(
                         """
-                                public class Main {
-                                    public static@jdk.jfr.Name("A") void test() {
-                                        System.out.println("A");
-                                    }
-                                }
-                                """
+                          public class Main {
+                              public static@jdk.jfr.Name("A") void test() {
+                                  System.out.println("A");
+                              }
+                          }
+                          """
                 )
         );
     }
@@ -57,12 +74,12 @@ public class ModifierTest implements RewriteTest {
         rewriteRun(
                 java(
                         """
-                                public class Main {
-                                    public static @jdk.jfr.Name("A") void test() {
-                                        System.out.println("A");
-                                    }
-                                }
-                                """
+                          public class Main {
+                              public static @jdk.jfr.Name("A") void test() {
+                                  System.out.println("A");
+                              }
+                          }
+                          """
                 )
         );
     }
