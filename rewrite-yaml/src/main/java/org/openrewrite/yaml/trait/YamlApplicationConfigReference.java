@@ -65,6 +65,7 @@ public class YamlApplicationConfigReference extends YamlReference {
         @Override
         public SimpleTraitMatcher<YamlReference> getMatcher() {
             return matcher;
+            
         }
     }
 }

@@ -96,6 +96,7 @@ public class Java17Parser implements JavaParser {
             } catch (Exception e) {
                 throw new IllegalStateException("Unable to construct Java17Parser.", e);
             }
+            
         }
     }
 }

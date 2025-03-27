@@ -16,4 +16,6 @@
 package org.openrewrite;
 
 public class Z {
+
+
 }
