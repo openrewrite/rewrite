@@ -39,6 +39,22 @@ public class ModifierTest implements RewriteTest {
     }
 
     @Test
+    public void modifierNoSpaceThenAnnotationScenario2() {
+        rewriteRun(
+                java(
+                        """
+                          public class Main {
+                              public@jdk.jfr.Name("A") static@jdk.jfr.Label("2nd") void test() {
+                                  System.out.println("A");
+                              }
+                          }
+                          """
+                )
+        );
+
+    }
+
+    @Test
     public void modifierNoSpaceThenMultipleAnnotation() {
         rewriteRun(
                 java(
