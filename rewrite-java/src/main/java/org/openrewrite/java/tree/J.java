@@ -2942,7 +2942,7 @@ public interface J extends Tree {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
+    @RequiredArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)})
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class InstanceOf implements J, Expression, TypedTree {
         @Nullable

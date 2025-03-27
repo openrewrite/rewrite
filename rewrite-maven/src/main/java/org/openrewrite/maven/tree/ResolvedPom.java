@@ -416,6 +416,7 @@ public class ResolvedPom {
                 mergeProperties(profile.getProperties(), pom);
             }
             mergeProperties(pom.getProperties(), pom);
+            updateRepositories();
 
             //Resolve repositories (which may rely on properties ^^^)
             for (Profile profile : effectiveProfiles) {
@@ -748,6 +749,18 @@ public class ResolvedPom {
                 }
                 mergePlugins(pluginManagement, incomingPlugins);
             }
+        }
+
+        private void updateRepositories() {
+            repositories = ListUtils.map(repositories, repo -> {
+                if (ResolvedPom.placeholderHelper.hasPlaceholders(repo.getId())) {
+                    repo = repo.withId(ResolvedPom.placeholderHelper.replacePlaceholders(repo.getId(), properties::get));
+                }
+                if (ResolvedPom.placeholderHelper.hasPlaceholders(repo.getUri())) {
+                    repo = repo.withUri(ResolvedPom.placeholderHelper.replacePlaceholders(repo.getUri(), properties::get));
+                }
+                return repo;
+            });
         }
 
         private void mergeRepositories(List<MavenRepository> incomingRepositories) {
