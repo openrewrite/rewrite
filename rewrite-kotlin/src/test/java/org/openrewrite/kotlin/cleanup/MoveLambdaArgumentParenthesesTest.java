@@ -27,17 +27,16 @@ class MoveLambdaArgumentParenthesesTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new MoveLambdaArgumentParentheses())
-                .typeValidationOptions(TypeValidation.none())
-                .expectedCyclesThatMakeChanges(1)
-                .cycles(1);
+        spec.recipe(new MoveLambdaArgumentParentheses());
     }
 
     @DocumentExample
     @Test
     void removeParenthesesFromLet() {
         rewriteRun(
-          kotlin(
+                spec -> spec.recipe(new MoveLambdaArgumentParentheses())
+                        .typeValidationOptions(TypeValidation.none())
+            ,kotlin(
             """
               fun method() {
                   val foo = 1.let({ it + 1 })
@@ -113,12 +112,11 @@ class MoveLambdaArgumentParenthesesTest implements RewriteTest {
     @Test
     void noChangeWhenNotLambda() {
         rewriteRun(
-                spec -> spec.recipe(new MoveLambdaArgumentParentheses())
-                        .expectedCyclesThatMakeChanges(0),
             kotlin(
             """
               fun method() {
                   val list = listOf(1, 2, 3)
+                  fun isEven(num: Int): Boolean = num % 2 == 0
                   list.filter(::isEven)
               }
               """
@@ -126,10 +124,39 @@ class MoveLambdaArgumentParenthesesTest implements RewriteTest {
             kotlin(
             """
               fun method() {
-                  run(::print)
+                  run(::println)
               }
               """
             )
+        );
+    }
+
+
+    @Test
+    void noChangeWhenHaveLambdaAndArgument() {
+        rewriteRun(
+                kotlin(
+                    """
+                  fun method() {
+                      val testingMethod = {_: () -> Int,  _: () -> Int -> println("Hello, world") }
+                      testingMethod({ 1 }) { 1 }
+                  }
+                  """
+                )
+        );
+    }
+
+    @Test
+    void noChangeWhenUseLambdaOutsideParentheses() {
+        rewriteRun(
+                kotlin(
+                    """
+                  fun method() {
+                      val list = listOf(1, 2, 3)
+                      list.filterIndexed { index, value -> index > 1 && value > 1 }
+                  }
+                  """
+                )
         );
     }
 }

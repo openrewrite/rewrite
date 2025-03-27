@@ -22,7 +22,6 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.kotlin.KotlinTemplate;
 import org.openrewrite.kotlin.KotlinVisitor;
-import org.openrewrite.kotlin.tree.K;
 
 import java.time.Duration;
 import java.util.List;
@@ -53,16 +52,24 @@ public class MoveLambdaArgumentParentheses extends Recipe {
                 // Check if this is a method call has a single lambda argument
                 List<Expression> arguments = method.getArguments();
                 if (method.getArguments().size() == 1 && arguments.get(0) instanceof J.Lambda) {
-                    K.Lambda arg = ((K.Lambda) arguments.get(0));
+                    String methodAsString = method.print(getCursor()).trim().replace(" ", "");
+                    // check if method have lambda argument outside parentheses
+                    if (methodAsString.endsWith("}") || methodAsString.endsWith("};")) {
+                        return method;
+                    }
 
-                    String select = method.getSelect() == null ? "" : method.getSelect().print(getCursor()) + ".";
-                    String methodName = method.getSimpleName() + " ";
-                    String lambda = arg.print(getCursor());
+                    String lambda = arguments.get(0).print(getCursor());
+                    Object[] parameters = new Object[]{method.getSelect(), method.getSimpleName(), lambda};
+                    String code = "#{any()}.#{} #{}";
+                    if (method.getSelect() == null) {
+                        parameters = new Object[]{method.getSimpleName(), lambda};
+                        code = "#{} #{}";
+                    }
 
-                    return KotlinTemplate.builder(select + methodName + lambda)
+                    return KotlinTemplate.builder(code)
                             .build()
-                            .apply(getCursor(), method.getCoordinates().replace())
-                            .withPrefix(method.getPrefix());
+                            .apply(getCursor(), method.getCoordinates().replace(), parameters)
+                           .withPrefix(method.getPrefix());
 
                 }
 
