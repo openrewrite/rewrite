@@ -8,7 +8,7 @@ import {
 } from "../../../main/javascript";
 import {RewriteRpc} from "../../../main/javascript/rpc";
 import {PlainText, text} from "../../../main/javascript/text";
-import {RecipeSpec, SourceSpec} from "../../../main/javascript/test";
+import {RecipeSpec} from "../../../main/javascript/test";
 import {PassThrough} from "node:stream";
 import * as rpc from "vscode-jsonrpc/node";
 import "../example-recipe";
@@ -51,15 +51,13 @@ describe("RewriteRpcTest", () => {
     });
 
     test("print", () => spec.rewriteRun(
-        text(
-            "Hello Jon!",
-            (spec: SourceSpec<PlainText>) => {
-                spec.beforeRecipe = async (text: PlainText) => {
-                    expect(await server.print(text)).toEqual("Hello Jon!");
-                    return text;
-                }
+        {
+            ...text("Hello Jon!"),
+            beforeRecipe: async (text: PlainText) => {
+                expect(await server.print(text)).toEqual("Hello Jon!");
+                return text;
             }
-        )
+        }
     ));
 
     test("getRecipes", async () =>
@@ -80,13 +78,13 @@ describe("RewriteRpcTest", () => {
             expect(rows).toContain(new ReplacedText("hello.txt", "hello"));
         });
         await spec.rewriteRun(
-            text(
-                "Hello Jon!",
-                "hello",
-                spec => {
-                    spec.path = "hello.txt";
-                }
-            )
+            {
+                ...text(
+                    "Hello Jon!",
+                    "hello"
+                ),
+                path: "hello.txt"
+            }
         );
     });
 
