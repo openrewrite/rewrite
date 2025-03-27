@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,15 +25,15 @@ class ModifierTest implements RewriteTest {
     @Test
     void modifierNoSpaceThenAnnotation() {
         rewriteRun(
-                java(
-                        """
-                                public class Main {
-                                    public@jdk.jfr.Name("A") void test() {
-                                        System.out.println("A");
-                                    }
-                                }
-                                """
-                )
+          java(
+            """
+              public class Main {
+                  public@jdk.jfr.Name("A") void test() {
+                      System.out.println("A");
+                  }
+              }
+              """
+          )
         );
 
     }
@@ -41,15 +41,15 @@ class ModifierTest implements RewriteTest {
     @Test
     void modifierNoSpaceThenAnnotationScenario2() {
         rewriteRun(
-                java(
-                        """
-                                public class Main {
-                                    public@jdk.jfr.Name("A") static@jdk.jfr.Label("2nd") void test() {
-                                        System.out.println("A");
-                                    }
-                                }
-                                """
-                )
+          java(
+            """
+              public class Main {
+                  public@jdk.jfr.Name("A") static@jdk.jfr.Label("2nd") void test() {
+                      System.out.println("A");
+                  }
+              }
+              """
+          )
         );
 
     }
@@ -57,15 +57,15 @@ class ModifierTest implements RewriteTest {
     @Test
     void modifierNoSpaceThenMultipleAnnotation() {
         rewriteRun(
-                java(
-                        """
-                                public class Main {
-                                    public@jdk.jfr.Name("A")@jdk.jfr.Label("test") void test() {
-                                        System.out.println("A");
-                                    }
-                                }
-                                """
-                )
+          java(
+            """
+              public class Main {
+                  public@jdk.jfr.Name("A")@jdk.jfr.Label("test") void test() {
+                      System.out.println("A");
+                  }
+              }
+              """
+          )
         );
 
     }
@@ -73,31 +73,30 @@ class ModifierTest implements RewriteTest {
     @Test
     void multipleModifiersNoSpaceThenAnnotation() {
         rewriteRun(
-                java(
-                        """
-                                public class Main {
-                                    public static@jdk.jfr.Name("A") void test() {
-                                        System.out.println("A");
-                                    }
-                                }
-                                """
-                )
+          java(
+            """
+              public class Main {
+                  public static@jdk.jfr.Name("A") void test() {
+                      System.out.println("A");
+                  }
+              }
+              """
+          )
         );
     }
 
     @Test
     void modifierWithSpaceThenAnnotation() {
         rewriteRun(
-                java(
-                        """
-                                public class Main {
-                                    public static @jdk.jfr.Name("A") void test() {
-                                        System.out.println("A");
-                                    }
-                                }
-                                """
-                )
+          java(
+            """
+              public class Main {
+                  public static @jdk.jfr.Name("A") void test() {
+                      System.out.println("A");
+                  }
+              }
+              """
+          )
         );
     }
 }
-
