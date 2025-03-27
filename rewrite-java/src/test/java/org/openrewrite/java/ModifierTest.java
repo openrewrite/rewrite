@@ -20,8 +20,8 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
-public class ModifierTest implements RewriteTest {
-
+class ModifierTest implements RewriteTest {
+    void modifierNoSpaceThenAnnotation() {
     @Test
     public void modifierNoSpaceThenAnnotation() {
         rewriteRun(
@@ -39,7 +39,7 @@ public class ModifierTest implements RewriteTest {
     }
 
     @Test
-    public void modifierNoSpaceThenAnnotationScenario2() {
+    void modifierNoSpaceThenAnnotationScenario2() {
         rewriteRun(
                 java(
                         """
@@ -55,7 +55,7 @@ public class ModifierTest implements RewriteTest {
     }
 
     @Test
-    public void modifierNoSpaceThenMultipleAnnotation() {
+    void modifierNoSpaceThenMultipleAnnotation() {
         rewriteRun(
                 java(
                         """
@@ -71,7 +71,7 @@ public class ModifierTest implements RewriteTest {
     }
 
     @Test
-    public void multipleModifiersNoSpaceThenAnnotation() {
+    void multipleModifiersNoSpaceThenAnnotation() {
         rewriteRun(
                 java(
                         """
