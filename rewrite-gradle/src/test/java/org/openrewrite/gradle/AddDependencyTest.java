@@ -33,8 +33,7 @@ import org.openrewrite.test.TypeValidation;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.gradle.Assertions.settingsGradle;
+import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.groovy.Assertions.groovy;
 import static org.openrewrite.groovy.Assertions.srcMainGroovy;
@@ -1578,6 +1577,85 @@ class AddDependencyTest implements RewriteTest {
                     """.formatted(gradleConfiguration)
                 )));
         }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"com.google.common.math.*", "com.google.common.math.IntMath"})
+    void kotlinDslOnlyIfUsingTestScope(String onlyIfUsing) {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", onlyIfUsing)),
+          mavenProject("project",
+            srcTestJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradleKts(
+              """
+                plugins {
+                    `java-library`
+                }
+                
+                repositories {
+                    mavenCentral()
+                }
+                """,
+              """
+                plugins {
+                    `java-library`
+                }
+                
+                repositories {
+                    mavenCentral()
+                }
+                
+                dependencies {
+                    testImplementation("com.google.guava:guava:29.0-jre")
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void kotlinDslMatchesDependencyDeclarationStyle() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
+          mavenProject("project",
+            srcTestJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradleKts(
+              """
+                plugins {
+                    `java-library`
+                }
+                
+                repositories {
+                    mavenCentral()
+                }
+                
+                dependencies {
+                    implementation(group = "commons-lang", name = "commons-lang", version = "1.0")
+                }
+                """,
+              """
+                plugins {
+                    `java-library`
+                }
+                
+                repositories {
+                    mavenCentral()
+                }
+                
+                dependencies {
+                    implementation(group = "commons-lang", name = "commons-lang", version = "1.0")
+                
+                    testImplementation(group = "com.google.guava", name = "guava", version = "29.0-jre")
+                }
+                """
+            )
+          )
+        );
     }
 
     private AddDependency addDependency(@SuppressWarnings("SameParameterValue") String gav) {
