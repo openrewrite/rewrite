@@ -110,7 +110,7 @@ public class FindDependency extends Recipe {
     }
 
     private static boolean versionIsValid(@Nullable String desiredVersion, @Nullable String versionPattern,
-                                          Supplier<ResolvedDependency> resolvedDependencySupplier) {
+                                          Supplier<@Nullable ResolvedDependency> resolvedDependencySupplier) {
         if (desiredVersion == null) {
             return true;
         }
