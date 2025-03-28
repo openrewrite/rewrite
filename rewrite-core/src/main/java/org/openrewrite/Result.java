@@ -54,9 +54,8 @@ public class Result {
     @Getter
     private final Collection<List<Recipe>> recipes;
 
-    @Getter
-    @Nullable
-    private final Duration timeSavings;
+    private final Duration potentialTimeSavings;
+    private @Nullable Duration timeSavings;
 
     public Result(@Nullable SourceFile before, @Nullable SourceFile after, Collection<List<Recipe>> recipes) {
         this.before = before;
@@ -64,18 +63,16 @@ public class Result {
         this.recipes = recipes;
 
         Duration timeSavings = Duration.ZERO;
-        if (!isLocalAndHasNoChanges(before, after)) {
-            for (List<Recipe> recipesStack : recipes) {
-                if (recipesStack != null && !recipesStack.isEmpty()) {
-                    Duration perOccurrence = recipesStack.get(recipesStack.size() - 1).getEstimatedEffortPerOccurrence();
-                    if (perOccurrence != null) {
-                        timeSavings = perOccurrence;
-                        break;
-                    }
+        for (List<Recipe> recipesStack : recipes) {
+            if (recipesStack != null && !recipesStack.isEmpty()) {
+                Duration perOccurrence = recipesStack.get(recipesStack.size() - 1).getEstimatedEffortPerOccurrence();
+                if (perOccurrence != null) {
+                    timeSavings = perOccurrence;
+                    break;
                 }
             }
         }
-        this.timeSavings = timeSavings;
+        this.potentialTimeSavings = timeSavings;
     }
 
     public Result(@Nullable SourceFile before, SourceFile after) {
@@ -138,6 +135,17 @@ public class Result {
                 return super.visit(tree, changed);
             }
         }.reduce(root, new AtomicBoolean(false)).get();
+    }
+
+    public Duration getTimeSavings() {
+        if (timeSavings == null) {
+            if (potentialTimeSavings.isZero() || isLocalAndHasNoChanges(before, after)) {
+                timeSavings = Duration.ZERO;
+            } else {
+                timeSavings = potentialTimeSavings;
+            }
+        }
+        return timeSavings;
     }
 
     /**
@@ -260,9 +268,9 @@ public class Result {
 
     public static boolean isLocalAndHasNoChanges(@Nullable SourceFile before, @Nullable SourceFile after) {
         return (before == after) ||
-                (before != null && after != null &&
-                        // Remote source files are fetched on `printAll`, let's avoid that cost.
-                        !(before instanceof Remote) && !(after instanceof Remote) &&
-                        before.printAll().equals(after.printAll()));
+               (before != null && after != null &&
+                // Remote source files are fetched on `printAll`, let's avoid that cost.
+                !(before instanceof Remote) && !(after instanceof Remote) &&
+                before.printAll().equals(after.printAll()));
     }
 }
