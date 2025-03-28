@@ -129,6 +129,7 @@ public interface ExecutionContext extends RpcCodec<ExecutionContext> {
     default void rpcSend(ExecutionContext after, RpcSendQueue q) {
         // The after state will change if any messages have changed by a call to clone
         q.getAndSend(after, ctx -> {
+            //noinspection ConstantValue
             Map<String, Object> messages = new HashMap<>(ctx.getMessages() == null ?
                     emptyMap() : ctx.getMessages());
             // The remote side will manage its own recipe and cycle state.
@@ -152,6 +153,7 @@ public interface ExecutionContext extends RpcCodec<ExecutionContext> {
 
     @Override
     default ExecutionContext rpcReceive(ExecutionContext before, RpcReceiveQueue q) {
+        //noinspection NullableProblems
         Map<String, Object> messages = q.receive(before.getMessages());
         for (Map.Entry<String, Object> e : messages.entrySet()) {
             before.putMessage(e.getKey(), e.getValue());

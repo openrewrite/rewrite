@@ -12,7 +12,7 @@ import {RecipeSpec} from "../../../main/javascript/test";
 import {PassThrough} from "node:stream";
 import * as rpc from "vscode-jsonrpc/node";
 import "../example-recipe";
-import {ReplacedText} from "../example-recipe";
+import {ChangeText, ReplacedText} from "../example-recipe";
 
 describe("RewriteRpcTest", () => {
     const spec = new RecipeSpec();
