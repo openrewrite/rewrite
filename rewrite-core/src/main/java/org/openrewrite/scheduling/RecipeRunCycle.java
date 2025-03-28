@@ -306,6 +306,6 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     }
 
     public boolean isCurrentlyExecuting(Recipe recipe) {
-        return Objects.equals(current, recipe);
+        return current == recipe;
     }
 }

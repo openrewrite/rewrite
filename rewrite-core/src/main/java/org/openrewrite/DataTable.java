@@ -91,7 +91,7 @@ public class DataTable<Row> {
     }
 
     public void insertRow(ExecutionContext ctx, Row row) {
-        if (!allowWritingInThisCycle(ctx) || ctx.getCycleDetails().isCurrentlyExecuting(recipe)) {
+        if (!allowWritingInThisCycle(ctx) || !ctx.getCycleDetails().isCurrentlyExecuting(recipe)) {
             return;
         }
         ctx.computeMessage(ExecutionContext.DATA_TABLES, row, ConcurrentHashMap::new, (extract, allDataTables) -> {
