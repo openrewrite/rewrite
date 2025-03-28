@@ -543,4 +543,113 @@ class AnnotationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void modifierNoSpaceThenAnnotation() {
+        rewriteRun(
+          java(
+            """
+              public class Main {
+                  public@jdk.jfr.Name("A") void test() {
+                      System.out.println("A");
+                  }
+              }
+              """
+          )
+        );
+
+    }
+
+    @Test
+    void modifierWithMultipleSpaceThenAnnotation() {
+        rewriteRun(
+          java(
+            """
+              public class Main {
+                  public   @jdk.jfr.Name("A") void test() {
+                      System.out.println("A");
+                  }
+              }
+              """
+          )
+        );
+
+    }
+    @Test
+    void modifierWithMultipleSpaceThenAnnotationScenario2() {
+        rewriteRun(
+          java(
+            """
+              public class Main {
+                  public    @jdk.jfr.Name("A") static   @jdk.jfr.Label("2nd") void test() {
+                      System.out.println("A");
+                  }
+              }
+              """
+          )
+        );
+
+    }
+
+    @Test
+    void modifierNoSpaceThenAnnotationScenario2() {
+        rewriteRun(
+          java(
+            """
+              public class Main {
+                  public@jdk.jfr.Name("A") static@jdk.jfr.Label("2nd") void test() {
+                      System.out.println("A");
+                  }
+              }
+              """
+          )
+        );
+
+    }
+
+    @Test
+    void modifierNoSpaceThenMultipleAnnotation() {
+        rewriteRun(
+          java(
+            """
+              public class Main {
+                  public@jdk.jfr.Name("A")@jdk.jfr.Label("test") void test() {
+                      System.out.println("A");
+                  }
+              }
+              """
+          )
+        );
+
+    }
+
+    @Test
+    void multipleModifiersNoSpaceThenAnnotation() {
+        rewriteRun(
+          java(
+            """
+              public class Main {
+                  public static@jdk.jfr.Name("A") void test() {
+                      System.out.println("A");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void modifierWithSpaceThenAnnotation() {
+        rewriteRun(
+          java(
+            """
+              public class Main {
+                  public static @jdk.jfr.Name("A") void test() {
+                      System.out.println("A");
+                  }
+              }
+              """
+          )
+        );
+    }
 }
