@@ -242,61 +242,49 @@ public class Substitutions {
     public Collection<JavaType.GenericTypeVariable> getTypeVariablesReferencedByParameters() {
         Set<JavaType.GenericTypeVariable> typeVariables = Collections.newSetFromMap(new IdentityHashMap<>());
         for (Object parameter : parameters) {
-            if (parameter instanceof J) {
-                new JavaVisitor<Integer>() {
-                    final JavaTypeVisitor<Integer> typeVisitor = new JavaTypeVisitor<Integer>() {
-                        @Override
-                        public JavaType visitAnnotation(JavaType.Annotation annotation, Integer p) {
-                            return annotation.getType();
-                        }
-
-                        @Override
-                        public JavaType visitArray(JavaType.Array array, Integer p) {
-                            return array;
-                        }
-
-                        @Override
-                        public JavaType visitClass(JavaType.Class aClass, Integer p) {
-                            return aClass;
-                        }
-
-                        @Override
-                        public JavaType visitGenericTypeVariable(JavaType.GenericTypeVariable generic, Integer p) {
-                            return typeVariables.add(generic) ? super.visitGenericTypeVariable(generic, p) : generic;
-                        }
-
-                        @Override
-                        public JavaType visitMethod(JavaType.Method method, Integer p) {
-                            return method;
-                        }
-
-                        @Override
-                        public JavaType visitParameterized(JavaType.Parameterized parameterized, Integer p) {
-                            for (JavaType typeParameter : parameterized.getTypeParameters()) {
-                                visit(typeParameter, p);
-                            }
-                            return super.visitParameterized(parameterized, p);
-                        }
-
-                        @Override
-                        public JavaType visitVariable(JavaType.Variable variable, Integer p) {
-                            return variable;
-                        }
-                    };
+            if (parameter instanceof Expression) {
+                new JavaTypeVisitor<Integer>() {
+                    @Override
+                    public JavaType visitAnnotation(JavaType.Annotation annotation, Integer p) {
+                        return annotation.getType();
+                    }
 
                     @Override
-                    public J visitExpression(Expression expression, Integer p) {
-                        typeVisitor.visit(expression.getType(), p);
-                        return expression;
+                    public JavaType visitArray(JavaType.Array array, Integer p) {
+                        return array;
                     }
-                }.visit((J) parameter, 0);
-                getTypeVariables0(typeVariables);
+
+                    @Override
+                    public JavaType visitClass(JavaType.Class aClass, Integer p) {
+                        return aClass;
+                    }
+
+                    @Override
+                    public JavaType visitGenericTypeVariable(JavaType.GenericTypeVariable generic, Integer p) {
+                        return typeVariables.add(generic) ? super.visitGenericTypeVariable(generic, p) : generic;
+                    }
+
+                    @Override
+                    public JavaType visitMethod(JavaType.Method method, Integer p) {
+                        return method;
+                    }
+
+                    @Override
+                    public JavaType visitParameterized(JavaType.Parameterized parameterized, Integer p) {
+                        for (JavaType typeParameter : parameterized.getTypeParameters()) {
+                            visit(typeParameter, p);
+                        }
+                        return super.visitParameterized(parameterized, p);
+                    }
+
+                    @Override
+                    public JavaType visitVariable(JavaType.Variable variable, Integer p) {
+                        return variable;
+                    }
+                }.visit(((Expression) parameter).getType(), 0);
             }
         }
         return typeVariables;
-    }
-
-    private void getTypeVariables0(Set<JavaType.GenericTypeVariable> typeVariables) {
     }
 
     @SuppressWarnings("SpellCheckingInspection")
