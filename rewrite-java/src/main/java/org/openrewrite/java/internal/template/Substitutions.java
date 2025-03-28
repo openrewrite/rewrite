@@ -177,20 +177,24 @@ public class Substitutions {
     }
 
     private String getTypeName(@Nullable JavaType type) {
+        return getTypeName0(type, 0);
+    }
+
+    private String getTypeName0(@Nullable JavaType type, int level) {
         if (type == null) {
             return "java.lang.Object";
         } else if (type instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable genericTypeVariable = (JavaType.GenericTypeVariable) type;
-            if (genericTypeVariable.getName().equals("?")) {
-                // wildcards cannot be used as type parameters on method invocations
+            if (level == 0 && genericTypeVariable.getName().equals("?")) {
+                // wildcards cannot be used as type parameters on method invocations as in `foo.<?> bar()`
                 return "java.lang.Object";
             }
             return genericTypeVariable.getName();
         } else if (type instanceof JavaType.Parameterized) {
-            String result = getTypeName(((JavaType.Parameterized) type).getType());
+            String result = getTypeName0(((JavaType.Parameterized) type).getType(), level++);
             StringJoiner joiner = new StringJoiner(", ", "<", ">");
             for (JavaType t : ((JavaType.Parameterized) type).getTypeParameters()) {
-                joiner.add(getTypeName(t));
+                joiner.add(getTypeName0(t, level++));
             }
             return result + joiner;
         }
@@ -234,14 +238,14 @@ public class Substitutions {
         return "";
     }
 
-    public Collection<JavaType.GenericTypeVariable> getTypeVariables() {
+    public Collection<JavaType.GenericTypeVariable> getTypeVariablesReferencedByParameters() {
         Set<JavaType.GenericTypeVariable> typeVariables = new HashSet<>();
         for (Object parameter : parameters) {
             if (parameter instanceof J) {
                 new JavaVisitor<Integer>() {
                     @Override
                     public @Nullable JavaType visitType(@Nullable JavaType javaType, Integer p) {
-                        if (javaType instanceof JavaType.GenericTypeVariable) {
+                        if (javaType instanceof JavaType.GenericTypeVariable && !((JavaType.GenericTypeVariable) javaType).getName().equals("?")) {
                             typeVariables.add((JavaType.GenericTypeVariable) javaType);
                         }
                         return super.visitType(javaType, p);

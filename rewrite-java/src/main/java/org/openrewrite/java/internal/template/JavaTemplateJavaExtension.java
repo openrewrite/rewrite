@@ -443,7 +443,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             private <J3 extends J> J3 maybeReplaceStatement(Statement statement, Class<J3> expected, Integer p) {
                 if (loc == STATEMENT_PREFIX && statement.isScope(insertionPoint)) {
                     if (mode == JavaCoordinates.Mode.REPLACEMENT) {
-                        Collection<JavaType.GenericTypeVariable> typeVariables = substitutions.getTypeVariables();
+                        Collection<JavaType.GenericTypeVariable> typeVariables = substitutions.getTypeVariablesReferencedByParameters();
                         List<J3> gen = substitutions.unsubstitute(templateParser.parseBlockStatements(getCursor(),
                                 expected, substitutedTemplate, typeVariables, loc, mode));
                         if (gen.size() != 1) {
