@@ -22,6 +22,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.TypeValidation;
 
 import java.util.List;
@@ -865,7 +866,7 @@ class JavaTemplateTest implements RewriteTest {
               public class ArrayHelper {
                   public static Object[] of(Object... objects){ return null;}
               }
-              """
+              """, SourceSpec::skip
           ),
           java(
             """

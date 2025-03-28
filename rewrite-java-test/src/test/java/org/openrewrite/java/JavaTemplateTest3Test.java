@@ -361,7 +361,6 @@ class JavaTemplateTest3Test implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("ClassInitializerMayBeStatic")
     @Test
     void replaceMethodNameAndArgumentsSimultaneously() {
         rewriteRun(
@@ -436,7 +435,7 @@ class JavaTemplateTest3Test implements RewriteTest {
                   public void method(int[] val) {}
                   public void method(int[] val1, String val2) {}
               }
-              """
+              """, SourceSpec::skip
           ),
           java(
             """

@@ -36,7 +36,6 @@ import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 
-import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 
 public class JavaTemplateParser {
@@ -199,14 +198,14 @@ public class JavaTemplateParser {
                 .listTemplatedTrees(cu, Statement.class).get(0);
     }
 
-    public J.MethodInvocation parseMethodArguments(Cursor cursor, String template, Space.Location location) {
+    public J.MethodInvocation parseMethodArguments(Cursor cursor, String template, Collection<JavaType.GenericTypeVariable> typeVariables, Space.Location location) {
         J.MethodInvocation method = cursor.getValue();
         String methodWithReplacementArgs = method.withArguments(Collections.emptyList()).printTrimmed(cursor.getParentOrThrow())
                 .replaceAll("\\)$", template + ")");
         // TODO: The stub string includes the scoped elements of each original AST, and therefore is not a good
         //       cache key. There are virtual no cases where a stub key will result in re-use. If we can come up with
         //       a safe, reusable key, we can consider using the cache for block statements.
-        @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacementArgs, emptyList(), location, JavaCoordinates.Mode.REPLACEMENT);
+        @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacementArgs, typeVariables, location, JavaCoordinates.Mode.REPLACEMENT);
         onBeforeParseTemplate.accept(stub);
         JavaSourceFile cu = compileTemplate(stub);
         return (J.MethodInvocation) statementTemplateGenerator

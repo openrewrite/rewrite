@@ -383,7 +383,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                 if ((loc == METHOD_INVOCATION_ARGUMENTS || loc == METHOD_INVOCATION_NAME) && method.isScope(insertionPoint)) {
                     J.MethodInvocation m;
                     if (loc == METHOD_INVOCATION_ARGUMENTS) {
-                        m = substitutions.unsubstitute(templateParser.parseMethodArguments(getCursor(), substitutedTemplate, loc));
+                        m = substitutions.unsubstitute(templateParser.parseMethodArguments(getCursor(), substitutedTemplate, substitutions.getTypeVariablesReferencedByParameters(), loc));
                         m = autoFormat(m, 0);
                         m = method.withArguments(m.getArguments()).withMethodType(m.getMethodType());
                     } else {
