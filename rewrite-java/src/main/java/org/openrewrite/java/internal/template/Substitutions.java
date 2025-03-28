@@ -136,6 +136,8 @@ public class Substitutions {
                     ((J.NewClass) parameter).getClazz() != null) {
                     // for anonymous classes get the type from the supertype
                     type = ((J.NewClass) parameter).getClazz().getType();
+                } else if (parameter instanceof J.Empty && ((J.Empty) parameter).getMarkers().findFirst(TemplateParameter.class).isPresent()) {
+                    type = ((J.Empty) parameter).getMarkers().findFirst(TemplateParameter.class).get().getType();
                 } else if (parameter instanceof TypedTree) {
                     type = ((TypedTree) parameter).getType();
                 } else {
