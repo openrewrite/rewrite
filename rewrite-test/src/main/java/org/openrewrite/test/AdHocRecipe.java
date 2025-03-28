@@ -15,10 +15,8 @@
  */
 package org.openrewrite.test;
 
-import lombok.EqualsAndHashCode;
-import lombok.RequiredArgsConstructor;
-import lombok.Value;
-import lombok.With;
+import lombok.*;
+import lombok.experimental.NonFinal;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -33,7 +31,7 @@ import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-@RequiredArgsConstructor
+@AllArgsConstructor
 public class AdHocRecipe extends Recipe {
     @With
     @Nullable
@@ -48,6 +46,8 @@ public class AdHocRecipe extends Recipe {
     @Nullable
     Boolean causesAnotherCycle;
 
+    @Setter(AccessLevel.PACKAGE)
+    @NonFinal
     @With
     @Nullable
     transient Supplier<TreeVisitor<?, ExecutionContext>> getVisitor;

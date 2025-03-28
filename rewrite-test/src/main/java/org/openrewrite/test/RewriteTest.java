@@ -59,7 +59,8 @@ public interface RewriteTest extends SourceSpecs {
 
     static AdHocRecipe toRecipe(Function<Recipe, TreeVisitor<?, ExecutionContext>> visitor) {
         AdHocRecipe r = toRecipe();
-        return r.withGetVisitor(() -> visitor.apply(r));
+        r.setGetVisitor(() -> visitor.apply(r));
+        return r;
     }
 
     static Recipe fromRuntimeClasspath(String recipe) {
