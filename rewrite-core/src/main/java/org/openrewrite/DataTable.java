@@ -20,7 +20,6 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.scheduling.RecipeRunCycle;
 
 import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
@@ -92,7 +91,7 @@ public class DataTable<Row> {
     }
 
     public void insertRow(ExecutionContext ctx, Row row) {
-        if (!allowWritingInThisCycle(ctx)) {
+        if (!allowWritingInThisCycle(ctx) || !ctx.getCycleDetails().acceptRowForDataTable(this)) {
             return;
         }
         ctx.computeMessage(ExecutionContext.DATA_TABLES, row, ConcurrentHashMap::new, (extract, allDataTables) -> {
@@ -112,7 +111,6 @@ public class DataTable<Row> {
      * @return weather to allow writing in this cycle
      */
     protected boolean allowWritingInThisCycle(ExecutionContext ctx) {
-        RecipeRunCycle<?> details = ctx.getCycleDetails();
-        return details.getCycle() <= 1 && details.acceptRowForDataTable(this);
+        return ctx.getCycle() <= 1;
     }
 }
