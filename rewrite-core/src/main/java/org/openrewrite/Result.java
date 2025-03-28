@@ -63,10 +63,8 @@ public class Result {
         this.after = after;
         this.recipes = recipes;
 
-        Duration timeSavings = null;
-        if (isLocalAndHasNoChanges(before, after)) {
-            timeSavings = Duration.ZERO;
-        } else {
+        Duration timeSavings = Duration.ZERO;
+        if (!isLocalAndHasNoChanges(before, after)) {
             for (List<Recipe> recipesStack : recipes) {
                 if (recipesStack != null && !recipesStack.isEmpty()) {
                     Duration perOccurrence = recipesStack.get(recipesStack.size() - 1).getEstimatedEffortPerOccurrence();
@@ -77,7 +75,6 @@ public class Result {
                 }
             }
         }
-
         this.timeSavings = timeSavings;
     }
 
