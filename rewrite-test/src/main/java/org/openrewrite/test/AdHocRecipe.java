@@ -15,8 +15,10 @@
  */
 package org.openrewrite.test;
 
-import lombok.*;
-import lombok.experimental.NonFinal;
+import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
+import lombok.With;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -25,6 +27,7 @@ import org.openrewrite.internal.StringUtils;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import static java.util.Objects.requireNonNull;
@@ -46,11 +49,8 @@ public class AdHocRecipe extends Recipe {
     @Nullable
     Boolean causesAnotherCycle;
 
-    @Setter(AccessLevel.PACKAGE)
-    @NonFinal
     @With
-    @Nullable
-    transient Supplier<TreeVisitor<?, ExecutionContext>> getVisitor;
+    transient Function<Recipe, TreeVisitor<?, ExecutionContext>> getVisitor;
 
     @With
     @Nullable
@@ -96,6 +96,6 @@ public class AdHocRecipe extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return requireNonNull(getVisitor).get();
+        return requireNonNull(getVisitor).apply(this);
     }
 }
