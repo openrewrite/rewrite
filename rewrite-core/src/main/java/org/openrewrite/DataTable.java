@@ -113,6 +113,6 @@ public class DataTable<Row> {
      */
     protected boolean allowWritingInThisCycle(ExecutionContext ctx) {
         RecipeRunCycle<?> details = ctx.getCycleDetails();
-        return ctx.getCycle() <= 1 && details.isCurrentlyExecuting(recipe);
+        return details.getCycle() <= 1 && details.acceptRowForDataTable(this);
     }
 }

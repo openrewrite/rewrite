@@ -308,4 +308,11 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     public boolean isCurrentlyExecuting(Recipe recipe) {
         return current == recipe;
     }
+
+    public boolean acceptRowForDataTable(DataTable<?> dataTable) {
+        return isCurrentlyExecuting(dataTable.getRecipe()) ||
+               dataTable == recipeRunStats ||
+               dataTable == sourcesFileResults ||
+               dataTable == errorsTable;
+    }
 }
