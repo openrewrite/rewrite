@@ -23,6 +23,7 @@ import org.openrewrite.jgit.lib.FileMode;
 import org.openrewrite.marker.DeserializationError;
 import org.openrewrite.marker.RecipesThatMadeChanges;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.remote.Remote;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -62,17 +63,18 @@ public class Result {
         this.after = after;
         this.recipes = recipes;
 
-        Duration timeSavings = null;
-        for (List<Recipe> recipesStack : recipes) {
-            if (recipesStack != null && !recipesStack.isEmpty()) {
-                Duration perOccurrence = recipesStack.get(recipesStack.size() - 1).getEstimatedEffortPerOccurrence();
-                if (perOccurrence != null) {
-                    timeSavings = perOccurrence;
-                    break;
+        Duration timeSavings = Duration.ZERO;
+        if (!isLocalAndHasNoChanges(before, after)) {
+            for (List<Recipe> recipesStack : recipes) {
+                if (recipesStack != null && !recipesStack.isEmpty()) {
+                    Duration perOccurrence = recipesStack.get(recipesStack.size() - 1).getEstimatedEffortPerOccurrence();
+                    if (perOccurrence != null) {
+                        timeSavings = perOccurrence;
+                        break;
+                    }
                 }
             }
         }
-
         this.timeSavings = timeSavings;
     }
 
@@ -254,5 +256,13 @@ public class Result {
     @Override
     public String toString() {
         return diff();
+    }
+
+    public static boolean isLocalAndHasNoChanges(@Nullable SourceFile before, @Nullable SourceFile after) {
+        return (before == after) ||
+                (before != null && after != null &&
+                        // Remote source files are fetched on `printAll`, let's avoid that cost.
+                        !(before instanceof Remote) && !(after instanceof Remote) &&
+                        before.printAll().equals(after.printAll()));
     }
 }
