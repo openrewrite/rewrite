@@ -27,9 +27,7 @@ import org.openrewrite.java.internal.grammar.TemplateParameterParser;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser.TypeContext;
 import org.openrewrite.java.tree.*;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -188,6 +186,13 @@ public class Substitutions {
                 return "java.lang.Object";
             }
             return genericTypeVariable.getName();
+        } else if (type instanceof JavaType.Parameterized) {
+            String result = getTypeName(((JavaType.Parameterized) type).getType());
+            StringJoiner joiner = new StringJoiner(", ", "<", ">");
+            for (JavaType t : ((JavaType.Parameterized) type).getTypeParameters()) {
+                joiner.add(getTypeName(t));
+            }
+            return result + joiner;
         }
         return TypeUtils.toString(type).replace("$", ".");
     }
@@ -227,6 +232,28 @@ public class Substitutions {
             return ((JavaType.FullyQualified) t).getFullyQualifiedName();
         }
         return "";
+    }
+
+    public Collection<JavaType.GenericTypeVariable> getTypeVariables() {
+        Set<JavaType.GenericTypeVariable> typeVariables = new HashSet<>();
+        for (Object parameter : parameters) {
+            if (parameter instanceof J) {
+                new JavaVisitor<Integer>() {
+                    @Override
+                    public @Nullable JavaType visitType(@Nullable JavaType javaType, Integer p) {
+                        if (javaType instanceof JavaType.GenericTypeVariable) {
+                            typeVariables.add((JavaType.GenericTypeVariable) javaType);
+                        }
+                        return super.visitType(javaType, p);
+                    }
+                }.visit((J) parameter, 0);
+                getTypeVariables0(typeVariables);
+            }
+        }
+        return typeVariables;
+    }
+
+    private void getTypeVariables0(Set<JavaType.GenericTypeVariable> typeVariables) {
     }
 
     @SuppressWarnings("SpellCheckingInspection")

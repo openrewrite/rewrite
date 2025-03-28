@@ -35,6 +35,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 
 public class JavaTemplateParser {
@@ -108,9 +109,9 @@ public class JavaTemplateParser {
         }).get(0);
     }
 
-    public J parseExpression(Cursor cursor, String template, Space.Location location) {
+    public J parseExpression(Cursor cursor, String template, Collection<JavaType.GenericTypeVariable> typeVariables, Space.Location location) {
         return cacheIfContextFree(cursor, new ContextFreeCacheKey(template, Expression.class, imports),
-                tmpl -> statementTemplateGenerator.template(cursor, tmpl, location, JavaCoordinates.Mode.REPLACEMENT),
+                tmpl -> statementTemplateGenerator.template(cursor, tmpl, typeVariables, location, JavaCoordinates.Mode.REPLACEMENT),
                 stub -> {
                     onBeforeParseTemplate.accept(stub);
                     JavaSourceFile cu = compileTemplate(stub);
@@ -166,11 +167,12 @@ public class JavaTemplateParser {
 
     public <J2 extends J> List<J2> parseBlockStatements(Cursor cursor, Class<J2> expected,
                                                         String template,
+                                                        Collection<JavaType.GenericTypeVariable> typeVariables,
                                                         Space.Location location,
                                                         JavaCoordinates.Mode mode) {
         return cacheIfContextFree(cursor,
                 new ContextFreeCacheKey(template, expected, imports),
-                tmpl -> statementTemplateGenerator.template(cursor, tmpl, location, mode),
+                tmpl -> statementTemplateGenerator.template(cursor, tmpl, typeVariables, location, mode),
                 stub -> {
                     onBeforeParseTemplate.accept(stub);
                     JavaSourceFile cu = compileTemplate(stub);
@@ -189,7 +191,7 @@ public class JavaTemplateParser {
         // TODO: The stub string includes the scoped elements of each original AST, and therefore is not a good
         //       cache key. There are virtual no cases where a stub key will result in re-use. If we can come up with
         //       a safe, reusable key, we can consider using the cache for block statements.
-        @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacedNameAndArgs, location, JavaCoordinates.Mode.REPLACEMENT);
+        @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacedNameAndArgs, emptyList(), location, JavaCoordinates.Mode.REPLACEMENT);
         onBeforeParseTemplate.accept(stub);
         JavaSourceFile cu = compileTemplate(stub);
         return (J.MethodInvocation) statementTemplateGenerator
@@ -203,7 +205,7 @@ public class JavaTemplateParser {
         // TODO: The stub string includes the scoped elements of each original AST, and therefore is not a good
         //       cache key. There are virtual no cases where a stub key will result in re-use. If we can come up with
         //       a safe, reusable key, we can consider using the cache for block statements.
-        @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacementArgs, location, JavaCoordinates.Mode.REPLACEMENT);
+        @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacementArgs, emptyList(), location, JavaCoordinates.Mode.REPLACEMENT);
         onBeforeParseTemplate.accept(stub);
         JavaSourceFile cu = compileTemplate(stub);
         return (J.MethodInvocation) statementTemplateGenerator

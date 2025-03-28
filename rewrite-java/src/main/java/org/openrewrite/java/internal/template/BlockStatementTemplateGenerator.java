@@ -33,6 +33,7 @@ import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.java.tree.JavaCoordinates.Mode.AFTER;
@@ -51,7 +52,7 @@ public class BlockStatementTemplateGenerator {
     protected final Set<String> imports;
     private final boolean contextSensitive;
 
-    public String template(Cursor cursor, String template, Space.Location location, JavaCoordinates.Mode mode) {
+    public String template(Cursor cursor, String template, Collection<JavaType.GenericTypeVariable> typeVariables, Space.Location location, JavaCoordinates.Mode mode) {
         //noinspection ConstantConditions
         return Timer.builder("rewrite.template.generate.statement")
                 .register(Metrics.globalRegistry)
@@ -71,7 +72,7 @@ public class BlockStatementTemplateGenerator {
                     if (contextSensitive) {
                         contextTemplate(next(cursor), cursor.getValue(), before, after, cursor.getValue(), mode);
                     } else {
-                        contextFreeTemplate(next(cursor), cursor.getValue(), before, after);
+                        contextFreeTemplate(next(cursor), cursor.getValue(), typeVariables, before, after);
                     }
 
                     return before.toString().trim() +
@@ -112,7 +113,6 @@ public class BlockStatementTemplateGenerator {
             @Override
             public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, Integer integer) {
                 right = super.visitRightPadded(right, loc, integer);
-                //noinspection ConstantValue
                 if (right != null) {
                     for (Comment comment : right.getAfter().getComments()) {
                         if (isTemplateStopComment(comment)) {
@@ -128,7 +128,6 @@ public class BlockStatementTemplateGenerator {
             public <T> JLeftPadded<T> visitLeftPadded(@Nullable JLeftPadded<T> left, JLeftPadded.Location loc,
                                                       Integer integer) {
                 left = super.visitLeftPadded(left, loc, integer);
-                //noinspection ConstantValue
                 if (left != null) {
                     for (Comment comment : left.getBefore().getComments()) {
                         if (isTemplateStopComment(comment)) {
@@ -203,7 +202,7 @@ public class BlockStatementTemplateGenerator {
     }
 
     @SuppressWarnings("DataFlowIssue")
-    protected void contextFreeTemplate(Cursor cursor, J j, StringBuilder before, StringBuilder after) {
+    protected void contextFreeTemplate(Cursor cursor, J j, Collection<JavaType.GenericTypeVariable> typeVariables, StringBuilder before, StringBuilder after) {
         if (j instanceof J.Lambda) {
             throw new IllegalArgumentException(
                     "Templating a lambda requires a cursor so that it can be properly parsed and type-attributed. " +
@@ -238,7 +237,11 @@ public class BlockStatementTemplateGenerator {
                     "Templating a class declaration requires context from which package declaration and imports may be reached. " +
                     "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive().");
         } else if (j instanceof Statement && !(j instanceof J.Import) && !(j instanceof J.Package)) {
-            before.insert(0, "class Template {{\n");
+            if (typeVariables.isEmpty()) {
+                before.insert(0, "class Template {{\n");
+            } else {
+                before.insert(0, String.format("class Template<%s> {{\n", typeVariables.stream().map(TypeUtils::toString).collect(Collectors.joining(", "))));
+            }
             after.append("\n}}");
         }
 
