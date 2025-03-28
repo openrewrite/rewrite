@@ -175,18 +175,7 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
 
     private <JS extends Json> List<JsonRightPadded<JS>> collapseToNoSpaceIfEmpty(List<JsonRightPadded<JS>> list) {
         if (isEmpty(list)) {
-            JsonRightPadded<JS> oldEmpty = list.get(0);
-            JsonRightPadded<JS> newEmpty = (JsonRightPadded<JS>) JsonRightPadded.build(
-                    (Json.Empty) list.get(0).getElement()
-                    .withPrefix(Space.EMPTY));
-            boolean anythingChanged =
-                    !oldEmpty.getAfter().getWhitespace().isEmpty() ||
-                    !oldEmpty.getAfter().getComments().isEmpty() ||
-                    !oldEmpty.getElement().getPrefix().getComments().isEmpty() ||
-                    !oldEmpty.getElement().getPrefix().getWhitespace().isEmpty();
-            if (anythingChanged) {
-                 return Collections.singletonList(newEmpty);
-            }
+            return ListUtils.map(list, right -> right.withElement(right.getElement().withPrefix(Space.EMPTY)).withAfter(Space.EMPTY));
         }
         return list;
     }
