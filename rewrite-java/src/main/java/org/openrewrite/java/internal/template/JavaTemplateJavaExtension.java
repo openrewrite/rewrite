@@ -387,7 +387,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                         m = autoFormat(m, 0);
                         m = method.withArguments(m.getArguments()).withMethodType(m.getMethodType());
                     } else {
-                        m = substitutions.unsubstitute(templateParser.parseMethod(getCursor(), substitutedTemplate, loc));
+                        m = substitutions.unsubstitute(templateParser.parseMethod(getCursor(), substitutedTemplate, substitutions.getTypeVariablesReferencedByParameters(), loc));
                         m = autoFormat(m, 0);
                         m = method.withName(m.getName()).withArguments(m.getArguments()).withMethodType(m.getMethodType());
                     }
@@ -443,9 +443,8 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             private <J3 extends J> J3 maybeReplaceStatement(Statement statement, Class<J3> expected, Integer p) {
                 if (loc == STATEMENT_PREFIX && statement.isScope(insertionPoint)) {
                     if (mode == JavaCoordinates.Mode.REPLACEMENT) {
-                        Collection<JavaType.GenericTypeVariable> typeVariables = substitutions.getTypeVariablesReferencedByParameters();
                         List<J3> gen = substitutions.unsubstitute(templateParser.parseBlockStatements(getCursor(),
-                                expected, substitutedTemplate, typeVariables, loc, mode));
+                                expected, substitutedTemplate, substitutions.getTypeVariablesReferencedByParameters(), loc, mode));
                         if (gen.size() != 1) {
                             // for some languages with optional semicolons, templates may generate a statement
                             // and an empty, e.g. for a statement replacement in Groovy for the last statement
