@@ -77,7 +77,7 @@ public class SourcesFileResults extends DataTable<SourcesFileResults.Row> {
                         result.getAfter() == null ? "" : result.getAfter().getSourcePath().toString(),
                         recipeThatMadeChange[0] == null ? "" : recipeThatMadeChange[0].getName(),
                         recipeThatMadeChange[1].getName(),
-                        result.getTimeSavings() == null ? 0 : result.getTimeSavings().getSeconds(),
+                        result.getTimeSavings().getSeconds(),
                         cycle
                 ));
                 for (int i = recipeThatMadeChange[1].getRecipeList().size() - 1; i >= 0; i--) {

@@ -74,13 +74,15 @@ public class FindMissingTypes extends Recipe {
                                 .map(t -> t.getClass().getSimpleName())
                                 .collect(Collectors.joining("->"));
                         J j = getCursor().firstEnclosing(J.class);
-                        String printedTree;
-                        if (getCursor().firstEnclosing(JavaSourceFile.class) != null) {
-                            printedTree = j != null ? j.printTrimmed(new InMemoryExecutionContext(), getCursor().getParentOrThrow()) : "";
-                        } else {
-                            printedTree = String.valueOf(j);
+                        if (j != null) {
+                            String printedTree;
+                            if (getCursor().firstEnclosing(JavaSourceFile.class) != null) {
+                                printedTree = j.printTrimmed(new InMemoryExecutionContext(), getCursor().getParentOrThrow());
+                            } else {
+                                printedTree = String.valueOf(j);
+                            }
+                            missingTypeResults.add(new MissingTypeResult(message, path, printedTree, j));
                         }
-                        missingTypeResults.add(new MissingTypeResult(message, path, printedTree, j));
                     }
                     return super.visitMarker(marker, missingTypeResults);
                 }
@@ -92,14 +94,16 @@ public class FindMissingTypes extends Recipe {
     @Getter
     @AllArgsConstructor
     public static class MissingTypeResult {
+        @Nullable
         String message;
+
         String path;
         String printedTree;
         J j;
     }
 
     @Value
-    @EqualsAndHashCode(callSuper = true)
+    @EqualsAndHashCode(callSuper = false)
     static class FindMissingTypesVisitor extends JavaIsoVisitor<ExecutionContext> {
 
         boolean checkDocumentation;

@@ -15,8 +15,8 @@
  */
 package org.openrewrite.test;
 
+import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
-import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import lombok.With;
 import org.intellij.lang.annotations.Language;
@@ -27,13 +27,14 @@ import org.openrewrite.internal.StringUtils;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-@RequiredArgsConstructor
+@AllArgsConstructor
 public class AdHocRecipe extends Recipe {
     @With
     @Nullable
@@ -49,8 +50,7 @@ public class AdHocRecipe extends Recipe {
     Boolean causesAnotherCycle;
 
     @With
-    @Nullable
-    transient Supplier<TreeVisitor<?, ExecutionContext>> getVisitor;
+    transient Function<Recipe, TreeVisitor<?, ExecutionContext>> getVisitor;
 
     @With
     @Nullable
@@ -96,6 +96,6 @@ public class AdHocRecipe extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return requireNonNull(getVisitor).get();
+        return requireNonNull(getVisitor).apply(this);
     }
 }
