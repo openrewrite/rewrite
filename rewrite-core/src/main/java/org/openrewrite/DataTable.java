@@ -39,7 +39,7 @@ public class DataTable<Row> {
     @Language("markdown")
     private final @NlsRewrite.Description String description;
 
-    private final @Nullable Recipe recipe;
+    private transient final @Nullable Recipe recipe;
     /**
      * @param recipe      The recipe that this data table is associated with.
      * @param type        The model type for a single row of this data table.
