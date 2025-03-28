@@ -39,7 +39,8 @@ class JavaTemplateTest3Test implements RewriteTest {
               @Override
               public J.Package visitPackage(J.Package pkg, ExecutionContext p) {
                   if (pkg.getExpression().printTrimmed(getCursor()).equals("a")) {
-                      return JavaTemplate.builder("b").contextSensitive().build()
+                      return JavaTemplate.builder("b")
+                        .build()
                         .apply(getCursor(), pkg.getCoordinates().replace());
                   }
                   return super.visitPackage(pkg, p);
@@ -143,7 +144,9 @@ class JavaTemplateTest3Test implements RewriteTest {
     void replaceStatementInLambdaBodySingleStatementBlock() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("return n == 1;").contextSensitive().build();
+              final JavaTemplate t = JavaTemplate.builder("return n == 1;")
+                .contextSensitive()
+                .build();
 
               @Override
               public J visitReturn(J.Return return_, ExecutionContext p) {
@@ -194,7 +197,9 @@ class JavaTemplateTest3Test implements RewriteTest {
     void replaceStatementInLambdaBodyWithVariableDeclaredInBlock() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("return n == 1;").contextSensitive().build();
+              final JavaTemplate t = JavaTemplate.builder("return n == 1;")
+                .contextSensitive()
+                .build();
 
               @Override
               public J visitReturn(J.Return return_, ExecutionContext p) {
