@@ -105,6 +105,7 @@ public class JsonSender extends JsonVisitor<RpcSendQueue> {
 
     @Override
     public @Nullable <T extends Json> JsonRightPadded<T> visitRightPadded(@Nullable JsonRightPadded<T> right, RpcSendQueue q) {
+        assert right != null;
         q.getAndSend(right, JsonRightPadded::getElement, j -> visit(j, q));
         q.getAndSend(right, j -> asRef(j.getAfter()),
                 space -> visitSpace(Reference.getValueNonNull(space), q));

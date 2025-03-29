@@ -17,7 +17,7 @@ package org.openrewrite.rpc;
 
 import org.junit.jupiter.api.Test;
 
-import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -43,7 +43,7 @@ public class RpcSendQueueTest {
               new RpcObjectData(RpcObjectData.State.NO_CHANGE, null, null, null) /* C */
             );
             latch.countDown();
-        }, new HashMap<>());
+        }, new IdentityHashMap<>());
 
         q.sendList(after, before, Function.identity(), null);
         q.flush();
@@ -62,7 +62,7 @@ public class RpcSendQueueTest {
               new RpcObjectData(RpcObjectData.State.CHANGE, null, List.of(), null)
             );
             latch.countDown();
-        }, new HashMap<>());
+        }, new IdentityHashMap<>());
 
         q.sendList(after, null, Function.identity(), null);
         q.flush();
