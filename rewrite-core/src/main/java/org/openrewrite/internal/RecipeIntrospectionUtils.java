@@ -28,6 +28,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 import static java.util.Collections.emptyList;
 
@@ -97,32 +99,38 @@ public class RecipeIntrospectionUtils {
     }
 
     public static Recipe constructRecipe(Class<?> recipeClass) {
-        return construct(recipeClass);
+        return construct(recipeClass, null);
     }
 
-    private static <V> V construct(Class<?> clazz) {
+    public static Recipe constructRecipe(Class<?> recipeClass, Map<String, Object> args) {
+        return construct(recipeClass, args);
+    }
+
+    private static <V> V construct(Class<?> clazz, @Nullable Map<String, Object> args) {
         Constructor<?> primaryConstructor = getZeroArgsConstructor(clazz);
         if (primaryConstructor == null) {
             primaryConstructor = getPrimaryConstructor(clazz);
         }
-        Object[] constructorArgs = new Object[primaryConstructor.getParameterCount()];
+        @Nullable Object[] constructorArgs = new Object[primaryConstructor.getParameterCount()];
         for (int i = 0; i < primaryConstructor.getParameters().length; i++) {
             java.lang.reflect.Parameter param = primaryConstructor.getParameters()[i];
-            if (param.getType().isPrimitive()) {
+            if (args != null && args.containsKey(param.getName())) {
+                constructorArgs[i] = convert(args.get(param.getName()), param.getType());
+            } else if (param.getType().isPrimitive()) {
                 constructorArgs[i] = getPrimitiveDefault(param.getType());
             } else if (param.getType().equals(String.class) && isKotlin(clazz)) {
                 // Default Recipe::validate is more valuable if we pass null for unconfigured Strings.
                 // But, that's not safe for Kotlin non-null types, so use an empty String for those
                 // (though it will sneak through default recipe validation)
                 constructorArgs[i] = "";
-            } else if (Enum.class.isAssignableFrom(param.getType())) {
+            } else if (Enum.class.isAssignableFrom(param.getType()) && args == null) {
                 try {
                     Object[] values = (Object[]) param.getType().getMethod("values").invoke(null);
                     constructorArgs[i] = values[0];
                 } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException e) {
                     throw new RuntimeException(e);
                 }
-            } else if (List.class.isAssignableFrom(param.getType())) {
+            } else if (List.class.isAssignableFrom(param.getType()) && args == null) {
                 constructorArgs[i] = emptyList();
             } else {
                 constructorArgs[i] = null;
@@ -136,6 +144,20 @@ public class RecipeIntrospectionUtils {
             // Should never happen
             throw getRecipeIntrospectionException(clazz, e);
         }
+    }
+
+    private static Object convert(Object o, Class<?> type) {
+        if (type == String.class) {
+            return Objects.toString(o, null);
+        } else if (o instanceof String && type.isEnum()) {
+            Object[] values = type.getEnumConstants();
+            for (Object value : values) {
+                if (value.toString().equalsIgnoreCase((String) o)) {
+                    return value;
+                }
+            }
+        }
+        return o;
     }
 
     private static boolean isKotlin(Class<?> clazz) {
