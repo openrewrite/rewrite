@@ -18,6 +18,7 @@ package org.openrewrite;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.text.ChangeText;
 
 import java.util.HashMap;
@@ -44,5 +45,65 @@ class RecipeBasicsTest {
     void instanceName() {
         ChangeText ct = new ChangeText("hi");
         assertThat(ct.getInstanceName()).isEqualTo("Change text to `hi`");
+    }
+
+
+    static class RecipeBase extends Recipe {
+        String option;
+        public RecipeBase(String option) {
+            this.option = option;
+        }
+
+        @Override
+        public String getDisplayName() {
+            return "Recipe base";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Recipe base.";
+        }
+    }
+
+    static class ExtendingRecipe extends RecipeBase {
+        @SuppressWarnings("unused")
+        @Option(displayName = "Option", description = "Option description")
+        String getOption() {
+            return option;
+        }
+
+        public ExtendingRecipe(String option) {
+            super(option);
+        }
+    }
+
+    @Test
+    void subclassExposesOptionsViaMethod() {
+        RecipeDescriptor d = new ExtendingRecipe("option").createRecipeDescriptor();
+        assertThat(d.getOptions().get(0).getDisplayName()).isEqualTo("Option");
+    }
+
+    static class RecipeWithConstructorParameter extends Recipe {
+        String option;
+
+        public RecipeWithConstructorParameter(@Option(displayName = "Option", description = "Option description") String option) {
+            this.option = option;
+        }
+
+        @Override
+        public String getDisplayName() {
+            return "";
+        }
+
+        @Override
+        public String getDescription() {
+            return "";
+        }
+    }
+
+    @Test
+    void optionExposedViaConstructorParameter() {
+        RecipeDescriptor d = new RecipeWithConstructorParameter("option").createRecipeDescriptor();
+        assertThat(d.getOptions().get(0).getDisplayName()).isEqualTo("Option");
     }
 }
