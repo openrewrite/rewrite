@@ -19,7 +19,9 @@ import org.openrewrite.Cursor;
 import org.openrewrite.java.internal.template.BlockStatementTemplateGenerator;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 
+import java.util.Collection;
 import java.util.Set;
 
 public class KotlinBlockStatementTemplateGenerator extends BlockStatementTemplateGenerator {
@@ -28,7 +30,7 @@ public class KotlinBlockStatementTemplateGenerator extends BlockStatementTemplat
     }
 
     @Override
-    protected void contextFreeTemplate(Cursor cursor, J j, StringBuilder before, StringBuilder after) {
+    protected void contextFreeTemplate(Cursor cursor, J j, Collection<JavaType.GenericTypeVariable> typeVariables, StringBuilder before, StringBuilder after) {
         if (!(j instanceof Expression)) {
             throw new IllegalArgumentException(
                     "Kotlin templating is currently only implemented for context-free expressions and not for `" + j.getClass() + "` instances.");

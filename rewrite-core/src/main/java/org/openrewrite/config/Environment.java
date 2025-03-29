@@ -43,6 +43,9 @@ public class Environment {
         for (ResourceLoader dependencyResourceLoader : dependencyResourceLoaders) {
             dependencyRecipes.addAll(dependencyResourceLoader.listRecipes());
         }
+        Map<String, Recipe> dependencyRecipeMap = new HashMap<>();
+        dependencyRecipes.forEach(r -> dependencyRecipeMap.putIfAbsent(r.getName(), r));
+
         Map<String, List<Contributor>> recipeToContributors = new HashMap<>();
         Map<String, List<RecipeExample>> recipeExamples = new HashMap<>();
         for (ResourceLoader r : resourceLoaders) {
@@ -58,9 +61,13 @@ public class Environment {
         }
         for (Recipe recipe : dependencyRecipes) {
             if (recipe instanceof DeclarativeRecipe) {
-                ((DeclarativeRecipe) recipe).initialize(dependencyRecipes, recipeToContributors);
+                ((DeclarativeRecipe) recipe).initialize(dependencyRecipeMap::get, recipeToContributors);
             }
         }
+
+        Map<String, Recipe> availableRecipeMap = new HashMap<>(dependencyRecipeMap);
+        recipes.forEach(r -> availableRecipeMap.putIfAbsent(r.getName(), r));
+
         for (Recipe recipe : recipes) {
             recipe.setContributors(recipeToContributors.get(recipe.getName()));
 
@@ -69,10 +76,7 @@ public class Environment {
             }
 
             if (recipe instanceof DeclarativeRecipe) {
-                List<Recipe> availableRecipes = new ArrayList<>();
-                availableRecipes.addAll(dependencyRecipes);
-                availableRecipes.addAll(recipes);
-                ((DeclarativeRecipe) recipe).initialize(availableRecipes, recipeToContributors);
+                ((DeclarativeRecipe) recipe).initialize(availableRecipeMap::get, recipeToContributors);
             }
         }
         return recipes;

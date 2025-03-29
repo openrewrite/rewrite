@@ -25,6 +25,7 @@ import org.openrewrite.*;
 import java.net.URI;
 import java.time.Duration;
 import java.util.*;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import static java.util.Collections.emptyList;
@@ -90,20 +91,26 @@ public class DeclarativeRecipe extends Recipe {
 
     public void initialize(Collection<Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
         initValidation = Validated.none();
+        Map<String, Recipe> recipeMap = new HashMap<>();
+        availableRecipes.forEach(r -> recipeMap.putIfAbsent(r.getName(), r));
+        initialize(uninitializedRecipes, recipeList, recipeMap::get, recipeToContributors);
+        initialize(uninitializedPreconditions, preconditions, recipeMap::get, recipeToContributors);
+    }
+
+    public void initialize(Function<String, @Nullable Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
+        initValidation = Validated.none();
         initialize(uninitializedRecipes, recipeList, availableRecipes, recipeToContributors);
         initialize(uninitializedPreconditions, preconditions, availableRecipes, recipeToContributors);
     }
 
-    private void initialize(List<Recipe> uninitialized, List<Recipe> initialized, Collection<Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
+    private void initialize(List<Recipe> uninitialized, List<Recipe> initialized, Function<String, @Nullable Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
         initialized.clear();
         for (int i = 0; i < uninitialized.size(); i++) {
             Recipe recipe = uninitialized.get(i);
             if (recipe instanceof LazyLoadedRecipe) {
                 String recipeFqn = ((LazyLoadedRecipe) recipe).getRecipeFqn();
-                Optional<Recipe> next = availableRecipes.stream()
-                        .filter(r -> recipeFqn.equals(r.getName())).findAny();
-                if (next.isPresent()) {
-                    Recipe subRecipe = next.get();
+                Recipe subRecipe = availableRecipes.apply(recipeFqn);
+                if (subRecipe != null) {
                     if (subRecipe instanceof DeclarativeRecipe) {
                         ((DeclarativeRecipe) subRecipe).initialize(availableRecipes, recipeToContributors);
                     }
