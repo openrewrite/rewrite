@@ -43,74 +43,6 @@ public class Environment {
     private final Collection<? extends ResourceLoader> resourceLoaders;
     private final Collection<? extends ResourceLoader> dependencyResourceLoaders;
 
-    public @Nullable Recipe loadRecipe(String recipeName, ResourceLoader.RecipeDetail... details) {
-        Recipe recipe = null;
-        for (ResourceLoader loader : resourceLoaders) {
-            recipe = loader.loadRecipe(recipeName, details);
-            if (recipe != null) {
-                break;
-            }
-        }
-        if (recipe == null) {
-            return null;
-        }
-
-        boolean includeExamples = ResourceLoader.RecipeDetail.EXAMPLES.includedIn(details);
-        boolean includeContributors = ResourceLoader.RecipeDetail.CONTRIBUTORS.includedIn(details);
-
-        Map<String, List<Contributor>> recipeToContributors = new HashMap<>();
-        Map<String, List<RecipeExample>> recipeExamples = new HashMap<>();
-        if (includeContributors || includeExamples) {
-            for (ResourceLoader r : resourceLoaders) {
-                if (r instanceof YamlResourceLoader) {
-                    if (includeExamples) {
-                        recipeExamples.putAll(r.listRecipeExamples());
-                    }
-                    if (includeContributors) {
-                        recipeToContributors.putAll(r.listContributors());
-                    }
-                }
-            }
-        }
-
-        Map<String, Recipe> dependencyRecipes = new HashMap<>();
-        for (ResourceLoader dependencyResourceLoader : dependencyResourceLoaders) {
-            for (Recipe listedRecipe : dependencyResourceLoader.listRecipes()) {
-                dependencyRecipes.putIfAbsent(listedRecipe.getName(), listedRecipe);
-            }
-        }
-        for (Recipe dependency : dependencyRecipes.values()) {
-            if (dependency instanceof DeclarativeRecipe) {
-                ((DeclarativeRecipe) dependency).initialize(dependencyRecipes::get, recipeToContributors);
-            }
-        }
-
-        if (includeContributors && recipeToContributors.containsKey(recipe.getName())) {
-            recipe.setContributors(recipeToContributors.get(recipe.getName()));
-        }
-
-        if (includeExamples && recipeExamples.containsKey(recipe.getName())) {
-            recipe.setExamples(recipeExamples.get(recipe.getName()));
-        }
-
-        if (recipe instanceof DeclarativeRecipe) {
-            Function<String, @Nullable Recipe> loadFunction = key -> {
-                if (dependencyRecipes.containsKey(key)) {
-                    return dependencyRecipes.get(key);
-                }
-                for (ResourceLoader resourceLoader : resourceLoaders) {
-                    Recipe r = resourceLoader.loadRecipe(key, details);
-                    if (r != null) {
-                        return r;
-                    }
-                }
-                return null;
-            };
-            ((DeclarativeRecipe) recipe).initialize(loadFunction, recipeToContributors);
-        }
-        return recipe;
-    }
-
     public List<Recipe> listRecipes() {
         List<Recipe> dependencyRecipes = new ArrayList<>();
         for (ResourceLoader dependencyResourceLoader : dependencyResourceLoaders) {
@@ -268,6 +200,74 @@ public class Environment {
 
     public Recipe activateRecipes(String... activeRecipes) {
         return activateRecipes(Arrays.asList(activeRecipes));
+    }
+
+    private @Nullable Recipe loadRecipe(String recipeName, ResourceLoader.RecipeDetail... details) {
+        Recipe recipe = null;
+        for (ResourceLoader loader : resourceLoaders) {
+            recipe = loader.loadRecipe(recipeName, details);
+            if (recipe != null) {
+                break;
+            }
+        }
+        if (recipe == null) {
+            return null;
+        }
+
+        boolean includeExamples = ResourceLoader.RecipeDetail.EXAMPLES.includedIn(details);
+        boolean includeContributors = ResourceLoader.RecipeDetail.CONTRIBUTORS.includedIn(details);
+
+        Map<String, List<Contributor>> recipeToContributors = new HashMap<>();
+        Map<String, List<RecipeExample>> recipeExamples = new HashMap<>();
+        if (includeContributors || includeExamples) {
+            for (ResourceLoader r : resourceLoaders) {
+                if (r instanceof YamlResourceLoader) {
+                    if (includeExamples) {
+                        recipeExamples.putAll(r.listRecipeExamples());
+                    }
+                    if (includeContributors) {
+                        recipeToContributors.putAll(r.listContributors());
+                    }
+                }
+            }
+        }
+
+        Map<String, Recipe> dependencyRecipes = new HashMap<>();
+        for (ResourceLoader dependencyResourceLoader : dependencyResourceLoaders) {
+            for (Recipe listedRecipe : dependencyResourceLoader.listRecipes()) {
+                dependencyRecipes.putIfAbsent(listedRecipe.getName(), listedRecipe);
+            }
+        }
+        for (Recipe dependency : dependencyRecipes.values()) {
+            if (dependency instanceof DeclarativeRecipe) {
+                ((DeclarativeRecipe) dependency).initialize(dependencyRecipes::get, recipeToContributors);
+            }
+        }
+
+        if (includeContributors && recipeToContributors.containsKey(recipe.getName())) {
+            recipe.setContributors(recipeToContributors.get(recipe.getName()));
+        }
+
+        if (includeExamples && recipeExamples.containsKey(recipe.getName())) {
+            recipe.setExamples(recipeExamples.get(recipe.getName()));
+        }
+
+        if (recipe instanceof DeclarativeRecipe) {
+            Function<String, @Nullable Recipe> loadFunction = key -> {
+                if (dependencyRecipes.containsKey(key)) {
+                    return dependencyRecipes.get(key);
+                }
+                for (ResourceLoader resourceLoader : resourceLoaders) {
+                    Recipe r = resourceLoader.loadRecipe(key, details);
+                    if (r != null) {
+                        return r;
+                    }
+                }
+                return null;
+            };
+            ((DeclarativeRecipe) recipe).initialize(loadFunction, recipeToContributors);
+        }
+        return recipe;
     }
 
     /**
