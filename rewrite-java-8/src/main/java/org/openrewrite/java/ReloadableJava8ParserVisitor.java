@@ -2113,6 +2113,8 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         final AtomicReference<String> word = new AtomicReference<>("");
         int afterLastModifierPosition = cursor;
         int lastAnnotationPosition = cursor;
+        boolean noSpace = false;
+
         for (int i = cursor; i < source.length(); i++) {
             if (annotationPosTable.containsKey(i)) {
                 JCAnnotation jcAnnotation = annotationPosTable.get(i);
@@ -2144,7 +2146,11 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
             } else if (inComment && c == '\n' || c == '\r') {
                 inComment = false;
             } else if (!inMultilineComment && !inComment) {
-                if (Character.isWhitespace(c)) {
+                if (Character.isWhitespace(c) || (noSpace = (i + 1 < source.length() && source.charAt(i + 1) == '@'))) {
+                    if(noSpace){
+                        word.getAndUpdate(w -> w + c);
+                        noSpace = false;
+                    }
                     if (!word.get().isEmpty()) {
                         Modifier matching = null;
                         for (Modifier modifier : modifiers.getFlags()) {
@@ -2244,7 +2250,8 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                     continue;
                 }
                 annotations.add(convert(jcAnnotation));
-                i = cursor;
+                // Adjusting the index by subtracting 1 to account for the case where annotations are not separated by a space
+                i = cursor - 1;
                 continue;
             }
             char c = source.charAt(i);
