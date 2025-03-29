@@ -15,14 +15,8 @@
  */
 package org.openrewrite.config;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
 import com.fasterxml.jackson.databind.exc.InvalidTypeIdException;
-import com.fasterxml.jackson.databind.json.JsonMapper;
-import com.fasterxml.jackson.databind.type.TypeFactory;
-import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import lombok.Getter;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
@@ -48,6 +42,7 @@ import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.RecipeSerializer.maybeAddKotlinModule;
 import static org.openrewrite.Tree.randomId;
@@ -74,6 +69,7 @@ public class YamlResourceLoader implements ResourceLoader {
 
     @Nullable
     private Map<String, List<RecipeExample>> recipeNameToExamples;
+    private final RecipeLoader recipeLoader;
 
     @Getter
     private enum ResourceType {
@@ -165,6 +161,7 @@ public class YamlResourceLoader implements ResourceLoader {
         this.dependencyResourceLoaders = dependencyResourceLoaders;
         this.mapper = ObjectMappers.propertyBasedMapper(classLoader);
         this.classLoader = classLoader;
+        this.recipeLoader = new RecipeLoader(classLoader);
 
         mapperCustomizer.accept(mapper);
         maybeAddKotlinModule(mapper);
@@ -184,21 +181,42 @@ public class YamlResourceLoader implements ResourceLoader {
         }
     }
 
+    private final Map<ResourceType, Collection<Map<String, Object>>> resourceCache = new EnumMap<>(ResourceType.class);
+
     private Collection<Map<String, Object>> loadResources(ResourceType resourceType) {
-        Collection<Map<String, Object>> resources = new ArrayList<>();
-        Yaml yaml = new Yaml(new SafeConstructor(new LoaderOptions()));
-        for (Object resource : yaml.loadAll(yamlSource)) {
-            if (resource instanceof Map) {
-                @SuppressWarnings("unchecked") Map<String, Object> resourceMap = (Map<String, Object>) resource;
-                if (resourceType == ResourceType.fromSpec((String) resourceMap.get("type"))) {
-                    resources.add(resourceMap);
+        return resourceCache.computeIfAbsent(resourceType, rt -> {
+            Collection<Map<String, Object>> resources = new ArrayList<>();
+            Yaml yaml = new Yaml(new SafeConstructor(new LoaderOptions()));
+            for (Object resource : yaml.loadAll(yamlSource)) {
+                if (resource instanceof Map) {
+                    @SuppressWarnings("unchecked") Map<String, Object> resourceMap = (Map<String, Object>) resource;
+                    if (resourceType == ResourceType.fromSpec((String) resourceMap.get("type"))) {
+                        resources.add(resourceMap);
+                    }
                 }
             }
-        }
-        return resources;
+            return resources;
+        });
     }
 
-    @SuppressWarnings("unchecked")
+    @Override
+    public @Nullable Recipe loadRecipe(String recipeName, RecipeDetail... details) {
+        Collection<Map<String, Object>> resources = loadResources(ResourceType.Recipe);
+        Map<String, List<Contributor>> contributors = RecipeDetail.CONTRIBUTORS.includedIn(details) ? listContributors() : emptyMap();
+        for (Map<String, Object> recipeResource : resources) {
+            if (!recipeResource.containsKey("name") || !recipeName.equals(recipeResource.get("name"))) {
+                continue;
+            }
+            return mapToRecipe(recipeResource, contributors);
+        }
+        try {
+            return recipeLoader.load(recipeName, null);
+        } catch (IllegalArgumentException | NoClassDefFoundError ignored) {
+            // handled by caller
+        }
+        return null;
+    }
+
     @Override
     public Collection<Recipe> listRecipes() {
         Collection<Map<String, Object>> resources = loadResources(ResourceType.Recipe);
@@ -209,86 +227,93 @@ public class YamlResourceLoader implements ResourceLoader {
                 continue;
             }
 
-            @Language("markdown") String name = (String) r.get("name");
+            DeclarativeRecipe recipe = mapToRecipe(r, contributors);
+            recipes.add(recipe);
+        }
+        return recipes;
+    }
 
-            @Language("markdown")
-            String displayName = (String) r.get("displayName");
-            if (displayName == null) {
-                displayName = name;
-            }
+    @SuppressWarnings("unchecked")
+    private DeclarativeRecipe mapToRecipe(Map<String, Object> yaml, Map<String, List<Contributor>> contributors) {
+        @Language("markdown") String name = (String) yaml.get("name");
 
-            @Language("markdown")
-            String description = (String) r.get("description");
+        @Language("markdown")
+        String displayName = (String) yaml.get("displayName");
+        if (displayName == null) {
+            displayName = name;
+        }
 
-            Set<String> tags = Collections.emptySet();
-            List<String> rawTags = (List<String>) r.get("tags");
-            if (rawTags != null) {
-                tags = new HashSet<>(rawTags);
-            }
+        @Language("markdown")
+        String description = (String) yaml.get("description");
 
-            String estimatedEffortPerOccurrenceStr = (String) r.get("estimatedEffortPerOccurrence");
-            Duration estimatedEffortPerOccurrence = null;
-            if (estimatedEffortPerOccurrenceStr != null) {
-                estimatedEffortPerOccurrence = Duration.parse(estimatedEffortPerOccurrenceStr);
-            }
+        Set<String> tags = Collections.emptySet();
+        List<String> rawTags = (List<String>) yaml.get("tags");
+        if (rawTags != null) {
+            tags = new HashSet<>(rawTags);
+        }
 
-            List<Object> rawMaintainers = (List<Object>) r.getOrDefault("maintainers", emptyList());
-            List<Maintainer> maintainers;
-            if (rawMaintainers.isEmpty()) {
-                maintainers = emptyList();
-            } else {
-                maintainers = new ArrayList<>(rawMaintainers.size());
-                for (Object rawMaintainer : rawMaintainers) {
-                    if (rawMaintainer instanceof Map) {
-                        Map<String, Object> maintainerMap = (Map<String, Object>) rawMaintainer;
-                        String maintainerName = (String) maintainerMap.get("maintainer");
-                        String logoString = (String) maintainerMap.get("logo");
-                        URI logo = (logoString == null) ? null : URI.create(logoString);
-                        maintainers.add(new Maintainer(maintainerName, logo));
-                    }
+        String estimatedEffortPerOccurrenceStr = (String) yaml.get("estimatedEffortPerOccurrence");
+        Duration estimatedEffortPerOccurrence = null;
+        if (estimatedEffortPerOccurrenceStr != null) {
+            estimatedEffortPerOccurrence = Duration.parse(estimatedEffortPerOccurrenceStr);
+        }
+
+        List<Object> rawMaintainers = (List<Object>) yaml.getOrDefault("maintainers", emptyList());
+        List<Maintainer> maintainers;
+        if (rawMaintainers.isEmpty()) {
+            maintainers = emptyList();
+        } else {
+            maintainers = new ArrayList<>(rawMaintainers.size());
+            for (Object rawMaintainer : rawMaintainers) {
+                if (rawMaintainer instanceof Map) {
+                    Map<String, Object> maintainerMap = (Map<String, Object>) rawMaintainer;
+                    String maintainerName = (String) maintainerMap.get("maintainer");
+                    String logoString = (String) maintainerMap.get("logo");
+                    URI logo = (logoString == null) ? null : URI.create(logoString);
+                    maintainers.add(new Maintainer(maintainerName, logo));
                 }
             }
-            DeclarativeRecipe recipe = new DeclarativeRecipe(
-                    name,
-                    displayName,
-                    description,
-                    tags,
-                    estimatedEffortPerOccurrence,
-                    source,
-                    (boolean) r.getOrDefault("causesAnotherCycle", false),
-                    maintainers);
+        }
+        DeclarativeRecipe recipe = new DeclarativeRecipe(
+                name,
+                displayName,
+                description,
+                tags,
+                estimatedEffortPerOccurrence,
+                source,
+                (boolean) yaml.getOrDefault("causesAnotherCycle", false),
+                maintainers);
 
-            List<Object> recipeList = (List<Object>) r.get("recipeList");
-            if (recipeList == null) {
-                throw new RecipeException("Invalid Recipe [" + name + "] recipeList is null");
-            }
-            for (int i = 0; i < recipeList.size(); i++) {
+        List<Object> recipeList = (List<Object>) yaml.get("recipeList");
+        if (recipeList == null) {
+            throw new RecipeException("Invalid Recipe [" + name + "] recipeList is null");
+        }
+        for (int i = 0; i < recipeList.size(); i++) {
+            loadRecipe(
+                    name,
+                    i,
+                    recipeList.get(i),
+                    recipe::addUninitialized,
+                    recipe::addUninitialized,
+                    recipe::addValidation
+            );
+        }
+        List<Object> preconditions = (List<Object>) yaml.get("preconditions");
+        if (preconditions != null) {
+            for (int i = 0; i < preconditions.size(); i++) {
                 loadRecipe(
                         name,
                         i,
-                        recipeList.get(i),
-                        recipe::addUninitialized,
-                        recipe::addUninitialized,
-                        recipe::addValidation
-                );
+                        preconditions.get(i),
+                        recipe::addUninitializedPrecondition,
+                        recipe::addUninitializedPrecondition,
+                        recipe::addValidation);
             }
-            List<Object> preconditions = (List<Object>) r.get("preconditions");
-            if (preconditions != null) {
-                for (int i = 0; i < preconditions.size(); i++) {
-                    loadRecipe(
-                            name,
-                            i,
-                            preconditions.get(i),
-                            recipe::addUninitializedPrecondition,
-                            recipe::addUninitializedPrecondition,
-                            recipe::addValidation);
-                }
-            }
-            recipe.setContributors(contributors.get(recipe.getName()));
-            recipes.add(recipe);
         }
-
-        return recipes;
+        if (contributors.containsKey(recipe.getName())) {
+            recipe.setContributors(contributors.get(recipe.getName()));
+        }
+        return recipe;
     }
 
     @SuppressWarnings("unchecked")
@@ -300,18 +325,7 @@ public class YamlResourceLoader implements ResourceLoader {
                     Consumer<Validated<Object>> addValidation) {
         if (recipeData instanceof String) {
             String recipeName = (String) recipeData;
-            try {
-                addRecipe.accept(new RecipeLoader(classLoader).load(recipeName, null));
-            } catch (IllegalArgumentException ignored) {
-                // it's probably declarative
-                addLazyLoadRecipe.accept(recipeName);
-            } catch (NoClassDefFoundError e) {
-                addInvalidRecipeValidation(
-                        addValidation,
-                        recipeName,
-                        null,
-                        "Recipe class " + recipeName + " cannot be found");
-            }
+            addLazyLoadRecipe.accept(recipeName);
         } else if (recipeData instanceof Map) {
             Map.Entry<String, Object> nameAndConfig = ((Map<String, Object>) recipeData).entrySet().iterator().next();
             String recipeName = nameAndConfig.getKey();
