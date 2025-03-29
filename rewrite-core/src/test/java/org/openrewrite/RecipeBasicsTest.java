@@ -67,7 +67,7 @@ class RecipeBasicsTest {
 
     static class ExtendingRecipe extends RecipeBase {
         @SuppressWarnings("unused")
-        @Option(displayName = "Option", description = "Option description")
+        @Option(displayName = "Option", description = "Option description", example = "Example")
         String getOption() {
             return option;
         }
@@ -86,7 +86,7 @@ class RecipeBasicsTest {
     static class RecipeWithConstructorParameter extends Recipe {
         String option;
 
-        public RecipeWithConstructorParameter(@Option(displayName = "Option", description = "Option description") String option) {
+        public RecipeWithConstructorParameter(@Option(displayName = "Option", description = "Option description", example = "Example") String option) {
             this.option = option;
         }
 
