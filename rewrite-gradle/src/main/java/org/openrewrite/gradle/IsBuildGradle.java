@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle;
 
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
@@ -23,18 +24,17 @@ import org.openrewrite.marker.SearchResult;
 
 import java.nio.file.Path;
 
-import static java.util.Objects.requireNonNull;
-
 public class IsBuildGradle<P> extends TreeVisitor<Tree, P> {
     @Override
-    public Tree visit(@Nullable Tree tree, P p) {
+    public @Nullable Tree preVisit(@NonNull Tree tree, P p) {
+        stopAfterPreVisit();
         if (tree instanceof JavaSourceFile) {
-            JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
-            if (matches(cu.getSourcePath())) {
-                return SearchResult.found(cu);
+            JavaSourceFile sourceFile = (JavaSourceFile) tree;
+            if (matches(sourceFile.getSourcePath())) {
+                return SearchResult.found(sourceFile);
             }
         }
-        return super.visit(tree, p);
+        return tree;
     }
 
     public static boolean matches(Path sourcePath) {

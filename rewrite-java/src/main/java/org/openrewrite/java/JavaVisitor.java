@@ -88,7 +88,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     @SuppressWarnings({"ConstantConditions", "unchecked"})
     public <J2 extends J> J2 autoFormat(J2 j, @Nullable J stopAfter, P p, Cursor cursor) {
-        AutoFormatService service = getCursor().firstEnclosingOrThrow(JavaSourceFile.class).service(AutoFormatService.class);
+        AutoFormatService service = cursor.firstEnclosingOrThrow(JavaSourceFile.class).service(AutoFormatService.class);
         return (J2) service.autoFormatVisitor(stopAfter).visit(j, p, cursor);
     }
 

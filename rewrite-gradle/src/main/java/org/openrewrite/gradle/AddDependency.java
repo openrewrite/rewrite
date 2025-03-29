@@ -22,9 +22,8 @@ import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindJVMTestSuites;
-import org.openrewrite.groovy.GroovyIsoVisitor;
-import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
@@ -194,7 +193,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Scanned acc) {
         return Preconditions.check(!acc.configurationsByProject.isEmpty(),
-                Preconditions.check(new IsBuildGradle<>(), new GroovyIsoVisitor<ExecutionContext>() {
+                Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
 
                     @Override
                     public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
@@ -202,10 +201,6 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                             return (J) tree;
                         }
                         JavaSourceFile s = (JavaSourceFile) tree;
-                        if (!isAcceptable(s, ctx) || !s.getSourcePath().toString().endsWith(".gradle") || s.getSourcePath().getFileName().toString().equals("settings.gradle")) {
-                            return s;
-                        }
-
                         Optional<JavaProject> maybeJp = s.getMarkers().findFirst(JavaProject.class);
                         if (!maybeJp.isPresent()) {
                             return s;
@@ -252,18 +247,17 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                             return s;
                         }
 
-                        G.CompilationUnit g = (G.CompilationUnit) s;
                         for (String resolvedConfiguration : resolvedConfigurations) {
                             if (targetsCustomJVMTestSuite(resolvedConfiguration, acc.customJvmTestSuitesWithDependencies.get(jp))) {
-                                g = (G.CompilationUnit) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, purgeSourceSet(configuration),
-                                        classifier, extension, metadataFailures, isMatchingJVMTestSuite(resolvedConfiguration)).visitNonNull(g, ctx);
+                                s = (JavaSourceFile) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, purgeSourceSet(configuration),
+                                        classifier, extension, metadataFailures, isMatchingJVMTestSuite(resolvedConfiguration)).visitNonNull(s, ctx);
                             } else {
-                                g = (G.CompilationUnit) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, resolvedConfiguration,
-                                        classifier, extension, metadataFailures, this::isTopLevel).visitNonNull(g, ctx);
+                                s = (JavaSourceFile) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, resolvedConfiguration,
+                                        classifier, extension, metadataFailures, this::isTopLevel).visitNonNull(s, ctx);
                             }
                         }
 
-                        return g;
+                        return s;
                     }
 
                     private boolean isTopLevel(Cursor cursor) {
