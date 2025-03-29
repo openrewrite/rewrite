@@ -2146,6 +2146,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
             } else if (inComment && c == '\n' || c == '\r') {
                 inComment = false;
             } else if (!inMultilineComment && !inComment) {
+                // Added one more condition to handle if the annotation followed by modifier without space
                 if (Character.isWhitespace(c) || (noSpace = (i + 1 < source.length() && source.charAt(i + 1) == '@'))) {
                     if(noSpace){
                         word.getAndUpdate(w -> w + c);

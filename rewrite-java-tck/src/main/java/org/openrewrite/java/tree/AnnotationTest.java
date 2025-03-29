@@ -575,6 +575,7 @@ class AnnotationTest implements RewriteTest {
         );
 
     }
+
     @Test
     void modifierWithMultipleSpaceThenAnnotationScenario2() {
         rewriteRun(
@@ -598,6 +599,22 @@ class AnnotationTest implements RewriteTest {
             """
               public class Main {
                   public@jdk.jfr.Name("A") static@jdk.jfr.Label("2nd") void test() {
+                      System.out.println("A");
+                  }
+              }
+              """
+          )
+        );
+
+    }
+
+    @Test
+    void modifierNoSpaceThenAnnotationScenario3() {
+        rewriteRun(
+          java(
+            """
+              public class Main {
+                  public@jdk.jfr.Name("A")   static  @jdk.jfr.Label("2nd") void test() {
                       System.out.println("A");
                   }
               }
