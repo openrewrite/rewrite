@@ -267,12 +267,6 @@ public abstract class Recipe implements Cloneable {
         // Option annotations can be placed on fields, bean-style getters, or on the primary constructor
         for (Method method : recipe.getClass().getDeclaredMethods()) {
             if (method.getName().startsWith("get") && method.getParameterCount() == 0) {
-                Object value;
-                try {
-                    value = method.invoke(recipe);
-                } catch (ReflectiveOperationException e) {
-                    value = null;
-                }
                 Option option = method.getAnnotation(Option.class);
                 //noinspection ConstantValue
                 if (option != null) {
@@ -283,7 +277,7 @@ public abstract class Recipe implements Cloneable {
                             option.example().isEmpty() ? null : option.example(),
                             option.valid().length == 1 && option.valid()[0].isEmpty() ? null : Arrays.asList(option.valid()),
                             option.required(),
-                            value));
+                            null));
                 }
             }
         }
