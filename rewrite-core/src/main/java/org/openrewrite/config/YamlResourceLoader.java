@@ -69,6 +69,7 @@ public class YamlResourceLoader implements ResourceLoader {
 
     @Nullable
     private Map<String, List<RecipeExample>> recipeNameToExamples;
+
     private final RecipeLoader recipeLoader;
 
     @Getter
