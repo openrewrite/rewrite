@@ -1769,6 +1769,27 @@ class ChangePackageTest implements RewriteTest {
     }
 
     @Test
+    void changeTypeInLiteral() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("test.type", "test.test.type", true)),
+          java(
+            """
+              class Test {
+                  String ref = "test.type.A";
+                  String extendedRef = "there is a type reference here -> test.type.A <- hopefully it only replaces that";
+              }
+              """,
+            """
+              class Test {
+                  String ref = "test.test.type.A";
+                  String extendedRef = "there is a type reference here -> test.test.type.A <- hopefully it only replaces that";
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void changeNonRecursivePackageInYamlKey() {
         rewriteRun(
           spec -> spec.recipe(new ChangePackage("org.apache.http", "org.apache.hc.core5.http", false)),

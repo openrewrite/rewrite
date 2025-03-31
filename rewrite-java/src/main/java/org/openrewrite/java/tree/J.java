@@ -1477,7 +1477,7 @@ public interface J extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class CompilationUnit implements J, JavaSourceFile, SourceFile {
+    final class CompilationUnit implements J, JavaSourceFile, SourceFile ,SourceFileWithReferences {
         @Nullable
         @NonFinal
         transient SoftReference<TypesInUse> typesInUse;
@@ -1640,6 +1640,16 @@ public interface J extends Tree {
                 }
             }
             return cache;
+        }
+
+        @Nullable
+        @NonFinal
+        transient SoftReference<References> references;
+
+        @Override
+        public References getReferences() {
+            this.references = build(this.references);
+            return Objects.requireNonNull(this.references.get());
         }
 
         @Override
@@ -4765,7 +4775,7 @@ public interface J extends Tree {
         public String getPackageName() {
             return expression.withPrefix(Space.EMPTY).print(new Cursor(null,
                     new J.CompilationUnit(null, null, Tree.randomId(), Space.EMPTY, Markers.EMPTY, null,
-                            null, null, false, null, null, null, null, Space.EMPTY)));
+                            null, null, false, null, null, null, null, Space.EMPTY, null)));
         }
 
         @Override

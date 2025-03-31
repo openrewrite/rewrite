@@ -114,7 +114,8 @@ public class ChangePackage extends Recipe {
                             }
                         }
                     }
-                } else if (tree instanceof SourceFileWithReferences) {
+                }
+                if (tree instanceof SourceFileWithReferences) {
                     SourceFileWithReferences cu = (SourceFileWithReferences) tree;
                     boolean recursive = Boolean.TRUE.equals(ChangePackage.this.recursive);
                     String recursivePackageNamePrefix = oldPackageName + ".";
@@ -137,9 +138,11 @@ public class ChangePackage extends Recipe {
             @Override
             public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
+                Tree visited = tree;
                 if (tree instanceof JavaSourceFile) {
-                    return new JavaChangePackageVisitor().visit(tree, ctx, requireNonNull(getCursor().getParent()));
-                } else if (tree instanceof SourceFileWithReferences) {
+                    visited =  new JavaChangePackageVisitor().visit(tree, ctx, requireNonNull(getCursor().getParent()));
+                }
+                if (tree instanceof SourceFileWithReferences) {
                     SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
                     SourceFileWithReferences.References references = sourceFile.getReferences();
                     boolean recursive = Boolean.TRUE.equals(ChangePackage.this.recursive);
@@ -148,9 +151,9 @@ public class ChangePackage extends Recipe {
                     for (Reference ref : references.findMatches(matcher)) {
                         matches.put(ref.getTree(), ref);
                     }
-                    return new ReferenceChangePackageVisitor(matches, matcher.createRenamer(newPackageName)).visit(tree, ctx, requireNonNull(getCursor().getParent()));
+                    visited = new ReferenceChangePackageVisitor(matches, matcher.createRenamer(newPackageName)).visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 }
-                return tree;
+                return visited;
             }
         });
     }

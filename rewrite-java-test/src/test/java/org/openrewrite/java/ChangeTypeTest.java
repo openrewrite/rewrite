@@ -2081,7 +2081,27 @@ class ChangeTypeTest implements RewriteTest {
               """
           )
         );
+    }
 
+    @Test
+    void changeTypeInLiteral() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("test.type.A", "test.type.B", true)),
+          java(
+            """
+              class Test {
+                  String ref = "test.type.A";
+                  String extendedRef = "there is a type reference here -> test.type.A <- hopefully it only replaces that";
+              }
+              """,
+            """
+              class Test {
+                  String ref = "test.type.B";
+                  String extendedRef = "there is a type reference here -> test.type.B <- hopefully it only replaces that";
+              }
+              """
+          )
+        );
     }
 
     @Test
