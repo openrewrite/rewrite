@@ -331,7 +331,18 @@ public class YamlResourceLoader implements ResourceLoader {
                     Consumer<Validated<Object>> addValidation) {
         if (recipeData instanceof String) {
             String recipeName = (String) recipeData;
-            addLazyLoadRecipe.accept(recipeName);
+            try {
+                addRecipe.accept(recipeLoader.load(recipeName, null));
+            } catch (IllegalArgumentException ignored) {
+                // it's probably declarative
+                addLazyLoadRecipe.accept(recipeName);
+            } catch (NoClassDefFoundError e) {
+                addInvalidRecipeValidation(
+                        addValidation,
+                        recipeName,
+                        null,
+                        "Recipe class " + recipeName + " cannot be found");
+            }
         } else if (recipeData instanceof Map) {
             Map.Entry<String, Object> nameAndConfig = ((Map<String, Object>) recipeData).entrySet().iterator().next();
             String recipeName = nameAndConfig.getKey();
@@ -339,7 +350,7 @@ public class YamlResourceLoader implements ResourceLoader {
             try {
                 if (recipeArgs instanceof Map) {
                     try {
-                        addRecipe.accept(new RecipeLoader(classLoader).load(recipeName, (Map<String, Object>) recipeArgs));
+                        addRecipe.accept(recipeLoader.load(recipeName, (Map<String, Object>) recipeArgs));
                     } catch (IllegalArgumentException e) {
                         if (e.getCause() instanceof InvalidTypeIdException) {
                             addInvalidRecipeValidation(

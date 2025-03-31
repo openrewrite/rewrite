@@ -38,7 +38,7 @@ import static org.openrewrite.internal.RecipeIntrospectionUtils.constructRecipe;
 
 public class ClasspathScanningLoader implements ResourceLoader {
 
-    private final LinkedHashSet<Recipe> recipes = new LinkedHashSet<>();
+    private final LinkedHashMap<String, Recipe> recipes = new LinkedHashMap<>();
     private final List<NamedStyles> styles = new ArrayList<>();
 
     private final LinkedHashSet<RecipeDescriptor> recipeDescriptors = new LinkedHashSet<>();
@@ -121,14 +121,16 @@ public class ClasspathScanningLoader implements ResourceLoader {
             // Extract in two passes so that the full list of recipes from all sources are known when computing recipe descriptors
             // Otherwise recipes which include recipes from other sources in their recipeList will have incomplete descriptors
             for (YamlResourceLoader resourceLoader : yamlResourceLoaders) {
-                recipes.addAll(resourceLoader.listRecipes());
+                for (Recipe recipe : resourceLoader.listRecipes()) {
+                    recipes.put(recipe.getName(), recipe);
+                }
                 categoryDescriptors.addAll(resourceLoader.listCategoryDescriptors());
                 styles.addAll(resourceLoader.listStyles());
                 recipeAttributions.putAll(resourceLoader.listContributors());
                 recipeExamples.putAll(resourceLoader.listRecipeExamples());
             }
             for (YamlResourceLoader resourceLoader : yamlResourceLoaders) {
-                recipeDescriptors.addAll(resourceLoader.listRecipeDescriptors(recipes, recipeAttributions, recipeExamples));
+                recipeDescriptors.addAll(resourceLoader.listRecipeDescriptors(recipes.values(), recipeAttributions, recipeExamples));
             }
         }
     }
@@ -172,7 +174,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
             try {
                 Recipe recipe = constructRecipe(recipeClass);
                 recipeDescriptors.add(recipe.getDescriptor());
-                recipes.add(recipe);
+                recipes.put(recipe.getName(), recipe);
                 MetricsHelper.successTags(builder.tags("recipe", "elided"));
             } catch (Throwable e) {
                 MetricsHelper.errorTags(builder.tags("recipe", recipeClass.getName()), e);
@@ -183,8 +185,13 @@ public class ClasspathScanningLoader implements ResourceLoader {
     }
 
     @Override
+    public @Nullable Recipe loadRecipe(String recipeName, RecipeDetail... details) {
+        return recipes.get(recipeName);
+    }
+
+    @Override
     public Collection<Recipe> listRecipes() {
-        return recipes;
+        return recipes.values();
     }
 
     @Override
