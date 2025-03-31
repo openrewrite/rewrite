@@ -19,7 +19,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreType;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
-import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
@@ -39,7 +38,6 @@ public class DataTable<Row> {
     @Language("markdown")
     private final @NlsRewrite.Description String description;
 
-    private transient final @Nullable Recipe recipe;
     /**
      * @param recipe      The recipe that this data table is associated with.
      * @param type        The model type for a single row of this data table.
@@ -55,7 +53,6 @@ public class DataTable<Row> {
                      @NlsRewrite.Description @Language("markdown") String description) {
         this.displayName = displayName;
         this.description = description;
-        this.recipe = recipe;
         recipe.addDataTable(this);
     }
 
@@ -71,7 +68,6 @@ public class DataTable<Row> {
                      @NlsRewrite.Description @Language("markdown") String description) {
         this.displayName = displayName;
         this.description = description;
-        this.recipe = recipe;
 
         // Only null when transferring DataTables over RPC.
         //noinspection ConstantValue
@@ -91,7 +87,7 @@ public class DataTable<Row> {
     }
 
     public void insertRow(ExecutionContext ctx, Row row) {
-        if (!allowWritingInThisCycle(ctx) || !ctx.getCycleDetails().acceptRowForDataTable(this)) {
+        if (!allowWritingInThisCycle(ctx)) {
             return;
         }
         ctx.computeMessage(ExecutionContext.DATA_TABLES, row, ConcurrentHashMap::new, (extract, allDataTables) -> {
