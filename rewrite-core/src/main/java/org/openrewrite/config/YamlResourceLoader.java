@@ -59,9 +59,6 @@ public class YamlResourceLoader implements ResourceLoader {
 
     private final ObjectMapper mapper;
 
-    @Nullable
-    private final ClassLoader classLoader;
-
     private final Collection<? extends ResourceLoader> dependencyResourceLoaders;
 
     @Nullable
@@ -161,7 +158,6 @@ public class YamlResourceLoader implements ResourceLoader {
         this.source = source;
         this.dependencyResourceLoaders = dependencyResourceLoaders;
         this.mapper = ObjectMappers.propertyBasedMapper(classLoader);
-        this.classLoader = classLoader;
         this.recipeLoader = new RecipeLoader(classLoader);
 
         mapperCustomizer.accept(mapper);
@@ -171,7 +167,7 @@ public class YamlResourceLoader implements ResourceLoader {
         try {
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
             int nRead;
-            byte[] data = new byte[1024];
+            byte[] data = new byte[8192];
             while ((nRead = yamlInput.read(data, 0, data.length)) != -1) {
                 buffer.write(data, 0, nRead);
             }
