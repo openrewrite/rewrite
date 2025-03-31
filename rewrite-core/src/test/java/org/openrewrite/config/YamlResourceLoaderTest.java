@@ -324,7 +324,7 @@ class YamlResourceLoaderTest implements RewriteTest {
 
     @Test
     void loadRecipeWithRecipeDataStringThatThrowsNoClassDefFoundError() {
-        assertRecipeLazyLoaded(
+        assertRecipeWithRecipeDataThatThrowsNoClassDefFoundError(
           RecipeWithBadStaticInitializer.class.getName());
     }
 
@@ -335,7 +335,6 @@ class YamlResourceLoaderTest implements RewriteTest {
     }
 
     private void assertRecipeWithRecipeDataThatThrowsNoClassDefFoundError(Object recipeData) {
-        final List<String> lazyLoadRecipes = new ArrayList<>();
         final List<Validated<Object>> invalidRecipes = new ArrayList<>();
         YamlResourceLoader resourceLoader = createYamlResourceLoader();
 
@@ -343,28 +342,13 @@ class YamlResourceLoaderTest implements RewriteTest {
           "org.company.CustomRecipe",
           0,
           recipeData,
-          lazyLoadRecipes::add,
           recipe -> {
           },
-          invalidRecipes::add);
+          recipe -> {
+          },
+          validated -> invalidRecipes.add(validated));
 
         assertEquals(1, invalidRecipes.size());
-    }
-
-    private void assertRecipeLazyLoaded(Object recipeData) {
-        final List<String> lazyLoadRecipes = new ArrayList<>();
-        YamlResourceLoader resourceLoader = createYamlResourceLoader();
-
-        resourceLoader.loadRecipe(
-          "org.company.CustomRecipe",
-          0,
-          recipeData,
-          lazyLoadRecipes::add,
-          recipe -> {
-          },
-          v -> {});
-
-        assertThat(lazyLoadRecipes).isNotEmpty();
     }
 
     private YamlResourceLoader createYamlResourceLoader() {
