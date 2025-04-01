@@ -32,10 +32,10 @@ class KotlinTemplateTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new KotlinVisitor<>() {
               @Override
-              public J visitAssignment(J.Assignment assignment, ExecutionContext executionContext) {
+              public J visitBinary(J.Binary binary, ExecutionContext ctx) {
                   return KotlinTemplate.builder("println(\"foo\");")
                     .build()
-                    .apply(getCursor(), assignment.getCoordinates().replace());
+                    .apply(getCursor(), binary.getCoordinates().replace());
               }
           })),
           kotlin(
