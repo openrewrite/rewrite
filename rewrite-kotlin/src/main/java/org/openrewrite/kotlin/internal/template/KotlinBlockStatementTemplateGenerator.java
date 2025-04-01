@@ -20,8 +20,6 @@ import org.openrewrite.java.internal.template.BlockStatementTemplateGenerator;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Statement;
-import org.openrewrite.kotlin.tree.K;
 
 import java.util.Collection;
 import java.util.Set;
@@ -33,28 +31,15 @@ public class KotlinBlockStatementTemplateGenerator extends BlockStatementTemplat
 
     @Override
     protected void contextFreeTemplate(Cursor cursor, J j, Collection<JavaType.GenericTypeVariable> typeVariables, StringBuilder before, StringBuilder after) {
-        if (j instanceof J.MethodInvocation) {
-            before.insert(0, "class Template {\n");
-            JavaType.Method methodType = ((J.MethodInvocation) j).getMethodType();
-            if (methodType == null || methodType.getReturnType() != JavaType.Primitive.Void) {
-                before.append("var o : Any = ");
-            }
-            after.append(";\n}");
-        } else if (j instanceof Expression && !(j instanceof J.Assignment)) {
-            before.insert(0, "class Template {\n");
-            before.append("var o : Any = ");
-            after.append(";\n}");
-        } else if (j instanceof Statement && !(j instanceof J.Import) && !(j instanceof J.Package)) {
-            before.insert(0, "class Template {\ninit {\n");
-            after.append("\n}\n}");
-        } else if (j instanceof J.ClassDeclaration || j instanceof K.ClassDeclaration) {
+        if (!(j instanceof Expression)) {
             throw new IllegalArgumentException(
-                    "Templating a class declaration requires context from which package declaration and imports may be reached. " +
-                    "Mark this template as context-sensitive by calling KotlinTemplate.Builder#contextSensitive().");
-        } else {
-            throw new IllegalArgumentException(
-                    "Kotlin templating is currently only implemented for context-free expressions and statements and not for `" + j.getClass() + "` instances.");
+                    "Kotlin templating is currently only implemented for context-free expressions and not for `" + j.getClass() + "` instances.");
         }
+
+        before.insert(0, "class Template {\n");
+        before.append("var o : Object = ");
+        after.append(";");
+        after.append("\n}");
 
         before.insert(0, TEMPLATE_INTERNAL_IMPORTS);
         for (String anImport : imports) {
