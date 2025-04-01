@@ -44,13 +44,13 @@ public class KotlinBlockStatementTemplateGenerator extends BlockStatementTemplat
             before.insert(0, "class Template {\n");
             before.append("var o : Any = ");
             after.append(";\n}");
-        } else if (j instanceof Statement && !(j instanceof J.Import) && !(j instanceof J.Package)) {
-            before.insert(0, "class Template {\ninit {\n");
-            after.append("\n}\n}");
         } else if (j instanceof J.ClassDeclaration || j instanceof K.ClassDeclaration) {
             throw new IllegalArgumentException(
                     "Templating a class declaration requires context from which package declaration and imports may be reached. " +
                     "Mark this template as context-sensitive by calling KotlinTemplate.Builder#contextSensitive().");
+        } else if (j instanceof Statement && !(j instanceof J.Import) && !(j instanceof J.Package)) {
+            before.insert(0, "class Template {\ninit {\n");
+            after.append("\n}\n}");
         } else {
             throw new IllegalArgumentException(
                     "Kotlin templating is currently only implemented for context-free expressions and statements and not for `" + j.getClass() + "` instances.");
