@@ -28,6 +28,7 @@ import org.jspecify.annotations.Nullable;
 import java.io.File;
 import java.io.Serializable;
 import java.net.URI;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 
@@ -40,7 +41,7 @@ import java.time.Duration;
 public class MavenRepository implements Serializable {
 
     public static final MavenRepository MAVEN_LOCAL_USER_NEUTRAL = new MavenRepository("local", new File("~/.m2/repository").toString(), "true", "true", true, null, null, null, false);
-    public static final MavenRepository MAVEN_LOCAL_DEFAULT = new MavenRepository("local", Paths.get(System.getProperty("user.home"), ".m2", "repository").toUri().toString(), "true", "true", true, null, null, null, false);
+    public static final MavenRepository MAVEN_LOCAL_DEFAULT = new MavenRepository("local", determineM2LocalHome().toUri().toString(), "true", "true", true, null, null, null, false);
     public static final MavenRepository MAVEN_CENTRAL = new MavenRepository("central", "https://repo.maven.apache.org/maven2", "true", "false", true, null, null, null, true);
 
     @EqualsAndHashCode.Include
@@ -212,5 +213,13 @@ public class MavenRepository implements Serializable {
             String propertyName = rawProperty.replace("${env.", "").replace("}", "");
             return System.getenv(propertyName);
         }
+    }
+
+    private static Path determineM2LocalHome() {
+        String m2Local = System.getenv("M2_HOME");
+        if (m2Local != null) {
+            return Paths.get(m2Local, "repository");
+        }
+        return Paths.get(System.getProperty("user.home"), ".m2", "repository");
     }
 }
