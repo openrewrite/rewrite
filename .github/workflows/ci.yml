@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   build:
-    uses: openrewrite/gh-automation/.github/workflows/ci-gradle.yml@945c96bec0018a6757dfed3d66cca7da867fe206
+    uses: openrewrite/gh-automation/.github/workflows/ci-gradle.yml@greg-m2-cache
     secrets:
       gradle_enterprise_access_key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
       ossrh_username: ${{ secrets.OSSRH_USERNAME }}
