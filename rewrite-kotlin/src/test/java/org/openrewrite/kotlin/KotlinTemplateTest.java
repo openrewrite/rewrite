@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
@@ -29,15 +28,14 @@ class KotlinTemplateTest implements RewriteTest {
 
     @DocumentExample
     @Test
-    @Disabled
     void templateMethodInvocation() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new KotlinVisitor<>() {
               @Override
-              public J visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
+              public J visitBinary(J.Binary binary, ExecutionContext ctx) {
                   return KotlinTemplate.builder("println(\"foo\");")
                     .build()
-                    .apply(getCursor(), assignment.getCoordinates().replace());
+                    .apply(getCursor(), binary.getCoordinates().replace());
               }
           })),
           kotlin(
