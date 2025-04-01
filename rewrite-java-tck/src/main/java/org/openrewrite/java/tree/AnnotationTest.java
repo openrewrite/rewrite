@@ -549,15 +549,13 @@ class AnnotationTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              public class Main {
+              public class A {
                   public@jdk.jfr.Name("A") void test() {
-                      System.out.println("A");
                   }
               }
               """
           )
         );
-
     }
 
     @Test
@@ -565,15 +563,13 @@ class AnnotationTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              public class Main {
+              public class A {
                   public   @jdk.jfr.Name("A") void test() {
-                      System.out.println("A");
                   }
               }
               """
           )
         );
-
     }
 
     @Test
@@ -581,15 +577,13 @@ class AnnotationTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              public class Main {
+              public class A {
                   public    @jdk.jfr.Name("A") static   @jdk.jfr.Label("2nd") void test() {
-                      System.out.println("A");
                   }
               }
               """
           )
         );
-
     }
 
     @Test
@@ -597,15 +591,13 @@ class AnnotationTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              public class Main {
+              public class A {
                   public@jdk.jfr.Name("A") static@jdk.jfr.Label("2nd") void test() {
-                      System.out.println("A");
                   }
               }
               """
           )
         );
-
     }
 
     @Test
@@ -613,15 +605,13 @@ class AnnotationTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              public class Main {
+              public class A {
                   public@jdk.jfr.Name("A")   static  @jdk.jfr.Label("2nd") void test() {
-                      System.out.println("A");
                   }
               }
               """
           )
         );
-
     }
 
     @Test
@@ -629,15 +619,13 @@ class AnnotationTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              public class Main {
+              public class A {
                   public@jdk.jfr.Name("A")@jdk.jfr.Label("test") void test() {
-                      System.out.println("A");
                   }
               }
               """
           )
         );
-
     }
 
     @Test
@@ -645,9 +633,8 @@ class AnnotationTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              public class Main {
+              public class A {
                   public static@jdk.jfr.Name("A") void test() {
-                      System.out.println("A");
                   }
               }
               """
@@ -660,9 +647,8 @@ class AnnotationTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              public class Main {
+              public class A {
                   public static @jdk.jfr.Name("A") void test() {
-                      System.out.println("A");
                   }
               }
               """
