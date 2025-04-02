@@ -1,3 +1,18 @@
+/*
+ * Copyright 2025 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.openrewrite.java.trait;
 
 import lombok.Value;
@@ -22,7 +37,7 @@ public class StringLiteralReference implements Reference {
     @Override
     public String getValue() {
         if (getTree() instanceof J.Literal) {
-            if (((J.Literal) getTree()).getType().equals(JavaType.Primitive.String)) {
+            if (((J.Literal) getTree()).getType() == JavaType.Primitive.String) {
                 String literal = (String) ((J.Literal) getTree()).getValue();
                 java.util.regex.Matcher match = referencePattern.matcher(literal);
                 if (match.find()) {
@@ -43,7 +58,7 @@ public class StringLiteralReference implements Reference {
         Tree tree = cursor.getValue();
         if (tree instanceof J.Literal) {
             J.Literal literal = (J.Literal) tree;
-            if (((J.Literal) tree).getType().equals(JavaType.Primitive.String)) {
+            if (((J.Literal) tree).getType() == JavaType.Primitive.String) {
                 return literal.withValue(((String)literal.getValue()).replace(getValue(), renamer.rename(this))).withValueSource(literal.getValueSource().replace(getValue(), renamer.rename(this)));
             }
         }
@@ -58,7 +73,7 @@ public class StringLiteralReference implements Reference {
             protected @Nullable StringLiteralReference test(Cursor cursor) {
                 Object value = cursor.getValue();
                 if (value instanceof J.Literal) {
-                    if (((J.Literal) value).getType().equals(JavaType.Primitive.String)) {
+                    if (((J.Literal) value).getType() == JavaType.Primitive.String) {
                         String literal = (String) ((J.Literal) value).getValue();
                         java.util.regex.Matcher match = referencePattern.matcher(literal);
                         if (match.find()) {
