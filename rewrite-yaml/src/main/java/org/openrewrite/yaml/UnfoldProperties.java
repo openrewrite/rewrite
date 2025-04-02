@@ -104,7 +104,7 @@ public class UnfoldProperties extends Recipe {
 
             /**
              * MaybeAutoFormat cannot determine the proper indenting.
-             * So shift when the first key with dots is targets:
+             * So shift when the first key with dots is targeted:
              *
              * <pre>
              * {@code
