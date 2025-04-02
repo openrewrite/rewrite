@@ -1477,7 +1477,7 @@ public interface J extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class CompilationUnit implements J, JavaSourceFile, SourceFile ,SourceFileWithReferences {
+    final class CompilationUnit implements J, JavaSourceFile, SourceFile, SourceFileWithReferences {
         @Nullable
         @NonFinal
         transient SoftReference<TypesInUse> typesInUse;
