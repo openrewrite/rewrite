@@ -32,7 +32,7 @@ import java.util.regex.Pattern;
 public class StringLiteralReference implements Reference {
     Cursor cursor;
     Kind kind;
-    Pattern referencePattern = Pattern.compile("\\p{javaJavaIdentifierStart}*\\.\\p{javaJavaIdentifierStart}*");
+    Pattern referencePattern = Pattern.compile("\\p{javaJavaIdentifierStart}+(?:\\.\\p{javaJavaIdentifierStart}+)+");
 
     @Override
     public String getValue() {
@@ -67,7 +67,7 @@ public class StringLiteralReference implements Reference {
 
     public static class Provider extends AbstractProvider<StringLiteralReference> {
         private static final SimpleTraitMatcher<StringLiteralReference> matcher = new SimpleTraitMatcher<StringLiteralReference>() {
-            private final Pattern referencePattern = Pattern.compile("\\p{javaJavaIdentifierStart}*\\.\\p{javaJavaIdentifierStart}*");
+            private final Pattern referencePattern = Pattern.compile("\\p{javaJavaIdentifierStart}+(?:\\.\\p{javaJavaIdentifierStart}+)+");
 
             @Override
             protected @Nullable StringLiteralReference test(Cursor cursor) {
