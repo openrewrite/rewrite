@@ -49,17 +49,17 @@ import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
 @SuppressWarnings("unused")
 public interface RewriteTest extends SourceSpecs {
     static AdHocRecipe toRecipe(Supplier<TreeVisitor<?, ExecutionContext>> visitor) {
-        return new AdHocRecipe(null, null, null, r -> visitor.get(), null, null);
+        return new AdHocRecipe(null, null, null, visitor, null, null);
     }
 
     static AdHocRecipe toRecipe() {
         return new AdHocRecipe(null, null, null,
-                r -> TreeVisitor.noop(), null, null);
+                TreeVisitor::noop, null, null);
     }
 
     static AdHocRecipe toRecipe(Function<Recipe, TreeVisitor<?, ExecutionContext>> visitor) {
-        return new AdHocRecipe(null, null, null,
-                visitor, null, null);
+        AdHocRecipe r = toRecipe();
+        return r.withGetVisitor(() -> visitor.apply(r));
     }
 
     static Recipe fromRuntimeClasspath(String recipe) {

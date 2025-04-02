@@ -16,7 +16,6 @@
 package org.openrewrite.internal;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Recipe;
 import org.openrewrite.config.RecipeIntrospectionException;
@@ -30,12 +29,10 @@ public class RecipeLoader {
     @Nullable
     private final ClassLoader classLoader;
 
-    @Getter
-    private final ObjectMapper mapper;
+    private @Nullable ObjectMapper mapper;
 
     public RecipeLoader(@Nullable ClassLoader classLoader) {
         this.classLoader = classLoader;
-        this.mapper = ObjectMappers.propertyBasedMapper(classLoader);
     }
 
     public Recipe load(String recipeName, @Nullable Map<String, Object> recipeArgs) {
@@ -43,14 +40,18 @@ public class RecipeLoader {
             Class<?> recipeClass = Class.forName(recipeName, true,
                     classLoader == null ? this.getClass().getClassLoader() : classLoader);
             return RecipeIntrospectionUtils.constructRecipe(recipeClass, recipeArgs == null ? emptyMap() : recipeArgs);
-        } catch (ReflectiveOperationException | RecipeIntrospectionException |  IllegalArgumentException e) {
+        } catch (ReflectiveOperationException | RecipeIntrospectionException | IllegalArgumentException e) {
             return instantiateRecipe(recipeName, recipeArgs == null ? emptyMap() : recipeArgs);
         }
+    }
+
+    public ObjectMapper getMapper() {
+        return mapper != null ? mapper : (mapper = ObjectMappers.propertyBasedMapper(classLoader));
     }
 
     private Recipe instantiateRecipe(String recipeName, Map<String, Object> args) throws IllegalArgumentException {
         Map<Object, Object> withJsonType = new HashMap<>(args);
         withJsonType.put("@c", recipeName);
-        return mapper.convertValue(withJsonType, Recipe.class);
+        return getMapper().convertValue(withJsonType, Recipe.class);
     }
 }

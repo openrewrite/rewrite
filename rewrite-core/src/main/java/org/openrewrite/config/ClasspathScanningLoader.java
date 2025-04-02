@@ -26,6 +26,7 @@ import org.openrewrite.Recipe;
 import org.openrewrite.ScanningRecipe;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
+import org.openrewrite.internal.RecipeLoader;
 import org.openrewrite.style.NamedStyles;
 
 import java.lang.reflect.Constructor;
@@ -47,6 +48,9 @@ public class ClasspathScanningLoader implements ResourceLoader {
     private final Map<String, List<Contributor>> recipeAttributions = new HashMap<>();
     private final Map<String, List<RecipeExample>> recipeExamples = new HashMap<>();
 
+    private final ClassLoader classLoader;
+    private @Nullable Runnable performScan;
+
     /**
      * Construct a ClasspathScanningLoader scans the runtime classpath of the current java process for recipes
      *
@@ -54,11 +58,14 @@ public class ClasspathScanningLoader implements ResourceLoader {
      * @param acceptPackages Limit scan to specified packages
      */
     public ClasspathScanningLoader(Properties properties, String[] acceptPackages) {
-        scanClasses(new ClassGraph().acceptPackages(acceptPackages), getClass().getClassLoader());
-        scanYaml(new ClassGraph().acceptPaths("META-INF/rewrite"),
-                properties,
-                emptyList(),
-                null);
+        this.classLoader = ClasspathScanningLoader.class.getClassLoader();
+        this.performScan = () -> {
+            scanClasses(new ClassGraph().acceptPackages(acceptPackages), getClass().getClassLoader());
+            scanYaml(new ClassGraph().acceptPaths("META-INF/rewrite"),
+                    properties,
+                    emptyList(),
+                    null);
+        };
     }
 
     /**
@@ -68,32 +75,38 @@ public class ClasspathScanningLoader implements ResourceLoader {
      * @param classLoader Limit scan to classes loadable by this classloader
      */
     public ClasspathScanningLoader(Properties properties, ClassLoader classLoader) {
-        scanClasses(new ClassGraph()
-                .ignoreParentClassLoaders()
-                .overrideClassLoaders(classLoader), classLoader);
+        this.classLoader = classLoader;
+        this.performScan = () -> {
+            scanClasses(new ClassGraph()
+                    .ignoreParentClassLoaders()
+                    .overrideClassLoaders(classLoader), classLoader);
 
-        scanYaml(new ClassGraph()
-                        .ignoreParentClassLoaders()
-                        .overrideClassLoaders(classLoader)
-                        .acceptPaths("META-INF/rewrite"),
-                properties,
-                emptyList(),
-                classLoader);
+            scanYaml(new ClassGraph()
+                            .ignoreParentClassLoaders()
+                            .overrideClassLoaders(classLoader)
+                            .acceptPaths("META-INF/rewrite"),
+                    properties,
+                    emptyList(),
+                    classLoader);
+        };
     }
 
     public ClasspathScanningLoader(Path jar, Properties properties, Collection<? extends ResourceLoader> dependencyResourceLoaders, ClassLoader classLoader) {
+        this.classLoader = classLoader;
         String jarName = jar.toFile().getName();
 
-        scanClasses(new ClassGraph()
-                .acceptJars(jarName)
-                .ignoreParentClassLoaders()
-                .overrideClassLoaders(classLoader), classLoader);
+        this.performScan = () -> {
+            scanClasses(new ClassGraph()
+                    .acceptJars(jarName)
+                    .ignoreParentClassLoaders()
+                    .overrideClassLoaders(classLoader), classLoader);
 
-        scanYaml(new ClassGraph()
-                .acceptJars(jarName)
-                .ignoreParentClassLoaders()
-                .overrideClassLoaders(classLoader)
-                .acceptPaths("META-INF/rewrite"), properties, dependencyResourceLoaders, classLoader);
+            scanYaml(new ClassGraph()
+                    .acceptJars(jarName)
+                    .ignoreParentClassLoaders()
+                    .overrideClassLoaders(classLoader)
+                    .acceptPaths("META-INF/rewrite"), properties, dependencyResourceLoaders, classLoader);
+        };
     }
 
     public static ClasspathScanningLoader onlyYaml(Properties properties) {
@@ -104,6 +117,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
     }
 
     private ClasspathScanningLoader() {
+        this.classLoader = ClasspathScanningLoader.class.getClassLoader();
     }
 
     /**
@@ -186,36 +200,57 @@ public class ClasspathScanningLoader implements ResourceLoader {
 
     @Override
     public @Nullable Recipe loadRecipe(String recipeName, RecipeDetail... details) {
+        if (performScan != null) {
+            try {
+                return new RecipeLoader(classLoader).load(recipeName, null);
+            } catch (NoClassDefFoundError | IllegalArgumentException ignored) {
+                // it's probably declarative
+            }
+        }
+        ensureScanned();
         return recipes.get(recipeName);
     }
 
     @Override
     public Collection<Recipe> listRecipes() {
+        ensureScanned();
         return recipes.values();
+    }
+
+    private void ensureScanned() {
+        if (performScan != null) {
+            performScan.run();
+            performScan = null;
+        }
     }
 
     @Override
     public Collection<RecipeDescriptor> listRecipeDescriptors() {
+        ensureScanned();
         return recipeDescriptors;
     }
 
     @Override
     public Collection<CategoryDescriptor> listCategoryDescriptors() {
+        ensureScanned();
         return categoryDescriptors;
     }
 
     @Override
     public Collection<NamedStyles> listStyles() {
+        ensureScanned();
         return styles;
     }
 
     @Override
     public Map<String, List<RecipeExample>> listRecipeExamples() {
+        ensureScanned();
         return recipeExamples;
     }
 
     @Override
     public Map<String, List<Contributor>> listContributors() {
+        ensureScanned();
         return recipeAttributions;
     }
 }
