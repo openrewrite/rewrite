@@ -147,7 +147,6 @@ public interface ExecutionContext extends RpcCodec<ExecutionContext> {
                         row -> Integer.toString(System.identityHashCode(row)),
                         null);
             }
-
         }
     }
 

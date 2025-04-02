@@ -53,6 +53,6 @@ export class ParserSourceReader {
 }
 
 export function readSourceSync(ctx: ExecutionContext, sourcePath: string) {
-    const vol = ctx[PARSER_VOLUME] as Volume | undefined;
+    const vol = ctx.messages[PARSER_VOLUME] as Volume | undefined;
     return (vol?.readFileSync(sourcePath) ?? readFileSync(sourcePath)).toString();
 }

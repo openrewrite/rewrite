@@ -1,18 +1,12 @@
 import {describe} from "@jest/globals";
-import {
-    createExecutionContext,
-    ExecutionContext,
-    PARSER_VOLUME,
-    ParserSourceReader,
-    readSourceSync
-} from "../../main/javascript";
+import {ExecutionContext, PARSER_VOLUME, ParserSourceReader, readSourceSync} from "../../main/javascript";
 import {Volume} from "memfs";
 
 
 describe("parse source reader utility", () => {
     const vol = Volume.fromJSON({"./source.json": `  { "type": "object" }`});
-    const ctx: ExecutionContext = createExecutionContext();
-    ctx[PARSER_VOLUME] = vol;
+    const ctx: ExecutionContext = new ExecutionContext();
+    ctx.messages[PARSER_VOLUME] = vol;
 
     test("whitespace", () => {
         const reader = new ParserSourceReader("source.json", ctx);

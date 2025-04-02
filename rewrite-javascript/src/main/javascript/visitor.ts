@@ -146,7 +146,7 @@ export function noopVisitor<T extends Tree, P>() {
 
 export class RecipeRunError extends Error {
     constructor(public readonly cause: Error, public readonly cursor?: Cursor) {
-        super(cause.message);
+        super(cause.stack);
     }
 }
 

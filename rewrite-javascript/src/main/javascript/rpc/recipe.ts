@@ -46,7 +46,7 @@ export class RpcRecipe extends Recipe {
         // It doesn't matter which one added data table entries, because they all share
         // the same view of the data tables.
         if ("org.openrewrite.rpc.id" in ctx) {
-            const updated = await this.rpc.getObject(ctx["org.openrewrite.rpc.id"]);
+            const updated = await this.rpc.getObject(ctx.messages["org.openrewrite.rpc.id"]);
             Object.assign(ctx, updated);
         }
     }

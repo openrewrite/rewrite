@@ -16,7 +16,7 @@ import {
 import {RpcObjectData, RpcObjectState, RpcReceiveQueue} from "./queue";
 import {RpcCodecs} from "./codec";
 import {RpcRecipe} from "./recipe";
-import {isExecutionContext} from "../execution";
+import {ExecutionContext} from "../execution";
 
 export class RewriteRpc {
     private readonly snowflake = SnowflakeId();
@@ -127,8 +127,8 @@ export class RewriteRpc {
     scan(tree: Tree, visitorName: string, p: any, cursor: Cursor | undefined): Promise<VisitResponse> {
         this.localObjects.set(tree.id.toString(), tree);
         const pId = this.localObject(p);
-        if (isExecutionContext(p)) {
-            p["org.openrewrite.rpc.id"] = pId;
+        if (p instanceof ExecutionContext) {
+            p.messages["org.openrewrite.rpc.id"] = pId;
         }
         const cursorIds = this.getCursorIds(cursor);
         return this.connection.sendRequest(

@@ -1,7 +1,8 @@
 import {ExecutionContext} from "./execution";
-import {OptionDescriptor, Recipe} from "./recipe";
+import {OptionDescriptor} from "./recipe";
 
-const DATA_TABLES_KEY = "org.openrewrite.dataTables";
+export const DATA_TABLES_KEY = "org.openrewrite.dataTables";
+const DATA_TABLES_CHANGED_KEY = "org.openrewrite.dataTables";
 const COLUMNS_KEY = Symbol("org.openrewrite.dataTables.columns");
 
 export function Column(descriptor: ColumnDescriptor) {
@@ -43,25 +44,33 @@ export class DataTable<Row> {
     }
 
     insertRow(ctx: ExecutionContext, row: Row): void {
-        if (!ctx[DATA_TABLES_KEY]) {
-            ctx[DATA_TABLES_KEY] = {};
+        (ctx as any)[DATA_TABLES_CHANGED_KEY] = true;
+
+        if (!ctx.messages[DATA_TABLES_KEY]) {
+            ctx.messages[DATA_TABLES_KEY] = {};
         }
-        if (!ctx[DATA_TABLES_KEY][this._descriptor.name]) {
-            ctx[DATA_TABLES_KEY][this._descriptor.name] = [];
+        if (!ctx.messages[DATA_TABLES_KEY][this._descriptor.name]) {
+            ctx.messages[DATA_TABLES_KEY][this._descriptor.name] = [];
         }
-        ctx[DATA_TABLES_KEY][this._descriptor.name].push(row);
+        ctx.messages[DATA_TABLES_KEY][this._descriptor.name].push(row);
     }
+}
+
+export function dataTablesChanged(ctx: ExecutionContext): boolean {
+    const changed = !!(ctx as any)[DATA_TABLES_CHANGED_KEY];
+    delete (ctx as any)[DATA_TABLES_CHANGED_KEY];
+    return changed;
 }
 
 export function getRowsByDataTableName(ctx: ExecutionContext): [string, any[]][] {
     if (!(DATA_TABLES_KEY in ctx)) {
         return [];
     }
-    return Object.entries(ctx[DATA_TABLES_KEY]);
+    return Object.entries(ctx.messages[DATA_TABLES_KEY]);
 }
 
 export function getRows<Row>(dataTableName: string, ctx: ExecutionContext): Row[] {
-    return ctx[DATA_TABLES_KEY]?.[dataTableName] ?? [];
+    return ctx.messages[DATA_TABLES_KEY]?.[dataTableName] ?? [];
 }
 
 export interface DataTableDescriptor {

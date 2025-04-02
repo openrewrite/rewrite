@@ -1,5 +1,5 @@
 import {Recipe} from "../recipe";
-import {createExecutionContext, ExecutionContext} from "../execution";
+import {ExecutionContext} from "../execution";
 import {noopVisitor, TreeVisitor} from "../visitor";
 import {Parser, PARSER_VOLUME, readSourceSync} from "../parser";
 import {TreePrinters} from "../print";
@@ -26,7 +26,7 @@ export class RecipeSpec {
      * Used for both parsing and recipe execution unless an alternative recipe execution context is set with
      * recipeExecutionContext.
      */
-    executionContext: ExecutionContext = createExecutionContext();
+    executionContext: ExecutionContext = new ExecutionContext();
 
     /**
      * If not specified, will share executionContext instance with the parsing phase.
@@ -116,7 +116,7 @@ export class RecipeSpec {
         const before: [SourceSpec<any>, string][] = [];
         const vol = memfs().vol
         vol.mkdirSync(process.cwd(), {recursive: true});
-        this.executionContext[PARSER_VOLUME] = vol;
+        this.executionContext.messages[PARSER_VOLUME] = vol;
         for (const spec of specs) {
             if (spec.before) {
                 const sourcePath = `${SnowflakeId().generate()}.txt`;

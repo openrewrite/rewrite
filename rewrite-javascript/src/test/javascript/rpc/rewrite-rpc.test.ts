@@ -1,18 +1,12 @@
 import {afterEach, beforeEach, describe, expect, test} from "@jest/globals";
-import {
-    createExecutionContext,
-    Cursor,
-    ExecutionContext,
-    isExecutionContext,
-    rootCursor
-} from "../../../main/javascript";
+import {Cursor, ExecutionContext, rootCursor} from "../../../main/javascript";
 import {RewriteRpc} from "../../../main/javascript/rpc";
 import {PlainText, text} from "../../../main/javascript/text";
 import {RecipeSpec} from "../../../main/javascript/test";
 import {PassThrough} from "node:stream";
 import * as rpc from "vscode-jsonrpc/node";
 import "../example-recipe";
-import {ChangeText, ReplacedText} from "../example-recipe";
+import {ReplacedText} from "../example-recipe";
 
 describe("RewriteRpcTest", () => {
     const spec = new RecipeSpec();
@@ -42,12 +36,12 @@ describe("RewriteRpcTest", () => {
     });
 
     test("sendReceiveExecutionContext", async () => {
-        const ctx = createExecutionContext();
-        ctx["key"] = "value";
+        const ctx = new ExecutionContext();
+        ctx.messages["key"] = "value";
         client.localObjects.set("123", ctx);
         const received = await server.getObject<ExecutionContext>("123");
-        expect(received["key"]).toEqual("value");
-        expect(isExecutionContext(received));
+        expect(received.messages["key"]).toEqual("value");
+        expect(received instanceof ExecutionContext);
     });
 
     test("print", () => spec.rewriteRun(
