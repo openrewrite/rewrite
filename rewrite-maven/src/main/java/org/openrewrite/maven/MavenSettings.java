@@ -162,7 +162,7 @@ public class MavenSettings {
     }
 
     private static Path userSettingsPath() {
-        return Paths.get(System.getProperty("user.home")).resolve(".m2/settings.xml");
+        return MavenHomeDirectory.get().resolve("settings.xml");
     }
 
     private static Optional<Path> findMavenHomeSettings() {
