@@ -245,6 +245,9 @@ public class YamlParser implements org.openrewrite.Parser {
                             tag = createTag(tagPrefix, Markers.EMPTY, tagName, tagSuffix);
                         }
 
+                        // Decrementing the value by 1 if fmt contains any Unicode character
+                        valueStart -= (int) fmt.codePoints().filter(Character::isSupplementaryCodePoint).count();
+
                         String scalarValue;
                         switch (scalar.getScalarStyle()) {
                             case DOUBLE_QUOTED:

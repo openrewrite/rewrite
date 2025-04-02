@@ -339,4 +339,68 @@ class YamlParserTest implements RewriteTest {
           yaml(yaml)
         );
     }
+
+    @Test
+    void testWithUnicodeCharacters() {
+        rewriteRun(
+          yaml(
+            """
+              - name: Elephant
+              - #🦍COMMENT: unicode
+              - action: Do something
+            """)
+        );
+    }
+
+    @Test
+    void testWithUnicodeCharactersInSingleLine() {
+        rewriteRun(
+          yaml(
+            """
+              - name: Elephant
+              - #🦍COMMENT: 🐶unicode
+              - action: Do something
+            """)
+        );
+    }
+
+    @Test
+    void testWithoutUnicodeCharacters() {
+        rewriteRun(
+          yaml(
+            """
+              - name: Elephant
+              - #COMMENT: unicode
+              - action: Do something
+            """)
+        );
+    }
+
+    @Test
+    void testWithMultipleUnicodeCharacters() {
+        rewriteRun(
+          yaml(
+            """
+              - name: Rat
+              - #🐀COMMENT: unicode
+              - color: Black
+              - #🦍COMMENT: unicode
+              - action: Escape
+            """)
+        );
+    }
+
+    @Test
+    void testWithMultipleUnicodeCharactersPerLine() {
+        rewriteRun(
+          yaml(
+            """
+              - name: Rat
+              - #🐀COMMENT: 🦍unicode
+              - color: Black
+              - #🦍COMMENT: 🎱unicode
+              - action: Escape
+            """)
+        );
+    }
 }
