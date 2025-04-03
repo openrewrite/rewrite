@@ -369,9 +369,9 @@ class YamlParserTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-              - name: Elephant
-              - #COMMENT: unicode
-              - action: Do something
+            - name: Elephant
+            - #COMMENT: unicode
+            - action: Do something
             """)
         );
     }
