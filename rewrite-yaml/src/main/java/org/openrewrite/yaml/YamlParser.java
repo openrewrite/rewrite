@@ -245,8 +245,8 @@ public class YamlParser implements org.openrewrite.Parser {
                             tag = createTag(tagPrefix, Markers.EMPTY, tagName, tagSuffix);
                         }
 
-                        // Decrementing the value by 1 if fmt contains any Unicode character
-                        valueStart -= (int) fmt.codePoints().filter(Character::isSupplementaryCodePoint).count();
+                        // Adjust `valueStart` by subtracting the count of supplementary Unicode characters in `fmt`.
+                        valueStart -= fmt.codePoints().map(c -> Character.isSupplementaryCodePoint(c) ? 1 : 0).sum();
 
                         String scalarValue;
                         switch (scalar.getScalarStyle()) {
