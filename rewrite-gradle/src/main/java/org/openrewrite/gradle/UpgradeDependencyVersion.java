@@ -267,7 +267,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                                 continue;
                             }
                             try {
-                                String resolvedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                                String resolvedVersion = new DependencyVersionSelector(metadataFailures, mavenDownloadEvents, gradleProject, null)
                                         .select(new GroupArtifact(dep.getGroupId(), dep.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
                                 if (resolvedVersion != null) {
                                     acc.versionPropNameToGA.put(versionVariableName, ga);
@@ -460,7 +460,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                         }
 
                         try {
-                            String selectedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                            String selectedVersion = new DependencyVersionSelector(metadataFailures, mavenDownloadEvents, gradleProject, null)
                                     .select(dep.getGav(), method.getSimpleName(), newVersion, versionPattern, ctx);
                             if (selectedVersion == null || dep.getVersion().equals(selectedVersion)) {
                                 return arg;
@@ -516,7 +516,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     String selectedVersion;
                     try {
                         GroupArtifactVersion gav = new GroupArtifactVersion((String) groupLiteral.getValue(), (String) artifactLiteral.getValue(), version);
-                        selectedVersion = new DependencyVersionSelector(metadataFailures, gradleProject, null)
+                        selectedVersion = new DependencyVersionSelector(metadataFailures, mavenDownloadEvents, gradleProject, null)
                                 .select(gav, m.getSimpleName(), newVersion, versionPattern, ctx);
                     } catch (MavenDownloadingException e) {
                         return e.warn(m);
@@ -612,7 +612,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
 
         private J.@Nullable Literal getNewVersion(J.Literal literal, Map.Entry<GroupArtifact, Set<String>> gaWithConfigurations, ExecutionContext ctx) throws MavenDownloadingException {
             GroupArtifact ga = gaWithConfigurations.getKey();
-            DependencyVersionSelector dependencyVersionSelector = new DependencyVersionSelector(metadataFailures, gradleProject, null);
+            DependencyVersionSelector dependencyVersionSelector = new DependencyVersionSelector(metadataFailures, mavenDownloadEvents, gradleProject, null);
             GroupArtifactVersion gav = new GroupArtifactVersion(ga.getGroupId(), ga.getArtifactId(), (String) literal.getValue());
 
             String selectedVersion;
