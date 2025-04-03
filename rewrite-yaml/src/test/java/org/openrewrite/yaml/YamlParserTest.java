@@ -395,11 +395,11 @@ class YamlParserTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-              - name: Rat
-              - #🐀COMMENT: 🦍unicode
-              - color: Black
-              - #🦍COMMENT: 🎱unicode
-              - action: Escape
+            - name: Rat
+            - #🐀COMMENT: 🦍unicode
+            - color: Black
+            - #🦍COMMENT: 🎱unicode
+            - action: Escape
             """)
         );
     }
