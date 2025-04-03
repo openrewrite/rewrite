@@ -22,6 +22,7 @@ import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
@@ -38,7 +39,8 @@ class JavaTemplateTest3Test implements RewriteTest {
               @Override
               public J.Package visitPackage(J.Package pkg, ExecutionContext p) {
                   if (pkg.getExpression().printTrimmed(getCursor()).equals("a")) {
-                      return JavaTemplate.builder("b").contextSensitive().build()
+                      return JavaTemplate.builder("b")
+                        .build()
                         .apply(getCursor(), pkg.getCoordinates().replace());
                   }
                   return super.visitPackage(pkg, p);
@@ -94,7 +96,7 @@ class JavaTemplateTest3Test implements RewriteTest {
               """,
             """
               class Test {
-                            
+              
                   int test2(int n) {
                       return n;
                   }
@@ -120,14 +122,14 @@ class JavaTemplateTest3Test implements RewriteTest {
           java(
             """
               import java.util.function.Function;
-
+              
               class Test {
                   Function<Object, String> toString = it -> it.toString();
               }
               """,
             """
               import java.util.function.Function;
-
+              
               class Test {
                   Function<Object, String> toString = Object::toString;
               }
@@ -142,7 +144,9 @@ class JavaTemplateTest3Test implements RewriteTest {
     void replaceStatementInLambdaBodySingleStatementBlock() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("return n == 1;").contextSensitive().build();
+              final JavaTemplate t = JavaTemplate.builder("return n == 1;")
+                .contextSensitive()
+                .build();
 
               @Override
               public J visitReturn(J.Return return_, ExecutionContext p) {
@@ -159,10 +163,10 @@ class JavaTemplateTest3Test implements RewriteTest {
           java(
             """
               import java.util.stream.Stream;
-
+              
               class Test {
                   int n;
-
+              
                   void method(Stream<Object> obj) {
                       obj.filter(o -> {
                           return n == 0;
@@ -172,10 +176,10 @@ class JavaTemplateTest3Test implements RewriteTest {
               """,
             """
               import java.util.stream.Stream;
-
+              
               class Test {
                   int n;
-
+              
                   void method(Stream<Object> obj) {
                       obj.filter(o -> {
                           return n == 1;
@@ -193,7 +197,9 @@ class JavaTemplateTest3Test implements RewriteTest {
     void replaceStatementInLambdaBodyWithVariableDeclaredInBlock() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("return n == 1;").contextSensitive().build();
+              final JavaTemplate t = JavaTemplate.builder("return n == 1;")
+                .contextSensitive()
+                .build();
 
               @Override
               public J visitReturn(J.Return return_, ExecutionContext p) {
@@ -209,7 +215,7 @@ class JavaTemplateTest3Test implements RewriteTest {
           java(
             """
               import java.util.stream.Stream;
-
+              
               class Test {
                   static void method(Stream<Object> obj) {
                       obj.filter(o -> {
@@ -221,7 +227,7 @@ class JavaTemplateTest3Test implements RewriteTest {
               """,
             """
               import java.util.stream.Stream;
-
+              
               class Test {
                   static void method(Stream<Object> obj) {
                       obj.filter(o -> {
@@ -253,7 +259,7 @@ class JavaTemplateTest3Test implements RewriteTest {
           java(
             """
               import java.util.stream.Stream;
-
+              
               class Test {
                   static void method(Stream<String> obj) {
                       obj.map(o -> {
@@ -266,7 +272,7 @@ class JavaTemplateTest3Test implements RewriteTest {
               """,
             """
               import java.util.stream.Stream;
-
+              
               class Test {
                   static void method(Stream<String> obj) {
                       obj.map(o -> {
@@ -299,7 +305,7 @@ class JavaTemplateTest3Test implements RewriteTest {
           java(
             """
               import java.util.stream.Stream;
-
+              
               class Test {
                   static void method(Stream<String> obj) {
                       obj.filter(o -> o.toLowerCase().length() > 0);
@@ -308,7 +314,7 @@ class JavaTemplateTest3Test implements RewriteTest {
               """,
             """
               import java.util.stream.Stream;
-
+              
               class Test {
                   static void method(Stream<String> obj) {
                       obj.filter(o -> o.toUpperCase().length() > 0);
@@ -338,7 +344,7 @@ class JavaTemplateTest3Test implements RewriteTest {
           java(
             """
               import java.util.stream.Stream;
-
+              
               class Test {
                   enum Abc {A,B,C}
                   static void method(Stream<Abc> obj) {
@@ -348,7 +354,7 @@ class JavaTemplateTest3Test implements RewriteTest {
               """,
             """
               import java.util.stream.Stream;
-
+              
               class Test {
                   enum Abc {A,B,C}
                   static void method(Stream<Abc> obj) {
@@ -360,7 +366,6 @@ class JavaTemplateTest3Test implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("ClassInitializerMayBeStatic")
     @Test
     void replaceMethodNameAndArgumentsSimultaneously() {
         rewriteRun(
@@ -369,19 +374,8 @@ class JavaTemplateTest3Test implements RewriteTest {
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                   J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
                   if (mi.getSimpleName().equals("acceptInteger")) {
-                      mi = JavaTemplate.builder("acceptString(#{any()}.toString())").contextSensitive()
-                        .javaParser(JavaParser.fromJavaVersion()
-                          .dependsOn(
-                            """
-                                  package org.openrewrite;
-                                  public class A {
-                                      public A acceptInteger(Integer i) { return this; }
-                                      public A acceptString(String s) { return this; }
-                                      public A someOtherMethod() { return this; }
-                                  }
-                              """
-                          )
-                        )
+                      mi = JavaTemplate.builder("acceptString(#{any()}.toString())")
+                        .javaParser(JavaParser.fromJavaVersion())
                         .build()
                         .apply(updateCursor(mi), mi.getCoordinates().replaceMethod(), mi.getArguments().get(0));
                       mi = mi.withName(mi.getName().withType(mi.getMethodType()));
@@ -393,33 +387,31 @@ class JavaTemplateTest3Test implements RewriteTest {
             """
               package org.openrewrite;
               public class A {
-                  public A acceptInteger(Integer i) { return this; }
+                  public A acceptInteger(Number i) { return this; }
                   public A acceptString(String s) { return this; }
                   public A someOtherMethod() { return this; }
               }
-              """
+              """, SourceSpec::skip
           ),
           java(
             """
               package org.openrewrite;
-                            
-              public class Foo {
-                  {
-                      Integer i = 1;
+              
+              public class Foo<N extends Number> {
+                  void foo(N n) {
                       new A().someOtherMethod()
-                              .acceptInteger(i)
+                              .acceptInteger(n)
                               .someOtherMethod();
                   }
               }
               """,
             """
               package org.openrewrite;
-                            
-              public class Foo {
-                  {
-                      Integer i = 1;
+              
+              public class Foo<N extends Number> {
+                  void foo(N n) {
                       new A().someOtherMethod()
-                              .acceptString(i.toString())
+                              .acceptString(n.toString())
                               .someOtherMethod();
                   }
               }
@@ -448,7 +440,7 @@ class JavaTemplateTest3Test implements RewriteTest {
                   public void method(int[] val) {}
                   public void method(int[] val1, String val2) {}
               }
-              """
+              """, SourceSpec::skip
           ),
           java(
             """
@@ -491,10 +483,10 @@ class JavaTemplateTest3Test implements RewriteTest {
           java(
             """
               import java.util.function.Function;
-
+              
               class Test {
                   Function<Object, String> toString = getToString();
-                  
+              
                   static Function<Object, String> getToString() {
                       return Object::toString;
                   }
@@ -502,10 +494,10 @@ class JavaTemplateTest3Test implements RewriteTest {
               """,
             """
               import java.util.function.Function;
-
+              
               class Test {
                   Function<Object, String> toString = Object::toString;
-                  
+              
                   static Function<Object, String> getToString() {
                       return Object::toString;
                   }
