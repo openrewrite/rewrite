@@ -2466,6 +2466,12 @@ public class GroovyParserVisitor {
         } else if (node instanceof BinaryExpression) {
             BinaryExpression expr = (BinaryExpression) node;
             return determineParenthesisLevel(expr, expr.getLeftExpression().getLineNumber(), expr.getLineNumber(), expr.getLeftExpression().getColumnNumber(), expr.getColumnNumber());
+        } else if (node instanceof ConstantExpression && isOlderThanGroovy3()) {
+            ConstantExpression expr = (ConstantExpression) node;
+            return determineParenthesisLevel(expr, expr.getLineNumber(), expr.getLastLineNumber(), expr.getColumnNumber(), expr.getLastColumnNumber());
+        } else if (node instanceof ConstructorCallExpression && isOlderThanGroovy3()) {
+            ConstructorCallExpression expr = (ConstructorCallExpression) node;
+            return determineParenthesisLevel(expr, expr.getArguments().getLineNumber(), expr.getLineNumber(), expr.getArguments().getColumnNumber(), expr.getColumnNumber()) - 1;
         }
         return null;
     }
@@ -2514,7 +2520,7 @@ public class GroovyParserVisitor {
                 if (delimiter == null) {
                     if (source.charAt(i) == '(') {
                         count++;
-                    } else if (source.charAt(i) == ')') {
+                    } else if (source.charAt(i) == ')' && !(node instanceof ConstantExpression)) {
                         count--;
                     }
                 } else {
