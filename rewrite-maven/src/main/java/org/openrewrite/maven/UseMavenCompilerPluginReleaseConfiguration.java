@@ -18,6 +18,7 @@ package org.openrewrite.maven;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Cursor;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -26,6 +27,8 @@ import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
+import java.util.Arrays;
+import java.util.List;
 
 import static org.openrewrite.xml.AddOrUpdateChild.addOrUpdateChild;
 import static org.openrewrite.xml.FilterTagChildrenVisitor.filterTagChildren;
@@ -37,10 +40,6 @@ public class UseMavenCompilerPluginReleaseConfiguration extends Recipe {
             new XPathMatcher("/project/build//plugins"),
             new XPathMatcher("/project/profiles/profile/build//plugins")
     );
-
-    private boolean matchesAnyPattern(Cursor cursor) {
-        return PLUGIN_MATCHERS.stream().anyMatch(matcher -> matcher.matches(cursor));
-    }
 
     @Option(
             displayName = "Release version",
@@ -100,6 +99,10 @@ public class UseMavenCompilerPluginReleaseConfiguration extends Recipe {
             }
 
         };
+    }
+
+    private boolean matchesAnyPattern(Cursor cursor) {
+        return PLUGIN_MATCHERS.stream().anyMatch(matcher -> matcher.matches(cursor));
     }
 
     private boolean currentNewerThanProposed(@SuppressWarnings("OptionalUsedAsFieldOrParameterType") Optional<String> maybeRelease) {
