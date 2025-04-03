@@ -47,6 +47,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     @EqualsAndHashCode.Exclude
     MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
+
     @EqualsAndHashCode.Exclude
     MavenDownloadEvents mavenDownloadEvents = new MavenDownloadEvents(this);
 
