@@ -81,7 +81,7 @@ public class MavenWrapper {
     String distributionUri;
     Checksum distributionChecksum;
 
-    private final static Cache<String, Checksum> artifactChecksumCache = Caffeine.newBuilder().maximumSize(20).build();
+    private final static Cache<URI, Checksum> artifactChecksumCache = Caffeine.newBuilder().maximumSize(20).build();
 
     public static MavenWrapper create(
             @Nullable String wrapperVersion,
@@ -153,12 +153,12 @@ public class MavenWrapper {
     }
 
     private static Checksum retrieveChecksumUsingCache(RemoteFile remote, ExecutionContext ctx) {
-        Checksum ret = artifactChecksumCache.getIfPresent(remote.getUri().toString());
+        Checksum ret = artifactChecksumCache.getIfPresent(remote.getUri());
         if (ret != null) {
             return ret;
         }
         ret = Checksum.sha256(remote, ctx).getChecksum();
-        artifactChecksumCache.put(remote.getUri().toString(), ret);
+        artifactChecksumCache.put(remote.getUri(), ret);
         return ret;
     }
 
