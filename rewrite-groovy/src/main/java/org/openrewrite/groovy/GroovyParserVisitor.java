@@ -934,6 +934,9 @@ public class GroovyParserVisitor {
                     case "in":
                         gBinaryOp = G.Binary.Type.In;
                         break;
+                    case "<=>":
+                        gBinaryOp = G.Binary.Type.SPACESHIP;
+                        break;
                 }
 
                 cursor += binary.getOperation().getText().length();

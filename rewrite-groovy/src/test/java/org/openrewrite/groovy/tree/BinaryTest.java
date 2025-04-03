@@ -261,4 +261,20 @@ class BinaryTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void spaceShipOperator() {
+        rewriteRun(
+          groovy(
+            """
+              def justPrint(){
+                  println(1 <=> 2)
+                  println('a' <=> 'z')
+                  def a = 'tiger'
+                  def b = 'cheetah'
+                  println(a <=> b)
+              }
+              """
+          ));
+    }
 }
