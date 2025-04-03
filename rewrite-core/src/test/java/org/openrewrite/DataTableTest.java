@@ -17,6 +17,7 @@ package org.openrewrite;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreType;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.table.TextMatches;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
@@ -75,6 +76,110 @@ class DataTableTest implements RewriteTest {
                 assertThat(run.getDataTables().keySet()).noneMatch(dt -> dt instanceof WordTable);
             }),
           text("hello world")
+        );
+    }
+
+    @Test
+    void noRowsFromDeclarativePrecondition() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+              """
+                ---
+                type: specs.openrewrite.org/v1beta/recipe
+                name: test.recipe
+                displayName: Recipe producing data table as precondition
+                description: .
+                preconditions:
+                 - org.openrewrite.text.Find:
+                     find: hello
+                recipeList:
+                  - org.openrewrite.Recipe$Noop
+                """,
+              "test.recipe"
+            )
+            .afterRecipe(run -> {
+                assertThat(run.getDataTables().keySet()).noneMatch(dt -> dt instanceof TextMatches);
+            }),
+          text("hello world")
+        );
+    }
+
+    @Test
+    void rowsFromDeclarativeRecipe() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+              """
+                ---
+                type: specs.openrewrite.org/v1beta/recipe
+                name: test.recipe
+                displayName: Recipe producing data table in recipe list
+                description: .
+                recipeList:
+                  - org.openrewrite.text.Find:
+                      find: hello
+                """,
+              "test.recipe"
+            )
+            .afterRecipe(run -> {
+                assertThat(run.getDataTables().keySet()).anyMatch(dt -> dt instanceof TextMatches);
+            }),
+          text("hello world", "~~>hello world")
+        );
+    }
+
+    @Test
+    void rowsFromSecondaryDeclarativeRecipe() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+              """
+                ---
+                type: specs.openrewrite.org/v1beta/recipe
+                name: test.recipe
+                displayName: Top-level recipe
+                description: .
+                recipeList:
+                  - test.recipe2
+                ---
+                type: specs.openrewrite.org/v1beta/recipe
+                name: test.recipe2
+                displayName: Recipe producing data table
+                description: .
+                recipeList:
+                  - org.openrewrite.text.Find:
+                      find: hello
+                """,
+              "test.recipe"
+            )
+            .afterRecipe(run -> {
+                assertThat(run.getDataTables().keySet()).anyMatch(dt -> dt instanceof TextMatches);
+            }),
+          text("hello world", "~~>hello world")
+        );
+    }
+
+    @Test
+    void rowsFromDeclarativeRecipeWithPrecondition() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+              """
+                ---
+                type: specs.openrewrite.org/v1beta/recipe
+                name: test.recipe
+                displayName: Recipe producing data table as precondition and in recipe list
+                description: .
+                preconditions:
+                 - org.openrewrite.text.Find:
+                     find: hello
+                recipeList:
+                  - org.openrewrite.text.Find:
+                      find: hello
+                """,
+              "test.recipe"
+            )
+            .afterRecipe(run -> {
+                assertThat(run.getDataTables().keySet()).anyMatch(dt -> dt instanceof TextMatches);
+            }),
+          text("hello world", "~~>hello world")
         );
     }
 

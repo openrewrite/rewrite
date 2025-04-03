@@ -308,8 +308,11 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     }
 
     public boolean isCurrentlyExecuting(Recipe recipe) {
-        // The latter is currently required for RPC which doesn't execute recipes via RecipeRunCycle
-        return current == recipe || this.recipe == recipe;
+        // The second alternative is for declarative recipes with preconditions
+        // The third alternative is currently required for RPC which doesn't execute recipes via RecipeRunCycle
+        return current == recipe ||
+               current instanceof Recipe.DelegatingRecipe && ((Recipe.DelegatingRecipe) current).getDelegate() == recipe ||
+               this.recipe == recipe;
     }
 
     public boolean acceptRowForDataTable(DataTable<?> dataTable) {
