@@ -1,6 +1,8 @@
 plugins {
     id("org.openrewrite.build.language-library")
     id("org.openrewrite.build.java8-text-blocks")
+    // Prevent cache misses due to metadata differences inside the JAR
+    id("org.gradlex.reproducible-builds") version "1.0"
 }
 
 dependencies {
@@ -14,6 +16,24 @@ dependencies {
         // so we can run tests in the IDE with the IntelliJ IDEA runner
         runtimeOnly(project(":rewrite-java-17"))
     }
+}
+
+configurations.all {
+    resolutionStrategy {
+        eachDependency {
+            if (requested.group == "org.assertj" && requested.name == "assertj-core") {
+                useVersion("3.+") // Pin to latest 3.+ version as AssertJ 4 requires Java 17
+            }
+        }
+    }
+}
+
+infoBroker {
+    // Prevent cache misses due to unstable attributes, e.g. "Build-Date"
+    includedManifestProperties = listOf(
+        "Module-Owner",
+        "Module-Email",
+    )
 }
 
 tasks.withType<Javadoc> {

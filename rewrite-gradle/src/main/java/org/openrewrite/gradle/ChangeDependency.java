@@ -15,18 +15,18 @@
  */
 package org.openrewrite.gradle;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
+import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.gradle.internal.ChangeStringLiteral;
+import org.openrewrite.gradle.internal.Dependency;
+import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindGradleProject;
 import org.openrewrite.gradle.trait.GradleDependency;
-import org.openrewrite.gradle.util.ChangeStringLiteral;
-import org.openrewrite.gradle.util.Dependency;
-import org.openrewrite.gradle.util.DependencyStringNotationConverter;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
@@ -46,6 +46,7 @@ import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
+@RequiredArgsConstructor
 public class ChangeDependency extends Recipe {
     @Option(displayName = "Old groupId",
             description = "The old groupId to replace. The groupId is the first part of a dependency coordinate 'com.google.guava:guava:VERSION'. Supports glob expressions.",
@@ -97,26 +98,10 @@ public class ChangeDependency extends Recipe {
     @Nullable
     Boolean overrideManagedVersion;
 
-    /**
-     * Keeping this constructor just for compatibility purposes
-     *
-     * @deprecated Use {@link ChangeDependency#ChangeDependency(String, String, String, String, String, String, Boolean)}
-     */
-    @Deprecated
-    public ChangeDependency(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern) {
-        this(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern, null);
-    }
-
-    @JsonCreator
-    public ChangeDependency(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern, @Nullable Boolean overrideManagedVersion) {
-        this.oldGroupId = oldGroupId;
-        this.oldArtifactId = oldArtifactId;
-        this.newGroupId = newGroupId;
-        this.newArtifactId = newArtifactId;
-        this.newVersion = newVersion;
-        this.versionPattern = versionPattern;
-        this.overrideManagedVersion = overrideManagedVersion;
-    }
+    // Individual dependencies tend to appear in several places within a given dependency graph.
+    // Minimize the number of allocations by caching the updated dependencies.
+    transient Map<org.openrewrite.maven.tree.Dependency, org.openrewrite.maven.tree.Dependency> updatedRequested = new HashMap<>();
+    transient Map<org.openrewrite.maven.tree.ResolvedDependency, org.openrewrite.maven.tree.ResolvedDependency> updatedResolved = new HashMap<>();
 
     @Override
     public String getDisplayName() {
@@ -180,14 +165,16 @@ public class ChangeDependency extends Recipe {
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
-                GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher();
+                GradleDependency.Matcher gradleDependencyMatcher = new GradleDependency.Matcher()
+                        .groupId(oldGroupId)
+                        .artifactId(oldArtifactId);
 
                 if (!gradleDependencyMatcher.get(getCursor()).isPresent()) {
                     return m;
                 }
 
                 List<Expression> depArgs = m.getArguments();
-                if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry) {
+                if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry || depArgs.get(0) instanceof G.MapLiteral) {
                     m = updateDependency(m, ctx);
                 } else if (depArgs.get(0) instanceof J.MethodInvocation &&
                            (((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("platform") ||
@@ -204,7 +191,7 @@ public class ChangeDependency extends Recipe {
                     String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                     if (gav != null) {
                         Dependency original = DependencyStringNotationConverter.parse(gav);
-                        if (original != null && depMatcher.matches(original.getGroupId(), original.getArtifactId())) {
+                        if (original != null) {
                             Dependency updated = original;
                             if (!StringUtils.isBlank(newGroupId) && !updated.getGroupId().equals(newGroupId)) {
                                 updated = updated.withGroupId(newGroupId);
@@ -238,7 +225,7 @@ public class ChangeDependency extends Recipe {
 
                         J.Literal literal = (J.Literal) strings.get(0);
                         Dependency original = DependencyStringNotationConverter.parse((String) requireNonNull(literal.getValue()));
-                        if (original != null && depMatcher.matches(original.getGroupId(), original.getArtifactId())) {
+                        if (original != null) {
                             Dependency updated = original;
                             if (!StringUtils.isBlank(newGroupId) && !updated.getGroupId().equals(newGroupId)) {
                                 updated = updated.withGroupId(newGroupId);
@@ -352,6 +339,92 @@ public class ChangeDependency extends Recipe {
                             return arg;
                         }));
                     }
+                } else if (m.getArguments().get(0) instanceof G.MapLiteral) {
+                    G.MapLiteral map = (G.MapLiteral) depArgs.get(0);
+                    G.MapEntry groupEntry = null;
+                    G.MapEntry artifactEntry = null;
+                    G.MapEntry versionEntry = null;
+                    String groupId = null;
+                    String artifactId = null;
+                    String version = null;
+
+                    for (G.MapEntry arg : map.getElements()) {
+                        if (!(arg.getKey() instanceof J.Literal) || !(arg.getValue() instanceof J.Literal)) {
+                            continue;
+                        }
+                        J.Literal key = (J.Literal) arg.getKey();
+                        J.Literal value = (J.Literal) arg.getValue();
+                        if (!(key.getValue() instanceof String) || !(value.getValue() instanceof String)) {
+                            continue;
+                        }
+                        String keyValue = (String) key.getValue();
+                        String valueValue = (String) value.getValue();
+                        switch (keyValue) {
+                            case "group":
+                                groupEntry = arg;
+                                groupId = valueValue;
+                                break;
+                            case "name":
+                                artifactEntry = arg;
+                                artifactId = valueValue;
+                                break;
+                            case "version":
+                                versionEntry = arg;
+                                version = valueValue;
+                                break;
+                        }
+                    }
+                    if (groupId == null || artifactId == null) {
+                        return m;
+                    }
+                    if (!depMatcher.matches(groupId, artifactId)) {
+                        return m;
+                    }
+                    String updatedGroupId = groupId;
+                    if (!StringUtils.isBlank(newGroupId) && !updatedGroupId.equals(newGroupId)) {
+                        updatedGroupId = newGroupId;
+                    }
+                    String updatedArtifactId = artifactId;
+                    if (!StringUtils.isBlank(newArtifactId) && !updatedArtifactId.equals(newArtifactId)) {
+                        updatedArtifactId = newArtifactId;
+                    }
+                    String updatedVersion = version;
+                    if (!StringUtils.isBlank(newVersion) && (!StringUtils.isBlank(version) || Boolean.TRUE.equals(overrideManagedVersion))) {
+                        String resolvedVersion;
+                        try {
+                            resolvedVersion = new DependencyVersionSelector(null, gradleProject, null)
+                                    .select(new GroupArtifact(updatedGroupId, updatedArtifactId), m.getSimpleName(), newVersion, versionPattern, ctx);
+                        } catch (MavenDownloadingException e) {
+                            return e.warn(m);
+                        }
+                        if (resolvedVersion != null && !resolvedVersion.equals(updatedVersion)) {
+                            updatedVersion = resolvedVersion;
+                        }
+                    }
+
+                    if (!updatedGroupId.equals(groupId) || !updatedArtifactId.equals(artifactId) || updatedVersion != null && !updatedVersion.equals(version)) {
+                        G.MapEntry finalGroup = groupEntry;
+                        String finalGroupIdValue = updatedGroupId;
+                        G.MapEntry finalArtifact = artifactEntry;
+                        String finalArtifactIdValue = updatedArtifactId;
+                        G.MapEntry finalVersion = versionEntry;
+                        String finalVersionValue = updatedVersion;
+                        m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
+                            G.MapLiteral mapLiteral = (G.MapLiteral) arg;
+                            return mapLiteral.withElements(ListUtils.map(mapLiteral.getElements(), e -> {
+                                if (e == finalGroup) {
+                                    return finalGroup.withValue(ChangeStringLiteral.withStringValue((J.Literal) finalGroup.getValue(), finalGroupIdValue));
+                                }
+                                if (e == finalArtifact) {
+                                    return finalArtifact.withValue(ChangeStringLiteral.withStringValue((J.Literal) finalArtifact.getValue(), finalArtifactIdValue));
+                                }
+                                if (e == finalVersion) {
+                                    return finalVersion.withValue(ChangeStringLiteral.withStringValue((J.Literal) finalVersion.getValue(), finalVersionValue));
+                                }
+                                return e;
+                            }));
+                        }));
+                    }
                 }
 
                 return m;
@@ -364,32 +437,40 @@ public class ChangeDependency extends Recipe {
                 for (GradleDependencyConfiguration gdc : nameToConfiguration.values()) {
                     GradleDependencyConfiguration newGdc = gdc;
                     newGdc = newGdc.withRequested(ListUtils.map(gdc.getRequested(), requested -> {
+                        assert requested != null;
                         if (depMatcher.matches(requested.getGroupId(), requested.getArtifactId())) {
-                            GroupArtifactVersion gav = requested.getGav();
-                            if (newGroupId != null) {
-                                gav = gav.withGroupId(newGroupId);
-                            }
-                            if (newArtifactId != null) {
-                                gav = gav.withArtifactId(newArtifactId);
-                            }
-                            if (gav != requested.getGav()) {
-                                return requested.withGav(gav);
-                            }
+                            requested = updatedRequested.computeIfAbsent(requested, r -> {
+                                GroupArtifactVersion gav = r .getGav();
+                                if (newGroupId != null) {
+                                    gav = gav.withGroupId(newGroupId);
+                                }
+                                if (newArtifactId != null) {
+                                    gav = gav.withArtifactId(newArtifactId);
+                                }
+                                if (gav != r .getGav()) {
+                                    r = r.withGav(gav);
+                                }
+                                return r;
+                            });
                         }
                         return requested;
                     }));
                     newGdc = newGdc.withDirectResolved(ListUtils.map(gdc.getDirectResolved(), resolved -> {
+                        assert resolved != null;
                         if (depMatcher.matches(resolved.getGroupId(), resolved.getArtifactId())) {
-                            ResolvedGroupArtifactVersion gav = resolved.getGav();
-                            if (newGroupId != null) {
-                                gav = gav.withGroupId(newGroupId);
-                            }
-                            if (newArtifactId != null) {
-                                gav = gav.withArtifactId(newArtifactId);
-                            }
-                            if (gav != resolved.getGav()) {
-                                return resolved.withGav(gav);
-                            }
+                            resolved = updatedResolved.computeIfAbsent(resolved, r -> {
+                                ResolvedGroupArtifactVersion gav = r.getGav();
+                                if (newGroupId != null) {
+                                    gav = gav.withGroupId(newGroupId);
+                                }
+                                if (newArtifactId != null) {
+                                    gav = gav.withArtifactId(newArtifactId);
+                                }
+                                if (gav != r.getGav()) {
+                                    r = r.withGav(gav);
+                                }
+                                return r;
+                            });
                         }
                         return resolved;
                     }));

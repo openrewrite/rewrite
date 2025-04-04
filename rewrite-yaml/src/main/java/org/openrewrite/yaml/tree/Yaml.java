@@ -15,18 +15,22 @@
  */
 package org.openrewrite.yaml.tree;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.YamlVisitor;
 import org.openrewrite.yaml.internal.YamlPrinter;
 
+import java.lang.ref.SoftReference;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 import static java.util.stream.Collectors.toList;
@@ -60,8 +64,10 @@ public interface Yaml extends Tree {
 
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     @With
-    class Documents implements Yaml, SourceFile {
+    class Documents implements Yaml, SourceFileWithReferences {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -125,6 +131,16 @@ public interface Yaml extends Tree {
         public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
             return new YamlPrinter<>();
         }
+
+        @Nullable
+        @NonFinal
+        transient SoftReference<References> references;
+
+        @Override
+        public References getReferences() {
+            this.references = build(this.references);
+            return Objects.requireNonNull(this.references.get());
+        }
     }
 
     @Value
@@ -153,7 +169,7 @@ public interface Yaml extends Tree {
                     Markers.EMPTY,
                     explicit,
                     block.copyPaste(),
-                    end == null ? null : end.copyPaste()
+                    end.copyPaste()
             );
         }
 
@@ -215,6 +231,9 @@ public interface Yaml extends Tree {
         @Nullable
         Anchor anchor;
 
+        @Nullable
+        Tag tag;
+
         String value;
 
         public enum Style {
@@ -225,6 +244,22 @@ public interface Yaml extends Tree {
             PLAIN
         }
 
+        @Deprecated
+        public Scalar(UUID id, String prefix, Markers markers, Style style, @Nullable Anchor anchor, String value) {
+            this(id, prefix, markers, style, anchor, null, value);
+        }
+
+        @JsonCreator
+        public Scalar(UUID id, String prefix, Markers markers, Style style, @Nullable Anchor anchor, @Nullable Tag tag, String value) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            this.style = style;
+            this.anchor = anchor;
+            this.tag = tag;
+            this.value = value;
+        }
+
         @Override
         public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
             return v.visitScalar(this, p);
@@ -232,7 +267,7 @@ public interface Yaml extends Tree {
 
         @Override
         public Scalar copyPaste() {
-            return new Scalar(randomId(), prefix, Markers.EMPTY, style, anchor, value);
+            return new Scalar(randomId(), prefix, Markers.EMPTY, style, anchor, tag, value);
         }
 
         @Override
@@ -262,6 +297,25 @@ public interface Yaml extends Tree {
         @Nullable
         Anchor anchor;
 
+        @Nullable
+        Tag tag;
+
+        @Deprecated
+        public Mapping(UUID id, Markers markers, @Nullable String openingBracePrefix, List<Entry> entries, @Nullable String closingBracePrefix, @Nullable Anchor anchor) {
+            this(id, markers, openingBracePrefix, entries, closingBracePrefix, anchor, null);
+        }
+
+        @JsonCreator
+        public Mapping(UUID id, Markers markers, @Nullable String openingBracePrefix, List<Entry> entries, @Nullable String closingBracePrefix, @Nullable Anchor anchor, @Nullable Tag tag) {
+            this.id = id;
+            this.markers = markers;
+            this.openingBracePrefix = openingBracePrefix;
+            this.entries = entries;
+            this.closingBracePrefix = closingBracePrefix;
+            this.anchor = anchor;
+            this.tag = tag;
+        }
+
         @Override
         public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
             return v.visitMapping(this, p);
@@ -270,7 +324,7 @@ public interface Yaml extends Tree {
         @Override
         public Mapping copyPaste() {
             return new Mapping(randomId(), Markers.EMPTY, openingBracePrefix, entries.stream().map(Entry::copyPaste)
-                    .collect(toList()), closingBracePrefix, anchor);
+                    .collect(toList()), closingBracePrefix, anchor, tag);
         }
 
         /**
@@ -347,6 +401,25 @@ public interface Yaml extends Tree {
         @Nullable
         Anchor anchor;
 
+        @Nullable
+        Tag tag;
+
+        @Deprecated
+        public Sequence(UUID id, Markers markers, @Nullable String openingBracketPrefix, List<Entry> entries, @Nullable String closingBracketPrefix, @Nullable Anchor anchor) {
+            this(id, markers, openingBracketPrefix, entries, closingBracketPrefix, anchor, null);
+        }
+
+        @JsonCreator
+        public Sequence(UUID id, Markers markers, @Nullable String openingBracketPrefix, List<Entry> entries, @Nullable String closingBracketPrefix, @Nullable Anchor anchor, @Nullable Tag tag) {
+            this.id = id;
+            this.markers = markers;
+            this.openingBracketPrefix = openingBracketPrefix;
+            this.entries = entries;
+            this.closingBracketPrefix = closingBracketPrefix;
+            this.anchor = anchor;
+            this.tag = tag;
+        }
+
         @Override
         public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
             return v.visitSequence(this, p);
@@ -355,7 +428,7 @@ public interface Yaml extends Tree {
         @Override
         public Sequence copyPaste() {
             return new Sequence(randomId(), Markers.EMPTY, openingBracketPrefix,
-                    entries.stream().map(Entry::copyPaste).collect(toList()), closingBracketPrefix, anchor);
+                    entries.stream().map(Entry::copyPaste).collect(toList()), closingBracketPrefix, anchor, tag);
         }
 
         @Override
@@ -489,6 +562,76 @@ public interface Yaml extends Tree {
         @Override
         public String toString() {
             return "Yaml.Anchor(" + key + ")";
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Tag implements Yaml {
+        public enum Kind {
+            LOCAL {
+                @Override
+                public String print(String name) {
+                    return "!" + name;
+                }
+            },
+            IMPLICIT_GLOBAL {
+                @Override
+                public String print(String name) {
+                    return "!!" + name;
+                }
+            },
+            EXPLICIT_GLOBAL {
+                @Override
+                public String print(String name) {
+                    return "!<" + name + ">";
+                }
+            };
+
+            public abstract String print(String name);
+        }
+
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        String prefix;
+
+        @With
+        Markers markers;
+
+        @With
+        String name;
+
+        @With
+        String suffix;
+
+        @Getter
+        Kind kind;
+
+        public Tag(UUID id, String prefix, Markers markers, String name, String suffix, Kind kind) {
+            this.id = id;
+            this.prefix = prefix;
+            this.suffix = suffix;
+            this.markers = markers;
+            this.name = name;
+            this.kind = kind;
+        }
+
+        @Override
+        public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
+            return v.visitTag(this, p);
+        }
+
+        @Override
+        public Tag copyPaste() {
+            return new Tag(randomId(), prefix, Markers.EMPTY, name, suffix, kind);
+        }
+
+        @Override
+        public String toString() {
+            return "Yaml.Tag(" + name + ")";
         }
     }
 }

@@ -40,9 +40,46 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
-    void string() {
+    void singleQuoteString() {
         rewriteRun(
-          groovy("'hello'")
+          groovy(
+            """
+              'hello'
+              """
+          )
+        );
+    }
+
+    @Test
+    void regexPatternSingleQuoteString() {
+        rewriteRun(
+          groovy(
+            """
+              ~"hello"
+              """
+          )
+        );
+    }
+
+    @Test
+    void doubleQuoteString() {
+        rewriteRun(
+          groovy(
+            """
+              "hello"
+              """
+          )
+        );
+    }
+
+    @Test
+    void regexPatternDoubleQuoteString() {
+        rewriteRun(
+          groovy(
+            """
+              ~"hello"
+              """
+          )
         );
     }
 
@@ -74,6 +111,19 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
+    void regexPatternQuotedString() {
+        rewriteRun(
+          groovy(
+            """
+              ~\"""
+                  " Hi "
+              \"""
+              """
+          )
+        );
+    }
+
+    @Test
     void slashString() {
         rewriteRun(
           groovy(
@@ -85,11 +135,44 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
+    void regexPatternSlashString() {
+        rewriteRun(
+          groovy(
+            """
+              ~/foo/
+              """
+          )
+        );
+    }
+
+    @Test
+    void escapedString() {
+        rewriteRun(
+          groovy(
+            """
+              "f\\"o\\\\\\"o"
+              """
+          )
+        );
+    }
+
+    @Test
     void gString() {
         rewriteRun(
           groovy(
             """
               " uid: ${ UUID.randomUUID() } "
+              """
+          )
+        );
+    }
+
+    @Test
+    void regexPatternGString() {
+        rewriteRun(
+          groovy(
+            """
+              ~"${ UUID.randomUUID() }"
               """
           )
         );
@@ -170,6 +253,28 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
+    void gStringWithEscapedDelimiter() {
+        rewriteRun(
+          groovy(
+            """
+              String s = "<a href=\\"$url\\">${displayName}</a>"
+              """
+          )
+        );
+    }
+
+    @Test
+    void gStringWithStringLiteralsWithParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              "Hello ${from(":-)").via(''':-|(''').via(":-)").to(':-(')}!"
+              """
+          )
+        );
+    }
+
+    @Test
     void mapLiteral() {
         rewriteRun(
           groovy(
@@ -217,18 +322,6 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
-    void emptyListLiteral() {
-        rewriteRun(
-          groovy(
-            """
-              def a = []
-              def b = [   ]
-              """
-          )
-        );
-    }
-
-    @Test
     void multilineStringWithApostrophes() {
         rewriteRun(
           groovy(
@@ -255,17 +348,6 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
-    void listLiteralTrailingComma() {
-        rewriteRun(
-          groovy(
-            """
-              def a = [ "foo" /* "foo" suffix */ , /* "]" prefix */ ]
-              """
-          )
-        );
-    }
-
-    @Test
     void gStringThatHasEmptyValueExpressionForUnknownReason() {
         rewriteRun(
           groovy(
@@ -282,7 +364,7 @@ class LiteralTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-            "\\\\n\\t"
+            "\\\\\\\\n\\\\t"
             '\\\\n\\t'
             ///\\\\n\\t///
             """
@@ -307,12 +389,17 @@ class LiteralTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              def a = ("-")
+              def a = (       "-"  )
               """
           ),
           groovy(
             """
               def a = (("-"))
+              """
+          ),
+          groovy(
+            """
+              from(":-)").via(''':-|(''').via(":-)").to(':-(')
               """
           )
         );

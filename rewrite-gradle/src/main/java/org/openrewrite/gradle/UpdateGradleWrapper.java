@@ -15,10 +15,7 @@
  */
 package org.openrewrite.gradle;
 
-import lombok.AccessLevel;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
+import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
@@ -158,6 +155,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         return gradleWrapper;
     }
 
+    @Data
     public static class GradleWrapperState {
         boolean gradleProject = false;
         boolean needsWrapperUpdate = false;
@@ -224,8 +222,10 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                         // Typical example: https://services.gradle.org/distributions/gradle-7.4-all.zip or https://company.com/repo/gradle-8.2-bin.zip
                         String currentDistributionUrl = entry.getValue().getText();
 
-                        GradleWrapper gradleWrpr = getGradleWrapper(ctx);
-                        if (StringUtils.isBlank(gradleWrpr.getDistributionUrl()) && !StringUtils.isBlank(version) &&
+                        if (gradleWrapper == null) {
+                            getGradleWrapper(ctx);
+                        }
+                        if (StringUtils.isBlank(gradleWrapper.getDistributionUrl()) && !StringUtils.isBlank(version) &&
                             Semver.validate(version, null).getValue() instanceof ExactVersion) {
                             String newDownloadUrl = currentDistributionUrl.replace("\\", "")
                                     .replaceAll("(.*gradle-)(\\d+\\.\\d+(?:\\.\\d+)?)(.*-(?:bin|all).zip)",
@@ -233,13 +233,13 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                             gradleWrapper = new GradleWrapper(version, new DistributionInfos(newDownloadUrl, null, null));
                         }
                         String wrapperHost = currentDistributionUrl.substring(0, currentDistributionUrl.lastIndexOf("/")) + "/gradle-";
-                        if (StringUtils.isBlank(wrapperUri) && !StringUtils.isBlank(gradleWrpr.getDistributionUrl()) &&
-                            !gradleWrpr.getPropertiesFormattedUrl().startsWith(wrapperHost)) {
-                            String newDownloadUrl = gradleWrpr.getDistributionUrl()
+                        if (StringUtils.isBlank(wrapperUri) && !StringUtils.isBlank(gradleWrapper.getDistributionUrl()) &&
+                            !gradleWrapper.getPropertiesFormattedUrl().startsWith(wrapperHost)) {
+                            String newDownloadUrl = gradleWrapper.getDistributionUrl()
                                     .replace("\\", "")
                                     .replaceAll("(.*gradle-)(\\d+\\.\\d+(?:\\.\\d+)?)(.*-(?:bin|all).zip)",
                                             wrapperHost + gradleWrapper.getVersion() + "$3");
-                            gradleWrapper = new GradleWrapper(gradleWrpr.getVersion(), new DistributionInfos(newDownloadUrl, null, null));
+                            gradleWrapper = new GradleWrapper(gradleWrapper.getVersion(), new DistributionInfos(newDownloadUrl, null, null));
                         }
 
                         if (!gradleWrapper.getPropertiesFormattedUrl().equals(currentDistributionUrl)) {
@@ -251,10 +251,6 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                 new TreeVisitor<Tree, ExecutionContext>() {
                     @Override
                     public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-                        if (!super.isAcceptable(sourceFile, ctx)) {
-                            return false;
-                        }
-
                         if (new FindGradleProject(FindGradleProject.SearchCriteria.Marker).getVisitor().visitNonNull(sourceFile, ctx) != sourceFile) {
                             acc.gradleProject = true;
                         }
@@ -276,6 +272,12 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                         }
 
                         return false;
+                    }
+
+                    @Override
+                    public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                        // "work" already performed by `isAcceptable()`; no need to visit anymore
+                        return tree;
                     }
                 }
         );
@@ -359,6 +361,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (!(tree instanceof SourceFile)) {
+                    //noinspection DataFlowIssue
                     return tree;
                 }
 
@@ -380,6 +383,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                     }
                 }
 
+                GradleWrapper gradleWrapper = getGradleWrapper(ctx);
                 if (sourceFile instanceof PlainText && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_SCRIPT_LOCATION_RELATIVE_PATH)) {
                     String gradlewText = unixScript(gradleWrapper, ctx);
                     PlainText gradlew = (PlainText) setExecutable(sourceFile);
@@ -476,7 +480,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         return script;
     }
 
-    private class WrapperPropertiesVisitor extends PropertiesVisitor<ExecutionContext> {
+    private static class WrapperPropertiesVisitor extends PropertiesVisitor<ExecutionContext> {
 
         private static final String DISTRIBUTION_SHA_256_SUM_KEY = "distributionSha256Sum";
         private final GradleWrapper gradleWrapper;

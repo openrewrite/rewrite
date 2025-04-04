@@ -29,13 +29,10 @@ import org.openrewrite.tree.ParseError;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.tree.Xml;
 
-import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.Collections.*;
@@ -45,6 +42,7 @@ import static org.openrewrite.Tree.randomId;
 public class MavenParser implements Parser {
 
     private final Collection<String> activeProfiles;
+    private final Map<String, String> properties;
     private final boolean skipDependencyResolution;
 
     @Override
@@ -80,9 +78,7 @@ public class MavenParser implements Parser {
                 if (pom.getProperties().isEmpty()) {
                     pom = pom.withProperties(new LinkedHashMap<>());
                 }
-                String baseDir = pomPath.toAbsolutePath().getParent().toString();
-                pom.getProperties().put("project.basedir", baseDir);
-                pom.getProperties().put("basedir", baseDir);
+                pom.getProperties().putAll(properties);
 
                 SourceFile sourceFile = new MavenXmlParser()
                         .parseInputs(singletonList(source), relativeTo, ctx)
@@ -107,11 +103,20 @@ public class MavenParser implements Parser {
         MavenExecutionContextView mavenCtx = MavenExecutionContextView.view(ctx);
         MavenSettings sanitizedSettings = mavenCtx.getSettings() == null ? null : mavenCtx.getSettings()
                 .withServers(null);
+        List<String> effectivelyActiveProfiles = Stream.concat(mavenCtx.getActiveProfiles().stream(), activeProfiles.stream()).collect(Collectors.toList());
 
         for (Map.Entry<Xml.Document, Pom> docToPom : projectPoms.entrySet()) {
             try {
-                ResolvedPom resolvedPom = docToPom.getValue().resolve(activeProfiles, downloader, ctx);
-                MavenResolutionResult model = new MavenResolutionResult(randomId(), null, resolvedPom, emptyList(), null, emptyMap(), sanitizedSettings, mavenCtx.getActiveProfiles());
+                ResolvedPom resolvedPom = docToPom.getValue().resolve(effectivelyActiveProfiles, downloader, ctx);
+                MavenResolutionResult model = new MavenResolutionResult(randomId(),
+                        null,
+                        resolvedPom,
+                        emptyList(),
+                        null,
+                        emptyMap(),
+                        sanitizedSettings,
+                        effectivelyActiveProfiles,
+                        properties);
                 if (!skipDependencyResolution) {
                     model = model.resolveDependencies(downloader, ctx);
                 }
@@ -141,7 +146,7 @@ public class MavenParser implements Parser {
         for (int i = 0; i < parsed.size(); i++) {
             SourceFile maven = parsed.get(i);
             Optional<MavenResolutionResult> maybeResolutionResult = maven.getMarkers().findFirst(MavenResolutionResult.class);
-            if(!maybeResolutionResult.isPresent()) {
+            if (!maybeResolutionResult.isPresent()) {
                 continue;
             }
             MavenResolutionResult resolutionResult = maybeResolutionResult.get();
@@ -151,7 +156,7 @@ public class MavenParser implements Parser {
                     continue;
                 }
                 Optional<MavenResolutionResult> maybeModuleResolutionResult = possibleModule.getMarkers().findFirst(MavenResolutionResult.class);
-                if(!maybeModuleResolutionResult.isPresent()) {
+                if (!maybeModuleResolutionResult.isPresent()) {
                     continue;
                 }
                 MavenResolutionResult moduleResolutionResult = maybeModuleResolutionResult.get();
@@ -184,6 +189,7 @@ public class MavenParser implements Parser {
 
     public static class Builder extends Parser.Builder {
         private final Collection<String> activeProfiles = new HashSet<>();
+        private final Map<String, String> properties = new HashMap<>();
         private boolean skipDependencyResolution;
 
         public Builder() {
@@ -203,26 +209,17 @@ public class MavenParser implements Parser {
             return this;
         }
 
-        @SuppressWarnings("unused") // Used in `MavenMojoProjectParser.parseMaven(..)`
-        public Builder mavenConfig(@Nullable Path mavenConfig) {
-            if (mavenConfig != null && mavenConfig.toFile().exists()) {
-                try {
-                    String mavenConfigText = new String(Files.readAllBytes(mavenConfig));
-                    Matcher matcher = Pattern.compile("(?:$|\\s)-P\\s+(\\S+)").matcher(mavenConfigText);
-                    if (matcher.find()) {
-                        String[] profiles = matcher.group(1).split(",");
-                        return activeProfiles(profiles);
-                    }
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
+        public Builder property(@Nullable String key, String value) {
+            //noinspection ConstantConditions
+            if (key != null && value != null) {
+                this.properties.put(key, value);
             }
             return this;
         }
 
         @Override
         public MavenParser build() {
-            return new MavenParser(activeProfiles, skipDependencyResolution);
+            return new MavenParser(activeProfiles, properties, skipDependencyResolution);
         }
 
         @Override

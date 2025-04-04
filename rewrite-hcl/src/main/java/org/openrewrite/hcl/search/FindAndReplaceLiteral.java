@@ -64,7 +64,8 @@ public class FindAndReplaceLiteral extends Recipe {
     Boolean regex;
 
     @Option(displayName = "Case sensitive",
-            description = "If `true` the search will be sensitive to case. Default `false`.", required = false)
+            description = "If `true` the search will be sensitive to case. Default `false`.",
+            required = false)
     @Nullable
     Boolean caseSensitive;
 

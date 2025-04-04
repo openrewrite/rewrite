@@ -16,9 +16,13 @@
 package org.openrewrite.java.search;
 
 import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavadocVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.SearchResult;
@@ -31,25 +35,33 @@ import java.util.stream.Collectors;
 
 import static org.openrewrite.java.tree.TypeUtils.isWellFormedType;
 
+@Value
+@EqualsAndHashCode(callSuper = false)
 public class FindMissingTypes extends Recipe {
+
+    @Option(displayName = "Check documentation",
+            description = "When set to `true` any references in documentation (i.e. Javadoc for Java) will also be checked. Default is `false`.",
+            required = false
+    )
+    boolean checkDocumentation;
 
     @Override
     public String getDisplayName() {
-        return "Find missing type information on Java ASTs";
+        return "Find missing type information on Java LSTs";
     }
 
     @Override
     public String getDescription() {
-        return "This is a diagnostic recipe to highlight where ASTs are missing type attribution information.";
+        return "This is a diagnostic recipe to highlight where LSTs are missing type attribution information.";
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new FindMissingTypesVisitor();
+        return new FindMissingTypesVisitor(checkDocumentation);
     }
 
-    public static List<MissingTypeResult> findMissingTypes(J j) {
-        J j1 = new FindMissingTypesVisitor().visit(j, new InMemoryExecutionContext());
+    public static List<MissingTypeResult> findMissingTypes(J j, boolean checkDocumentation) {
+        J j1 = new FindMissingTypesVisitor(checkDocumentation).visit(j, new InMemoryExecutionContext());
         List<MissingTypeResult> results = new ArrayList<>();
         if (j1 != j) {
             new JavaIsoVisitor<List<MissingTypeResult>>() {
@@ -62,13 +74,15 @@ public class FindMissingTypes extends Recipe {
                                 .map(t -> t.getClass().getSimpleName())
                                 .collect(Collectors.joining("->"));
                         J j = getCursor().firstEnclosing(J.class);
-                        String printedTree;
-                        if (getCursor().firstEnclosing(JavaSourceFile.class) != null) {
-                            printedTree = j != null ? j.printTrimmed(new InMemoryExecutionContext(), getCursor().getParentOrThrow()) : "";
-                        } else {
-                            printedTree = String.valueOf(j);
+                        if (j != null) {
+                            String printedTree;
+                            if (getCursor().firstEnclosing(JavaSourceFile.class) != null) {
+                                printedTree = j.printTrimmed(new InMemoryExecutionContext(), getCursor().getParentOrThrow());
+                            } else {
+                                printedTree = String.valueOf(j);
+                            }
+                            missingTypeResults.add(new MissingTypeResult(message, path, printedTree, j));
                         }
-                        missingTypeResults.add(new MissingTypeResult(message, path, printedTree, j));
                     }
                     return super.visitMarker(marker, missingTypeResults);
                 }
@@ -80,15 +94,20 @@ public class FindMissingTypes extends Recipe {
     @Getter
     @AllArgsConstructor
     public static class MissingTypeResult {
+        @Nullable
         String message;
+
         String path;
         String printedTree;
         J j;
     }
 
+    @Value
+    @EqualsAndHashCode(callSuper = false)
     static class FindMissingTypesVisitor extends JavaIsoVisitor<ExecutionContext> {
 
-        private final Set<JavaType> seenTypes = new HashSet<>();
+        boolean checkDocumentation;
+        Set<JavaType> seenTypes = new HashSet<>();
 
         @Override
         public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
@@ -142,6 +161,18 @@ public class FindMissingTypes extends Recipe {
                     // The MethodDeclaration#name#type and the methodType field should be the same object.
                     // A different object in one implies a type has changed, either in the method signature or deeper in the type tree.
                     mi = SearchResult.found(mi, "MethodInvocation#name#type is not the same instance as the MethodType of MethodInvocation.");
+                }
+                if (type != null) {
+                    int argCount = 0;
+                    for (Expression argument : mi.getArguments()) {
+                        if (!(argument instanceof J.Empty)) {
+                            argCount++;
+                        }
+                    }
+                    int minCount = type.hasFlags(Flag.Varargs) ? type.getParameterTypes().size() - 1 : type.getParameterTypes().size();
+                    if (argCount < minCount) {
+                        mi = SearchResult.found(mi, "argument count mismatch: " + argCount + " != " + type.getParameterTypes().size());
+                    }
                 }
             }
             return mi;
@@ -228,6 +259,16 @@ public class FindMissingTypes extends Recipe {
                 p = SearchResult.found(p, "ParameterizedType#clazz is J.Identifier and the type is is not JavaType$Class.");
             }
             return p;
+        }
+
+        @Override
+        protected JavadocVisitor<ExecutionContext> getJavadocVisitor() {
+            return new JavadocVisitor<ExecutionContext>(this) {
+                @Override
+                public @Nullable Javadoc visit(@Nullable Tree tree, ExecutionContext ctx) {
+                    return checkDocumentation ? super.visit(tree, ctx) : (Javadoc) tree;
+                }
+            };
         }
 
         private boolean isAllowedToHaveNullType(J.Identifier ident) {

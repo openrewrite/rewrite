@@ -30,8 +30,99 @@ class AnnotationTest implements RewriteTest {
           groovy(
             """
               @Foo
+              class Test implements Runnable {
+                  @java.lang.Override
+                  void run() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void simpleFQN() {
+        rewriteRun(
+          groovy(
+            """
+              @org.springframework.stereotype.Service
+              class Test {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void withParentheses() {
+        rewriteRun(
+          groovy(
+            """
+              @Foo()
+              class Test {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void inline() {
+        rewriteRun(
+          groovy(
+            """
+              @Foo class Test implements Runnable {
+                  @Override void run() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void withProperties() {
+        rewriteRun(
+          groovy(
+            """
+              @Foo(value = "A", version = "1.0")
+              class Test {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void withConstantProperty() {
+        rewriteRun(
+          groovy(
+            """
+              @Foo(value = Test.VERSION)
+              class Test {
+                  static final String VERSION = "1.23"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void withStaticallyImportedConstantProperty() {
+        rewriteRun(
+          groovy(
+            """
+              import static java.io.File.separator
+              @Deprecated(since = separator)
               class Test {
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void withImplicitValueProperty() {
+        rewriteRun(
+          groovy(
+            """
+              @Foo("A")
+              class Test {}
               """
           )
         );
@@ -43,9 +134,118 @@ class AnnotationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              @Foo(bar = @Bar)
-              class Test {
-              }
+              @Foo(bar = @Bar(@Baz(baz = @Qux("1.0"))))
+              class Test {}
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4254")
+    @Test
+    void groovyTransformAnnotation() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.transform.EqualsAndHashCode
+              import groovy.transform.ToString
+              
+              @Foo
+              @ToString
+              @EqualsAndHashCode
+              @Bar
+              class Test {}
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4254")
+    @Test
+    void groovyTransformImmutableAnnotation() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.transform.Immutable
+              import groovy.transform.TupleConstructor
+              
+              @Foo
+              @TupleConstructor
+              @Immutable
+              @Bar
+              class Test {}
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4254")
+    @Test
+    void groovyTransformImmutableFQNAnnotation() {
+        rewriteRun(
+          groovy(
+            """
+              @groovy.transform.Immutable
+              class Test {}
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/4853")
+    @Test
+    void annotationOnVariable() {
+        rewriteRun(
+          groovy(
+            """
+              @Foo def a = "a"
+              """
+          )
+        );
+    }
+
+    @Test
+    void groovyTransformFieldAnnotationOnVariable() {
+        rewriteRun(
+          groovy(
+            """
+              import groovy.transform.Field
+              
+              @Field def a = [1, 2, 3]
+              """
+          )
+        );
+    }
+
+    @Test
+    void groovyTransformFieldFQNAnnotationOnVariable() {
+        rewriteRun(
+          groovy(
+            """
+              @groovy.transform.Field def a = [1, 2, 3]
+              """
+          )
+        );
+    }
+
+    @Test
+    void groovyTransformFieldFQNAnnotationOnVariableWithReference() {
+        rewriteRun(
+          groovy(
+            """
+              def z = 1 + 2
+              @groovy.transform.Field def a = z
+              """
+          )
+        );
+    }
+
+    @Test
+    void groovyTransformFieldFQNAnnotationOnVariableWithMethodInvocation() {
+        rewriteRun(
+          groovy(
+            """
+              @groovy.transform.Field def a = callSomething()
               """
           )
         );

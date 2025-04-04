@@ -19,15 +19,18 @@ import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
+import org.openrewrite.gradle.internal.DependencyStringNotationConverter;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
-import org.openrewrite.gradle.util.DependencyStringNotationConverter;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.maven.tree.Dependency;
+import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 import org.openrewrite.trait.Trait;
 
 import java.util.List;
@@ -43,6 +46,8 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
     ResolvedDependency resolvedDependency;
 
     public static class Matcher extends GradleTraitMatcher<GradleDependency> {
+        private static final MethodMatcher DEPENDENCY_DSL_MATCHER = new MethodMatcher("DependencyHandlerSpec *(..)");
+
         @Nullable
         protected String configuration;
 
@@ -77,67 +82,96 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                     return null;
                 }
 
+                if (withinDependencyConstraintsBlock(cursor)) {
+                    // A dependency constraint is different from an actual dependency
+                    return null;
+                }
+
                 GradleProject gradleProject = getGradleProject(cursor);
-                if (gradleProject == null) {
-                    return null;
-                }
-
                 GradleDependencyConfiguration gdc = getConfiguration(gradleProject, methodInvocation);
-                if (gdc == null) {
+                if (gdc == null && !(DEPENDENCY_DSL_MATCHER.matches(methodInvocation) && !"project".equals(methodInvocation.getSimpleName()))) {
                     return null;
                 }
 
-                if (!(StringUtils.isBlank(configuration) || methodInvocation.getSimpleName().equals(configuration))) {
+                if (!StringUtils.isBlank(configuration) && !methodInvocation.getSimpleName().equals(configuration)) {
                     return null;
                 }
 
-                org.openrewrite.gradle.util.Dependency dependency = null;
+                org.openrewrite.gradle.internal.Dependency dependency = null;
                 Expression argument = methodInvocation.getArguments().get(0);
                 if (argument instanceof J.Literal || argument instanceof G.GString || argument instanceof G.MapEntry || argument instanceof G.MapLiteral) {
                     dependency = parseDependency(methodInvocation.getArguments());
-                } else if (argument instanceof J.MethodInvocation &&
-                        (((J.MethodInvocation) argument).getSimpleName().equals("platform") ||
-                                ((J.MethodInvocation) argument).getSimpleName().equals("enforcedPlatform"))) {
-                    dependency = parseDependency(((J.MethodInvocation) argument).getArguments());
+                } else if (argument instanceof J.MethodInvocation) {
+                    if (((J.MethodInvocation) argument).getSimpleName().equals("platform") ||
+                            ((J.MethodInvocation) argument).getSimpleName().equals("enforcedPlatform")) {
+                        dependency = parseDependency(((J.MethodInvocation) argument).getArguments());
+                    } else if (((J.MethodInvocation) argument).getSimpleName().equals("project")) {
+                        // project dependencies are not yet supported
+                        return null;
+                    }
                 }
 
                 if (dependency == null) {
                     return null;
                 }
 
-                if (gdc.isCanBeResolved()) {
-                    for (ResolvedDependency resolvedDependency : gdc.getResolved()) {
-                        if ((groupId == null || matchesGlob(resolvedDependency.getGroupId(), groupId)) &&
-                                (artifactId == null || matchesGlob(resolvedDependency.getArtifactId(), artifactId))) {
-                            Dependency req = resolvedDependency.getRequested();
-                            if ((req.getGroupId() == null || req.getGroupId().equals(dependency.getGroupId())) &&
-                                    req.getArtifactId().equals(dependency.getArtifactId())) {
-                                return new GradleDependency(cursor, resolvedDependency);
+                if (gdc != null) {
+                    if (gdc.isCanBeResolved()) {
+                        for (ResolvedDependency resolvedDependency : gdc.getResolved()) {
+                            if ((groupId == null || matchesGlob(resolvedDependency.getGroupId(), groupId)) &&
+                                    (artifactId == null || matchesGlob(resolvedDependency.getArtifactId(), artifactId))) {
+                                Dependency req = resolvedDependency.getRequested();
+                                if ((req.getGroupId() == null || req.getGroupId().equals(dependency.getGroupId())) &&
+                                        req.getArtifactId().equals(dependency.getArtifactId())) {
+                                    return new GradleDependency(cursor, resolvedDependency);
+                                }
                             }
                         }
-                    }
-                } else {
-                    for (GradleDependencyConfiguration transitiveConfiguration : gradleProject.configurationsExtendingFrom(gdc, true)) {
-                        if (transitiveConfiguration.isCanBeResolved()) {
-                            for (ResolvedDependency resolvedDependency : transitiveConfiguration.getResolved()) {
-                                if ((groupId == null || matchesGlob(resolvedDependency.getGroupId(), groupId)) &&
-                                        (artifactId == null || matchesGlob(resolvedDependency.getArtifactId(), artifactId))) {
-                                    Dependency req = resolvedDependency.getRequested();
-                                    if ((req.getGroupId() == null || req.getGroupId().equals(dependency.getGroupId())) &&
-                                            req.getArtifactId().equals(dependency.getArtifactId())) {
-                                        return new GradleDependency(cursor, resolvedDependency);
+                    } else {
+                        for (GradleDependencyConfiguration transitiveConfiguration : gradleProject.configurationsExtendingFrom(gdc, true)) {
+                            if (transitiveConfiguration.isCanBeResolved()) {
+                                for (ResolvedDependency resolvedDependency : transitiveConfiguration.getResolved()) {
+                                    if ((groupId == null || matchesGlob(resolvedDependency.getGroupId(), groupId)) &&
+                                            (artifactId == null || matchesGlob(resolvedDependency.getArtifactId(), artifactId))) {
+                                        Dependency req = resolvedDependency.getRequested();
+                                        if ((req.getGroupId() == null || req.getGroupId().equals(dependency.getGroupId())) &&
+                                                req.getArtifactId().equals(dependency.getArtifactId())) {
+                                            return new GradleDependency(cursor, resolvedDependency);
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
+
+                if ((groupId == null || matchesGlob(dependency.getGroupId(), groupId)) &&
+                        (artifactId == null || matchesGlob(dependency.getArtifactId(), artifactId))) {
+                    // Couldn't find the actual resolved dependency, return a virtualized one instead
+                    ResolvedDependency resolvedDependency = ResolvedDependency.builder()
+                            .depth(-1)
+                            .gav(new ResolvedGroupArtifactVersion(null, dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion() != null ? dependency.getVersion() : "", null))
+                            .classifier(dependency.getClassifier())
+                            .type(dependency.getExt())
+                            .requested(Dependency.builder()
+                                    .scope(methodInvocation.getSimpleName())
+                                    .type(dependency.getExt())
+                                    .gav(new GroupArtifactVersion(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion()))
+                                    .classifier(dependency.getClassifier())
+                                    .build())
+                            .build();
+                    return new GradleDependency(cursor, resolvedDependency);
+                }
             }
 
             return null;
         }
 
-        private static @Nullable GradleDependencyConfiguration getConfiguration(GradleProject gradleProject, J.MethodInvocation methodInvocation) {
+        private static @Nullable GradleDependencyConfiguration getConfiguration(@Nullable GradleProject gradleProject, J.MethodInvocation methodInvocation) {
+            if (gradleProject == null) {
+                return null;
+            }
+
             String methodName = methodInvocation.getSimpleName();
             if (methodName.equals("classpath")) {
                 return gradleProject.getBuildscript().getConfiguration(methodName);
@@ -146,12 +180,12 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             }
         }
 
-        private boolean withinDependenciesBlock(Cursor cursor) {
+        private boolean withinBlock(Cursor cursor, String name) {
             Cursor parentCursor = cursor.getParent();
             while (parentCursor != null) {
                 if (parentCursor.getValue() instanceof J.MethodInvocation) {
                     J.MethodInvocation m = parentCursor.getValue();
-                    if (m.getSimpleName().equals("dependencies")) {
+                    if (m.getSimpleName().equals(name)) {
                         return true;
                     }
                 }
@@ -161,7 +195,15 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             return false;
         }
 
-        private org.openrewrite.gradle.util.@Nullable Dependency parseDependency(List<Expression> arguments) {
+        private boolean withinDependenciesBlock(Cursor cursor) {
+            return withinBlock(cursor, "dependencies");
+        }
+
+        private boolean withinDependencyConstraintsBlock(Cursor cursor) {
+            return withinBlock(cursor, "constraints") && withinDependenciesBlock(cursor);
+        }
+
+        private org.openrewrite.gradle.internal.@Nullable Dependency parseDependency(List<Expression> arguments) {
             Expression argument = arguments.get(0);
             if (argument instanceof J.Literal) {
                 return DependencyStringNotationConverter.parse((String) ((J.Literal) argument).getValue());
@@ -184,7 +226,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
             return null;
         }
 
-        private static org.openrewrite.gradle.util.@Nullable Dependency getMapEntriesDependency(List<Expression> arguments) {
+        private static org.openrewrite.gradle.internal.@Nullable Dependency getMapEntriesDependency(List<Expression> arguments) {
             String group = null;
             String artifact = null;
 
@@ -213,7 +255,7 @@ public class GradleDependency implements Trait<J.MethodInvocation> {
                 return null;
             }
 
-            return new org.openrewrite.gradle.util.Dependency(group, artifact, null, null, null);
+            return new org.openrewrite.gradle.internal.Dependency(group, artifact, null, null, null);
         }
     }
 }

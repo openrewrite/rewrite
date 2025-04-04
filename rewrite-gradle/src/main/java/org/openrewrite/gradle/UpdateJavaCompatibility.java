@@ -19,7 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.gradle.util.ChangeStringLiteral;
+import org.openrewrite.gradle.internal.ChangeStringLiteral;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
@@ -101,10 +101,10 @@ public class UpdateJavaCompatibility extends Recipe {
             public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
                 G.CompilationUnit c = (G.CompilationUnit) super.visitCompilationUnit(cu, ctx);
                 if (getCursor().pollMessage(SOURCE_COMPATIBILITY_FOUND) == null) {
-                    c = addCompatibilityTypeToSourceFile(c, "source");
+                    c = addCompatibilityTypeToSourceFile(c, "source", ctx);
                 }
                 if (getCursor().pollMessage(TARGET_COMPATIBILITY_FOUND) == null) {
-                    c = addCompatibilityTypeToSourceFile(c, "target");
+                    c = addCompatibilityTypeToSourceFile(c, "target", ctx);
                 }
                 return c;
             }
@@ -202,6 +202,7 @@ public class UpdateJavaCompatibility extends Recipe {
                         int currentMajor = getMajorVersion(m.getArguments().get(0));
                         if (shouldUpdateVersion(currentMajor) || shouldUpdateStyle(declarationStyle)) {
                             DeclarationStyle actualStyle = declarationStyle == null ? currentStyle : declarationStyle;
+                            //noinspection DataFlowIssue
                             return m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> changeExpression(arg, actualStyle)));
                         } else {
                             return m;
@@ -383,9 +384,9 @@ public class UpdateJavaCompatibility extends Recipe {
         });
     }
 
-    private G.CompilationUnit addCompatibilityTypeToSourceFile(G.CompilationUnit c, String compatibilityType) {
+    private G.CompilationUnit addCompatibilityTypeToSourceFile(G.CompilationUnit c, String compatibilityType, ExecutionContext ctx) {
         if ((this.compatibilityType == null || compatibilityType.equals(this.compatibilityType.toString())) && Boolean.TRUE.equals(addIfMissing)) {
-            G.CompilationUnit sourceFile = (G.CompilationUnit) GradleParser.builder().build().parse("\n" + compatibilityType + "Compatibility = " + styleMissingCompatibilityVersion())
+            G.CompilationUnit sourceFile = (G.CompilationUnit) GradleParser.builder().build().parse(ctx, "\n" + compatibilityType + "Compatibility = " + styleMissingCompatibilityVersion())
                     .findFirst()
                     .orElseThrow(() -> new IllegalStateException("Unable to parse compatibility type as a Gradle file"));
             sourceFile.getStatements();

@@ -45,6 +45,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     static final XPathMatcher PLUGIN_MATCHER = new XPathMatcher("//plugins/plugin");
     static final XPathMatcher MANAGED_PLUGIN_MATCHER = new XPathMatcher("//pluginManagement/plugins/plugin");
     static final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent");
+    static final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
 
     private transient Xml.@Nullable Document document;
 
@@ -259,6 +260,10 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         return isTag("parent") && PARENT_MATCHER.matches(getCursor());
     }
 
+    public boolean isProjectTag() {
+        return isTag("project") && PROJECT_MATCHER.matches(getCursor());
+    }
+
     private boolean isTag(String name) {
         // `XPathMatcher` is still a bit expensive
         return getCursor().getValue() instanceof Xml.Tag && name.equals(getCursor().<Xml.Tag>getValue().getName());
@@ -382,6 +387,15 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     public MavenMetadata downloadMetadata(String groupId, String artifactId, @Nullable ResolvedPom containingPom, ExecutionContext ctx) throws MavenDownloadingException {
         return new MavenPomDownloader(emptyMap(), ctx, getResolutionResult().getMavenSettings(), getResolutionResult().getActiveProfiles())
                 .downloadMetadata(new GroupArtifact(groupId, artifactId), containingPom, getResolutionResult().getPom().getRepositories());
+    }
+
+    public MavenMetadata downloadPluginMetadata(String groupId, String artifactId, ExecutionContext ctx) throws MavenDownloadingException {
+        return downloadPluginMetadata(groupId, artifactId, null, ctx);
+    }
+
+    public MavenMetadata downloadPluginMetadata(String groupId, String artifactId, @Nullable ResolvedPom containingPom, ExecutionContext ctx) throws MavenDownloadingException {
+        return new MavenPomDownloader(emptyMap(), ctx, getResolutionResult().getMavenSettings(), getResolutionResult().getActiveProfiles())
+                .downloadMetadata(new GroupArtifact(groupId, artifactId), containingPom, getResolutionResult().getPom().getPluginRepositories());
     }
 
     /**

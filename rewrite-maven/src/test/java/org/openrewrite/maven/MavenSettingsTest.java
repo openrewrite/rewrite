@@ -578,9 +578,7 @@ class MavenSettingsTest {
     class MergingTest {
         @Language("xml")
         private final String installationSettings = """
-              <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                  xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+              <settings>
                   <servers>
                        <server>
                            <id>private-repo</id>
@@ -674,6 +672,54 @@ class MavenSettingsTest {
             assertThat(mergedSettings.getActiveProfiles().getActiveProfiles()).hasSize(2);
             assertThat(mergedSettings.getMirrors().getMirrors()).hasSize(2);
             assertThat(mergedSettings.getServers().getServers()).hasSize(2);
+        }
+
+        @Test
+        void mergedOrderingPutsFirstSettingsFirst() {
+            MavenSettings baseSettings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+              //language=xml
+              """
+                <settings>
+                    <profiles>
+                        <profile>
+                            <id>first-profile</id>
+                            <repositories>
+                                <repository>
+                                    <id>first-repo</id>
+                                    <name>Private First Repo</name>
+                                    <url>https://repo.company1.net/maven</url>
+                                </repository>
+                            </repositories>
+                        </profile>
+                    </profiles>
+                </settings>
+                """
+            ), ctx);
+            MavenSettings userSettings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+              //language=xml
+              """
+                <settings>
+                    <profiles>
+                        <profile>
+                            <id>second-profile</id>
+                            <repositories>
+                                <repository>
+                                    <id>second-repo</id>
+                                    <name>Private Second Repo</name>
+                                    <url>https://repo.company2.net/maven</url>
+                                </repository>
+                            </repositories>
+                        </profile>
+                    </profiles>
+                </settings>
+                """
+            ), ctx);
+
+            MavenSettings mergedSettings = baseSettings.merge(userSettings);
+            assertThat(mergedSettings.getProfiles().getProfiles().get(0).getId()).isEqualTo("first-profile");
+            assertThat(mergedSettings.getProfiles().getProfiles().get(1).getId()).isEqualTo("second-profile");
+            assertThat(mergedSettings.getProfiles().getProfiles().get(0).getRepositories().getRepositories().get(0).getId()).isEqualTo("first-repo");
+            assertThat(mergedSettings.getProfiles().getProfiles().get(1).getRepositories().getRepositories().get(0).getId()).isEqualTo("second-repo");
         }
 
         @Test

@@ -25,13 +25,11 @@ import okhttp3.mockwebserver.RecordedRequest;
 import okhttp3.tls.HandshakeCertificates;
 import okhttp3.tls.HeldCertificate;
 import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.HttpSenderExecutionContextView;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.Issue;
-import org.openrewrite.ParseExceptionResult;
-import org.openrewrite.Parser;
-import org.openrewrite.ipc.http.OkHttpSender;
+import org.openrewrite.*;
+import org.openrewrite.maven.http.OkHttpSender;
 import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.test.RewriteTest;
@@ -40,13 +38,15 @@ import org.openrewrite.tree.ParseError;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static java.util.stream.Collectors.groupingBy;
+import static org.assertj.core.api.Assertions.*;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
@@ -145,6 +145,80 @@ class MavenParserTest implements RewriteTest {
               </project>
               """
           )
+        );
+    }
+
+    @Test
+    void repositoryWithPropertyPlaceholders() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-project</artifactId>
+                  <version>1</version>
+                  <properties>
+                        <my.artifact.repo.url>https://my.artifact.repo.com</my.artifact.repo.url>
+                  </properties>
+                  <repositories>
+                      <repository>
+                          <id>my-artifact-repo</id>
+                          <url>${my.artifact.repo.url}</url>
+                      </repository>
+                  </repositories>
+              </project>
+              """,
+            spec -> spec.afterRecipe(p ->
+              assertThat(p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getRepositories())
+                .map(MavenRepository::getUri)
+                .describedAs("Property placeholder in repository URL resolved")
+                .singleElement()
+                .isEqualTo("https://my.artifact.repo.com"))
+          )
+        );
+    }
+
+    @Test
+    void repositoryWithPropertyFromParent() {
+        rewriteRun(
+          mavenProject("parent", pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-parent</artifactId>
+                  <version>1</version>
+                  <properties>
+                        <my.artifact.repo.url>https://my.artifact.repo.com</my.artifact.repo.url>
+                  </properties>
+              </project>
+              """
+          )),
+          mavenProject("child", pomXml(
+            """
+              <project>
+                  <parent>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-parent</artifactId>
+                      <version>1</version>
+                  </parent>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-child</artifactId>
+                  <version>1</version>
+                  <repositories>
+                      <repository>
+                          <id>my-artifact-repo</id>
+                          <url>${my.artifact.repo.url}</url>
+                      </repository>
+                  </repositories>
+              </project>
+              """,
+            spec -> spec.afterRecipe(p ->
+              assertThat(p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getRepositories())
+                .map(MavenRepository::getUri)
+                .describedAs("Property placeholder in repository URL resolved")
+                .singleElement()
+                .isEqualTo("https://my.artifact.repo.com"))
+          ))
         );
     }
 
@@ -1249,6 +1323,205 @@ class MavenParserTest implements RewriteTest {
             )
           )
         );
+    }
+
+    @Nested
+    class Profiles {
+
+        //language=xml
+        private final String parent = """
+          <project>
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>org.openrewrite.maven</groupId>
+              <artifactId>parent</artifactId>
+              <version>0.1.0-SNAPSHOT</version>
+              <packaging>pom</packaging>
+              <profiles>
+                  <profile>
+                      <id>active-profile-1</id>
+                      <activation>
+                          <activeByDefault>true</activeByDefault>
+                      </activation>
+                      <properties>
+                          <d.version>2.0.9</d.version>
+                      </properties>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.slf4j</groupId>
+                              <artifactId>slf4j-api</artifactId>
+                              <version>${d.version}</version>
+                          </dependency>
+                      </dependencies>
+                  </profile>
+                  <profile>
+                      <id>active-profile-2</id>
+                      <activation>
+                          <activeByDefault>true</activeByDefault>
+                      </activation>
+                      <properties>
+                          <e.version>2.11.0</e.version>
+                      </properties>
+                      <dependencies>
+                          <dependency>
+                              <groupId>commons-io</groupId>
+                              <artifactId>commons-io</artifactId>
+                              <version>${e.version}</version>
+                          </dependency>
+                      </dependencies>
+                  </profile>
+              </profiles>
+          </project>
+          """;
+
+        //language=xml
+        private final String child = """
+          <project>
+              <parent>
+                  <groupId>org.openrewrite.maven</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>0.1.0-SNAPSHOT</version>
+                  <relativePath />
+              </parent>
+              <groupId>org.openrewrite.maven</groupId>
+              <artifactId>a</artifactId>
+          </project>
+          """;
+
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/4269")
+        @DisplayName("activeByDefault=true profiles from a POM should be active " +
+                     "unless there is another active profile _from the same POM file_")
+        @Test
+        void activeByDefaultWithoutPomLocalActiveProfile() {
+            rewriteRun(
+              mavenProject("c",
+                pomXml(
+                  parent
+                )
+              ),
+              pomXml(
+                child, spec -> spec.afterRecipe(pomXml -> {
+                    Map<String, List<ResolvedDependency>> deps =
+                      pomXml.getMarkers()
+                        .findFirst(MavenResolutionResult.class)
+                        .orElseThrow()
+                        .getDependencies()
+                        .get(Scope.Compile)
+                        .stream()
+                        .collect(groupingBy(ResolvedDependency::getArtifactId));
+
+                    assertThat(deps)
+                      .hasEntrySatisfying("slf4j-api", rds -> assertThat(rds)
+                        .singleElement().extracting(ResolvedDependency::getVersion).isEqualTo("2.0.9"))
+                      .hasEntrySatisfying("commons-io", rds -> assertThat(rds)
+                        .singleElement().extracting(ResolvedDependency::getVersion).isEqualTo("2.11.0"));
+                })
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/4269")
+        @DisplayName("activeByDefault=true profiles from a POM should not be active" +
+                     " if there is another active profile _from the same POM file_")
+        @Test
+        void activeByDefaultWithPomLocalActiveProfile() {
+            rewriteRun(
+              recipeSpec -> recipeSpec
+                .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext()))
+                .parser(MavenParser.builder().activeProfiles("active-profile-1")),
+              mavenProject("c",
+                pomXml(
+                  parent
+                )
+              ),
+              pomXml(
+                child, spec -> spec.afterRecipe(pomXml -> {
+                      Map<String, List<ResolvedDependency>> deps =
+                        pomXml.getMarkers()
+                          .findFirst(MavenResolutionResult.class)
+                          .orElseThrow()
+                          .getDependencies()
+                          .get(Scope.Compile)
+                          .stream()
+                          .collect(groupingBy(ResolvedDependency::getArtifactId));
+
+                      assertThat(deps)
+                        .hasEntrySatisfying("slf4j-api", rds -> assertThat(rds)
+                          .singleElement().extracting(ResolvedDependency::getVersion).isEqualTo("2.0.9"))
+                        .doesNotContainKey("commons-io");
+                  }
+                )
+              )
+            );
+        }
+
+        @Test
+        void settingsActiveProfiles() {
+            var mavenCtx = MavenExecutionContextView.view(new InMemoryExecutionContext(t -> {
+                throw new RuntimeException(t);
+            }));
+            var settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
+              //language=xml
+              """
+                <settings>
+                  <activeProfiles>
+                      <activeProfile>foo</activeProfile>
+                  </activeProfiles>
+                </settings>
+                """
+            ), mavenCtx);
+            mavenCtx.setMavenSettings(settings);
+
+            rewriteRun(
+              recipeSpec -> recipeSpec.executionContext(mavenCtx),
+              pomXml(
+                """
+                  <project>
+                      <groupId>some.group</groupId>
+                      <artifactId>some.artifact</artifactId>
+                      <version>1-SNAPSHOT</version>
+                      <dependencies>
+                          <dependency>
+                              <groupId>commons-io</groupId>
+                              <artifactId>commons-io</artifactId>
+                          </dependency>
+                      </dependencies>
+                      <profiles>
+                          <profile>
+                              <id>foo</id>
+                              <properties>
+                                  <commons-io.version>2.11.0</commons-io.version>
+                              </properties>
+                              <dependencyManagement>
+                                  <dependencies>
+                                      <dependency>
+                                          <groupId>commons-io</groupId>
+                                          <artifactId>commons-io</artifactId>
+                                          <version>${commons-io.version}</version>
+                                      </dependency>
+                                  </dependencies>
+                              </dependencyManagement>
+                          </profile>
+                      </profiles>
+                  </project>
+                  """, spec -> spec.afterRecipe(pomXml -> {
+                      Map<String, List<ResolvedDependency>> deps =
+                        pomXml.getMarkers()
+                          .findFirst(MavenResolutionResult.class)
+                          .orElseThrow()
+                          .getDependencies()
+                          .get(Scope.Compile)
+                          .stream()
+                          .collect(groupingBy(ResolvedDependency::getArtifactId));
+
+                      assertThat(deps)
+                        .hasEntrySatisfying("commons-io", rds -> assertThat(rds)
+                          .singleElement().extracting(ResolvedDependency::getVersion).isEqualTo("2.11.0"));
+                  }
+                )
+              )
+            );
+        }
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/378")
@@ -3357,5 +3630,221 @@ class MavenParserTest implements RewriteTest {
             )
           )
         );
+    }
+
+    @Test
+    void systemPropertyTakesPrecedence() {
+        System.setProperty("hatversion", "2.3.0");
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>parent</artifactId>
+                <version>1.0-SNAPSHOT</version>
+                <packaging>pom</packaging>
+                <name>parent</name>
+                <url>http://www.example.com</url>
+                <properties>
+                  <hatversion>SYSTEM_PROPERTY_SHOULD_OVERRIDE_THIS</hatversion>
+                </properties>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.springframework.hateoas</groupId>
+                        <artifactId>spring-hateoas</artifactId>
+                        <version>${hatversion}</version>
+                    </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void propertyFromMavenConfig() {
+        rewriteRun(
+          spec -> spec.parser(MavenParser.builder().property("revision", "1.0.0")),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>parent</artifactId>
+                <version>${revision}</version>
+              </project>
+              """,
+            spec -> spec.afterRecipe(p -> {
+                  var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                  assertThat(results.getPom().getVersion()).isEqualTo("${revision}");
+                  assertThat(results.getPom().getProperties().get("revision")).isEqualTo("1.0.0");
+              }
+            )
+          )
+        );
+    }
+
+    @Test
+    void propertyFromMavenConfigFromParentPomCanBeUsedInChild() {
+        rewriteRun(
+          spec -> spec.parser(MavenParser.builder().property("revision", "1.0.0")),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>parent</artifactId>
+                <version>${revision}</version>
+              </project>
+              """
+          ),
+          mavenProject("child",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                  <parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>${revision}</version>
+                  </parent>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>child</artifactId>
+                  <version>${revision}</version>
+                </project>
+                """,
+              spec -> spec.afterRecipe(p -> {
+                  var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                  assertThat(results.getPom().getVersion()).isEqualTo("${revision}");
+                  assertThat(results.getPom().getProperties().get("revision")).isEqualTo("1.0.0");
+                  assertThat(results.getParent().getPom().getVersion()).isEqualTo("${revision}");
+                  assertThat(results.getParent().getPom().getProperties().get("revision")).isEqualTo("1.0.0");
+              })
+            )
+          )
+        );
+    }
+
+    @Test
+    void profilesFromMavenConfig() {
+        rewriteRun(
+          spec -> spec.parser(MavenParser.builder().activeProfiles("a", "b", "c")),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>parent</artifactId>
+                <version>1.0.0</version>
+              </project>
+              """,
+            spec -> spec.afterRecipe(p -> {
+                  var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                  assertThat(results.getPom().getActiveProfiles()).contains("a", "b", "c");
+              }
+            )
+          )
+        );
+    }
+
+    /**
+     * Maven successfully resolves this pom, but warns that transitive dependencies are invalid. e.g.:
+     * [WARNING] The POM for com.sun.xml.stream.buffer:streambuffer:jar:0.6 is invalid, transitive dependencies (if any) will not be available, enable debug logging for more details
+     * [WARNING] The POM for org.jvnet.staxex:stax-ex:jar:1.0 is invalid, transitive dependencies (if any) will not be available, enable debug logging for more details
+     * [WARNING] The POM for com.sun.xsom:xsom:jar:20070323 is invalid, transitive dependencies (if any) will not be available, enable debug logging for more details
+     * Looking inside streambuffer's pom it is missing version numbers for its "activation:activation" dependency.
+     * Maven lists these as the dependencies of this pom and we should match its behavior:
+     * org.jvnet.jax-ws-commons:jaxws-json:jar:1.1:compile
+     * +- com.sun.xml.ws:jaxws-rt:jar:2.1.2-alpha-20070426:compile
+     * |  +- javax.xml.ws:jaxws-api:jar:2.1:compile
+     * |  +- com.sun.xml.messaging.saaj:saaj-impl:jar:1.3:compile
+     * |  |  \- javax.xml.soap:saaj-api:jar:1.3:compile
+     * |  +- com.sun.xml.stream:sjsxp:jar:1.0:compile
+     * |  |  \- javax.xml.stream:stax-api:jar:1.0:compile
+     * |  \- org.jvnet.staxex:stax-ex:jar:1.0:compile
+     * +- com.sun.xml.bind:jaxb-impl:jar:2.1.3:compile
+     * |  \- javax.xml.bind:jaxb-api:jar:2.1:compile
+     * |     \- javax.activation:activation:jar:1.1:compile
+     * +- com.sun.xml.stream.buffer:streambuffer:jar:0.6:compile
+     * +- com.sun.xsom:xsom:jar:20070323:compile
+     * +- org.codehaus.jettison:jettison:jar:1.0-beta-1:compile
+     * |  +- junit:junit:jar:3.8.1:compile
+     * |  \- stax:stax-api:jar:1.0.1:compile
+     * +- velocity:velocity:jar:1.5:compile
+     * |  +- commons-collections:commons-collections:jar:3.1:compile
+     * |  +- commons-lang:commons-lang:jar:2.1:compile
+     * |  \- oro:oro:jar:2.0.8:compile
+     * \- com.sun.xml:relaxngDatatype:jar:1.0:compile
+     */
+    @Test
+    void invalidTransitives() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>app</artifactId>
+                <version>1.0.0</version>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.jvnet.jax-ws-commons</groupId>
+                      <artifactId>jaxws-json</artifactId>
+                      <version>1.1</version>
+                    </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void invalidDirect() {
+        assertThatThrownBy(() -> rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>app</artifactId>
+                <version>1.0.0</version>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.jvnet.jax-ws-commons</groupId>
+                      <artifactId>jaxws-json</artifactId>
+                    </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        )).isInstanceOf(AssertionError.class)
+          .cause()
+          .isInstanceOf(MavenDownloadingException.class);
+    }
+
+    @Test
+    void wildcardExclusion() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>app</artifactId>
+                <version>1.0.0</version>
+                  <dependencies>
+                    <dependency>
+                        <groupId>ch.qos.logback</groupId>
+                        <artifactId>logback-classic</artifactId>
+                        <version>1.3.11</version>
+                        <exclusions>
+                            <exclusion>
+                                <groupId>*</groupId>
+                                <artifactId>*</artifactId>
+                            </exclusion>
+                        </exclusions>
+                    </dependency>
+                  </dependencies>
+              </project>
+              """, spec -> spec.afterRecipe(pom -> {
+                MavenResolutionResult resolution = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                assertThat(resolution.findDependencies("ch.qos.logback", "logback-core", Scope.Compile)).isEmpty();
+            })
+          ));
     }
 }

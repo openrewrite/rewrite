@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -53,7 +54,7 @@ public class ReplaceConstant extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaVisitor<ExecutionContext>() {
+        JavaVisitor<ExecutionContext> replacementVisitor = new JavaVisitor<ExecutionContext>() {
             J.@Nullable Literal literal;
 
             @Override
@@ -117,5 +118,9 @@ public class ReplaceConstant extends Recipe {
                 return literal;
             }
         };
+        return Preconditions.check(
+                new UsesType<>(owningType, true),
+                replacementVisitor
+        );
     }
 }

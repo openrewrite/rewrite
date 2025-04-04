@@ -16,6 +16,8 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
@@ -630,6 +632,157 @@ class JavaTemplateMatchTest implements RewriteTest {
               class T {
                   boolean m(boolean b1, boolean b2) {
                       return b1 || b2;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "java.util.Collections.emptyList()",
+      "java.util.Collections.<Object>emptyList()"
+    })
+    void matchMethodWithGenericType(String templateString) {
+        rewriteRun(
+          spec -> spec
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+                private final JavaTemplate template = JavaTemplate.builder(templateString).build();
+
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    boolean found = template.matches(getCursor());
+                    return found ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
+                }
+          })),
+          java(
+              """
+              import java.util.Collections;
+              import java.util.List;
+              class Test {
+                  static List<Object> EMPTY_LIST = Collections.emptyList();
+              }
+              """,
+              """
+              import java.util.Collections;
+              import java.util.List;
+              class Test {
+                  static List<Object> EMPTY_LIST = /*~~>*/Collections.emptyList();
+              }
+              """)
+        );
+    }
+
+    @Test
+    void matchMethodWithGenericTypeWithConcreteType() {
+        rewriteRun(
+          spec -> spec
+            .recipe(toRecipe(() -> new JavaVisitor<>() {
+                private final JavaTemplate template = JavaTemplate.builder("java.util.Collections.<CharSequence>emptyList()").build();
+
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    boolean found = template.matches(getCursor());
+                    return found ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
+                }
+            })),
+          java(
+              """
+              import java.util.Collections;
+              import java.util.List;
+              class Test {
+                  static List<CharSequence> EXACT_MATCH            = Collections.emptyList();
+                  static List<CharSequence> EXACT_MATCH_EXPLICIT   = Collections.<CharSequence>emptyList();
+                  static List<String> COLLECTION_OF_SUBTYPE        = Collections.emptyList(); // List of Dogs is not List of Animals
+              }
+              """,
+              """
+              import java.util.Collections;
+              import java.util.List;
+              class Test {
+                  static List<CharSequence> EXACT_MATCH            = /*~~>*/Collections.emptyList();
+                  static List<CharSequence> EXACT_MATCH_EXPLICIT   = /*~~>*/Collections.<CharSequence>emptyList();
+                  static List<String> COLLECTION_OF_SUBTYPE        = Collections.emptyList(); // List of Dogs is not List of Animals
+              }
+              """)
+        );
+    }
+
+    @Test
+    void matchPrimitiveArrays() {
+        rewriteRun(
+          spec -> spec
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                final JavaTemplate before = JavaTemplate
+                  .builder("Arrays.binarySearch(#{a:any(int[])}, #{key:any(int)})")
+                  .imports("java.util.Arrays")
+                  .build();
+
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                    return before.matches(getCursor()) ? SearchResult.found(mi) : mi;
+                }
+            })),
+          //language=java
+          java(
+            """
+              import java.util.Arrays;
+              class Foo {
+                  void test() {
+                      Arrays.binarySearch(new int[]{1, 2, 3}, 2);
+                      Arrays.binarySearch(new short[]{1, 2, 3}, (short) 2);
+                  }
+              }
+              """,
+            """
+              import java.util.Arrays;
+              class Foo {
+                  void test() {
+                      /*~~>*/Arrays.binarySearch(new int[]{1, 2, 3}, 2);
+                      Arrays.binarySearch(new short[]{1, 2, 3}, (short) 2);
+                  }
+              }
+              """
+          )
+        );
+
+    }
+
+    @Test
+    void matchClassArrays() {
+        rewriteRun(
+          spec -> spec
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                final JavaTemplate before = JavaTemplate
+                  .builder("Objects.hash(#{a:any(java.lang.Object[])})")
+                  .imports("java.util.Objects")
+                  .build();
+
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                    return before.matches(getCursor()) ? SearchResult.found(mi) : mi;
+                }
+            })),
+          //language=java
+          java(
+            """
+              import java.util.Objects;
+              class Foo {
+                  void test() {
+                      Objects.hash(new Object[5]);
+                      Objects.hash(new Object(), new Object()); // varargs not yet supported
+                  }
+              }
+              """,
+            """
+              import java.util.Objects;
+              class Foo {
+                  void test() {
+                      /*~~>*/Objects.hash(new Object[5]);
+                      Objects.hash(new Object(), new Object()); // varargs not yet supported
                   }
               }
               """

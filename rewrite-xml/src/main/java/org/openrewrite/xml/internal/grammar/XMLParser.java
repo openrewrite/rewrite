@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from java-escape by ANTLR 4.11.1
+// Generated from ~/git/rewrite/rewrite-xml/src/main/antlr/XMLParser.g4 by ANTLR 4.13.2
 package org.openrewrite.xml.internal.grammar;
 import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.atn.ATN;
@@ -27,30 +27,30 @@ import org.antlr.v4.runtime.tree.TerminalNode;
 
 import java.util.List;
 
-@SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue"})
+@SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue", "this-escape"})
 public class XMLParser extends Parser {
-	static { RuntimeMetaData.checkVersion("4.11.1", RuntimeMetaData.VERSION); }
+	static { RuntimeMetaData.checkVersion("4.13.2", RuntimeMetaData.VERSION); }
 
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		COMMENT=1, CDATA=2, ParamEntityRef=3, EntityRef=4, CharRef=5, SEA_WS=6, 
-		UTF_ENCODING_BOM=7, QUESTION_MARK=8, SPECIAL_OPEN_XML=9, OPEN=10, SPECIAL_OPEN=11, 
-		DTD_OPEN=12, TEXT=13, DTD_CLOSE=14, DTD_SUBSET_OPEN=15, DTD_S=16, DOCTYPE=17, 
-		DTD_SUBSET_CLOSE=18, MARKUP_OPEN=19, DTS_SUBSET_S=20, MARK_UP_CLOSE=21, 
-		MARKUP_S=22, MARKUP_TEXT=23, MARKUP_SUBSET=24, PI_S=25, PI_TEXT=26, CLOSE=27, 
-		SPECIAL_CLOSE=28, SLASH_CLOSE=29, S=30, DIRECTIVE_OPEN=31, DIRECTIVE_CLOSE=32, 
+		COMMENT=1, CDATA=2, ParamEntityRef=3, EntityRef=4, CharRef=5, SEA_WS=6,
+		UTF_ENCODING_BOM=7, QUESTION_MARK=8, SPECIAL_OPEN_XML=9, OPEN=10, SPECIAL_OPEN=11,
+		DTD_OPEN=12, TEXT=13, DTD_CLOSE=14, DTD_SUBSET_OPEN=15, DTD_S=16, DOCTYPE=17,
+		DTD_SUBSET_CLOSE=18, MARKUP_OPEN=19, DTS_SUBSET_S=20, MARK_UP_CLOSE=21,
+		MARKUP_S=22, MARKUP_TEXT=23, MARKUP_SUBSET=24, PI_S=25, PI_TEXT=26, CLOSE=27,
+		SPECIAL_CLOSE=28, SLASH_CLOSE=29, S=30, DIRECTIVE_OPEN=31, DIRECTIVE_CLOSE=32,
 		SLASH=33, EQUALS=34, STRING=35, Name=36;
 	public static final int
-		RULE_document = 0, RULE_prolog = 1, RULE_xmldecl = 2, RULE_misc = 3, RULE_doctypedecl = 4, 
-		RULE_intsubset = 5, RULE_markupdecl = 6, RULE_declSep = 7, RULE_externalid = 8, 
-		RULE_processinginstruction = 9, RULE_content = 10, RULE_element = 11, 
+		RULE_document = 0, RULE_prolog = 1, RULE_xmldecl = 2, RULE_misc = 3, RULE_doctypedecl = 4,
+		RULE_intsubset = 5, RULE_markupdecl = 6, RULE_declSep = 7, RULE_externalid = 8,
+		RULE_processinginstruction = 9, RULE_content = 10, RULE_element = 11,
 		RULE_jspdirective = 12, RULE_reference = 13, RULE_attribute = 14, RULE_chardata = 15;
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"document", "prolog", "xmldecl", "misc", "doctypedecl", "intsubset", 
-			"markupdecl", "declSep", "externalid", "processinginstruction", "content", 
+			"document", "prolog", "xmldecl", "misc", "doctypedecl", "intsubset",
+			"markupdecl", "declSep", "externalid", "processinginstruction", "content",
 			"element", "jspdirective", "reference", "attribute", "chardata"
 		};
 	}
@@ -58,20 +58,20 @@ public class XMLParser extends Parser {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, null, null, null, null, null, null, null, "'?'", null, "'<'", null, 
-			null, null, null, null, null, null, null, null, null, null, null, null, 
+			null, null, null, null, null, null, null, null, "'?'", null, "'<'", null,
+			null, null, null, null, null, null, null, null, null, null, null, null,
 			null, null, null, null, null, "'/>'", null, "'%@'", "'%'", "'/'", "'='"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "COMMENT", "CDATA", "ParamEntityRef", "EntityRef", "CharRef", "SEA_WS", 
-			"UTF_ENCODING_BOM", "QUESTION_MARK", "SPECIAL_OPEN_XML", "OPEN", "SPECIAL_OPEN", 
-			"DTD_OPEN", "TEXT", "DTD_CLOSE", "DTD_SUBSET_OPEN", "DTD_S", "DOCTYPE", 
-			"DTD_SUBSET_CLOSE", "MARKUP_OPEN", "DTS_SUBSET_S", "MARK_UP_CLOSE", "MARKUP_S", 
-			"MARKUP_TEXT", "MARKUP_SUBSET", "PI_S", "PI_TEXT", "CLOSE", "SPECIAL_CLOSE", 
-			"SLASH_CLOSE", "S", "DIRECTIVE_OPEN", "DIRECTIVE_CLOSE", "SLASH", "EQUALS", 
+			null, "COMMENT", "CDATA", "ParamEntityRef", "EntityRef", "CharRef", "SEA_WS",
+			"UTF_ENCODING_BOM", "QUESTION_MARK", "SPECIAL_OPEN_XML", "OPEN", "SPECIAL_OPEN",
+			"DTD_OPEN", "TEXT", "DTD_CLOSE", "DTD_SUBSET_OPEN", "DTD_S", "DOCTYPE",
+			"DTD_SUBSET_CLOSE", "MARKUP_OPEN", "DTS_SUBSET_S", "MARK_UP_CLOSE", "MARKUP_S",
+			"MARKUP_TEXT", "MARKUP_SUBSET", "PI_S", "PI_TEXT", "CLOSE", "SPECIAL_CLOSE",
+			"SLASH_CLOSE", "S", "DIRECTIVE_OPEN", "DIRECTIVE_CLOSE", "SLASH", "EQUALS",
 			"STRING", "Name"
 		};
 	}
@@ -110,7 +110,7 @@ public class XMLParser extends Parser {
 	}
 
 	@Override
-	public String getGrammarFileName() { return "java-escape"; }
+	public String getGrammarFileName() { return "XMLParser.g4"; }
 
 	@Override
 	public String[] getRuleNames() { return ruleNames; }
@@ -245,7 +245,7 @@ public class XMLParser extends Parser {
 			setState(44);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			while (((_la) & ~0x3f) == 0 && ((1L << _la) & 6146L) != 0) {
+			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 6146L) != 0)) {
 				{
 				{
 				setState(41);
@@ -266,7 +266,7 @@ public class XMLParser extends Parser {
 					setState(47);
 					jspdirective();
 					}
-					} 
+					}
 				}
 				setState(52);
 				_errHandler.sync(this);
@@ -561,7 +561,7 @@ public class XMLParser extends Parser {
 			setState(89);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			while (((_la) & ~0x3f) == 0 && ((1L << _la) & 526346L) != 0) {
+			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & 526346L) != 0)) {
 				{
 				setState(87);
 				_errHandler.sync(this);
@@ -849,7 +849,7 @@ public class XMLParser extends Parser {
 			{
 			setState(115);
 			match(SPECIAL_OPEN);
-			setState(117); 
+			setState(117);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			do {
@@ -859,7 +859,7 @@ public class XMLParser extends Parser {
 				match(PI_TEXT);
 				}
 				}
-				setState(119); 
+				setState(119);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			} while ( _la==PI_TEXT );
@@ -1066,7 +1066,7 @@ public class XMLParser extends Parser {
 						setState(140);
 						content();
 						}
-						} 
+						}
 					}
 					setState(145);
 					_errHandler.sync(this);
@@ -1331,7 +1331,7 @@ public class XMLParser extends Parser {
 			{
 			setState(179);
 			_la = _input.LA(1);
-			if ( !(((_la) & ~0x3f) == 0 && ((1L << _la) & 8512L) != 0) ) {
+			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & 8512L) != 0)) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {

@@ -25,6 +25,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.style.Style;
 
 import java.util.List;
 
@@ -69,8 +70,8 @@ public class PadEmptyForLoopComponents extends Recipe {
             public J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     SourceFile cu = (SourceFile) requireNonNull(tree);
-                    emptyForInitializerPadStyle = cu.getStyle(EmptyForInitializerPadStyle.class);
-                    emptyForIteratorPadStyle = cu.getStyle(EmptyForIteratorPadStyle.class);
+                    emptyForInitializerPadStyle = Style.from(EmptyForInitializerPadStyle.class, cu);
+                    emptyForIteratorPadStyle = Style.from(EmptyForIteratorPadStyle.class, cu);
                 }
                 return super.visit(tree, ctx);
             }

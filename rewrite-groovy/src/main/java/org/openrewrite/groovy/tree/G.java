@@ -464,7 +464,7 @@ public interface G extends J {
         }
 
         @SuppressWarnings("unused")
-        public MapEntry withKey(@Nullable Expression key) {
+        public MapEntry withKey(Expression key) {
             return getPadding().withKey(JRightPadded.withElement(this.key, key));
         }
 
@@ -511,7 +511,7 @@ public interface G extends J {
                 return t.key;
             }
 
-            public MapEntry withKey(@Nullable JRightPadded<Expression> key) {
+            public MapEntry withKey(JRightPadded<Expression> key) {
                 return t.key == key ? t : new MapEntry(t.id, t.prefix, t.markers, key, t.value, t.type);
             }
         }
@@ -793,7 +793,8 @@ public interface G extends J {
             Find,
             Match,
             In,
-            Access
+            Access,
+            Spaceship
         }
 
         public Padding getPadding() {

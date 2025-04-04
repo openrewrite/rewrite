@@ -17,6 +17,7 @@ dependencies {
     compileOnly("org.slf4j:slf4j-api:1.7.+")
 
     implementation(project(":rewrite-java"))
+    implementation(project(":rewrite-java-lombok"))
     implementation("org.ow2.asm:asm:latest.release")
 
     implementation("io.micrometer:micrometer-core:1.9.+")
@@ -26,6 +27,16 @@ dependencies {
 
     testImplementation(project(":rewrite-test"))
     "javaTck"(project(":rewrite-java-tck"))
+}
+
+configurations.all {
+    resolutionStrategy {
+        eachDependency {
+            if (requested.group == "org.assertj" && requested.name == "assertj-core") {
+                useVersion("3.+") // Pin to latest 3.+ version as AssertJ 4 requires Java 17
+            }
+        }
+    }
 }
 
 java {

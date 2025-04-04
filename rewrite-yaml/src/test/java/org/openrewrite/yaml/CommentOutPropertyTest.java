@@ -17,24 +17,17 @@ package org.openrewrite.yaml;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.yaml.Assertions.yaml;
 
 class CommentOutPropertyTest implements RewriteTest {
 
-    @Override
-    public void defaults(RecipeSpec spec) {
-        spec.recipe(new CommentOutProperty("management.metrics.binders.files.enabled", "some comments"));
-    }
-
     @DocumentExample("comment out a map entry")
     @Test
     void regular() {
         rewriteRun(
-          spec -> spec.recipe(new CommentOutProperty("foo.bar.sequence.propertyA",
-            "Some comments")),
+          spec -> spec.recipe(new CommentOutProperty("foo.bar.sequence.propertyA", "Some comments", null)),
           yaml(
             """
                 foo:
@@ -63,8 +56,7 @@ class CommentOutPropertyTest implements RewriteTest {
     @Test
     void commentSequence() {
         rewriteRun(
-          spec -> spec.recipe(new CommentOutProperty("foo.bar.sequence",
-            "Some comments")),
+          spec -> spec.recipe(new CommentOutProperty("foo.bar.sequence", "Some comments", null)),
           yaml(
             """
               foo:
@@ -92,8 +84,7 @@ class CommentOutPropertyTest implements RewriteTest {
     @Test
     void commentSingleProperty() {
         rewriteRun(
-          spec -> spec.recipe(new CommentOutProperty("with.java-version",
-            "Some comments")),
+          spec -> spec.recipe(new CommentOutProperty("with.java-version", "Some comments", null)),
           yaml(
             """
               with:
@@ -115,8 +106,7 @@ class CommentOutPropertyTest implements RewriteTest {
     @Test
     void commentLastPropertyWithIndent() {
         rewriteRun(
-          spec -> spec.recipe(new CommentOutProperty("with.java-version",
-            "Some comments")),
+          spec -> spec.recipe(new CommentOutProperty("with.java-version", "Some comments", null)),
           yaml(
             """
               with:
@@ -136,8 +126,7 @@ class CommentOutPropertyTest implements RewriteTest {
     @Test
     void commentLastPropertyOfFirstDocument() {
         rewriteRun(
-          spec -> spec.recipe(new CommentOutProperty("with.java-version",
-            "Some comments")),
+          spec -> spec.recipe(new CommentOutProperty("with.java-version", "Some comments", null)),
           yaml(
             """
               with:
@@ -159,8 +148,7 @@ class CommentOutPropertyTest implements RewriteTest {
     @Test
     void commentLastProperty() {
         rewriteRun(
-          spec -> spec.recipe(new CommentOutProperty("test",
-            "Some comments")),
+          spec -> spec.recipe(new CommentOutProperty("test", "Some comments", null)),
           yaml(
             """
               test: foo
@@ -168,6 +156,174 @@ class CommentOutPropertyTest implements RewriteTest {
             """
               # Some comments
               # test: foo
+              """
+          )
+        );
+    }
+
+    @DocumentExample("comment out a map entry")
+    @Test
+    void sequenceKeepProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new CommentOutProperty("foo.bar.sequence.propertyA",
+            "Some comments", false)),
+          yaml(
+            """
+                foo:
+                  bar:
+                    sequence:
+                      - name: name
+                      - propertyA: fieldA
+                      - propertyB: fieldB
+                    scalar: value
+              """,
+            """
+                foo:
+                  bar:
+                    sequence:
+                      - name: name
+                      # Some comments
+                      - propertyA: fieldA
+                      - propertyB: fieldB
+                    scalar: value
+              """
+          )
+        );
+    }
+
+    @DocumentExample("comment out a map entry")
+    @Test
+    void sequenceFirstKeepProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new CommentOutProperty("foo.bar.sequence.name", "Some comments", false)),
+          yaml(
+            """
+                foo:
+                  bar:
+                    sequence:
+                      - name: name
+                      - propertyA: fieldA
+                      - propertyB: fieldB
+                    scalar: value
+              """,
+            """
+                foo:
+                  bar:
+                    sequence:
+                      # Some comments
+                      - name: name
+                      - propertyA: fieldA
+                      - propertyB: fieldB
+                    scalar: value
+              """
+          )
+        );
+    }
+
+    @DocumentExample("comment out entire sequence")
+    @Test
+    void commentSequenceKeepProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new CommentOutProperty("foo.bar.sequence", "Some comments", false)),
+          yaml(
+            """
+              foo:
+                bar:
+                  sequence:
+                    - name: name
+                    - propertyA: fieldA
+                    - propertyB: fieldB
+                  scalar: value
+              """,
+            """
+              foo:
+                bar:
+                  # Some comments
+                  sequence:
+                    - name: name
+                    - propertyA: fieldA
+                    - propertyB: fieldB
+                  scalar: value
+              """
+          )
+        );
+    }
+
+    @Test
+    void commentSinglePropertyKeepProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new CommentOutProperty("with.java-version", "Some comments", false)),
+          yaml(
+            """
+              with:
+                java-cache: 'maven'
+                java-version: 11
+                test: 'bar'
+              """,
+            """
+              with:
+                java-cache: 'maven'
+                # Some comments
+                java-version: 11
+                test: 'bar'
+              """
+          )
+        );
+    }
+
+    @Test
+    void commentLastPropertyWithIndentKeepProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new CommentOutProperty("with.java-version", "Some comments", false)),
+          yaml(
+            """
+              with:
+                java-cache: 'maven'
+                java-version: 11
+              """,
+            """
+              with:
+                java-cache: 'maven'
+                # Some comments
+                java-version: 11
+              """
+          )
+        );
+    }
+
+    @Test
+    void commentLastPropertyOfFirstDocumentKeepProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new CommentOutProperty("with.java-version", "Some comments", false)),
+          yaml(
+            """
+              with:
+                java-cache: 'maven'
+                java-version: 11
+              ---
+              """,
+            """
+              with:
+                java-cache: 'maven'
+                # Some comments
+                java-version: 11
+              ---
+              """
+          )
+        );
+    }
+
+    @Test
+    void commentLastPropertyKeepProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new CommentOutProperty("test", "Some comments", false)),
+          yaml(
+            """
+              test: foo
+              """,
+            """
+              # Some comments
+              test: foo
               """
           )
         );

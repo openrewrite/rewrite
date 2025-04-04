@@ -16,6 +16,7 @@
 package org.openrewrite.gradle;
 
 import lombok.EqualsAndHashCode;
+import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -52,9 +53,11 @@ import static java.util.Collections.singletonMap;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Preconditions.not;
 
+@SuppressWarnings("GroovyAssignabilityCheck")
 @Incubating(since = "8.18.0")
 @Value
 @EqualsAndHashCode(callSuper = false)
+@RequiredArgsConstructor
 public class UpgradeTransitiveDependencyVersion extends Recipe {
     private static final MethodMatcher DEPENDENCIES_DSL_MATCHER = new MethodMatcher("RewriteGradleProject dependencies(..)");
     private static final MethodMatcher CONSTRAINTS_MATCHER = new MethodMatcher("org.gradle.api.artifacts.dsl.DependencyHandler constraints(..)", true);
@@ -106,6 +109,33 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
     @Nullable
     List<String> onlyForConfigurations;
 
+    /**
+     * This recipe needs to generate LST elements representing "constraints" and "because" method invocations.
+     * Aside from their parameterization with different arguments they are otherwise identical.
+     * GradleParser isn't particularly fast, so in a recipe run which involves more than one UpgradeTransitiveDependencyVersion
+     * it is much faster to produce these LST elements only once then manipulate their arguments.
+     * This largely mimics how caching works in JavaTemplate. If we create a Gradle/GroovyTemplate this could be refactored.
+     */
+    private static Map<String, Optional<G.CompilationUnit>> snippetCache(ExecutionContext ctx) {
+        //noinspection unchecked
+        return (Map<String, Optional<G.CompilationUnit>>) ctx.getMessages()
+                .computeIfAbsent(UpgradeTransitiveDependencyVersion.class.getName() + ".snippetCache", k -> new HashMap<String, Optional<G.CompilationUnit>>());
+    }
+
+    private static Optional<G.CompilationUnit> parseAsGradle(String snippet, ExecutionContext ctx) {
+        return snippetCache(ctx)
+                .computeIfAbsent(snippet, s -> GradleParser.builder().build().parse(ctx, snippet)
+                        .findFirst()
+                        .map(maybeCu -> {
+                            maybeCu.getMarkers()
+                                    .findFirst(ParseExceptionResult.class)
+                                    .ifPresent(per -> {
+                                        throw new IllegalStateException("Encountered exception " + per.getExceptionType() + " with message " + per.getMessage() + " on snippet:\n" + snippet);
+                                    });
+                            return (G.CompilationUnit) maybeCu;
+                        }));
+    }
+
     @Override
     public String getDisplayName() {
         return "Upgrade transitive Gradle dependencies";
@@ -133,6 +163,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
         DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
 
         return Preconditions.check(new FindGradleProject(FindGradleProject.SearchCriteria.Marker), new GroovyVisitor<ExecutionContext>() {
+            @SuppressWarnings("NotNullFieldNotInitialized")
             GradleProject gradleProject;
 
             @Override
@@ -320,14 +351,14 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
             if (DEPENDENCIES_DSL_MATCHER.matches(method)) {
-                J withConstraints = (J) GradleParser.builder().build().parse(
+                G.CompilationUnit withConstraints = parseAsGradle(
                         //language=groovy
                         "plugins { id 'java' }\n" +
                         "dependencies {\n" +
                         "    constraints {\n" +
                         "    }\n" +
-                        "}\n"
-                ).findFirst().orElseThrow(() -> new IllegalStateException("Unable to parse constraints block"));
+                        "}\n", ctx)
+                        .orElseThrow(() -> new IllegalStateException("Unable to parse constraints block"));
 
                 Statement constraints = FindMethods.find(withConstraints, "org.gradle.api.artifacts.dsl.DependencyHandler constraints(..)", true)
                         .stream()
@@ -408,6 +439,30 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
             return m;
         }
     }
+
+    //language=groovy
+    private static final String INDIVIDUAL_CONSTRAINT_SNIPPET =
+            "plugins {\n" +
+            "    id 'java'\n" +
+            "}\n" +
+            "dependencies {\n" +
+            "    constraints {\n" +
+            "        implementation('foobar')\n" +
+            "    }\n" +
+            "}";
+    //language=groovy
+    private static final String INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET =
+            "plugins {\n" +
+            "    id 'java'\n" +
+            "}\n" +
+            "dependencies {\n" +
+            "    constraints {\n" +
+            "        implementation('foobar') {\n" +
+            "            because 'because'\n" +
+            "        }\n" +
+            "    }\n" +
+            "}";
+
     @Value
     @EqualsAndHashCode(callSuper = false)
     private static class CreateConstraintVisitor extends GroovyIsoVisitor<ExecutionContext> {
@@ -417,26 +472,16 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
 
         @Nullable
         String because;
+
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             if ("version".equals(method.getSimpleName())) {
                 return method;
             }
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            Optional<G.CompilationUnit> withConstraint = GradleParser.builder().build().parse(String.format(
-                    "plugins {\n" +
-                    "    id 'java'\n" +
-                    "}\n" +
-                    "dependencies {\n" +
-                    "    constraints {\n" +
-                    "        implementation('%s')%s\n" +
-                    "    }\n" +
-                    "}",
-                    gav,
-                    because == null ? "" : String.format(" {\n            because '%s'\n        }", because)
-            )).findFirst().map(G.CompilationUnit.class::cast);
 
-            J.MethodInvocation constraint = withConstraint.map(it -> (J.MethodInvocation) it.getStatements().get(1))
+            J.MethodInvocation constraint = parseAsGradle(because == null ? INDIVIDUAL_CONSTRAINT_SNIPPET : INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET, ctx)
+                    .map(it -> (J.MethodInvocation) it.getStatements().get(1))
                     .map(dependenciesMethod -> (J.Lambda) dependenciesMethod.getArguments().get(0))
                     .map(dependenciesClosure -> (J.Block)dependenciesClosure.getBody())
                     .map(dependenciesBody -> (J.Return) dependenciesBody.getStatements().get(0))
@@ -445,7 +490,25 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                     .map(constraintsLambda -> (J.Block) constraintsLambda.getBody())
                     .map(constraintsBlock -> (J.Return) constraintsBlock.getStatements().get(0))
                     .map(returnConfiguration -> (J.MethodInvocation) returnConfiguration.getExpression())
-                    .map(it -> it.withName(it.getName().withSimpleName(config)))
+                    .map(it -> it.withName(it.getName().withSimpleName(config))
+                            .withArguments(ListUtils.map(it.getArguments(), arg -> {
+                                if (arg instanceof J.Literal) {
+                                    return ((J.Literal) requireNonNull(arg))
+                                            .withValue(gav.toString())
+                                            .withValueSource("'" + gav + "'");
+                                } else if (arg instanceof J.Lambda && because != null) {
+                                    return (Expression) new GroovyIsoVisitor<Integer>() {
+                                        @Override
+                                        public J.Literal visitLiteral(J.Literal literal, Integer integer) {
+                                            return literal.withValue(because)
+                                                    .withValueSource("'" + because + "'");
+                                        }
+                                    }.visitNonNull(arg, 0);
+                                }
+                                return arg;
+                            })))
+                    // Assign a unique ID so multiple constraints can be added
+                    .map(it -> it.withId(Tree.randomId()))
                     .orElseThrow(() -> new IllegalStateException("Unable to find constraint"));
 
             m = autoFormat(m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
@@ -514,13 +577,13 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
         }
     }
 
+    @SuppressWarnings("NullableProblems")
     private static class RemoveVersionVisitor extends GroovyIsoVisitor<ExecutionContext> {
 
         @Override
         public  J.@Nullable Return visitReturn(J.Return _return, ExecutionContext ctx) {
             J.Return r = super.visitReturn(_return, ctx);
             if(r.getExpression() == null) {
-                //noinspection DataFlowIssue
                 return null;
             }
             return r;
@@ -530,7 +593,6 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
         public  J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
             if("version".equals(m.getSimpleName()) && m.getArguments().size() == 1 && m.getArguments().get(0) instanceof J.Lambda) {
-                //noinspection DataFlowIssue
                 return null;
             }
             return m;
@@ -571,15 +633,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            J.Lambda becauseArg = GradleParser.builder().build().parse(String.format(
-                    "plugin { id 'java' }\n" +
-                    "dependencies { constraints {\n" +
-                    "    implementation('org.openrewrite:rewrite-core:8.0.0') {\n" +
-                    "        because '%s'\n" +
-                    "    }\n" +
-                    "}}",
-                    because))
-                    .map(G.CompilationUnit.class::cast)
+            J.Lambda becauseArg = parseAsGradle(INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET, ctx)
                     .map(cu -> (J.MethodInvocation) cu.getStatements().get(1))
                     .map(J.MethodInvocation.class::cast)
                     .map(dependencies -> (J.Lambda) dependencies.getArguments().get(0))
@@ -591,7 +645,13 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                     .map(J.Return.class::cast)
                     .map(returnImplementation -> ((J.MethodInvocation) requireNonNull(returnImplementation.getExpression())).getArguments().get(1))
                     .map(J.Lambda.class::cast)
-                    .findFirst()
+                    .map(it -> (J.Lambda) new GroovyIsoVisitor<Integer>() {
+                        @Override
+                        public J.Literal visitLiteral(J.Literal literal, Integer integer) {
+                            return literal.withValue(because)
+                                    .withValueSource("'" + because + "'");
+                        }
+                    }.visitNonNull(it, 0))
                     .orElseThrow(() -> new IllegalStateException("Unable to parse because text"));
             m = m.withArguments(ListUtils.concat(m.getArguments().subList(0, 1), becauseArg));
             m = autoFormat(m, ctx, getCursor().getParentOrThrow());

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,9 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from java-escape by ANTLR 4.11.1
+// Generated from ~/git/rewrite/rewrite-json/src/main/antlr/JSON5.g4 by ANTLR 4.13.2
 package org.openrewrite.json.internal.grammar;
-
 import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.atn.ATN;
 import org.antlr.v4.runtime.atn.ATNDeserializer;
@@ -28,19 +27,19 @@ import org.antlr.v4.runtime.tree.TerminalNode;
 
 import java.util.List;
 
-@SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue"})
+@SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue", "this-escape"})
 public class JSON5Parser extends Parser {
-	static { RuntimeMetaData.checkVersion("4.11.1", RuntimeMetaData.VERSION); }
+	static { RuntimeMetaData.checkVersion("4.13.2", RuntimeMetaData.VERSION); }
 
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		T__0=1, T__1=2, T__2=3, T__3=4, T__4=5, T__5=6, SINGLE_LINE_COMMENT=7, 
-		MULTI_LINE_COMMENT=8, LITERAL=9, STRING=10, NUMBER=11, NUMERIC_LITERAL=12, 
+		T__0=1, T__1=2, T__2=3, T__3=4, T__4=5, T__5=6, SINGLE_LINE_COMMENT=7,
+		MULTI_LINE_COMMENT=8, LITERAL=9, STRING=10, NUMBER=11, NUMERIC_LITERAL=12,
 		SYMBOL=13, IDENTIFIER=14, WS=15, UTF_8_BOM=16;
 	public static final int
-		RULE_json5 = 0, RULE_obj = 1, RULE_member = 2, RULE_key = 3, RULE_value = 4, 
+		RULE_json5 = 0, RULE_obj = 1, RULE_member = 2, RULE_key = 3, RULE_value = 4,
 		RULE_arr = 5, RULE_number = 6;
 	private static String[] makeRuleNames() {
 		return new String[] {
@@ -51,15 +50,15 @@ public class JSON5Parser extends Parser {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, "'{'", "','", "'}'", "':'", "'['", "']'", null, null, null, null, 
+			null, "'{'", "','", "'}'", "':'", "'['", "']'", null, null, null, null,
 			null, null, null, null, null, "'\\uFEFF'"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, null, null, null, null, null, null, "SINGLE_LINE_COMMENT", "MULTI_LINE_COMMENT", 
-			"LITERAL", "STRING", "NUMBER", "NUMERIC_LITERAL", "SYMBOL", "IDENTIFIER", 
+			null, null, null, null, null, null, null, "SINGLE_LINE_COMMENT", "MULTI_LINE_COMMENT",
+			"LITERAL", "STRING", "NUMBER", "NUMERIC_LITERAL", "SYMBOL", "IDENTIFIER",
 			"WS", "UTF_8_BOM"
 		};
 	}
@@ -98,7 +97,7 @@ public class JSON5Parser extends Parser {
 	}
 
 	@Override
-	public String getGrammarFileName() { return "java-escape"; }
+	public String getGrammarFileName() { return "JSON5.g4"; }
 
 	@Override
 	public String[] getRuleNames() { return ruleNames; }
@@ -149,7 +148,7 @@ public class JSON5Parser extends Parser {
 			setState(15);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			if (((_la) & ~0x3f) == 0 && ((1L << _la) & 15906L) != 0) {
+			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & 15906L) != 0)) {
 				{
 				setState(14);
 				value();
@@ -226,7 +225,7 @@ public class JSON5Parser extends Parser {
 						setState(22);
 						member();
 						}
-						} 
+						}
 					}
 					setState(27);
 					_errHandler.sync(this);
@@ -519,7 +518,7 @@ public class JSON5Parser extends Parser {
 						setState(53);
 						value();
 						}
-						} 
+						}
 					}
 					setState(58);
 					_errHandler.sync(this);

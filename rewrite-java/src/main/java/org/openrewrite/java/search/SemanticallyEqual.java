@@ -41,24 +41,12 @@ public class SemanticallyEqual {
         return semanticallyEqualVisitor.isEqual();
     }
 
-    /**
-     * Compares method invocations and new class constructors based on the `JavaType.Method` instead of checking
-     * each types of each parameter.
-     * I.E. void foo(Object obj) {} invoked with `java.lang.String` or `java.lang.Integer` will return true.
-     */
-    public static boolean areSemanticallyEqual(J firstElem, J secondElem) {
-        SemanticallyEqualVisitor semanticallyEqualVisitor = new SemanticallyEqualVisitor(false);
-        semanticallyEqualVisitor.visit(firstElem, secondElem);
-        return semanticallyEqualVisitor.isEqual.get();
-    }
-
     @SuppressWarnings("ConstantConditions")
     protected static class SemanticallyEqualVisitor extends JavaIsoVisitor<J> {
         private final boolean compareMethodArguments;
 
         protected final AtomicBoolean isEqual = new AtomicBoolean(true);
         private final Deque<Map<String, String>> variableScope = new ArrayDeque<>();
-        private final Set<JavaType> seen = new HashSet<>();
 
         public SemanticallyEqualVisitor(boolean compareMethodArguments) {
             this.compareMethodArguments = compareMethodArguments;
@@ -137,10 +125,7 @@ public class SemanticallyEqual {
         }
 
         protected boolean declaresVariableScope(J tree) {
-            if (tree instanceof J.Lambda) {
-                return true;
-            }
-            return false;
+            return tree instanceof J.Lambda;
         }
 
         @Override
@@ -381,7 +366,13 @@ public class SemanticallyEqual {
                 J.Case compareTo = (J.Case) j;
                 this.visitList(_case.getStatements(), compareTo.getStatements());
                 visit(_case.getBody(), compareTo.getBody());
-                this.visitList(_case.getExpressions(), compareTo.getExpressions());
+                this.visitList(_case.getCaseLabels(), compareTo.getCaseLabels());
+                if (_case.getGuard() != null && compareTo.getGuard() != null) {
+                    visit(_case.getGuard(), compareTo.getGuard());
+                } else if (nullMissMatch(_case.getGuard(), compareTo.getGuard())) {
+                    isEqual.set(false);
+                    return _case;
+                }
             }
             return _case;
         }
@@ -696,12 +687,56 @@ public class SemanticallyEqual {
         @Override
         public J.Identifier visitIdentifier(J.Identifier identifier, J j) {
             if (isEqual.get()) {
-                if (!(j instanceof J.Identifier)) {
-                    if (!(j instanceof J.FieldAccess) || !TypeUtils.isOfType(identifier.getFieldType(), ((J.FieldAccess) j).getName().getFieldType())) {
-                        isEqual.set(false);
-                    } else if (identifier.getFieldType() != null && !identifier.getFieldType().hasFlags(Flag.Static)) {
-                        isEqual.set(false);
+                if (j instanceof J.FieldAccess) {
+                    J.FieldAccess field = (J.FieldAccess) j;
+                    Expression fieldTarget = field.getTarget();
+
+                    // Consider implicit-this "a" equivalent to "this.a"
+                    // Definitely does not account for every possible edge case around "this", but handles the common case
+                    if (fieldTarget instanceof J.Identifier && "this".equals(((J.Identifier) fieldTarget).getSimpleName())) {
+                        visit(identifier, field.getName());
+                        return identifier;
                     }
+
+                    // Identifier name and type aren't the same as the field access they are obviously different
+                    if (!identifier.getSimpleName().equals(field.getSimpleName()) || !TypeUtils.isOfType(identifier.getFieldType(), field.getName().getFieldType())) {
+                        isEqual.set(false);
+                        return identifier;
+                    }
+
+                    // Either both are variables or both are not (e.g. types)
+                    if ((identifier.getFieldType() == null) ^ (field.getName().getFieldType() == null)) {
+                        isEqual.set(false);
+                        return identifier;
+                    }
+
+                    String identifierTypeFqn = identifier.getType() instanceof JavaType.FullyQualified ? ((JavaType.FullyQualified) identifier.getType()).getFullyQualifiedName() : "";
+                    // If the field access is a static field access, the identifier must be a class reference
+                    // e.g.: Pattern is semantically equal to java.util.regex.Pattern
+                    if (field.isFullyQualifiedClassReference(identifierTypeFqn)) {
+                        return identifier;
+                    }
+
+                    if (identifier.getFieldType() != null) {
+                        // Similarly, might be comparing a statically imported field to a fully qualified
+                        // e.g. java.util.regex.Pattern.CASE_INSENSITIVE is semantically equal to CASE_INSENSITIVE when the latter is a static import of the former
+                        JavaType identifierOwner = identifier.getFieldType().getOwner();
+                        String identifierOwnerFqn = identifierOwner instanceof JavaType.FullyQualified ? ((JavaType.FullyQualified) identifierOwner).getFullyQualifiedName() : "";
+                        if (field.getTarget() instanceof J.FieldAccess && ((J.FieldAccess) field.getTarget()).isFullyQualifiedClassReference(identifierOwnerFqn)) {
+                            return identifier;
+                        }
+
+                        // Identifier is statically imported field name "CASE_INSENSITIVE", field is field  access "Pattern.CASE_INSENSITIVE"
+                        if (identifierOwner instanceof JavaType.FullyQualified && ((JavaType.FullyQualified) identifierOwner).getClassName().equals(fieldTarget.toString()) && TypeUtils.isOfType(identifier.getFieldType().getOwner(), fieldTarget.getType())) {
+                            return identifier;
+                        }
+                    }
+
+                    isEqual.set(false);
+                    return identifier;
+                }
+                if (!(j instanceof J.Identifier)) {
+                    isEqual.set(false);
                     return identifier;
                 }
 
@@ -782,6 +817,25 @@ public class SemanticallyEqual {
         }
 
         @Override
+        public J.DeconstructionPattern visitDeconstructionPattern(J.DeconstructionPattern deconstructionPattern, J j) {
+            if (isEqual.get()) {
+                if (!(j instanceof J.DeconstructionPattern)) {
+                    isEqual.set(false);
+                    return deconstructionPattern;
+                }
+
+                J.DeconstructionPattern compareTo = (J.DeconstructionPattern) j;
+                if (!TypeUtils.isOfType(deconstructionPattern.getType(), compareTo.getType())) {
+                    isEqual.set(false);
+                    return deconstructionPattern;
+                }
+                visit(deconstructionPattern.getDeconstructor(), compareTo.getDeconstructor());
+                this.visitList(deconstructionPattern.getNested(), compareTo.getNested());
+            }
+            return deconstructionPattern;
+        }
+
+        @Override
         public J.Label visitLabel(J.Label label, J j) {
             if (isEqual.get()) {
                 if (!(j instanceof J.Label)) {
@@ -828,13 +882,31 @@ public class SemanticallyEqual {
                 }
 
                 J.Literal compareTo = (J.Literal) j;
-                if (!TypeUtils.isOfType(literal.getType(), compareTo.getType()) ||
-                    !Objects.equals(literal.getValue(), compareTo.getValue())) {
+                if (!samePrimitiveValue(literal, compareTo)) {
                     isEqual.set(false);
                     return literal;
                 }
             }
             return literal;
+        }
+
+        private static boolean samePrimitiveValue(J.Literal literal, J.Literal compareTo) {
+            Object value = literal.getValue();
+            Object compareToValue = compareTo.getValue();
+            if (Objects.equals(value, compareToValue)) {
+                return true;
+            } else if (value == null) {
+                return compareToValue == null;
+            } else if (value instanceof Number) {
+                if (!(compareToValue instanceof Number)) {
+                    return false;
+                } else if (value instanceof Double || value instanceof Float || compareToValue instanceof Double || compareToValue instanceof Float) {
+                    return ((Number) value).doubleValue() == ((Number) compareToValue).doubleValue();
+                } else if  (value instanceof Integer || value instanceof Long  || value instanceof Short ||  value instanceof Byte) {
+                    return ((Number) value).longValue() == ((Number) compareToValue).longValue();
+                }
+            }
+            return false;
         }
 
         @Override
@@ -856,8 +928,7 @@ public class SemanticallyEqual {
                     return memberRef;
                 }
 
-                visit(memberRef.getContaining(), compareTo.getContaining());
-                this.visitList(memberRef.getTypeParameters(), compareTo.getTypeParameters());
+                visitList(memberRef.getTypeParameters(), compareTo.getTypeParameters());
             }
             return memberRef;
         }
@@ -923,8 +994,7 @@ public class SemanticallyEqual {
                       !nullMissMatch(method.getSelect(), compareTo.getSelect())) ||
                     method.getMethodType() == null ||
                     compareTo.getMethodType() == null ||
-                    !TypeUtils.isAssignableTo(method.getMethodType().getReturnType(), compareTo.getMethodType().getReturnType()) ||
-                    nullListSizeMissMatch(method.getTypeParameters(), compareTo.getTypeParameters())) {
+                    !TypeUtils.isAssignableTo(method.getMethodType().getReturnType(), compareTo.getMethodType().getReturnType())) {
                     isEqual.set(false);
                     return method;
                 }
@@ -966,7 +1036,6 @@ public class SemanticallyEqual {
                 if (compareMethodArguments || containsLiteral) {
                     this.visitList(method.getArguments(), compareTo.getArguments());
                 }
-                this.visitList(method.getTypeParameters(), compareTo.getTypeParameters());
             }
             return method;
         }

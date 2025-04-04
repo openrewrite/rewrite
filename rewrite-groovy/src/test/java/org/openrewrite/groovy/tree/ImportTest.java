@@ -35,6 +35,17 @@ class ImportTest implements RewriteTest {
     }
 
     @Test
+    void multipleImportsOnOneLine() {
+        rewriteRun(
+          groovy(
+            """
+              import java.util.List;import java.util.Set
+              """
+          )
+        );
+    }
+
+    @Test
     void starImport() {
         rewriteRun(
           groovy(
@@ -87,6 +98,74 @@ class ImportTest implements RewriteTest {
               import static java.util.Collections.singletonList as listOf
               """,
             spec -> spec.afterRecipe(cu -> assertThat(cu.getEof()).isEqualTo(Space.EMPTY))
+          )
+        );
+    }
+
+    @Test
+    void duplicateImportsAndComments() {
+        rewriteRun(
+          groovy(
+            """
+                    import static      java.util.Collections.*    ;     import               static      java.util.Collections.*
+                    //import static      java.util.Collections.*    ;     import               static      java.util.Collections.*
+              import java.util.Collections.*  ; import static java.util.Collections.*
+              import java.util.Collections.*
+              import static java.util.Collections.singletonList as listOf
+              import static java.util.Collections.singletonList as listOf
+              import /*static java.util.Collections.singletonList;import static*/ java.util.Collections.*
+              import /*static java.util.Collections.singletonList;
+              
+              
+              import static java.util.Collections.**/java.util.Collections.*
+              import /*static java.util.Collections.singletonList;
+              
+              
+              import static java.util.Collections.**/static          java.util.Collections.*
+              import static java.util.Collections.singletonList;import static java.util.Collections.*
+              import java.util.Collections.*
+              """
+          )
+        );
+    }
+
+    @Test
+    void multiLineCommentBeforeStarStaticImport() {
+        rewriteRun(
+          groovy(
+            """
+            /*
+             * Hello
+             */
+            import java.io.File
+            import static java.lang.Math.*
+            import java.nio.file.Path
+            final String s = new String("s")
+            """
+          )
+        );
+    }
+
+    @Test
+    void twoSameImportStarStatements() {
+        rewriteRun(
+          groovy(
+            """
+            import static java.lang.Math.*
+            import static java.lang.Math.*
+            """
+          )
+        );
+    }
+
+    @Test
+    void oneImportStaticStarSplitIntoTwoLines() {
+        rewriteRun(
+          groovy(
+            """
+            import/* export
+            */static java.lang.Math.*
+            """
           )
         );
     }

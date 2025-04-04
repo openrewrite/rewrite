@@ -25,6 +25,7 @@ import org.openrewrite.*;
 import java.net.URI;
 import java.time.Duration;
 import java.util.*;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import static java.util.Collections.emptyList;
@@ -41,6 +42,7 @@ public class DeclarativeRecipe extends Recipe {
 
     @Getter
     @Language("markdown")
+    @Nullable // in YAML the description is not always present
     private final String description;
 
     @Getter
@@ -89,20 +91,26 @@ public class DeclarativeRecipe extends Recipe {
 
     public void initialize(Collection<Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
         initValidation = Validated.none();
+        Map<String, Recipe> recipeMap = new HashMap<>();
+        availableRecipes.forEach(r -> recipeMap.putIfAbsent(r.getName(), r));
+        initialize(uninitializedRecipes, recipeList, recipeMap::get, recipeToContributors);
+        initialize(uninitializedPreconditions, preconditions, recipeMap::get, recipeToContributors);
+    }
+
+    public void initialize(Function<String, @Nullable Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
+        initValidation = Validated.none();
         initialize(uninitializedRecipes, recipeList, availableRecipes, recipeToContributors);
         initialize(uninitializedPreconditions, preconditions, availableRecipes, recipeToContributors);
     }
 
-    private void initialize(List<Recipe> uninitialized, List<Recipe> initialized, Collection<Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
+    private void initialize(List<Recipe> uninitialized, List<Recipe> initialized, Function<String, @Nullable Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
         initialized.clear();
         for (int i = 0; i < uninitialized.size(); i++) {
             Recipe recipe = uninitialized.get(i);
             if (recipe instanceof LazyLoadedRecipe) {
                 String recipeFqn = ((LazyLoadedRecipe) recipe).getRecipeFqn();
-                Optional<Recipe> next = availableRecipes.stream()
-                        .filter(r -> recipeFqn.equals(r.getName())).findAny();
-                if (next.isPresent()) {
-                    Recipe subRecipe = next.get();
+                Recipe subRecipe = availableRecipes.apply(recipeFqn);
+                if (subRecipe != null) {
                     if (subRecipe instanceof DeclarativeRecipe) {
                         ((DeclarativeRecipe) subRecipe).initialize(availableRecipes, recipeToContributors);
                     }
@@ -149,7 +157,7 @@ public class DeclarativeRecipe extends Recipe {
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
             return new TreeVisitor<Tree, ExecutionContext>() {
-                TreeVisitor<?, ExecutionContext> p = precondition.get();
+                final TreeVisitor<?, ExecutionContext> p = precondition.get();
 
                 @Override
                 public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
@@ -244,11 +252,6 @@ public class DeclarativeRecipe extends Recipe {
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor(T acc) {
             return Preconditions.check(bellwether.isPreconditionApplicable(), delegate.getVisitor(acc));
-        }
-
-        @Override
-        public List<Recipe> getRecipeList() {
-            return decorateWithPreconditionBellwether(bellwether, delegate.getRecipeList());
         }
 
         @Override
@@ -373,7 +376,7 @@ public class DeclarativeRecipe extends Recipe {
         for (Recipe childRecipe : getRecipeList()) {
             recipeList.add(childRecipe.getDescriptor());
         }
-        return new RecipeDescriptor(getName(), getDisplayName(), getDescription(),
+        return new RecipeDescriptor(getName(), getDisplayName(), getInstanceName(), getDescription() != null ? getDescription() : "",
                 getTags(), getEstimatedEffortPerOccurrence(),
                 emptyList(), recipeList, getDataTableDescriptors(), getMaintainers(), getContributors(),
                 getExamples(), source);

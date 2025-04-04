@@ -410,6 +410,25 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
     }
 
     @Override
+    public Hcl visitLegacyIndexAttributeExpression(HCLParser.LegacyIndexAttributeExpressionContext ctx) {
+        return convert(ctx, (c, prefix) -> {
+            String valueSource = c.legacyIndexAttr().NumericLiteral().getText();
+            Integer value = Integer.parseInt(valueSource);
+            return new Hcl.LegacyIndexAttributeAccess(
+                    randomId(),
+                    Space.format(prefix),
+                    Markers.EMPTY,
+                    new HclRightPadded<>(
+                            (Expression) visit(c.exprTerm()),
+                            sourceBefore("."),
+                            Markers.EMPTY
+                    ),
+                    new Hcl.Literal(randomId(), Space.format(prefix(c.legacyIndexAttr().NumericLiteral())), Markers.EMPTY, value, valueSource)
+            );
+        });
+    }
+
+    @Override
     public Hcl visitLiteralValue(HCLParser.LiteralValueContext ctx) {
         return convert(ctx, (c, prefix) -> {
             Object value;
@@ -444,10 +463,15 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
             Space tuplePrefix = sourceBefore("{");
             List<HclRightPadded<Expression>> mappedValues = new ArrayList<>();
             List<HCLParser.ObjectelemContext> values = ctx.objectelem();
-            for (int i = 0; i < values.size(); i++) {
-                HCLParser.ObjectelemContext value = values.get(i);
-                mappedValues.add(HclRightPadded.build((Expression) visit(value))
-                        .withAfter(i == values.size() - 1 ? sourceBefore("}") : Space.EMPTY));
+            if (values.isEmpty()) {
+                mappedValues.add(
+                        HclRightPadded.build(new Hcl.Empty(randomId(), sourceBefore("}"), Markers.EMPTY)));
+            } else {
+                for (int i = 0; i < values.size(); i++) {
+                    HCLParser.ObjectelemContext value = values.get(i);
+                    mappedValues.add(HclRightPadded.build((Expression) visit(value))
+                            .withAfter(i == values.size() - 1 ? sourceBefore("}") : Space.EMPTY));
+                }
             }
 
             return new Hcl.ObjectValue(randomId(), Space.format(prefix), Markers.EMPTY,
@@ -469,7 +493,13 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
                 if (ctx.LPAREN() != null) {
                     parenthesesPrefix = sourceBefore("(");
                 }
-                name = visitIdentifier(ctx.Identifier());
+                if (ctx.Identifier() != null) {
+                    name = visitIdentifier(ctx.Identifier());
+                } else if (ctx.expression(0) != null) {
+                    name = (Expression) visit(ctx.expression(0));
+                } else {
+                    throw new IllegalStateException("Unsupported LHS in object element");
+                }
                 if (ctx.RPAREN() != null) {
                     name = new Hcl.Parentheses(randomId(), parenthesesPrefix, Markers.EMPTY,
                             HclRightPadded.build(name).withAfter(sourceBefore(")")));
@@ -486,7 +516,7 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
                             c.ASSIGN() != null ? Hcl.Attribute.Type.Assignment : Hcl.Attribute.Type.ObjectElement,
                             Markers.EMPTY
                     ),
-                    (Expression) visit(c.expression()),
+                    (Expression) visit(c.expression().get(c.expression().size() - 1)),
                     ctx.COMMA() == null ?
                             null :
                             new Hcl.Empty(randomId(), sourceBefore(","), Markers.EMPTY)
@@ -731,25 +761,26 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
 
         int delimIndex = cursor;
         for (; delimIndex < source.length() - untilDelim.length() + 1; delimIndex++) {
-            if (inSingleLineComment && source.charAt(delimIndex) == '\n') {
-                inSingleLineComment = false;
+            if (inSingleLineComment) {
+                if (source.charAt(delimIndex) == '\n') {
+                    inSingleLineComment = false;
+                }
             } else {
                 if (source.length() - untilDelim.length() > delimIndex + 1) {
                     if ('#' == source.charAt(delimIndex)) {
                         inSingleLineComment = true;
-                        delimIndex++;
                     } else switch (source.substring(delimIndex, delimIndex + 2)) {
                         case "//":
-                            inSingleLineComment = true;
-                            delimIndex += 2;
+                            inSingleLineComment = !inMultiLineComment;
+                            delimIndex += 1;
                             break;
                         case "/*":
                             inMultiLineComment = true;
-                            delimIndex += 2;
+                            delimIndex += 1;
                             break;
                         case "*/":
                             inMultiLineComment = false;
-                            delimIndex += 2;
+                            delimIndex += 1;
                             break;
                     }
                 }

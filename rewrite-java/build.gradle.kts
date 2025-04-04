@@ -13,9 +13,9 @@ tasks.register<JavaExec>("generateAntlrSources") {
     mainClass.set("org.antlr.v4.Tool")
 
     args = listOf(
-            "-o", "src/main/java/org/openrewrite/java/internal/grammar",
-            "-package", "org.openrewrite.java.internal.grammar",
-            "-visitor"
+        "-o", "src/main/java/org/openrewrite/java/internal/grammar",
+        "-package", "org.openrewrite.java.internal.grammar",
+        "-visitor"
     ) + fileTree("src/main/antlr").matching { include("**/*.g4") }.map { it.path }
 
     classpath = antlrGeneration
@@ -33,13 +33,12 @@ configurations.named("testImplementation").configure {
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-yaml"))
-    api(project(":rewrite-xml"))
 
     api("io.micrometer:micrometer-core:1.9.+")
     api("org.jetbrains:annotations:latest.release")
 
-    antlrGeneration("org.antlr:antlr4:4.11.1")
-    implementation("org.antlr:antlr4-runtime:4.11.1")
+    antlrGeneration("org.antlr:antlr4:4.13.2")
+    implementation("org.antlr:antlr4-runtime:4.13.2")
     // Pinned to 9.+ because 10.x does not support Java 8: https://checkstyle.sourceforge.io/#JRE_and_JDK
     checkstyle("com.puppycrawl.tools:checkstyle:9.+") {
         isTransitive = false
@@ -51,9 +50,11 @@ dependencies {
     implementation("org.apache.commons:commons-text:latest.release")
     implementation("io.github.classgraph:classgraph:latest.release")
 
-    implementation("org.xerial.snappy:snappy-java:1.1.10.+")
-
     api("com.fasterxml.jackson.core:jackson-annotations")
+
+    // these are required for now so that `ChangeType` and `ChangePackage` can use the `Reference` trait
+    runtimeOnly(project(":rewrite-properties"))
+    runtimeOnly(project(":rewrite-xml"))
 
     implementation("org.ow2.asm:asm:latest.release")
     implementation("org.ow2.asm:asm-util:latest.release")
@@ -64,13 +65,11 @@ dependencies {
     testRuntimeOnly(project(":rewrite-java-17"))
     testImplementation("com.tngtech.archunit:archunit:1.0.1")
     testImplementation("com.tngtech.archunit:archunit-junit5:1.0.1")
+    testImplementation("org.junit-pioneer:junit-pioneer:2.0.0")
 
     // For use in ClassGraphTypeMappingTest
     testRuntimeOnly("org.eclipse.persistence:org.eclipse.persistence.core:3.0.2")
     testRuntimeOnly("org.slf4j:jul-to-slf4j:1.7.+")
-
-    // For use in ReplaceAnnotationTest
-    testRuntimeOnly("org.projectlombok:lombok:latest.release")
 }
 
 tasks.withType<Javadoc> {
