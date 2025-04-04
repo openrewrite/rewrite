@@ -2111,6 +2111,27 @@ class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
+    void changeTypeInLiteralTrueButNoLiteralReference() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new ChangeType("a.A1", "a.A2", true, true))
+            .parser(JavaParser.fromJavaVersion().dependsOn(a1, a2)),
+          java(
+            """
+              import a.A1;
+              
+              public class B extends A1 {}
+              """,
+            """
+              import a.A2;
+              
+              public class B extends A2 {}
+              """
+          )
+        );
+    }
+
+    @Test
     void changeTypeWorksOnDirectInvocations() {
         rewriteRun(
           spec -> spec.recipe(Recipe.noop()), // do not run the default recipe
