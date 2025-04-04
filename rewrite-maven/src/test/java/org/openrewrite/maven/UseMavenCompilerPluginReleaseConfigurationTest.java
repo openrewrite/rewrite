@@ -590,7 +590,6 @@ class UseMavenCompilerPluginReleaseConfigurationTest implements RewriteTest {
                       </build>
                   </profile>
                 </profiles>
-                
               
               </project>
               """,
@@ -618,7 +617,7 @@ class UseMavenCompilerPluginReleaseConfigurationTest implements RewriteTest {
                       </build>
                   </profile>
                  </profiles>
-                
+              
               </project>
               """
           )

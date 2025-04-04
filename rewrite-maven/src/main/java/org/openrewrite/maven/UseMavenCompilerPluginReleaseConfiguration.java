@@ -65,7 +65,7 @@ public class UseMavenCompilerPluginReleaseConfiguration extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
-                if (!matchesAnyPattern.matches(getCursor())) {
+                if (!matchesAnyPattern(getCursor())) {
                     return t;
                 }
                 Optional<Xml.Tag> maybeCompilerPlugin = t.getChildren().stream()
@@ -98,11 +98,10 @@ public class UseMavenCompilerPluginReleaseConfiguration extends Recipe {
                 return updated;
             }
 
+            private boolean matchesAnyPattern(Cursor cursor) {
+                return PLUGIN_MATCHERS.stream().anyMatch(matcher -> matcher.matches(cursor));
+            }
         };
-    }
-
-    private boolean matchesAnyPattern(Cursor cursor) {
-        return PLUGIN_MATCHERS.stream().anyMatch(matcher -> matcher.matches(cursor));
     }
 
     private boolean currentNewerThanProposed(@SuppressWarnings("OptionalUsedAsFieldOrParameterType") Optional<String> maybeRelease) {
