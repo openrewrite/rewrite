@@ -38,7 +38,7 @@ class ChangeTypeTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new ChangeType("a.A1", "a.A2", true));
+        spec.recipe(new ChangeType("a.A1", "a.A2", true, null));
     }
 
     @Language("java")
@@ -63,7 +63,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void doNotAddJavaLangWrapperImports() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.lang.Integer", "java.lang.Long", true)),
+          spec -> spec.recipe(new ChangeType("java.lang.Integer", "java.lang.Long", true, null)),
           java(
             "public class ThinkPositive { private Integer fred = 1;}",
             "public class ThinkPositive { private Long fred = 1;}"
@@ -74,7 +74,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void okWithTopLevelType() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.util.Map$Entry", "java.util.List", true)),
+          spec -> spec.recipe(new ChangeType("java.util.Map$Entry", "java.util.List", true, null)),
           java(
             """
               import java.util.Map;
@@ -105,7 +105,7 @@ class ChangeTypeTest implements RewriteTest {
     void conflictingImports() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType(
-            "java.util.List", "kotlin.collections.Set", true)),
+            "java.util.List", "kotlin.collections.Set", true, null)),
           java(
             """
               import java.util.*;
@@ -129,7 +129,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void starImport() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.util.logging.LoggingMXBean", "java.lang.management.PlatformLoggingMXBean", true)),
+          spec -> spec.recipe(new ChangeType("java.util.logging.LoggingMXBean", "java.lang.management.PlatformLoggingMXBean", true, null)),
           java(
             """
               import java.util.logging.*;
@@ -158,7 +158,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void allowJavaLangSubpackages() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.util.logging.LoggingMXBean", "java.lang.management.PlatformLoggingMXBean", true)),
+          spec -> spec.recipe(new ChangeType("java.util.logging.LoggingMXBean", "java.lang.management.PlatformLoggingMXBean", true, null)),
           java(
             """
               import java.util.logging.LoggingMXBean;
@@ -187,7 +187,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void unnecessaryImport() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("test.Outer.Inner", "java.util.ArrayList", true)),
+          spec -> spec.recipe(new ChangeType("test.Outer.Inner", "java.util.ArrayList", true, null)),
           java(
             """
               import test.Outer;
@@ -220,7 +220,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void changeInnerClassToOuterClass() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.util.Map$Entry", "java.util.List", true)),
+          spec -> spec.recipe(new ChangeType("java.util.Map$Entry", "java.util.List", true, null)),
           java(
             """
               import java.util.Map;
@@ -249,7 +249,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void changeStaticFieldAccess() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.io.File", "my.pkg.List", true)),
+          spec -> spec.recipe(new ChangeType("java.io.File", "my.pkg.List", true, null)),
           java(
             """
               import java.io.File;
@@ -281,7 +281,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void replaceWithNestedType() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.io.File", "java.util.Map$Entry", true)),
+          spec -> spec.recipe(new ChangeType("java.io.File", "java.util.Map$Entry", true, null)),
           java(
             """
               import java.io.File;
@@ -305,7 +305,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void replacePrivateNestedType() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.A.B1", "a.A.B2", false)),
+          spec -> spec.recipe(new ChangeType("a.A.B1", "a.A.B2", false, null)),
           java(
             """
               package a;
@@ -329,7 +329,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void deeplyNestedInnerClass() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.A.B.C", "a.A.B.C2", false)),
+          spec -> spec.recipe(new ChangeType("a.A.B.C", "a.A.B.C2", false, null)),
           java(
             """
               package a;
@@ -394,7 +394,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void annotation() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.b.c.A1", "a.b.d.A2", true)),
+          spec -> spec.recipe(new ChangeType("a.b.c.A1", "a.b.d.A2", true, null)),
           java("package a.b.c;\npublic @interface A1 {}"),
           java("package a.b.d;\npublic @interface A2 {}"),
           java(
@@ -413,7 +413,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void array2() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("com.acme.product.Pojo", "com.acme.product.v2.Pojo", true)),
+          spec -> spec.recipe(new ChangeType("com.acme.product.Pojo", "com.acme.product.v2.Pojo", true, null)),
           java(
             """
               package com.acme.product;
@@ -510,8 +510,8 @@ class ChangeTypeTest implements RewriteTest {
     void classDecl() {
         rewriteRun(
           spec -> spec.recipes(
-            new ChangeType("a.A1", "a.A2", true),
-            new ChangeType("I1", "I2", true)
+            new ChangeType("a.A1", "a.A2", true, null),
+            new ChangeType("I1", "I2", true, null)
           ),
           java(a1),
           java(a2),
@@ -837,7 +837,7 @@ class ChangeTypeTest implements RewriteTest {
 
     @Test
     void staticImports2() {
-        rewriteRun(spec -> spec.recipe(new ChangeType("com.acme.product.RunnableFactory", "com.acme.product.v2.RunnableFactory", true)),
+        rewriteRun(spec -> spec.recipe(new ChangeType("com.acme.product.RunnableFactory", "com.acme.product.v2.RunnableFactory", true, null)),
           java(
             """
               package com.acme.product;
@@ -879,7 +879,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void staticConstant() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("com.acme.product.RunnableFactory", "com.acme.product.v2.RunnableFactory", true)),
+          spec -> spec.recipe(new ChangeType("com.acme.product.RunnableFactory", "com.acme.product.v2.RunnableFactory", true, null)),
           java(
             """
               package com.acme.product;
@@ -920,7 +920,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void primitiveToClass() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("int", "java.lang.Integer", true)),
+          spec -> spec.recipe(new ChangeType("int", "java.lang.Integer", true, null)),
           java(
             """
               class A {
@@ -945,7 +945,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void classToPrimitive() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.lang.Integer", "int", true)),
+          spec -> spec.recipe(new ChangeType("java.lang.Integer", "int", true, null)),
           java(
             """
               class A {
@@ -971,7 +971,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void importOrdering() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("com.yourorg.a.A", "com.myorg.b.B", true)),
+          spec -> spec.recipe(new ChangeType("com.yourorg.a.A", "com.myorg.b.B", true, null)),
           java(
             """
               package com.yourorg.a;
@@ -1015,7 +1015,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void changeTypeWithInnerClass() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("com.acme.product.OuterClass", "com.acme.product.v2.OuterClass", true)),
+          spec -> spec.recipe(new ChangeType("com.acme.product.OuterClass", "com.acme.product.v2.OuterClass", true, null)),
           java(
             """
               package com.acme.product;
@@ -1068,7 +1068,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void uppercaseInPackage() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("com.acme.product.util.accessDecision.AccessVote", "com.acme.product.v2.util.accessDecision.AccessVote", true)),
+          spec -> spec.recipe(new ChangeType("com.acme.product.util.accessDecision.AccessVote", "com.acme.product.v2.util.accessDecision.AccessVote", true, null)),
           java(
             """
               package com.acme.product.util.accessDecision;
@@ -1109,7 +1109,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void lambda() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("com.acme.product.Procedure", "com.acme.product.Procedure2", true)),
+          spec -> spec.recipe(new ChangeType("com.acme.product.Procedure", "com.acme.product.Procedure2", true, null)),
           java(
             """
               package com.acme.product;
@@ -1149,7 +1149,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void assignment() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("com.acme.product.util.accessDecision.AccessVote", "com.acme.product.v2.util.accessDecision.AccessVote", true)),
+          spec -> spec.recipe(new ChangeType("com.acme.product.util.accessDecision.AccessVote", "com.acme.product.v2.util.accessDecision.AccessVote", true, null)),
           java(
             """
               package com.acme.product.util.accessDecision;
@@ -1195,7 +1195,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void ternary() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("com.acme.product.util.accessDecision.AccessVote", "com.acme.product.v2.util.accessDecision.AccessVote", true)),
+          spec -> spec.recipe(new ChangeType("com.acme.product.util.accessDecision.AccessVote", "com.acme.product.v2.util.accessDecision.AccessVote", true, null)),
           java(
             """
               package com.acme.product.util.accessDecision;
@@ -1237,7 +1237,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void changeTypeInTypeDeclaration() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("de.Class2", "de.Class1", false)),
+          spec -> spec.recipe(new ChangeType("de.Class2", "de.Class1", false, null)),
           java(
             """
               package de;
@@ -1255,7 +1255,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void doNotChangeTypeInTypeDeclaration() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("de.Class2", "de.Class1", true)),
+          spec -> spec.recipe(new ChangeType("de.Class2", "de.Class1", true, null)),
           java(
             """
               package de;
@@ -1268,7 +1268,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void javadocs() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.util.List", "java.util.Collection", true)),
+          spec -> spec.recipe(new ChangeType("java.util.List", "java.util.Collection", true, null)),
           java(
             """
               import java.util.List;
@@ -1298,7 +1298,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void onlyUpdateApplicableImport() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("com.acme.product.factory.V1Factory", "com.acme.product.factory.V1FactoryA", true)),
+          spec -> spec.recipe(new ChangeType("com.acme.product.factory.V1Factory", "com.acme.product.factory.V1FactoryA", true, null)),
           java(
             """
               package com.acme.product.factory;
@@ -1364,7 +1364,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void filePathMatchWithNoMatchedClassFqn() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.b.Original", "x.y.Target", false)),
+          spec -> spec.recipe(new ChangeType("a.b.Original", "x.y.Target", false, null)),
           java(
             """
               package a;
@@ -1381,7 +1381,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void onlyChangeTypeWithoutMatchedFilePath() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.b.Original", "x.y.Target", false)),
+          spec -> spec.recipe(new ChangeType("a.b.Original", "x.y.Target", false, null)),
           java(
             """
               package a.b;
@@ -1405,7 +1405,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void renameClassAndFilePath() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.b.Original", "x.y.Target", false)),
+          spec -> spec.recipe(new ChangeType("a.b.Original", "x.y.Target", false, null)),
           java(
             """
               package a.b;
@@ -1429,7 +1429,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void updateImportPrefixWithEmptyPackage() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.b.Original", "Target", false)),
+          spec -> spec.recipe(new ChangeType("a.b.Original", "Target", false, null)),
           java(
             """
               package a.b;
@@ -1453,7 +1453,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void updateClassPrefixWithEmptyPackage() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.b.Original", "Target", false)),
+          spec -> spec.recipe(new ChangeType("a.b.Original", "Target", false, null)),
           java(
             """
               package a.b;
@@ -1473,7 +1473,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void renameInnerClass() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.b.C$Original", "a.b.C$Target", false)),
+          spec -> spec.recipe(new ChangeType("a.b.C$Original", "a.b.C$Target", false, null)),
           java(
             """
               package a.b;
@@ -1497,7 +1497,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void changePathOfNonPublicClass() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.b.C", "x.y.Z", false)),
+          spec -> spec.recipe(new ChangeType("a.b.C", "x.y.Z", false, null)),
           java(
             """
               package a.b;
@@ -1522,7 +1522,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void renamePackage() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.b.Original", "x.y.Original", false)),
+          spec -> spec.recipe(new ChangeType("a.b.Original", "x.y.Original", false, null)),
           java(
             """
               package a.b;
@@ -1542,7 +1542,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void renameClass() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.b.Original", "a.b.Target", false)),
+          spec -> spec.recipe(new ChangeType("a.b.Original", "a.b.Target", false, null)),
           java(
             """
               package a.b;
@@ -1561,7 +1561,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void updateMethodType() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", false)),
+          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", false, null)),
           java(
             """
               package a;
@@ -1696,7 +1696,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void changeConstructor() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", false)),
+          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", false, null)),
           java(
             """
               package a;
@@ -1727,7 +1727,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void updateJavaTypeClassKindAnnotation() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("org.openrewrite.Test1", "org.openrewrite.Test2", false)),
+          spec -> spec.recipe(new ChangeType("org.openrewrite.Test1", "org.openrewrite.Test2", false, null)),
           java(
             """
               package org.openrewrite;
@@ -1787,7 +1787,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void changeJavaTypeClassKindEnum() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("org.openrewrite.MyEnum1", "org.openrewrite.MyEnum2", false)),
+          spec -> spec.recipe(new ChangeType("org.openrewrite.MyEnum1", "org.openrewrite.MyEnum2", false, null)),
           java(
             """
               package org.openrewrite;
@@ -1839,7 +1839,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void doesNotModifyInnerClassesIfIgnoreDefinitionTrue() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("Test.InnerA", "Test.InnerB", true)),
+          spec -> spec.recipe(new ChangeType("Test.InnerA", "Test.InnerB", true, null)),
           java(
             """
               public class Test {
@@ -1876,7 +1876,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void doesNotModifyPackageOfSibling() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("org.openrewrite.Test", "org.openrewrite.subpackage.Test", false)),
+          spec -> spec.recipe(new ChangeType("org.openrewrite.Test", "org.openrewrite.subpackage.Test", false, null)),
           java(
             """
               package org.openrewrite;
@@ -1923,10 +1923,12 @@ class ChangeTypeTest implements RewriteTest {
           recipeSpec -> recipeSpec.recipes(
             new ChangeType(
               "org.codehaus.jackson.map.ObjectMapper",
-              "com.fasterxml.jackson.databind.ObjectMapper", true),
+              "com.fasterxml.jackson.databind.ObjectMapper",
+              true,
+              null),
             new ChangeType(
               "org.codehaus.jackson.map.SerializationConfig$Feature",
-              "com.fasterxml.jackson.databind.SerializationFeature", true)
+              "com.fasterxml.jackson.databind.SerializationFeature", true, null)
           ),
           java(
             """
@@ -1987,6 +1989,7 @@ class ChangeTypeTest implements RewriteTest {
           spec -> spec.recipe(new ChangeType(
             "javax.annotation.Nonnull",
             "org.checkerframework.checker.nullness.qual.NonNull",
+            null,
             null)),
           // language=java
           java(
@@ -2021,7 +2024,8 @@ class ChangeTypeTest implements RewriteTest {
           spec -> spec.recipe(new ChangeType(
             "org.a.A",
             "org.ab.AB",
-            true)),
+            true,
+            null)),
           java(
             """
               package org.a;
@@ -2065,7 +2069,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void changeTypeInSpringXml() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("test.type.A", "test.type.B", true)),
+          spec -> spec.recipe(new ChangeType("test.type.A", "test.type.B", true, null)),
           xml(
             """
               <?xml version="1.0" encoding="UTF-8"?>
@@ -2086,7 +2090,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void changeTypeInLiteral() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("test.type.A", "test.type.B", true)),
+          spec -> spec.recipe(new ChangeType("test.type.A", "test.type.B", true, true)),
           java(
             """
               class Test {
@@ -2114,7 +2118,7 @@ class ChangeTypeTest implements RewriteTest {
               public class HelloClass {}
               """,
             spec -> spec.beforeRecipe((source) -> {
-                TreeVisitor<?, ExecutionContext> visitor = new ChangeType("hello.HelloClass", "hello.GoodbyeClass", false).getVisitor();
+                TreeVisitor<?, ExecutionContext> visitor = new ChangeType("hello.HelloClass", "hello.GoodbyeClass", false, null).getVisitor();
 
                 J.CompilationUnit cu = (J.CompilationUnit) visitor.visit(source, new InMemoryExecutionContext());
                 assertEquals("GoodbyeClass", cu.getClasses().get(0).getSimpleName());
@@ -2128,7 +2132,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void changeTypeInPropertiesFile() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.lang.String", "java.lang.Integer", true)),
+          spec -> spec.recipe(new ChangeType("java.lang.String", "java.lang.Integer", true, null)),
           properties(
             """
               a.property=java.lang.String
@@ -2146,7 +2150,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void changeTypeInYaml() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.lang.String", "java.lang.Integer", true)),
+          spec -> spec.recipe(new ChangeType("java.lang.String", "java.lang.Integer", true, null)),
           yaml(
             """
               root:
@@ -2171,7 +2175,7 @@ class ChangeTypeTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/4773")
     void noRenameOfTypeWithMatchingPrefix() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("org.codehaus.jackson.annotate.JsonIgnoreProperties", "com.fasterxml.jackson.annotation.JsonIgnoreProperties", false))
+          spec -> spec.recipe(new ChangeType("org.codehaus.jackson.annotate.JsonIgnoreProperties", "com.fasterxml.jackson.annotation.JsonIgnoreProperties", false, null))
             .parser(JavaParser.fromJavaVersion()
               .dependsOn(
                 """
@@ -2220,7 +2224,7 @@ class ChangeTypeTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/4764")
     void changeTypeOfInnerClass() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("foo.A$Builder", "bar.A$Builder", true))
+          spec -> spec.recipe(new ChangeType("foo.A$Builder", "bar.A$Builder", true, null))
             .parser(JavaParser.fromJavaVersion().dependsOn(
                 """
                   package foo;

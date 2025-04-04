@@ -21,6 +21,7 @@ import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.trait.Traits;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.trait.Reference;
@@ -98,6 +99,15 @@ public class ChangePackage extends Recipe {
                 stopAfterPreVisit();
                 if (tree instanceof JavaSourceFile) {
                     JavaSourceFile cu = (JavaSourceFile) tree;
+                    if (Boolean.TRUE.equals(visitStringLiterals)) {
+                        return Traits.literal().asVisitor(lit -> {
+                            String string = lit.getString();
+                            if (string != null && string.contains(oldPackageName)) {
+                                return SearchResult.found(lit.getTree());
+                            }
+                            return lit.getTree();
+                        }).visit(cu, ctx, getCursor().getParentTreeCursor());
+                    }
                     if (cu.getPackageDeclaration() != null) {
                         String original = cu.getPackageDeclaration().getExpression()
                                 .printTrimmed(getCursor()).replaceAll("\\s", "");
@@ -165,7 +175,6 @@ public class ChangePackage extends Recipe {
     private class JavaChangePackageVisitor extends JavaVisitor<ExecutionContext> {
         private static final String RENAME_TO_KEY = "renameTo";
         private static final String RENAME_FROM_KEY = "renameFrom";
-        private final Pattern referencePattern = Pattern.compile("\\p{javaJavaIdentifierStart}+(?:\\.\\p{javaJavaIdentifierStart}+)+");
 
         private final Map<JavaType, JavaType> oldNameToChangedType = new IdentityHashMap<>();
         private final JavaType.Class newPackageType = JavaType.ShallowClass.build(newPackageName);
@@ -244,16 +253,16 @@ public class ChangePackage extends Recipe {
         }
 
         @Override
-        public J visitLiteral(J.Literal literal, ExecutionContext executionContext) {
+        public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
             J.Literal lit = literal;
             boolean visitLiterals = Boolean.TRUE.equals(ChangePackage.this.visitStringLiterals);
             if (visitLiterals && literal.getType().equals(JavaType.Primitive.String)) {
-                String value = (String) literal.getValue();
-                if (referencePattern.matcher(value).find()) {
+                Pattern pat = Pattern.compile("(?:\\A|\\s)" + oldPackageName + "[.\\p{javaJavaIdentifierStart}]*(?:|\\s)");
+                if (pat.matcher((String)lit.getValue()).find()) {
                     lit = lit.withValue(((String)lit.getValue()).replace(oldPackageName, newPackageName)).withValueSource(lit.getValueSource().replace(oldPackageName, newPackageName));
                 }
             }
-            return super.visitLiteral(lit, executionContext);
+            return super.visitLiteral(lit, ctx);
         }
 
         @Override
