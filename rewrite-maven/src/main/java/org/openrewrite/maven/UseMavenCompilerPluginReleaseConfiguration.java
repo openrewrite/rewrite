@@ -87,9 +87,8 @@ public class UseMavenCompilerPluginReleaseConfiguration extends Recipe {
                         child -> !("source".equals(child.getName()) || "target".equals(child.getName())));
                 String releaseVersionValue = hasJavaVersionProperty(getCursor().firstEnclosingOrThrow(Xml.Document.class)) ?
                         "${java.version}" : releaseVersion.toString();
-                updated = addOrUpdateChild(updated, compilerPluginConfig,
+                return addOrUpdateChild(updated, compilerPluginConfig,
                         Xml.Tag.build("<release>" + releaseVersionValue + "</release>"), getCursor().getParentOrThrow());
-                return updated;
             }
         };
     }
