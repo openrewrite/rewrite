@@ -464,7 +464,7 @@ public class AdaptiveRadixTree<V> {
 
             // If we're at capacity, grow
             if (size >= 16) {
-                Node48<V> node = new Node48<>(keyOffset, keyLength);
+                Node64<V> node = new Node64<>(keyOffset, keyLength);
                 node.value = this.value;
                 for (int i = 0; i < size; i++) {
                     //noinspection DataFlowIssue
@@ -505,67 +505,206 @@ public class AdaptiveRadixTree<V> {
         }
     }
 
-    private static class Node48<V> extends InternalNode<V> {
-        private byte[] index;
+    private static class Node64<V> extends InternalNode<V> {
+        // One long for each 64 possible byte values
+        private long bitmap0; // Bytes 0-63
+        private long bitmap1; // Bytes 64-127
+        private long bitmap2; // Bytes 128-191
+        private long bitmap3; // Bytes 192-255
+
         private @Nullable Node<V>[] children;
-        private int size;
 
         @SuppressWarnings("unchecked")
-        Node48(int keyOffset, int keyLength) {
+        Node64(int keyOffset, int keyLength) {
             super(keyOffset, keyLength);
-            this.index = new byte[256];
-            Arrays.fill(this.index, (byte) -1);
-            this.children = (Node<V>[]) new Node[48];
-            this.size = 0;
+            this.bitmap0 = 0L;
+            this.bitmap1 = 0L;
+            this.bitmap2 = 0L;
+            this.bitmap3 = 0L;
+            this.children = (Node<V>[]) new Node[0];
         }
 
         @Override
         @Nullable
         Node<V> getChild(byte key) {
-            byte idx = index[key & 0xFF];
-            return idx >= 0 ? children[idx] : null;
+            int idx = key & 0xFF;
+            int longIndex = idx >>> 6;  // Divide by 64
+            int bitIndex = idx & 0x3F;  // Modulo 64
+            long mask = 1L << bitIndex;
+            long bitmap;
+
+            // Select the appropriate bitmap field
+            switch (longIndex) {
+                case 0:
+                    bitmap = bitmap0;
+                    break;
+                case 1:
+                    bitmap = bitmap1;
+                    break;
+                case 2:
+                    bitmap = bitmap2;
+                    break;
+                case 3:
+                    bitmap = bitmap3;
+                    break;
+                default:
+                    throw new IllegalStateException("Invalid index");
+            }
+
+            if ((bitmap & mask) == 0) {
+                return null;
+            }
+
+            // Count bits set before this position
+            int pos = 0;
+            // Add bits from previous longs
+            if (longIndex > 0) pos += Long.bitCount(bitmap0);
+            if (longIndex > 1) pos += Long.bitCount(bitmap1);
+            if (longIndex > 2) pos += Long.bitCount(bitmap2);
+
+            // Add bits from current long
+            pos += Long.bitCount(bitmap & (mask - 1));
+
+            return children[pos];
         }
 
         @Override
         @Nullable
         InternalNode<V> addChild(byte key, Node<V> child, KeyTable keyTable) {
             int idx = key & 0xFF;
-            if (index[idx] >= 0) {
-                children[index[idx]] = child;
+            int longIndex = idx >>> 6;
+            int bitIndex = idx & 0x3F;
+            long mask = 1L << bitIndex;
+
+            // Check if child already exists
+            boolean exists;
+            switch (longIndex) {
+                case 0:
+                    exists = (bitmap0 & mask) != 0;
+                    break;
+                case 1:
+                    exists = (bitmap1 & mask) != 0;
+                    break;
+                case 2:
+                    exists = (bitmap2 & mask) != 0;
+                    break;
+                case 3:
+                    exists = (bitmap3 & mask) != 0;
+                    break;
+                default:
+                    throw new IllegalStateException("Invalid index");
+            }
+
+            if (exists) {
+                // Calculate position as in getChild
+                int pos = 0;
+                if (longIndex > 0) pos += Long.bitCount(bitmap0);
+                if (longIndex > 1) pos += Long.bitCount(bitmap1);
+                if (longIndex > 2) pos += Long.bitCount(bitmap2);
+
+                switch (longIndex) {
+                    case 0:
+                        pos += Long.bitCount(bitmap0 & (mask - 1));
+                        break;
+                    case 1:
+                        pos += Long.bitCount(bitmap1 & (mask - 1));
+                        break;
+                    case 2:
+                        pos += Long.bitCount(bitmap2 & (mask - 1));
+                        break;
+                    case 3:
+                        pos += Long.bitCount(bitmap3 & (mask - 1));
+                        break;
+                }
+
+                children[pos] = child;
                 return null;
             }
 
-            if (size >= 48) {
-                Node256<V> node = new Node256<>(-1, 0);
-                node.value = this.value;
+            // If we're at capacity, grow to Node256
+            if (children.length >= 64) {
+                Node256<V> node256 = new Node256<>(-1, 0);
+                node256.value = this.value;
+
+                // Add all existing children
                 for (int i = 0; i < 256; i++) {
-                    if (index[i] >= 0) {
-                        //noinspection DataFlowIssue
-                        node.addChild((byte) i, children[index[i]], keyTable);
+                    byte childKey = (byte) i;
+                    Node<V> existingChild = getChild(childKey);
+                    if (existingChild != null) {
+                        node256.addChild(childKey, existingChild, keyTable);
                     }
                 }
-                node.addChild(key, child, keyTable);
-                return node;
+
+                // Add the new child
+                node256.addChild(key, child, keyTable);
+                return node256;
             }
 
-            index[idx] = (byte) size;
-            children[size] = child;
-            size++;
+            // Calculate position for new child
+            int pos = 0;
+            if (longIndex > 0) pos += Long.bitCount(bitmap0);
+            if (longIndex > 1) pos += Long.bitCount(bitmap1);
+            if (longIndex > 2) pos += Long.bitCount(bitmap2);
+
+            switch (longIndex) {
+                case 0:
+                    pos += Long.bitCount(bitmap0 & (mask - 1));
+                    break;
+                case 1:
+                    pos += Long.bitCount(bitmap1 & (mask - 1));
+                    break;
+                case 2:
+                    pos += Long.bitCount(bitmap2 & (mask - 1));
+                    break;
+                case 3:
+                    pos += Long.bitCount(bitmap3 & (mask - 1));
+                    break;
+            }
+
+            // Grow children array
+            @SuppressWarnings("unchecked")
+            Node<V>[] newChildren = (Node<V>[]) new Node[children.length + 1];
+            System.arraycopy(children, 0, newChildren, 0, pos);
+            newChildren[pos] = child;
+            System.arraycopy(children, pos, newChildren, pos + 1, children.length - pos);
+            children = newChildren;
+
+            // Set the bit
+            switch (longIndex) {
+                case 0:
+                    bitmap0 |= mask;
+                    break;
+                case 1:
+                    bitmap1 |= mask;
+                    break;
+                case 2:
+                    bitmap2 |= mask;
+                    break;
+                case 3:
+                    bitmap3 |= mask;
+                    break;
+            }
+
             return null;
         }
 
         @Override
         Node<V> copy() {
-            Node48<V> clone = new Node48<>(keyOffset, keyLength);
+            Node64<V> clone = new Node64<>(keyOffset, keyLength);
             clone.value = this.value;
-            clone.size = this.size;
-            clone.index = Arrays.copyOf(this.index, this.index.length);
-            clone.children = Arrays.copyOf(this.children, this.children.length);
+            clone.bitmap0 = this.bitmap0;
+            clone.bitmap1 = this.bitmap1;
+            clone.bitmap2 = this.bitmap2;
+            clone.bitmap3 = this.bitmap3;
+
+            clone.children = new Node[this.children.length];
+
             // Deep copy children
-            for (int i = 0; i < size; i++) {
+            for (int i = 0; i < this.children.length; i++) {
                 //noinspection DataFlowIssue
-                clone.children[i] = children[i].copy();
+                clone.children[i] = this.children[i].copy();
             }
+
             return clone;
         }
     }
@@ -577,12 +716,6 @@ public class AdaptiveRadixTree<V> {
         Node256(int keyOffset, int keyLength) {
             super(keyOffset, keyLength);
             this.children = (Node<V>[]) new Node[256];
-        }
-
-        @SuppressWarnings("unchecked")
-        Node256(int keyOffset, int keyLength, @Nullable Node<V>[] children) {
-            super(keyOffset, keyLength);
-            this.children = children;
         }
 
         @Override
@@ -651,21 +784,16 @@ public class AdaptiveRadixTree<V> {
     }
 
     private static class KeyTable {
-        private static final int INITIAL_CAPACITY = 128 * 1024; // 128KiB
+        private static final int INITIAL_CAPACITY = 16 * 1024; // 16KiB
         private static final int MAX_SMALL_GROWTH_SIZE = 1024 * 1024; // 1MiB
         private static final double LARGE_GROWTH_FACTOR = 1.3;
 
-        private byte[] storage;
+        private byte @Nullable [] storage;
         private int size;
-
-        KeyTable() {
-            this.storage = new byte[INITIAL_CAPACITY];
-            this.size = 0;
-        }
 
         KeyTable copy() {
             KeyTable copy = new KeyTable();
-            copy.storage = Arrays.copyOf(storage, storage.length);
+            copy.storage = storage != null ? Arrays.copyOf(storage, storage.length) : null;
             copy.size = size;
             return copy;
         }
@@ -674,6 +802,7 @@ public class AdaptiveRadixTree<V> {
         int store(byte[] key, int offset, int length) {
             ensureCapacity(length);
             int startOffset = size;
+            assert storage != null;
             System.arraycopy(key, offset, storage, size, length);
             size += length;
             return startOffset;
@@ -683,6 +812,7 @@ public class AdaptiveRadixTree<V> {
             if (length <= 0) return true;
             if (keyOffset + length > key.length) return false;
 
+            assert storage != null;
             for (int i = 0; i < length; i++) {
                 if (key[keyOffset + i] != storage[storedOffset + i]) {
                     return false;
@@ -692,6 +822,11 @@ public class AdaptiveRadixTree<V> {
         }
 
         private void ensureCapacity(int additional) {
+            if (storage == null) {
+                storage = new byte[INITIAL_CAPACITY];
+                size = 0;
+            }
+
             int required = size + additional;
             if (required <= storage.length) {
                 return;
@@ -709,11 +844,12 @@ public class AdaptiveRadixTree<V> {
         }
 
         public byte get(int offset) {
+            assert storage != null;
             return storage[offset];
         }
 
         public void clear() {
-            storage = new byte[INITIAL_CAPACITY];
+            storage = null;
             size = 0;
         }
     }

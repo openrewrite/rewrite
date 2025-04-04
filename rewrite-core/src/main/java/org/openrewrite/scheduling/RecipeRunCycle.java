@@ -38,6 +38,7 @@ import java.util.function.UnaryOperator;
 
 import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
+import static org.openrewrite.ExecutionContext.SCANNING_MUTATION_VALIDATION;
 import static org.openrewrite.Recipe.PANIC;
 
 @RequiredArgsConstructor
@@ -91,7 +92,12 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                             recipeRunStats.recordScan(recipe, () -> {
                                 TreeVisitor<?, ExecutionContext> scanner = scanningRecipe.getScanner(acc);
                                 if (scanner.isAcceptable(source, ctx)) {
-                                    scanner.visit(source, ctx, rootCursor);
+                                    Tree maybeMutated = scanner.visit(source, ctx, rootCursor);
+                                    assert maybeMutated == source || !ctx.getMessage(SCANNING_MUTATION_VALIDATION, false) :
+                                            "Edits made from within ScanningRecipe.getScanner() are discarded. " +
+                                            "The purpose of a scanner is to aggregate information for use in subsequent phases. " +
+                                            "Use ScanningRecipe.getVisitor() for making edits. " +
+                                            "To disable this warning set TypeValidation.immutableScanning to false in your tests.";
                                 }
                                 return source;
                             });
@@ -219,7 +225,9 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         String beforePath = (before == null) ? "" : before.getSourcePath().toString();
         String afterPath = (after == null) ? "" : after.getSourcePath().toString();
         Recipe recipe = recipeStack.peek();
-        Long effortSeconds = (recipe.getEstimatedEffortPerOccurrence() == null) ? 0L : recipe.getEstimatedEffortPerOccurrence().getSeconds();
+        Long effortSeconds = (recipe.getEstimatedEffortPerOccurrence() == null || Result.isLocalAndHasNoChanges(before, after)) ?
+                0L : recipe.getEstimatedEffortPerOccurrence().getSeconds();
+
         String parentName = "";
         boolean hierarchical = recipeStack.size() > 1;
         if (hierarchical) {

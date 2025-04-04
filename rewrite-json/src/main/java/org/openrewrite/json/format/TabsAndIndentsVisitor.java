@@ -92,7 +92,9 @@ public class TabsAndIndentsVisitor<P> extends JsonIsoVisitor<P> {
             Json.JsonObject obj = (Json.JsonObject) json;
             List<JsonRightPadded<Json>> members = obj.getPadding().getMembers();
             LineWrapSetting wrappingSetting = this.wrappingAndBracesStyle.getWrapObjects();
-            members = applyWrappingStyleToLastChildSuffix(members, wrappingSetting, relativeIndent);
+            if (!WrappingAndBracesVisitor.isEmpty(members)) {
+                members = applyWrappingStyleToLastChildSuffix(members, wrappingSetting, relativeIndent);
+            }
             json = obj.getPadding().withMembers(members);
         }
 
@@ -100,7 +102,9 @@ public class TabsAndIndentsVisitor<P> extends JsonIsoVisitor<P> {
             Json.Array array = (Json.Array) json;
             List<JsonRightPadded<JsonValue>> members = array.getPadding().getValues();
             LineWrapSetting wrappingSetting = this.wrappingAndBracesStyle.getWrapArrays();
-            members = applyWrappingStyleToLastChildSuffix(members, wrappingSetting, relativeIndent);
+            if (!WrappingAndBracesVisitor.isEmpty(members)) {
+                members = applyWrappingStyleToLastChildSuffix(members, wrappingSetting, relativeIndent);
+            }
             json = array.getPadding().withValues(members);
         }
 
@@ -118,7 +122,7 @@ public class TabsAndIndentsVisitor<P> extends JsonIsoVisitor<P> {
             } else {
                 throw new UnsupportedOperationException("Unknown LineWrapSetting: " + wrapping);
             }
-            if (!newAfter.equals(currentAfter)) {
+            if (!newAfter.equals(currentAfter) && elem.getAfter().getComments().isEmpty()) {
                 return elem.withAfter(Space.build(newAfter, emptyList()));
             } else {
                 return elem;

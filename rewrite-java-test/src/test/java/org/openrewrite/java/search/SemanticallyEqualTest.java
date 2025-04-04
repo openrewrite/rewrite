@@ -101,6 +101,22 @@ class SemanticallyEqualTest {
     }
 
     @Test
+    void longLiterals() {
+        assertEqual(
+          """
+            class A {
+                long n = 1;
+            }
+            """,
+          """
+            class A {
+                long n = 1L;
+            }
+            """
+        );
+    }
+
+    @Test
     void classLiterals() {
         assertExpressionsEqual(
           """

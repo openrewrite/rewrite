@@ -1117,8 +1117,9 @@ public class MavenPomDownloader {
         }
 
         // Any response code below 100 implies that no connection was made. Sometimes 0 or -1 is used for connection failures.
+        // 408 is sometimes used for connection timeouts as well. So we cannot assume that a 408 means the server is reached
         public boolean isServerReached() {
-            return responseCode != null && responseCode >= 100;
+            return responseCode != null && responseCode >= 100 && responseCode != 408;
         }
     }
 

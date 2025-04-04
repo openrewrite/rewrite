@@ -515,7 +515,9 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                     EMPTY
             );
         } else if (kind.getType() == J.ClassDeclaration.Kind.Type.Enum) {
-            if (positionOfNext(";", null) >= 0) {
+            int nextSemicolonPosition = positionOfNext(";", null);
+            int nextClosingBracePosition = positionOfNext("}", null);
+            if (nextSemicolonPosition >= 0 && nextSemicolonPosition < nextClosingBracePosition) {
                 enumSet = padRight(new J.EnumValueSet(randomId(), sourceBefore(";"), Markers.EMPTY, emptyList(), true), EMPTY);
             }
         }
@@ -781,14 +783,21 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitInstanceOf(InstanceOfTree node, Space fmt) {
+        J pattern = null;
+        J.Modifier modifier = null;
         JavaType type = typeMapping.type(node);
-        return new J.InstanceOf(randomId(), fmt, Markers.EMPTY,
-                convert(node.getExpression(), t -> sourceBefore("instanceof")),
-                convert(node.getType()),
-                node.getPattern() instanceof JCBindingPattern b ?
-                        new J.Identifier(randomId(), sourceBefore(b.getVariable().getName().toString()), Markers.EMPTY, emptyList(), b.getVariable().getName().toString(),
-                                type, typeMapping.variableType(b.var.sym)) : null,
-                type);
+
+        JRightPadded<Expression> expression = convert(node.getExpression(), t -> sourceBefore("instanceof"));
+        //Handling final modifier in instance of pattern matching
+        if (node.getPattern() instanceof JCBindingPattern b && b.var.mods.flags == Flags.FINAL) {
+             modifier = new J.Modifier(randomId(), sourceBefore("final"), Markers.EMPTY, null, J.Modifier.Type.Final, emptyList());
+        }
+        J clazz = convert(node.getType());
+        if (node.getPattern() instanceof JCBindingPattern b) {
+            pattern = new J.Identifier(randomId(), sourceBefore(b.getVariable().getName().toString()), Markers.EMPTY, emptyList(), b.getVariable().getName().toString(),
+                    type, typeMapping.variableType(b.var.sym));
+        }
+        return new J.InstanceOf(randomId(), fmt, Markers.EMPTY, expression, clazz, pattern, type, modifier);
     }
 
     @Override
@@ -2200,6 +2209,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         boolean inMultilineComment = false;
         int afterLastModifierPosition = cursor;
         int lastAnnotationPosition = cursor;
+        boolean noSpace = false;
 
         int keywordStartIdx = -1;
         for (int i = cursor; i < source.length(); i++) {
@@ -2233,9 +2243,10 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             } else if (inComment && c == '\n' || c == '\r') {
                 inComment = false;
             } else if (!inMultilineComment && !inComment) {
-                if (Character.isWhitespace(c)) {
+                // Check: char is whitespace OR next char is an `@` (which is an annotation preceded by modifier/annotation without space)
+                if (Character.isWhitespace(c) || (noSpace = (i + 1 < source.length() && source.charAt(i + 1) == '@'))) {
                     if (keywordStartIdx != -1) {
-                        Modifier matching = MODIFIER_BY_KEYWORD.get(source.substring(keywordStartIdx, i));
+                        Modifier matching = MODIFIER_BY_KEYWORD.get(source.substring(keywordStartIdx, noSpace ? i + 1 : i));
                         keywordStartIdx = -1;
 
                         if (matching == null) {
@@ -2333,7 +2344,8 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                     continue;
                 }
                 annotations.add(convert(jcAnnotation));
-                i = cursor;
+                // Adjusting the index by subtracting 1 to account for the case where annotations are not separated by a space
+                i = cursor - 1;
                 continue;
             }
             char c = source.charAt(i);

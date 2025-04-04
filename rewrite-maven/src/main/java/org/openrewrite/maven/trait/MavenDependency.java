@@ -71,14 +71,20 @@ public class MavenDependency implements Trait<Xml.Tag> {
         try {
             MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
             MavenSettings settings = mctx.effectiveSettings(mrr);
-            MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> new MavenPomDownloader(
-                    emptyMap(), ctx,
-                    settings,
-                    Optional.ofNullable(settings)
-                            .map(MavenSettings::getActiveProfiles)
-                            .map(MavenSettings.ActiveProfiles::getActiveProfiles)
-                            .orElse(null)
-            ).downloadMetadata(new GroupArtifact(groupId, artifactId), null, mrr.getPom().getRepositories()));
+            MavenMetadata mavenMetadata;
+            try {
+                mavenMetadata = metadataFailures.insertRows(ctx, () -> new MavenPomDownloader(
+                        emptyMap(), ctx,
+                        settings,
+                        Optional.ofNullable(settings)
+                                .map(MavenSettings::getActiveProfiles)
+                                .map(MavenSettings.ActiveProfiles::getActiveProfiles)
+                                .orElse(null)
+                ).downloadMetadata(new GroupArtifact(groupId, artifactId), null, mrr.getPom().getRepositories()));
+            } catch (NumberFormatException e) {
+                // this can happen when we encounter exotic, non-semver version numbers
+                return null;
+            }
             List<String> versions = new ArrayList<>();
             for (String v : mavenMetadata.getVersioning().getVersions()) {
                 if (versionComparator.isValid(finalVersion, v)) {

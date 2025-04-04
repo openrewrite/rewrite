@@ -19,7 +19,6 @@ import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.JsonRpcMethod;
 import io.moderne.jsonrpc.JsonRpcRequest;
 import io.moderne.jsonrpc.internal.SnowflakeId;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.VisibleForTesting;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -188,8 +187,8 @@ public class RewriteRpc {
         if (cursor != null) {
             cursorIds = cursor.getPathAsStream().map(c -> {
                 String id = c instanceof Tree ?
-                        ((Tree) c).getId().toString()
-                        : localObjectIds.computeIfAbsent(c, c2 -> SnowflakeId.generateId());
+                        ((Tree) c).getId().toString() :
+                        localObjectIds.computeIfAbsent(c, c2 -> SnowflakeId.generateId());
                 localObjects.put(id, c);
                 return id;
             }).collect(Collectors.toList());

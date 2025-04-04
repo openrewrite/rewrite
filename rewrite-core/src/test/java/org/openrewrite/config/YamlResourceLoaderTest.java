@@ -346,7 +346,7 @@ class YamlResourceLoaderTest implements RewriteTest {
           },
           recipe -> {
           },
-          validated -> invalidRecipes.add(validated));
+          invalidRecipes::add);
 
         assertEquals(1, invalidRecipes.size());
     }

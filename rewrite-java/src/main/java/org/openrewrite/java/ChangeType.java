@@ -68,7 +68,7 @@ public class ChangeType extends Recipe {
         if (oldFullyQualifiedTypeName == null || newFullyQualifiedTypeName == null) {
             return getDisplayName();
         }
-        
+
         String oldShort = oldFullyQualifiedTypeName.substring(oldFullyQualifiedTypeName.lastIndexOf('.') + 1);
         String newShort = newFullyQualifiedTypeName.substring(newFullyQualifiedTypeName.lastIndexOf('.') + 1);
         if (oldShort.equals(newShort)) {

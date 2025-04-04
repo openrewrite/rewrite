@@ -15,11 +15,11 @@
  */
 package org.openrewrite.java.tree;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIdentityInfo;
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import com.fasterxml.jackson.annotation.ObjectIdGenerators;
-import lombok.*;
+import com.fasterxml.jackson.annotation.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.Value;
+import lombok.With;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
@@ -359,6 +359,7 @@ public interface JavaType {
         @With
         @Nullable
         @NonFinal
+        @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
         Integer managedReference;
 
         @With(AccessLevel.NONE)
@@ -780,6 +781,7 @@ public interface JavaType {
         @With
         @Nullable
         @NonFinal
+        @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
         Integer managedReference;
 
         @With
@@ -926,6 +928,7 @@ public interface JavaType {
         @Getter
         @Nullable
         @NonFinal
+        @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
         Integer managedReference;
 
         @With
@@ -1020,6 +1023,7 @@ public interface JavaType {
         @Getter
         @Nullable
         @NonFinal
+        @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
         Integer managedReference;
 
         @NonFinal
@@ -1227,6 +1231,7 @@ public interface JavaType {
         @With
         @Nullable
         @NonFinal
+        @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
         Integer managedReference;
 
         @With(AccessLevel.PRIVATE)
@@ -1578,6 +1583,7 @@ public interface JavaType {
         @With
         @Nullable
         @NonFinal
+        @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
         Integer managedReference;
 
         @With(AccessLevel.PRIVATE)

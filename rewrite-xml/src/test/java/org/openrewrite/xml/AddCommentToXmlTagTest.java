@@ -19,7 +19,8 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.maven.Assertions.pomXml;
+import static org.openrewrite.xml.Assertions.xml;
+
 
 class AddCommentToXmlTagTest implements RewriteTest {
 
@@ -33,7 +34,7 @@ class AddCommentToXmlTagTest implements RewriteTest {
               " Comment text "
             )
           ),
-          pomXml(
+          xml(
             """
               <project>
                 <modelVersion>4.0.0</modelVersion>

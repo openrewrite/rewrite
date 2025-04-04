@@ -187,4 +187,92 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5174")
+    void shouldUpdateWithinMethod() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("foo.Bar.QUX1", "foo.Bar.QUX2")),
+          java(
+            """
+              package foo;
+
+              public class Bar {
+                  public static final String QUX1 = "QUX1";
+                  public static final String QUX2 = "QUX2";
+              }
+              """
+          ),
+          java(
+            """
+              import static foo.Bar.QUX1;
+
+              class Test {
+                  String out = QUX1;
+                  void a() {
+                      String in = QUX1;
+                  }
+              }
+              """,
+            """
+              import static foo.Bar.QUX2;
+
+              class Test {
+                  String out = QUX2;
+                  void a() {
+                      String in = QUX2;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/5174")
+    void shouldUpdateWithinMethod2() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("foo.Bar.QUX1", "foo.Bar.QUX2")),
+          java(
+            """
+              package foo;
+
+              public class Bar {
+                  public static final String QUX1 = "QUX1";
+                  public static final String QUX2 = "QUX2";
+              }
+              """
+          ),
+          java(
+            """
+              import foo.Bar;
+              
+              import static foo.Bar.QUX2;
+
+              class Test {
+                  public static final String QUX1 = "QUX111"; // the same name as Bar.QUX1
+
+                  void a() {
+                      String in = Bar.QUX1;
+                      String in2 = QUX2;
+                  }
+              }
+              """,
+            """
+              import foo.Bar;
+              
+              import static foo.Bar.QUX2;
+
+              class Test {
+                  public static final String QUX1 = "QUX111"; // the same name as Bar.QUX1
+
+                  void a() {
+                      String in = Bar.QUX2;
+                      String in2 = QUX2;
+                  }
+              }
+              """
+          )
+        );
+    }
 }

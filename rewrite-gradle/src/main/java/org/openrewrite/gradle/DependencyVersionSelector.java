@@ -127,22 +127,47 @@ public class DependencyVersionSelector {
      * @return The selected version, if any.
      * @throws MavenDownloadingException If there is a problem downloading metadata for the dependency.
      */
-    public @Nullable String select(GroupArtifactVersion gav,
-                         @Nullable String configuration,
-                         @Nullable String version,
-                         @Nullable String versionPattern,
-                         ExecutionContext ctx) throws MavenDownloadingException {
+    public @Nullable String select(
+            GroupArtifactVersion gav,
+            @Nullable String configuration,
+            @Nullable String version,
+            @Nullable String versionPattern,
+            ExecutionContext ctx) throws MavenDownloadingException {
+        try {
+            VersionComparator versionComparator = StringUtils.isBlank(version) ?
+                    new LatestRelease(versionPattern) :
+                    requireNonNull(Semver.validate(version, versionPattern).getValue());
+            return select(gav, configuration, version, versionComparator, ctx);
+        } catch (IllegalStateException e) {
+            // this can happen when we encounter exotic versions
+            return null;
+        }
+    }
+
+    /**
+     * Used to upgrade a version for a dependency that already has a version.
+     *
+     * @param gav            The group, artifact, and version of the existing dependency.
+     * @param configuration  The configuration to select the version for. The configuration influences
+     *                       which set of Maven repositories (either plugin repositories or regular repositories)
+     *                       are used to resolve Maven metadata from.     * @param version        The version to select, in node-semver format.
+     * @param versionComparator the comparator used to establish the validity of a potential upgrade
+     * @param ctx            The execution context, which can influence dependency resolution.
+     * @return The selected version, if any.
+     * @throws MavenDownloadingException If there is a problem downloading metadata for the dependency.
+     */
+    public @Nullable String select(
+            GroupArtifactVersion gav,
+            @Nullable String configuration,
+            @Nullable String version,
+            VersionComparator versionComparator,
+            ExecutionContext ctx) throws MavenDownloadingException {
         if (gav.getVersion() == null) {
             throw new IllegalArgumentException("Version must be specified. Call the select method " +
                                                "that accepts a GroupArtifact instead if there is no " +
                                                "current version.");
         }
-
         try {
-            VersionComparator versionComparator = StringUtils.isBlank(version) ?
-                    new LatestRelease(versionPattern) :
-                    requireNonNull(Semver.validate(version, versionPattern).getValue());
-
             if (versionComparator instanceof ExactVersion) {
                 return versionComparator.upgrade(gav.getVersion(), singletonList(version)).orElse(null);
             } else if (versionComparator instanceof LatestPatch && !Semver.isVersion(gav.getVersion())) {
