@@ -52,7 +52,7 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
     String newGroupId;
 
     @Option(displayName = "New artifact ID",
-            description = "The new artifact ID to use..",
+            description = "The new artifact ID to use.",
             example = "my-new-maven-plugin",
             required = false)
     @Nullable
