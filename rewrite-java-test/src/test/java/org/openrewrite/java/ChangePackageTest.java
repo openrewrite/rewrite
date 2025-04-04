@@ -1780,7 +1780,7 @@ class ChangePackageTest implements RewriteTest {
     }
 
     @Test
-    void changeTypeInLiteral() {
+    void changePackageInLiteral() {
         rewriteRun(
           spec -> spec.recipe(new ChangePackage("test.type", "test.test.type", true, true)),
           java(
