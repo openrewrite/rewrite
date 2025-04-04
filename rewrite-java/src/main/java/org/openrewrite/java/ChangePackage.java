@@ -29,6 +29,7 @@ import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
 
@@ -60,6 +61,12 @@ public class ChangePackage extends Recipe {
             required = false)
     @Nullable
     Boolean recursive;
+
+    @Option(displayName = "Apply to string literal",
+            description = "When set to `true`, String literal will also be taken into account.",
+            required = false)
+    @Nullable
+    Boolean visitStringLiterals;
 
     @Override
     public String getInstanceNameSuffix() {
@@ -114,8 +121,7 @@ public class ChangePackage extends Recipe {
                             }
                         }
                     }
-                }
-                if (tree instanceof SourceFileWithReferences) {
+                } else if (tree instanceof SourceFileWithReferences) {
                     SourceFileWithReferences cu = (SourceFileWithReferences) tree;
                     boolean recursive = Boolean.TRUE.equals(ChangePackage.this.recursive);
                     String recursivePackageNamePrefix = oldPackageName + ".";
@@ -138,11 +144,9 @@ public class ChangePackage extends Recipe {
             @Override
             public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
-                Tree visited = tree;
                 if (tree instanceof JavaSourceFile) {
-                    visited =  new JavaChangePackageVisitor().visit(tree, ctx, requireNonNull(getCursor().getParent()));
-                }
-                if (tree instanceof SourceFileWithReferences) {
+                    return new JavaChangePackageVisitor().visit(tree, ctx, requireNonNull(getCursor().getParent()));
+                } else if (tree instanceof SourceFileWithReferences) {
                     SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
                     SourceFileWithReferences.References references = sourceFile.getReferences();
                     boolean recursive = Boolean.TRUE.equals(ChangePackage.this.recursive);
@@ -151,9 +155,9 @@ public class ChangePackage extends Recipe {
                     for (Reference ref : references.findMatches(matcher)) {
                         matches.put(ref.getTree(), ref);
                     }
-                    visited = new ReferenceChangePackageVisitor(matches, matcher.createRenamer(newPackageName)).visit(tree, ctx, requireNonNull(getCursor().getParent()));
+                    return new ReferenceChangePackageVisitor(matches, matcher.createRenamer(newPackageName)).visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 }
-                return visited;
+                return tree;
             }
         });
     }
@@ -161,6 +165,7 @@ public class ChangePackage extends Recipe {
     private class JavaChangePackageVisitor extends JavaVisitor<ExecutionContext> {
         private static final String RENAME_TO_KEY = "renameTo";
         private static final String RENAME_FROM_KEY = "renameFrom";
+        private final Pattern referencePattern = Pattern.compile("\\p{javaJavaIdentifierStart}+(?:\\.\\p{javaJavaIdentifierStart}+)+");
 
         private final Map<JavaType, JavaType> oldNameToChangedType = new IdentityHashMap<>();
         private final JavaType.Class newPackageType = JavaType.ShallowClass.build(newPackageName);
@@ -236,6 +241,19 @@ public class ChangePackage extends Recipe {
         @Override
         public @Nullable JavaType visitType(@Nullable JavaType javaType, ExecutionContext ctx) {
             return updateType(javaType);
+        }
+
+        @Override
+        public J visitLiteral(J.Literal literal, ExecutionContext executionContext) {
+            J.Literal lit = literal;
+            boolean visitLiterals = Boolean.TRUE.equals(ChangePackage.this.visitStringLiterals);
+            if (visitLiterals && literal.getType().equals(JavaType.Primitive.String)) {
+                String value = (String) literal.getValue();
+                if (referencePattern.matcher(value).find()) {
+                    lit = lit.withValue(((String)lit.getValue()).replace(oldPackageName, newPackageName)).withValueSource(lit.getValueSource().replace(oldPackageName, newPackageName));
+                }
+            }
+            return super.visitLiteral(lit, executionContext);
         }
 
         @Override

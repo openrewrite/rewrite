@@ -125,8 +125,7 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
                     }
                 }
             }
-        }
-        if (tree instanceof SourceFileWithReferences) {
+        } else if (tree instanceof SourceFileWithReferences) {
             SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
             SourceFileWithReferences.References references = sourceFile.getReferences();
             for (Reference ignored : references.findMatches(referenceMatcher)) {

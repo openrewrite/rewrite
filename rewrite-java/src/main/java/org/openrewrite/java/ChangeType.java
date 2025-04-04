@@ -30,6 +30,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
 
@@ -53,6 +54,12 @@ public class ChangeType extends Recipe {
             required = false)
     @Nullable
     Boolean ignoreDefinition;
+
+    @Option(displayName = "Apply to string literal",
+            description = "When set to `true`, String literal will also be taken into account.",
+            required = false)
+    @Nullable
+    Boolean visitStringLiterals;
 
     @Override
     public String getDisplayName() {
@@ -98,8 +105,7 @@ public class ChangeType extends Recipe {
                         return SearchResult.found(cu);
                     }
                     return new UsesType<>(oldFullyQualifiedTypeName, true).visitNonNull(cu, ctx);
-                }
-                if (tree instanceof SourceFileWithReferences) {
+                } else if (tree instanceof SourceFileWithReferences) {
                     SourceFileWithReferences cu = (SourceFileWithReferences) tree;
                     return new UsesType<>(oldFullyQualifiedTypeName, true).visitNonNull(cu, ctx);
                 }
@@ -116,11 +122,9 @@ public class ChangeType extends Recipe {
             @Override
             public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
-                Tree visited = tree;
                 if (tree instanceof J) {
-                    visited = new JavaChangeTypeVisitor(oldFullyQualifiedTypeName, newFullyQualifiedTypeName, ignoreDefinition).visit(visited, ctx, requireNonNull(getCursor().getParent()));
-                }
-                if (tree instanceof SourceFileWithReferences) {
+                    return new JavaChangeTypeVisitor(oldFullyQualifiedTypeName, newFullyQualifiedTypeName, ignoreDefinition).visit(tree, ctx, requireNonNull(getCursor().getParent()));
+                } else if (tree instanceof SourceFileWithReferences) {
                     SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
                     SourceFileWithReferences.References references = sourceFile.getReferences();
                     TypeMatcher matcher = new TypeMatcher(oldFullyQualifiedTypeName);
@@ -128,17 +132,17 @@ public class ChangeType extends Recipe {
                     for (Reference ref : references.findMatches(matcher)) {
                         matches.put(ref.getTree(), ref);
                     }
-                    visited = new ReferenceChangeTypeVisitor(matches, matcher.createRenamer(newFullyQualifiedTypeName)).visit(visited, ctx, requireNonNull(getCursor().getParent()));
+                    return new ReferenceChangeTypeVisitor(matches, matcher.createRenamer(newFullyQualifiedTypeName)).visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 }
-                return visited;
+                return tree;
             }
         });
     }
 
-    private static class JavaChangeTypeVisitor extends JavaVisitor<ExecutionContext> {
+    private class JavaChangeTypeVisitor extends JavaVisitor<ExecutionContext> {
         private final JavaType.Class originalType;
         private final JavaType targetType;
-
+        private final Pattern referencePattern = Pattern.compile("\\p{javaJavaIdentifierStart}+(?:\\.\\p{javaJavaIdentifierStart}+)+");
 
         private J.@Nullable Identifier importAlias;
 
@@ -200,6 +204,19 @@ public class ChangeType extends Recipe {
         @Override
         public @Nullable JavaType visitType(@Nullable JavaType javaType, ExecutionContext ctx) {
             return updateType(javaType);
+        }
+
+        @Override
+        public J visitLiteral(J.Literal literal, ExecutionContext executionContext) {
+            J.Literal lit = literal;
+            boolean visitLiterals = Boolean.TRUE.equals(ChangeType.this.visitStringLiterals);
+            if (visitLiterals && literal.getType().equals(JavaType.Primitive.String)) {
+                String value = (String) literal.getValue();
+                if (referencePattern.matcher(value).find()) {
+                    lit = lit.withValue(((String)lit.getValue()).replace(oldFullyQualifiedTypeName, newFullyQualifiedTypeName)).withValueSource(lit.getValueSource().replace(oldFullyQualifiedTypeName, newFullyQualifiedTypeName));
+                }
+            }
+            return super.visitLiteral(lit, executionContext);
         }
 
         private void addImport(JavaType.FullyQualified owningClass) {
