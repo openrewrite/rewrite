@@ -20,6 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.maven.table.MavenDownloadEvents;
 import org.openrewrite.maven.trait.MavenDependency;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.maven.utilities.RetainVersions;
@@ -51,6 +52,9 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVersion.Accumulator> {
     @EqualsAndHashCode.Exclude
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
+
+    @EqualsAndHashCode.Exclude
+    transient MavenDownloadEvents mavenDownloadEvents = new MavenDownloadEvents(this);
 
     // there are several implicitly defined version properties that we should never attempt to update
     private static final Collection<String> implicitlyDefinedVersionProperties = Arrays.asList(
@@ -149,6 +153,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                     if (d != null && d.getRepository() != null) {
                         // if the resolved dependency exists AND it does not represent an artifact that was parsed
                         // as a source file, attempt to find a new version.
+                        MavenExecutionContextView.view(ctx).setDownloadEventsDataTable(mavenDownloadEvents);
                         try {
                             String newerVersion = MavenDependency.findNewerVersion(d.getGroupId(), d.getArtifactId(), d.getVersion(), getResolutionResult(), metadataFailures,
                                     versionComparator, ctx);
@@ -167,6 +172,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<UpgradeDependencyVe
                             }
                         } catch (MavenDownloadingException e) {
                             return e.warn(tag);
+                        } finally {
+                            MavenExecutionContextView.view(ctx).setDownloadEventsDataTable(null);
                         }
                     }
                 }
