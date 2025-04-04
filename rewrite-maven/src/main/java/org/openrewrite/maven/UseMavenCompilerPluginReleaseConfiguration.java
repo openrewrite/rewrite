@@ -18,7 +18,6 @@ package org.openrewrite.maven;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.Cursor;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -27,8 +26,6 @@ import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
-import java.util.Arrays;
-import java.util.List;
 
 import static org.openrewrite.xml.AddOrUpdateChild.addOrUpdateChild;
 import static org.openrewrite.xml.FilterTagChildrenVisitor.filterTagChildren;
@@ -36,10 +33,7 @@ import static org.openrewrite.xml.FilterTagChildrenVisitor.filterTagChildren;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class UseMavenCompilerPluginReleaseConfiguration extends Recipe {
-    private static final List<XPathMatcher> PLUGIN_MATCHERS = Arrays.asList(
-            new XPathMatcher("/project/build//plugins"),
-            new XPathMatcher("/project/profiles/profile/build//plugins")
-    );
+    private static final XPathMatcher PLUGINS_MATCHER = new XPathMatcher("/project//build//plugins");
 
     @Option(
             displayName = "Release version",
@@ -65,7 +59,7 @@ public class UseMavenCompilerPluginReleaseConfiguration extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
-                if (!matchesAnyPattern(getCursor())) {
+                if (!PLUGINS_MATCHER.matches(getCursor())) {
                     return t;
                 }
                 Optional<Xml.Tag> maybeCompilerPlugin = t.getChildren().stream()
@@ -96,10 +90,6 @@ public class UseMavenCompilerPluginReleaseConfiguration extends Recipe {
                 updated = addOrUpdateChild(updated, compilerPluginConfig,
                         Xml.Tag.build("<release>" + releaseVersionValue + "</release>"), getCursor().getParentOrThrow());
                 return updated;
-            }
-
-            private boolean matchesAnyPattern(Cursor cursor) {
-                return PLUGIN_MATCHERS.stream().anyMatch(matcher -> matcher.matches(cursor));
             }
         };
     }
