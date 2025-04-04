@@ -149,8 +149,37 @@ class MavenParserTest implements RewriteTest {
     }
 
     @Test
-    @Issue("https://github.com/openrewrite/rewrite/issues/2603")
     void repositoryWithPropertyPlaceholders() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-project</artifactId>
+                  <version>1</version>
+                  <properties>
+                        <my.artifact.repo.url>https://my.artifact.repo.com</my.artifact.repo.url>
+                  </properties>
+                  <repositories>
+                      <repository>
+                          <id>my-artifact-repo</id>
+                          <url>${my.artifact.repo.url}</url>
+                      </repository>
+                  </repositories>
+              </project>
+              """,
+            spec -> spec.afterRecipe(p ->
+              assertThat(p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getRepositories())
+                .map(MavenRepository::getUri)
+                .describedAs("Property placeholder in repository URL resolved")
+                .singleElement()
+                .isEqualTo("https://my.artifact.repo.com"))
+          )
+        );
+    }
+
+    @Test
+    void repositoryWithPropertyFromParent() {
         rewriteRun(
           mavenProject("parent", pomXml(
             """

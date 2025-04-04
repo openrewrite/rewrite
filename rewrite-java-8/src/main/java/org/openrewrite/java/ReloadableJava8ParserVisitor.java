@@ -26,7 +26,6 @@ import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
 import com.sun.tools.javac.util.Context;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.PrintOutputCapture;

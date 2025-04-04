@@ -23,7 +23,10 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
 
 import static java.util.Collections.*;
 import static java.util.Objects.requireNonNull;

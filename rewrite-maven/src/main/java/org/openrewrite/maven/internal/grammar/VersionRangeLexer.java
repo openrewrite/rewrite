@@ -15,14 +15,12 @@
  */
 // Generated from ~/git/rewrite/rewrite-maven/src/main/antlr/VersionRangeLexer.g4 by ANTLR 4.13.2
 package org.openrewrite.maven.internal.grammar;
-import org.antlr.v4.runtime.Lexer;
-import org.antlr.v4.runtime.CharStream;
-import org.antlr.v4.runtime.Token;
-import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.*;
-import org.antlr.v4.runtime.atn.*;
+import org.antlr.v4.runtime.atn.ATN;
+import org.antlr.v4.runtime.atn.ATNDeserializer;
+import org.antlr.v4.runtime.atn.LexerATNSimulator;
+import org.antlr.v4.runtime.atn.PredictionContextCache;
 import org.antlr.v4.runtime.dfa.DFA;
-import org.antlr.v4.runtime.misc.*;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue", "this-escape"})
 public class VersionRangeLexer extends Lexer {
@@ -32,7 +30,7 @@ public class VersionRangeLexer extends Lexer {
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		COMMA=1, PROPERTY_OPEN=2, PROPERTY_CLOSE=3, OPEN_RANGE_OPEN=4, OPEN_RANGE_CLOSE=5, 
+		COMMA=1, PROPERTY_OPEN=2, PROPERTY_CLOSE=3, OPEN_RANGE_OPEN=4, OPEN_RANGE_CLOSE=5,
 		CLOSED_RANGE_OPEN=6, CLOSED_RANGE_CLOSE=7, Version=8, WS=9;
 	public static String[] channelNames = {
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN"
@@ -44,7 +42,7 @@ public class VersionRangeLexer extends Lexer {
 
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"COMMA", "PROPERTY_OPEN", "PROPERTY_CLOSE", "OPEN_RANGE_OPEN", "OPEN_RANGE_CLOSE", 
+			"COMMA", "PROPERTY_OPEN", "PROPERTY_CLOSE", "OPEN_RANGE_OPEN", "OPEN_RANGE_CLOSE",
 			"CLOSED_RANGE_OPEN", "CLOSED_RANGE_CLOSE", "Version", "WS"
 		};
 	}
@@ -58,8 +56,8 @@ public class VersionRangeLexer extends Lexer {
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, "COMMA", "PROPERTY_OPEN", "PROPERTY_CLOSE", "OPEN_RANGE_OPEN", 
-			"OPEN_RANGE_CLOSE", "CLOSED_RANGE_OPEN", "CLOSED_RANGE_CLOSE", "Version", 
+			null, "COMMA", "PROPERTY_OPEN", "PROPERTY_CLOSE", "OPEN_RANGE_OPEN",
+			"OPEN_RANGE_CLOSE", "CLOSED_RANGE_OPEN", "CLOSED_RANGE_CLOSE", "Version",
 			"WS"
 		};
 	}

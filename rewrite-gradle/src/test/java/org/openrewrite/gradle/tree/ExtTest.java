@@ -36,4 +36,17 @@ class ExtTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void extWithSpaceShip(){
+        rewriteRun(
+          buildGradle(
+            """
+              ext{
+                  "a" <=> "b" ?: true
+              }
+              """
+          )
+        );
+    }
 }
