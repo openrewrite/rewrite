@@ -113,7 +113,7 @@ public class RecipeIntrospectionUtils {
 
     private static <V> V construct(Class<?> clazz, @Nullable Map<String, Object> args) {
         Constructor<?> constructor = getConstructor(clazz, args);
-        @Nullable Object[] constructorArgs = new Object[constructor.getParameterCount()];
+        Object @Nullable[] constructorArgs = new Object[constructor.getParameterCount()];
         for (int i = 0; i < constructor.getParameters().length; i++) {
             java.lang.reflect.Parameter param = constructor.getParameters()[i];
             if (args != null && args.containsKey(param.getName())) {
