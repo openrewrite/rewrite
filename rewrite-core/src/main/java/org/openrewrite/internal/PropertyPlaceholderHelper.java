@@ -119,7 +119,7 @@ public class PropertyPlaceholderHelper {
                 }
 
                 // Proceed with unprocessed value.
-                startIndex = result.indexOf(placeholderPrefix, endIndex + placeholderSuffix.length() - 1);
+                startIndex = result.indexOf(placeholderPrefix, endIndex + placeholderSuffix.length());
                 visitedPlaceholders.remove(originalPlaceholder);
             } else {
                 startIndex = -1;
