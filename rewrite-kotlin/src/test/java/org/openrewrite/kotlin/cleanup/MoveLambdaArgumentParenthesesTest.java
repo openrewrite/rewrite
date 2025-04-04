@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
@@ -34,19 +33,17 @@ class MoveLambdaArgumentParenthesesTest implements RewriteTest {
     @Test
     void removeParenthesesFromLet() {
         rewriteRun(
-                spec -> spec.recipe(new MoveLambdaArgumentParentheses())
-                        .typeValidationOptions(TypeValidation.none())
-            ,kotlin(
+          kotlin(
             """
-              fun method() {
-                  val foo = 1.let({ it + 1 })
-              }
-              """,
+            fun method(number: Int) {
+                val foo = number.let({ it + 1 })
+            }
+            """,
             """
-              fun method() {
-                  val foo = 1.let { it + 1 }
-              }
-              """
+            fun method(number: Int) {
+                val foo = number.let { it + 1 }
+            }
+            """
           )
         );
     }
@@ -112,22 +109,22 @@ class MoveLambdaArgumentParenthesesTest implements RewriteTest {
     @Test
     void noChangeWhenNotLambda() {
         rewriteRun(
-            kotlin(
+          kotlin(
+          """
+            fun method() {
+                val list = listOf(1, 2, 3)
+                fun isEven(num: Int): Boolean = num % 2 == 0
+                list.filter(::isEven)
+            }
             """
-              fun method() {
-                  val list = listOf(1, 2, 3)
-                  fun isEven(num: Int): Boolean = num % 2 == 0
-                  list.filter(::isEven)
-              }
-              """
-            ),
-            kotlin(
+          ),
+          kotlin(
+          """
+            fun method() {
+                run(::println)
+            }
             """
-              fun method() {
-                  run(::println)
-              }
-              """
-            )
+          )
         );
     }
 
@@ -135,28 +132,28 @@ class MoveLambdaArgumentParenthesesTest implements RewriteTest {
     @Test
     void noChangeWhenHaveLambdaAndArgument() {
         rewriteRun(
-                kotlin(
-                    """
-                  fun method() {
-                      val testingMethod = {_: () -> Int,  _: () -> Int -> println("Hello, world") }
-                      testingMethod({ 1 }) { 1 }
-                  }
-                  """
-                )
+          kotlin(
+              """
+            fun method() {
+                val testingMethod = {_: () -> Int,  _: () -> Int -> println("Hello, world") }
+                testingMethod({ 1 }) { 1 }
+            }
+            """
+          )
         );
     }
 
     @Test
     void noChangeWhenUseLambdaOutsideParentheses() {
         rewriteRun(
-                kotlin(
-                    """
-                  fun method() {
-                      val list = listOf(1, 2, 3)
-                      list.filterIndexed { index, value -> index > 1 && value > 1 }
-                  }
-                  """
-                )
+          kotlin(
+              """
+            fun method() {
+                val list = listOf(1, 2, 3)
+                list.filterIndexed { index, value -> index > 1 && value > 1 }
+            }
+            """
+          )
         );
     }
 }

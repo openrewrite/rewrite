@@ -36,7 +36,7 @@ public class MoveLambdaArgumentParentheses extends Recipe {
     @Override
     public String getDescription() {
         return "Move lambda argument outside of method invocation parentheses when they are the only argument. " +
-               "For example, converts `1.let({ it + 1 })` to `1.let { it + 1 }`.";
+                "For example, converts `1.let({ it + 1 })` to `1.let { it + 1 }`.";
     }
 
     @Override
@@ -59,20 +59,20 @@ public class MoveLambdaArgumentParentheses extends Recipe {
                     }
 
                     String lambda = arguments.get(0).print(getCursor());
-                    Object[] parameters = new Object[]{method.getSelect(), method.getSimpleName(), lambda};
-                    String code = "#{any()}.#{} #{}";
+                    Object[] parameters;
+                    String code;
                     if (method.getSelect() == null) {
                         parameters = new Object[]{method.getSimpleName(), lambda};
                         code = "#{} #{}";
+                    } else {
+                        parameters = new Object[]{method.getSelect(), method.getSimpleName(), lambda};
+                        code = "#{any()}.#{} #{}";
                     }
-
                     return KotlinTemplate.builder(code)
                             .build()
                             .apply(getCursor(), method.getCoordinates().replace(), parameters)
-                           .withPrefix(method.getPrefix());
-
+                            .withPrefix(method.getPrefix());
                 }
-
                 return method;
 
             }
