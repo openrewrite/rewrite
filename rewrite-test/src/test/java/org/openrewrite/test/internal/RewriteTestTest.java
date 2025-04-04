@@ -166,7 +166,7 @@ class ScannerEdit extends ScanningRecipe<AtomicBoolean> {
     public TreeVisitor<?, ExecutionContext> getScanner(AtomicBoolean acc) {
         return new PlainTextVisitor<>() {
             @Override
-            public PlainText visitText(PlainText text, ExecutionContext executionContext) {
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
                 return text.withText("mutated");
             }
         };

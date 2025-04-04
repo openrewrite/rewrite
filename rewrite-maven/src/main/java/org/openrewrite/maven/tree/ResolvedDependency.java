@@ -23,7 +23,10 @@ import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 
 import java.io.Serializable;
-import java.util.*;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Set;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.internal.StringUtils.matchesGlob;

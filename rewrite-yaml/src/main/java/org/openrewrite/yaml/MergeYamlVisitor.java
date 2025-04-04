@@ -36,9 +36,7 @@ import static org.openrewrite.Cursor.ROOT_VALUE;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.ListUtils.*;
 import static org.openrewrite.internal.StringUtils.*;
-import static org.openrewrite.yaml.MergeYaml.InsertMode;
-import static org.openrewrite.yaml.MergeYaml.InsertMode.*;
-import static org.openrewrite.yaml.MergeYaml.REMOVE_PREFIX;
+import static org.openrewrite.yaml.MergeYaml.*;
 
 /**
  * Visitor class to merge two yaml files.
