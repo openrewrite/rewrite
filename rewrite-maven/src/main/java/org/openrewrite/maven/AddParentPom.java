@@ -160,7 +160,6 @@ public class AddParentPom extends Recipe {
             private Optional<String> findAcceptableVersion(String groupId, String artifactId, ExecutionContext ctx)
                     throws MavenDownloadingException {
                 if (availableVersions == null) {
-                    ResolutionEventListener resolutionListener = new MavenExecutionContextView(ctx).getResolutionListener();
                     MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
                     availableVersions = mavenMetadata.getVersioning().getVersions().stream()
                             .filter(v -> versionComparator.isValid(null, v))

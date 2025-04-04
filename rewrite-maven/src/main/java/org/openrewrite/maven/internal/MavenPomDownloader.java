@@ -174,7 +174,6 @@ public class MavenPomDownloader {
             });
         } catch (FailsafeException failsafeException) {
             if (failsafeException.getCause() instanceof HttpSenderResponseException) {
-                Integer responseCode = ((HttpSenderResponseException) failsafeException.getCause()).getResponseCode();
                 throw (HttpSenderResponseException) failsafeException.getCause();
             }
             if (downloadEventsDataTable != null) {
