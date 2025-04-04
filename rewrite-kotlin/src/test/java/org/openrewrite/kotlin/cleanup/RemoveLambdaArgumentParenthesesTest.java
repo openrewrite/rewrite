@@ -22,11 +22,11 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
-class MoveLambdaArgumentParenthesesTest implements RewriteTest {
+class RemoveLambdaArgumentParenthesesTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new MoveLambdaArgumentParentheses());
+        spec.recipe(new RemoveLambdaArgumentParentheses());
     }
 
     @DocumentExample

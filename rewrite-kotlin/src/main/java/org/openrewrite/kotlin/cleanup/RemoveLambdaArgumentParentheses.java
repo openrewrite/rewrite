@@ -29,17 +29,16 @@ import org.openrewrite.marker.Markers;
 
 import java.time.Duration;
 
-public class MoveLambdaArgumentParentheses extends Recipe {
+public class RemoveLambdaArgumentParentheses extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Move lambda argument outside of method invocation parentheses";
+        return "Remove method invocation parentheses around single lambda argument";
     }
 
     @Override
     public String getDescription() {
-        return "Move lambda argument outside of method invocation parentheses when they are the only argument. " +
-                "For example, converts `1.let({ it + 1 })` to `1.let { it + 1 }`.";
+        return "For example, convert `1.let({ it + 1 })` to `1.let { it + 1 }`.";
     }
 
     @Override
@@ -63,7 +62,6 @@ public class MoveLambdaArgumentParentheses extends Recipe {
                     }
                 }
                 return method;
-
             }
         };
     }
