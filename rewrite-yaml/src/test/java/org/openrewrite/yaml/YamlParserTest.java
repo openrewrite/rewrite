@@ -15,8 +15,6 @@
  */
 package org.openrewrite.yaml;
 
-import java.util.List;
-import java.util.stream.Stream;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -26,6 +24,9 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.yaml.tree.Yaml;
+
+import java.util.List;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -255,8 +256,8 @@ class YamlParserTest implements RewriteTest {
             """
           )
         );
-    }  
-  
+    }
+
     @Test
     void tagsAsInCloudFormation() {
         rewriteRun(
@@ -337,6 +338,70 @@ class YamlParserTest implements RewriteTest {
           // thus proving the parser can handle a flow-style sequence ending at the boundary of the internal buffer used by SnakeYaml StreamReader.
           spec -> spec.recipe(new DeleteKey(".nonexistent","*")),
           yaml(yaml)
+        );
+    }
+
+    @Test
+    void withUnicodeCharacters() {
+        rewriteRun(
+          yaml(
+            """
+            - name: Elephant
+            - #🦍COMMENT: unicode
+            - action: Do something
+            """)
+        );
+    }
+
+    @Test
+    void withUnicodeCharactersInSingleLine() {
+        rewriteRun(
+          yaml(
+            """
+            - name: Elephant
+            - #🦍COMMENT: 🐶unicode
+            - action: Do something
+            """)
+        );
+    }
+
+    @Test
+    void withoutUnicodeCharacters() {
+        rewriteRun(
+          yaml(
+            """
+            - name: Elephant
+            - #COMMENT: unicode
+            - action: Do something
+            """)
+        );
+    }
+
+    @Test
+    void withMultipleUnicodeCharacters() {
+        rewriteRun(
+          yaml(
+            """
+            - name: Rat
+            - #🐀COMMENT: unicode
+            - color: Black
+            - #🦍COMMENT: unicode
+            - action: Escape
+            """)
+        );
+    }
+
+    @Test
+    void withMultipleUnicodeCharactersPerLine() {
+        rewriteRun(
+          yaml(
+            """
+            - name: Rat
+            - #🐀COMMENT: 🦍unicode
+            - color: Black
+            - #🦍COMMENT: 🎱unicode
+            - action: Escape
+            """)
         );
     }
 }
