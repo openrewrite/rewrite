@@ -148,7 +148,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             case In:
                 keyword = "in";
                 break;
-            case SPACESHIP:
+            case Spaceship:
                 keyword = "<=>";
                 break;
         }
