@@ -188,15 +188,33 @@ public class RecipeIntrospectionUtils {
     }
 
     private static Class<?> getWrapperType(Class<?> primitiveType) {
-        if (primitiveType == int.class) return Integer.class;
-        if (primitiveType == boolean.class) return Boolean.class;
-        if (primitiveType == byte.class) return Byte.class;
-        if (primitiveType == char.class) return Character.class;
-        if (primitiveType == double.class) return Double.class;
-        if (primitiveType == float.class) return Float.class;
-        if (primitiveType == long.class) return Long.class;
-        if (primitiveType == short.class) return Short.class;
-        if (primitiveType == void.class) return Void.class;
+        if (primitiveType == int.class) {
+            return Integer.class;
+        }
+        if (primitiveType == boolean.class) {
+            return Boolean.class;
+        }
+        if (primitiveType == byte.class) {
+            return Byte.class;
+        }
+        if (primitiveType == char.class) {
+            return Character.class;
+        }
+        if (primitiveType == double.class) {
+            return Double.class;
+        }
+        if (primitiveType == float.class) {
+            return Float.class;
+        }
+        if (primitiveType == long.class) {
+            return Long.class;
+        }
+        if (primitiveType == short.class) {
+            return Short.class;
+        }
+        if (primitiveType == void.class) {
+            return Void.class;
+        }
         return primitiveType;
     }
 
