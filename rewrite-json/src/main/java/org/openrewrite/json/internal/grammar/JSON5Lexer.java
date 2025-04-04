@@ -15,14 +15,12 @@
  */
 // Generated from ~/git/rewrite/rewrite-json/src/main/antlr/JSON5.g4 by ANTLR 4.13.2
 package org.openrewrite.json.internal.grammar;
-import org.antlr.v4.runtime.Lexer;
-import org.antlr.v4.runtime.CharStream;
-import org.antlr.v4.runtime.Token;
-import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.*;
-import org.antlr.v4.runtime.atn.*;
+import org.antlr.v4.runtime.atn.ATN;
+import org.antlr.v4.runtime.atn.ATNDeserializer;
+import org.antlr.v4.runtime.atn.LexerATNSimulator;
+import org.antlr.v4.runtime.atn.PredictionContextCache;
 import org.antlr.v4.runtime.dfa.DFA;
-import org.antlr.v4.runtime.misc.*;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue", "this-escape"})
 public class JSON5Lexer extends Lexer {
@@ -32,8 +30,8 @@ public class JSON5Lexer extends Lexer {
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		T__0=1, T__1=2, T__2=3, T__3=4, T__4=5, T__5=6, SINGLE_LINE_COMMENT=7, 
-		MULTI_LINE_COMMENT=8, LITERAL=9, STRING=10, NUMBER=11, NUMERIC_LITERAL=12, 
+		T__0=1, T__1=2, T__2=3, T__3=4, T__4=5, T__5=6, SINGLE_LINE_COMMENT=7,
+		MULTI_LINE_COMMENT=8, LITERAL=9, STRING=10, NUMBER=11, NUMERIC_LITERAL=12,
 		SYMBOL=13, IDENTIFIER=14, WS=15, UTF_8_BOM=16;
 	public static String[] channelNames = {
 		"DEFAULT_TOKEN_CHANNEL", "HIDDEN"
@@ -45,10 +43,10 @@ public class JSON5Lexer extends Lexer {
 
 	private static String[] makeRuleNames() {
 		return new String[] {
-			"T__0", "T__1", "T__2", "T__3", "T__4", "T__5", "SINGLE_LINE_COMMENT", 
-			"MULTI_LINE_COMMENT", "LITERAL", "STRING", "DOUBLE_QUOTE_CHAR", "SINGLE_QUOTE_CHAR", 
-			"ESCAPE_SEQUENCE", "NUMBER", "NUMERIC_LITERAL", "SYMBOL", "HEX", "INT", 
-			"EXP", "IDENTIFIER", "IDENTIFIER_START", "IDENTIFIER_PART", "UNICODE_SEQUENCE", 
+			"T__0", "T__1", "T__2", "T__3", "T__4", "T__5", "SINGLE_LINE_COMMENT",
+			"MULTI_LINE_COMMENT", "LITERAL", "STRING", "DOUBLE_QUOTE_CHAR", "SINGLE_QUOTE_CHAR",
+			"ESCAPE_SEQUENCE", "NUMBER", "NUMERIC_LITERAL", "SYMBOL", "HEX", "INT",
+			"EXP", "IDENTIFIER", "IDENTIFIER_START", "IDENTIFIER_PART", "UNICODE_SEQUENCE",
 			"NEWLINE", "WS", "UTF_8_BOM"
 		};
 	}
@@ -56,15 +54,15 @@ public class JSON5Lexer extends Lexer {
 
 	private static String[] makeLiteralNames() {
 		return new String[] {
-			null, "'{'", "','", "'}'", "':'", "'['", "']'", null, null, null, null, 
+			null, "'{'", "','", "'}'", "':'", "'['", "']'", null, null, null, null,
 			null, null, null, null, null, "'\\uFEFF'"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
 	private static String[] makeSymbolicNames() {
 		return new String[] {
-			null, null, null, null, null, null, null, "SINGLE_LINE_COMMENT", "MULTI_LINE_COMMENT", 
-			"LITERAL", "STRING", "NUMBER", "NUMERIC_LITERAL", "SYMBOL", "IDENTIFIER", 
+			null, null, null, null, null, null, null, "SINGLE_LINE_COMMENT", "MULTI_LINE_COMMENT",
+			"LITERAL", "STRING", "NUMBER", "NUMERIC_LITERAL", "SYMBOL", "IDENTIFIER",
 			"WS", "UTF_8_BOM"
 		};
 	}

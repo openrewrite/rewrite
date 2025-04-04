@@ -23,6 +23,7 @@ import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
@@ -83,6 +84,7 @@ class JsonSendReceiveTest implements RewriteTest {
         }));
     }
 
+    @DocumentExample
     @Test
     void sendReceiveIdempotence() {
         rewriteRun(

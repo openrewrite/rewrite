@@ -16,6 +16,7 @@
 package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.test.RecipeSpec;
@@ -32,6 +33,7 @@ class UpdateMavenModelTest implements RewriteTest {
           .classpath("guava", "jackson-databind"));
     }
 
+    @DocumentExample
     @Test
     void mavenUserPropertiesExistAfterUpdateMavenModel() {
         rewriteRun(

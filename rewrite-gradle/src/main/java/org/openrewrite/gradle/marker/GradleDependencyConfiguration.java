@@ -24,7 +24,10 @@ import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.ResolvedDependency;
 
 import java.io.Serializable;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 
 import static java.util.Collections.emptyList;
 

@@ -28,8 +28,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
+import static java.util.Collections.*;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
@@ -81,7 +80,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             List<Statement> gen = substitutions.unsubstitute(templateParser.parseBlockStatements(
                                     new Cursor(getCursor(), insertionPoint),
                                     Statement.class,
-                                    substitutedTemplate, loc, mode));
+                                    substitutedTemplate, emptySet(), loc, mode));
 
                             if (coordinates.getComparator() != null) {
                                 J.Block b = block;
@@ -112,7 +111,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                 List<Statement> gen = substitutions.unsubstitute(templateParser.parseBlockStatements(
                                         new Cursor(getCursor(), insertionPoint),
                                         Statement.class,
-                                        substitutedTemplate, loc, mode));
+                                        substitutedTemplate, emptySet(), loc, mode));
 
                                 Cursor parent = getCursor();
                                 for (int i = 0; i < gen.size(); i++) {
@@ -208,7 +207,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(
                                     getCursor(),
                                     substitutedTemplate,
-                                    loc))
+                                    emptyList(), loc))
                             .withPrefix(expression.getPrefix()), p);
                 }
                 return expression;
@@ -220,14 +219,14 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(
                                     getCursor(),
                                     substitutedTemplate,
-                                    loc))
+                                    emptyList(), loc))
                             .withPrefix(fa.getPrefix()), p);
                 } else if (loc == STATEMENT_PREFIX && fa.isScope(insertionPoint)) {
                     // NOTE: while `J.FieldAccess` inherits from `Statement` they can only ever be used as expressions
                     return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(
                                     getCursor(),
                                     substitutedTemplate,
-                                    loc))
+                                    emptyList(), loc))
                             .withPrefix(fa.getPrefix()), p);
                 }
                 return super.visitFieldAccess(fa, p);
@@ -240,7 +239,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(
                                     getCursor(),
                                     substitutedTemplate,
-                                    loc))
+                                    emptyList(), loc))
                             .withPrefix(ident.getPrefix()), p);
                 }
                 return super.visitIdentifier(ident, p);
@@ -282,7 +281,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                         }
                         case BLOCK_PREFIX: {
                             List<Statement> gen = substitutions.unsubstitute(templateParser.parseBlockStatements(getCursor(), Statement.class,
-                                    substitutedTemplate, loc, mode));
+                                    substitutedTemplate, emptySet(), loc, mode));
                             J.Block body = method.getBody();
                             if (body == null) {
                                 body = EMPTY_BLOCK;
@@ -387,11 +386,11 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                 if ((loc == METHOD_INVOCATION_ARGUMENTS || loc == METHOD_INVOCATION_NAME) && method.isScope(insertionPoint)) {
                     J.MethodInvocation m;
                     if (loc == METHOD_INVOCATION_ARGUMENTS) {
-                        m = substitutions.unsubstitute(templateParser.parseMethodArguments(getCursor(), substitutedTemplate, loc));
+                        m = substitutions.unsubstitute(templateParser.parseMethodArguments(getCursor(), substitutedTemplate, substitutions.getTypeVariablesReferencedByParameters(), loc));
                         m = autoFormat(m, 0);
                         m = method.withArguments(m.getArguments()).withMethodType(m.getMethodType());
                     } else {
-                        m = substitutions.unsubstitute(templateParser.parseMethod(getCursor(), substitutedTemplate, loc));
+                        m = substitutions.unsubstitute(templateParser.parseMethod(getCursor(), substitutedTemplate, substitutions.getTypeVariablesReferencedByParameters(), loc));
                         m = autoFormat(m, 0);
                         m = method.withName(m.getName()).withArguments(m.getArguments()).withMethodType(m.getMethodType());
                     }
@@ -448,7 +447,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                 if (loc == STATEMENT_PREFIX && statement.isScope(insertionPoint)) {
                     if (mode == JavaCoordinates.Mode.REPLACEMENT) {
                         List<J3> gen = substitutions.unsubstitute(templateParser.parseBlockStatements(getCursor(),
-                                expected, substitutedTemplate, loc, mode));
+                                expected, substitutedTemplate, substitutions.getTypeVariablesReferencedByParameters(), loc, mode));
                         if (gen.size() != 1) {
                             // for some languages with optional semicolons, templates may generate a statement
                             // and an empty, e.g. for a statement replacement in Groovy for the last statement
