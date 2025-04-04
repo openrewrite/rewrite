@@ -228,10 +228,10 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               
               dependencies {
                   constraints {
-                      implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
+                      earlib('com.fasterxml.jackson.core:jackson-core:2.12.5') {
                           because 'CVE-2024-BAD'
                       }
-                      earlib('com.fasterxml.jackson.core:jackson-core:2.12.5') {
+                      implementation('com.fasterxml.jackson.core:jackson-core:2.12.5') {
                           because 'CVE-2024-BAD'
                       }
                   }
@@ -479,7 +479,6 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     void constraintDoesNotGetAddedInsideConstraint() {
         rewriteRun(
           spec -> spec
-            .beforeRecipe(withToolingApi())
             .recipe(new UpgradeTransitiveDependencyVersion("com.fasterxml.jackson.core", "jackson-core","2.12.5", null, "CVE-2024-BAD", null)),
           //language=groovy
           buildGradle(
@@ -533,7 +532,6 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     void includedConfigurationsReceiveOnlyConfiguredConstraints() {
         rewriteRun(
           spec -> spec
-            .beforeRecipe(withToolingApi())
             .recipe(new UpgradeTransitiveDependencyVersion(
               "org.apache.commons", "commons-lang3", "3.14.0", null, null, List.of("pitest"))),
           buildGradle(
@@ -568,7 +566,6 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     void noIncludedConfigurationsReceiveAllConstraints() {
         rewriteRun(
           spec -> spec
-            .beforeRecipe(withToolingApi())
             .recipe(new UpgradeTransitiveDependencyVersion(
               "org.apache.commons", "commons-lang3", "3.14.0", null, null, null)),
           buildGradle(
@@ -605,7 +602,6 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     void IncludedDefaultConfigurationsReceiveRuntimeConstraints() {
         rewriteRun(
           spec -> spec
-            .beforeRecipe(withToolingApi())
             .recipe(new UpgradeTransitiveDependencyVersion(
               "org.apache.commons", "commons-lang3", "3.14.0", null, null, List.of("implementation", "runtimeOnly"))),
           buildGradle(
@@ -630,6 +626,46 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   }
               
                   compileOnly 'org.apache.activemq:artemis-jakarta-server:2.28.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void useResolutionStrategyWhenSpringDependencyManagementPluginIsPresent() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.5'
+              }
+              repositories { mavenCentral() }
+              
+              dependencies {
+              
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+                  id 'io.spring.dependency-management' version '1.1.5'
+              }
+              repositories { mavenCentral() }
+              configurations.all {
+                  resolutionStrategy.eachDependency { details ->
+                      if (details.requested.group == 'com.fasterxml.jackson.core' && details.requested.name == 'jackson-core') {
+                          details.useVersion('2.12.5')
+                          details.because('CVE-2024-BAD')
+                      }
+                  }
+              }
+              
+              dependencies {
+              
+                  implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """
           )

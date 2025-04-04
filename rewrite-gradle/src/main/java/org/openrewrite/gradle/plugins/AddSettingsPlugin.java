@@ -17,10 +17,10 @@ package org.openrewrite.gradle.plugins;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.IsSettingsGradle;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.semver.Semver;
 
 @Value
@@ -57,6 +57,15 @@ public class AddSettingsPlugin extends Recipe {
     @Nullable
     Boolean apply;
 
+    @Option(displayName = "Accept transitive",
+            description = "Some plugins apply other plugins. When this is set to true no plugin declaration will be added if the plugin is already applied transitively. " +
+                          "When this is set to false the plugin will be added explicitly even if it is already applied transitively. " +
+                          "Defaults to `true`.",
+            valid = {"true", "false"},
+            required = false)
+    @Nullable
+    Boolean acceptTransitive;
+
     @Override
     public String getDisplayName() {
         return "Add Gradle settings plugin";
@@ -80,7 +89,7 @@ public class AddSettingsPlugin extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(
                 new IsSettingsGradle<>(),
-                new AddPluginVisitor(pluginId, StringUtils.isBlank(version) ? "latest.release" : version, versionPattern, apply)
+                new AddPluginVisitor(pluginId, StringUtils.isBlank(version) ? "latest.release" : version, versionPattern, apply, acceptTransitive)
         );
     }
 }

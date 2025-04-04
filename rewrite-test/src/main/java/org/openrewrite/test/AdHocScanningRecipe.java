@@ -19,9 +19,9 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -90,7 +90,7 @@ public class AdHocScanningRecipe extends ScanningRecipe<Void> {
     }
 
     @Override
-    public Void getInitialValue(ExecutionContext ctx) {
+    public @Nullable Void getInitialValue(ExecutionContext ctx) {
         return null;
     }
 

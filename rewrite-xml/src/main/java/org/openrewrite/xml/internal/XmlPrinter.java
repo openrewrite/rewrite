@@ -103,7 +103,7 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
     public Xml visitAttributeValue(Xml.Attribute.Value value, PrintOutputCapture<P> p) {
         beforeSyntax(value, p);
         char valueDelim;
-        if (Xml.Attribute.Value.Quote.Double.equals(value.getQuote())) {
+        if (Xml.Attribute.Value.Quote.Double == value.getQuote()) {
             valueDelim = '"';
         } else {
             valueDelim = '\'';
@@ -155,7 +155,7 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
     @Override
     public Xml visitDocTypeDecl(Xml.DocTypeDecl docTypeDecl, PrintOutputCapture<P> p) {
         beforeSyntax(docTypeDecl, p);
-        p.append("<!DOCTYPE");
+        p.append("<!" + docTypeDecl.getDocumentDeclaration());
         visit(docTypeDecl.getName(), p);
         visit(docTypeDecl.getExternalId(), p);
         visit(docTypeDecl.getInternalSubset(), p);

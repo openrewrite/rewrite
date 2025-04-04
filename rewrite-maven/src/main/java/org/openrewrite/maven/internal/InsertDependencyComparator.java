@@ -20,7 +20,6 @@ import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class InsertDependencyComparator implements Comparator<Content> {
     private final Map<Content, Float> positions = new LinkedHashMap<>();
@@ -30,48 +29,54 @@ public class InsertDependencyComparator implements Comparator<Content> {
             positions.put(existingDependencies.get(i), (float) i);
         }
 
-        // if everything were ideally sorted, which dependency would the addable dependency
-        // come after?
-        List<Xml.Tag> ideallySortedDependencies = existingDependencies.stream()
-                .filter(c -> c instanceof Xml.Tag)
-                .map(c -> (Xml.Tag) c)
-                .collect(Collectors.toList());
+        // Make a copy of statements with only dependencies
+        List<Xml.Tag> dependencies = new ArrayList<>();
+        for (Content c : existingDependencies) {
+            if (c instanceof Xml.Tag) {
+                dependencies.add((Xml.Tag) c);
+            }
+        }
 
-        ideallySortedDependencies.add(dependencyTag);
-        ideallySortedDependencies.sort(dependencyComparator);
+        if (dependencies.isEmpty()) {
+            positions.put(dependencyTag, existingDependencies.size() + 0.5f);
+            return;
+        }
+
+        dependencies.add(dependencyTag);
+        dependencies.sort(dependencyComparator);
 
         Content afterDependency = null;
-        for (int i = 0; i < ideallySortedDependencies.size(); i++) {
-            Content d = ideallySortedDependencies.get(i);
+        for (int i = 0; i < dependencies.size(); i++) {
+            Content d = dependencies.get(i);
             if (dependencyTag == d) {
                 if (i > 0) {
-                    afterDependency = ideallySortedDependencies.get(i - 1);
+                    afterDependency = dependencies.get(i - 1);
                 }
                 break;
             }
         }
 
-        float insertPos = afterDependency == null ? -0.5f : 0.5f;
-        List<? extends Content> contents = new ArrayList<>(positions.keySet());
-        for (float f = afterDependency == null ? 0 : positions.get(afterDependency); f < contents.size(); f++) {
-            if (!(contents.get((int) f) instanceof Xml.Tag)) {
+        // Put `dependencyTag` at the proper place in the positions map
+        boolean isFirst = afterDependency == null;
+        for (float f = isFirst ? 0 : positions.get(afterDependency); f < existingDependencies.size(); f++) {
+            Content content = existingDependencies.get((int) f);
+            if (!(content instanceof Xml.Tag)) {
                 continue;
             }
-            positions.put(dependencyTag, positions.get(contents.get((int) f)) + insertPos);
+            positions.put(dependencyTag, positions.get(content) + (isFirst ? -0.5f : 0.5f));
             break;
         }
     }
 
     @Override
     public int compare(Content o1, Content o2) {
-        Float anotherFloat = positions.get(o2);
-        return anotherFloat == null ? 0 : positions.get(o1).compareTo(anotherFloat);
+        return positions.get(o1).compareTo(positions.get(o2));
     }
 
     private static final Comparator<Xml.Tag> dependencyComparator = (d1, d2) -> {
         Scope scope1 = Scope.fromName(d1.getChildValue("scope").orElse(null));
         Scope scope2 = Scope.fromName(d2.getChildValue("scope").orElse(null));
-        if (!scope1.equals(scope2)) {
+        if (scope1 != scope2) {
             return scope1.compareTo(scope2);
         }
 

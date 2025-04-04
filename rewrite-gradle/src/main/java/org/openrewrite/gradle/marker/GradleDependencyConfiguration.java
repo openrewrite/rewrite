@@ -18,13 +18,16 @@ package org.openrewrite.gradle.marker;
 import lombok.Value;
 import lombok.With;
 import lombok.experimental.NonFinal;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.ResolvedDependency;
 
 import java.io.Serializable;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 
 import static java.util.Collections.emptyList;
 
@@ -70,7 +73,7 @@ public class GradleDependencyConfiguration implements Serializable {
      */
     public List<ResolvedDependency> getResolved() {
         List<ResolvedDependency> resolved = new ArrayList<>(getDirectResolved());
-        Set<ResolvedDependency> alreadyResolved = new HashSet<>();
+        Set<ResolvedDependency> alreadyResolved = new LinkedHashSet<>();
         return resolveTransitiveDependencies(resolved, alreadyResolved);
     }
 
@@ -109,8 +112,7 @@ public class GradleDependencyConfiguration implements Serializable {
         return new ArrayList<>(result);
     }
 
-    @Nullable
-    public Dependency findRequestedDependency(String groupId, String artifactId) {
+    public @Nullable Dependency findRequestedDependency(String groupId, String artifactId) {
         for (Dependency d : requested) {
             if (StringUtils.matchesGlob(d.getGav().getGroupId(), groupId) &&
                 StringUtils.matchesGlob(d.getGav().getArtifactId(), artifactId)) {
@@ -120,8 +122,7 @@ public class GradleDependencyConfiguration implements Serializable {
         return null;
     }
 
-    @Nullable
-    public ResolvedDependency findResolvedDependency(String groupId, String artifactId) {
+    public @Nullable ResolvedDependency findResolvedDependency(String groupId, String artifactId) {
         for (ResolvedDependency d : directResolved) {
             ResolvedDependency dependency = d.findDependency(groupId, artifactId);
             if (dependency != null) {

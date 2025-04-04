@@ -24,11 +24,11 @@ import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenXmlMapper;
 import org.openrewrite.maven.internal.RawRepositories;
 import org.openrewrite.maven.tree.MavenRepository;
@@ -83,8 +83,7 @@ public class MavenSettings {
         this.servers = servers;
     }
 
-    @Nullable
-    public static MavenSettings parse(Parser.Input source, ExecutionContext ctx) {
+    public static @Nullable MavenSettings parse(Parser.Input source, ExecutionContext ctx) {
         try {
             return new Interpolator().interpolate(
                     MavenXmlMapper.readMapper().readValue(source.getSource(ctx), MavenSettings.class));
@@ -94,8 +93,7 @@ public class MavenSettings {
         }
     }
 
-    @Nullable
-    public static MavenSettings parse(Path settingsPath, ExecutionContext ctx) {
+    public static @Nullable MavenSettings parse(Path settingsPath, ExecutionContext ctx) {
         return parse(new Parser.Input(settingsPath, () -> {
             try {
                 return Files.newInputStream(settingsPath);
@@ -106,15 +104,44 @@ public class MavenSettings {
         }), ctx);
     }
 
-    @Nullable
-    public static MavenSettings readMavenSettingsFromDisk(ExecutionContext ctx) {
+    public static @Nullable MavenSettings readMavenSettingsFromDisk(ExecutionContext ctx) {
         final Optional<MavenSettings> userSettings = Optional.of(userSettingsPath())
                 .filter(MavenSettings::exists)
                 .map(path -> parse(path, ctx));
         final MavenSettings installSettings = findMavenHomeSettings().map(path -> parse(path, ctx)).orElse(null);
-        return userSettings.map(mavenSettings -> mavenSettings.merge(installSettings))
+        MavenSettings settings = userSettings.map(mavenSettings -> mavenSettings.merge(installSettings))
                 .orElse(installSettings);
+
+        if (settings != null) {
+            settings.maybeDecryptPasswords(ctx);
+        }
+
+        return settings;
     }
+
+    void maybeDecryptPasswords(ExecutionContext ctx) {
+        MavenSecuritySettings security = MavenSecuritySettings.readMavenSecuritySettingsFromDisk(ctx);
+        if (security == null) {
+            return;
+        }
+
+        String decryptedMasterPassword = security.decrypt(security.getMaster(), "settings.security");
+        if (decryptedMasterPassword != null) {
+            if (mavenLocal != null) {
+                String password = security.decrypt(mavenLocal.getPassword(), decryptedMasterPassword);
+                if (password != null) {
+                    mavenLocal = mavenLocal.withPassword(password);
+                }
+            }
+            if (servers != null) {
+                servers.servers = ListUtils.map(servers.servers, server -> {
+                    String password = security.decrypt(server.getPassword(), decryptedMasterPassword);
+                    return password == null ? server : server.withPassword(password);
+                });
+            }
+        }
+    }
+
 
     public static boolean readFromDiskEnabled() {
         final String propertyValue = System.getProperty("org.openrewrite.test.readMavenSettingsFromDisk");
@@ -161,7 +188,7 @@ public class MavenSettings {
         if (profiles != null) {
             for (Profile profile : profiles.getProfiles()) {
                 if (profile.isActive(activeProfiles) || (this.activeProfiles != null &&
-                                                         profile.isActive(this.activeProfiles.getActiveProfiles()))) {
+                        profile.isActive(this.activeProfiles.getActiveProfiles()))) {
                     if (profile.repositories != null) {
                         for (RawRepositories.Repository repository : profile.repositories.getRepositories()) {
                             activeRepositories.put(repository.getId(), repository);
@@ -216,14 +243,12 @@ public class MavenSettings {
                     interpolate(mavenSettings.servers));
         }
 
-        @Nullable
-        private ActiveProfiles interpolate(@Nullable ActiveProfiles activeProfiles) {
+        private @Nullable ActiveProfiles interpolate(@Nullable ActiveProfiles activeProfiles) {
             if (activeProfiles == null) return null;
             return new ActiveProfiles(ListUtils.map(activeProfiles.getActiveProfiles(), this::interpolate));
         }
 
-        @Nullable
-        private Mirrors interpolate(@Nullable Mirrors mirrors) {
+        private @Nullable Mirrors interpolate(@Nullable Mirrors mirrors) {
             if (mirrors == null) return null;
             return new Mirrors(ListUtils.map(mirrors.getMirrors(), this::interpolate));
         }
@@ -232,21 +257,18 @@ public class MavenSettings {
             return new Mirror(interpolate(mirror.id), interpolate(mirror.url), interpolate(mirror.getMirrorOf()), mirror.releases, mirror.snapshots);
         }
 
-        @Nullable
-        private Servers interpolate(@Nullable Servers servers) {
+        private @Nullable Servers interpolate(@Nullable Servers servers) {
             if (servers == null) return null;
             return new Servers(ListUtils.map(servers.getServers(), this::interpolate));
         }
 
-        @Nullable
-        private ServerConfiguration interpolate(@Nullable ServerConfiguration configuration) {
+        private @Nullable ServerConfiguration interpolate(@Nullable ServerConfiguration configuration) {
             if (configuration == null) {
                 return null;
             }
             return new ServerConfiguration(
                     ListUtils.map(configuration.httpHeaders, this::interpolate),
-                    configuration.connectTimeout,
-                    configuration.readTimeout
+                    configuration.timeout
             );
         }
 
@@ -259,8 +281,7 @@ public class MavenSettings {
                     interpolate(server.configuration));
         }
 
-        @Nullable
-        private String interpolate(@Nullable String s) {
+        private @Nullable String interpolate(@Nullable String s) {
             return s == null ? null : propertyPlaceholders.replacePlaceholders(s, propertyResolver);
         }
     }
@@ -418,20 +439,16 @@ public class MavenSettings {
     @JsonIgnoreProperties(value = "httpHeaders")
     public static class ServerConfiguration {
         @JacksonXmlProperty(localName = "property")
-        @JacksonXmlElementWrapper(localName = "httpHeaders", useWrapping = true) // wrapping is disabled by default on MavenXmlMapper
+        @JacksonXmlElementWrapper(localName = "httpHeaders", useWrapping = true)
+        // wrapping is disabled by default on MavenXmlMapper
         @Nullable
         List<HttpHeader> httpHeaders;
-        /**
-         * Timeout in milliseconds for establishing a connection.
-         */
-        @Nullable
-        Long connectTimeout;
 
         /**
-         * Timeout in milliseconds for reading from the connection.
+         * Timeout in milliseconds for reading connecting to and reading from the connection.
          */
         @Nullable
-        Long readTimeout;
+        Long timeout;
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

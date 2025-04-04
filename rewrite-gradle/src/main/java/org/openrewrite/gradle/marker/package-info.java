@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@NonNullApi
+@NullMarked
 package org.openrewrite.gradle.marker;
 
-import org.openrewrite.internal.lang.NonNullApi;
+import org.jspecify.annotations.NullMarked;

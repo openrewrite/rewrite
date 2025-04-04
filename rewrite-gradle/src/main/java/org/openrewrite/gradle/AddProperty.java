@@ -17,8 +17,8 @@ package org.openrewrite.gradle;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.ChangePropertyValue;
 import org.openrewrite.properties.PropertiesParser;
 
@@ -52,6 +52,7 @@ public class AddProperty extends ScanningRecipe<AddProperty.NeedsProperty> {
     @Option(displayName = "File pattern",
             description = "A glob expression that can be used to constrain which directories or source files should be searched. " +
                           "When not set, all source files are searched.",
+            required = false,
             example = "**/*.properties")
     @Nullable
     String filePattern;

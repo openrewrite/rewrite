@@ -18,13 +18,13 @@ package org.openrewrite.groovy.tree;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.groovy.GroovyPrinter;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.internal.GroovyWhitespaceValidationService;
 import org.openrewrite.groovy.service.GroovyAutoFormatService;
 import org.openrewrite.internal.WhitespaceValidationService;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.tree.*;
@@ -52,8 +52,7 @@ public interface G extends J {
         return v.isAdaptableTo(GroovyVisitor.class);
     }
 
-    @Nullable
-    default <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
+    default <P> @Nullable J acceptGroovy(GroovyVisitor<P> v, P p) {
         return v.defaultValue(this, p);
     }
 
@@ -133,9 +132,8 @@ public interface G extends J {
         @Nullable
         JRightPadded<Package> packageDeclaration;
 
-        @Nullable
         @Override
-        public Package getPackageDeclaration() {
+        public @Nullable Package getPackageDeclaration() {
             return packageDeclaration == null ? null : packageDeclaration.getElement();
         }
 
@@ -256,8 +254,7 @@ public interface G extends J {
         public static class Padding implements JavaSourceFile.Padding {
             private final G.CompilationUnit t;
 
-            @Nullable
-            public JRightPadded<Package> getPackageDeclaration() {
+            public @Nullable JRightPadded<Package> getPackageDeclaration() {
                 return t.packageDeclaration;
             }
 
@@ -467,7 +464,7 @@ public interface G extends J {
         }
 
         @SuppressWarnings("unused")
-        public MapEntry withKey(@Nullable Expression key) {
+        public MapEntry withKey(Expression key) {
             return getPadding().withKey(JRightPadded.withElement(this.key, key));
         }
 
@@ -510,12 +507,11 @@ public interface G extends J {
         public static class Padding {
             private final MapEntry t;
 
-            @Nullable
-            public JRightPadded<Expression> getKey() {
+            public @Nullable JRightPadded<Expression> getKey() {
                 return t.key;
             }
 
-            public MapEntry withKey(@Nullable JRightPadded<Expression> key) {
+            public MapEntry withKey(JRightPadded<Expression> key) {
                 return t.key == key ? t : new MapEntry(t.id, t.prefix, t.markers, key, t.value, t.type);
             }
         }
@@ -797,7 +793,8 @@ public interface G extends J {
             Find,
             Match,
             In,
-            Access
+            Access,
+            Spaceship
         }
 
         public Padding getPadding() {

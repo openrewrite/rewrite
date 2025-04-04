@@ -34,7 +34,6 @@ import org.openrewrite.xml.SemanticallyEqual;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.tree.Xml;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -54,7 +53,7 @@ class MavenSettingsTest {
 
     @Test
     void parse() {
-        ctx.setMavenSettings(MavenSettings.parse(new Parser.Input(Paths.get("settings.xml"), () -> new ByteArrayInputStream(
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
           //language=xml
           """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -78,8 +77,8 @@ class MavenSettingsTest {
                         </profile>
                     </profiles>
                 </settings>
-            """.getBytes()
-        )), ctx));
+            """
+        ), ctx));
 
         assertThat(ctx.getRepositories()).hasSize(1);
     }
@@ -87,7 +86,7 @@ class MavenSettingsTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/131")
     @Test
     void defaultActiveWhenNoOthersAreActive() {
-        ctx.setMavenSettings(MavenSettings.parse(new Parser.Input(Paths.get("settings.xml"), () -> new ByteArrayInputStream(
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
           //language=xml
           """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -119,15 +118,15 @@ class MavenSettingsTest {
                         </profile>
                     </profiles>
                 </settings>
-            """.getBytes()
-        )), ctx));
+            """
+        ), ctx));
 
         assertThat(ctx.getRepositories().stream().map(MavenRepository::getUri)).containsExactly("https://activebydefault.com");
     }
 
     @Test
     void idCollisionLastRepositoryWins() {
-        ctx.setMavenSettings(MavenSettings.parse(new Parser.Input(Paths.get("settings.xml"), () -> new ByteArrayInputStream(
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
           //language=xml
           """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -158,18 +157,18 @@ class MavenSettingsTest {
                         </profile>
                     </profiles>
                 </settings>
-            """.getBytes()
-        )), ctx));
+            """
+        ), ctx));
 
         assertThat(ctx.getRepositories())
           .as("When multiple repositories have the same id in a maven settings file the last one wins. In a pom.xml an error would be thrown.")
-          .containsExactly(new MavenRepository("repo", "https://lastwins.com", null, null, null, null, null, null));
+          .containsExactly(new MavenRepository("repo", "https://lastwins.com", null, null, null, null, null));
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/131")
     @Test
     void defaultOnlyActiveIfNoOthersAreActive() {
-        ctx.setMavenSettings(MavenSettings.parse(new Parser.Input(Paths.get("settings.xml"), () -> new ByteArrayInputStream(
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
           //language=xml
           """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -206,8 +205,8 @@ class MavenSettingsTest {
                         </profile>
                     </profiles>
                 </settings>
-            """.getBytes()
-        )), ctx));
+            """
+        ), ctx));
 
         assertThat(ctx.getActiveProfiles())
           .containsExactly("repo");
@@ -219,7 +218,7 @@ class MavenSettingsTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/130")
     @Test
     void mirrorReplacesRepository() {
-        ctx.setMavenSettings(MavenSettings.parse(new Parser.Input(Paths.get("settings.xml"), () -> new ByteArrayInputStream(
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
           //language=xml
           """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -250,8 +249,8 @@ class MavenSettingsTest {
                         </mirror>
                     </mirrors>
                 </settings>
-            """.getBytes()
-        )), ctx));
+            """
+        ), ctx));
 
         assertThat(ctx.getRepositories().stream()
           .map(repo -> MavenRepositoryMirror.apply(ctx.getMirrors(), repo))
@@ -261,7 +260,7 @@ class MavenSettingsTest {
 
     @Test
     void starredMirrorWithExclusion() {
-        ctx.setMavenSettings(MavenSettings.parse(new Parser.Input(Paths.get("settings.xml"), () -> new ByteArrayInputStream(
+        ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
           //language=xml
           """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -296,8 +295,8 @@ class MavenSettingsTest {
                         </mirror>
                     </mirrors>
                 </settings>
-            """.getBytes()
-        )), ctx));
+            """
+        ), ctx));
 
         assertThat(ctx.getRepositories().stream()
           .map(repo -> MavenRepositoryMirror.apply(ctx.getMirrors(), repo)))
@@ -316,7 +315,7 @@ class MavenSettingsTest {
 
     @Test
     void serverCredentials() {
-        var settings = MavenSettings.parse(new Parser.Input(Paths.get("settings.xml"), () -> new ByteArrayInputStream(
+        var settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
           //language=xml
           """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -330,8 +329,8 @@ class MavenSettingsTest {
                         </server>
                       </servers>
                 </settings>
-            """.getBytes()
-        )), ctx);
+            """
+        ), ctx);
 
         assertThat(settings.getServers()).isNotNull();
         assertThat(settings.getServers().getServers()).hasSize(1);
@@ -343,7 +342,9 @@ class MavenSettingsTest {
 
     @Test
     void serverTimeouts() {
-        var settings = MavenSettings.parse(new Parser.Input(Paths.get("settings.xml"), () -> new ByteArrayInputStream(
+        // Deliberately supporting the simpler old configuration of a single timeout
+        // https://maven.apache.org/guides/mini/guide-http-settings.html#connection-timeouts
+        var settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
           //language=xml
           """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -353,21 +354,19 @@ class MavenSettingsTest {
                         <server>
                           <id>server001</id>
                           <configuration>
-                            <connectTimeout>40000</connectTimeout>
-                            <readTimeout>50000</readTimeout>
+                            <timeout>40000</timeout>
                           </configuration>
                         </server>
                       </servers>
                 </settings>
-            """.getBytes()
-        )), ctx);
+            """
+        ), ctx);
 
         assertThat(settings.getServers()).isNotNull();
         assertThat(settings.getServers().getServers()).hasSize(1);
         assertThat(settings.getServers().getServers().get(0))
           .matches(repo -> repo.getId().equals("server001"))
-          .matches(repo -> repo.getConfiguration().getConnectTimeout().equals(40000L))
-          .matches(repo -> repo.getConfiguration().getReadTimeout().equals(50000L));
+          .matches(repo -> repo.getConfiguration().getTimeout().equals(40000L));
     }
 
     @Nested
@@ -375,7 +374,7 @@ class MavenSettingsTest {
     class LocalRepositoryTest {
         @Test
         void parsesLocalRepositoryPathFromSettingsXml(@TempDir Path localRepoPath) {
-            ctx.setMavenSettings(MavenSettings.parse(new Parser.Input(Paths.get("settings.xml"), () -> new ByteArrayInputStream(
+            ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
               //language=xml
               """
                     <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -383,8 +382,8 @@ class MavenSettingsTest {
                         xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
                           <localRepository>%s</localRepository>
                     </settings>
-                """.formatted(localRepoPath).getBytes()
-            )), ctx));
+                """.formatted(localRepoPath)
+            ), ctx));
             assertThat(ctx.getLocalRepository().getUri())
               .startsWith("file://")
               .containsSubsequence(localRepoPath.toUri().toString().split("/"));
@@ -392,7 +391,7 @@ class MavenSettingsTest {
 
         @Test
         void parsesLocalRepositoryUriFromSettingsXml(@TempDir Path localRepoPath) {
-            ctx.setMavenSettings(MavenSettings.parse(new Parser.Input(Paths.get("settings.xml"), () -> new ByteArrayInputStream(
+            ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
               //language=xml
               """
                     <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -400,8 +399,8 @@ class MavenSettingsTest {
                         xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
                           <localRepository>%s</localRepository>
                     </settings>
-                """.formatted(localRepoPath).getBytes()
-            )), ctx));
+                """.formatted(localRepoPath)
+            ), ctx));
 
             assertThat(ctx.getLocalRepository().getUri())
               .startsWith("file://")
@@ -410,15 +409,15 @@ class MavenSettingsTest {
 
         @Test
         void defaultsToTheMavenDefault() {
-            ctx.setMavenSettings(MavenSettings.parse(new Parser.Input(Paths.get("settings.xml"), () -> new ByteArrayInputStream(
+            ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
               //language=xml
               """
                         <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                             xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
                         </settings>
-                """.getBytes()
-            )), ctx));
+                """
+            ), ctx));
 
             assertThat(ctx.getLocalRepository().getUri()).isEqualTo(MavenRepository.MAVEN_LOCAL_DEFAULT.getUri());
         }
@@ -430,7 +429,7 @@ class MavenSettingsTest {
         @Test
         void properties() {
             System.setProperty("rewrite.test.custom.location", "/tmp");
-            var settings = MavenSettings.parse(new Parser.Input(Paths.get("settings.xml"), () -> new ByteArrayInputStream(
+            var settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
               //language=xml
               """
                     <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -462,15 +461,15 @@ class MavenSettingsTest {
                             </profile>
                         </profiles>
                     </settings>
-                """.getBytes()
-            )), ctx);
+                """
+            ), ctx);
 
             assertThat(settings.getLocalRepository()).isEqualTo("/tmp/maven/local/repository/");
         }
 
         @Test
         void unresolvedPlaceholdersRemainUnchanged() {
-            var settings = MavenSettings.parse(new Parser.Input(Paths.get("settings.xml"), () -> new ByteArrayInputStream(
+            var settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
               //language=xml
               """
                     <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -502,8 +501,8 @@ class MavenSettingsTest {
                             </profile>
                         </profiles>
                     </settings>
-                """.getBytes()
-            )), ctx);
+                """
+            ), ctx);
 
             assertThat(settings.getLocalRepository())
               .isEqualTo("${custom.location.zz}/maven/local/repository/");
@@ -516,7 +515,7 @@ class MavenSettingsTest {
         void env() {
             updateEnvMap("REWRITE_TEST_PRIVATE_REPO_USERNAME", "user");
             updateEnvMap("REWRITE_TEST_PRIVATE_REPO_PASSWORD", "pass");
-            var settings = MavenSettings.parse(new Parser.Input(Paths.get("settings.xml"), () -> new ByteArrayInputStream(
+            var settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
               //language=xml
               """
                     <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -548,8 +547,8 @@ class MavenSettingsTest {
                             </profile>
                         </profiles>
                     </settings>
-                """.getBytes()
-            )), ctx);
+                """
+            ), ctx);
 
             assertThat(settings.getServers()).isNotNull();
             assertThat(settings.getServers().getServers()).hasSize(1);
@@ -579,9 +578,7 @@ class MavenSettingsTest {
     class MergingTest {
         @Language("xml")
         private final String installationSettings = """
-              <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                  xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+              <settings>
                   <servers>
                        <server>
                            <id>private-repo</id>
@@ -621,9 +618,8 @@ class MavenSettingsTest {
         @Test
         void concatenatesElementsWithUniqueIds() {
             Path path = Paths.get("settings.xml");
-            var baseSettings = MavenSettings.parse(new Parser.Input(path, () -> new ByteArrayInputStream(
-              installationSettings.getBytes())), ctx);
-            var userSettings = MavenSettings.parse(new Parser.Input(path, () -> new ByteArrayInputStream(
+            var baseSettings = MavenSettings.parse(Parser.Input.fromString(path, installationSettings), ctx);
+            var userSettings = MavenSettings.parse(Parser.Input.fromString(path,
               //language=xml
               """
                     <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -667,8 +663,8 @@ class MavenSettingsTest {
                             </mirror>
                         </mirrors>
                     </settings>
-                """.getBytes()
-            )), ctx);
+                """
+            ), ctx);
 
             var mergedSettings = userSettings.merge(baseSettings);
 
@@ -679,11 +675,58 @@ class MavenSettingsTest {
         }
 
         @Test
+        void mergedOrderingPutsFirstSettingsFirst() {
+            MavenSettings baseSettings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+              //language=xml
+              """
+                <settings>
+                    <profiles>
+                        <profile>
+                            <id>first-profile</id>
+                            <repositories>
+                                <repository>
+                                    <id>first-repo</id>
+                                    <name>Private First Repo</name>
+                                    <url>https://repo.company1.net/maven</url>
+                                </repository>
+                            </repositories>
+                        </profile>
+                    </profiles>
+                </settings>
+                """
+            ), ctx);
+            MavenSettings userSettings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+              //language=xml
+              """
+                <settings>
+                    <profiles>
+                        <profile>
+                            <id>second-profile</id>
+                            <repositories>
+                                <repository>
+                                    <id>second-repo</id>
+                                    <name>Private Second Repo</name>
+                                    <url>https://repo.company2.net/maven</url>
+                                </repository>
+                            </repositories>
+                        </profile>
+                    </profiles>
+                </settings>
+                """
+            ), ctx);
+
+            MavenSettings mergedSettings = baseSettings.merge(userSettings);
+            assertThat(mergedSettings.getProfiles().getProfiles().get(0).getId()).isEqualTo("first-profile");
+            assertThat(mergedSettings.getProfiles().getProfiles().get(1).getId()).isEqualTo("second-profile");
+            assertThat(mergedSettings.getProfiles().getProfiles().get(0).getRepositories().getRepositories().get(0).getId()).isEqualTo("first-repo");
+            assertThat(mergedSettings.getProfiles().getProfiles().get(1).getRepositories().getRepositories().get(0).getId()).isEqualTo("second-repo");
+        }
+
+        @Test
         void replacesElementsWithMatchingIds() {
             Path path = Paths.get("settings.xml");
-            var baseSettings = MavenSettings.parse(new Parser.Input(path, () -> new ByteArrayInputStream(
-              installationSettings.getBytes())), ctx);
-            var userSettings = MavenSettings.parse(new Parser.Input(path, () -> new ByteArrayInputStream(
+            var baseSettings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"), installationSettings), ctx);
+            var userSettings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
               //language=xml
               """
                     <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
@@ -716,8 +759,8 @@ class MavenSettingsTest {
                             </mirror>
                         </mirrors>
                     </settings>
-                """.getBytes()
-            )), ctx);
+                """
+            ), ctx);
 
             var mergedSettings = userSettings.merge(baseSettings);
 
@@ -742,7 +785,7 @@ class MavenSettingsTest {
      */
     @Test
     void serverHttpHeaders() {
-        var settings = MavenSettings.parse(new Parser.Input(Paths.get("settings.xml"), () -> new ByteArrayInputStream(
+        var settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
           //language=xml
           """
             <settings>
@@ -772,8 +815,8 @@ class MavenSettingsTest {
                     </profile>
                 </profiles>
             </settings>
-            """.getBytes()
-        )), ctx);
+            """
+        ), ctx);
 
         MavenSettings.Server server = settings.getServers().getServers().get(0);
         assertThat(server.getConfiguration().getHttpHeaders().get(0).getName()).isEqualTo("X-JFrog-Art-Api");
@@ -787,7 +830,7 @@ class MavenSettingsTest {
                 <server>
                   <id>maven-snapshots</id>
                   <configuration>
-                    <connectTimeout>10000</connectTimeout>
+                    <timeout>10000</timeout>
                     <httpHeaders>
                       <property>
                         <name>X-JFrog-Art-Api</name>
@@ -801,7 +844,7 @@ class MavenSettingsTest {
             """).findFirst().get();
 
         MavenSettings.HttpHeader httpHeader = new MavenSettings.HttpHeader("X-JFrog-Art-Api", "myApiToken");
-        MavenSettings.ServerConfiguration configuration = new MavenSettings.ServerConfiguration(java.util.Collections.singletonList(httpHeader), 10000L, null);
+        MavenSettings.ServerConfiguration configuration = new MavenSettings.ServerConfiguration(java.util.Collections.singletonList(httpHeader), 10000L);
         MavenSettings.Server server = new MavenSettings.Server("maven-snapshots", null, null, configuration);
         MavenSettings.Servers servers = new MavenSettings.Servers(java.util.Collections.singletonList(server));
         MavenSettings settings = new MavenSettings(null, null, null, null, servers);

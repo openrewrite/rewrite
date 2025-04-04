@@ -15,6 +15,7 @@
  */
 package org.openrewrite.hcl.format;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.hcl.HclIsoVisitor;
 import org.openrewrite.hcl.style.SpacesStyle;
@@ -23,7 +24,6 @@ import org.openrewrite.hcl.tree.Expression;
 import org.openrewrite.hcl.tree.Hcl;
 import org.openrewrite.hcl.tree.HclLeftPadded;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -52,7 +52,7 @@ public class AttributeSpaceVisitor<P> extends HclIsoVisitor<P> {
         if (parent instanceof Hcl.Block || parent instanceof Hcl.ObjectValue) {
             List<Hcl.Attribute> siblingAttributes = getSiblingAttributes(parent);
 
-            if (attribute.getType().equals(Hcl.Attribute.Type.Assignment)) {
+            if (attribute.getType() == Hcl.Attribute.Type.Assignment) {
                 HclLeftPadded<Hcl.Attribute.Type> type = a.getPadding().getType();
 
                 if (Boolean.TRUE.equals(style.getBodyContent().getColumnarAlignment())) {
@@ -106,7 +106,7 @@ public class AttributeSpaceVisitor<P> extends HclIsoVisitor<P> {
         boolean groupFound = false;
         Hcl.Attribute perviousSibling = null;
         for (Hcl.Attribute sibling : siblings) {
-            if (sibling.getType().equals(Hcl.Attribute.Type.Assignment)) {
+            if (sibling.getType() == Hcl.Attribute.Type.Assignment) {
                 boolean siblingPrefixHasNewLines = sibling.getPrefix().getWhitespace().split("\r\n|\r|\n").length > 2;
                 boolean siblingIsMultiline = sibling.getValue().print(getCursor()).split("\r\n|\r|\n").length > 2;
                 boolean previousSiblingIsMultiline = perviousSibling != null && perviousSibling.getValue().print(getCursor()).split("\r\n|\r|\n").length > 2;
@@ -132,18 +132,16 @@ public class AttributeSpaceVisitor<P> extends HclIsoVisitor<P> {
         return (attribute.getPrefix().getIndent() + attribute.getName().print(getCursor())).length();
     }
 
-    @Nullable
     @Override
-    public Hcl postVisit(Hcl tree, P p) {
+    public @Nullable Hcl postVisit(Hcl tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
             getCursor().putMessageOnFirstEnclosing(Hcl.ConfigFile.class, "stop", true);
         }
         return super.postVisit(tree, p);
     }
 
-    @Nullable
     @Override
-    public Hcl visit(@Nullable Tree tree, P p) {
+    public @Nullable Hcl visit(@Nullable Tree tree, P p) {
         if (getCursor().getNearestMessage("stop") != null) {
             return (Hcl) tree;
         }

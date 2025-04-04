@@ -27,8 +27,9 @@ import java.util.concurrent.atomic.AtomicReference;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class DeleteKey extends Recipe {
+
     @Option(displayName = "Key path",
-            description = "A JsonPath expression to locate a JSON entry.",
+            description = "A [JsonPath](https://docs.openrewrite.org/reference/jsonpath-and-jsonpathmatcher-reference) expression to locate a JSON entry.",
             example = "$.subjects.kind")
     String keyPath;
 

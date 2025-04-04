@@ -17,30 +17,36 @@ package org.openrewrite.maven;
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import okhttp3.OkHttpClient;
 import okhttp3.mockwebserver.Dispatcher;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
-import org.intellij.lang.annotations.Language;
+import okhttp3.tls.HandshakeCertificates;
+import okhttp3.tls.HeldCertificate;
 import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.Issue;
-import org.openrewrite.Parser;
+import org.openrewrite.*;
+import org.openrewrite.maven.http.OkHttpSender;
 import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 import org.openrewrite.tree.ParseError;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.net.InetAddress;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Base64;
 import java.util.List;
-import java.util.stream.StreamSupport;
+import java.util.Map;
+import java.util.Objects;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static java.util.stream.Collectors.groupingBy;
+import static org.assertj.core.api.Assertions.*;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
@@ -62,6 +68,32 @@ class MavenParserTest implements RewriteTest {
                     <artifactId>junit</artifactId>
                     <version>[4.11]</version>
                   </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void prerequisites() {
+        rewriteRun(
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+                <prerequisites>
+                    <maven>3.0</maven>
+                </prerequisites>
+                <dependencies>
+                    <dependency>
+                      <groupId>org.apache.maven.reporting</groupId>
+                      <artifactId>maven-reporting-api</artifactId>
+                      <version>${project.prerequisites.maven}</version>
+                    </dependency>
                 </dependencies>
               </project>
               """
@@ -113,6 +145,80 @@ class MavenParserTest implements RewriteTest {
               </project>
               """
           )
+        );
+    }
+
+    @Test
+    void repositoryWithPropertyPlaceholders() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-project</artifactId>
+                  <version>1</version>
+                  <properties>
+                        <my.artifact.repo.url>https://my.artifact.repo.com</my.artifact.repo.url>
+                  </properties>
+                  <repositories>
+                      <repository>
+                          <id>my-artifact-repo</id>
+                          <url>${my.artifact.repo.url}</url>
+                      </repository>
+                  </repositories>
+              </project>
+              """,
+            spec -> spec.afterRecipe(p ->
+              assertThat(p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getRepositories())
+                .map(MavenRepository::getUri)
+                .describedAs("Property placeholder in repository URL resolved")
+                .singleElement()
+                .isEqualTo("https://my.artifact.repo.com"))
+          )
+        );
+    }
+
+    @Test
+    void repositoryWithPropertyFromParent() {
+        rewriteRun(
+          mavenProject("parent", pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-parent</artifactId>
+                  <version>1</version>
+                  <properties>
+                        <my.artifact.repo.url>https://my.artifact.repo.com</my.artifact.repo.url>
+                  </properties>
+              </project>
+              """
+          )),
+          mavenProject("child", pomXml(
+            """
+              <project>
+                  <parent>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-parent</artifactId>
+                      <version>1</version>
+                  </parent>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-child</artifactId>
+                  <version>1</version>
+                  <repositories>
+                      <repository>
+                          <id>my-artifact-repo</id>
+                          <url>${my.artifact.repo.url}</url>
+                      </repository>
+                  </repositories>
+              </project>
+              """,
+            spec -> spec.afterRecipe(p ->
+              assertThat(p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getRepositories())
+                .map(MavenRepository::getUri)
+                .describedAs("Property placeholder in repository URL resolved")
+                .singleElement()
+                .isEqualTo("https://my.artifact.repo.com"))
+          ))
         );
     }
 
@@ -880,79 +986,97 @@ class MavenParserTest implements RewriteTest {
         var username = "admin";
         var password = "password";
         try (MockWebServer mockRepo = new MockWebServer()) {
+            // TLS server setup based on https://github.com/square/okhttp/blob/master/okhttp-tls/README.md
+            String localhost = InetAddress.getByName("localhost").getCanonicalHostName();
+            HeldCertificate localhostCertificate = new HeldCertificate.Builder()
+              .addSubjectAlternativeName(localhost)
+              .build();
+            HandshakeCertificates serverCertificates = new HandshakeCertificates.Builder()
+              .heldCertificate(localhostCertificate)
+              .build();
+            mockRepo.useHttps(serverCertificates.sslSocketFactory(), false);
+
             mockRepo.setDispatcher(new Dispatcher() {
                 @Override
                 public MockResponse dispatch(RecordedRequest request) {
                     MockResponse resp = new MockResponse();
-                    if (StreamSupport.stream(request.getHeaders().spliterator(), false)
-                      .noneMatch(it -> it.getFirst().equals("Authorization") &&
-                                       it.getSecond().equals("Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes())))) {
+                    if (!Objects.equals(
+                      request.getHeader("Authorization"),
+                      "Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes()))) {
                         return resp.setResponseCode(401);
                     } else {
-                        //language=xml
-                        resp.setBody("""
-                          <project>
-                            <modelVersion>4.0.0</modelVersion>
-                          
-                            <groupId>com.foo</groupId>
-                            <artifactId>bar</artifactId>
-                            <version>1.0.0</version>
-                          
-                          </project>
-                          """
-                        );
+                        if (!"HEAD".equalsIgnoreCase(request.getMethod())) {
+                            //language=xml
+                            resp.setBody("""
+                              <project>
+                                <modelVersion>4.0.0</modelVersion>
+                              
+                                <groupId>com.foo</groupId>
+                                <artifactId>bar</artifactId>
+                                <version>1.0.0</version>
+                              
+                              </project>
+                              """
+                            );
+                        }
                         return resp.setResponseCode(200);
                     }
                 }
             });
 
             mockRepo.start();
-            var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext(t -> {
+            var mavenCtx = MavenExecutionContextView.view(new InMemoryExecutionContext(t -> {
                 throw new RuntimeException(t);
             }));
-            var settings = MavenSettings.parse(new Parser.Input(Paths.get("settings.xml"), () ->
-              new ByteArrayInputStream(
-                //language=xml
-                """
-                      <settings>
-                          <mirrors>
-                              <mirror>
-                                  <mirrorOf>*</mirrorOf>
-                                  <name>repo</name>
-                                  <url>http://%s:%d</url>
-                                  <id>repo</id>
-                              </mirror>
-                          </mirrors>
-                          <servers>
-                              <server>
-                                  <id>repo</id>
-                                  <username>%s</username>
-                                  <password>%s</password>
-                              </server>
-                          </servers>
-                      </settings>
-                  """.formatted(mockRepo.getHostName(), mockRepo.getPort(), username, password).getBytes()
-              )), ctx);
-            ctx.setMavenSettings(settings);
+            var settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
+              //language=xml
+              """
+                <settings>
+                    <mirrors>
+                        <mirror>
+                            <mirrorOf>*</mirrorOf>
+                            <name>repo</name>
+                            <url>http://%s:%d</url>
+                            <id>repo</id>
+                        </mirror>
+                    </mirrors>
+                    <servers>
+                        <server>
+                            <id>repo</id>
+                            <username>%s</username>
+                            <password>%s</password>
+                        </server>
+                    </servers>
+                </settings>
+                """.formatted(mockRepo.getHostName(), mockRepo.getPort(), username, password)
+            ), mavenCtx);
+            mavenCtx.setMavenSettings(settings);
+
+            // TLS client setup (just make it trust the self-signed certificate)
+            HandshakeCertificates clientCertificates = new HandshakeCertificates.Builder()
+              .addTrustedCertificate(localhostCertificate.certificate())
+              .build();
+            OkHttpClient client = new OkHttpClient.Builder()
+              .sslSocketFactory(clientCertificates.sslSocketFactory(), clientCertificates.trustManager())
+              .build();
+            var ctx = new HttpSenderExecutionContextView(mavenCtx).setHttpSender(new OkHttpSender(client));
 
             var maven = MavenParser.builder().build().parse(
               ctx,
               """
-                    <project>
-                        <modelVersion>4.0.0</modelVersion>
-                
-                        <groupId>org.openrewrite.test</groupId>
-                        <artifactId>foo</artifactId>
-                        <version>0.1.0-SNAPSHOT</version>
-                
-                        <dependencies>
-                            <dependency>
-                                <groupId>com.foo</groupId>
-                                <artifactId>bar</artifactId>
-                                <version>1.0.0</version>
-                            </dependency>
-                        </dependencies>
-                    </project>
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                                 <groupId>org.openrewrite.test</groupId>
+                    <artifactId>foo</artifactId>
+                    <version>0.1.0-SNAPSHOT</version>
+                                 <dependencies>
+                        <dependency>
+                            <groupId>com.foo</groupId>
+                            <artifactId>bar</artifactId>
+                            <version>1.0.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>
                 """
             ).findFirst().orElseThrow(() -> new IllegalArgumentException("Could not parse as XML"));
 
@@ -1201,6 +1325,205 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
+    @Nested
+    class Profiles {
+
+        //language=xml
+        private final String parent = """
+          <project>
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>org.openrewrite.maven</groupId>
+              <artifactId>parent</artifactId>
+              <version>0.1.0-SNAPSHOT</version>
+              <packaging>pom</packaging>
+              <profiles>
+                  <profile>
+                      <id>active-profile-1</id>
+                      <activation>
+                          <activeByDefault>true</activeByDefault>
+                      </activation>
+                      <properties>
+                          <d.version>2.0.9</d.version>
+                      </properties>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.slf4j</groupId>
+                              <artifactId>slf4j-api</artifactId>
+                              <version>${d.version}</version>
+                          </dependency>
+                      </dependencies>
+                  </profile>
+                  <profile>
+                      <id>active-profile-2</id>
+                      <activation>
+                          <activeByDefault>true</activeByDefault>
+                      </activation>
+                      <properties>
+                          <e.version>2.11.0</e.version>
+                      </properties>
+                      <dependencies>
+                          <dependency>
+                              <groupId>commons-io</groupId>
+                              <artifactId>commons-io</artifactId>
+                              <version>${e.version}</version>
+                          </dependency>
+                      </dependencies>
+                  </profile>
+              </profiles>
+          </project>
+          """;
+
+        //language=xml
+        private final String child = """
+          <project>
+              <parent>
+                  <groupId>org.openrewrite.maven</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>0.1.0-SNAPSHOT</version>
+                  <relativePath />
+              </parent>
+              <groupId>org.openrewrite.maven</groupId>
+              <artifactId>a</artifactId>
+          </project>
+          """;
+
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/4269")
+        @DisplayName("activeByDefault=true profiles from a POM should be active " +
+                     "unless there is another active profile _from the same POM file_")
+        @Test
+        void activeByDefaultWithoutPomLocalActiveProfile() {
+            rewriteRun(
+              mavenProject("c",
+                pomXml(
+                  parent
+                )
+              ),
+              pomXml(
+                child, spec -> spec.afterRecipe(pomXml -> {
+                    Map<String, List<ResolvedDependency>> deps =
+                      pomXml.getMarkers()
+                        .findFirst(MavenResolutionResult.class)
+                        .orElseThrow()
+                        .getDependencies()
+                        .get(Scope.Compile)
+                        .stream()
+                        .collect(groupingBy(ResolvedDependency::getArtifactId));
+
+                    assertThat(deps)
+                      .hasEntrySatisfying("slf4j-api", rds -> assertThat(rds)
+                        .singleElement().extracting(ResolvedDependency::getVersion).isEqualTo("2.0.9"))
+                      .hasEntrySatisfying("commons-io", rds -> assertThat(rds)
+                        .singleElement().extracting(ResolvedDependency::getVersion).isEqualTo("2.11.0"));
+                })
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/4269")
+        @DisplayName("activeByDefault=true profiles from a POM should not be active" +
+                     " if there is another active profile _from the same POM file_")
+        @Test
+        void activeByDefaultWithPomLocalActiveProfile() {
+            rewriteRun(
+              recipeSpec -> recipeSpec
+                .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext()))
+                .parser(MavenParser.builder().activeProfiles("active-profile-1")),
+              mavenProject("c",
+                pomXml(
+                  parent
+                )
+              ),
+              pomXml(
+                child, spec -> spec.afterRecipe(pomXml -> {
+                      Map<String, List<ResolvedDependency>> deps =
+                        pomXml.getMarkers()
+                          .findFirst(MavenResolutionResult.class)
+                          .orElseThrow()
+                          .getDependencies()
+                          .get(Scope.Compile)
+                          .stream()
+                          .collect(groupingBy(ResolvedDependency::getArtifactId));
+
+                      assertThat(deps)
+                        .hasEntrySatisfying("slf4j-api", rds -> assertThat(rds)
+                          .singleElement().extracting(ResolvedDependency::getVersion).isEqualTo("2.0.9"))
+                        .doesNotContainKey("commons-io");
+                  }
+                )
+              )
+            );
+        }
+
+        @Test
+        void settingsActiveProfiles() {
+            var mavenCtx = MavenExecutionContextView.view(new InMemoryExecutionContext(t -> {
+                throw new RuntimeException(t);
+            }));
+            var settings = MavenSettings.parse(Parser.Input.fromString(Path.of("settings.xml"),
+              //language=xml
+              """
+                <settings>
+                  <activeProfiles>
+                      <activeProfile>foo</activeProfile>
+                  </activeProfiles>
+                </settings>
+                """
+            ), mavenCtx);
+            mavenCtx.setMavenSettings(settings);
+
+            rewriteRun(
+              recipeSpec -> recipeSpec.executionContext(mavenCtx),
+              pomXml(
+                """
+                  <project>
+                      <groupId>some.group</groupId>
+                      <artifactId>some.artifact</artifactId>
+                      <version>1-SNAPSHOT</version>
+                      <dependencies>
+                          <dependency>
+                              <groupId>commons-io</groupId>
+                              <artifactId>commons-io</artifactId>
+                          </dependency>
+                      </dependencies>
+                      <profiles>
+                          <profile>
+                              <id>foo</id>
+                              <properties>
+                                  <commons-io.version>2.11.0</commons-io.version>
+                              </properties>
+                              <dependencyManagement>
+                                  <dependencies>
+                                      <dependency>
+                                          <groupId>commons-io</groupId>
+                                          <artifactId>commons-io</artifactId>
+                                          <version>${commons-io.version}</version>
+                                      </dependency>
+                                  </dependencies>
+                              </dependencyManagement>
+                          </profile>
+                      </profiles>
+                  </project>
+                  """, spec -> spec.afterRecipe(pomXml -> {
+                      Map<String, List<ResolvedDependency>> deps =
+                        pomXml.getMarkers()
+                          .findFirst(MavenResolutionResult.class)
+                          .orElseThrow()
+                          .getDependencies()
+                          .get(Scope.Compile)
+                          .stream()
+                          .collect(groupingBy(ResolvedDependency::getArtifactId));
+
+                      assertThat(deps)
+                        .hasEntrySatisfying("commons-io", rds -> assertThat(rds)
+                          .singleElement().extracting(ResolvedDependency::getVersion).isEqualTo("2.11.0"));
+                  }
+                )
+              )
+            );
+        }
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/378")
     @Test
     void parseNotInProfileActivation() {
@@ -1228,6 +1551,7 @@ class MavenParserTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1427")
     @Test
     void parseEmptyActivationTag() {
+        //noinspection DataFlowIssue
         rewriteRun(
           pomXml(
             """
@@ -1283,6 +1607,7 @@ class MavenParserTest implements RewriteTest {
                 assertThat(activation).isNotNull();
                 assertThat(activation.getActiveByDefault()).isNull();
                 assertThat(activation.getJdk()).isNull();
+                //noinspection DataFlowIssue
                 assertThat(activation.getProperty()).isNull();
             })
           )
@@ -2245,94 +2570,9 @@ class MavenParserTest implements RewriteTest {
     }
 
     @Test
-    void exclusions() {
-        rewriteRun(
-          mavenProject("a",
-            pomXml("""
-              <?xml version="1.0" encoding="UTF-8"?>
-              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-                <modelVersion>4.0.0</modelVersion>
-                <groupId>org.sample</groupId>
-                <artifactId>a</artifactId>
-                <version>1.0.0</version>
-                <dependencies>
-                  <dependency>
-                    <groupId>junit</groupId>
-                    <artifactId>junit</artifactId>
-                    <version>4.12</version>
-                  </dependency>
-                </dependencies>
-              </project>
-              """
-            )
-          ),
-          mavenProject("b",
-            pomXml("""
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>org.sample</groupId>
-                  <artifactId>b</artifactId>
-                  <version>1.0.0</version>
-                  <dependencies>
-                    <dependency>
-                      <groupId>org.sample</groupId>
-                      <artifactId>a</artifactId>
-                      <version>1.0.0</version>
-                      <exclusions>
-                        <exclusion>
-                          <groupId>junit</groupId>
-                          <artifactId>junit</artifactId>
-                        </exclusion>
-                      </exclusions>
-                    </dependency>
-                  </dependencies>
-                </project>
-                """,
-              spec -> spec.afterRecipe(afterDoc -> assertThat(afterDoc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
-                .findDependencies("org.sample", "a", Scope.Compile))
-                .singleElement()
-                .satisfies(aDep -> assertThat(aDep.getEffectiveExclusions())
-                  .singleElement()
-                  .matches(ga -> ga.getArtifactId().equals("junit")))
-              ))),
-          mavenProject("c",
-            pomXml("""
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>org.sample</groupId>
-                  <artifactId>c</artifactId>
-                  <version>1.0.0</version>
-                  <dependencies>
-                    <dependency>
-                      <groupId>org.sample</groupId>
-                      <artifactId>b</artifactId>
-                      <version>1.0.0</version>
-                    </dependency>
-                  </dependencies>
-                </project>
-                """,
-              spec -> spec.afterRecipe(afterDoc -> assertThat(afterDoc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow())
-                .satisfies(mavenResolutionResult -> assertThat(mavenResolutionResult
-                  .findDependencies("org.sample", "a", Scope.Compile))
-                  .singleElement()
-                  .satisfies(aDep -> assertThat(aDep.getEffectiveExclusions())
-                    .singleElement()
-                    .matches(ga -> ga.getArtifactId().equals("junit"))))
-                .satisfies(mavenResolutionResult -> assertThat(mavenResolutionResult
-                  .findDependencies("org.sample", "b", Scope.Compile))
-                  .singleElement()
-                  .satisfies(aDep -> assertThat(aDep.getEffectiveExclusions()).isEmpty()))
-              )
-            ))
-        );
-    }
-
-    @Test
     void malformedPom() {
-        @Language("xml")
-        String malformedPomXml = """
+        //language=xml
+        String validXml = """
           <project>
             <groupId>com.mycompany.app</groupId>
             <artifactId>my-app</artifactId>
@@ -2344,9 +2584,13 @@ class MavenParserTest implements RewriteTest {
                 <artifactId>junit</artifactId>
                 <version>4.11</version>
               </dependency>
+            </dependencies>
           </project>
           """;
-        assertThat(MavenParser.builder().build().parse(malformedPomXml))
+        // I'm tired of the IDE warning me about the XML being malformed, so break it programmatically
+        String malformedXml = validXml.replace("  </dependencies>", "");
+        //noinspection LanguageMismatch
+        assertThat(MavenParser.builder().build().parse(malformedXml))
           .singleElement()
           .isInstanceOf(ParseError.class);
     }
@@ -2750,9 +2994,7 @@ class MavenParserTest implements RewriteTest {
                         <groupId>org.openrewrite.maven</groupId>
                         <artifactId>b</artifactId>
                         <version>0.1.0-SNAPSHOT</version>
-                
                         <packaging>pom</packaging>
-                
                         <build>
                           <plugins>
                             <plugin>
@@ -2782,7 +3024,6 @@ class MavenParserTest implements RewriteTest {
                           <relativePath />
                       </parent>
                       <artifactId>a</artifactId>
-                
                       <build>
                           <plugins>
                             <plugin>
@@ -2825,9 +3066,7 @@ class MavenParserTest implements RewriteTest {
                         <groupId>org.openrewrite.maven</groupId>
                         <artifactId>b</artifactId>
                         <version>0.1.0-SNAPSHOT</version>
-                
                         <packaging>pom</packaging>
-                
                         <build>
                           <plugins>
                             <plugin>
@@ -2857,7 +3096,6 @@ class MavenParserTest implements RewriteTest {
                           <relativePath />
                       </parent>
                       <artifactId>a</artifactId>
-                
                       <build>
                           <plugins>
                             <plugin>
@@ -3037,5 +3275,576 @@ class MavenParserTest implements RewriteTest {
             })
           )
         );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4093")
+    void circularImportDependency() {
+        rewriteRun(
+          mavenProject("root",
+            pomXml(
+              """
+                <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>circular-example-parent</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <modules>
+                    <module>circular-example-child</module>
+                  </modules>
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.example</groupId>
+                        <artifactId>circular-example-child</artifactId>
+                        <version>0.0.1-SNAPSHOT</version>
+                        <scope>import</scope>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                </project>
+                """,
+              spec -> spec.afterRecipe(pomXml -> {
+                  MavenResolutionResult resolution = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                  GroupArtifactVersion gav = resolution.getPom().getDependencyManagement().get(0).getGav();
+                  assertThat(gav.getGroupId()).isEqualTo("junit");
+                  assertThat(gav.getArtifactId()).isEqualTo("junit");
+                  assertThat(gav.getVersion()).isEqualTo("4.13.2");
+              })
+            ),
+            mavenProject("circular-example-child",
+              pomXml(
+                """
+                  <project>
+                    <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>circular-example-parent</artifactId>
+                      <version>0.0.1-SNAPSHOT</version>
+                    </parent>
+                    <artifactId>circular-example-child</artifactId>
+                    <version>0.0.1-SNAPSHOT</version>
+                    <dependencyManagement>
+                      <dependencies>
+                        <dependency>
+                          <groupId>junit</groupId>
+                          <artifactId>junit</artifactId>
+                          <version>4.13.2</version>
+                        </dependency>
+                      </dependencies>
+                    </dependencyManagement>
+                  </project>
+                  """,
+                spec -> spec.afterRecipe(pomXml -> {
+                    MavenResolutionResult resolution = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                    GroupArtifactVersion gav = resolution.getPom().getDependencyManagement().get(0).getGav();
+                    assertThat(gav.getGroupId()).isEqualTo("junit");
+                    assertThat(gav.getArtifactId()).isEqualTo("junit");
+                    assertThat(gav.getVersion()).isEqualTo("4.13.2");
+                })
+              )
+            )
+          )
+        );
+    }
+
+    @Test
+    void circularMavenProperty() {
+        rewriteRun(
+          mavenProject("root",
+            pomXml(
+              """
+                <project>
+                    <groupId>example</groupId>
+                    <artifactId>example-root</artifactId>
+                    <packaging>pom</packaging>
+                    <version>1.0.0</version>
+                
+                    <properties>
+                        <project.version>1.0.1</project.version>
+                    </properties>
+                
+                    <modules>
+                        <module>example-child</module>
+                    </modules>
+                </project>
+                """,
+              spec -> spec.afterRecipe(pomXml -> assertThat(
+                pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
+                  .getPom().getProperties().get("project.version"))
+                .isEqualTo("1.0.1"))
+            ),
+            mavenProject("circular-example-child",
+              pomXml(
+                """
+                  <project>
+                      <parent>
+                          <groupId>example</groupId>
+                          <artifactId>example-root</artifactId>
+                          <version>1.0.0</version>
+                      </parent>
+                      <artifactId>example-child</artifactId>
+                      <version>${project.version}</version>
+                  </project>
+                  """,
+                spec -> spec.afterRecipe(pomXml -> assertThat(
+                  pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
+                    .getPom().getVersion())
+                  .isEqualTo("1.0.1"))
+              )
+            )
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/4319")
+    void multiModulePropertyVersionShouldAddModules() {
+        rewriteRun(
+          mavenProject("root",
+            pomXml(
+              """
+                <project>
+                    <groupId>example</groupId>
+                    <artifactId>example-root</artifactId>
+                    <packaging>pom</packaging>
+                    <version>${revision}</version>
+                    <properties>
+                        <revision>1.0.1</revision>
+                    </properties>
+                    <modules>
+                        <module>example-child</module>
+                    </modules>
+                </project>
+                """,
+              spec -> spec.afterRecipe(pomXml -> assertThat(
+                pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
+                  .getModules()).isNotEmpty())
+            ),
+            mavenProject("example-child",
+              pomXml(
+                """
+                  <project>
+                      <parent>
+                          <groupId>example</groupId>
+                          <artifactId>example-root</artifactId>
+                          <version>${revision}</version>
+                      </parent>
+                      <artifactId>example-child</artifactId>
+                  </project>
+                  """
+              )
+            )
+          )
+        );
+    }
+
+    @Test
+    void childDependencyDefinitionShouldTakePrecedence() {
+        rewriteRun(
+          mavenProject("parent",
+            pomXml(
+              """
+                <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <modules>
+                        <module>child</module>
+                    </modules>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>31.1-jre</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """
+            ),
+            mavenProject("child",
+              pomXml(
+                """
+                  <project>
+                      <parent>
+                          <groupId>com.mycompany.app</groupId>
+                          <artifactId>parent</artifactId>
+                          <version>1</version>
+                          <relativePath>../pom.xml</relativePath>
+                      </parent>
+                      <artifactId>child</artifactId>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>31.1-jre</version>
+                              <scope>test</scope>
+                          </dependency>
+                      </dependencies>
+                  </project>
+                  """,
+                spec -> spec.afterRecipe(pomXml -> {
+                      MavenResolutionResult res = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                      assertThat(res.getDependencies().get(Scope.Compile)).isEmpty();
+                      assertThat(res.getDependencies().get(Scope.Runtime)).isEmpty();
+                      assertThat(res.getDependencies().get(Scope.Provided)).isEmpty();
+                      assertThat(res.getDependencies().get(Scope.Test)).isNotEmpty().anyMatch(dep -> dep.getGroupId().equals("com.google.guava") && dep.getArtifactId().equals("guava"));
+                  }
+                )
+              )
+            )
+          )
+        );
+    }
+
+    @Test
+    void missingDependencyIsExcluded() {
+        rewriteRun(
+          // Suppress test framework's usual error handler because we expect an error resolving coherence
+          spec -> spec.executionContext(new InMemoryExecutionContext(throwable -> {
+            }))
+            .typeValidationOptions(TypeValidation.none()),
+          mavenProject("a",
+            pomXml("""
+                <project>
+                    <groupId>com.test</groupId>
+                    <artifactId>a</artifactId>
+                    <version>1.0.0</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.test</groupId>
+                            <artifactId>b</artifactId>
+                            <version>1.0.0</version>
+                            <exclusions>
+                                  <exclusion>
+                                      <groupId>com.oracle.coherence</groupId>
+                                      <artifactId>coherence</artifactId>
+                                  </exclusion>
+                            </exclusions>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """,
+              spec -> spec.afterRecipe(pom -> {
+                  assertThat(pom.getMarkers().findFirst(ParseExceptionResult.class)).isEmpty();
+                  assertThat(pom.getMarkers().findFirst(MavenResolutionResult.class))
+                    .isNotEmpty()
+                    .get()
+                    .as("A's dependency on B should be represented within the maven resolution result")
+                    .matches(mrr -> !mrr.findDependencies("com.test", "b", Scope.Compile).isEmpty())
+                    .as("The excluded dependency should not appear within the maven resolution result")
+                    .matches(mrr -> mrr.findDependencies("com.oracle.coherence", "coherence", Scope.Compile).isEmpty());
+              })
+            )),
+          mavenProject("b",
+            pomXml("""
+              <project>
+                  <groupId>com.test</groupId>
+                  <artifactId>b</artifactId>
+                  <version>1.0.0</version>
+                  <dependencies>
+                      <dependency>
+                          <!-- this is not actually available in maven central -->
+                          <groupId>com.oracle.coherence</groupId>
+                          <artifactId>coherence</artifactId>
+                          <version>12.1.3.0.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+            )
+          )
+        );
+    }
+
+    @Test
+    void exclusionsAffectTransitiveDependencies() {
+        rewriteRun(
+          // Suppress test framework's usual error handler because we expect an error resolving coherence
+          spec -> spec.executionContext(new InMemoryExecutionContext(throwable -> {
+            }))
+            .typeValidationOptions(TypeValidation.none()),
+          mavenProject("x",
+            pomXml("""
+                <project>
+                    <groupId>com.test</groupId>
+                    <artifactId>x</artifactId>
+                    <version>1.0.0</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.test</groupId>
+                            <artifactId>y</artifactId>
+                            <version>1.0.0</version>
+                            <exclusions>
+                                  <exclusion>
+                                      <groupId>com.oracle.coherence</groupId>
+                                      <artifactId>coherence</artifactId>
+                                  </exclusion>
+                            </exclusions>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """,
+              spec -> spec.afterRecipe(pom -> {
+                  assertThat(pom.getMarkers().findFirst(ParseExceptionResult.class)).isEmpty();
+                  assertThat(pom.getMarkers().findFirst(MavenResolutionResult.class))
+                    .isNotEmpty()
+                    .get()
+                    .as("X's dependency on Y should be represented within the maven resolution result")
+                    .matches(mrr -> !mrr.findDependencies("com.test", "y", Scope.Compile).isEmpty())
+                    .as("The excluded dependency should not appear within the maven resolution result")
+                    .matches(mrr -> mrr.findDependencies("com.oracle.coherence", "coherence", Scope.Compile).isEmpty());
+              })
+            )),
+          mavenProject("y",
+            pomXml("""
+              <project>
+                  <groupId>com.test</groupId>
+                  <artifactId>y</artifactId>
+                  <version>1.0.0</version>
+                  <dependencies>
+                  <dependency>
+                      <groupId>com.test</groupId>
+                      <artifactId>z</artifactId>
+                      <version>1.0.0</version>
+                  </dependency>
+                  </dependencies>
+              </project>
+              """
+            )
+          ),
+          mavenProject("z",
+            pomXml("""
+              <project>
+                  <groupId>com.test</groupId>
+                  <artifactId>z</artifactId>
+                  <version>1.0.0</version>
+                  <dependencies>
+                  <dependency>
+                      <!-- this is not actually available in maven central -->
+                      <groupId>com.oracle.coherence</groupId>
+                      <artifactId>coherence</artifactId>
+                      <version>12.1.3.0.0</version>
+                  </dependency>
+                  </dependencies>
+              </project>
+              """
+            )
+          )
+        );
+    }
+
+    @Test
+    void systemPropertyTakesPrecedence() {
+        System.setProperty("hatversion", "2.3.0");
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>parent</artifactId>
+                <version>1.0-SNAPSHOT</version>
+                <packaging>pom</packaging>
+                <name>parent</name>
+                <url>http://www.example.com</url>
+                <properties>
+                  <hatversion>SYSTEM_PROPERTY_SHOULD_OVERRIDE_THIS</hatversion>
+                </properties>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.springframework.hateoas</groupId>
+                        <artifactId>spring-hateoas</artifactId>
+                        <version>${hatversion}</version>
+                    </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void propertyFromMavenConfig() {
+        rewriteRun(
+          spec -> spec.parser(MavenParser.builder().property("revision", "1.0.0")),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>parent</artifactId>
+                <version>${revision}</version>
+              </project>
+              """,
+            spec -> spec.afterRecipe(p -> {
+                  var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                  assertThat(results.getPom().getVersion()).isEqualTo("${revision}");
+                  assertThat(results.getPom().getProperties().get("revision")).isEqualTo("1.0.0");
+              }
+            )
+          )
+        );
+    }
+
+    @Test
+    void propertyFromMavenConfigFromParentPomCanBeUsedInChild() {
+        rewriteRun(
+          spec -> spec.parser(MavenParser.builder().property("revision", "1.0.0")),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>parent</artifactId>
+                <version>${revision}</version>
+              </project>
+              """
+          ),
+          mavenProject("child",
+            //language=xml
+            pomXml(
+              """
+                <project>
+                  <parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>${revision}</version>
+                  </parent>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>child</artifactId>
+                  <version>${revision}</version>
+                </project>
+                """,
+              spec -> spec.afterRecipe(p -> {
+                  var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                  assertThat(results.getPom().getVersion()).isEqualTo("${revision}");
+                  assertThat(results.getPom().getProperties().get("revision")).isEqualTo("1.0.0");
+                  assertThat(results.getParent().getPom().getVersion()).isEqualTo("${revision}");
+                  assertThat(results.getParent().getPom().getProperties().get("revision")).isEqualTo("1.0.0");
+              })
+            )
+          )
+        );
+    }
+
+    @Test
+    void profilesFromMavenConfig() {
+        rewriteRun(
+          spec -> spec.parser(MavenParser.builder().activeProfiles("a", "b", "c")),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>parent</artifactId>
+                <version>1.0.0</version>
+              </project>
+              """,
+            spec -> spec.afterRecipe(p -> {
+                  var results = p.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                  assertThat(results.getPom().getActiveProfiles()).contains("a", "b", "c");
+              }
+            )
+          )
+        );
+    }
+
+    /**
+     * Maven successfully resolves this pom, but warns that transitive dependencies are invalid. e.g.:
+     * [WARNING] The POM for com.sun.xml.stream.buffer:streambuffer:jar:0.6 is invalid, transitive dependencies (if any) will not be available, enable debug logging for more details
+     * [WARNING] The POM for org.jvnet.staxex:stax-ex:jar:1.0 is invalid, transitive dependencies (if any) will not be available, enable debug logging for more details
+     * [WARNING] The POM for com.sun.xsom:xsom:jar:20070323 is invalid, transitive dependencies (if any) will not be available, enable debug logging for more details
+     * Looking inside streambuffer's pom it is missing version numbers for its "activation:activation" dependency.
+     * Maven lists these as the dependencies of this pom and we should match its behavior:
+     * org.jvnet.jax-ws-commons:jaxws-json:jar:1.1:compile
+     * +- com.sun.xml.ws:jaxws-rt:jar:2.1.2-alpha-20070426:compile
+     * |  +- javax.xml.ws:jaxws-api:jar:2.1:compile
+     * |  +- com.sun.xml.messaging.saaj:saaj-impl:jar:1.3:compile
+     * |  |  \- javax.xml.soap:saaj-api:jar:1.3:compile
+     * |  +- com.sun.xml.stream:sjsxp:jar:1.0:compile
+     * |  |  \- javax.xml.stream:stax-api:jar:1.0:compile
+     * |  \- org.jvnet.staxex:stax-ex:jar:1.0:compile
+     * +- com.sun.xml.bind:jaxb-impl:jar:2.1.3:compile
+     * |  \- javax.xml.bind:jaxb-api:jar:2.1:compile
+     * |     \- javax.activation:activation:jar:1.1:compile
+     * +- com.sun.xml.stream.buffer:streambuffer:jar:0.6:compile
+     * +- com.sun.xsom:xsom:jar:20070323:compile
+     * +- org.codehaus.jettison:jettison:jar:1.0-beta-1:compile
+     * |  +- junit:junit:jar:3.8.1:compile
+     * |  \- stax:stax-api:jar:1.0.1:compile
+     * +- velocity:velocity:jar:1.5:compile
+     * |  +- commons-collections:commons-collections:jar:3.1:compile
+     * |  +- commons-lang:commons-lang:jar:2.1:compile
+     * |  \- oro:oro:jar:2.0.8:compile
+     * \- com.sun.xml:relaxngDatatype:jar:1.0:compile
+     */
+    @Test
+    void invalidTransitives() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>app</artifactId>
+                <version>1.0.0</version>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.jvnet.jax-ws-commons</groupId>
+                      <artifactId>jaxws-json</artifactId>
+                      <version>1.1</version>
+                    </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void invalidDirect() {
+        assertThatThrownBy(() -> rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>app</artifactId>
+                <version>1.0.0</version>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.jvnet.jax-ws-commons</groupId>
+                      <artifactId>jaxws-json</artifactId>
+                    </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        )).isInstanceOf(AssertionError.class)
+          .cause()
+          .isInstanceOf(MavenDownloadingException.class);
+    }
+
+    @Test
+    void wildcardExclusion() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>app</artifactId>
+                <version>1.0.0</version>
+                  <dependencies>
+                    <dependency>
+                        <groupId>ch.qos.logback</groupId>
+                        <artifactId>logback-classic</artifactId>
+                        <version>1.3.11</version>
+                        <exclusions>
+                            <exclusion>
+                                <groupId>*</groupId>
+                                <artifactId>*</artifactId>
+                            </exclusion>
+                        </exclusions>
+                    </dependency>
+                  </dependencies>
+              </project>
+              """, spec -> spec.afterRecipe(pom -> {
+                MavenResolutionResult resolution = pom.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                assertThat(resolution.findDependencies("ch.qos.logback", "logback-core", Scope.Compile)).isEmpty();
+            })
+          ));
     }
 }

@@ -15,7 +15,7 @@
  */
 package org.openrewrite.maven.tree;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 public enum Scope {
     None, // the root of a resolution tree
@@ -24,6 +24,7 @@ public enum Scope {
     Runtime,
     Test,
     System,
+    Import,
     Invalid;
 
     /**
@@ -41,8 +42,7 @@ public enum Scope {
      * @param scope The scope on the left column of the table.
      * @return The scope inside the table.
      */
-    @Nullable
-    public Scope transitiveOf(@Nullable Scope scope) {
+    public @Nullable Scope transitiveOf(@Nullable Scope scope) {
         if (scope == null) {
             return this;
         }
@@ -111,6 +111,8 @@ public enum Scope {
                 return Test;
             case "system":
                 return System;
+            case "import":
+                return Import;
             default:
                 return Invalid;
         }
@@ -121,7 +123,7 @@ public enum Scope {
      *
      * @return Scope with the higher precedence.
      */
-    @Nullable public static Scope maxPrecedence(@Nullable Scope scope1, @Nullable Scope scope2) {
+    public static @Nullable Scope maxPrecedence(@Nullable Scope scope1, @Nullable Scope scope2) {
         if (scope1 == null) {
             return scope2;
         } else if (scope2 == null) {
@@ -134,14 +136,27 @@ public enum Scope {
     }
 
     /**
-     * It is sometimes convenient for recipes that operate on both Gradle and Maven files to translate a Maven scope
-     * into a Gradle dependency configuration with a similar meaning.
-     * Gradle dependency configurations are more varied and have different semantics than Maven scopes, so this should
-     * be used deliberately and in contexts sufficiently general that the differences are not important.
+     * There are more, and more complex, gradle dependency configurations than there are maven scopes.
+     * <p/>
+     * In Maven you place a dependency that should be available at runtime but not at compile time into the "runtime" scope.
+     * In Gradle you place a dependency that should be available at runtime but not at compile time into the "runtimeOnly" configuration.
+     * In this situation you should use {@link Scope#asConsumableGradleConfigurationName}.
+     * <p/>
+     * In Maven you read the runtime classpath from the "runtime" scope.
+     * In Gradle you read the runtime classpath from the "runtimeClasspath" configuration.
+     * In this situation you should use {@link Scope#asResolvableGradleConfigurationName}.
+     * <p/>
+     * This method is deprecated because its name is ambiguous about which of these possible mappings it is referring to.
      */
-    @SuppressWarnings("unused")
-    @Nullable
-    public static String asGradleConfigurationName(@Nullable Scope scope) {
+    @Deprecated
+    public static @Nullable String asGradleConfigurationName(@Nullable Scope scope) {
+        return asConsumableGradleConfigurationName(scope);
+    }
+
+    /**
+     * Use when you want to know which Gradle configuration you should *add* an entry to in order to most closely match a given Maven scope.
+     */
+    public static @Nullable String asConsumableGradleConfigurationName(@Nullable Scope scope) {
         if(scope == null) {
             return null;
         }
@@ -154,6 +169,30 @@ public enum Scope {
                 return "runtimeOnly";
             case Test:
                 return "testImplementation";
+            case System:
+                return "system";
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * Use when you want to know which Gradle configuration you should *read* to get contents similar to a given Maven scope.
+     */
+    @SuppressWarnings("unused")
+    public static @Nullable String asResolvableGradleConfigurationName(@Nullable Scope scope) {
+        if(scope == null) {
+            return null;
+        }
+        switch (scope) {
+            case Compile:
+                return "compileClasspath";
+            case Provided:
+                return "compileOnly";
+            case Runtime:
+                return "runtimeClasspath";
+            case Test:
+                return "testRuntimeClasspath";
             case System:
                 return "system";
             default:

@@ -1,5 +1,11 @@
 <p align="center">
-  <img src="./doc/logo-oss.png" alt="OpenRewrite"/>
+  <a href="https://docs.openrewrite.org">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://github.com/openrewrite/rewrite/raw/main/doc/logo-oss-dark.svg">
+      <source media="(prefers-color-scheme: light)" srcset="https://github.com/openrewrite/rewrite/raw/main/doc/logo-oss-light.svg">
+      <img alt="OpenRewrite Logo" src="https://github.com/openrewrite/rewrite/raw/main/doc/logo-oss-light.svg" width='600px'>
+    </picture>
+  </a>
 </p>
 
 <div align="center">
@@ -14,7 +20,7 @@
 
 <h1 align="center">Fast, repeatable refactoring for developers</h1>
 
-The OpenRewrite project is an automated refactoring ecosystem for source code, enabling developers to effectively eliminate technical debt within their repositories.
+The OpenRewrite project (managed by [Moderne](https://www.moderne.ai/)) is an open-source automated refactoring ecosystem for source code, enabling developers to effectively eliminate technical debt within their repositories.
 
 It consists of an auto-refactoring engine that runs prepackaged, open source refactoring recipes for common framework migrations, security fixes, and stylistic consistency tasks—reducing your coding effort from hours or days to minutes. Build tool plugins like [OpenRewrite Gradle Plugin](https://docs.openrewrite.org/reference/gradle-plugin-configuration) and [OpenRewrite Maven Plugin](https://docs.openrewrite.org/reference/rewrite-maven-plugin) help you run these recipes on one repository at a time.
 
@@ -25,8 +31,8 @@ Start with our [quickstart guide](https://docs.openrewrite.org/running-recipes/g
 Get and stay informed:
 * Read the [documentation](http://docs.openrewrite.org).
 * Join us on [Slack](https://join.slack.com/t/rewriteoss/shared_invite/zt-nj42n3ea-b~62rIHzb3Vo0E1APKCXEA) or [Discord](https://discord.gg/xk3ZKrhWAb)! We're happy to answer your questions directly.
-* Check out [Community Office Hours](https://www.youtube.com/@moderne-auto-remediation/streams) where we deep dive topics and answer questions.
-* Subscribe to our [YouTube](https://www.youtube.com/@moderne-auto-remediation) channel for great videos on OpenRewrite recipes.
+* Check out [Community Office Hours](https://www.youtube.com/@moderne-and-openrewrite/streams) where we deep dive topics and answer questions.
+* Subscribe to our [YouTube](https://www.youtube.com/@moderne-and-openrewrite) channel for great videos on OpenRewrite recipes.
 * Follow us on [Twitter](https://twitter.com/openrewrite) and [LinkedIn](https://www.linkedin.com/company/moderneinc).
 
 OpenRewrite is Apache2 licensed and maintained by Moderne. OpenRewrite's refactoring engine and recipes will always be open source.

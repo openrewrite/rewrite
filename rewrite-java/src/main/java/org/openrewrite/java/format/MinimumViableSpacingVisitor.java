@@ -16,9 +16,9 @@
 package org.openrewrite.java.format;
 
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.tree.*;
@@ -211,18 +211,16 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
         return v;
     }
 
-    @Nullable
     @Override
-    public J postVisit(J tree, P p) {
+    public @Nullable J postVisit(J tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
             getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, "stop", true);
         }
         return super.postVisit(tree, p);
     }
 
-    @Nullable
     @Override
-    public J visit(@Nullable Tree tree, P p) {
+    public @Nullable J visit(@Nullable Tree tree, P p) {
         if (getCursor().getNearestMessage("stop") != null) {
             return (J) tree;
         }

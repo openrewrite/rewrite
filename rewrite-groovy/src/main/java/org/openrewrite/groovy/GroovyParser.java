@@ -25,9 +25,9 @@ import org.codehaus.groovy.control.io.InputStreamReaderSource;
 import org.codehaus.groovy.control.messages.WarningMessage;
 import org.codehaus.groovy.transform.stc.StaticTypeCheckingVisitor;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.groovy.tree.G;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.marker.Markers;
@@ -35,11 +35,9 @@ import org.openrewrite.style.NamedStyles;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -58,17 +56,16 @@ public class GroovyParser implements Parser {
     @Nullable
     private final Collection<Path> classpath;
 
-    private final List<NamedStyles> styles;
     private final boolean logCompilationWarningsAndErrors;
     private final JavaTypeCache typeCache;
     private final List<Consumer<CompilerConfiguration>> compilerCustomizers;
 
     @Override
     public Stream<SourceFile> parse(@Language("groovy") String... sources) {
-        Pattern packagePattern = Pattern.compile("^package\\s+([^;]+);");
+        Pattern packagePattern = Pattern.compile("\\bpackage\\s+([.\\w]+)");
         Pattern classPattern = Pattern.compile("(class|interface|enum)\\s*(<[^>]*>)?\\s+(\\w+)");
 
-        Function<String, String> simpleName = sourceStr -> {
+        Function<String, @Nullable String> simpleName = sourceStr -> {
             Matcher classMatcher = classPattern.matcher(sourceStr);
             return classMatcher.find() ? classMatcher.group(3) : null;
         };
@@ -83,11 +80,7 @@ public class GroovyParser implements Parser {
                                                        .orElse(Long.toString(System.nanoTime())) + ".java";
 
                             Path path = Paths.get(pkg + className);
-                            return new Input(
-                                    path, null,
-                                    () -> new ByteArrayInputStream(sourceFile.getBytes(StandardCharsets.UTF_8)),
-                                    true
-                            );
+                            return Input.fromString(path, sourceFile);
                         })
                         .collect(toList()),
                 null,
@@ -128,7 +121,7 @@ public class GroovyParser implements Parser {
                         );
 
                         pctx.getParsingListener().startedParsing(input);
-                        CompilationUnit compUnit = new CompilationUnit(configuration, null, classLoader, classLoader);
+                        CompilationUnit compUnit = new LessAstTransformationsCompilationUnit(configuration, null, classLoader, classLoader);
                         compUnit.addSource(unit);
                         compUnit.compile(Phases.CANONICALIZATION);
                         ModuleNode ast = unit.getAST();
@@ -152,7 +145,7 @@ public class GroovyParser implements Parser {
                                 ctx
                         );
                         G.CompilationUnit gcu = mappingVisitor.visit(compiled.getSourceUnit(), compiled.getModule());
-                        if (warnings.size() > 0) {
+                        if (!warnings.isEmpty()) {
                             Markers m = gcu.getMarkers();
                             for (ParseWarning warning : warnings) {
                                 m = m.add(warning);
@@ -241,7 +234,7 @@ public class GroovyParser implements Parser {
             return this;
         }
 
-        public Builder classpath(@Nullable String... artifactNames) {
+        public Builder classpath(String... artifactNames) {
             this.artifactNames = Arrays.asList(artifactNames);
             this.classpath = null;
             return this;
@@ -278,8 +271,7 @@ public class GroovyParser implements Parser {
             return this;
         }
 
-        @Nullable
-        private Collection<Path> resolvedClasspath() {
+        private @Nullable Collection<Path> resolvedClasspath() {
             if (artifactNames != null && !artifactNames.isEmpty()) {
                 classpath = JavaParser.dependenciesFromClasspath(artifactNames.toArray(new String[0]));
                 artifactNames = null;
@@ -289,12 +281,19 @@ public class GroovyParser implements Parser {
 
         @Override
         public GroovyParser build() {
-            return new GroovyParser(resolvedClasspath(), styles, logCompilationWarningsAndErrors, typeCache, compilerCustomizers);
+            return new GroovyParser(resolvedClasspath(), logCompilationWarningsAndErrors, typeCache, compilerCustomizers);
         }
 
         @Override
         public String getDslName() {
             return "groovy";
+        }
+
+        @Override
+        public GroovyParser.Builder clone() {
+            GroovyParser.Builder clone = (GroovyParser.Builder) super.clone();
+            clone.typeCache = this.typeCache.clone();
+            return clone;
         }
     }
 }

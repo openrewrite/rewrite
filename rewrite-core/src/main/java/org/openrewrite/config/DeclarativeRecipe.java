@@ -19,12 +19,13 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
 import lombok.experimental.NonFinal;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.net.URI;
 import java.time.Duration;
 import java.util.*;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import static java.util.Collections.emptyList;
@@ -41,6 +42,7 @@ public class DeclarativeRecipe extends Recipe {
 
     @Getter
     @Language("markdown")
+    @Nullable // in YAML the description is not always present
     private final String description;
 
     @Getter
@@ -89,20 +91,26 @@ public class DeclarativeRecipe extends Recipe {
 
     public void initialize(Collection<Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
         initValidation = Validated.none();
+        Map<String, Recipe> recipeMap = new HashMap<>();
+        availableRecipes.forEach(r -> recipeMap.putIfAbsent(r.getName(), r));
+        initialize(uninitializedRecipes, recipeList, recipeMap::get, recipeToContributors);
+        initialize(uninitializedPreconditions, preconditions, recipeMap::get, recipeToContributors);
+    }
+
+    public void initialize(Function<String, @Nullable Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
+        initValidation = Validated.none();
         initialize(uninitializedRecipes, recipeList, availableRecipes, recipeToContributors);
         initialize(uninitializedPreconditions, preconditions, availableRecipes, recipeToContributors);
     }
 
-    private void initialize(List<Recipe> uninitialized, List<Recipe> initialized, Collection<Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
+    private void initialize(List<Recipe> uninitialized, List<Recipe> initialized, Function<String, @Nullable Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
         initialized.clear();
         for (int i = 0; i < uninitialized.size(); i++) {
             Recipe recipe = uninitialized.get(i);
             if (recipe instanceof LazyLoadedRecipe) {
                 String recipeFqn = ((LazyLoadedRecipe) recipe).getRecipeFqn();
-                Optional<Recipe> next = availableRecipes.stream()
-                        .filter(r -> recipeFqn.equals(r.getName())).findAny();
-                if (next.isPresent()) {
-                    Recipe subRecipe = next.get();
+                Recipe subRecipe = availableRecipes.apply(recipeFqn);
+                if (subRecipe != null) {
                     if (subRecipe instanceof DeclarativeRecipe) {
                         ((DeclarativeRecipe) subRecipe).initialize(availableRecipes, recipeToContributors);
                     }
@@ -149,7 +157,7 @@ public class DeclarativeRecipe extends Recipe {
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
             return new TreeVisitor<Tree, ExecutionContext>() {
-                TreeVisitor<?, ExecutionContext> p = precondition.get();
+                final TreeVisitor<?, ExecutionContext> p = precondition.get();
 
                 @Override
                 public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
@@ -168,7 +176,7 @@ public class DeclarativeRecipe extends Recipe {
 
     @EqualsAndHashCode(callSuper = false)
     @Value
-    static class BellwetherDecoratedRecipe extends Recipe {
+    static class BellwetherDecoratedRecipe extends Recipe implements DelegatingRecipe {
 
         DeclarativeRecipe.PreconditionBellwether bellwether;
         Recipe delegate;
@@ -197,11 +205,16 @@ public class DeclarativeRecipe extends Recipe {
         public List<Recipe> getRecipeList() {
             return decorateWithPreconditionBellwether(bellwether, delegate.getRecipeList());
         }
+
+        @Override
+        public boolean causesAnotherCycle() {
+            return delegate.causesAnotherCycle();
+        }
     }
 
     @Value
     @EqualsAndHashCode(callSuper = false)
-    static class BellwetherDecoratedScanningRecipe<T> extends ScanningRecipe<T> {
+    static class BellwetherDecoratedScanningRecipe<T> extends ScanningRecipe<T> implements DelegatingRecipe {
 
         DeclarativeRecipe.PreconditionBellwether bellwether;
         ScanningRecipe<T> delegate;
@@ -242,8 +255,8 @@ public class DeclarativeRecipe extends Recipe {
         }
 
         @Override
-        public List<Recipe> getRecipeList() {
-            return decorateWithPreconditionBellwether(bellwether, delegate.getRecipeList());
+        public boolean causesAnotherCycle() {
+            return delegate.causesAnotherCycle();
         }
     }
 
@@ -260,13 +273,26 @@ public class DeclarativeRecipe extends Recipe {
                         getName() + " declares the ScanningRecipe " + precondition.getName() + " as a precondition." +
                         "ScanningRecipe cannot be used as Preconditions.");
             }
-            andPreconditions.add(precondition::getVisitor);
+            andPreconditions.add(() -> orVisitors(precondition));
         }
         PreconditionBellwether bellwether = new PreconditionBellwether(Preconditions.and(andPreconditions.toArray(new Supplier[]{})));
         List<Recipe> recipeListWithBellwether = new ArrayList<>(recipeList.size() + 1);
         recipeListWithBellwether.add(bellwether);
         recipeListWithBellwether.addAll(decorateWithPreconditionBellwether(bellwether, recipeList));
         return recipeListWithBellwether;
+    }
+
+    private static TreeVisitor<?, ExecutionContext> orVisitors(Recipe recipe) {
+        if (recipe.getRecipeList().isEmpty()) {
+            return recipe.getVisitor();
+        }
+        List<TreeVisitor<?, ExecutionContext>> conditions = new ArrayList<>();
+        conditions.add(recipe.getVisitor());
+        for (Recipe r : recipe.getRecipeList()) {
+            conditions.add(orVisitors(r));
+        }
+        //noinspection unchecked
+        return Preconditions.or(conditions.toArray(new TreeVisitor[0]));
     }
 
     private static boolean isScanningRecipe(Recipe recipe) {
@@ -350,7 +376,7 @@ public class DeclarativeRecipe extends Recipe {
         for (Recipe childRecipe : getRecipeList()) {
             recipeList.add(childRecipe.getDescriptor());
         }
-        return new RecipeDescriptor(getName(), getDisplayName(), getDescription(),
+        return new RecipeDescriptor(getName(), getDisplayName(), getInstanceName(), getDescription() != null ? getDescription() : "",
                 getTags(), getEstimatedEffortPerOccurrence(),
                 emptyList(), recipeList, getDataTableDescriptors(), getMaintainers(), getContributors(),
                 getExamples(), source);

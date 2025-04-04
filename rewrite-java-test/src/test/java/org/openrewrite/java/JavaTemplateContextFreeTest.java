@@ -159,4 +159,40 @@ class JavaTemplateContextFreeTest implements RewriteTest {
           ));
     }
 
+    @Test
+    void contextFreeTypeParameter() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  if (multiVariable.getVariables().get(0).getSimpleName().equals("o")) {
+                      return JavaTemplate.builder("var o = #{any()};")
+                        .build()
+                        .apply(getCursor(), multiVariable.getCoordinates().replace(), multiVariable.getVariables().get(0).getInitializer());
+                  }
+                  return multiVariable;
+              }
+          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          java(
+            """
+              import java.util.Optional;
+              
+              class Test {
+                  <T extends Number> void test(T element) {
+                      Optional<T> o = Optional.of(element);
+                  }
+              }
+              """,
+            """
+              import java.util.Optional;
+              
+              class Test {
+                  <T extends Number> void test(T element) {
+                      var o = Optional.of(element);
+                  }
+              }
+              """
+          )
+        );
+    }
 }

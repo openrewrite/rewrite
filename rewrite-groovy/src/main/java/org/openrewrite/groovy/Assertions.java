@@ -17,9 +17,10 @@ package org.openrewrite.groovy;
 
 
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
 import org.openrewrite.groovy.tree.G;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 
@@ -33,6 +34,9 @@ public class Assertions {
     private Assertions() {
     }
 
+    private static GroovyParser.Builder groovyParser = GroovyParser.builder()
+            .classpath(JavaParser.runtimeClasspath())
+            .logCompilationWarningsAndErrors(true);
 
     public static SourceSpecs groovy(@Language("groovy") @Nullable String before) {
         return groovy(before, s -> {
@@ -40,7 +44,7 @@ public class Assertions {
     }
 
     public static SourceSpecs groovy(@Language("groovy") @Nullable String before, Consumer<SourceSpec<G.CompilationUnit>> spec) {
-        SourceSpec<G.CompilationUnit> groovy = new SourceSpec<>(G.CompilationUnit.class, null, GroovyParser.builder(), before, null);
+        SourceSpec<G.CompilationUnit> groovy = new SourceSpec<>(G.CompilationUnit.class, null, groovyParser, before, null);
         spec.accept(groovy);
         return groovy;
     }
@@ -52,7 +56,7 @@ public class Assertions {
 
     public static SourceSpecs groovy(@Language("groovy") @Nullable String before, @Language("groovy") @Nullable String after,
                                      Consumer<SourceSpec<G.CompilationUnit>> spec) {
-        SourceSpec<G.CompilationUnit> groovy = new SourceSpec<>(G.CompilationUnit.class, null, GroovyParser.builder(), before, s -> after);
+        SourceSpec<G.CompilationUnit> groovy = new SourceSpec<>(G.CompilationUnit.class, null, groovyParser, before, s -> after);
         spec.accept(groovy);
         return groovy;
     }

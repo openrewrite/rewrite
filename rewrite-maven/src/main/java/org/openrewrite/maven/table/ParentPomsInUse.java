@@ -17,18 +17,16 @@ package org.openrewrite.maven.table;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreType;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Column;
 import org.openrewrite.DataTable;
 import org.openrewrite.Recipe;
-import org.openrewrite.internal.lang.Nullable;
 
 @JsonIgnoreType
 public class ParentPomsInUse extends DataTable<ParentPomsInUse.Row> {
 
     public ParentPomsInUse(Recipe recipe) {
-        super(recipe, Row.class,
-                ParentPomsInUse.class.getName(),
-                "Maven parent POMs in use", "Projects, GAVs and relativePaths for Maven parent POMs in use.");
+        super(recipe, "Maven parent POMs in use", "Projects, GAVs and relativePaths for Maven parent POMs in use.");
     }
 
     @Value

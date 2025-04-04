@@ -20,10 +20,13 @@ import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.*;
 import lombok.experimental.NonFinal;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.io.Serializable;
-import java.util.*;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Set;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
@@ -52,7 +55,8 @@ public class ResolvedDependency implements Serializable {
     @EqualsAndHashCode.Exclude
     List<ResolvedDependency> dependencies;
 
-    List<License> licenses;
+    @Builder.Default
+    List<License> licenses = emptyList();
 
     @Nullable
     String type;
@@ -110,18 +114,15 @@ public class ResolvedDependency implements Serializable {
         return depth != 0;
     }
 
-    @Nullable
-    public String getDatedSnapshotVersion() {
+    public @Nullable String getDatedSnapshotVersion() {
         return gav.getDatedSnapshotVersion();
     }
 
-    @Nullable
-    public ResolvedDependency findDependency(String groupId, String artifactId) {
+    public @Nullable ResolvedDependency findDependency(String groupId, String artifactId) {
         return findDependency0(groupId, artifactId, Collections.newSetFromMap(new IdentityHashMap<>()));
     }
 
-    @Nullable
-    private ResolvedDependency findDependency0(String groupId, String artifactId, Set<ResolvedDependency> visited) {
+    private @Nullable ResolvedDependency findDependency0(String groupId, String artifactId, Set<ResolvedDependency> visited) {
         if (matchesGlob(getGroupId(), groupId) && matchesGlob(getArtifactId(), artifactId)) {
             return this;
         } else if (!visited.add(this)) {

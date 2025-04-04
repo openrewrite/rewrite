@@ -22,6 +22,7 @@ import org.gradle.api.Project
 import org.gradle.api.Task
 import org.gradle.api.artifacts.Dependency
 import org.gradle.api.artifacts.ExternalDependency
+import org.gradle.api.artifacts.ProjectDependency
 import org.gradle.api.artifacts.dsl.DependencyConstraintHandler
 import org.gradle.api.artifacts.dsl.DependencyHandler
 import org.gradle.api.file.FileCollection
@@ -38,6 +39,8 @@ import org.gradle.process.JavaForkOptions
 import org.gradle.process.ProcessForkOptions
 
 interface DependencyHandlerSpec extends DependencyHandler {
+    ProjectDependency project(String path)
+    ProjectDependency project(String path, String configuration)
     Dependency annotationProcessor(Object... dependencyNotation)
     Dependency annotationProcessor(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
     Dependency api(Object... dependencyNotation)
@@ -75,6 +78,7 @@ interface DependencyHandlerSpec extends DependencyHandler {
     Dependency earlib(Object... dependencyNotation)
     Dependency earlib(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
 
+    @Override
     void constraints(Action<? super DependencyConstraintHandler> configureAction)
 }
 
@@ -189,6 +193,8 @@ abstract class RewriteGradleProject extends groovy.lang.Script implements Projec
     abstract Task task(Map<String, ?> options)
     abstract Task task(Map<String, ?> options, Closure configureClosure)
     abstract Task task(String name, Closure configureClosure)
+
+    @Override
     abstract Task task(String name)
     abstract <T extends Task> T task(String name, Class<T> type)
     abstract <T extends Task> T task(String name, Class<T> type, Object... constructorArgs)

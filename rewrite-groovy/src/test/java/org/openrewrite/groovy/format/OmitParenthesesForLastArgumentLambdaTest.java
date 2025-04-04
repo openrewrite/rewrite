@@ -15,7 +15,6 @@
  */
 package org.openrewrite.groovy.format;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -38,7 +37,6 @@ class OmitParenthesesForLastArgumentLambdaTest implements RewriteTest {
         spec.recipe(new OmitParenthesesForLastArgumentLambda());
     }
 
-    @Disabled("Not yet implemented")
     @Test
     void lastClosureArgument() {
         rewriteRun(

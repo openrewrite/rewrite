@@ -15,11 +15,11 @@
  */
 package org.openrewrite.java;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Javadoc;
 
@@ -33,8 +33,7 @@ public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
         this.javaVisitor = javaVisitor;
     }
 
-    @Nullable
-    protected J javaVisitorVisit(@Nullable Tree tree, P p) {
+    protected @Nullable J javaVisitorVisit(@Nullable Tree tree, P p) {
         Cursor previous = javaVisitor.getCursor();
         J j = javaVisitor.visit(tree, p, getCursor());
         javaVisitor.setCursor(previous);

@@ -17,9 +17,9 @@ package org.openrewrite.java;
 
 import lombok.Value;
 import org.antlr.v4.runtime.*;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.grammar.TemplateParameterLexer;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser.TypedPatternContext;
@@ -73,18 +73,22 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
             substituted = propertyPlaceholderHelper.replacePlaceholders(substituted, key -> {
                 String s;
                 if (!key.isEmpty()) {
-                    TemplateParameterParser parser = new TemplateParameterParser(new CommonTokenStream(new TemplateParameterLexer(
-                            CharStreams.fromString(key))));
-
-                    parser.removeErrorListeners();
-                    parser.addErrorListener(new BaseErrorListener() {
+                    BaseErrorListener errorListener = new BaseErrorListener() {
                         @Override
                         public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol,
                                                 int line, int charPositionInLine, String msg, RecognitionException e) {
                             throw new IllegalArgumentException(
                                     String.format("Syntax error at line %d:%d %s.", line, charPositionInLine, msg), e);
                         }
-                    });
+                    };
+
+                    TemplateParameterLexer lexer = new TemplateParameterLexer(CharStreams.fromString(key));
+                    lexer.removeErrorListeners();
+                    lexer.addErrorListener(errorListener);
+
+                    TemplateParameterParser parser = new TemplateParameterParser(new CommonTokenStream(lexer));
+                    parser.removeErrorListeners();
+                    parser.addErrorListener(errorListener);
 
                     TemplateParameterParser.MatcherPatternContext ctx = parser.matcherPattern();
                     if (ctx.typedPattern() == null) {

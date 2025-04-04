@@ -15,8 +15,8 @@
  */
 package org.openrewrite.semver;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -41,7 +41,7 @@ public class TildeRange extends LatestRelease {
 
     @Override
     public boolean isValid(@Nullable String currentVersion, String version) {
-        return super.isValid(currentVersion, version) &&
+        return VersionComparator.checkVersion(version, getMetadataPattern(), false) &&
                 super.compare(currentVersion, version, upperExclusive) < 0 &&
                 super.compare(currentVersion, version, lower) >= 0;
     }

@@ -17,14 +17,9 @@ package org.openrewrite.maven.search;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.config.DeclarativeRecipe;
 import org.openrewrite.test.RewriteTest;
 
-import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
 
 import static org.openrewrite.maven.Assertions.pomXml;
 
@@ -97,6 +92,7 @@ class FindPluginTest implements RewriteTest {
             ---
             type: specs.openrewrite.org/v1beta/recipe
             name: org.openrewrite.MultiModuleTest
+            description: Test.
             preconditions:
               - org.openrewrite.maven.search.FindPlugin:
                   groupId: org.apache.maven.plugins
@@ -115,7 +111,7 @@ class FindPluginTest implements RewriteTest {
                       <packaging>pom</packaging>
                       <modules>
                           <module>submodule</module>
-                      </modules>                
+                      </modules>
                       <build>
                           <plugins>
                               <plugin>
@@ -124,16 +120,16 @@ class FindPluginTest implements RewriteTest {
                                   <version>5.28.0</version>
                               </plugin>
                           </plugins>
-                      </build>                  
+                      </build>
                   </project>
-                  """,sourceSpecs -> sourceSpecs.path("pom.xml")),
+                  """, sourceSpecs -> sourceSpecs.path("pom.xml")),
           pomXml(
             """
                 <project>
                     <parent>
                         <groupId>org.example</groupId>
                         <artifactId>mvn_multi_module_test</artifactId>
-                        <version>1.0-SNAPSHOT</version>            
+                        <version>1.0-SNAPSHOT</version>
                     </parent>
                     <artifactId>submodule</artifactId>
                     <build>
@@ -146,7 +142,7 @@ class FindPluginTest implements RewriteTest {
                         </plugins>
                     </build>
                 </project>
-                    """,sourceSpecs -> sourceSpecs.path("submodule.pom.xml")
+                """, sourceSpecs -> sourceSpecs.path("submodule.pom.xml")
           )
         );
     }

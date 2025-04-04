@@ -19,11 +19,11 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Checksum;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.HttpSenderExecutionContextView;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.marker.Markers;
 
@@ -56,6 +56,7 @@ public class RemoteFile implements Remote {
     FileAttributes fileAttributes;
 
     @Language("markdown")
+    @Nullable
     String description;
 
     @Nullable
@@ -69,7 +70,11 @@ public class RemoteFile implements Remote {
             Path localFile = cache.compute(uri, () -> {
                 //noinspection resource
                 HttpSender.Response response = httpSender.get(uri.toString()).send();
-                return response.getBody();
+                if (response.isSuccessful()) {
+                    return response.getBody();
+                } else {
+                    throw new IllegalStateException("Failed to download " + uri + " to artifact cache got an " + response.getCode());
+                }
             }, ctx.getOnError());
 
             if (localFile == null) {

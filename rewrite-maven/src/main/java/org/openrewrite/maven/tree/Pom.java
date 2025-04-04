@@ -19,8 +19,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Value;
 import lombok.With;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 
@@ -30,11 +30,11 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.internal.ListUtils.concatAll;
 
 /**
@@ -86,6 +86,9 @@ public class Pom {
     String name;
 
     @Nullable
+    Prerequisites prerequisites;
+
+    @Nullable
     String packaging;
 
     @Builder.Default
@@ -101,6 +104,9 @@ public class Pom {
     List<MavenRepository> repositories = emptyList();
 
     @Builder.Default
+    List<MavenRepository> pluginRepositories = emptyList();
+
+    @Builder.Default
     List<License> licenses = emptyList();
 
     @Builder.Default
@@ -111,6 +117,10 @@ public class Pom {
 
     @Builder.Default
     List<Plugin> pluginManagement = emptyList();
+
+    @Builder.Default
+    @Nullable
+    List<String> subprojects = emptyList();
 
     public String getGroupId() {
         return gav.getGroupId();
@@ -124,8 +134,7 @@ public class Pom {
         return gav.getVersion();
     }
 
-    @Nullable
-    public String getDatedSnapshotVersion() {
+    public @Nullable String getDatedSnapshotVersion() {
         return gav.getDatedSnapshotVersion();
     }
 
@@ -154,7 +163,27 @@ public class Pom {
                     return r;
                 })
                 .distinct()
-                .collect(Collectors.toList());
+                .collect(toList());
+    }
+
+    /**
+     * "[activeByDefault] profile will automatically be active for all builds unless another profile in the same POM is
+     * activated using one of the previously described methods. All profiles that are active by default are automatically
+     * deactivated when a profile in the POM is activated on the command line or through its activation config."
+     *
+     * @param explicitActiveProfiles Any profiles explicitly activated on the command line.
+     * @return the effective profiles, given the explicitly active profiles, or failing that those active by default.
+     */
+    List<Profile> effectiveProfiles(Iterable<String> explicitActiveProfiles) {
+        List<Profile> pomActivatedProfiles = profiles.stream()
+                .filter(p -> p.isActive(explicitActiveProfiles))
+                .collect(toList());
+        if (!pomActivatedProfiles.isEmpty()) {
+            return pomActivatedProfiles;
+        }
+        return profiles.stream()
+                .filter(p -> p.getActivation() != null && Boolean.TRUE.equals(p.getActivation().getActiveByDefault()))
+                .collect(toList());
     }
 
     /**
@@ -180,14 +209,15 @@ public class Pom {
                 emptyList(),
                 concatAll(initialRepositories, getEffectiveRepositories()),
                 repositories,
+                pluginRepositories,
                 dependencies,
                 plugins,
-                pluginManagement)
+                pluginManagement,
+                subprojects)
                 .resolve(ctx, downloader);
     }
 
-    @Nullable
-    public String getValue(@Nullable String value) {
+    public @Nullable String getValue(@Nullable String value) {
         if (value == null) {
             return null;
         }

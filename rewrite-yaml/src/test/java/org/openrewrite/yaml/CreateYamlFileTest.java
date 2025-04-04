@@ -16,11 +16,11 @@
 package org.openrewrite.yaml;
 
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.remote.RemoteArtifactCache;
 import org.openrewrite.remote.RemoteExecutionContextView;
 import org.openrewrite.test.MockHttpSender;
@@ -120,7 +120,7 @@ class CreateYamlFileTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new CreateYamlFile(
             "test/test-file-2.yaml",
-            null,
+            "",
             null,
             true
           )),
@@ -205,6 +205,67 @@ class CreateYamlFileTest implements RewriteTest {
             null,
             fileContents,
             spec -> spec.path("test/test.yaml")
+          )
+        );
+    }
+
+    @Test
+    void shouldCreateYamlFromYamlRecipe() {
+        rewriteRun(spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.CreateYamlPrecondition
+            displayName: Create yaml file with precondition
+            description: Create a yaml file with a precondition.
+            recipeList:
+              - org.openrewrite.yaml.CreateYamlFile:
+                  relativeFileName: created.yml
+                  overwriteExisting: false
+                  fileContents: |
+                    content: yes
+            """, "org.openrewrite.CreateYamlPrecondition"),
+          yaml(
+                """
+            foo: bar
+            """, spec -> spec.path("precondition.yml")),
+          yaml(
+            null,
+            """
+                    content: yes
+                    """,
+            spec -> spec.path("created.yml")
+          )
+        );
+    }
+
+    @Test
+    void shouldCreateYamlFromYamlRecipeWithPrecondition() {
+        rewriteRun(spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.CreateYamlPrecondition
+            displayName: Create yaml file with precondition
+            description: Create a yaml file with a precondition.
+            preconditions:
+              - org.openrewrite.FindSourceFiles:
+                  filePattern: "**/precondition.yml"
+            recipeList:
+              - org.openrewrite.yaml.CreateYamlFile:
+                  relativeFileName: created.yml
+                  overwriteExisting: false
+                  fileContents: |
+                    content: yes
+            """, "org.openrewrite.CreateYamlPrecondition"),
+          yaml(
+                """
+            foo: bar
+            """, spec -> spec.path("precondition.yml")),
+          yaml(
+            null,
+            """
+                    content: yes
+                    """,
+            spec -> spec.path("created.yml")
           )
         );
     }

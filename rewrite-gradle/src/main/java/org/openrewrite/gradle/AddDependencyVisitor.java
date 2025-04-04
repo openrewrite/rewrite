@@ -16,9 +16,9 @@
 package org.openrewrite.gradle;
 
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.gradle.internal.InsertDependencyComparator;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
@@ -27,7 +27,6 @@ import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
@@ -102,7 +101,7 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
         }
 
         if (dependenciesBlockMissing) {
-            Statement dependenciesInvocation = GRADLE_PARSER.parse("dependencies {}")
+            Statement dependenciesInvocation = GRADLE_PARSER.parse(ctx, "dependencies {}")
                     .findFirst()
                     .map(G.CompilationUnit.class::cast)
                     .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
@@ -260,11 +259,12 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
                                "\n}";
             }
 
-            ExecutionContext parseCtx = new InMemoryExecutionContext();
-            parseCtx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
-            SourceFile parsed = GRADLE_PARSER.parse(parseCtx, codeTemplate)
+            Boolean requirePrintEqualsInput = ctx.getMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT);
+            ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
+            SourceFile parsed = GRADLE_PARSER.parse(ctx, codeTemplate)
                     .findFirst()
                     .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"));
+            ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, requirePrintEqualsInput);
 
             if (parsed instanceof ParseError) {
                 throw ((ParseError) parsed).toException();
@@ -290,22 +290,10 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
                             }
                         } else {
                             Space originalPrefix = addDependencyInvocation.getPrefix();
-                            if (currentStatement instanceof J.VariableDeclarations) {
-                                J.VariableDeclarations variableDeclarations = (J.VariableDeclarations) currentStatement;
-                                if (variableDeclarations.getTypeExpression() != null) {
-                                    addDependencyInvocation = addDependencyInvocation.withPrefix(variableDeclarations.getTypeExpression().getPrefix());
-                                }
-                            } else {
-                                addDependencyInvocation = addDependencyInvocation.withPrefix(currentStatement.getPrefix());
-                            }
+                            addDependencyInvocation = addDependencyInvocation.withPrefix(currentStatement.getPrefix());
 
                             if (addDependencyInvocation.getSimpleName().equals(beforeDependency.getSimpleName())) {
-                                if (currentStatement instanceof J.VariableDeclarations) {
-                                    J.VariableDeclarations variableDeclarations = (J.VariableDeclarations) currentStatement;
-                                    if (variableDeclarations.getTypeExpression() != null && !variableDeclarations.getTypeExpression().getPrefix().equals(originalPrefix)) {
-                                        statements.set(i, variableDeclarations.withTypeExpression(variableDeclarations.getTypeExpression().withPrefix(originalPrefix)));
-                                    }
-                                } else if (!currentStatement.getPrefix().equals(originalPrefix)) {
+                                if (!currentStatement.getPrefix().equals(originalPrefix)) {
                                     statements.set(i, currentStatement.withPrefix(originalPrefix));
                                 }
                             }

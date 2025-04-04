@@ -17,8 +17,8 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -79,7 +79,7 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
         @Override
         public J visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
             JavaType.Variable fieldType = ident.getFieldType();
-            if (isConstant(fieldType) && !isVariableDeclaration()) {
+            if (isConstant(fieldType)) {
                 return replaceFieldAccess(ident, fieldType);
             }
             return super.visitIdentifier(ident, ctx);
@@ -121,28 +121,9 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
             return expression;
         }
 
-        private boolean isConstant(@Nullable JavaType.Variable varType) {
+        private boolean isConstant(JavaType.@Nullable Variable varType) {
             return varType != null && TypeUtils.isOfClassType(varType.getOwner(), existingOwningType) &&
                     varType.getName().equals(constantName);
-        }
-
-        private boolean isVariableDeclaration() {
-            Cursor maybeVariable = getCursor().dropParentUntil(is -> is instanceof J.VariableDeclarations || is instanceof J.CompilationUnit);
-            if (!(maybeVariable.getValue() instanceof J.VariableDeclarations)) {
-                return false;
-            }
-            JavaType.Variable variableType = ((J.VariableDeclarations) maybeVariable.getValue()).getVariables().get(0).getVariableType();
-            if (variableType == null) {
-                return true;
-            }
-
-            JavaType.FullyQualified ownerFqn = TypeUtils.asFullyQualified(variableType.getOwner());
-            if (ownerFqn == null) {
-                return true;
-            }
-
-            return constantName.equals(((J.VariableDeclarations) maybeVariable.getValue()).getVariables().get(0).getSimpleName()) &&
-                    existingOwningType.equals(ownerFqn.getFullyQualifiedName());
         }
     }
 }

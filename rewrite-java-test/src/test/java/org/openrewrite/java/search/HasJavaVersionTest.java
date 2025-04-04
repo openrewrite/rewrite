@@ -68,6 +68,7 @@ class HasJavaVersionTest implements RewriteTest {
             ---
             type: specs.openrewrite.org/v1beta/recipe
             name: org.openrewrite.PreconditionTest
+            description: Test.
             preconditions:
               - org.openrewrite.java.search.HasJavaVersion:
                   version: 11
@@ -87,6 +88,7 @@ class HasJavaVersionTest implements RewriteTest {
             ---
             type: specs.openrewrite.org/v1beta/recipe
             name: org.openrewrite.PreconditionTest
+            description: Test.
             preconditions:
               - org.openrewrite.java.search.HasJavaVersion:
                   version: 11
@@ -105,6 +107,7 @@ class HasJavaVersionTest implements RewriteTest {
             ---
             type: specs.openrewrite.org/v1beta/recipe
             name: org.openrewrite.CombinedWithFindMethod
+            description: Test.
             recipeList:
               - org.openrewrite.java.search.HasJavaVersion:
                   version: 11
@@ -142,6 +145,7 @@ class HasJavaVersionTest implements RewriteTest {
             ---
             type: specs.openrewrite.org/v1beta/recipe
             name: org.openrewrite.CombinedWithFindMethod
+            description: Test.
             recipeList:
               - org.openrewrite.java.search.FindMethods:
                   methodPattern: java.util.List add(..)

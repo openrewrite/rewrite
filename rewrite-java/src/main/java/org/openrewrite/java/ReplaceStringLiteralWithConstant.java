@@ -15,13 +15,12 @@
  */
 package org.openrewrite.java;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.experimental.NonFinal;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
 
@@ -29,7 +28,6 @@ import java.lang.reflect.Field;
 import java.util.Objects;
 
 import static org.openrewrite.Validated.invalid;
-
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -46,18 +44,8 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
     String literalValue;
 
     @Option(displayName = "Fully qualified name of the constant to use in place of String literal", example = "org.springframework.http.MediaType.APPLICATION_JSON_VALUE")
+    @Nullable
     String fullyQualifiedConstantName;
-
-    public ReplaceStringLiteralWithConstant(String fullyQualifiedConstantName) {
-        this.literalValue = null;
-        this.fullyQualifiedConstantName = fullyQualifiedConstantName;
-    }
-
-    @JsonCreator
-    public ReplaceStringLiteralWithConstant(String literalValue, String fullyQualifiedConstantName) {
-        this.literalValue = literalValue;
-        this.fullyQualifiedConstantName = fullyQualifiedConstantName;
-    }
 
     @Override
     public String getDisplayName() {
@@ -69,8 +57,7 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
         return "Replace String literal with constant, adding import on class if needed.";
     }
 
-    @Nullable
-    public String getLiteralValue() {
+    public @Nullable String getLiteralValue() {
         if (this.literalValue == null && this.fullyQualifiedConstantName != null) {
             try {
                 this.literalValue = (String) getConstantValueByFullyQualifiedName(this.fullyQualifiedConstantName);
@@ -83,34 +70,42 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
     }
 
     @Override
-    public Validated validate() {
-        Validated result = super.validate();
+    public Validated<Object> validate() {
+        Validated<Object> result = super.validate();
         if (StringUtils.isBlank(fullyQualifiedConstantName)) {
             return result.and(invalid(CONSTANT_FQN_PARAM, fullyQualifiedConstantName, "The constant's fully qualified name may not be empty or blank."));
         }
-        try {
-            Object constantValue = getConstantValueByFullyQualifiedName(fullyQualifiedConstantName);
-            if (constantValue == null) {
-                return result.and(invalid(CONSTANT_FQN_PARAM, fullyQualifiedConstantName, "Provided constant should not be null."));
+        if (StringUtils.isBlank(literalValue)) {
+            try {
+                Object constantValue = getConstantValueByFullyQualifiedName(fullyQualifiedConstantName);
+                if (constantValue == null) {
+                    return result.and(invalid(CONSTANT_FQN_PARAM, fullyQualifiedConstantName, "Provided constant should not be null."));
+                }
+                if (!(constantValue instanceof String)) {
+                    // currently, we only support string literals, also see visitor implementation
+                    return result.and(invalid(CONSTANT_FQN_PARAM, fullyQualifiedConstantName, "Unsupported type of constant provided. Only literals can be replaced."));
+                }
+                return result;
+            } catch (ClassNotFoundException e) {
+                return result.and(invalid(CONSTANT_FQN_PARAM, fullyQualifiedConstantName, "No class for specified name was found."));
+            } catch (NoSuchFieldException e) {
+                return result.and(invalid(CONSTANT_FQN_PARAM, fullyQualifiedConstantName, "No field with specified name was found."));
+            } catch (IllegalAccessException e) {
+                return result.and(invalid(CONSTANT_FQN_PARAM, fullyQualifiedConstantName, "Unable to access specified field."));
             }
-            if (!(constantValue instanceof String)) {
-                // currently, we only support string literals, also see visitor implementation
-                return result.and(invalid(CONSTANT_FQN_PARAM, fullyQualifiedConstantName, "Unsupported type of constant provided. Only literals can be replaced."));
-            }
-            return result;
-        } catch (ClassNotFoundException e) {
-            return result.and(invalid(CONSTANT_FQN_PARAM, fullyQualifiedConstantName, "No class for specified name was found."));
-        } catch (NoSuchFieldException e) {
-            return result.and(invalid(CONSTANT_FQN_PARAM, fullyQualifiedConstantName, "No field with specified name was found."));
-        } catch (IllegalAccessException e) {
-            return result.and(invalid(CONSTANT_FQN_PARAM, fullyQualifiedConstantName, "Unable to access specified field."));
         }
+        return result;
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         String value = getLiteralValue();
-        return value == null ? TreeVisitor.noop() : new ReplaceStringLiteralVisitor(value, fullyQualifiedConstantName);
+        if (value == null) {
+            return TreeVisitor.noop();
+        } else {
+            assert fullyQualifiedConstantName != null : "Validation should have failed if constant name is null";
+            return new ReplaceStringLiteralVisitor(value, fullyQualifiedConstantName);
+        }
     }
 
     private static class ReplaceStringLiteralVisitor extends JavaVisitor<ExecutionContext> {
@@ -143,7 +138,6 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
 
             maybeAddImport(owningType, false);
             return JavaTemplate.builder(template)
-                    .contextSensitive()
                     .imports(owningType)
                     .build()
                     .apply(getCursor(), literal.getCoordinates().replace())
@@ -151,8 +145,7 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
         }
     }
 
-    @Nullable
-    private static Object getConstantValueByFullyQualifiedName(String fullyQualifiedConstantName) throws ClassNotFoundException, IllegalAccessException, NoSuchFieldException {
+    private static @Nullable Object getConstantValueByFullyQualifiedName(String fullyQualifiedConstantName) throws ClassNotFoundException, IllegalAccessException, NoSuchFieldException {
         String owningType = fullyQualifiedConstantName.substring(0, fullyQualifiedConstantName.lastIndexOf('.'));
         String constantName = fullyQualifiedConstantName.substring(fullyQualifiedConstantName.lastIndexOf('.') + 1);
         Field constantField = Class.forName(owningType).getField(constantName);

@@ -19,7 +19,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.EqualsAndHashCode;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.marker.Markers;
 
 import java.util.*;
@@ -80,7 +80,11 @@ public class Space {
         return whitespace == null ? "" : whitespace;
     }
 
-    private String getWhitespaceIndent(@Nullable String whitespace) {
+    public String getWhitespaceIndent() {
+        return getWhitespaceIndent(this.whitespace);
+    }
+
+    private static String getWhitespaceIndent(@Nullable String whitespace) {
         if (whitespace == null) {
             return "";
         }
@@ -217,7 +221,7 @@ public class Space {
             last = c;
         }
         // If a file ends with a single-line comment there may be no terminating newline
-        if (comment.length() > 0) {
+        if (comment.length() > 0 || inSingleLineComment) {
             comments.add(new Comment(false, comment.toString(), prefix.toString(), Markers.EMPTY));
             prefix.setLength(0);
         }

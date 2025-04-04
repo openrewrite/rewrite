@@ -19,13 +19,13 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.RecipeScheduler;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ExceptionUtils;
 import org.openrewrite.internal.RecipeRunException;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.util.UUID;
 import java.util.function.UnaryOperator;
@@ -156,9 +156,8 @@ public interface Markup extends Marker {
             return message;
         }
 
-        @Nullable
         @Override
-        public String getDetail() {
+        public @Nullable String getDetail() {
             return detail;
         }
     }
@@ -181,9 +180,8 @@ public interface Markup extends Marker {
             return message;
         }
 
-        @Nullable
         @Override
-        public String getDetail() {
+        public @Nullable String getDetail() {
             return detail;
         }
     }

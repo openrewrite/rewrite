@@ -17,9 +17,9 @@ package org.openrewrite;
 
 import lombok.Value;
 import lombok.With;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.config.ColumnDescriptor;
 import org.openrewrite.config.DataTableDescriptor;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.io.*;
 import java.lang.reflect.Field;
@@ -42,8 +42,7 @@ public class RecipeRun {
     @With
     Map<DataTable<?>, List<?>> dataTables;
 
-    @Nullable
-    public DataTable<?> getDataTable(String name) {
+    public @Nullable DataTable<?> getDataTable(String name) {
         for (DataTable<?> dataTable : dataTables.keySet()) {
             if (dataTable.getName().equals(name)) {
                 return dataTable;
@@ -52,8 +51,7 @@ public class RecipeRun {
         return null;
     }
 
-    @Nullable
-    public <E> List<E> getDataTableRows(String name) {
+    public <E> @Nullable List<E> getDataTableRows(String name) {
         for (Map.Entry<DataTable<?>, List<?>> dataTableAndRows : dataTables.entrySet()) {
             if (dataTableAndRows.getKey().getName().equals(name)) {
                 //noinspection unchecked

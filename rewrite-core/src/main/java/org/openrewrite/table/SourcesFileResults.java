@@ -16,6 +16,7 @@
 package org.openrewrite.table;
 
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.config.RecipeDescriptor;
 
@@ -31,11 +32,13 @@ public class SourcesFileResults extends DataTable<SourcesFileResults.Row> {
     @Value
     public static class Row {
         @Column(displayName = "Source path before the run",
-                description = "The source path of the file before the run.")
+                description = "The source path of the file before the run. `null` when a source file was created during the run.")
+        @Nullable
         String sourcePath;
 
         @Column(displayName = "Source path after the run",
-                description = "A recipe may modify the source path. This is the path after the run.")
+                description = "A recipe may modify the source path. This is the path after the run. `null` when a source file was deleted during the run.")
+        @Nullable
         String afterSourcePath;
 
         @Column(displayName = "Parent of the recipe that made changes",
@@ -74,7 +77,7 @@ public class SourcesFileResults extends DataTable<SourcesFileResults.Row> {
                         result.getAfter() == null ? "" : result.getAfter().getSourcePath().toString(),
                         recipeThatMadeChange[0] == null ? "" : recipeThatMadeChange[0].getName(),
                         recipeThatMadeChange[1].getName(),
-                        result.getTimeSavings() == null ? 0 : result.getTimeSavings().getSeconds(),
+                        result.getTimeSavings().getSeconds(),
                         cycle
                 ));
                 for (int i = recipeThatMadeChange[1].getRecipeList().size() - 1; i >= 0; i--) {

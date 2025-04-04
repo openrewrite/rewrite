@@ -18,11 +18,11 @@ package org.openrewrite.maven;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.apache.commons.lang3.StringUtils;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
@@ -60,8 +60,9 @@ public class RemoveRepository extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new MavenIsoVisitor<ExecutionContext>() {
+
             @Override
-            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            public  Xml.@Nullable Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag repo = super.visitTag(tag, ctx);
 
                 if (REPOS_MATCHER.matches(getCursor()) || PLUGIN_REPOS_MATCHER.matches(getCursor())) {

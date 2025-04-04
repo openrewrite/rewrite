@@ -15,12 +15,12 @@
  */
 package org.openrewrite.groovy;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTypeMappingTest;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.tree.JavaType;
@@ -77,10 +77,10 @@ class GroovyTypeMappingTest implements JavaTypeMappingTest {
 
         new GroovyVisitor<Integer>() {
             @Override
-            public org.openrewrite.java.tree.JavaType visitType(@Nullable org.openrewrite.java.tree.JavaType javaType, Integer p) {
+            public org.openrewrite.java.tree.JavaType visitType(org.openrewrite.java.tree.@Nullable JavaType javaType, Integer p) {
                 return new JavaTypeVisitor<Integer>() {
                     @Override
-                    public org.openrewrite.java.tree.JavaType visit(@Nullable org.openrewrite.java.tree.JavaType javaType, Integer p) {
+                    public org.openrewrite.java.tree.JavaType visit(org.openrewrite.java.tree.@Nullable JavaType javaType, Integer p) {
                         if (javaType != null) {
                             if (uniqueTypes.add(javaType)) {
                                 typeBySignatureAfterMapping.compute(javaType.toString(), (t, existing) -> {

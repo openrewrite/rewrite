@@ -15,7 +15,7 @@
  */
 package org.openrewrite.maven.tree;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
@@ -64,4 +64,13 @@ public interface ResolutionEventListener {
 
     default void repositoryAccessFailed(String uri, Throwable e) {
     }
+
+    /**
+     * This is called if a previous failure to access a repository was cached and used.
+     * Useful to log when a persistent maven cache is used to debug issues where repositories are not being attempted for downloads.
+      * @param uri The repository URI which was not attempted to access
+     */
+    default void repositoryAccessFailedPreviously(String uri) {
+    }
+
 }

@@ -33,7 +33,7 @@ public class EffectiveManagedDependencies extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Effective dependencies";
+        return "Effective managed dependencies";
     }
 
     @Override

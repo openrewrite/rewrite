@@ -15,12 +15,17 @@
  */
 package org.openrewrite.marker;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.openrewrite.GitRemote;
 import org.openrewrite.jgit.api.Git;
 import org.openrewrite.jgit.api.errors.GitAPIException;
 import org.openrewrite.jgit.lib.Constants;
@@ -38,10 +43,12 @@ import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
+import static com.fasterxml.jackson.core.JsonParser.Feature.INCLUDE_SOURCE_IN_LOCATION;
 import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -51,40 +58,64 @@ import static org.openrewrite.jgit.lib.ConfigConstants.CONFIG_BRANCH_SECTION;
 @SuppressWarnings({"ConstantConditions", "HttpUrlsUsage"})
 class GitProvenanceTest {
 
-    private static Stream<String> remotes() {
+    private static Stream<Arguments> remotes() {
         return Stream.of(
-          "ssh://git@github.com/openrewrite/rewrite.git",
-          "https://github.com/openrewrite/rewrite.git",
-          "file:///openrewrite/rewrite.git",
-          "http://localhost:7990/scm/openrewrite/rewrite.git",
-          "http://localhost:7990/scm/some/openrewrite/rewrite.git",
-          "git@github.com:openrewrite/rewrite.git",
-          "org-12345678@github.com:openrewrite/rewrite.git"
+          Arguments.of("ssh://git@github.com/openrewrite/rewrite.git", "openrewrite", "rewrite"),
+          Arguments.of("https://github.com/openrewrite/rewrite.git", "openrewrite", "rewrite"),
+          Arguments.of("file:///openrewrite/rewrite.git", "openrewrite", "rewrite"),
+          Arguments.of("http://localhost:7990/scm/openrewrite/rewrite.git", "openrewrite", "rewrite"),
+          Arguments.of("http://localhost:7990/scm/some/openrewrite/rewrite.git", "openrewrite", "rewrite"),
+          Arguments.of("git@github.com:openrewrite/rewrite.git", "openrewrite", "rewrite"),
+          Arguments.of("org-12345678@github.com:openrewrite/rewrite.git", "openrewrite", "rewrite"),
+          Arguments.of("https://dev.azure.com/openrewrite/rewrite/_git/rewrite", "openrewrite/rewrite", "rewrite"),
+          Arguments.of("https://openrewrite@dev.azure.com/openrewrite/rewrite/_git/rewrite",
+            "openrewrite/rewrite",
+            "rewrite"),
+          Arguments.of("git@ssh.dev.azure.com:v3/openrewrite/rewrite/rewrite", "openrewrite/rewrite", "rewrite"),
+          Arguments.of("ssh://git@ssh.dev.azure.com/v3/openrewrite/rewrite/rewrite", "openrewrite/rewrite", "rewrite")
         );
     }
 
-    @SuppressWarnings("deprecation")
     @ParameterizedTest
     @MethodSource("remotes")
-    void getOrganizationName(String remote) {
-        assertThat(new GitProvenance(randomId(), remote, "main", "123", null, null, emptyList()).getOrganizationName())
-          .isEqualTo("openrewrite");
+    void getRepositoryPath(String origin, String expectedOrg, String expectedRepo) {
+        GitProvenance gitProvenance = new GitProvenance(randomId(), origin, "main", "123", null, null, List.of());
+        assertThat(gitProvenance.getOrganizationName()).isEqualTo(expectedOrg);
+        assertThat(gitProvenance.getRepositoryName()).isEqualTo(expectedRepo);
+        String expectedPath = expectedOrg + '/' + expectedRepo;
+        assertThat(gitProvenance.getRepositoryPath()).isEqualTo(expectedPath);
+    }
+
+    @ParameterizedTest
+    @MethodSource("remotes")
+    void getRepositoryOrigin(String origin, String expectedOrg, String expectedRepo) {
+        GitProvenance gitProvenance = new GitProvenance(randomId(), origin, "main", "123", null, null, List.of());
+        assertThat(gitProvenance.getOrganizationName()).isEqualTo(expectedOrg);
+        assertThat(gitProvenance.getRepositoryName()).isEqualTo(expectedRepo);
+        assertThat(gitProvenance.getOrigin()).isEqualTo(origin);
     }
 
     @ParameterizedTest
     @CsvSource({
-      "git@gitlab.acme.com:organization/subgroup/repository.git, https://gitlab.acme.com, organization/subgroup",
-      "git@gitlab.acme.com:organization/subgroup/repository.git, git@gitlab.acme.com, organization/subgroup"
+      "https://github.com/organization/repository, https://github.com, GitHub, organization",
+      "git@gitlab.acme.com/organization/subgroup/repository.git, https://gitlab.acme.com, GitLab, organization/subgroup",
+      "git@gitlab.acme.com/organization/subgroup/repository.git, git@gitlab.acme.com, GitLab, organization/subgroup",
+      "git@gitlab.acme.com:organization/subgroup/repository.git, ssh://git@gitlab.acme.com, GitLab, organization/subgroup",
+      "https://dev.azure.com/organization/project/_git/repository, https://dev.azure.com, AzureDevOps, organization/project",
+      "https://organization@dev.azure.com/organization/project/_git/repository, https://dev.azure.com, AzureDevOps, organization/project",
+      "git@ssh.dev.azure.com:v3/organization/project/repository, git@ssh.dev.azure.com, AzureDevOps, organization/project"
     })
-    void getOrganizationNameWithBaseUrl(String gitOrigin, String baseUrl, String organizationName) {
-        assertThat(new GitProvenance(randomId(), gitOrigin, "main", "123", null, null, emptyList()).getOrganizationName(baseUrl))
+    void getOrganizationName(String gitOrigin, String baseUrl, GitRemote.Service service, String organizationName) {
+        GitRemote.Parser parser = new GitRemote.Parser();
+        parser.registerRemote(service, baseUrl);
+        assertThat(new GitProvenance(randomId(), gitOrigin, "main", "123", null, null, emptyList(), parser.parse(gitOrigin)).getOrganizationName())
           .isEqualTo(organizationName);
     }
 
     @ParameterizedTest
     @MethodSource("remotes")
     void getRepositoryName(String remote) {
-        assertThat(new GitProvenance(randomId(), remote, "main", "123", null, null, emptyList()).getRepositoryName())
+        assertThat(new GitProvenance(randomId(), remote, "main", "123", null, null, emptyList(), null).getRepositoryName())
           .isEqualTo("rewrite");
     }
 
@@ -196,6 +227,7 @@ class GitProvenanceTest {
         );
     }
 
+    @SuppressWarnings("deprecation")
     @ParameterizedTest
     @MethodSource("baseUrls")
     void multiplePathSegments(String baseUrl) {
@@ -205,7 +237,8 @@ class GitProvenanceTest {
           "1234567890abcdef1234567890abcdef12345678",
           null,
           null,
-          emptyList());
+          emptyList(),
+          null);
 
         assertThat(provenance.getOrganizationName(baseUrl)).isEqualTo("group/subgroup1/subgroup2");
         assertThat(provenance.getRepositoryName()).isEqualTo("repo");
@@ -366,6 +399,18 @@ class GitProvenanceTest {
             assertThat(git).isNotNull();
             assertThat(git.getBranch()).isEqualTo("main");
         }
+    }
+
+    @Test
+    void serialization() throws JsonProcessingException {
+        GitProvenance gitProvenance = new GitProvenance(randomId(), "https://github.com/octocat/Hello-World.git", "main", "123", null, null, List.of());
+        ObjectMapper mapper = new ObjectMapper()
+          .findAndRegisterModules()
+          .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+          .enable(INCLUDE_SOURCE_IN_LOCATION);
+        String json = mapper.writeValueAsString(gitProvenance);
+        GitProvenance read = mapper.readValue(json, GitProvenance.class);
+        assertThat(read).isEqualTo(gitProvenance);
     }
 
     void runCommand(Path workingDir, String command) {

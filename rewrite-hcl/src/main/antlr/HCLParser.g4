@@ -52,6 +52,7 @@ exprTerm
     | functionCall                  #FunctionCallExpression
     | exprTerm index                #IndexAccessExpression
     | exprTerm getAttr              #AttributeAccessExpression
+    | exprTerm legacyIndexAttr      #LegacyIndexAttributeExpression
     | exprTerm splat                #SplatExpression
     | LPAREN expression RPAREN      #ParentheticalExpression
     ;
@@ -86,7 +87,7 @@ object
     ;
 
 objectelem
-    : (Identifier | LPAREN Identifier RPAREN | QUOTE quotedTemplatePart* QUOTE) (ASSIGN | COLON) expression COMMA?
+    : (Identifier | LPAREN Identifier RPAREN | QUOTE quotedTemplatePart* QUOTE | expression) (ASSIGN | COLON) expression COMMA?
     ;
 
 // For Expressions
@@ -142,6 +143,14 @@ index
 
 getAttr
     : DOT Identifier
+    ;
+
+// Legacy Index Access Operator
+// https://github.com/hashicorp/hcl/blob/923b06b5d6adf61a647101c605f7463a1bd56cbf/hclsyntax/spec.md#L547
+// Interestingly not mentioned in hcl2 syntax specification anymore
+
+legacyIndexAttr
+    : DOT NumericLiteral
     ;
 
 // Splat Operators

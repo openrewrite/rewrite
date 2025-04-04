@@ -15,13 +15,10 @@
  */
 package org.openrewrite.semver;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
-import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.util.regex.Matcher;
-
-import static java.lang.Integer.parseInt;
 
 public class LatestRelease implements VersionComparator {
     @Nullable
@@ -31,26 +28,13 @@ public class LatestRelease implements VersionComparator {
         this.metadataPattern = metadataPattern;
     }
 
+    protected @Nullable String getMetadataPattern() {
+        return metadataPattern;
+    }
+
     @Override
     public boolean isValid(@Nullable String currentVersion, String version) {
-        Matcher matcher = VersionComparator.RELEASE_PATTERN.matcher(version);
-        if (!matcher.matches() || PRE_RELEASE_ENDING.matcher(version).find()) {
-            return false;
-        }
-        boolean requireMeta = !StringUtils.isNullOrEmpty(metadataPattern);
-        String versionMeta = matcher.group(6);
-        if (requireMeta) {
-            return versionMeta != null && versionMeta.matches(metadataPattern);
-        } else if (versionMeta == null) {
-            return true;
-        }
-        String lowercaseVersionMeta = versionMeta.toLowerCase();
-        for (String suffix : RELEASE_SUFFIXES) {
-            if (suffix.equals(lowercaseVersionMeta)) {
-                return true;
-            }
-        }
-        return false;
+        return VersionComparator.checkVersion(version, metadataPattern, true);
     }
 
     static String normalizeVersion(String version) {
@@ -100,8 +84,16 @@ public class LatestRelease implements VersionComparator {
     @SuppressWarnings("ResultOfMethodCallIgnored")
     @Override
     public int compare(@Nullable String currentVersion, String v1, String v2) {
-        if (v1.equals(v2)) {
+        if (v1.equalsIgnoreCase(v2)) {
             return 0;
+        } else if (v1.equalsIgnoreCase("LATEST")) {
+            return 1;
+        } else if (v2.equalsIgnoreCase("LATEST")) {
+            return -1;
+        } else if (v1.equalsIgnoreCase("RELEASE")) {
+            return 1;
+        } else if (v2.equalsIgnoreCase("RELEASE")) {
+            return -1;
         }
 
         String nv1 = normalizeVersion(v1);
@@ -127,16 +119,15 @@ public class LatestRelease implements VersionComparator {
         Matcher v1Gav = VersionComparator.RELEASE_PATTERN.matcher(nv1);
         Matcher v2Gav = VersionComparator.RELEASE_PATTERN.matcher(nv2);
 
-        v1Gav.matches();
-        v2Gav.matches();
+        v1Gav.find();
+        v2Gav.find();
 
         // Remove the metadata pattern from the normalized versions, this only impacts the comparison when all version
         // parts are the same:
         //
         // HyphenRange [25-28] should include "28-jre" and "28-android" as possible candidates.
-        String normalized1 = metadataPattern == null ? nv1 : nv1.replace(metadataPattern, "");
-        String normalized2 = metadataPattern == null ? nv2 : nv1.replace(metadataPattern, "");
-
+        String normalized1 = metadataPattern == null ? nv1 : nv1.replaceAll(metadataPattern, "");
+        String normalized2 = metadataPattern == null ? nv2 : nv2.replaceAll(metadataPattern, "");
         try {
             for (int i = 1; i <= Math.max(vp1, vp2); i++) {
                 String v1Part = v1Gav.group(i);
@@ -147,9 +138,10 @@ public class LatestRelease implements VersionComparator {
                     return 1;
                 }
 
-                int diff = parseInt(v1Part) - parseInt(v2Part);
+                long diff = Long.parseLong(v1Part) - Long.parseLong(v2Part);
                 if (diff != 0) {
-                    return diff;
+                    // squish the long to fit into an int; all that matters is whether the return value is pos/neg/zero
+                    return (int) (diff / Math.abs(diff));
                 }
             }
         } catch (IllegalStateException exception) {
@@ -161,7 +153,7 @@ public class LatestRelease implements VersionComparator {
     }
 
     public static Validated<LatestRelease> buildLatestRelease(String toVersion, @Nullable String metadataPattern) {
-        return "latest.release".equalsIgnoreCase(toVersion) ?
+        return "latest.release".equalsIgnoreCase(toVersion) || "latest.major".equalsIgnoreCase(toVersion) ?
                 Validated.valid("latestRelease", new LatestRelease(metadataPattern)) :
                 Validated.invalid("latestRelease", toVersion, "not latest release");
     }

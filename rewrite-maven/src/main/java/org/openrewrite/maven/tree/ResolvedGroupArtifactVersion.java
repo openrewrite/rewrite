@@ -18,7 +18,7 @@ package org.openrewrite.maven.tree;
 
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.io.Serializable;
 import java.util.Objects;
@@ -49,8 +49,12 @@ public class ResolvedGroupArtifactVersion implements Serializable {
         return new GroupArtifact(groupId, artifactId);
     }
 
+    public GroupArtifactVersion asGroupArtifactVersion() {
+        return new GroupArtifactVersion(groupId, artifactId, version);
+    }
+
     public ResolvedGroupArtifactVersion withGroupArtifact(GroupArtifact ga) {
-        if(Objects.equals(ga.getGroupId(), groupId) && Objects.equals(ga.getArtifactId(), artifactId)) {
+        if (Objects.equals(ga.getGroupId(), groupId) && Objects.equals(ga.getArtifactId(), artifactId)) {
             return this;
         }
         return new ResolvedGroupArtifactVersion(repository, ga.getGroupId(), ga.getArtifactId(), version, datedSnapshotVersion);

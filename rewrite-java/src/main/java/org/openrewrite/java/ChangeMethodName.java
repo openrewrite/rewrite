@@ -17,8 +17,8 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
@@ -28,7 +28,7 @@ import org.openrewrite.java.tree.*;
 public class ChangeMethodName extends Recipe {
 
     @Option(displayName = "Method pattern",
-            description = "A method pattern that is used to find matching method declarations/invocations.",
+            description = MethodMatcher.METHOD_PATTERN_DESCRIPTION,
             example = "org.mockito.Matchers anyVararg()")
     String methodPattern;
 
@@ -63,6 +63,11 @@ public class ChangeMethodName extends Recipe {
     @Override
     public String getDescription() {
         return "Rename a method.";
+    }
+
+    @Override
+    public Validated<Object> validate() {
+        return super.validate().and(MethodMatcher.validate(methodPattern));
     }
 
     @Override

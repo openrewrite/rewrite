@@ -16,11 +16,11 @@
 package org.openrewrite.java;
 
 import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -72,7 +72,7 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
           .afterRecipe(run -> run.getChangeset().getAllResults().forEach(r -> assertTypeAttribution((J) r.getAfter())));
     }
 
-    @SuppressWarnings({"PointlessBooleanExpression", "IfStatementWithIdenticalBranches", "ConstantValue"})
+    @SuppressWarnings({"PointlessBooleanExpression", "IfStatementWithIdenticalBranches"})
     @Test
     void replaceExpressionInNestedIfCondition() {
         rewriteRun(
@@ -480,7 +480,6 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
 
                     List<Expression> arguments = mi.getArguments();
                     mi = JavaTemplate.builder("#{any(java.lang.String)}.formatted(#{any()})")
-                      .contextSensitive()
                       .build()
                       .apply(
                         updateCursor(mi),
@@ -531,7 +530,7 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
 
     @SuppressWarnings("SuspiciousMethodCalls")
     static void assertTypeAttribution(J sf) {
-        List<FindMissingTypes.MissingTypeResult> missingTypes = FindMissingTypes.findMissingTypes(sf);
+        List<FindMissingTypes.MissingTypeResult> missingTypes = FindMissingTypes.findMissingTypes(sf, false);
         Map<J, Cursor> expectedMissing = new LinkedHashMap<>();
         Map<J, Cursor> actualMissing = new LinkedHashMap<>();
         new JavaIsoVisitor<Integer>() {

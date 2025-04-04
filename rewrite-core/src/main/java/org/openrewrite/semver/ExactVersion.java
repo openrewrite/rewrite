@@ -15,13 +15,15 @@
  */
 package org.openrewrite.semver;
 
+import lombok.Getter;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Validated;
-import org.openrewrite.internal.lang.Nullable;
 
 /**
  * Version selector for matching exact version: either explicitly prefixed with "=",
  * or implicit default when no other version selectors match.
  */
+@Getter
 public class ExactVersion extends LatestRelease {
     String version;
 
@@ -45,16 +47,16 @@ public class ExactVersion extends LatestRelease {
         }
         String versionOnly;
         int hyphenIndex = pattern.indexOf('-');
-        if(hyphenIndex == -1) {
+        if (hyphenIndex == -1) {
             versionOnly = pattern;
         } else {
             versionOnly = pattern.substring(0, hyphenIndex);
         }
-        if(versionOnly.startsWith("latest") ||
-                versionOnly.contains("x") ||
-                versionOnly.contains("^") ||
-                versionOnly.contains("~") ||
-                versionOnly.contains(" ")) {
+        if (versionOnly.startsWith("latest") ||
+            versionOnly.contains("x") ||
+            versionOnly.contains("^") ||
+            versionOnly.contains("~") ||
+            versionOnly.contains(" ")) {
             return Validated.invalid("exactVersion", pattern, "not an exact version number");
         }
         return Validated.valid("exactVersion", new ExactVersion(pattern));

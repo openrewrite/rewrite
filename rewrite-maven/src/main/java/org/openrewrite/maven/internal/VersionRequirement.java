@@ -21,7 +21,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.tree.TerminalNode;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.internal.grammar.VersionRangeLexer;
 import org.openrewrite.maven.internal.grammar.VersionRangeParser;
@@ -30,8 +30,6 @@ import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.Version;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.Iterator;
 import java.util.List;
@@ -41,7 +39,6 @@ import static java.util.stream.Collectors.toList;
 
 @RequiredArgsConstructor
 public class VersionRequirement {
-    private static final Logger logger = LoggerFactory.getLogger(VersionRequirement.class);
 
     @Nullable
     private final VersionRequirement nearer;
@@ -100,7 +97,7 @@ public class VersionRequirement {
                         CharStreams.fromString(requested))));
 
                 parser.removeErrorListeners();
-                parser.addErrorListener(new LoggingErrorListener());
+                parser.addErrorListener(new PrintingErrorListener());
 
                 return new VersionRangeParserBaseVisitor<VersionSpec>() {
                     @Override
@@ -230,16 +227,14 @@ public class VersionRequirement {
         }
     }
 
-    @Nullable
-    public String resolve(DownloadOperation<Iterable<String>> availableVersions) throws MavenDownloadingException {
+    public @Nullable String resolve(DownloadOperation<Iterable<String>> availableVersions) throws MavenDownloadingException {
         if (selected == null) {
             selected = cacheResolved(availableVersions);
         }
         return selected;
     }
 
-    @Nullable
-    private String cacheResolved(DownloadOperation<Iterable<String>> availableVersions) throws MavenDownloadingException {
+    private @Nullable String cacheResolved(DownloadOperation<Iterable<String>> availableVersions) throws MavenDownloadingException {
         String nearestSoftRequirement = null;
         VersionRequirement next = this;
         VersionRequirement nearestHardRequirement = null;
@@ -282,19 +277,18 @@ public class VersionRequirement {
         return latest.toString();
     }
 
-    @Nullable
-    public String resolve(GroupArtifact groupArtifact, MavenPomDownloader downloader, List<MavenRepository> repositories) throws MavenDownloadingException {
+    public @Nullable String resolve(GroupArtifact groupArtifact, MavenPomDownloader downloader, List<MavenRepository> repositories) throws MavenDownloadingException {
         return resolve(() -> {
             MavenMetadata metadata = downloader.downloadMetadata(groupArtifact, null, repositories);
             return metadata.getVersioning().getVersions();
         });
     }
 
-    private static class LoggingErrorListener extends BaseErrorListener {
+    private static class PrintingErrorListener extends BaseErrorListener {
         @Override
         public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol,
                                 int line, int charPositionInLine, String msg, RecognitionException e) {
-            logger.warn("Syntax error at line {}:{} {}", line, charPositionInLine, msg);
+            System.out.printf("Syntax error at line %d:%d %s%n", line, charPositionInLine, msg);
         }
     }
 }

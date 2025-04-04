@@ -16,14 +16,21 @@
 package org.openrewrite.text;
 
 import lombok.*;
+import lombok.experimental.NonFinal;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.RpcSendQueue;
 
+import java.lang.ref.SoftReference;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Predicate;
 
@@ -35,8 +42,8 @@ import static org.openrewrite.internal.ListUtils.nullIfEmpty;
  */
 @Value
 @Builder
-@AllArgsConstructor
-public class PlainText implements SourceFile, Tree {
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+public class PlainText implements SourceFileWithReferences, Tree, RpcCodec<PlainText> {
 
     @Builder.Default
     @With
@@ -79,15 +86,40 @@ public class PlainText implements SourceFile, Tree {
     @Builder.Default
     String text = "";
 
+    @Nullable
+    List<Snippet> snippets;
+
+    @Nullable
+    @NonFinal
+    @ToString.Exclude
+    transient SoftReference<References> references;
+
+    public PlainText(UUID id, Path sourcePath, Markers markers, @Nullable String charsetName, boolean charsetBomMarked,
+                     @Nullable FileAttributes fileAttributes, @Nullable Checksum checksum, String text, @Nullable List<Snippet> snippets) {
+        this.id = id;
+        this.sourcePath = sourcePath;
+        this.markers = markers;
+        this.charsetName = charsetName;
+        this.charsetBomMarked = charsetBomMarked;
+        this.fileAttributes = fileAttributes;
+        this.checksum = checksum;
+        this.text = text;
+        this.snippets = snippets;
+    }
+
+    @Override
+    public References getReferences() {
+        this.references = build(this.references);
+        return Objects.requireNonNull(this.references.get());
+    }
+
     public PlainText withText(String text) {
         if (!text.equals(this.text)) {
             return new PlainText(this.id, this.sourcePath, this.markers, this.charsetName, this.charsetBomMarked,
-                    this.fileAttributes, this.checksum, text, this.snippets);
+                    this.fileAttributes, this.checksum, text, this.snippets, this.references);
         }
         return this;
     }
-
-    List<Snippet> snippets;
 
     @Override
     public <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
@@ -123,7 +155,40 @@ public class PlainText implements SourceFile, Tree {
         if (this.snippets == snippets) {
             return this;
         }
-        return new PlainText(id, sourcePath, markers, charsetName, charsetBomMarked, fileAttributes, checksum, text, snippets);
+        return new PlainText(id, sourcePath, markers, charsetName, charsetBomMarked, fileAttributes, checksum, text, snippets, null);
+    }
+
+    @Override
+    public void rpcSend(PlainText after, RpcSendQueue q) {
+        q.getAndSend(after, Tree::getId);
+        q.sendMarkers(after, Tree::getMarkers);
+        q.getAndSend(after, (PlainText d) -> d.getSourcePath().toString());
+        q.getAndSend(after, (PlainText d) -> d.getCharset().name());
+        q.getAndSend(after, PlainText::isCharsetBomMarked);
+        q.getAndSend(after, PlainText::getChecksum);
+        q.getAndSend(after, PlainText::getFileAttributes);
+        q.getAndSend(after, PlainText::getText);
+        q.getAndSendList(after, PlainText::getSnippets, Tree::getId, snippet -> {
+            q.getAndSend(snippet, Tree::getId);
+            q.sendMarkers(snippet, Tree::getMarkers);
+            q.getAndSend(snippet, Snippet::getText);
+        });
+    }
+
+    @Override
+    public PlainText rpcReceive(PlainText t, RpcReceiveQueue q) {
+        return t.withId(UUID.fromString(q.receiveAndGet(t.getId(), UUID::toString)))
+                .withMarkers(q.receiveMarkers(t.getMarkers()))
+                .withSourcePath(Paths.get(q.receiveAndGet(t.getSourcePath(), Path::toString)))
+                .withCharset(Charset.forName(q.receiveAndGet(t.getCharset(), Charset::name)))
+                .withCharsetBomMarked(q.receive(t.isCharsetBomMarked()))
+                .withChecksum(q.receive(t.getChecksum()))
+                .<PlainText>withFileAttributes(q.receive(t.getFileAttributes()))
+                .withText(q.receiveAndGet(t.getText(), String::toString))
+                .withSnippets(q.receiveList(t.getSnippets(), s -> s
+                        .withId(UUID.fromString(q.receiveAndGet(s.getId(), UUID::toString)))
+                        .withMarkers(q.receiveMarkers(s.getMarkers()))
+                        .withText(q.receiveAndGet(s.getText(), String::toString))));
     }
 
     @Value

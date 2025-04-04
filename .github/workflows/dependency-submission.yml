@@ -15,8 +15,12 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
       - name: Generate and submit dependency graph
-        uses: gradle/actions/dependency-submission@v3
+        uses: gradle/actions/dependency-submission@v4
         env:
           # Exclude all dependencies that originate solely in the 'buildSrc' project
           DEPENDENCY_GRAPH_EXCLUDE_PROJECTS: ':buildSrc'

@@ -166,24 +166,33 @@ class JsonPathMatcherTest {
     }
 
     @Test
-    void wildcardAtRoot() {
+    void booleanLiteralMatching() {
         assertMatched(
-          "$.*",
-          simple,
+          "$[?(@.bool == true)]",
+          List.of(
+            //language=json5
+            """
+              {
+                "bool": true
+              }
+              """
+          ),
           List.of(
             """
-                  "root": {
-                    "literal": "$.root.literal",
-                    "object": {
-                      "literal": "$.root.object.literal",
-                      "list": [{
-                        "literal": "$.root.object.list[0]"
-                      }]
-                    },
-                    "list": [{
-                      "literal": "$.root.list[0]"
-                    }]
-                  }
+              {
+                "bool": true
+              }
+              """
+          )
+        );
+        assertNotMatched(
+          "$[?(@.bool == true)]",
+          List.of(
+            //language=json5
+            """
+              {
+                "bool": false
+              }
               """
           )
         );

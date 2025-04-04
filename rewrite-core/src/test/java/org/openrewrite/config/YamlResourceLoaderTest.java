@@ -346,7 +346,7 @@ class YamlResourceLoaderTest implements RewriteTest {
           },
           recipe -> {
           },
-          validated -> invalidRecipes.add(validated));
+          invalidRecipes::add);
 
         assertEquals(1, invalidRecipes.size());
     }
@@ -360,7 +360,7 @@ class YamlResourceLoaderTest implements RewriteTest {
 
     private static class RecipeWithBadStaticInitializer extends Recipe {
         // Explicitly fail static initialization
-        static int val = 1 / 0;
+        static final int val = 1 / 0;
 
         @Override
         public String getDisplayName() {

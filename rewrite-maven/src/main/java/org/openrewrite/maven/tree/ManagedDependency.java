@@ -20,7 +20,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
@@ -47,6 +47,7 @@ public interface ManagedDependency {
         @Nullable
         String classifier;
 
+        @Nullable
         List<GroupArtifact> exclusions;
 
         @Override
@@ -59,9 +60,8 @@ public interface ManagedDependency {
             return gav.getArtifactId();
         }
 
-        @Nullable
         @Override
-        public String getVersion() {
+        public @Nullable String getVersion() {
             return gav.getVersion();
         }
 
@@ -87,9 +87,8 @@ public interface ManagedDependency {
             return gav.getArtifactId();
         }
 
-        @Nullable
         @Override
-        public String getVersion() {
+        public @Nullable String getVersion() {
             return gav.getVersion();
         }
 

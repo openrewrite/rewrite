@@ -96,6 +96,9 @@ public enum NameCaseConvention {
     }
 
     public static boolean matches(NameCaseConvention convention, String str) {
+        if (str.isEmpty()) {
+            return false;
+        }
         switch (convention) {
             case LOWER_CAMEL:
                 if (!Character.isLowerCase(str.charAt(0)) && str.charAt(0) != '$') {

@@ -15,14 +15,13 @@
  */
 package org.openrewrite;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -93,8 +92,10 @@ public class PathUtils {
                 }
             }
             return false;
-        } else { // If eitherOrPatterns is empty and excludedPatterns is not
-            if (!matchesGlob(convertNegationToWildcard(globPattern), relativePath)) {
+        } else {
+            // When only a segment of a path is negated the other segments must still match
+            String wildcard = convertNegationToWildcard(globPattern);
+            if (!matchesGlob(wildcard, relativePath)) {
                 return false;
             }
             for (String excludedPattern : excludedPatterns) {
@@ -152,8 +153,8 @@ public class PathUtils {
             if (!StringUtils.matchesGlob(pathTokens[pathIdxEnd], pattTokens[pattIdxEnd])) {
                 return false;
             }
-            if (pattIdxEnd == (pattTokens.length - 1)
-                && (isFileSeparator(pattern.charAt(pattern.length() - 1)) ^ isFileSeparator(path.charAt(path.length() - 1)))) {
+            if (pattIdxEnd == (pattTokens.length - 1) &&
+                (isFileSeparator(pattern.charAt(pattern.length() - 1)) ^ isFileSeparator(path.charAt(path.length() - 1)))) {
                 return false;
             }
             pattIdxEnd--;
@@ -215,9 +216,9 @@ public class PathUtils {
 
     public static String convertNegationToWildcard(String globPattern) {
         // Regular expression to match !(...)
-        String negationPattern = "\\!\\((.*?)\\)";
+        String negationPattern = "!\\((.*?)\\)";
         // Replace all negation patterns with *
-        return globPattern.replaceAll(negationPattern, "*");
+        return globPattern.replaceAll(negationPattern, "**");
     }
 
     public static List<String> getExcludedPatterns(String globPattern) {
@@ -228,7 +229,7 @@ public class PathUtils {
         List<String> excludedPatterns = new ArrayList<>(3);
 
         // Regular expression to match !(...)
-        String negationPattern = "\\!\\((.*?)\\)";
+        String negationPattern = "!\\((.*?)\\)";
         Pattern pattern = Pattern.compile(negationPattern);
         Matcher matcher = pattern.matcher(globPattern);
 
@@ -252,14 +253,14 @@ public class PathUtils {
         List<String> eitherOrPatterns = new ArrayList<>(3);
 
         // Regular expression to match {...}
-        String eitherOrPattern = "\\{(.*?)\\}";
+        String eitherOrPattern = "\\{(.*?)}";
         Pattern pattern = Pattern.compile(eitherOrPattern);
         Matcher matcher = pattern.matcher(globPattern);
 
         // Find all possible patterns and generate patterns
         while (matcher.find()) {
             String eitherOrContent = matcher.group(1);
-            String[] options = eitherOrContent.split("\\,");
+            String[] options = eitherOrContent.split(",");
             for (String option : options) {
                 eitherOrPatterns.add(globPattern.replace(matcher.group(), option));
             }
@@ -294,8 +295,8 @@ public class PathUtils {
 
     @SuppressWarnings("SameParameterValue")
     private static boolean isFileSeparator(boolean strict, char ch) {
-        return strict
-                ? ch == File.separatorChar
-                : ch == UNIX_SEPARATOR || ch == WINDOWS_SEPARATOR;
+        return strict ?
+                ch == File.separatorChar :
+                ch == UNIX_SEPARATOR || ch == WINDOWS_SEPARATOR;
     }
 }

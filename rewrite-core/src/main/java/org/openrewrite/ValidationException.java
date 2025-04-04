@@ -15,7 +15,7 @@
  */
 package org.openrewrite;
 
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
 import java.util.stream.Collectors;

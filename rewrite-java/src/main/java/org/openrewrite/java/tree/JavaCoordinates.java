@@ -18,7 +18,7 @@ package org.openrewrite.java.tree;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.experimental.FieldDefaults;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.template.Coordinates;
 
 import java.util.Comparator;
@@ -34,7 +34,7 @@ public class JavaCoordinates implements Coordinates {
     Comparator<? extends J> comparator;
 
     public boolean isReplacement() {
-        return Mode.REPLACEMENT.equals(mode);
+        return Mode.REPLACEMENT == mode;
     }
 
     /**
@@ -52,8 +52,7 @@ public class JavaCoordinates implements Coordinates {
         REPLACEMENT
     }
 
-    @Nullable
-    public <J2 extends J> Comparator<J2> getComparator() {
+    public <J2 extends J> @Nullable Comparator<J2> getComparator() {
         //noinspection unchecked
         return (Comparator<J2>) comparator;
     }

@@ -18,6 +18,7 @@ rewrite-test
 # language parser.
 
 rewrite-java
+rewrite-java-lombok
 rewrite-java-test
 rewrite-java-tck
 rewrite-java-17
@@ -29,9 +30,11 @@ rewrite-gradle
 rewrite-groovy
 rewrite-hcl
 rewrite-json
+rewrite-kotlin
 rewrite-maven
 rewrite-properties
 rewrite-protobuf
+rewrite-toml
 rewrite-xml
 rewrite-yaml
 

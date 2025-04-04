@@ -17,8 +17,8 @@ package org.openrewrite.xml;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.tree.Xml;
 
 @Value
@@ -55,7 +55,7 @@ public class RemoveXmlTag extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (xPathMatcher.matches(getCursor())) {
-                    doAfterVisit(new RemoveContentVisitor<>(tag, true));
+                    doAfterVisit(new RemoveContentVisitor<>(tag, true, true));
                 }
                 return super.visitTag(tag, ctx);
             }

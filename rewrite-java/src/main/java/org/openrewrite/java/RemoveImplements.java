@@ -17,8 +17,8 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.service.AnnotationService;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -45,7 +45,7 @@ public class RemoveImplements extends Recipe {
                "Removes `@Overrides` annotations from methods which no longer override anything.";
     }
 
-    @Option(displayName = "Interface Type",
+    @Option(displayName = "Interface type",
             description = "The fully qualified name of the interface to remove.",
             example = "java.io.Serializable")
     String interfaceType;

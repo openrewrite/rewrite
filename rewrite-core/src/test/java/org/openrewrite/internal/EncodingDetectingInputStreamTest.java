@@ -33,8 +33,45 @@ class EncodingDetectingInputStreamTest {
 
     @Test
     void detectUTF8Bom() throws IOException {
-        String bom = "\uFEFF";
-        try (EncodingDetectingInputStream is = read(bom, UTF_8)) {
+        String str = "\uFEFF";
+        try (EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(str.getBytes(UTF_8)))) {
+            assertThat(is.readFully()).isEqualTo("");
+            assertThat(is.isCharsetBomMarked()).isTrue();
+        }
+    }
+
+    @Test
+    void emptyUtf8() throws IOException {
+        String str = "";
+        try (EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(str.getBytes(UTF_8)))) {
+            assertThat(is.readFully()).isEqualTo(str);
+            assertThat(is.isCharsetBomMarked()).isFalse();
+        }
+    }
+
+    @Test
+    void singleCharUtf8() throws IOException {
+        String str = "1";
+        try (EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(str.getBytes(UTF_8)))) {
+            assertThat(is.readFully()).isEqualTo(str);
+            assertThat(is.isCharsetBomMarked()).isFalse();
+        }
+    }
+
+    @Test
+    void skipUTF8Bom() throws IOException {
+        String bom = "\uFEFFhello";
+        try (EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(bom.getBytes(UTF_8)))) {
+            assertThat(is.readFully()).isEqualTo("hello");
+            assertThat(is.isCharsetBomMarked()).isTrue();
+        }
+    }
+
+    @Test
+    void skipUTF8BomKnownEncoding() throws IOException {
+        String bom = "\uFEFFhello";
+        try (EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(bom.getBytes(UTF_8)), UTF_8)) {
+            assertThat(is.readFully()).isEqualTo("hello");
             assertThat(is.isCharsetBomMarked()).isTrue();
         }
     }

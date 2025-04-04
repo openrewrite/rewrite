@@ -17,7 +17,7 @@ package org.openrewrite.maven.tree;
 
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.internal.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Objects;
@@ -27,6 +27,7 @@ import java.util.Objects;
 public class ResolvedManagedDependency {
     GroupArtifactVersion gav;
 
+    @Nullable
     Scope scope;
 
     @Nullable
@@ -35,6 +36,7 @@ public class ResolvedManagedDependency {
     @Nullable
     String classifier;
 
+    @Nullable
     List<GroupArtifact> exclusions;
 
     ManagedDependency requested;
@@ -64,8 +66,7 @@ public class ResolvedManagedDependency {
      *
      * @return the version of the dependency
      */
-    @Nullable
-    public String getVersion() {
+    public @Nullable String getVersion() {
         return gav.getVersion();
     }
 

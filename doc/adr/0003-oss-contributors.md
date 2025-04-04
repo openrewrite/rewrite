@@ -14,7 +14,7 @@ Provide guidelines for open source contributors to Rewrite projects.
 
 ### Backlog project
 
-OSS maintainers should regularly assign new issues to the [Backlog](https://github.com/orgs/openrewrite/projects/1) project. By default, issues begin in the icebox and are pulled forward to the backlog when work is anticipated soon.
+OSS maintainers should regularly assign new issues to the [Backlog](https://github.com/orgs/openrewrite/projects/4/views/10) project. By default, issues begin in the icebox and are pulled forward to the backlog when work is anticipated soon.
 
 ### Milestones
 

@@ -54,4 +54,18 @@ class HclCollectionValueTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void emptyMapInTwoLines() {
+        rewriteRun(
+          hcl(
+            """
+              locals {
+                known_weird_cases = {
+                }
+              }
+              """
+          )
+        );
+    }
 }
