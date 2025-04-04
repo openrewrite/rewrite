@@ -2095,12 +2095,14 @@ class ChangeTypeTest implements RewriteTest {
             """
               class Test {
                   String ref = "test.type.A";
+                  String refNested = "test.test.type.A";
                   String extendedRef = "there is a type reference here -> test.type.A <- hopefully it only replaces that";
               }
               """,
             """
               class Test {
                   String ref = "test.type.B";
+                  String refNested = "test.test.type.A";
                   String extendedRef = "there is a type reference here -> test.type.B <- hopefully it only replaces that";
               }
               """
