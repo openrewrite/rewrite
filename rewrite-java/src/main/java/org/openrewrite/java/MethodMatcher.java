@@ -29,7 +29,10 @@ import org.openrewrite.java.internal.grammar.MethodSignatureParser;
 import org.openrewrite.java.internal.grammar.MethodSignatureParserBaseVisitor;
 import org.openrewrite.java.tree.*;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.StringJoiner;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
