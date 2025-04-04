@@ -71,18 +71,18 @@ class MoveLambdaArgumentParenthesesTest implements RewriteTest {
     @Test
     void removeParenthesesFromRun() {
         rewriteRun(
-            kotlin(
+          kotlin(
+          """
+            fun method() {
+                run({ print("Hello world") })
+            }
+            """,
+          """
+            fun method() {
+                run { print("Hello world") }
+            }
             """
-              fun method() {
-                  run({ print("Hello world") })
-              }
-              """,
-            """
-              fun method() {
-                  run { print("Hello world") }
-              }
-              """
-            )
+          )
         );
     }
 
