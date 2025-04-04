@@ -113,7 +113,7 @@ public class RecipeIntrospectionUtils {
 
     private static <V> V construct(Class<?> clazz, @Nullable Map<String, Object> args) {
         Constructor<?> constructor = getConstructor(clazz, args);
-        @Nullable Object[] constructorArgs = new Object[constructor.getParameterCount()];
+        Object @Nullable[] constructorArgs = new Object[constructor.getParameterCount()];
         for (int i = 0; i < constructor.getParameters().length; i++) {
             java.lang.reflect.Parameter param = constructor.getParameters()[i];
             if (args != null && args.containsKey(param.getName())) {
@@ -188,15 +188,33 @@ public class RecipeIntrospectionUtils {
     }
 
     private static Class<?> getWrapperType(Class<?> primitiveType) {
-        if (primitiveType == int.class) return Integer.class;
-        if (primitiveType == boolean.class) return Boolean.class;
-        if (primitiveType == byte.class) return Byte.class;
-        if (primitiveType == char.class) return Character.class;
-        if (primitiveType == double.class) return Double.class;
-        if (primitiveType == float.class) return Float.class;
-        if (primitiveType == long.class) return Long.class;
-        if (primitiveType == short.class) return Short.class;
-        if (primitiveType == void.class) return Void.class;
+        if (primitiveType == int.class) {
+            return Integer.class;
+        }
+        if (primitiveType == boolean.class) {
+            return Boolean.class;
+        }
+        if (primitiveType == byte.class) {
+            return Byte.class;
+        }
+        if (primitiveType == char.class) {
+            return Character.class;
+        }
+        if (primitiveType == double.class) {
+            return Double.class;
+        }
+        if (primitiveType == float.class) {
+            return Float.class;
+        }
+        if (primitiveType == long.class) {
+            return Long.class;
+        }
+        if (primitiveType == short.class) {
+            return Short.class;
+        }
+        if (primitiveType == void.class) {
+            return Void.class;
+        }
         return primitiveType;
     }
 
