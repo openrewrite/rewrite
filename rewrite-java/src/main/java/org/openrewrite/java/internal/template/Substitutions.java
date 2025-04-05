@@ -180,26 +180,18 @@ public class Substitutions {
     }
 
     private String getTypeName(@Nullable JavaType type) {
-        return getTypeName0(type, 0);
-    }
-
-    private String getTypeName0(@Nullable JavaType type, int level) {
         if (type == null) {
             return "java.lang.Object";
         } else if (type instanceof JavaType.GenericTypeVariable) {
-            JavaType.GenericTypeVariable genericTypeVariable = (JavaType.GenericTypeVariable) type;
-            if (level == 0 && genericTypeVariable.getName().equals("?")) {
+            JavaType.GenericTypeVariable genericType = (JavaType.GenericTypeVariable) type;
+            if (!genericType.getName().equals("?")) {
+                return genericType.getName();
+            } else if (genericType.getVariance() != JavaType.GenericTypeVariable.Variance.COVARIANT || genericType.getBounds().size() != 1) {
                 // wildcards cannot be used as type parameters on method invocations as in `foo.<?> bar()`
                 return "java.lang.Object";
+            } else {
+                return TypeUtils.toString(genericType.getBounds().get(0));
             }
-            return genericTypeVariable.getName();
-        } else if (type instanceof JavaType.Parameterized) {
-            String result = getTypeName0(((JavaType.Parameterized) type).getType(), level++);
-            StringJoiner joiner = new StringJoiner(", ", "<", ">");
-            for (JavaType t : ((JavaType.Parameterized) type).getTypeParameters()) {
-                joiner.add(getTypeName0(t, level++));
-            }
-            return result + joiner;
         }
         return TypeUtils.toString(type).replace("$", ".");
     }
@@ -233,12 +225,10 @@ public class Substitutions {
     }
 
     private static String typeHintFor(@Nullable JavaType t) {
-        if (t instanceof JavaType.Primitive) {
-            return ((JavaType.Primitive) t).getKeyword();
-        } else if (t instanceof JavaType.FullyQualified) {
-            return ((JavaType.FullyQualified) t).getFullyQualifiedName();
+        if (t == null || t instanceof JavaType.GenericTypeVariable) {
+            return "";
         }
-        return "";
+        return TypeUtils.toString(t);
     }
 
     public Collection<JavaType.GenericTypeVariable> getTypeVariablesReferencedByParameters() {
@@ -263,7 +253,12 @@ public class Substitutions {
 
                     @Override
                     public JavaType visitGenericTypeVariable(JavaType.GenericTypeVariable generic, Integer p) {
-                        return typeVariables.add(generic) ? super.visitGenericTypeVariable(generic, p) : generic;
+                        if (typeVariables.contains(generic)) {
+                            return generic;
+                        } else if (!generic.getName().equals("?")) {
+                            typeVariables.add(generic);
+                        }
+                        return super.visitGenericTypeVariable(generic, p);
                     }
 
                     @Override

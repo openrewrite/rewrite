@@ -703,4 +703,74 @@ class TypeUtilsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void generatesValidToString() {
+        rewriteRun(
+          java(
+            """
+              import java.io.Serializable;
+              import java.util.Optional;
+              
+              class Test<A extends B, B extends Number, C extends Comparable<? super C> & Serializable> {
+                  A a;
+                  B b;
+                  C c;
+                  Optional<A> oa;
+                  Optional<B> ob;
+                  Optional<C> oc;
+                  Optional<?> ow;
+                  Optional<? extends A> oea;
+                  Optional<? extends B> oeb;
+                  Optional<? extends C> oec;
+                  Optional<? super A> osa;
+                  Optional<? super B> osb;
+                  Optional<? super C> osc;
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                @Override
+                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Object o) {
+                    JavaType variableType = variable.getVariableType().getType();
+                    switch (variable.getSimpleName()) {
+                        case "a" -> assertThat(variableType).satisfies(
+                          hasToString("A"),
+                          hasGenericString("A extends B"));
+                        case "b" -> assertThat(variableType).satisfies(
+                          hasToString("B"),
+                          hasGenericString("B extends java.lang.Number"));
+                        case "c" -> assertThat(variableType).satisfies(
+                          hasToString("C"),
+                          hasGenericString("C extends java.lang.Comparable<? super C> & java.io.Serializable"));
+                        case "oa" -> assertThat(variableType).satisfies(hasToString("java.util.Optional<A>"));
+                        case "ob" -> assertThat(variableType).satisfies(hasToString("java.util.Optional<B>"));
+                        case "oc" -> assertThat(variableType).satisfies(hasToString("java.util.Optional<C>"));
+                        case "ow" -> assertThat(variableType).satisfies(hasToString("java.util.Optional<?>"));
+                        case "oea" -> assertThat(variableType).satisfies(hasToString("java.util.Optional<? extends A>"));
+                        case "oeb" -> assertThat(variableType).satisfies(hasToString("java.util.Optional<? extends B>"));
+                        case "oec" -> assertThat(variableType).satisfies(hasToString("java.util.Optional<? extends C>"));
+                        case "osa" -> assertThat(variableType).satisfies(hasToString("java.util.Optional<? super A>"));
+                        case "osb" -> assertThat(variableType).satisfies(hasToString("java.util.Optional<? super B>"));
+                        case "osc" -> assertThat(variableType).satisfies(hasToString("java.util.Optional<? super C>"));
+                    }
+                    return variable;
+                }
+
+                private Consumer<JavaType> hasToString(String value) {
+                    return type -> {
+                        assertThat(type).matches(TypeUtils::isWellFormedType);
+                        assertThat(TypeUtils.toString(type)).isEqualTo(value);
+                    };
+                }
+
+                private Consumer<JavaType> hasGenericString(String value) {
+                    return type -> {
+                        assertThat(type).matches(TypeUtils::isWellFormedType);
+                        assertThat(TypeUtils.toGenericTypeString((JavaType.GenericTypeVariable) type)).isEqualTo(value);
+                    };
+                }
+            }.visit(cu, new InMemoryExecutionContext()))
+          )
+        );
+    }
 }

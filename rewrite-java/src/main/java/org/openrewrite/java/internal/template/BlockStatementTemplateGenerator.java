@@ -204,7 +204,7 @@ public class BlockStatementTemplateGenerator {
     @SuppressWarnings("DataFlowIssue")
     protected void contextFreeTemplate(Cursor cursor, J j, Collection<JavaType.GenericTypeVariable> typeVariables, StringBuilder before, StringBuilder after) {
         String classDeclaration = typeVariables.isEmpty() ? "Template" :
-                "Template<" + typeVariables.stream().map(TypeUtils::toString).collect(Collectors.joining(", ")) + ">";
+                "Template<" + typeVariables.stream().map(TypeUtils::toGenericTypeString).collect(Collectors.joining(", ")) + ">";
         if (j instanceof J.Lambda) {
             throw new IllegalArgumentException(
                     "Templating a lambda requires a cursor so that it can be properly parsed and type-attributed. " +
