@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.search.UsesType;
+import org.openrewrite.java.trait.Traits;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
@@ -30,6 +31,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
 
@@ -53,6 +55,12 @@ public class ChangeType extends Recipe {
             required = false)
     @Nullable
     Boolean ignoreDefinition;
+
+    @Option(displayName = "Apply to string literal",
+            description = "When set to `true`, String literal will also be taken into account.",
+            required = false)
+    @Nullable
+    Boolean visitStringLiterals;
 
     @Override
     public String getDisplayName() {
@@ -97,6 +105,16 @@ public class ChangeType extends Recipe {
                     if (!Boolean.TRUE.equals(ignoreDefinition) && containsClassDefinition(cu, oldFullyQualifiedTypeName)) {
                         return SearchResult.found(cu);
                     }
+                    if (Boolean.TRUE.equals(visitStringLiterals)) {
+                        return Traits.literal().asVisitor(lit -> {
+                            stopAfterPreVisit();
+                            String string = lit.getString();
+                            if (string != null && string.contains(oldFullyQualifiedTypeName)) {
+                                return SearchResult.found(lit.getTree());
+                            }
+                            return lit.getTree();
+                        }).visit(cu, ctx, getCursor().getParentTreeCursor());
+                    }
                     return new UsesType<>(oldFullyQualifiedTypeName, true).visitNonNull(cu, ctx);
                 } else if (tree instanceof SourceFileWithReferences) {
                     SourceFileWithReferences cu = (SourceFileWithReferences) tree;
@@ -132,10 +150,9 @@ public class ChangeType extends Recipe {
         });
     }
 
-    private static class JavaChangeTypeVisitor extends JavaVisitor<ExecutionContext> {
+    private class JavaChangeTypeVisitor extends JavaVisitor<ExecutionContext> {
         private final JavaType.Class originalType;
         private final JavaType targetType;
-
 
         private J.@Nullable Identifier importAlias;
 
@@ -197,6 +214,19 @@ public class ChangeType extends Recipe {
         @Override
         public @Nullable JavaType visitType(@Nullable JavaType javaType, ExecutionContext ctx) {
             return updateType(javaType);
+        }
+
+        @Override
+        public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
+            J.Literal lit = literal;
+            boolean visitLiterals = Boolean.TRUE.equals(ChangeType.this.visitStringLiterals);
+            if (visitLiterals && literal.getType() == JavaType.Primitive.String) {
+                Pattern pat = Pattern.compile("(?:\\A|\\s)" + oldFullyQualifiedTypeName + "(?:|\\s)");
+                if (pat.matcher((String)lit.getValue()).find()) {
+                    lit = lit.withValue(((String)lit.getValue()).replace(oldFullyQualifiedTypeName, newFullyQualifiedTypeName)).withValueSource(lit.getValueSource().replace(oldFullyQualifiedTypeName, newFullyQualifiedTypeName));
+                }
+            }
+            return super.visitLiteral(lit, ctx);
         }
 
         private void addImport(JavaType.FullyQualified owningClass) {

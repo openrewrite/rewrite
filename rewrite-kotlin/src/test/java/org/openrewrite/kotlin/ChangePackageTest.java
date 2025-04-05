@@ -30,7 +30,7 @@ import static org.openrewrite.kotlin.Assertions.kotlin;
 class ChangePackageTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new ChangePackage("a.b", "x.y", false));
+        spec.recipe(new ChangePackage("a.b", "x.y", false, null));
     }
 
     @DocumentExample
@@ -97,7 +97,7 @@ class ChangePackageTest implements RewriteTest {
     @Test
     void renamePackageRecursive() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePackage("org.foo", "org.foo.test", true)),
+          spec -> spec.recipe(new ChangePackage("org.foo", "org.foo.test", true, null)),
           kotlin(
             """
               package org.foo.internal
@@ -118,7 +118,7 @@ class ChangePackageTest implements RewriteTest {
     @Test
     void changeDefinition() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePackage("org.foo", "x.y.z", false)),
+          spec -> spec.recipe(new ChangePackage("org.foo", "x.y.z", false, null)),
           kotlin(
             """
               package org.foo
@@ -139,7 +139,7 @@ class ChangePackageTest implements RewriteTest {
     @Test
     void changePackageNameWithInheritance() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePackage("org.a", "org.b", false)),
+          spec -> spec.recipe(new ChangePackage("org.a", "org.b", false, null)),
           kotlin(
             """
               package org.a

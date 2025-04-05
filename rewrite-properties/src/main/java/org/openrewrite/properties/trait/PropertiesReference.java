@@ -34,11 +34,6 @@ public class PropertiesReference implements Reference {
     Kind kind;
 
     @Override
-    public Kind getKind() {
-        return kind;
-    }
-
-    @Override
     public String getValue() {
         if (getTree() instanceof Properties.Entry) {
             return ((Properties.Entry) getTree()).getValue().getText();

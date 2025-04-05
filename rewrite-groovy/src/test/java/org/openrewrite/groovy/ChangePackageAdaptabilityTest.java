@@ -33,7 +33,7 @@ class ChangePackageAdaptabilityTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new ChangePackage("a.b", "x.y", false));
+        spec.recipe(new ChangePackage("a.b", "x.y", false, null));
     }
 
     @DocumentExample
@@ -103,7 +103,7 @@ class ChangePackageAdaptabilityTest implements RewriteTest {
     @Test
     void renamePackageRecursive() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePackage("org.foo", "org.foo.test", true)),
+          spec -> spec.recipe(new ChangePackage("org.foo", "org.foo.test", true, null)),
           groovy(
             """
               package org.foo.internal
@@ -127,7 +127,7 @@ class ChangePackageAdaptabilityTest implements RewriteTest {
     @Test
     void changeDefinition() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePackage("org.foo", "x.y.z", false)),
+          spec -> spec.recipe(new ChangePackage("org.foo", "x.y.z", false, null)),
           groovy(
             """
               package org.foo

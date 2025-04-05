@@ -618,7 +618,7 @@ class RemoveImportTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipes(
             removeImport("java.util.Collection"),
-            new ChangeType("java.util.List", "java.util.Collection", null)
+            new ChangeType("java.util.List", "java.util.Collection", null, null)
           ),
           java(
             """

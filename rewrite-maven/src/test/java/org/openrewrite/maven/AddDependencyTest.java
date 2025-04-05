@@ -1305,7 +1305,7 @@ class AddDependencyTest implements RewriteTest {
               new AddDependency("org.checkerframework", "checker-qual", "3.44.0",
                 null, null, null, "main.java.checkerframework..*", null, null, null, null,
                 true),
-              new ChangePackage("main.java.checkerframework", "org.checkerframework", true)
+              new ChangePackage("main.java.checkerframework", "org.checkerframework", true, null)
             ),
           mavenProject("parent",
             pomXml(
@@ -1407,7 +1407,7 @@ class AddDependencyTest implements RewriteTest {
               new AddDependency("org.checkerframework", "checker-qual", "3.44.0",
                 null, null, null, "main.java.checkerframework..*", null, null, null, null,
                 true),
-              new ChangePackage("main.java.checkerframework", "org.checkerframework", true)
+              new ChangePackage("main.java.checkerframework", "org.checkerframework", true, null)
             ),
           mavenProject("parent",
             pomXml(
