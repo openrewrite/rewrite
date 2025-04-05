@@ -142,9 +142,7 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
     }
 
     public @Nullable T visit(@Nullable Tree tree, P p, Cursor parent) {
-        assert !parent.isRoot() ||
-               !(parent.getValue() instanceof Tree) ||
-               !((Tree) parent.getValue()).isScope(tree) ||
+        assert !(parent.isRoot() || (parent.getValue() instanceof Tree && ((Tree) parent.getValue()).isScope(tree))) ||
                !(p instanceof ExecutionContext) ||
                !CursorValidatingExecutionContextView.view((ExecutionContext) p).getValidateCursorAcyclic() :
                 "The `parent` cursor must not point to the same `tree` as the tree to be visited. " +
