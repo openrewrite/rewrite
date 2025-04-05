@@ -70,6 +70,7 @@ public class DeclarativeRecipe extends Recipe {
 
     private final List<Recipe> uninitializedPreconditions = new ArrayList<>();
 
+    @Getter
     @Setter
     private List<Recipe> preconditions = new ArrayList<>();
 
