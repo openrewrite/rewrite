@@ -98,7 +98,7 @@ public class MavenSecuritySettings {
     }
 
     private static Path userSecuritySettingsPath() {
-        return Paths.get(System.getProperty("user.home")).resolve(".m2/settings-security.xml");
+        return MavenHomeDirectory.get().resolve("settings-security.xml");
     }
 
     private static Optional<Path> findMavenHomeSettings() {

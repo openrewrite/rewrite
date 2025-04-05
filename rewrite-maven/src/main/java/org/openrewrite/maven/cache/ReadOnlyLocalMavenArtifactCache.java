@@ -16,6 +16,7 @@
 package org.openrewrite.maven.cache;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.maven.MavenHomeDirectory;
 import org.openrewrite.maven.tree.ResolvedDependency;
 
 import java.io.InputStream;
@@ -29,8 +30,7 @@ public class ReadOnlyLocalMavenArtifactCache extends LocalMavenArtifactCache {
     }
 
     public static ReadOnlyLocalMavenArtifactCache mavenLocal() {
-        return new ReadOnlyLocalMavenArtifactCache(
-                Paths.get(System.getProperty("user.home"), ".m2", "repository"));
+        return new ReadOnlyLocalMavenArtifactCache(MavenHomeDirectory.getRepository());
     }
 
     @Override

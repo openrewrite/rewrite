@@ -24,10 +24,12 @@ import lombok.experimental.Accessors;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.maven.MavenHomeDirectory;
 
 import java.io.File;
 import java.io.Serializable;
 import java.net.URI;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 
@@ -40,7 +42,7 @@ import java.time.Duration;
 public class MavenRepository implements Serializable {
 
     public static final MavenRepository MAVEN_LOCAL_USER_NEUTRAL = new MavenRepository("local", new File("~/.m2/repository").toString(), "true", "true", true, null, null, null, false);
-    public static final MavenRepository MAVEN_LOCAL_DEFAULT = new MavenRepository("local", Paths.get(System.getProperty("user.home"), ".m2", "repository").toUri().toString(), "true", "true", true, null, null, null, false);
+    public static final MavenRepository MAVEN_LOCAL_DEFAULT = new MavenRepository("local", MavenHomeDirectory.getRepository().toUri().toString(), "true", "true", true, null, null, null, false);
     public static final MavenRepository MAVEN_CENTRAL = new MavenRepository("central", "https://repo.maven.apache.org/maven2", "true", "false", true, null, null, null, true);
 
     @EqualsAndHashCode.Include
