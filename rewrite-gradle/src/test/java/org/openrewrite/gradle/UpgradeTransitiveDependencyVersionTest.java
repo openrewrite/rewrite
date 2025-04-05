@@ -16,14 +16,8 @@
 package org.openrewrite.gradle;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Cursor;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
-import org.openrewrite.internal.ListUtils;
-import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.kotlin.KotlinTemplate;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -32,7 +26,6 @@ import java.util.List;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
-import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
 

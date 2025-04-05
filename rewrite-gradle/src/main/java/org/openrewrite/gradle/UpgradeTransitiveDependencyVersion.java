@@ -490,7 +490,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
             String ga = gav.getGroupId() + ":" + gav.getArtifactId();
             String existingConstraintVersion = null;
             J.MethodInvocation existingConstraint = null;
-            MethodMatcher constraintMatcher = new MethodMatcher(CONSTRAINT_MATCHER);
+            MethodMatcher constraintMatcher = new MethodMatcher(CONSTRAINT_MATCHER, true);
             for (Statement statement : ((J.Block) ((J.Lambda) m.getArguments().get(0)).getBody()).getStatements()) {
                 if (statement instanceof J.MethodInvocation || (statement instanceof J.Return && ((J.Return) statement).getExpression() instanceof J.MethodInvocation)) {
                     J.MethodInvocation m2 = (J.MethodInvocation) (statement instanceof J.Return ? ((J.Return) statement).getExpression() :  statement);

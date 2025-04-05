@@ -107,7 +107,7 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                 }
             } else if (cu instanceof K.CompilationUnit) {
                 K.CompilationUnit k = (K.CompilationUnit) cu;
-                for (Statement statement : k.getStatements()) {
+                for (Statement statement : ((J.Block) k.getStatements().get(0)).getStatements()) {
                     if (statement instanceof J.MethodInvocation && ((J.MethodInvocation) statement).getSimpleName().equals("dependencies")) {
                         dependenciesBlockMissing = false;
                     }
@@ -122,7 +122,10 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                             .map(G.CompilationUnit.class::cast)
                             .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
                             .getStatements().get(0);
-                    dependenciesInvocation = autoFormat(dependenciesInvocation, ctx, new Cursor(getCursor(), cu));
+                    Cursor parent = getCursor();
+                    setCursor(new Cursor(parent, g));
+                    dependenciesInvocation = autoFormat(dependenciesInvocation, ctx, new Cursor(parent, g));
+                    setCursor(parent);
                     cu = g.withStatements(ListUtils.concat(g.getStatements(),
                             g.getStatements().isEmpty() ?
                                     dependenciesInvocation :
@@ -134,12 +137,15 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                             .map(K.CompilationUnit.class::cast)
                             .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
                             .getStatements().get(0)).getStatements().get(0);
-                    dependenciesInvocation = autoFormat(dependenciesInvocation, ctx, new Cursor(getCursor(), cu));
-//                    dependenciesInvocation = dependenciesInvocation.withArguments(ListUtils.mapFirst(dependenciesInvocation.getArguments(), arg -> {
-//                        J.Lambda lambda = (J.Lambda) requireNonNull(arg);
-//                        J.Block block = (J.Block) lambda.getBody();
-//                        return lambda.withBody(block.withEnd(Space.format("\n")));
-//                    }));
+                    Cursor parent = getCursor();
+                    setCursor(new Cursor(parent, k));
+                    dependenciesInvocation = autoFormat(dependenciesInvocation, ctx, new Cursor(getCursor(), k));
+                    setCursor(parent);
+                    dependenciesInvocation = dependenciesInvocation.withArguments(ListUtils.mapFirst(dependenciesInvocation.getArguments(), arg -> {
+                        J.Lambda lambda = (J.Lambda) requireNonNull(arg);
+                        J.Block block = (J.Block) lambda.getBody();
+                        return lambda.withBody(block.withEnd(Space.format("\n")));
+                    }));
                     cu = k.withStatements(ListUtils.concat(k.getStatements(),
                             k.getStatements().isEmpty() ?
                                     dependenciesInvocation :
