@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.maven.cache.InMemoryMavenPomCache;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.MavenParsingException;
+import org.openrewrite.maven.table.MavenDownloadEvents;
 import org.openrewrite.maven.tree.*;
 
 import java.time.Duration;
@@ -45,6 +46,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     private static final String MAVEN_POM_CACHE = "org.openrewrite.maven.pomCache";
     private static final String MAVEN_RESOLUTION_LISTENER = "org.openrewrite.maven.resolutionListener";
     private static final String MAVEN_RESOLUTION_TIME = "org.openrewrite.maven.resolutionTime";
+    private static final String MAVEN_DOWNLOAD_EVENTS_DATA_TABLE = "org.openrewrite.maven.downloadEventsDataTable";
 
     public MavenExecutionContextView(ExecutionContext delegate) {
         super(delegate);
@@ -83,6 +85,15 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
 
     public Collection<MavenRepositoryMirror> getMirrors() {
         return getMessage(MAVEN_MIRRORS, emptyList());
+    }
+
+    public MavenExecutionContextView setDownloadEventsDataTable(@Nullable MavenDownloadEvents downloadEvents) {
+        putMessage(MAVEN_DOWNLOAD_EVENTS_DATA_TABLE, downloadEvents);
+        return this;
+    }
+
+    public @Nullable MavenDownloadEvents getDownloadEventsDataTable() {
+        return getMessage(MAVEN_DOWNLOAD_EVENTS_DATA_TABLE, null);
     }
 
     /**

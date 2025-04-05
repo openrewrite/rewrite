@@ -15,6 +15,7 @@
  */
 package org.openrewrite.internal;
 
+import org.jetbrains.annotations.Contract;
 import org.jspecify.annotations.Nullable;
 
 import java.util.*;
@@ -56,6 +57,7 @@ public class PropertyPlaceholderHelper {
         this.valueSeparator = valueSeparator;
     }
 
+    @Contract("null -> false")
     public boolean hasPlaceholders(@Nullable String value) {
         if (value == null) {
             return false;

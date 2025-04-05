@@ -20,6 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.maven.table.MavenDownloadEvents;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.xml.tree.Xml;
@@ -32,9 +33,6 @@ import static java.util.stream.Collectors.toCollection;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<AddManagedDependency.Scanned> {
-
-    @EqualsAndHashCode.Exclude
-    transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
     @Override
     public String getDisplayName() {

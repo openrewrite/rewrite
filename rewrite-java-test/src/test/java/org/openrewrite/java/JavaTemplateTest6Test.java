@@ -182,7 +182,7 @@ class JavaTemplateTest6Test implements RewriteTest {
                   if (classDecl.getImplements() == null) {
                       maybeAddImport("java.io.Closeable");
                       maybeAddImport("java.io.Serializable");
-                      return JavaTemplate.builder("Serializable, Closeable").contextSensitive()
+                      return JavaTemplate.builder("Serializable, Closeable")
                         .imports("java.io.*")
                         .build()
                         .apply(getCursor(), classDecl.getCoordinates().replaceImplementsClause());
@@ -246,7 +246,6 @@ class JavaTemplateTest6Test implements RewriteTest {
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
                   if (method.getThrows() == null) {
                       return JavaTemplate.builder("Exception")
-                        .contextSensitive()
                         .build()
                         .apply(getCursor(), method.getCoordinates().replaceThrows());
                   }

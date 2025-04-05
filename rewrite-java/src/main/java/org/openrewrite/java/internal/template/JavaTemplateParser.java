@@ -34,6 +34,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.singletonList;
 
@@ -108,9 +109,9 @@ public class JavaTemplateParser {
         }).get(0);
     }
 
-    public J parseExpression(Cursor cursor, String template, Space.Location location) {
-        return cacheIfContextFree(cursor, new ContextFreeCacheKey(template, Expression.class, imports),
-                tmpl -> statementTemplateGenerator.template(cursor, tmpl, location, JavaCoordinates.Mode.REPLACEMENT),
+    public J parseExpression(Cursor cursor, String template, Collection<JavaType.GenericTypeVariable> typeVariables, Space.Location location) {
+        return cacheIfContextFree(cursor, new ContextFreeCacheKey(template, typeVariables.stream().map(TypeUtils::toString).collect(Collectors.toList()), Expression.class, imports),
+                tmpl -> statementTemplateGenerator.template(cursor, tmpl, typeVariables, location, JavaCoordinates.Mode.REPLACEMENT),
                 stub -> {
                     onBeforeParseTemplate.accept(stub);
                     JavaSourceFile cu = compileTemplate(stub);
@@ -166,11 +167,12 @@ public class JavaTemplateParser {
 
     public <J2 extends J> List<J2> parseBlockStatements(Cursor cursor, Class<J2> expected,
                                                         String template,
+                                                        Collection<JavaType.GenericTypeVariable> typeVariables,
                                                         Space.Location location,
                                                         JavaCoordinates.Mode mode) {
         return cacheIfContextFree(cursor,
-                new ContextFreeCacheKey(template, expected, imports),
-                tmpl -> statementTemplateGenerator.template(cursor, tmpl, location, mode),
+                new ContextFreeCacheKey(template, typeVariables.stream().map(TypeUtils::toString).collect(Collectors.toList()), expected, imports),
+                tmpl -> statementTemplateGenerator.template(cursor, tmpl, typeVariables, location, mode),
                 stub -> {
                     onBeforeParseTemplate.accept(stub);
                     JavaSourceFile cu = compileTemplate(stub);
@@ -178,7 +180,7 @@ public class JavaTemplateParser {
                 });
     }
 
-    public J.MethodInvocation parseMethod(Cursor cursor, String template, Space.Location location) {
+    public J.MethodInvocation parseMethod(Cursor cursor, String template, Collection<JavaType.GenericTypeVariable> typeVariables, Space.Location location) {
         J.MethodInvocation method = cursor.getValue();
         String methodWithReplacedNameAndArgs;
         if (method.getSelect() == null) {
@@ -189,25 +191,38 @@ public class JavaTemplateParser {
         // TODO: The stub string includes the scoped elements of each original AST, and therefore is not a good
         //       cache key. There are virtual no cases where a stub key will result in re-use. If we can come up with
         //       a safe, reusable key, we can consider using the cache for block statements.
-        @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacedNameAndArgs, location, JavaCoordinates.Mode.REPLACEMENT);
+        @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacedNameAndArgs, typeVariables, location, JavaCoordinates.Mode.REPLACEMENT);
         onBeforeParseTemplate.accept(stub);
         JavaSourceFile cu = compileTemplate(stub);
         return (J.MethodInvocation) statementTemplateGenerator
                 .listTemplatedTrees(cu, Statement.class).get(0);
     }
 
-    public J.MethodInvocation parseMethodArguments(Cursor cursor, String template, Space.Location location) {
+    public J.MethodInvocation parseMethodArguments(Cursor cursor, String template, Collection<JavaType.GenericTypeVariable> typeVariables, Space.Location location) {
         J.MethodInvocation method = cursor.getValue();
         String methodWithReplacementArgs = method.withArguments(Collections.emptyList()).printTrimmed(cursor.getParentOrThrow())
-                .replaceAll("\\)$", template + ")");
+                .replaceAll("\\)$", template + (isStatement(cursor) ? ");" : ")"));
         // TODO: The stub string includes the scoped elements of each original AST, and therefore is not a good
         //       cache key. There are virtual no cases where a stub key will result in re-use. If we can come up with
         //       a safe, reusable key, we can consider using the cache for block statements.
-        @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacementArgs, location, JavaCoordinates.Mode.REPLACEMENT);
+        @Language("java") String stub = statementTemplateGenerator.template(cursor, methodWithReplacementArgs, typeVariables, location, JavaCoordinates.Mode.REPLACEMENT);
         onBeforeParseTemplate.accept(stub);
         JavaSourceFile cu = compileTemplate(stub);
         return (J.MethodInvocation) statementTemplateGenerator
                 .listTemplatedTrees(cu, Statement.class).get(0);
+    }
+
+    private boolean isStatement(Cursor cursor) {
+        if (!(cursor.getValue() instanceof Statement)) {
+            return false;
+        } else if (cursor.getValue() instanceof Expression) {
+            J parent = cursor.getParentTreeCursor().getValue();
+            return parent instanceof J.Block ||
+                   parent instanceof J.If && ((J.If) parent).getThenPart() == cursor.getValue() ||
+                   parent instanceof J.If.Else && ((J.If.Else) parent).getBody() == cursor.getValue() ||
+                   parent instanceof Loop && ((Loop) parent).getBody() == cursor.getValue();
+        }
+        return false;
     }
 
     public List<J.Annotation> parseAnnotations(Cursor cursor, String template) {
@@ -320,6 +335,7 @@ public class JavaTemplateParser {
     @Value
     private static class ContextFreeCacheKey {
         String template;
+        List<String> typeVariables;
         Class<? extends J> expected;
         Set<String> imports;
     }

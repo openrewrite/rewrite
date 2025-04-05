@@ -65,7 +65,7 @@ public interface JavaParser extends Parser {
      * matching jars can be found.
      */
     static List<Path> dependenciesFromClasspath(String... artifactNames) {
-        List<URI> runtimeClasspath = new ClassGraph().disableNestedJarScanning().getClasspathURIs();
+        List<Path> runtimeClasspath = RuntimeClasspathCache.getRuntimeClasspath();
         List<Path> artifacts = new ArrayList<>(artifactNames.length);
         List<String> missingArtifactNames = new ArrayList<>(artifactNames.length);
         for (String artifactName : artifactNames) {
@@ -92,23 +92,18 @@ public interface JavaParser extends Parser {
      * @return List of Paths that match the artifact name.
      */
     // VisibleForTesting
-    static List<Path> filterArtifacts(String artifactName, List<URI> runtimeClasspath) {
+    static List<Path> filterArtifacts(String artifactName, List<Path> runtimeClasspath) {
         List<Path> artifacts = new ArrayList<>();
         // Bazel automatically replaces '-' with '_' when generating jar files.
         String normalizedArtifactName = artifactName.replace('-', '_');
         Pattern jarPattern = Pattern.compile(String.format("(%s|%s)(?:-.*?)?\\.jar$", artifactName, normalizedArtifactName));
         // In a multi-project IDE classpath, some classpath entries aren't jars
         Pattern explodedPattern = Pattern.compile("/" + artifactName + "/");
-        for (URI cpEntry : runtimeClasspath) {
-            if (!"file".equals(cpEntry.getScheme())) {
-                // exclude any `jar` entries which could result from `Bundle-ClassPath` in `MANIFEST.MF`
-                continue;
-            }
+        for (Path cpEntry : runtimeClasspath) {
             String cpEntryString = cpEntry.toString();
-            Path path = Paths.get(cpEntry);
             if (jarPattern.matcher(cpEntryString).find() ||
-                    explodedPattern.matcher(cpEntryString).find() && path.toFile().isDirectory()) {
-                artifacts.add(path);
+                    explodedPattern.matcher(cpEntryString).find() && cpEntry.toFile().isDirectory()) {
+                artifacts.add(cpEntry);
                 // Do not break because jarPattern matches "foo-bar-1.0.jar" and "foo-1.0.jar" to "foo"
             }
         }

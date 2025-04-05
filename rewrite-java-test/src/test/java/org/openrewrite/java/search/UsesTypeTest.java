@@ -53,7 +53,7 @@ class UsesTypeTest implements RewriteTest {
             """
               import java.util.ArrayList;
               import java.util.List;
-                            
+              
               class Test {
                   List<String> l = new ArrayList<>();
               }
@@ -61,7 +61,7 @@ class UsesTypeTest implements RewriteTest {
             """
               /*~~>*/import java.util.ArrayList;
               import java.util.List;
-                            
+              
               class Test {
                   List<String> l = new ArrayList<>();
               }
@@ -79,14 +79,14 @@ class UsesTypeTest implements RewriteTest {
             """
               import java.io.File;
               import java.util.Collections;
-                            
+              
               class Test {
               }
               """,
             """
               /*~~>*/import java.io.File;
               import java.util.Collections;
-                            
+              
               class Test {
               }
               """
@@ -106,14 +106,14 @@ class UsesTypeTest implements RewriteTest {
             """
               import java.io.File;
               import static java.util.Collections.singleton;
-                            
+              
               class Test {
               }
               """,
             """
               /*~~>*/import java.io.File;
               import static java.util.Collections.singleton;
-                            
+              
               class Test {
               }
               """
@@ -133,14 +133,14 @@ class UsesTypeTest implements RewriteTest {
             """
               import java.io.File;
               import static java.util.Collections.singleton;
-                            
+              
               class Test {
               }
               """,
             """
               /*~~>*/import java.io.File;
               import static java.util.Collections.singleton;
-                            
+              
               class Test {
               }
               """

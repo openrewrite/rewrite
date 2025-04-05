@@ -88,7 +88,10 @@ class MavenDependencyFailuresTest implements RewriteTest {
           spec -> spec
             .recipe(new UpgradeParentVersion("*", "*", "latest.patch", null, null))
             .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
-              .setRepositories(List.of(MavenRepository.builder().id("jenkins").uri("https://repo.jenkins-ci.org/public").knownToExist(true).build())))
+              .setRepositories(List.of(
+                MavenRepository.builder().id("central").uri("https://repo1.maven.org/maven2").knownToExist(true).build(),
+                MavenRepository.builder().id("jenkins").uri("https://repo.jenkins-ci.org/public").knownToExist(true).build()
+              )))
             .recipeExecutionContext(new InMemoryExecutionContext())
             .cycles(1)
             .expectedCyclesThatMakeChanges(1),

@@ -416,6 +416,7 @@ public class ResolvedPom {
                 mergeProperties(profile.getProperties(), pom);
             }
             mergeProperties(pom.getProperties(), pom);
+            updateRepositories();
 
             //Resolve repositories (which may rely on properties ^^^)
             for (Profile profile : effectiveProfiles) {
@@ -750,6 +751,18 @@ public class ResolvedPom {
             }
         }
 
+        private void updateRepositories() {
+            repositories = ListUtils.map(repositories, repo -> {
+                if (ResolvedPom.placeholderHelper.hasPlaceholders(repo.getId())) {
+                    repo = repo.withId(ResolvedPom.placeholderHelper.replacePlaceholders(repo.getId(), properties::get));
+                }
+                if (ResolvedPom.placeholderHelper.hasPlaceholders(repo.getUri())) {
+                    repo = repo.withUri(ResolvedPom.placeholderHelper.replacePlaceholders(repo.getUri(), properties::get));
+                }
+                return repo;
+            });
+        }
+
         private void mergeRepositories(List<MavenRepository> incomingRepositories) {
             if (!incomingRepositories.isEmpty()) {
                 if (repositories == null || repositories.isEmpty()) {
@@ -886,11 +899,10 @@ public class ResolvedPom {
                 // The dependency may be modified by the current pom's dependency management
                 d = getValues(d, depth);
                 try {
-                    if (d.getVersion() == null) {
-                        throw new MavenDownloadingException("No version provided", null, dd.getDependency().getGav());
+                    if (depth == 0 && d.getVersion() == null) {
+                        throw new MavenDownloadingException("No version provided for direct dependency", null, dd.getDependency().getGav());
                     }
-
-                    if (d.getType() != null && (!"jar".equals(d.getType()) && !"pom".equals(d.getType()) && !"zip".equals(d.getType()))) {
+                    if (d.getVersion() == null || (d.getType() != null && (!"jar".equals(d.getType()) && !"pom".equals(d.getType()) && !"zip".equals(d.getType())))) {
                         continue;
                     }
 
@@ -982,7 +994,6 @@ public class ResolvedPom {
                             d2 = d2.withGav(d2.getGav().withGroupId(resolvedPom.getGroupId()));
                         }
 
-                        //noinspection ConstantValue
                         if (d.getExclusions() != null) {
                             d2 = d2.withExclusions(ListUtils.concatAll(d2.getExclusions(), d.getExclusions()));
                             for (GroupArtifact exclusion : d.getExclusions()) {
@@ -991,7 +1002,7 @@ public class ResolvedPom {
                                     if (resolved.getEffectiveExclusions().isEmpty()) {
                                         resolved.unsafeSetEffectiveExclusions(new ArrayList<>());
                                     }
-                                    resolved.getEffectiveExclusions().add(exclusion);
+                                    resolved.getEffectiveExclusions().add(d2.getGav().asGroupArtifact());
                                     continue nextDependency;
                                 }
                             }

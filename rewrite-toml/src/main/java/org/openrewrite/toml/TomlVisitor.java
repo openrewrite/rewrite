@@ -20,7 +20,10 @@ import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.toml.tree.*;
+import org.openrewrite.toml.tree.Space;
+import org.openrewrite.toml.tree.Toml;
+import org.openrewrite.toml.tree.TomlRightPadded;
+import org.openrewrite.toml.tree.TomlValue;
 
 public class TomlVisitor<P> extends TreeVisitor<Toml, P> {
 

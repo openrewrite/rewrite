@@ -3061,4 +3061,72 @@ class MergeYamlTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void bracketNotationAfterRoot() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$[\"a.b.c\"].d1",
+            //language=yaml
+            "new-key: 123",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              a.b.c:
+               d1:
+                e1: text
+               d2:
+                e2: text
+              """,
+            """
+              a.b.c:
+               d1:
+                e1: text
+                new-key: 123
+               d2:
+                e2: text
+              """
+          )
+        );
+    }
+
+    @Test
+    void bracketNotation() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.a[\"b.c.d1\"]",
+            //language=yaml
+            "new-key: 123",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
+          )),
+          yaml(
+            """
+              a:
+               b.c.d1:
+                e1: text
+               d2:
+                e2: text
+              """,
+            """
+              a:
+               b.c.d1:
+                e1: text
+                new-key: 123
+               d2:
+                e2: text
+              """
+          )
+        );
+    }
 }
