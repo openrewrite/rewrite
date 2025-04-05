@@ -410,24 +410,40 @@ public interface J extends Tree {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class Assert implements J, Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
         @With
+        @Getter
         @EqualsAndHashCode.Include
         UUID id;
 
         @With
+        @Getter
         Space prefix;
 
         @With
+        @Getter
         Markers markers;
 
         @With
+        @Getter
         Expression condition;
 
         @Nullable
-        @With
         JLeftPadded<Expression> detail;
+
+        public @Nullable Expression getDetail() {
+            return detail != null ? detail.getElement() : null;
+        }
+
+        public Assert withDetail(@Nullable Expression detail) {
+            return getPadding().withDetail(JLeftPadded.withElement(this.detail, detail));
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -440,9 +456,37 @@ public interface J extends Tree {
             return new CoordinateBuilder.Statement(this);
         }
 
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
         @Override
         public String toString() {
             return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Assert t;
+
+            public @Nullable JLeftPadded<Expression> getDetail() {
+                return t.detail;
+            }
+
+            public Assert withDetail(@Nullable JLeftPadded<Expression> detail) {
+                return t.detail == detail ? t : new Assert(t.id, t.prefix, t.markers, t.condition, detail);
+            }
         }
     }
 
