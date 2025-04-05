@@ -19,15 +19,21 @@ import lombok.*;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.kotlin.KotlinParser;
+import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markers;
 
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -59,18 +65,20 @@ public class DependencyConstraintToRule extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new IsBuildGradle<>(), new GroovyIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new IsBuildGradle<>(), new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public G.CompilationUnit visitCompilationUnit(G.CompilationUnit compilationUnit, ExecutionContext ctx) {
-                List<GroupArtifactVersionBecause> gavs = new ArrayList<>();
-                Cursor parent = requireNonNull(getCursor().getParent());
-                G.CompilationUnit cu = (G.CompilationUnit) new RemoveConstraints().visitNonNull(compilationUnit, gavs, parent);
-                if (gavs.isEmpty()) {
-                    return compilationUnit;
+            public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    List<GroupArtifactVersionBecause> gavs = new ArrayList<>();
+                    JavaSourceFile cu = (JavaSourceFile) new RemoveConstraints().visitNonNull(tree, gavs);
+                    if (gavs.isEmpty()) {
+                        return (J) tree;
+                    }
+                    cu = (JavaSourceFile) new MaybeAddEachDependency().visitNonNull(cu, ctx);
+                    cu = (JavaSourceFile) new UpdateEachDependency(gavs, cu instanceof K.CompilationUnit).visitNonNull(cu, ctx);
+                    return cu;
                 }
-                cu = (G.CompilationUnit) new MaybeAddEachDependency().visitNonNull(cu, ctx, parent);
-                cu = (G.CompilationUnit) new UpdateEachDependency(gavs).visitNonNull(cu, ctx, parent);
-                return cu;
+                return super.visit(tree, ctx);
             }
         });
     }
@@ -89,7 +97,7 @@ public class DependencyConstraintToRule extends Recipe {
         String because;
     }
 
-    static class RemoveConstraints extends GroovyIsoVisitor<List<GroupArtifactVersionBecause>> {
+    static class RemoveConstraints extends JavaIsoVisitor<List<GroupArtifactVersionBecause>> {
 
         @SuppressWarnings({"DataFlowIssue", "NullableProblems"})
         @Override
@@ -122,7 +130,7 @@ public class DependencyConstraintToRule extends Recipe {
                         return statement;
                     }
                     AtomicReference<String> because = new AtomicReference<>(null);
-                    new GroovyIsoVisitor<Integer>() {
+                    new JavaIsoVisitor<Integer>() {
                         @Override
                         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer integer) {
                             J.MethodInvocation m1 = super.visitMethodInvocation(method, integer);
@@ -149,16 +157,17 @@ public class DependencyConstraintToRule extends Recipe {
 
     @Value
     @EqualsAndHashCode(callSuper = false)
-    static class UpdateEachDependency extends GroovyIsoVisitor<ExecutionContext> {
+    static class UpdateEachDependency extends JavaIsoVisitor<ExecutionContext> {
         List<GroupArtifactVersionBecause> groupArtifactVersions;
+        boolean isKotlinDsl;
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
             if (isEachDependency(m)) {
                 Cursor parent = requireNonNull(getCursor().getParent());
                 for (GroupArtifactVersionBecause gav : groupArtifactVersions) {
-                    m = (J.MethodInvocation) new MaybeAddIf(gav).visitNonNull(m, ctx, parent);
-                    m = (J.MethodInvocation) new UpdateIf(gav).visitNonNull(m, ctx, parent);
+                    m = (J.MethodInvocation) new MaybeAddIf(gav, isKotlinDsl).visitNonNull(m, ctx, parent);
+                    m = (J.MethodInvocation) new UpdateIf(gav, isKotlinDsl).visitNonNull(m, ctx, parent);
                 }
             }
             return m;
@@ -166,9 +175,11 @@ public class DependencyConstraintToRule extends Recipe {
     }
 
     @RequiredArgsConstructor
-    static class MaybeAddIf extends GroovyIsoVisitor<ExecutionContext> {
+    static class MaybeAddIf extends JavaIsoVisitor<ExecutionContext> {
         @NonNull
         GroupArtifactVersionBecause groupArtifactVersion;
+
+        final boolean isKotlinDsl;
 
         boolean containsAnyIfStatement;
         boolean containsMatchingIfStatement;
@@ -194,19 +205,33 @@ public class DependencyConstraintToRule extends Recipe {
                 return m;
             }
             String p = ((J.VariableDeclarations) rawParam).getVariables().get(0).getSimpleName();
-            @SuppressWarnings("GroovyEmptyStatementBody") @Language("groovy")
-            String snippet = "Object " + p + " = null\n" +
-                             "if (" + p + ".requested.group == '" + groupArtifactVersion.getGroupId() + "' && " +
-                             p + ".requested.name == '" + groupArtifactVersion.getArtifactId() + "') {\n}";
-            J.If newIf = GroovyParser.builder().build()
-                    .parse(ctx, snippet)
-                    .map(G.CompilationUnit.class::cast)
-                    .map(cu -> cu.getStatements().get(1))
-                    .map(J.If.class::cast)
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalStateException("Unable to produce a new if statement"));
+            J.If newIf;
+            if (!isKotlinDsl) {
+                @SuppressWarnings("GroovyEmptyStatementBody") @Language("groovy")
+                String snippet = "Object " + p + " = null\n" +
+                                 "if (" + p + ".requested.group == '" + groupArtifactVersion.getGroupId() + "' && " +
+                                 p + ".requested.name == '" + groupArtifactVersion.getArtifactId() + "') {\n}";
+                newIf = GroovyParser.builder().build()
+                        .parse(ctx, snippet)
+                        .map(G.CompilationUnit.class::cast)
+                        .map(cu -> cu.getStatements().get(1))
+                        .map(J.If.class::cast)
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalStateException("Unable to produce a new if statement"));
+            } else {
+                String snippet = "var " + p + ": Any = null\n" +
+                                 "if (" + p + ".requested.group == \"" + groupArtifactVersion.getGroupId() + "\" && " +
+                                 p + ".requested.name == \"" + groupArtifactVersion.getArtifactId() + "\") {\n}";
+                newIf = KotlinParser.builder().isKotlinScript(true).build()
+                        .parse(ctx, snippet)
+                        .map(K.CompilationUnit.class::cast)
+                        .map(cu -> (J.Block) cu.getStatements().get(0))
+                        .map(block -> (J.If) block.getStatements().get(1))
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalStateException("Unable to produce a new if statement"));
+            }
             if (containsAnyIfStatement) {
-                m = (J.MethodInvocation) new GroovyIsoVisitor<Integer>() {
+                m = (J.MethodInvocation) new JavaIsoVisitor<Integer>() {
                     boolean inserted;
 
                     @Override
@@ -253,8 +278,9 @@ public class DependencyConstraintToRule extends Recipe {
     }
 
     @AllArgsConstructor
-    static class UpdateIf extends GroovyIsoVisitor<ExecutionContext> {
+    static class UpdateIf extends JavaIsoVisitor<ExecutionContext> {
         GroupArtifactVersionBecause groupArtifactVersionBecause;
+        boolean isKotlinDsl;
 
         @Override
         public J.If visitIf(J.If iff, ExecutionContext ctx) {
@@ -262,7 +288,7 @@ public class DependencyConstraintToRule extends Recipe {
             if (predicateRelatesToGav(anIf, groupArtifactVersionBecause)) {
                 // The predicate of the if condition will already contain the relevant variable name
                 AtomicReference<String> variableName = new AtomicReference<>();
-                new GroovyIsoVisitor<Integer>() {
+                new JavaIsoVisitor<Integer>() {
                     @Override
                     public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer integer) {
                         // Comparison will involve "<variable name>.requested.group"
@@ -273,18 +299,36 @@ public class DependencyConstraintToRule extends Recipe {
                         return fieldAccess;
                     }
                 }.visit(anIf.getIfCondition(), 0);
-                @Language("groovy")
-                String snippet = variableName + ".useVersion('" + groupArtifactVersionBecause.getVersion() + "')\n";
-                if(groupArtifactVersionBecause.getBecause() != null) {
-                    snippet += variableName + ".because('" + groupArtifactVersionBecause.getBecause() + "')\n";
+                List<Statement> newStatements;
+                if (!isKotlinDsl) {
+                    @Language("groovy")
+                    String snippet = variableName + ".useVersion('" + groupArtifactVersionBecause.getVersion() + "')\n";
+                    if (groupArtifactVersionBecause.getBecause() != null) {
+                        snippet += variableName + ".because('" + groupArtifactVersionBecause.getBecause() + "')\n";
+                    }
+                    newStatements = GroovyParser.builder()
+                            .build()
+                            .parse(ctx, snippet)
+                            .map(G.CompilationUnit.class::cast)
+                            .map(G.CompilationUnit::getStatements)
+                            .findFirst()
+                            .orElseThrow(() -> new IllegalStateException("Unable to produce a new block statement"));
+                } else {
+                    @Language("kotlin")
+                    String snippet = variableName + ".useVersion(\"" + groupArtifactVersionBecause.getVersion() + "\")\n";
+                    if (groupArtifactVersionBecause.getBecause() != null) {
+                        snippet += variableName + ".because(\"" + groupArtifactVersionBecause.getBecause() + "\")\n";
+                    }
+                    newStatements = KotlinParser.builder()
+                            .isKotlinScript(true)
+                            .build()
+                            .parse(ctx, snippet)
+                            .map(K.CompilationUnit.class::cast)
+                            .map(cu -> (J.Block) cu.getStatements().get(0))
+                            .map(J.Block::getStatements)
+                            .findFirst()
+                            .orElseThrow(() -> new IllegalStateException("Unable to produce a new block statement"));
                 }
-                List<Statement> newStatements = GroovyParser.builder()
-                        .build()
-                        .parse(ctx, snippet)
-                        .map(G.CompilationUnit.class::cast)
-                        .map(G.CompilationUnit::getStatements)
-                        .findFirst()
-                        .orElseThrow(() -> new IllegalStateException("Unable to produce a new block statement"));
                 J.Block block = (J.Block) anIf.getThenPart();
                 block = block.withStatements(newStatements);
                 block = autoFormat(block, ctx, getCursor());
@@ -294,41 +338,8 @@ public class DependencyConstraintToRule extends Recipe {
         }
     }
 
-    static class MaybeAddEachDependency extends GroovyIsoVisitor<ExecutionContext> {
+    static class MaybeAddEachDependency extends JavaIsoVisitor<ExecutionContext> {
         boolean alreadyExists;
-
-        @Override
-        public G.CompilationUnit visitCompilationUnit(G.CompilationUnit compilationUnit, ExecutionContext ctx) {
-            G.CompilationUnit cu = super.visitCompilationUnit(compilationUnit, ctx);
-            if (alreadyExists) {
-                return cu;
-            }
-            // Prefer to insert before the dependencies block for readability
-            int insertionIndex = 0;
-            while (insertionIndex < cu.getStatements().size()) {
-                Statement s = cu.getStatements().get(insertionIndex);
-                if (s instanceof J.MethodInvocation && DEPENDENCIES_DSL_MATCHER.matches((J.MethodInvocation) s)) {
-                    break;
-                }
-                insertionIndex++;
-            }
-            J.MethodInvocation m = GradleParser.builder()
-                    .build()
-                    .parse(ctx,
-                           "\n" +
-                           "configurations.all {\n" +
-                           "    resolutionStrategy.eachDependency { details ->\n" +
-                           "    }\n" +
-                           "}")
-                    .map(G.CompilationUnit.class::cast)
-                    .map(G.CompilationUnit::getStatements)
-                    .map(it -> it.get(0))
-                    .map(J.MethodInvocation.class::cast)
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalStateException("Unable to create a new configurations.all block"));
-            cu = cu.withStatements(ListUtils.insert(cu.getStatements(), m, insertionIndex));
-            return cu;
-        }
 
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -345,6 +356,88 @@ public class DependencyConstraintToRule extends Recipe {
             if (alreadyExists) {
                 return (J) tree;
             }
+            if (tree instanceof JavaSourceFile) {
+                JavaSourceFile sourceFile = (JavaSourceFile) super.visit(tree, ctx);
+                if (alreadyExists) {
+                    return sourceFile;
+                }
+                // Prefer to insert before the dependencies block for readability
+                if (sourceFile instanceof G.CompilationUnit) {
+                    G.CompilationUnit cu = (G.CompilationUnit) sourceFile;
+                    int insertionIndex = 0;
+                    while (insertionIndex < cu.getStatements().size()) {
+                        Statement s = cu.getStatements().get(insertionIndex);
+                        if (s instanceof J.MethodInvocation && DEPENDENCIES_DSL_MATCHER.matches((J.MethodInvocation) s)) {
+                            break;
+                        }
+                        insertionIndex++;
+                    }
+                    J.MethodInvocation m = GradleParser.builder()
+                            .build()
+                            .parse(ctx,
+                                    "\n" +
+                                    "configurations.all {\n" +
+                                    "    resolutionStrategy.eachDependency { details ->\n" +
+                                    "    }\n" +
+                                    "}")
+                            .map(G.CompilationUnit.class::cast)
+                            .map(G.CompilationUnit::getStatements)
+                            .map(it -> it.get(0))
+                            .map(J.MethodInvocation.class::cast)
+                            .findFirst()
+                            .orElseThrow(() -> new IllegalStateException("Unable to create a new configurations.all block"));
+                    cu = cu.withStatements(ListUtils.insert(cu.getStatements(), m, insertionIndex));
+                    return cu;
+                } else {
+                    K.CompilationUnit cu = (K.CompilationUnit) sourceFile;
+                    J.Block block = (J.Block) cu.getStatements().get(0);
+                    int insertionIndex = 0;
+                    while (insertionIndex < block.getStatements().size()) {
+                        Statement s = block.getStatements().get(insertionIndex);
+                        if (s instanceof J.MethodInvocation && ((J.MethodInvocation) s).getSimpleName().equals("dependencies")) {
+                            break;
+                        }
+                        insertionIndex++;
+                    }
+                    J.MethodInvocation m = GradleParser.builder()
+                            .build()
+                            .parseInputs(Collections.singletonList(
+                                    new Parser.Input(
+                                            Paths.get("build.gradle.kts"),
+                                            () -> new ByteArrayInputStream(
+                                                    ("\n" +
+                                                     "configurations.all {\n" +
+                                                     "    resolutionStrategy.eachDependency { details ->}\n" +
+                                                     "}").getBytes(StandardCharsets.UTF_8)))
+                                    ), null, ctx)
+                            .map(K.CompilationUnit.class::cast)
+                            .map(k -> (J.Block) k.getStatements().get(0))
+                            .map(J.Block::getStatements)
+                            .map(it -> it.get(0))
+                            .map(J.MethodInvocation.class::cast)
+                            .findFirst()
+                            .map(m2 -> m2.withArguments(ListUtils.mapFirst(m2.getArguments(), arg -> {
+                                J.Lambda lambda1 = (J.Lambda) arg;
+                                J.Block block1 = (J.Block) lambda1.getBody();
+                                return lambda1.withBody(block1.withStatements(ListUtils.mapFirst(block1.getStatements(), arg2 -> {
+                                    J.MethodInvocation m3 = (J.MethodInvocation) arg2;
+                                    return m3.withArguments(ListUtils.mapFirst(m3.getArguments(), arg3 -> {
+                                        J.Lambda lambda2 = (J.Lambda) arg3;
+                                        return lambda2.withBody(((J.Block) lambda2.getBody()).withEnd(Space.format("\n")));
+                                    }));
+                                })));
+                            })))
+                            .orElseThrow(() -> new IllegalStateException("Unable to create a new configurations.all block"));
+                    final int finalInsertionIndex = insertionIndex;
+                    cu = cu.withStatements(ListUtils.mapFirst(cu.getStatements(), arg -> {
+                        if (arg == block) {
+                            return block.withStatements(ListUtils.insert(block.getStatements(), m, finalInsertionIndex));
+                        }
+                        return arg;
+                    }));
+                    return cu;
+                }
+            }
             return super.visit(tree, ctx);
         }
     }
@@ -352,7 +445,7 @@ public class DependencyConstraintToRule extends Recipe {
     private static boolean isInDependenciesBlock(Cursor cursor) {
         Cursor c = cursor.dropParentUntil(value ->
                 value == Cursor.ROOT_VALUE ||
-                (value instanceof J.MethodInvocation && DEPENDENCIES_DSL_MATCHER.matches((J.MethodInvocation) value)));
+                (value instanceof J.MethodInvocation && ((J.MethodInvocation) value).getSimpleName().equals("dependencies")));
         return c.getValue() instanceof J.MethodInvocation;
     }
 
@@ -375,7 +468,7 @@ public class DependencyConstraintToRule extends Recipe {
         // GroupId and artifactId might be compared in either order or this could be an unrelated comparison
         AtomicBoolean groupIdCompared = new AtomicBoolean();
         AtomicBoolean artifactIdCompared = new AtomicBoolean();
-        new GroovyIsoVisitor<GroupArtifactVersionBecause>() {
+        new JavaIsoVisitor<GroupArtifactVersionBecause>() {
             @Override
             public J.Binary visitBinary(J.Binary binary, GroupArtifactVersionBecause groupArtifactVersion) {
                 J.Binary b = super.visitBinary(binary, groupArtifactVersion);
