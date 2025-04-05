@@ -29,7 +29,9 @@ import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.maven.table.MavenDownloadEvents;
 import org.openrewrite.semver.Semver;
 
 import java.util.*;
@@ -44,6 +46,9 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     @EqualsAndHashCode.Exclude
     MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
+
+    @EqualsAndHashCode.Exclude
+    MavenDownloadEvents mavenDownloadEvents = new MavenDownloadEvents(this);
 
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
@@ -250,10 +255,10 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         for (String resolvedConfiguration : resolvedConfigurations) {
                             if (targetsCustomJVMTestSuite(resolvedConfiguration, acc.customJvmTestSuitesWithDependencies.get(jp))) {
                                 s = (JavaSourceFile) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, purgeSourceSet(configuration),
-                                        classifier, extension, metadataFailures, isMatchingJVMTestSuite(resolvedConfiguration)).visitNonNull(s, ctx);
+                                        classifier, extension, metadataFailures, mavenDownloadEvents, isMatchingJVMTestSuite(resolvedConfiguration)).visitNonNull(s, ctx);
                             } else {
                                 s = (JavaSourceFile) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, resolvedConfiguration,
-                                        classifier, extension, metadataFailures, this::isTopLevel).visitNonNull(s, ctx);
+                                        classifier, extension, metadataFailures, mavenDownloadEvents, this::isTopLevel).visitNonNull(s, ctx);
                             }
                         }
 

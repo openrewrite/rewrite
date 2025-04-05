@@ -22,6 +22,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.maven.table.MavenDownloadEvents;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
@@ -31,8 +32,6 @@ import java.util.Optional;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class ChangePluginGroupIdAndArtifactId extends Recipe {
-    @EqualsAndHashCode.Exclude
-    MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
     @Option(displayName = "Old group ID",
             description = "The old group ID to replace. The group ID is the first part of a plugin coordinate 'com.google.guava:guava:VERSION'. Supports glob expressions.",
@@ -45,21 +44,21 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
     String oldArtifactId;
 
     @Option(displayName = "New group ID",
-            description = "The new group ID to use. Defaults to the existing group ID.",
+            description = "The new group ID to use.",
             example = "corp.internal.openrewrite.recipe",
             required = false)
     @Nullable
     String newGroupId;
 
     @Option(displayName = "New artifact ID",
-            description = "The new artifact ID to use. Defaults to the existing artifact ID.",
+            description = "The new artifact ID to use.",
             example = "my-new-maven-plugin",
             required = false)
     @Nullable
     String newArtifactId;
 
     @Option(displayName = "New version",
-            description = "An exact version number or node-style semver selector used to select the version number.",
+            description = "An exact version number.",
             example = "29.X",
             required = false)
     @Nullable
@@ -77,7 +76,8 @@ public class ChangePluginGroupIdAndArtifactId extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Change the groupId and/or the artifactId of a specified Maven plugin. Optionally update the plugin version.";
+        return "Change the groupId and/or the artifactId of a specified Maven plugin. Optionally update the plugin version. " +
+                "This recipe does not perform any validation and assumes all values passed are valid.";
     }
 
     @Override

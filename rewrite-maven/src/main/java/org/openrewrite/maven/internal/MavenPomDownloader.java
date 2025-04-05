@@ -33,6 +33,7 @@ import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.cache.MavenPomCache;
+import org.openrewrite.maven.table.MavenDownloadEvents;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
 
@@ -148,12 +149,25 @@ public class MavenPomDownloader {
 
     byte[] sendRequest(HttpSender.Request request) throws IOException, HttpSenderResponseException {
         long start = System.nanoTime();
+        MavenDownloadEvents downloadEventsDataTable = ctx.getDownloadEventsDataTable();
+        if (downloadEventsDataTable != null) {
+            downloadEventsDataTable.insertStartedRow(ctx, request.getUrl().toString());
+        }
         try {
             return Failsafe.with(retryPolicy).get(() -> {
                 try (HttpSender.Response response = httpSender.send(request)) {
                     if (!response.isSuccessful()) {
-                        throw new HttpSenderResponseException(null, response.getCode(),
+                        HttpSenderResponseException exception = new HttpSenderResponseException(null, response.getCode(),
                                 new String(response.getBodyAsBytes()));
+                        Duration duration = Duration.ofNanos(System.nanoTime() - start);
+                        if (downloadEventsDataTable != null) {
+                            downloadEventsDataTable.insertErrorRow(ctx, request.getUrl().toString(), Integer.toString(response.getCode()), exception.getMessage(), duration);
+                        }
+                        throw exception;
+                    }
+                    Duration duration = Duration.ofNanos(System.nanoTime() - start);
+                    if (downloadEventsDataTable != null) {
+                        downloadEventsDataTable.insertFinishedRow(ctx, request.getUrl().toString(), Integer.toString(response.getCode()), duration);
                     }
                     return response.getBodyAsBytes();
                 }
@@ -162,8 +176,14 @@ public class MavenPomDownloader {
             if (failsafeException.getCause() instanceof HttpSenderResponseException) {
                 throw (HttpSenderResponseException) failsafeException.getCause();
             }
+            if (downloadEventsDataTable != null) {
+                downloadEventsDataTable.insertErrorRow(ctx, request.getUrl().toString(), null, failsafeException.getMessage(), Duration.ofNanos(System.nanoTime() - start));
+            }
             throw failsafeException;
         } catch (UncheckedIOException e) {
+            if (downloadEventsDataTable != null) {
+                downloadEventsDataTable.insertErrorRow(ctx, request.getUrl().toString(), null, e.getMessage(), Duration.ofNanos(System.nanoTime() - start));
+            }
             throw e.getCause();
         } finally {
             this.ctx.recordResolutionTime(Duration.ofNanos(System.nanoTime() - start));
@@ -940,11 +960,26 @@ public class MavenPomDownloader {
     private boolean jarExistsForPomUri(MavenRepository repo, String pomUrl) {
         String jarUrl = pomUrl.replaceAll("\\.pom$", ".jar");
         try {
+
+            MavenDownloadEvents downloadEventsDataTable = MavenExecutionContextView.view(ctx).getDownloadEventsDataTable();
+            long start = System.nanoTime();
             try {
                 return Failsafe.with(retryPolicy).get(() -> {
                     HttpSender.Request authenticated = applyAuthenticationAndTimeoutToRequest(repo, httpSender.get(jarUrl)).build();
+                    if (downloadEventsDataTable != null) {
+                        downloadEventsDataTable.insertStartedRow(ctx, authenticated.getUrl().toString());
+                    }
                     try (HttpSender.Response response = httpSender.send(authenticated)) {
-                        return response.isSuccessful();
+                        boolean successful = response.isSuccessful();
+                        if (downloadEventsDataTable != null) {
+                            String code = Integer.toString(response.getCode());
+                            if (successful) {
+                                downloadEventsDataTable.insertFinishedRow(ctx, authenticated.getUrl().toString(), code, Duration.ofNanos(System.nanoTime() - start));
+                            } else {
+                                downloadEventsDataTable.insertErrorRow(ctx, authenticated.getUrl().toString(), code, "HTTP " + code, Duration.ofNanos(System.nanoTime() - start));
+                            }
+                        }
+                        return successful;
                     }
                 });
             } catch (FailsafeException failsafeException) {
@@ -957,6 +992,10 @@ public class MavenPomDownloader {
                             return response.isSuccessful();
                         }
                     });
+                } else {
+                    if (downloadEventsDataTable != null) {
+                        downloadEventsDataTable.insertErrorRow(ctx, jarUrl, null, cause.getMessage(), Duration.ofNanos(System.nanoTime() - start));
+                    }
                 }
             }
         } catch (Throwable e) {

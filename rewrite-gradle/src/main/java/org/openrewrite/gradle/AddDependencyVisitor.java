@@ -34,8 +34,10 @@ import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenDownloadingExceptions;
+import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.maven.table.MavenDownloadEvents;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.tree.ParseError;
 
@@ -75,6 +77,9 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
 
     @Nullable
     private final MavenMetadataFailures metadataFailures;
+
+    @Nullable
+    private final MavenDownloadEvents mavenDownloadEvents;
 
     @Nullable
     private String resolvedVersion;
@@ -280,7 +285,7 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                     resolvedVersion = version;
                 } else {
                     try {
-                        resolvedVersion = new DependencyVersionSelector(metadataFailures, gp, null)
+                        resolvedVersion = new DependencyVersionSelector(metadataFailures, mavenDownloadEvents, gp, null)
                                 .select(new GroupArtifact(groupId, artifactId), configuration, version, versionPattern, ctx);
                     } catch (MavenDownloadingException e) {
                         return e.warn(m);

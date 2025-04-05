@@ -21,6 +21,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.maven.table.MavenDownloadEvents;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -38,7 +39,11 @@ import static org.openrewrite.internal.StringUtils.isBlank;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
+    @EqualsAndHashCode.Exclude
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
+
+    @EqualsAndHashCode.Exclude
+    transient MavenDownloadEvents mavenDownloadEvents = new MavenDownloadEvents(this);
 
     @Option(displayName = "Old groupId",
             description = "The old groupId to replace. The groupId is the first part of a dependency coordinate `com.google.guava:guava:VERSION`. Supports glob expressions.",
@@ -264,6 +269,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                     return newVersion;
                 }
                 String finalCurrentVersion = currentVersion != null ? currentVersion : newVersion;
+                MavenExecutionContextView.view(ctx).setDownloadEventsDataTable(mavenDownloadEvents);
                 if (availableVersions == null) {
                     availableVersions = new ArrayList<>();
                     MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
@@ -272,8 +278,9 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                             availableVersions.add(v);
                         }
                     }
-
                 }
+
+                MavenExecutionContextView.view(ctx).setDownloadEventsDataTable(null);
                 return availableVersions.isEmpty() ? newVersion : Collections.max(availableVersions, versionComparator);
             }
         };
