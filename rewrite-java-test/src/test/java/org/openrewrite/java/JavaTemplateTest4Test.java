@@ -167,7 +167,6 @@ class JavaTemplateTest4Test implements RewriteTest {
                   {
                       if (method.getSimpleName().equals("test") && method.getParameters().size() == 1) {
                           return JavaTemplate.builder("int n, #{}")
-                            .contextSensitive()
                             .build()
                             .apply(getCursor(), method.getCoordinates().replaceParameters(), method.getParameters().get(0));
                       }

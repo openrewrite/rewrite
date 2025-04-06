@@ -187,8 +187,8 @@ public class RewriteRpc {
         if (cursor != null) {
             cursorIds = cursor.getPathAsStream().map(c -> {
                 String id = c instanceof Tree ?
-                        ((Tree) c).getId().toString()
-                        : localObjectIds.computeIfAbsent(c, c2 -> SnowflakeId.generateId());
+                        ((Tree) c).getId().toString() :
+                        localObjectIds.computeIfAbsent(c, c2 -> SnowflakeId.generateId());
                 localObjects.put(id, c);
                 return id;
             }).collect(Collectors.toList());

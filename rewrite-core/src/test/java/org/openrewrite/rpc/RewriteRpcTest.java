@@ -82,6 +82,7 @@ class RewriteRpcTest implements RewriteTest {
         assertThat(received.<String>getMessage("key")).isEqualTo("value");
     }
 
+    @DocumentExample
     @Test
     void sendReceiveIdempotence() {
         rewriteRun(

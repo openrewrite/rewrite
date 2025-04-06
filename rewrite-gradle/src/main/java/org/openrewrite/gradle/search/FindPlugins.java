@@ -45,7 +45,6 @@ public class FindPlugins extends Recipe {
             description = "The unique identifier used to apply a plugin in the `plugins` block. " +
                           "Note that this alone is insufficient to search for plugins applied by fully qualified class name and the `buildscript` block.",
             example = "`com.jfrog.bintray`")
-    @Nullable
     String pluginId;
 
     @Option(displayName = "Plugin class",

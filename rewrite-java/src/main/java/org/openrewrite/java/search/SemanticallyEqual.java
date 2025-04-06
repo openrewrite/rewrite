@@ -882,13 +882,31 @@ public class SemanticallyEqual {
                 }
 
                 J.Literal compareTo = (J.Literal) j;
-                if (!TypeUtils.isOfType(literal.getType(), compareTo.getType()) ||
-                    !Objects.equals(literal.getValue(), compareTo.getValue())) {
+                if (!samePrimitiveValue(literal, compareTo)) {
                     isEqual.set(false);
                     return literal;
                 }
             }
             return literal;
+        }
+
+        private static boolean samePrimitiveValue(J.Literal literal, J.Literal compareTo) {
+            Object value = literal.getValue();
+            Object compareToValue = compareTo.getValue();
+            if (Objects.equals(value, compareToValue)) {
+                return true;
+            } else if (value == null) {
+                return compareToValue == null;
+            } else if (value instanceof Number) {
+                if (!(compareToValue instanceof Number)) {
+                    return false;
+                } else if (value instanceof Double || value instanceof Float || compareToValue instanceof Double || compareToValue instanceof Float) {
+                    return ((Number) value).doubleValue() == ((Number) compareToValue).doubleValue();
+                } else if  (value instanceof Integer || value instanceof Long  || value instanceof Short ||  value instanceof Byte) {
+                    return ((Number) value).longValue() == ((Number) compareToValue).longValue();
+                }
+            }
+            return false;
         }
 
         @Override

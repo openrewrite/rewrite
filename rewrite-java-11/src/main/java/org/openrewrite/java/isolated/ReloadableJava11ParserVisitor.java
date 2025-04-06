@@ -459,7 +459,9 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                     EMPTY
             );
         } else if (kind.getType() == J.ClassDeclaration.Kind.Type.Enum) {
-            if (positionOfNext(";", null) >= 0) {
+            int nextSemicolonPosition = positionOfNext(";", null);
+            int nextClosingBracePosition = positionOfNext("}", null);
+            if (nextSemicolonPosition >= 0 && nextSemicolonPosition < nextClosingBracePosition) {
                 enumSet = padRight(new J.EnumValueSet(randomId(), sourceBefore(";"), Markers.EMPTY, emptyList(), true), EMPTY);
             }
         }
@@ -2115,6 +2117,8 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
         final AtomicReference<String> word = new AtomicReference<>("");
         int afterLastModifierPosition = cursor;
         int lastAnnotationPosition = cursor;
+        boolean noSpace = false;
+
         for (int i = cursor; i < source.length(); i++) {
             if (annotationPosTable.containsKey(i)) {
                 JCAnnotation jcAnnotation = annotationPosTable.get(i);
@@ -2146,7 +2150,12 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
             } else if (inComment && c == '\n' || c == '\r') {
                 inComment = false;
             } else if (!inMultilineComment && !inComment) {
-                if (Character.isWhitespace(c)) {
+                // Check: char is whitespace OR next char is an `@` (which is an annotation preceded by modifier/annotation without space)
+                if (Character.isWhitespace(c) || (noSpace = (i + 1 < source.length() && source.charAt(i + 1) == '@'))) {
+                    if (noSpace) {
+                        word.getAndUpdate(w -> w + c);
+                        noSpace = false;
+                    }
                     if (!word.get().isEmpty()) {
                         Modifier matching = null;
                         for (Modifier modifier : modifiers.getFlags()) {
@@ -2246,7 +2255,8 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                     continue;
                 }
                 annotations.add(convert(jcAnnotation));
-                i = cursor;
+                // Adjusting the index by subtracting 1 to account for the case where annotations are not separated by a space
+                i = cursor - 1;
                 continue;
             }
             char c = source.charAt(i);

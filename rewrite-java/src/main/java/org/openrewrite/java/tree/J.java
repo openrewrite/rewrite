@@ -2942,7 +2942,7 @@ public interface J extends Tree {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
+    @RequiredArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)})
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class InstanceOf implements J, Expression, TypedTree {
         @Nullable
@@ -2986,6 +2986,11 @@ public interface J extends Tree {
         @Getter
         JavaType type;
 
+        @With
+        @Nullable
+        @Getter
+        Modifier modifier;
+
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitInstanceOf(this, p);
@@ -3023,6 +3028,18 @@ public interface J extends Tree {
             return p;
         }
 
+        @Deprecated
+        public InstanceOf(UUID id, Space prefix, Markers markers, JRightPadded<Expression> expression, J clazz, @Nullable J pattern, @Nullable JavaType type) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            this.expression = expression;
+            this.clazz = clazz;
+            this.pattern = pattern;
+            this.type = type;
+            this.modifier = null;
+        }
+
         @RequiredArgsConstructor
         public static class Padding {
             private final InstanceOf t;
@@ -3032,7 +3049,7 @@ public interface J extends Tree {
             }
 
             public InstanceOf withExpression(JRightPadded<Expression> expression) {
-                return t.expression == expression ? t : new InstanceOf(t.id, t.prefix, t.markers, expression, t.clazz, t.pattern, t.type);
+                return t.expression == expression ? t : new InstanceOf(t.id, t.prefix, t.markers, expression, t.clazz, t.pattern, t.type, t.modifier);
             }
 
             @Deprecated
@@ -3042,7 +3059,7 @@ public interface J extends Tree {
 
             @Deprecated
             public InstanceOf withExpr(JRightPadded<Expression> expression) {
-                return t.expression == expression ? t : new InstanceOf(t.id, t.prefix, t.markers, expression, t.clazz, t.pattern, t.type);
+                return t.expression == expression ? t : new InstanceOf(t.id, t.prefix, t.markers, expression, t.clazz, t.pattern, t.type, t.modifier);
             }
         }
     }

@@ -35,6 +35,8 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.table.MavenDownloadEvents;
+import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.semver.Semver;
 
@@ -52,6 +54,12 @@ import java.util.Optional;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class ChangePlugin extends Recipe {
+    @EqualsAndHashCode.Exclude
+    transient MavenMetadataFailures mavenMetadataFailures = new MavenMetadataFailures(this);
+
+    @EqualsAndHashCode.Exclude
+    transient MavenDownloadEvents mavenDownloadEvents = new MavenDownloadEvents(this);
+
     @Option(displayName = "Plugin ID",
             description = "The current Gradle plugin id.",
             example = "org.openrewrite.rewrite")
@@ -176,7 +184,7 @@ public class ChangePlugin extends Recipe {
 
                         if (!StringUtils.isBlank(newVersion)) {
                             try {
-                                String resolvedVersion = new DependencyVersionSelector(null, gradleProject, gradleSettings)
+                                String resolvedVersion = new DependencyVersionSelector(mavenMetadataFailures, mavenDownloadEvents, gradleProject, gradleSettings)
                                         .select(new GroupArtifact(newPluginId, newPluginId + ".gradle.plugin"), "classpath", newVersion, null, ctx);
                                 if (resolvedVersion == null) {
                                     return m;

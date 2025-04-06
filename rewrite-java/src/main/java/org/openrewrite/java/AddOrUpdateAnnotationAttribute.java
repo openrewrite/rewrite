@@ -67,18 +67,21 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
 
     @Option(displayName = "Attribute value",
             description = "The value to set the attribute to. Set to `null` to remove the attribute.",
+            required = false,
             example = "500")
     @Nullable
     String attributeValue;
 
     @Option(displayName = "Old Attribute value",
             description = "The current value of the attribute, this can be used to filter where the change is applied. Set to `null` for wildcard behavior.",
+            required = false,
             example = "400")
     @Nullable
     String oldAttributeValue;
 
     @Option(displayName = "Add only",
-            description = "When set to `true` will not change existing annotation attribute values.")
+            description = "When set to `true` will not change existing annotation attribute values.",
+            required = false)
     @Nullable
     Boolean addOnly;
 
@@ -86,7 +89,8 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
             description = "If the attribute is an array, setting this option to `true` will append the value(s). " +
                     "In conjunction with `addOnly`, it is possible to control duplicates: " +
                     "`addOnly=true`, always append. " +
-                    "`addOnly=false`, only append if the value is not already present.")
+                    "`addOnly=false`, only append if the value is not already present.",
+            required = false)
     @Nullable
     Boolean appendArray;
 

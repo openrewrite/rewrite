@@ -102,26 +102,29 @@ public class Semver {
             return version1;
         }
 
-        int major1 = Integer.parseInt(Semver.majorVersion(version1));
-        int major2 = Integer.parseInt(Semver.majorVersion(version2));
-        if (major1 != major2) return major1 > major2 ? version1 : version2;
+        try {
+            int major1 = Integer.parseInt(Semver.majorVersion(version1));
+            int major2 = Integer.parseInt(Semver.majorVersion(version2));
+            if (major1 != major2) return major1 > major2 ? version1 : version2;
 
-        int minor1 = Integer.parseInt(Semver.minorVersion(version1));
-        int minor2 = Integer.parseInt(Semver.minorVersion(version2));
-        if (minor1 != minor2) return minor1 > minor2 ? version1 : version2;
+            int minor1 = Integer.parseInt(Semver.minorVersion(version1));
+            int minor2 = Integer.parseInt(Semver.minorVersion(version2));
+            if (minor1 != minor2) return minor1 > minor2 ? version1 : version2;
 
-        String[] parts1 = version1.split("[.-]");
-        String[] parts2 = version2.split("[.-]");
-        int patch1 = parts1.length > 2 && parts1[2].matches("\\d+") ? Integer.parseInt(parts1[2]) : 0;
-        int patch2 = parts2.length > 2 && parts2[2].matches("\\d+") ? Integer.parseInt(parts2[2]) : 0;
-        if (patch1 != patch2) return patch1 > patch2 ? version1 : version2;
+            String[] parts1 = version1.split("[.-]");
+            String[] parts2 = version2.split("[.-]");
+            int patch1 = parts1.length > 2 && parts1[2].matches("\\d+") ? Integer.parseInt(parts1[2]) : 0;
+            int patch2 = parts2.length > 2 && parts2[2].matches("\\d+") ? Integer.parseInt(parts2[2]) : 0;
+            if (patch1 != patch2) return patch1 > patch2 ? version1 : version2;
 
-        String label1 = parts1.length > 3 ? parts1[3].toLowerCase() : "";
-        String label2 = parts2.length > 3 ? parts2[3].toLowerCase() : "";
+            String label1 = parts1.length > 3 ? parts1[3].toLowerCase() : "";
+            String label2 = parts2.length > 3 ? parts2[3].toLowerCase() : "";
 
-        if (label1.isEmpty() && !label2.isEmpty()) return version1;
-        if (!label1.isEmpty() && label2.isEmpty()) return version2;
-
+            if (label1.isEmpty() && !label2.isEmpty()) return version1;
+            if (!label1.isEmpty() && label2.isEmpty()) return version2;
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Error comparing version number \"" + version1 + "\" to \"" + version2 + "\"", e);
+        }
         return version1;
     }
 }
