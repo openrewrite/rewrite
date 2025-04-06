@@ -19,11 +19,9 @@ import com.fasterxml.jackson.annotation.JsonIgnoreType;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
+import org.openrewrite.internal.InMemoryDataTableStore;
 
 import java.lang.reflect.ParameterizedType;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @param <Row> The model type for a single row of this data table.
@@ -51,9 +49,7 @@ public class DataTable<Row> {
     public DataTable(Recipe recipe, Class<Row> type, String name,
                      @NlsRewrite.DisplayName @Language("markdown") String displayName,
                      @NlsRewrite.Description @Language("markdown") String description) {
-        this.displayName = displayName;
-        this.description = description;
-        recipe.addDataTable(this);
+        this(recipe, displayName, description);
     }
 
     /**
@@ -87,26 +83,10 @@ public class DataTable<Row> {
     }
 
     public void insertRow(ExecutionContext ctx, Row row) {
-        if (!allowWritingInThisCycle(ctx)) {
+        if (ctx.getCycle() > 1) {
             return;
         }
-        ctx.computeMessage(ExecutionContext.DATA_TABLES, row, ConcurrentHashMap::new, (extract, allDataTables) -> {
-            //noinspection unchecked
-            List<Row> dataTablesOfType = (List<Row>) allDataTables.computeIfAbsent(this, c -> new ArrayList<>());
-            dataTablesOfType.add(row);
-            return allDataTables;
-        });
-    }
-
-    /**
-     * This method is used to decide weather to ignore any row insertions in the current cycle.
-     * This prevents (by default) data table producing recipes from having to keep track of state across
-     * multiple cycles to prevent duplicate row entries.
-     *
-     * @param ctx the execution context
-     * @return weather to allow writing in this cycle
-     */
-    protected boolean allowWritingInThisCycle(ExecutionContext ctx) {
-        return ctx.getCycle() <= 1;
+        ctx.computeMessage(ExecutionContext.DATA_TABLE_STORE, row, InMemoryDataTableStore::new, (extract, dataTableStore) -> dataTableStore)
+                .insertRow(this, ctx, row);
     }
 }

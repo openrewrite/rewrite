@@ -94,4 +94,27 @@ class DataTableTest implements RewriteTest {
             }
         }
     }
+
+    @Test
+    void noRowsFromPrecondition() {
+        rewriteRun(
+          spec -> spec
+            .recipe(toRecipe(r -> Preconditions.check(toRecipe(r2 -> new PlainTextVisitor<>() {
+                final WordTable wordTable = new WordTable(r2);
+
+                @Override
+                public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                    int i = 0;
+                    for (String s : text.getText().split(" ")) {
+                        wordTable.insertRow(ctx, new WordTable.Row(i++, s));
+                    }
+                    return text;
+                }
+            }), TreeVisitor.noop())))
+            .afterRecipe(run -> {
+                assertThat(run.getDataTables().keySet()).noneMatch(dt -> dt instanceof WordTable);
+            }),
+          text("hello world")
+        );
+    }
 }

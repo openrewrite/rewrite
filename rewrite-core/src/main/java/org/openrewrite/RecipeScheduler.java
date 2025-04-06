@@ -26,7 +26,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.stream.Stream;
 
-import static java.util.Collections.emptyMap;
 import static org.openrewrite.Recipe.PANIC;
 import static org.openrewrite.scheduling.WorkingDirectoryExecutionContextView.WORKING_DIRECTORY_ROOT;
 
@@ -39,10 +38,7 @@ public class RecipeScheduler {
                                  int minCycles) {
         try {
             LargeSourceSet after = runRecipeCycles(recipe, sourceSet, ctx, maxCycles, minCycles);
-            return new RecipeRun(
-                    after.getChangeset(),
-                    ctx.getMessage(ExecutionContext.DATA_TABLES, emptyMap())
-            );
+            return new RecipeRun(after.getChangeset());
         } finally {
             Path workingDirectoryRoot = ctx.getMessage(WORKING_DIRECTORY_ROOT);
             if (workingDirectoryRoot != null) {

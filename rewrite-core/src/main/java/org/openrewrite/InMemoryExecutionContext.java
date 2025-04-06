@@ -23,7 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
-public class InMemoryExecutionContext implements ExecutionContext, Cloneable {
+public class InMemoryExecutionContext implements ExecutionContext {
     @Nullable
     private Map<String, Object> messages;
 
@@ -89,15 +89,5 @@ public class InMemoryExecutionContext implements ExecutionContext, Cloneable {
     @Override
     public BiConsumer<Throwable, ExecutionContext> getOnTimeout() {
         return onTimeout;
-    }
-
-    @SuppressWarnings("MethodDoesntCallSuperMethod")
-    @Override
-    public InMemoryExecutionContext clone() {
-        InMemoryExecutionContext clone = new InMemoryExecutionContext();
-        clone.messages = new ConcurrentHashMap<>(messages);
-        clone.messages.computeIfPresent(DATA_TABLES, (key, dt) ->
-                new ConcurrentHashMap<>(((Map<?, ?>) dt)));
-        return clone;
     }
 }

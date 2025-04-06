@@ -85,8 +85,6 @@ public class Visit implements RpcRequest {
                 localObjects.put(after.getId().toString(), after);
             }
 
-            maybeUpdateExecutionContext(request.getP(), p);
-
             return new VisitResponse(before != after);
         }
 
@@ -119,19 +117,17 @@ public class Visit implements RpcRequest {
         }
 
         private Object getVisitorP(Visit request) {
-            Object p = getObject.apply(request.getP());
-            // This is likely to be reused in subsequent visits, so we keep it.
-            localObjects.put(request.getP(), p);
-
-            if (p instanceof ExecutionContext) {
+            Object p;
+            if ("org.openrewrite.ExecutionContext".equals(request.getP())) {
+                p = new InMemoryExecutionContext();
                 String visitorName = request.getVisitor();
 
+                // This is really probably particular to the Java implementation,
+                // because we are carrying forward the legacy of cycles that are likely to be
+                // removed from OpenRewrite in the future.
                 if (visitorName.startsWith("scan:") || visitorName.startsWith("edit:")) {
                     Recipe recipe = preparedRecipes.get(visitorName.substring(
                             "edit:".length() /* 'scan:' has same length*/));
-                    // This is really probably particular to the Java implementation,
-                    // because we are carrying forward the legacy of cycles that are likely to be
-                    // removed from OpenRewrite in the future.
                     WatchableExecutionContext ctx = new WatchableExecutionContext((ExecutionContext) p);
                     ctx.putCycle(new RecipeRunCycle<>(recipe, 0, new Cursor(null, Cursor.ROOT_VALUE), ctx,
                             new RecipeRunStats(Recipe.noop()), new SourcesFileResults(Recipe.noop()),
@@ -139,26 +135,12 @@ public class Visit implements RpcRequest {
                     ctx.putCurrentRecipe(recipe);
                     return ctx;
                 }
+            } else {
+                p = getObject.apply(request.getP());
             }
+            // This is likely to be reused in subsequent visits, so we keep it.
+            localObjects.put(request.getP(), p);
             return p;
-        }
-
-        /**
-         * If the object is an instance of WatchableExecutionContext, and it has new messages,
-         * clone the underlying execution context and update the local state, so that when the
-         * remote asks for it, we see the ExecutionContext in CHANGE state.
-         *
-         * @param pId The ID of p
-         * @param p   An object, which may be an ExecutionContext
-         */
-        private void maybeUpdateExecutionContext(String pId, Object p) {
-            if (p instanceof WatchableExecutionContext && ((WatchableExecutionContext) p).hasNewMessages()) {
-                ExecutionContext ctx = ((WatchableExecutionContext) p).getDelegate();
-                while (ctx instanceof DelegatingExecutionContext) {
-                    ctx = ((DelegatingExecutionContext) ctx).getDelegate();
-                }
-                localObjects.put(pId, ((InMemoryExecutionContext) ctx).clone());
-            }
         }
     }
 }

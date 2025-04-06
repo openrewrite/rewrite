@@ -25,6 +25,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
 import org.openrewrite.config.Environment;
+import org.openrewrite.internal.InMemoryDataTableStore;
 import org.openrewrite.table.TextMatches;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
@@ -49,6 +50,7 @@ class RewriteRpcTest implements RewriteTest {
 
     RewriteRpc server;
     RewriteRpc client;
+    DataTableStore dataTableStore = new InMemoryDataTableStore();
 
     @BeforeEach
     void before() throws IOException {
@@ -59,11 +61,13 @@ class RewriteRpcTest implements RewriteTest {
 
         JsonRpc serverJsonRpc = new JsonRpc(new TraceMessageHandler("server",
           new HeaderDelimitedMessageHandler(serverIn, serverOut)));
-        server = new RewriteRpc(serverJsonRpc, env).batchSize(1).timeout(Duration.ofMinutes(10));
+        server = new RewriteRpc(serverJsonRpc, env).batchSize(1).timeout(Duration.ofMinutes(10))
+          .executionContext(ctx -> ctx.putMessage(ExecutionContext.DATA_TABLE_STORE, dataTableStore));
 
         JsonRpc clientJsonRpc = new JsonRpc(new TraceMessageHandler("client",
           new HeaderDelimitedMessageHandler(clientIn, clientOut)));
-        client = new RewriteRpc(clientJsonRpc, env).batchSize(1).timeout(Duration.ofMinutes(10));
+        client = new RewriteRpc(clientJsonRpc, env).batchSize(1).timeout(Duration.ofMinutes(10))
+          .executionContext(ctx -> ctx.putMessage(ExecutionContext.DATA_TABLE_STORE, dataTableStore));
     }
 
     @AfterEach
