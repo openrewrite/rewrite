@@ -49,44 +49,44 @@ class GroovyParserTest implements RewriteTest {
     @Test
     void shouldBeAbleToParseParenthesisedConstructorCallExpressions() {
         rewriteRun(
-            groovy(
-                """
-                (new BigDecimal(10))
-                """
-            )
+                groovy(
+                        """
+                        (new BigDecimal(10))
+                        """
+                )
         );
     }
 
     @Test
     void shouldBeAbleToParseParenthesisedSlashyStringConstantExpressions() {
         rewriteRun(
-            groovy(
-                """
-                ((/test/))
-                """
-            )
+                groovy(
+                        """
+                        ((/test/))
+                        """
+                )
         );
     }
 
     @Test
     void shouldBeAbleToParseParenthesisedQuotedConstantExpressions() {
         rewriteRun(
-            groovy(
-                """
-                (("test"))
-                """
-            )
+                groovy(
+                        """
+                        (("test"))
+                        """
+                )
         );
     }
 
     @Test
     void shouldBeAbleToParseParenthesisedIntegerConstantExpressions() {
         rewriteRun(
-            groovy(
-                """
-                ((100))
-                """
-            )
+                groovy(
+                        """
+                        (100)
+                        """
+                )
         );
     }
 
