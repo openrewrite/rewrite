@@ -2442,6 +2442,25 @@ public class GroovyParserVisitor {
         return false;
     }
 
+
+    /**
+     * Determines if the character at the specified {@code index} in the {@code source} is escaped.
+     * A character is considered escaped if it is preceded by an odd number of consecutive backslashes.
+     *
+     * @param index The index in the string to check for escaping.
+     *              This must be a valid index within the range of {@code source}.
+     * @return {@code true} if the character at the given index is escaped, {@code false} otherwise.
+     * @throws StringIndexOutOfBoundsException If the {@code index} is not within the valid range of the source string.
+     */
+    private boolean isEscaped(int index) {
+        int backslashCount = 0;
+        while (index >= 0 && source.charAt(index) == '\\') {
+            backslashCount++;
+            index--;
+        }
+        return backslashCount % 2 != 0;
+    }
+
     /**
      * Returns a string that is a part of this source. The substring begins at the specified beginIndex and extends until delimiter.
      * The cursor will not be moved.
@@ -2449,7 +2468,8 @@ public class GroovyParserVisitor {
     private String sourceSubstring(int beginIndex, String untilDelim) {
         int endIndex = source.indexOf(untilDelim, Math.max(beginIndex, cursor + untilDelim.length()));
         // don't stop if last char is escaped.
-        while (source.charAt(endIndex - 1) == '\\') {
+        // Fixed potential infinite loop by correctly handling escaped delimiters in the source string.
+        while (endIndex > 0 && isEscaped(endIndex - 1)) {
             endIndex = source.indexOf(untilDelim, endIndex + 1);
         }
         return source.substring(beginIndex, endIndex);

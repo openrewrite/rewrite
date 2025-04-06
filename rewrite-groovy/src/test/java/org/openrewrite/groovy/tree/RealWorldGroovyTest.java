@@ -441,4 +441,16 @@ class RealWorldGroovyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void stringWithMultipleBackslashes() {
+        rewriteRun(
+          groovy(
+            """
+              "".replaceAll('\\\\', '/')
+              "a\\b".replaceAll('\\\\', '/')
+              """
+          )
+        );
+    }
 }
