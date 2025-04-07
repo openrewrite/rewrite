@@ -106,14 +106,18 @@ public class ChangeType extends Recipe {
                         return SearchResult.found(cu);
                     }
                     if (Boolean.TRUE.equals(visitStringLiterals)) {
-                        return Traits.literal().asVisitor(lit -> {
+                        AtomicBoolean found = new AtomicBoolean(false);
+                        Traits.literal().asVisitor(lit -> {
                             stopAfterPreVisit();
                             String string = lit.getString();
                             if (string != null && string.contains(oldFullyQualifiedTypeName)) {
-                                return SearchResult.found(lit.getTree());
+                                found.set(true);
                             }
                             return lit.getTree();
                         }).visit(cu, ctx, getCursor().getParentTreeCursor());
+                        if (found.get()) {
+                            return SearchResult.found(cu);
+                        }
                     }
                     return new UsesType<>(oldFullyQualifiedTypeName, true).visitNonNull(cu, ctx);
                 } else if (tree instanceof SourceFileWithReferences) {

@@ -30,6 +30,7 @@ import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
@@ -100,13 +101,17 @@ public class ChangePackage extends Recipe {
                 if (tree instanceof JavaSourceFile) {
                     JavaSourceFile cu = (JavaSourceFile) tree;
                     if (Boolean.TRUE.equals(visitStringLiterals)) {
-                        return Traits.literal().asVisitor(lit -> {
+                        AtomicBoolean found = new AtomicBoolean(false);
+                        Traits.literal().asVisitor(lit -> {
                             String string = lit.getString();
                             if (string != null && string.contains(oldPackageName)) {
-                                return SearchResult.found(lit.getTree());
+                                found.set(true);
                             }
                             return lit.getTree();
                         }).visit(cu, ctx, getCursor().getParentTreeCursor());
+                        if (found.get()) {
+                            return SearchResult.found(cu);
+                        }
                     }
                     if (cu.getPackageDeclaration() != null) {
                         String original = cu.getPackageDeclaration().getExpression()
