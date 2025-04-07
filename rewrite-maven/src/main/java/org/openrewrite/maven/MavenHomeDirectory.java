@@ -30,4 +30,10 @@ public class MavenHomeDirectory {
     public static Path getRepository() {
         return get().resolve("repository");
     }
+    public static Path getSettingsXml() {
+        return get().resolve("settings.xml");
+    }
+    public static Path getSecuritySetingsXml() {
+        return get().resolve("settings-security.xml");
+    }
 }
