@@ -23,7 +23,6 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
-import org.openrewrite.maven.table.MavenDownloadEvents;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -45,11 +44,7 @@ import static org.openrewrite.maven.tree.Parent.DEFAULT_RELATIVE_PATH;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class ChangeParentPom extends Recipe {
-    @EqualsAndHashCode.Exclude
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
-
-    @EqualsAndHashCode.Exclude
-    transient MavenDownloadEvents mavenDownloadEvents = new MavenDownloadEvents(this);
 
     @Option(displayName = "Old group ID",
             description = "The group ID of the Maven parent pom to be changed away from.",
@@ -174,8 +169,6 @@ public class ChangeParentPom extends Recipe {
                         String currentArtifactId = tag.getChildValue("artifactId").orElse(oldArtifactId);
                         String targetArtifactId = newArtifactId == null ? currentArtifactId : newArtifactId;
                         String targetRelativePath = newRelativePath == null ? tag.getChildValue("relativePath").orElse(oldRelativePath) : newRelativePath;
-
-                        MavenExecutionContextView.view(ctx).setDownloadEventsDataTable(mavenDownloadEvents);
                         try {
                             Optional<String> targetVersion = findAcceptableVersion(targetGroupId, targetArtifactId, oldVersion, ctx);
                             if (!targetVersion.isPresent() ||
@@ -255,8 +248,6 @@ public class ChangeParentPom extends Recipe {
                                         repository.getUri(), repository.getSnapshots(), repository.getReleases(), repositoryResponse.getValue()));
                             }
                             return e.warn(tag);
-                        } finally {
-                            MavenExecutionContextView.view(ctx).setDownloadEventsDataTable(null);
                         }
                     }
                 }
@@ -279,9 +270,7 @@ public class ChangeParentPom extends Recipe {
                 String finalCurrentVersion = !Semver.isVersion(currentVersion) ? "0.0.0" : currentVersion;
 
                 if (availableVersions == null) {
-                    MavenExecutionContextView.view(ctx).setDownloadEventsDataTable(mavenDownloadEvents);
                     MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
-                    MavenExecutionContextView.view(ctx).setDownloadEventsDataTable(null);
                     //noinspection EqualsWithItself
                     availableVersions = mavenMetadata.getVersioning().getVersions().stream()
                             .filter(v -> versionComparator.isValid(finalCurrentVersion, v))

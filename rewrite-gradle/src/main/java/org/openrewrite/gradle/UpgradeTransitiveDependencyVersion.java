@@ -37,7 +37,6 @@ import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.MavenDownloadingException;
-import org.openrewrite.maven.table.MavenDownloadEvents;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
@@ -66,9 +65,6 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
 
     @EqualsAndHashCode.Exclude
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
-
-    @EqualsAndHashCode.Exclude
-    transient MavenDownloadEvents mavenDownloadEvents = new MavenDownloadEvents(this);
 
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. This can be a glob expression.",
@@ -177,7 +173,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
 
                 Map<GroupArtifact, Map<GradleDependencyConfiguration, String>> toUpdate = new LinkedHashMap<>();
 
-                DependencyVersionSelector versionSelector = new DependencyVersionSelector(metadataFailures, mavenDownloadEvents, gradleProject, null);
+                DependencyVersionSelector versionSelector = new DependencyVersionSelector(metadataFailures, gradleProject, null);
                 for (GradleDependencyConfiguration configuration : gradleProject.getConfigurations()) {
                     for (ResolvedDependency resolved : configuration.getResolved()) {
                         if (resolved.getDepth() > 0 && dependencyMatcher.matches(resolved.getGroupId(),

@@ -20,7 +20,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Validated;
 import org.openrewrite.maven.internal.InsertDependencyComparator;
-import org.openrewrite.maven.table.MavenDownloadEvents;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.ResolvedDependency;
@@ -74,9 +73,6 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
     private final MavenMetadataFailures metadataFailures;
 
     @Nullable
-    private final MavenDownloadEvents mavenDownloadEvents;
-
-    @Nullable
     private VersionComparator versionComparator;
 
     @Nullable
@@ -85,11 +81,10 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
     public AddDependencyVisitor(String groupId, String artifactId, String version,
                                 @Nullable String versionPattern, @Nullable String scope,
                                 @Nullable Boolean releasesOnly, @Nullable String type,
-                                @Nullable String classifier,
-                                @Nullable Boolean optional,
+                                @Nullable String classifier, @Nullable Boolean optional,
                                 @Nullable Pattern familyRegex) {
         this(groupId, artifactId, version, versionPattern, scope, releasesOnly, type,
-                classifier, optional, familyRegex, null, null);
+                classifier, optional, familyRegex, null);
     }
 
     @Override
@@ -196,7 +191,6 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
                 if (versionComparator == null || versionComparator instanceof ExactVersion) {
                     resolvedVersion = version;
                 } else {
-                    MavenExecutionContextView.view(ctx).setDownloadEventsDataTable(mavenDownloadEvents);
                     MavenMetadata mavenMetadata = metadataFailures == null ?
                             downloadMetadata(groupId, artifactId, ctx) :
                             metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
@@ -211,7 +205,6 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
                             .filter(v -> !Boolean.TRUE.equals(releasesOnly) || latest.isValid(null, v))
                             .max((v1, v2) -> versionComparator.compare(null, v1, v2))
                             .orElse(version);
-                    MavenExecutionContextView.view(ctx).setDownloadEventsDataTable(null);
                 }
             }
 
