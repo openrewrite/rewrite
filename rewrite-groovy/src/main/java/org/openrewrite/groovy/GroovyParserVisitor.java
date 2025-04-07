@@ -2459,20 +2459,27 @@ public class GroovyParserVisitor {
         } else if (rawIpl instanceof Integer) {
             // On Java 8 _INSIDE_PARENTHESES_LEVEL is a regular Integer
             return (Integer) rawIpl;
-        } else if (node instanceof MethodCallExpression && !isOlderThanGroovy3()) {
-            // Only for groovy 3+, because lower versions do always return `-1` for objectExpression.lineNumber / objectExpression.columnNumber
-            MethodCallExpression expr = (MethodCallExpression) node;
-            return determineParenthesisLevel(expr, expr.getObjectExpression().getLineNumber(), expr.getLineNumber(), expr.getObjectExpression().getColumnNumber(), expr.getColumnNumber());
-        } else if (node instanceof BinaryExpression) {
-            BinaryExpression expr = (BinaryExpression) node;
-            return determineParenthesisLevel(expr, expr.getLeftExpression().getLineNumber(), expr.getLineNumber(), expr.getLeftExpression().getColumnNumber(), expr.getColumnNumber());
-        } else if (node instanceof ConstantExpression && isOlderThanGroovy3()) {
-            ConstantExpression expr = (ConstantExpression) node;
-            return determineParenthesisLevel(expr, expr.getLineNumber(), expr.getLastLineNumber(), expr.getColumnNumber(), expr.getLastColumnNumber());
-        } else if (node instanceof ConstructorCallExpression && isOlderThanGroovy3()) {
-            ConstructorCallExpression expr = (ConstructorCallExpression) node;
-            return determineParenthesisLevel(expr, expr.getArguments().getLineNumber(), expr.getLineNumber(), expr.getArguments().getColumnNumber(), expr.getColumnNumber()) - 1;
         }
+
+        if (isOlderThanGroovy3()) {
+            if (node instanceof ConstantExpression) {
+                ConstantExpression expr = (ConstantExpression) node;
+                return determineParenthesisLevel(expr, expr.getLineNumber(), expr.getLastLineNumber(), expr.getColumnNumber(), expr.getLastColumnNumber());
+            } else if (node instanceof ConstructorCallExpression) {
+                ConstructorCallExpression expr = (ConstructorCallExpression) node;
+                return determineParenthesisLevel(expr, expr.getArguments().getLineNumber(), expr.getLineNumber(), expr.getArguments().getColumnNumber(), expr.getColumnNumber()) - 1;
+            } else if (node instanceof BinaryExpression) {
+                BinaryExpression expr = (BinaryExpression) node;
+                return determineParenthesisLevel(expr, expr.getLeftExpression().getLineNumber(), expr.getLineNumber(), expr.getLeftExpression().getColumnNumber(), expr.getColumnNumber());
+            }
+        } else {
+            if (node instanceof MethodCallExpression) {
+                // Only for groovy 3+, because lower versions do always return `-1` for objectExpression.lineNumber / objectExpression.columnNumber
+                MethodCallExpression expr = (MethodCallExpression) node;
+                return determineParenthesisLevel(expr, expr.getObjectExpression().getLineNumber(), expr.getLineNumber(), expr.getObjectExpression().getColumnNumber(), expr.getColumnNumber());
+            }
+        }
+
         return null;
     }
 
