@@ -18,11 +18,9 @@ package org.openrewrite.java.ai;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.table.TokenCount;
 import org.openrewrite.java.tree.J;
 

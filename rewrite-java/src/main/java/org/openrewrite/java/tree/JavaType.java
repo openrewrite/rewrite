@@ -16,7 +16,10 @@
 package org.openrewrite.java.tree;
 
 import com.fasterxml.jackson.annotation.*;
-import lombok.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.Value;
+import lombok.With;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;

@@ -25,7 +25,6 @@ import org.openrewrite.config.RecipeExample;
 
 import java.time.Duration;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;

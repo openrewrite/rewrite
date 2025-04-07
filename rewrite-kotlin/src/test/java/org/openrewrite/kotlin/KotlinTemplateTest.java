@@ -28,14 +28,14 @@ class KotlinTemplateTest implements RewriteTest {
 
     @DocumentExample
     @Test
-    void templateMethodInvocation() {
+    void replaceContextFreeStatement() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new KotlinVisitor<>() {
               @Override
-              public J visitBinary(J.Binary binary, ExecutionContext ctx) {
-                  return KotlinTemplate.builder("println(\"foo\");")
+              public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  return KotlinTemplate.builder("println(\"foo\")")
                     .build()
-                    .apply(getCursor(), binary.getCoordinates().replace());
+                    .apply(getCursor(), multiVariable.getCoordinates().replace());
               }
           })),
           kotlin(
@@ -49,7 +49,7 @@ class KotlinTemplateTest implements RewriteTest {
             """
               class Test {
                   fun foo() {
-                      val b1 = println("foo")
+                      println("foo")
                   }
               }
               """
