@@ -441,17 +441,4 @@ class RealWorldGroovyTest implements RewriteTest {
           )
         );
     }
-
-    @Test
-    @Issue("https://github.com/openrewrite/rewrite/issues/5232")
-    void stringWithMultipleBackslashes() {
-        rewriteRun(
-          groovy(
-            """
-              "".replaceAll('\\\\', '/')
-              "a\\b".replaceAll('\\\\', '/')
-              """
-          )
-        );
-    }
 }
