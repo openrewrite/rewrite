@@ -2442,6 +2442,25 @@ public class GroovyParserVisitor {
         return false;
     }
 
+
+    /**
+     * Determines if the character at the specified {@code index} in the {@code source} is escaped.
+     * A character is considered escaped if it is preceded by an odd number of consecutive backslashes.
+     *
+     * @param index The index in the string to check for escaping.
+     *              This must be a valid index within the range of {@code source}.
+     * @return {@code true} if the character at the given index is escaped, {@code false} otherwise.
+     * @throws StringIndexOutOfBoundsException If the {@code index} is not within the valid range of the source string.
+     */
+    private boolean isEscaped(int index) {
+        int backslashCount = 0;
+        while (index >= 0 && source.charAt(index) == '\\') {
+            backslashCount++;
+            index--;
+        }
+        return backslashCount % 2 != 0;
+    }
+
     /**
      * Returns a string that is a part of this source. The substring begins at the specified beginIndex and extends until delimiter.
      * The cursor will not be moved.
@@ -2449,7 +2468,8 @@ public class GroovyParserVisitor {
     private String sourceSubstring(int beginIndex, String untilDelim) {
         int endIndex = source.indexOf(untilDelim, Math.max(beginIndex, cursor + untilDelim.length()));
         // don't stop if last char is escaped.
-        while (source.charAt(endIndex - 1) == '\\') {
+        // Fixed potential infinite loop by correctly handling escaped delimiters in the source string.
+        while (endIndex > 0 && isEscaped(endIndex - 1)) {
             endIndex = source.indexOf(untilDelim, endIndex + 1);
         }
         return source.substring(beginIndex, endIndex);
@@ -2463,14 +2483,27 @@ public class GroovyParserVisitor {
         } else if (rawIpl instanceof Integer) {
             // On Java 8 _INSIDE_PARENTHESES_LEVEL is a regular Integer
             return (Integer) rawIpl;
-        } else if (node instanceof MethodCallExpression && !isOlderThanGroovy3()) {
-            // Only for groovy 3+, because lower versions do always return `-1` for objectExpression.lineNumber / objectExpression.columnNumber
-            MethodCallExpression expr = (MethodCallExpression) node;
-            return determineParenthesisLevel(expr, expr.getObjectExpression().getLineNumber(), expr.getLineNumber(), expr.getObjectExpression().getColumnNumber(), expr.getColumnNumber());
-        } else if (node instanceof BinaryExpression) {
-            BinaryExpression expr = (BinaryExpression) node;
-            return determineParenthesisLevel(expr, expr.getLeftExpression().getLineNumber(), expr.getLineNumber(), expr.getLeftExpression().getColumnNumber(), expr.getColumnNumber());
         }
+
+        if (isOlderThanGroovy3()) {
+            if (node instanceof ConstantExpression) {
+                ConstantExpression expr = (ConstantExpression) node;
+                return determineParenthesisLevel(expr, expr.getLineNumber(), expr.getLastLineNumber(), expr.getColumnNumber(), expr.getLastColumnNumber());
+            } else if (node instanceof ConstructorCallExpression) {
+                ConstructorCallExpression expr = (ConstructorCallExpression) node;
+                return determineParenthesisLevel(expr, expr.getArguments().getLineNumber(), expr.getLineNumber(), expr.getArguments().getColumnNumber(), expr.getColumnNumber()) - 1;
+            } else if (node instanceof BinaryExpression) {
+                BinaryExpression expr = (BinaryExpression) node;
+                return determineParenthesisLevel(expr, expr.getLeftExpression().getLineNumber(), expr.getLineNumber(), expr.getLeftExpression().getColumnNumber(), expr.getColumnNumber());
+            }
+        } else {
+            if (node instanceof MethodCallExpression) {
+                // Only for groovy 3+, because lower versions do always return `-1` for objectExpression.lineNumber / objectExpression.columnNumber
+                MethodCallExpression expr = (MethodCallExpression) node;
+                return determineParenthesisLevel(expr, expr.getObjectExpression().getLineNumber(), expr.getLineNumber(), expr.getObjectExpression().getColumnNumber(), expr.getColumnNumber());
+            }
+        }
+
         return null;
     }
 
@@ -2518,7 +2551,7 @@ public class GroovyParserVisitor {
                 if (delimiter == null) {
                     if (source.charAt(i) == '(') {
                         count++;
-                    } else if (source.charAt(i) == ')') {
+                    } else if (source.charAt(i) == ')' && !(node instanceof ConstantExpression)) {
                         count--;
                     }
                 } else {

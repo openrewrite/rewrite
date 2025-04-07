@@ -36,8 +36,6 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.maven.MavenDownloadingException;
-import org.openrewrite.maven.table.MavenDownloadEvents;
-import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
@@ -52,12 +50,6 @@ import static java.util.Objects.requireNonNull;
 @EqualsAndHashCode(callSuper = false)
 @RequiredArgsConstructor
 public class ChangeDependency extends Recipe {
-    @EqualsAndHashCode.Exclude
-    transient MavenMetadataFailures mavenMetadataFailures = new MavenMetadataFailures(this);
-
-    @EqualsAndHashCode.Exclude
-    transient MavenDownloadEvents mavenDownloadEvents = new MavenDownloadEvents(this);
-
     @Option(displayName = "Old groupId",
             description = "The old groupId to replace. The groupId is the first part of a dependency coordinate 'com.google.guava:guava:VERSION'. Supports glob expressions.",
             example = "org.openrewrite.recipe")
@@ -221,7 +213,7 @@ public class ChangeDependency extends Recipe {
                             if (!StringUtils.isBlank(newVersion) && (!StringUtils.isBlank(original.getVersion()) || Boolean.TRUE.equals(overrideManagedVersion))) {
                                 String resolvedVersion;
                                 try {
-                                    resolvedVersion = new DependencyVersionSelector(mavenMetadataFailures, mavenDownloadEvents, gradleProject, null)
+                                    resolvedVersion = new DependencyVersionSelector(null, gradleProject, null)
                                             .select(new GroupArtifact(updated.getGroupId(), updated.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
                                 } catch (MavenDownloadingException e) {
                                     return e.warn(m);
@@ -255,7 +247,7 @@ public class ChangeDependency extends Recipe {
                             if (!StringUtils.isBlank(newVersion)) {
                                 String resolvedVersion;
                                 try {
-                                    resolvedVersion = new DependencyVersionSelector(mavenMetadataFailures, mavenDownloadEvents, gradleProject, null)
+                                    resolvedVersion = new DependencyVersionSelector(null, gradleProject, null)
                                             .select(new GroupArtifact(updated.getGroupId(), updated.getArtifactId()), m.getSimpleName(), newVersion, versionPattern, ctx);
                                 } catch (MavenDownloadingException e) {
                                     return e.warn(m);
@@ -328,7 +320,7 @@ public class ChangeDependency extends Recipe {
                     if (!StringUtils.isBlank(newVersion) && (!StringUtils.isBlank(version) || Boolean.TRUE.equals(overrideManagedVersion))) {
                         String resolvedVersion;
                         try {
-                            resolvedVersion = new DependencyVersionSelector(mavenMetadataFailures, mavenDownloadEvents, gradleProject, null)
+                            resolvedVersion = new DependencyVersionSelector(null, gradleProject, null)
                                     .select(new GroupArtifact(updatedGroupId, updatedArtifactId), m.getSimpleName(), newVersion, versionPattern, ctx);
                         } catch (MavenDownloadingException e) {
                             return e.warn(m);
@@ -411,7 +403,7 @@ public class ChangeDependency extends Recipe {
                     if (!StringUtils.isBlank(newVersion) && (!StringUtils.isBlank(version) || Boolean.TRUE.equals(overrideManagedVersion))) {
                         String resolvedVersion;
                         try {
-                            resolvedVersion = new DependencyVersionSelector(mavenMetadataFailures, mavenDownloadEvents, gradleProject, null)
+                            resolvedVersion = new DependencyVersionSelector(null, gradleProject, null)
                                     .select(new GroupArtifact(updatedGroupId, updatedArtifactId), m.getSimpleName(), newVersion, versionPattern, ctx);
                         } catch (MavenDownloadingException e) {
                             return e.warn(m);
