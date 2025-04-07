@@ -1,3 +1,10 @@
+# Exclude Java output directories
+/build/
+/out/
+/src/main/java/
+/src/test/java/
+*gradle*
+
 # Exclude TypeScript source files
 /src/main/javascript/
 

@@ -136,7 +136,7 @@ export abstract class TreeVisitor<T extends Tree, P> {
     }
 }
 
-export function noopVisitor<T extends Tree, P>() {
+export function noopVisitor<T extends Tree, P>(): TreeVisitor<T, P> {
     return new class extends TreeVisitor<T, P> {
         async visit<R extends Tree>(tree: Tree): Promise<R | undefined> {
             return tree as unknown as R;
@@ -149,4 +149,3 @@ export class RecipeRunError extends Error {
         super(cause.stack);
     }
 }
-

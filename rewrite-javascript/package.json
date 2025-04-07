@@ -1,11 +1,14 @@
 {
   "name": "@openrewrite/rewrite",
-  "version": "latest",
+  "version": "8.50.0",
   "license": "Moderne Source Available License",
   "description": "OpenRewrite implementation for JavaScript.",
   "homepage": "https://github.com/openrewrite/rewrite",
   "main": "./dist/src/main/javascript/index.js",
   "types": "./dist/src/main/javascript/index.d.ts",
+  "files": [
+    "dist/src/main/javascript/**"
+  ],
   "exports": {
     ".": "./dist/src/main/javascript/index.js",
     "./json": "./dist/src/main/javascript/json/index.js",
@@ -37,5 +40,8 @@
     "jest": "^29.7.0",
     "ts-jest": "^29.2.5",
     "ts-node": "^10.9.2"
+  },
+  "bin": {
+    "rewrite-js": "./dist/src/main/javascript/rpc/server.js"
   }
 }

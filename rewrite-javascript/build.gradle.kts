@@ -18,3 +18,7 @@ dependencies {
     testImplementation("io.moderne:jsonrpc:latest.release")
 }
 
+tasks.named("publishToMavenLocal") {
+
+}
+
