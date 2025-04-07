@@ -10,7 +10,7 @@ export class PrepareRecipe {
     static handle(connection: MessageConnection,
                   preparedRecipes: Map<String, Recipe>) {
         const snowflake = SnowflakeId();
-        connection.onRequest(new rpc.RequestType<PrepareRecipe, PrepareRecipeResponse, Error>("PrepareRecipe"), (request) => {
+        connection.onRequest(new rpc.RequestType<PrepareRecipe, PrepareRecipeResponse, Error>("PrepareRecipe"), async (request) => {
             const id = snowflake.generate();
             const recipeCtor = RecipeRegistry.all.get(request.id);
             if (!recipeCtor) {
@@ -20,7 +20,7 @@ export class PrepareRecipe {
             preparedRecipes.set(id, recipe);
             return {
                 id: id,
-                descriptor: recipe.descriptor,
+                descriptor: await recipe.descriptor(),
                 editVisitor: `edit:${id}`,
                 scanVisitor: recipe instanceof ScanningRecipe ? `scan:${id}` : undefined
             }

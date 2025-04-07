@@ -66,7 +66,7 @@ export class RecipeSpec {
 
     private async expectParsePrintIdempotence(parsed: [SourceSpec<any>, SourceFile][]) {
         for (const [spec, sourceFile] of parsed) {
-            const beforeSource = spec.before;
+            const beforeSource = dedent(spec.before!);
             expect(await TreePrinters.print(sourceFile)).toEqual(beforeSource);
         }
     }

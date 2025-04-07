@@ -38,10 +38,11 @@ export class ReplacedText {
     );
 }
 
-@Registered("org.openrewrite.text.create-text")
+@Registered
 export class CreateText extends ScanningRecipe<{ exists: boolean }> {
-    displayName: string = "Create text file";
-    description: string = "Create a new text file.";
+    name = "org.openrewrite.text.create-text";
+    displayName = "Create text file";
+    description = "Create a new text file.";
 
     @Option({
         displayName: "Text",
@@ -71,8 +72,9 @@ export class CreateText extends ScanningRecipe<{ exists: boolean }> {
     }
 }
 
-@Registered("org.openrewrite.text.change-text")
+@Registered
 export class ChangeText extends Recipe {
+    name = "org.openrewrite.text.change-text"
     displayName = "Change text";
     description = "Change the text of a file.";
 
@@ -109,9 +111,13 @@ export class ChangeText extends Recipe {
     }
 }
 
-@Registered("org.openrewrite.text.with-recipe-list")
+@Registered
 export class RecipeWithRecipeList extends Recipe {
+    name = "org.openrewrite.text.with-recipe-list"
     displayName = "A recipe that has a recipe list";
     description = "To verify that it is possible for a recipe list to be called over RPC.";
-    recipeList = [new ChangeText({text: "hello"})];
+
+    async recipeList() {
+        return [new ChangeText({text: "hello"})];
+    }
 }

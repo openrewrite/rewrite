@@ -27,12 +27,12 @@ export class Result {
 }
 
 async function hasScanningRecipe(recipe: Recipe): Promise<boolean> {
-    return recipe instanceof ScanningRecipe || recipe.recipeList.some(hasScanningRecipe);
+    return recipe instanceof ScanningRecipe || (await recipe.recipeList()).some(hasScanningRecipe);
 }
 
 async function recurseRecipeList<T>(recipe: Recipe, initial: T, fn: (recipe: Recipe, t: T) => Promise<T | undefined>): Promise<T | undefined> {
     let t: T | undefined = await fn(recipe, initial);
-    for (const subRecipe of recipe.recipeList) {
+    for (const subRecipe of await recipe.recipeList()) {
         if (t === undefined) {
             return undefined;
         }
@@ -43,7 +43,7 @@ async function recurseRecipeList<T>(recipe: Recipe, initial: T, fn: (recipe: Rec
 
 async function recursiveOnComplete(recipe: Recipe, ctx: ExecutionContext): Promise<void> {
     await recipe.onComplete(ctx);
-    recipe.recipeList.forEach(r => recursiveOnComplete(r, ctx));
+    (await recipe.recipeList()).forEach(r => recursiveOnComplete(r, ctx));
 }
 
 export async function scheduleRun(recipe: Recipe, before: SourceFile[], ctx: ExecutionContext): Promise<RecipeRun> {

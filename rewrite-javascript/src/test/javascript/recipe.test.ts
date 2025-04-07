@@ -1,46 +1,29 @@
-import {Minutes, Option, Recipe, RecipeRegistry, Registered} from "../../main/javascript";
+import {RecipeRegistry} from "../../main/javascript";
 import {describe} from "@jest/globals";
+import {ChangeText} from "./example-recipe";
 
 describe("recipes", () => {
-    @Registered("org.openrewrite.my-recipe")
-    class MyRecipe extends Recipe {
-        displayName: string = "My recipe name";
-        description: string = "My recipe description.";
-        estimatedEffortPerOccurrence: Minutes = 1;
-
-        @Option({
-            displayName: "Text",
-            description: "Text to change to"
-        })
-        text!: string;
-
-        // Optional constructor if you want to make it easier to programmatically instantiate.
-        constructor(options: { text: string }) {
-            super();
-            if (options) {
-                this.text = options.text;
-            }
-        }
-    }
-
-    test("register a recipe with options", () => {
+    test("register a recipe with options", async () => {
         const recipe = RecipeRegistry.all.get(
-            "org.openrewrite.my-recipe")
+            "org.openrewrite.text.change-text")
         expect(recipe).toBeDefined()
-        expect(new recipe!()).toBeInstanceOf(MyRecipe)
+        expect(new recipe!()).toBeInstanceOf(ChangeText)
 
-        expect(new recipe!().descriptor).toEqual({
-            displayName: "My recipe name",
-            instanceName: "My recipe name",
-            description: "My recipe description.",
-            estimatedEffortPerOccurrence: 1,
+        expect(await new recipe!().descriptor()).toEqual({
+            name: "org.openrewrite.text.change-text",
+            displayName: "Change text",
+            instanceName: "Change text to 'undefined'",
+            description: "Change the text of a file.",
+            estimatedEffortPerOccurrence: 5,
             options: [
                 {
                     description: "Text to change to",
                     displayName: "Text",
-                    name: "text"
+                    name: "text",
+                    value: undefined
                 }
             ],
+            recipeList: [],
             tags: []
         })
     })

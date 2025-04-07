@@ -1,14 +1,15 @@
-import {Minutes, RecipeDescriptor, ScanningRecipe} from "../recipe";
+import {Minutes, Recipe, RecipeDescriptor, ScanningRecipe} from "../recipe";
 import {RewriteRpc} from "./rewrite-rpc";
 import {noopVisitor, TreeVisitor} from "../visitor";
 import {ExecutionContext} from "../execution";
 import {SourceFile} from "../tree";
 
 export class RpcRecipe extends ScanningRecipe<number> {
-    displayName: string = this.descriptor.displayName;
-    description: string = this.descriptor.description;
-    tags: string[] = this.descriptor.tags;
-    estimatedEffortPerOccurrence: Minutes = this.descriptor.estimatedEffortPerOccurrence;
+    name: string = this._descriptor.name;
+    displayName: string = this._descriptor.displayName;
+    description: string = this._descriptor.description;
+    tags: string[] = this._descriptor.tags;
+    estimatedEffortPerOccurrence: Minutes = this._descriptor.estimatedEffortPerOccurrence;
 
     constructor(private readonly rpc: RewriteRpc,
                 private readonly remoteId: string,
@@ -18,7 +19,7 @@ export class RpcRecipe extends ScanningRecipe<number> {
         super();
     }
 
-    get descriptor(): RecipeDescriptor {
+    async descriptor(): Promise<RecipeDescriptor> {
         return this._descriptor;
     }
 
@@ -59,6 +60,15 @@ export class RpcRecipe extends ScanningRecipe<number> {
 
     async generate(_acc: number, ctx: ExecutionContext): Promise<SourceFile[]> {
         return this.rpc.generate(this.remoteId, ctx);
+    }
+
+    async recipeList(): Promise<Recipe[]> {
+        const recipeList: Recipe[] = [];
+        for (const r of this._descriptor.recipeList) {
+            const opts = Object.fromEntries(r.options.map(opt => [opt.name, opt.value]));
+            recipeList.push(await this.rpc.prepareRecipe(r.name, opts));
+        }
+        return recipeList;
     }
 
     async onComplete(ctx: ExecutionContext): Promise<void> {
