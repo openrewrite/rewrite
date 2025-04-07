@@ -35,7 +35,6 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.BuildTool;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.table.MavenMetadataFailures;
-import org.openrewrite.maven.table.MavenDownloadEvents;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -50,11 +49,7 @@ import static java.util.Collections.singletonList;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class AddDevelocityGradlePlugin extends Recipe {
-    @EqualsAndHashCode.Exclude
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
-
-    @EqualsAndHashCode.Exclude
-    transient MavenDownloadEvents mavenDownloadEvents = new MavenDownloadEvents(this);
 
     @Option(displayName = "Plugin version",
             description = "An exact version number or node-style semver selector used to select the version number. " +
@@ -164,7 +159,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
                     GradleSettings gradleSettings = maybeGradleSettings.get();
 
                     try {
-                        String newVersion = findNewerVersion(new DependencyVersionSelector(metadataFailures, mavenDownloadEvents, null, gradleSettings), ctx);
+                        String newVersion = findNewerVersion(new DependencyVersionSelector(null, null, gradleSettings), ctx);
                         if (newVersion == null) {
                             return cu;
                         }
@@ -189,7 +184,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
                     GradleProject gradleProject = maybeGradleProject.get();
 
                     try {
-                        String newVersion = findNewerVersion(new DependencyVersionSelector(metadataFailures, mavenDownloadEvents, gradleProject, null), ctx);
+                        String newVersion = findNewerVersion(new DependencyVersionSelector(null, gradleProject, null), ctx);
                         if (newVersion == null) {
                             return cu;
                         }

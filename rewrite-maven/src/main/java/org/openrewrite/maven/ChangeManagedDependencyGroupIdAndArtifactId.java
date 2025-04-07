@@ -20,7 +20,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.maven.table.MavenDownloadEvents;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.ResolvedManagedDependency;
@@ -41,9 +40,6 @@ import static org.openrewrite.internal.StringUtils.isBlank;
 public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
     @EqualsAndHashCode.Exclude
     MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
-
-    @EqualsAndHashCode.Exclude
-    MavenDownloadEvents mavenDownloadEvents = new MavenDownloadEvents(this);
 
     // there are several implicitly defined version properties that we should never attempt to update
     private static final Set<String> implicitlyDefinedVersionProperties = new HashSet<>(Arrays.asList(
@@ -224,7 +220,6 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                     return newVersion;
                 }
                 String finalCurrentVersion = currentVersion != null ? currentVersion : newVersion;
-                MavenExecutionContextView.view(ctx).setDownloadEventsDataTable(mavenDownloadEvents);
                 if (availableVersions == null) {
                     availableVersions = new ArrayList<>();
                     MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
@@ -233,9 +228,8 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                             availableVersions.add(v);
                         }
                     }
-                }
 
-                MavenExecutionContextView.view(ctx).setDownloadEventsDataTable(null);
+                }
                 return availableVersions.isEmpty() ? newVersion : Collections.max(availableVersions, versionComparator);
             }
         };
