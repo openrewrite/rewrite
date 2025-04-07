@@ -5,10 +5,12 @@ import {
     Option,
     Recipe,
     Registered,
+    ScanningRecipe,
+    SourceFile,
     Transient,
     TreeVisitor
 } from "../../main/javascript";
-import {PlainText, PlainTextVisitor} from "../../main/javascript/text";
+import {PlainText, PlainTextParser, PlainTextVisitor} from "../../main/javascript/text";
 
 export class ReplacedText {
     @Column({
@@ -36,6 +38,39 @@ export class ReplacedText {
     );
 }
 
+@Registered("org.openrewrite.text.create-text")
+export class CreateText extends ScanningRecipe<{ exists: boolean }> {
+    displayName: string = "Create text file";
+    description: string = "Create a new text file.";
+
+    @Option({
+        displayName: "Text",
+        description: "Text to change to"
+    })
+    text!: string
+
+    @Option({
+        displayName: "Source path",
+        description: "The source path of the file to create."
+    })
+    sourcePath!: string
+
+    constructor(options: { text: string, sourcePath: string }) {
+        super(options);
+    }
+
+    initialValue(_ctx: ExecutionContext): { exists: boolean; } {
+        return {exists: false};
+    }
+
+    async generate(acc: { exists: boolean }, _ctx: ExecutionContext): Promise<SourceFile[]> {
+        if (acc.exists) {
+            return [];
+        }
+        return new PlainTextParser().parse({text: this.text, sourcePath: this.sourcePath});
+    }
+}
+
 @Registered("org.openrewrite.text.change-text")
 export class ChangeText extends Recipe {
     displayName = "Change text";
@@ -45,13 +80,10 @@ export class ChangeText extends Recipe {
         displayName: "Text",
         description: "Text to change to"
     })
-    text: string = "Hello World!"
+    text!: string;
 
     constructor(options: { text: string }) {
-        super();
-        if (options) {
-            this.text = options.text;
-        }
+        super(options);
     }
 
     @Transient

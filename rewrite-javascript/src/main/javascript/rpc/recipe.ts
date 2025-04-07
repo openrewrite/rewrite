@@ -1,9 +1,10 @@
-import {Minutes, Recipe, RecipeDescriptor} from "../recipe";
+import {Minutes, RecipeDescriptor, ScanningRecipe} from "../recipe";
 import {RewriteRpc} from "./rewrite-rpc";
-import {TreeVisitor} from "../visitor";
+import {noopVisitor, TreeVisitor} from "../visitor";
 import {ExecutionContext} from "../execution";
+import {SourceFile} from "../tree";
 
-export class RpcRecipe extends Recipe {
+export class RpcRecipe extends ScanningRecipe<number> {
     displayName: string = this.descriptor.displayName;
     description: string = this.descriptor.description;
     tags: string[] = this.descriptor.tags;
@@ -25,7 +26,11 @@ export class RpcRecipe extends Recipe {
         return this._descriptor.instanceName;
     }
 
-    get editor(): TreeVisitor<any, ExecutionContext> {
+    initialValue(_ctx: ExecutionContext) {
+        return 0
+    }
+
+    editorWithData(_acc: number): TreeVisitor<any, ExecutionContext> {
         const rpc = this.rpc;
         const editVisitor = this.editVisitor;
         return new class extends TreeVisitor<any, ExecutionContext> {
@@ -35,6 +40,25 @@ export class RpcRecipe extends Recipe {
                 return t;
             }
         };
+    }
+
+    scanner(_acc: number): TreeVisitor<any, ExecutionContext> {
+        const rpc = this.rpc;
+        const scanVisitor = this.scanVisitor;
+        if (scanVisitor) {
+            return new class extends TreeVisitor<any, ExecutionContext> {
+                protected async preVisit(tree: any, ctx: ExecutionContext): Promise<any> {
+                    await rpc.scan(tree, scanVisitor, ctx);
+                    this.stopAfterPreVisit();
+                    return tree;
+                }
+            };
+        }
+        return noopVisitor();
+    }
+
+    async generate(_acc: number, ctx: ExecutionContext): Promise<SourceFile[]> {
+        return this.rpc.generate(this.remoteId, ctx);
     }
 
     async onComplete(ctx: ExecutionContext): Promise<void> {

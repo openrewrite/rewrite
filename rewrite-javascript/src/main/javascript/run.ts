@@ -2,13 +2,11 @@ import {ExecutionContext} from "./execution";
 import {rootCursor, SourceFile} from "./tree";
 import {createTwoFilesPatch} from "diff";
 import {TreePrinters} from "./print";
-import {DataTable, getRowsByDataTableName} from "./data-table";
 import {Recipe, ScanningRecipe} from "./recipe";
 import {mapAsync} from "./util";
 
 export interface RecipeRun {
-    changeset: Result[],
-    dataTables: [DataTable<any>, any[]][]
+    changeset: Result[]
 }
 
 export class Result {
@@ -51,27 +49,41 @@ async function recursiveOnComplete(recipe: Recipe, ctx: ExecutionContext): Promi
 export async function scheduleRun(recipe: Recipe, before: SourceFile[], ctx: ExecutionContext): Promise<RecipeRun> {
     const cursor = rootCursor();
     if (await hasScanningRecipe(recipe)) {
-        await mapAsync(before, async before => await recurseRecipeList(recipe, before, (recipe, b) =>
-            recipe instanceof ScanningRecipe ?
-                recipe.scanner(recipe.accumulator(cursor, ctx)).visit(b, ctx, cursor) :
-                Promise.resolve(b)));
+        for (const b of before) {
+            await recurseRecipeList(recipe, b, async (recipe, b2) => {
+                if (recipe instanceof ScanningRecipe) {
+                    return recipe.scanner(recipe.accumulator(cursor, ctx)).visit(b2, ctx, cursor)
+                }
+            });
+        }
     }
 
     const generated = (await recurseRecipeList(recipe, [] as SourceFile[], async (recipe, generated) => {
         if (recipe instanceof ScanningRecipe) {
-            generated.push(...recipe.generate(recipe.accumulator(cursor, ctx)));
+            generated.push(...await recipe.generate(recipe.accumulator(cursor, ctx), ctx));
         }
         return generated;
     }))!;
 
-    const after = await mapAsync(before.concat(generated), async before => await recurseRecipeList(recipe, before, (recipe, b) => recipe.editor.visit(b, ctx)));
+    const changeset: Result[] = [];
+
+    for (const b of before) {
+        const editedB = await recurseRecipeList(recipe, b, (recipe, b2) => recipe.editor.visit(b2, ctx));
+        if (editedB !== b) {
+            changeset.push(new Result(b, editedB));
+        }
+    }
+
+    for (const g of generated) {
+        const editedG = await recurseRecipeList(recipe, g, (recipe, g2) => recipe.editor.visit(g2, ctx));
+        if (editedG) {
+            changeset.push(new Result(undefined, editedG));
+        }
+    }
 
     await recursiveOnComplete(recipe, ctx);
 
     return {
-        changeset: before.concat(generated).flatMap((b, i) =>
-            after[i] !== b ? [new Result(b, after[i])] : []),
-        dataTables: getRowsByDataTableName(ctx).map(([dt, rows]) =>
-            [(recipe as any)[dt] as DataTable<any>, rows])
+        changeset: changeset
     };
 }

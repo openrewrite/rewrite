@@ -1,12 +1,11 @@
 import {afterEach, beforeEach, describe, expect, test} from "@jest/globals";
-import {Cursor, ExecutionContext, rootCursor} from "../../../main/javascript";
+import {Cursor, rootCursor} from "../../../main/javascript";
 import {RewriteRpc} from "../../../main/javascript/rpc";
 import {PlainText, text} from "../../../main/javascript/text";
 import {RecipeSpec} from "../../../main/javascript/test";
 import {PassThrough} from "node:stream";
 import * as rpc from "vscode-jsonrpc/node";
 import "../example-recipe";
-import {ReplacedText} from "../example-recipe";
 
 describe("RewriteRpcTest", () => {
     const spec = new RecipeSpec();
@@ -35,15 +34,6 @@ describe("RewriteRpcTest", () => {
         client.end();
     });
 
-    test("sendReceiveExecutionContext", async () => {
-        const ctx = new ExecutionContext();
-        ctx.messages["key"] = "value";
-        client.localObjects.set("123", ctx);
-        const received = await server.getObject<ExecutionContext>("123");
-        expect(received.messages["key"]).toEqual("value");
-        expect(received instanceof ExecutionContext);
-    });
-
     test("print", () => spec.rewriteRun(
         {
             ...text("Hello Jon!"),
@@ -66,11 +56,6 @@ describe("RewriteRpcTest", () => {
 
     test("runRecipe", async () => {
         spec.recipe = await server.prepareRecipe("org.openrewrite.text.change-text", {text: "hello"});
-        spec.dataTable("org.openrewrite.text.replaced-text", (rows: ReplacedText[]) => {
-            // Prove that data tables can flow back over the RPC connection to the controlling
-            // processes' ExecutionContext.
-            expect(rows).toContain(new ReplacedText("hello.txt", "hello"));
-        });
         await spec.rewriteRun(
             {
                 ...text(
@@ -82,21 +67,21 @@ describe("RewriteRpcTest", () => {
         );
     });
 
-    // test("runScanningRecipeThatGenerates", () => {
-    //     spec.rewriteRun(
-    //         spec => spec
-    //             .recipe(server.prepareRecipe("org.openrewrite.text.CreateTextFile", {
-    //                 fileContents: "hello",
-    //                 relativeFileName: "hello.txt"
-    //             }))
-    //             .validateRecipeSerialization(false),
-    //         text(
-    //             null,
-    //             "hello",
-    //             spec => spec.path("hello.txt")
-    //         )
-    //     );
-    // });
+    test("runScanningRecipeThatGenerates", async () => {
+        spec.recipe = await server.prepareRecipe("org.openrewrite.text.create-text", {
+            text: "hello",
+            sourcePath: "hello.txt"
+        });
+        await spec.rewriteRun(
+            {
+                ...text(
+                    null,
+                    "hello"
+                ),
+                path: "hello.txt"
+            }
+        );
+    });
 
     test("runRecipeWithRecipeList", async () => {
         spec.recipe = await server.prepareRecipe("org.openrewrite.text.with-recipe-list");

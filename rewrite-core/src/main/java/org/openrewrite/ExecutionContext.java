@@ -23,12 +23,8 @@ import org.openrewrite.rpc.request.Visit;
 import org.openrewrite.scheduling.RecipeRunCycle;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.*;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -127,60 +123,11 @@ public interface ExecutionContext extends RpcCodec<ExecutionContext> {
      */
     @Override
     default void rpcSend(ExecutionContext after, RpcSendQueue q) {
-        // The after state will change if any messages have changed by a call to clone
-        q.getAndSend(after, ctx -> {
-            //noinspection ConstantValue
-            Map<String, Object> messages = new HashMap<>(ctx.getMessages() == null ?
-                    emptyMap() : ctx.getMessages());
-            // The remote side will manage its own recipe and cycle state.
-            messages.remove(CURRENT_CYCLE);
-            messages.remove(CURRENT_RECIPE);
-            messages.remove(DATA_TABLES);
-            return messages;
-        });
-
-        Map<DataTable<?>, List<?>> dt = after.getMessage(DATA_TABLES);
-        q.getAndSendList(after, sendWholeList(dt == null ? null : dt.keySet()), DataTable::getName, null);
-        if (dt != null) {
-            for (List<?> rowSet : dt.values()) {
-                q.getAndSendList(after, sendWholeList(rowSet),
-                        row -> Integer.toString(System.identityHashCode(row)),
-                        null);
-            }
-        }
+        // TODO send enough information for the remote to know which DataTableStore to use
     }
 
     @Override
     default ExecutionContext rpcReceive(ExecutionContext before, RpcReceiveQueue q) {
-        //noinspection NullableProblems
-        Map<String, Object> messages = q.receive(before.getMessages());
-        for (Map.Entry<String, Object> e : messages.entrySet()) {
-            before.putMessage(e.getKey(), e.getValue());
-        }
-
-        List<DataTable<?>> dataTables = q.receiveList(emptyList(), null);
-        //noinspection ConstantValue
-        if (dataTables != null) {
-            for (DataTable<?> dataTable : dataTables) {
-                List<?> rows = q.receiveList(emptyList(), null);
-                before.computeMessage(ExecutionContext.DATA_TABLES, rows, ConcurrentHashMap::new, (extract, allDataTables) -> {
-                    //noinspection unchecked
-                    List<Object> dataTablesOfType = (List<Object>) allDataTables.computeIfAbsent(dataTable, c -> new ArrayList<>());
-                    dataTablesOfType.addAll(rows);
-                    return allDataTables;
-                });
-            }
-        }
         return before;
-    }
-
-    static <T> Function<ExecutionContext, @Nullable List<T>> sendWholeList(@Nullable Collection<T> list) {
-        AtomicBoolean retrievedAfter = new AtomicBoolean(false);
-        return ctx -> {
-            if (!retrievedAfter.getAndSet(true)) {
-                return list == null ? null : new ArrayList<>(list);
-            }
-            return null;
-        };
     }
 }

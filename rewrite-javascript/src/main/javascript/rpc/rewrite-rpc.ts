@@ -124,17 +124,26 @@ export class RewriteRpc {
         return tree;
     }
 
-    scan(tree: Tree, visitorName: string, p: any, cursor: Cursor | undefined): Promise<VisitResponse> {
+    scan(tree: Tree, visitorName: string, p: any, cursor?: Cursor): Promise<VisitResponse> {
         this.localObjects.set(tree.id.toString(), tree);
         const pId = this.localObject(p);
-        if (p instanceof ExecutionContext) {
-            p.messages["org.openrewrite.rpc.id"] = pId;
-        }
         const cursorIds = this.getCursorIds(cursor);
         return this.connection.sendRequest(
             new rpc.RequestType<Visit, VisitResponse, Error>("Visit"),
             new Visit(visitorName, undefined, tree.id.toString(), pId, cursorIds)
         );
+    }
+
+    async generate(remoteRecipeId: string, ctx: ExecutionContext): Promise<SourceFile[]> {
+        const ctxId = this.localObject(ctx);
+        const generated: SourceFile[] = [];
+        for (const g of await this.connection.sendRequest(
+            new rpc.RequestType<Generate, string[], Error>("Generate"),
+            new Generate(remoteRecipeId, ctxId)
+        )) {
+            generated.push(await this.getObject(g));
+        }
+        return generated;
     }
 
     private localObject<P>(obj: P): string {

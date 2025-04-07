@@ -10,13 +10,13 @@ export class PrepareRecipe {
     static handle(connection: MessageConnection,
                   preparedRecipes: Map<String, Recipe>) {
         const snowflake = SnowflakeId();
-        connection.onRequest(new rpc.RequestType<PrepareRecipe, PrepareRecipeResponse, Error>("PrepareRecipe"), (params) => {
+        connection.onRequest(new rpc.RequestType<PrepareRecipe, PrepareRecipeResponse, Error>("PrepareRecipe"), (request) => {
             const id = snowflake.generate();
-            const recipeCtor = RecipeRegistry.all.get(params.id);
+            const recipeCtor = RecipeRegistry.all.get(request.id);
             if (!recipeCtor) {
-                throw new Error(`Could not find recipe with id ${params.id}`);
+                throw new Error(`Could not find recipe with id ${request.id}`);
             }
-            const recipe = new recipeCtor(params.options);
+            const recipe = new recipeCtor(request.options);
             preparedRecipes.set(id, recipe);
             return {
                 id: id,

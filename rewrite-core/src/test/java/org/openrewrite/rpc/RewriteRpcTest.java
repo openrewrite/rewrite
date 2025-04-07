@@ -22,6 +22,7 @@ import lombok.SneakyThrows;
 import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
 import org.openrewrite.config.Environment;
@@ -72,16 +73,6 @@ class RewriteRpcTest implements RewriteTest {
         client.shutdown();
     }
 
-    @Test
-    void sendReceiveExecutionContext() {
-        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
-        ctx.putMessage("key", "value");
-
-        client.localObjects.put("123", ctx);
-        InMemoryExecutionContext received = server.getObject("123");
-        assertThat(received.<String>getMessage("key")).isEqualTo("value");
-    }
-
     @DocumentExample
     @Test
     void sendReceiveIdempotence() {
@@ -125,6 +116,7 @@ class RewriteRpcTest implements RewriteTest {
         assertThat(recipe.getDescriptor().getDisplayName()).isEqualTo("Find text");
     }
 
+    @Disabled("Disabled until https://github.com/openrewrite/rewrite/pull/5260 is complete")
     @Test
     void runRecipe() {
         CountDownLatch latch = new CountDownLatch(1);

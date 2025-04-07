@@ -27,6 +27,8 @@ describe("recipes", () => {
         const recipe = RecipeRegistry.all.get(
             "org.openrewrite.my-recipe")
         expect(recipe).toBeDefined()
+        expect(new recipe!()).toBeInstanceOf(MyRecipe)
+
         expect(new recipe!().descriptor).toEqual({
             displayName: "My recipe name",
             instanceName: "My recipe name",

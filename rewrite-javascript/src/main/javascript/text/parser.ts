@@ -1,21 +1,19 @@
 import {ExecutionContext} from "../execution";
-import {Parser, readSourceSync} from "../parser";
+import {Parser, ParserInput, readSourceSync} from "../parser";
 import {PlainText, PlainTextKind} from "./tree";
 import {randomId} from "../uuid";
 import {emptyMarkers} from "../markers";
 import {relative} from "path";
 
-export class PlainTextParser extends Parser {
-
-    parse(ctx: ExecutionContext, relativeTo?: string, ...sourcePaths: string[]): PlainText[] {
+export class PlainTextParser extends Parser<PlainText> {
+    async parse(...sourcePaths: ParserInput[]): Promise<PlainText[]> {
         return sourcePaths.map(sourcePath => ({
             kind: PlainTextKind.PlainText,
             id: randomId(),
             markers: emptyMarkers,
-            sourcePath: relative(relativeTo || "", sourcePath),
-            text: readSourceSync(ctx, sourcePath),
+            sourcePath: this.relativePath(sourcePath),
+            text: readSourceSync(this.ctx, sourcePath),
             snippets: []
         }))
     }
-
 }

@@ -123,6 +123,7 @@ public class RewriteRpc {
         localObjects.put(sourceFile.getId().toString(), sourceFile);
 
         String pId = maybeUnwrapExecutionContext(p);
+
         List<String> cursorIds = getCursorIds(cursor);
 
         return send("Visit", new Visit(visitorName, null, sourceFile.getId().toString(), pId, cursorIds),

@@ -83,8 +83,6 @@ public class Visit implements RpcRequest {
                 localObjects.put(after.getId().toString(), after);
             }
 
-            maybeUpdateExecutionContext(request.getP(), p);
-
             return new VisitResponse(before != after);
         }
 
@@ -118,7 +116,6 @@ public class Visit implements RpcRequest {
 
         private Object getVisitorP(Visit request) {
             Object p = getObject.apply(request.getP());
-
             if (p instanceof ExecutionContext) {
                 String visitorName = request.getVisitor();
 
@@ -137,24 +134,6 @@ public class Visit implements RpcRequest {
                 }
             }
             return p;
-        }
-
-        /**
-         * If the object is an instance of WatchableExecutionContext, and it has new messages,
-         * clone the underlying execution context and update the local state, so that when the
-         * remote asks for it, we see the ExecutionContext in CHANGE state.
-         *
-         * @param pId The ID of p
-         * @param p   An object, which may be an ExecutionContext
-         */
-        private void maybeUpdateExecutionContext(String pId, Object p) {
-            if (p instanceof WatchableExecutionContext && ((WatchableExecutionContext) p).hasNewMessages()) {
-                ExecutionContext ctx = ((WatchableExecutionContext) p).getDelegate();
-                while (ctx instanceof DelegatingExecutionContext) {
-                    ctx = ((DelegatingExecutionContext) ctx).getDelegate();
-                }
-                localObjects.put(pId, ((InMemoryExecutionContext) ctx).clone());
-            }
         }
     }
 }

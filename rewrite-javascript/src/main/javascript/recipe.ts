@@ -1,7 +1,6 @@
 import {noopVisitor, TreeVisitor} from "./visitor";
 import {Cursor, SourceFile, Tree} from "./tree";
 import {ExecutionContext} from "./execution";
-import {randomId} from "./uuid";
 import {DataTableDescriptor} from "./data-table";
 
 const OPTIONS_KEY = "__recipe_options__";
@@ -9,6 +8,12 @@ const OPTIONS_KEY = "__recipe_options__";
 export type Minutes = number;
 
 export abstract class Recipe {
+    constructor(options?: {}) {
+        if (options) {
+            Object.assign(this, options);
+        }
+    }
+
     /**
      * A human-readable display name for the recipe, initial capped with no period.
      * For example, "Find text". The display name can be assumed to be rendered in
@@ -144,7 +149,7 @@ export abstract class ScanningRecipe<P> extends Recipe {
         return noopVisitor();
     }
 
-    generate(acc: P): SourceFile[] {
+    async generate(acc: P, ctx: ExecutionContext): Promise<SourceFile[]> {
         return [];
     }
 

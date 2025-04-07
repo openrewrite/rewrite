@@ -1,8 +1,7 @@
 import {ExecutionContext} from "./execution";
 import {OptionDescriptor} from "./recipe";
 
-export const DATA_TABLES_KEY = "org.openrewrite.dataTables";
-const DATA_TABLES_CHANGED_KEY = "org.openrewrite.dataTables";
+const DATA_TABLE_STORE = Symbol("org.openrewrite.dataTables.store");
 const COLUMNS_KEY = Symbol("org.openrewrite.dataTables.columns");
 
 export function Column(descriptor: ColumnDescriptor) {
@@ -18,6 +17,32 @@ export function Column(descriptor: ColumnDescriptor) {
 
         // Register the option metadata under the property key.
         target.constructor[COLUMNS_KEY][propertyKey] = descriptor;
+    }
+}
+
+export interface DataTableStore {
+    insertRow<Row>(dataTable: DataTable<Row>, ctx: ExecutionContext, row: Row): void
+
+    acceptRows(accept: boolean): void
+}
+
+export class InMemoryDataTableStore implements DataTableStore {
+    private _acceptRows = false
+    private readonly _dataTables: { [dataTable: string]: DataTable<any> } = {}
+    private readonly _rows: { [dataTable: string]: any[] } = {}
+
+    insertRow<Row>(dataTable: DataTable<Row>, _ctx: ExecutionContext, row: Row): void {
+        if (this._acceptRows) {
+            this._dataTables[dataTable.descriptor.name] = dataTable;
+            if (!this._rows[dataTable.descriptor.name]) {
+                this._rows[dataTable.descriptor.name] = [];
+            }
+            this._rows[dataTable.descriptor.name].push(row);
+        }
+    }
+
+    acceptRows(accept: boolean): void {
+        this._acceptRows = accept
     }
 }
 
@@ -44,33 +69,12 @@ export class DataTable<Row> {
     }
 
     insertRow(ctx: ExecutionContext, row: Row): void {
-        (ctx as any)[DATA_TABLES_CHANGED_KEY] = true;
-
-        if (!ctx.messages[DATA_TABLES_KEY]) {
-            ctx.messages[DATA_TABLES_KEY] = {};
+        if (!ctx.messages[DATA_TABLE_STORE]) {
+            ctx.messages[DATA_TABLE_STORE] = new InMemoryDataTableStore();
         }
-        if (!ctx.messages[DATA_TABLES_KEY][this._descriptor.name]) {
-            ctx.messages[DATA_TABLES_KEY][this._descriptor.name] = [];
-        }
-        ctx.messages[DATA_TABLES_KEY][this._descriptor.name].push(row);
+        const dataTableStore: DataTableStore = ctx.messages[DATA_TABLE_STORE];
+        dataTableStore.insertRow(this, ctx, row);
     }
-}
-
-export function dataTablesChanged(ctx: ExecutionContext): boolean {
-    const changed = !!(ctx as any)[DATA_TABLES_CHANGED_KEY];
-    delete (ctx as any)[DATA_TABLES_CHANGED_KEY];
-    return changed;
-}
-
-export function getRowsByDataTableName(ctx: ExecutionContext): [string, any[]][] {
-    if (!(DATA_TABLES_KEY in ctx)) {
-        return [];
-    }
-    return Object.entries(ctx.messages[DATA_TABLES_KEY]);
-}
-
-export function getRows<Row>(dataTableName: string, ctx: ExecutionContext): Row[] {
-    return ctx.messages[DATA_TABLES_KEY]?.[dataTableName] ?? [];
 }
 
 export interface DataTableDescriptor {

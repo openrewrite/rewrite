@@ -2,8 +2,6 @@ import * as rpc from "vscode-jsonrpc/node";
 import {Recipe, ScanningRecipe} from "../../recipe";
 import {Cursor, rootCursor, Tree} from "../../tree";
 import {TreeVisitor} from "../../visitor";
-import {ExecutionContext} from "../../execution";
-import {dataTablesChanged} from "../../data-table";
 
 export interface VisitResponse {
     modified: boolean
@@ -34,10 +32,6 @@ export class Visit {
                 localObjects.delete(before.id.toString());
             } else {
                 localObjects.set(after.id.toString(), after);
-            }
-
-            if (p instanceof ExecutionContext && dataTablesChanged(p)) {
-                localObjects.set(request.p, new ExecutionContext(p.messages));
             }
 
             return {modified: before !== after}

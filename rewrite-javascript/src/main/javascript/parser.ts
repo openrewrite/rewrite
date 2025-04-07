@@ -2,11 +2,27 @@ import {ExecutionContext} from "./execution";
 import {SourceFile} from "./tree";
 import {readFileSync} from "node:fs";
 import {Volume} from "memfs/lib/volume";
+import {relative} from "path";
+import {InMemoryDataTableStore} from "./data-table";
 
 export const PARSER_VOLUME = Symbol("PARSER_VOLUME");
 
-export abstract class Parser {
-    abstract parse(ctx: ExecutionContext, relativeTo?: string, ...sourcePaths: string[]): SourceFile[]
+export type SourcePath = string
+export type ParserInput = SourcePath | { text: string, sourcePath: string }
+
+export abstract class Parser<S extends SourceFile> {
+    constructor(protected ctx: ExecutionContext = new ExecutionContext(),
+                protected readonly relativeTo?: string) {
+    }
+
+    abstract parse(...sourcePaths: ParserInput[]): Promise<S[]>
+
+    protected relativePath(sourcePath: ParserInput): string {
+        if (typeof sourcePath === "string") {
+            return relative(this.relativeTo || "", sourcePath);
+        }
+        return sourcePath.sourcePath;
+    }
 }
 
 /**
@@ -17,7 +33,7 @@ export class ParserSourceReader {
     readonly source: string
     cursor: number = 0;
 
-    constructor(public readonly sourcePath: string, ctx: ExecutionContext) {
+    constructor(public readonly sourcePath: ParserInput, ctx: ExecutionContext) {
         this.source = readSourceSync(ctx, sourcePath)
     }
 
@@ -52,7 +68,10 @@ export class ParserSourceReader {
     }
 }
 
-export function readSourceSync(ctx: ExecutionContext, sourcePath: string) {
-    const vol = ctx.messages[PARSER_VOLUME] as Volume | undefined;
-    return (vol?.readFileSync(sourcePath) ?? readFileSync(sourcePath)).toString();
+export function readSourceSync(ctx: ExecutionContext, sourcePath: ParserInput) {
+    if (typeof sourcePath === "string") {
+        const vol = ctx.messages[PARSER_VOLUME] as Volume | undefined;
+        return (vol?.readFileSync(sourcePath) ?? readFileSync(sourcePath)).toString();
+    }
+    return sourcePath.text;
 }
