@@ -676,7 +676,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
 
     @Value
     @EqualsAndHashCode(callSuper = false)
-    private static class UpdateConstraintVersionVisitor extends GroovyIsoVisitor<ExecutionContext> {
+    private static class UpdateConstraintVersionVisitor extends JavaIsoVisitor<ExecutionContext> {
         GroupArtifactVersion gav;
         J.MethodInvocation existingConstraint;
 
@@ -726,7 +726,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
     }
 
     @SuppressWarnings("NullableProblems")
-    private static class RemoveVersionVisitor extends GroovyIsoVisitor<ExecutionContext> {
+    private static class RemoveVersionVisitor extends JavaIsoVisitor<ExecutionContext> {
 
         @Override
         public  J.@Nullable Return visitReturn(J.Return _return, ExecutionContext ctx) {
@@ -749,7 +749,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
 
     @Value
     @EqualsAndHashCode(callSuper = false)
-    private static class UpdateBecauseTextVisitor extends GroovyIsoVisitor<ExecutionContext> {
+    private static class UpdateBecauseTextVisitor extends JavaIsoVisitor<ExecutionContext> {
         String because;
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -776,7 +776,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
 
     @Value
     @EqualsAndHashCode(callSuper = false)
-    private static class CreateBecauseVisitor extends GroovyIsoVisitor<ExecutionContext> {
+    private static class CreateBecauseVisitor extends JavaIsoVisitor<ExecutionContext> {
         String because;
         boolean isKotlinDsl;
 
@@ -806,7 +806,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                         }.visitNonNull(it, 0))
                         .orElseThrow(() -> new IllegalStateException("Unable to parse because text"));
             } else {
-                becauseArg = parseAsGradle(INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET_GROOVY, true, ctx)
+                becauseArg = parseAsGradle(INDIVIDUAL_CONSTRAINT_BECAUSE_SNIPPET_KOTLIN, true, ctx)
                         .map(K.CompilationUnit.class::cast)
                         .map(cu -> (J.Block) cu.getStatements().get(0))
                         .map(block -> (J.MethodInvocation) block.getStatements().get(1))
@@ -819,11 +819,11 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                         .map(J.Return.class::cast)
                         .map(returnImplementation -> ((J.MethodInvocation) requireNonNull(returnImplementation.getExpression())).getArguments().get(1))
                         .map(J.Lambda.class::cast)
-                        .map(it -> (J.Lambda) new GroovyIsoVisitor<Integer>() {
+                        .map(it -> (J.Lambda) new KotlinIsoVisitor<Integer>() {
                             @Override
                             public J.Literal visitLiteral(J.Literal literal, Integer integer) {
                                 return literal.withValue(because)
-                                        .withValueSource("'" + because + "'");
+                                        .withValueSource("\"" + because + "\"");
                             }
                         }.visitNonNull(it, 0))
                         .orElseThrow(() -> new IllegalStateException("Unable to parse because text"));
