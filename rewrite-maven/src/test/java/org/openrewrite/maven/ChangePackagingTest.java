@@ -23,6 +23,7 @@ import static org.openrewrite.maven.Assertions.pomXml;
 
 class ChangePackagingTest implements RewriteTest {
 
+
     @DocumentExample
     @Test
     void addPackaging() {
