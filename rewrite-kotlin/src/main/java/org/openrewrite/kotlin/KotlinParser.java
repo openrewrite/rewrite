@@ -314,11 +314,12 @@ public class KotlinParser implements Parser {
         /**
          * This is an internal API which is subject to removal or change.
          */
-        public Builder addClasspathEntry(Path classpath) {
-            if (this.classpath.isEmpty()) {
-                this.classpath = Collections.singletonList(classpath);
-            } else {
-                this.classpath.add(classpath);
+        public Builder addClasspathEntry(Path entry) {
+            if (classpath.isEmpty()) {
+                classpath = Collections.singletonList(entry);
+            } else if (!classpath.contains(entry)) {
+                classpath = new ArrayList<>(classpath);
+                classpath.add(entry);
             }
             return this;
         }
