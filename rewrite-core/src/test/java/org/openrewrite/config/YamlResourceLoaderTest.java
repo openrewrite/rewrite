@@ -351,22 +351,6 @@ class YamlResourceLoaderTest implements RewriteTest {
         assertEquals(1, invalidRecipes.size());
     }
 
-    private void assertRecipeLazyLoaded(Object recipeData) {
-        final List<String> lazyLoadRecipes = new ArrayList<>();
-        YamlResourceLoader resourceLoader = createYamlResourceLoader();
-
-        resourceLoader.loadRecipe(
-          "org.company.CustomRecipe",
-          0,
-          recipeData,
-          lazyLoadRecipes::add,
-          recipe -> {
-          },
-          v -> {});
-
-        assertThat(lazyLoadRecipes).isNotEmpty();
-    }
-
     private YamlResourceLoader createYamlResourceLoader() {
         return new YamlResourceLoader(
           new ByteArrayInputStream("type: specs.openrewrite.org/v1beta/recipe".getBytes()),

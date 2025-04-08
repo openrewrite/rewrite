@@ -83,6 +83,11 @@ public class KotlinTemplate extends JavaTemplate {
         }
 
         @Override
+        public JavaTemplate.Builder contextSensitive() {
+            throw new UnsupportedOperationException("Only context-free templates are supported");
+        }
+
+        @Override
         public Builder imports(String... fullyQualifiedTypeNames) {
             for (String typeName : fullyQualifiedTypeNames) {
                 validateImport(typeName);
@@ -120,7 +125,7 @@ public class KotlinTemplate extends JavaTemplate {
 
         @Override
         public KotlinTemplate build() {
-            return new KotlinTemplate(false, parser, code, imports,
+            return new KotlinTemplate(false, parser.clone(), code, imports,
                     onAfterVariableSubstitution, onBeforeParseTemplate);
         }
     }

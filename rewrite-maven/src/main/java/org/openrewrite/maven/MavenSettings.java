@@ -34,25 +34,12 @@ import org.openrewrite.maven.internal.RawRepositories;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.ProfileActivation;
 
-import javax.crypto.BadPaddingException;
-import javax.crypto.Cipher;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
-import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.InvalidKeyException;
-import java.security.Key;
-import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.function.UnaryOperator;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
@@ -118,7 +105,7 @@ public class MavenSettings {
     }
 
     public static @Nullable MavenSettings readMavenSettingsFromDisk(ExecutionContext ctx) {
-        final Optional<MavenSettings> userSettings = Optional.of(userSettingsPath())
+        final Optional<MavenSettings> userSettings = Optional.of(MavenHomeDirectory.getSettingsXml())
                 .filter(MavenSettings::exists)
                 .map(path -> parse(path, ctx));
         final MavenSettings installSettings = findMavenHomeSettings().map(path -> parse(path, ctx)).orElse(null);
@@ -155,14 +142,9 @@ public class MavenSettings {
         }
     }
 
-
     public static boolean readFromDiskEnabled() {
         final String propertyValue = System.getProperty("org.openrewrite.test.readMavenSettingsFromDisk");
         return propertyValue != null && !propertyValue.equalsIgnoreCase("false");
-    }
-
-    private static Path userSettingsPath() {
-        return Paths.get(System.getProperty("user.home")).resolve(".m2/settings.xml");
     }
 
     private static Optional<Path> findMavenHomeSettings() {

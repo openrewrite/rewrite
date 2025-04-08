@@ -26,6 +26,7 @@ import org.openrewrite.xml.style.TabsAndIndentsStyle;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
+
 import static org.openrewrite.xml.format.AutodetectGeneralFormatStyle.autodetectGeneralFormatStyle;
 
 public class AutoFormatVisitor<P> extends XmlVisitor<P> {

@@ -20,6 +20,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaCoordinates;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
@@ -461,6 +462,58 @@ class JavaTemplateTest3Test implements RewriteTest {
                       int[] arr = new int[]{};
                       test.method(arr);
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceMethodInvocationStatementArguments() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
+                  J.MethodInvocation m = super.visitMethodInvocation(method, p);
+                  if (m.getArguments().size() == 2) {
+                      JavaCoordinates coordinates = m.getCoordinates().replaceArguments();
+                      m = JavaTemplate.builder("#{any(java.lang.Integer)}")
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), coordinates, m.getArguments().get(0));
+                  }
+                  return m;
+              }
+          })),
+          java(
+            """
+              import java.util.function.Predicate;
+              
+              class A {
+                  public Predicate<String> foo() {
+                      return new Predicate<String>() {
+                          @Override public boolean test(String s) {
+                              bar(1, 2);
+                              return false;
+                          }
+                      };
+                  }
+                  public void bar(int... i) {}
+              }
+              """,
+            """
+              import java.util.function.Predicate;
+              
+              class A {
+                  public Predicate<String> foo() {
+                      return new Predicate<String>() {
+                          @Override public boolean test(String s) {
+                              bar(1);
+                              return false;
+                          }
+                      };
+                  }
+                  public void bar(int... i) {}
               }
               """
           )

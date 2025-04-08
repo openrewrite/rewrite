@@ -22,10 +22,7 @@ import org.openrewrite.config.DataTableDescriptor;
 import org.openrewrite.config.RecipeIntrospectionException;
 
 import java.lang.annotation.Annotation;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
+import java.lang.reflect.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -77,15 +74,23 @@ public class RecipeIntrospectionUtils {
         } else if (recipeClass.getConstructors().length == 1) {
             return recipeClass.getConstructors()[0];
         } else {
-            for (Constructor<?> constructor : constructors) {
-                for (Annotation annotation : constructor.getAnnotations()) {
-                    if ("com.fasterxml.jackson.annotation.JsonCreator".equals(annotation.annotationType().getName())) {
-                        return constructor;
-                    }
-                }
+            Constructor<?> constructor = findJsonCreator(constructors);
+            if (constructor != null) {
+                return constructor;
             }
             throw new RecipeIntrospectionException("Unable to locate primary constructor for Recipe " + recipeClass);
         }
+    }
+
+    private static @Nullable Constructor<?> findJsonCreator(Constructor<?>[] constructors) {
+        for (Constructor<?> constructor : constructors) {
+            for (Annotation annotation : constructor.getAnnotations()) {
+                if ("com.fasterxml.jackson.annotation.JsonCreator".equals(annotation.annotationType().getName())) {
+                    return constructor;
+                }
+            }
+        }
+        return null;
     }
 
     public static @Nullable Constructor<?> getZeroArgsConstructor(Class<?> recipeClass) {
@@ -107,13 +112,10 @@ public class RecipeIntrospectionUtils {
     }
 
     private static <V> V construct(Class<?> clazz, @Nullable Map<String, Object> args) {
-        Constructor<?> primaryConstructor = getZeroArgsConstructor(clazz);
-        if (primaryConstructor == null) {
-            primaryConstructor = getPrimaryConstructor(clazz);
-        }
-        @Nullable Object[] constructorArgs = new Object[primaryConstructor.getParameterCount()];
-        for (int i = 0; i < primaryConstructor.getParameters().length; i++) {
-            java.lang.reflect.Parameter param = primaryConstructor.getParameters()[i];
+        Constructor<?> constructor = getConstructor(clazz, args);
+        Object @Nullable[] constructorArgs = new Object[constructor.getParameterCount()];
+        for (int i = 0; i < constructor.getParameters().length; i++) {
+            java.lang.reflect.Parameter param = constructor.getParameters()[i];
             if (args != null && args.containsKey(param.getName())) {
                 constructorArgs[i] = convert(args.get(param.getName()), param.getType());
             } else if (param.getType().isPrimitive()) {
@@ -136,14 +138,84 @@ public class RecipeIntrospectionUtils {
                 constructorArgs[i] = null;
             }
         }
-        primaryConstructor.setAccessible(true);
+        constructor.setAccessible(true);
         try {
             //noinspection unchecked
-            return (V) primaryConstructor.newInstance(constructorArgs);
+            return (V) constructor.newInstance(constructorArgs);
         } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
             // Should never happen
             throw getRecipeIntrospectionException(clazz, e);
         }
+    }
+
+    private static Constructor<?> getConstructor(Class<?> clazz, @Nullable Map<String, Object> args) {
+        if (args == null || args.isEmpty()) {
+            Constructor<?> constructor = getZeroArgsConstructor(clazz);
+            if (constructor != null) {
+                return constructor;
+            }
+            return getPrimaryConstructor(clazz);
+        } else {
+            Constructor<?>[] constructors = clazz.getConstructors();
+            Constructor<?> jsonCreator = findJsonCreator(constructors);
+            if (jsonCreator != null) {
+                return jsonCreator;
+            }
+
+            int argCount = args.size();
+            OUTER:
+            for (Constructor<?> constructor : constructors) {
+                if (constructor.getParameterCount() >= argCount) {
+                    for (int i = 0; i < constructor.getParameterCount(); i++) {
+                        Parameter param = constructor.getParameters()[i];
+                        if (!args.containsKey(param.getName())) {
+                            continue OUTER;
+                        }
+                        Class<?> paramType = getParamType(param);
+                        if (!paramType.isInstance(args.get(param.getName()))) {
+                            continue OUTER;
+                        }
+                    }
+                    return constructor;
+                }
+            }
+        }
+        throw new RecipeIntrospectionException("Unable to locate matching constructor for Recipe " + clazz.getName());
+    }
+
+    private static Class<?> getParamType(Parameter param) {
+        return param.getType().isPrimitive() ? getWrapperType(param.getType()) : param.getType();
+    }
+
+    private static Class<?> getWrapperType(Class<?> primitiveType) {
+        if (primitiveType == int.class) {
+            return Integer.class;
+        }
+        if (primitiveType == boolean.class) {
+            return Boolean.class;
+        }
+        if (primitiveType == byte.class) {
+            return Byte.class;
+        }
+        if (primitiveType == char.class) {
+            return Character.class;
+        }
+        if (primitiveType == double.class) {
+            return Double.class;
+        }
+        if (primitiveType == float.class) {
+            return Float.class;
+        }
+        if (primitiveType == long.class) {
+            return Long.class;
+        }
+        if (primitiveType == short.class) {
+            return Short.class;
+        }
+        if (primitiveType == void.class) {
+            return Void.class;
+        }
+        return primitiveType;
     }
 
     private static Object convert(Object o, Class<?> type) {
