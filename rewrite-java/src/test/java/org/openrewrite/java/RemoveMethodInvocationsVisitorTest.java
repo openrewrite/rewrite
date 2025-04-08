@@ -626,4 +626,29 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void removeConstructorMethod() {
+        rewriteRun(
+          spec -> spec.recipe(createRemoveMethodsRecipe("java.util.Date <constructor>(..)")),
+          // language=java
+          java(
+            """
+              import java.util.Date;
+              
+              class Test {
+                  void method() {
+                      Date date = new Date();
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void method() {
+                  }
+              }
+              """
+          )
+        );
+    }
 }
