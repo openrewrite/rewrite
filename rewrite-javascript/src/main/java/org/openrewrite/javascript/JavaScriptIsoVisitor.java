@@ -22,7 +22,6 @@ import org.openrewrite.javascript.tree.JS;
 
 public class JavaScriptIsoVisitor<P> extends JavaScriptVisitor<P> {
 
-    // JS overrides.
     @Override
     public JS.CompilationUnit visitCompilationUnit(JS.CompilationUnit cu, P p) {
         return (JS.CompilationUnit) super.visitCompilationUnit(cu, p);

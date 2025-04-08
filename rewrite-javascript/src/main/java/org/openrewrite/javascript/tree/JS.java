@@ -19,6 +19,7 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.*;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.internal.TypesInUse;
@@ -479,7 +480,7 @@ public interface JS extends J {
             }
 
             public ArrowFunction withBody(JLeftPadded<J> body) {
-                return f.body == body ?  f: new ArrowFunction(f.id, f.prefix, f.markers, f.leadingAnnotations, f.modifiers, f.typeParameters, f.parameters, f.returnTypeExpression, body, f.type);
+                return f.body == body ? f : new ArrowFunction(f.id, f.prefix, f.markers, f.leadingAnnotations, f.modifiers, f.typeParameters, f.parameters, f.returnTypeExpression, body, f.type);
             }
         }
 
@@ -2947,7 +2948,7 @@ public interface JS extends J {
             }
 
             public TaggedTemplateExpression withTypeArguments(@Nullable JContainer<Expression> typeArguments) {
-                return t.typeArguments == typeArguments ? t : new TaggedTemplateExpression(t.id, t.prefix, t.markers, t.tag, typeArguments,  t.templateExpression, t.type);
+                return t.typeArguments == typeArguments ? t : new TaggedTemplateExpression(t.id, t.prefix, t.markers, t.tag, typeArguments, t.templateExpression, t.type);
             }
         }
     }
@@ -3056,7 +3057,7 @@ public interface JS extends J {
             }
 
             public TemplateExpression withTemplateSpans(List<JRightPadded<TemplateSpan>> templateSpans) {
-                return t.templateSpans == templateSpans ? t : new TemplateExpression(t.id, t.prefix, t.markers,  t.head, templateSpans, t.type);
+                return t.templateSpans == templateSpans ? t : new TemplateExpression(t.id, t.prefix, t.markers, t.head, templateSpans, t.type);
             }
         }
     }
@@ -3347,7 +3348,7 @@ public interface JS extends J {
             }
 
             public TypeQuery withTypeArguments(@Nullable JContainer<Expression> typeArguments) {
-                return t.typeArguments == typeArguments ? t : new TypeQuery(t.id, t.prefix, t.markers, t.typeExpression,  typeArguments, t.type);
+                return t.typeArguments == typeArguments ? t : new TypeQuery(t.id, t.prefix, t.markers, t.typeExpression, typeArguments, t.type);
             }
         }
     }
@@ -4112,15 +4113,15 @@ public interface JS extends J {
             public Cursor getDeclaringScope(Cursor cursor) {
                 return cursor.dropParentUntil(it ->
                         it instanceof J.Block ||
-                                it instanceof J.Lambda ||
-                                it instanceof J.MethodDeclaration ||
-                                it == Cursor.ROOT_VALUE);
+                        it instanceof J.Lambda ||
+                        it instanceof J.MethodDeclaration ||
+                        it == Cursor.ROOT_VALUE);
             }
 
             public boolean isField(Cursor cursor) {
                 Cursor declaringScope = getDeclaringScope(cursor);
                 return declaringScope.getValue() instanceof J.Block &&
-                        declaringScope.getParentTreeCursor().getValue() instanceof J.ClassDeclaration;
+                       declaringScope.getParentTreeCursor().getValue() instanceof J.ClassDeclaration;
             }
 
             public JSNamedVariable.Padding getPadding() {
@@ -4326,8 +4327,8 @@ public interface JS extends J {
         @Override
         public String toString() {
             return "MethodDeclaration{" +
-                    (getMethodType() == null ? "unknown" : getMethodType()) +
-                    "}";
+                   (getMethodType() == null ? "unknown" : getMethodType()) +
+                   "}";
         }
 
         public JSMethodDeclaration.Padding getPadding() {
@@ -5657,6 +5658,7 @@ public interface JS extends J {
         }
 
     }
+
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
