@@ -84,7 +84,7 @@ public class MavenSecuritySettings {
     }
 
     public static @Nullable MavenSecuritySettings readMavenSecuritySettingsFromDisk(ExecutionContext ctx) {
-        Optional<MavenSecuritySettings> userSettings = Optional.of(MavenHomeDirectory.getSecuritySetingsXml())
+        Optional<MavenSecuritySettings> userSettings = Optional.of(userSecuritySettingsPath())
                 .filter(MavenSecuritySettings::exists)
                 .map(path -> parse(path, ctx));
         MavenSecuritySettings installSettings = findMavenHomeSettings().map(path -> parse(path, ctx)).orElse(null);
@@ -95,6 +95,10 @@ public class MavenSecuritySettings {
             return mergedSettings.merge(parse(Paths.get(mergedSettings.relocation), ctx));
         }
         return mergedSettings;
+    }
+
+    private static Path userSecuritySettingsPath() {
+        return Paths.get(System.getProperty("user.home")).resolve(".m2/settings-security.xml");
     }
 
     private static Optional<Path> findMavenHomeSettings() {
