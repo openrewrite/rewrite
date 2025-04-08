@@ -1,11 +1,11 @@
 import {mapAsync, produceAsync, SourceFile, TreeVisitor, ValidImmerRecipeReturnType} from "../";
 import {
-    JsonDocument,
     Empty,
     Identifier,
     isJson,
     Json,
     JsonArray,
+    JsonDocument,
     JsonKind,
     JsonObject,
     JsonRightPadded,

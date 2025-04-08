@@ -1,11 +1,11 @@
 import {JsonVisitor} from "./visitor";
 import {asRef, RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
 import {
-    JsonDocument,
     Empty,
     Identifier,
     Json,
     JsonArray,
+    JsonDocument,
     JsonKind,
     JsonObject,
     JsonRightPadded,

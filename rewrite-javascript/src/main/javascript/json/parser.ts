@@ -1,4 +1,4 @@
-import {emptyMarkers, ExecutionContext, Parser, ParserInput, ParserSourceReader, randomId} from "../";
+import {emptyMarkers, Parser, ParserInput, ParserSourceReader, randomId} from "../";
 import {
     emptySpace,
     Json,
@@ -18,7 +18,7 @@ export class JsonParser extends Parser<JsonDocument> {
     async parse(...sourcePaths: ParserInput[]): Promise<JsonDocument[]> {
         return sourcePaths.map(sourcePath => {
             return {
-                ...new ParseJsonReader(sourcePath, this.ctx, this.relativeTo).parse(),
+                ...new ParseJsonReader(sourcePath).parse(),
                 sourcePath: this.relativePath(sourcePath)
             };
         });
@@ -26,8 +26,8 @@ export class JsonParser extends Parser<JsonDocument> {
 }
 
 class ParseJsonReader extends ParserSourceReader {
-    constructor(sourcePath: ParserInput, ctx: ExecutionContext, private relativeTo?: string) {
-        super(sourcePath, ctx);
+    constructor(sourcePath: ParserInput) {
+        super(sourcePath);
     }
 
     private prefix() {

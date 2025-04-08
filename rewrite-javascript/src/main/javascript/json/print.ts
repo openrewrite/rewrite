@@ -1,11 +1,11 @@
 import {PrintOutputCapture, TreePrinters} from "../print";
 import {JsonVisitor} from "./visitor";
 import {
-    JsonDocument,
     Empty,
     Identifier,
     Json,
     JsonArray,
+    JsonDocument,
     JsonKind,
     JsonObject,
     JsonRightPadded,

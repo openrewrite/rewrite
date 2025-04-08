@@ -1,4 +1,4 @@
-import {JsonDocument, Empty, emptySpace, Json, JsonKind, JsonVisitor} from "../../../main/javascript/json";
+import {Empty, emptySpace, Json, JsonDocument, JsonKind, JsonVisitor} from "../../../main/javascript/json";
 import {emptyMarkers, randomId} from "../../../main/javascript";
 
 class SetEmptySpace extends JsonVisitor<number> {

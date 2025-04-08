@@ -1,11 +1,7 @@
 import {ExecutionContext} from "./execution";
 import {SourceFile} from "./tree";
 import {readFileSync} from "node:fs";
-import {Volume} from "memfs/lib/volume";
 import {relative} from "path";
-import {InMemoryDataTableStore} from "./data-table";
-
-export const PARSER_VOLUME = Symbol("PARSER_VOLUME");
 
 export type SourcePath = string
 export type ParserInput = SourcePath | { text: string, sourcePath: string }
@@ -33,8 +29,8 @@ export class ParserSourceReader {
     readonly source: string
     cursor: number = 0;
 
-    constructor(public readonly sourcePath: ParserInput, ctx: ExecutionContext) {
-        this.source = readSourceSync(ctx, sourcePath)
+    constructor(public readonly sourcePath: ParserInput) {
+        this.source = readSourceSync(sourcePath)
     }
 
     whitespace(): string {
@@ -68,10 +64,9 @@ export class ParserSourceReader {
     }
 }
 
-export function readSourceSync(ctx: ExecutionContext, sourcePath: ParserInput) {
+export function readSourceSync(sourcePath: ParserInput) {
     if (typeof sourcePath === "string") {
-        const vol = ctx.messages[PARSER_VOLUME] as Volume | undefined;
-        return (vol?.readFileSync(sourcePath) ?? readFileSync(sourcePath)).toString();
+        return readFileSync(sourcePath).toString();
     }
     return sourcePath.text;
 }

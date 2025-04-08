@@ -3,7 +3,6 @@ import {rootCursor, SourceFile} from "./tree";
 import {createTwoFilesPatch} from "diff";
 import {TreePrinters} from "./print";
 import {Recipe, ScanningRecipe} from "./recipe";
-import {mapAsync} from "./util";
 
 export interface RecipeRun {
     changeset: Result[]
