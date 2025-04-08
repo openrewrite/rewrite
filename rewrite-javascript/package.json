@@ -1,6 +1,6 @@
 {
   "name": "@openrewrite/rewrite",
-  "version": "8.50.0",
+  "version": "0.0.0",
   "license": "Moderne Source Available License",
   "description": "OpenRewrite implementation for JavaScript.",
   "homepage": "https://github.com/openrewrite/rewrite",
@@ -18,7 +18,8 @@
   "scripts": {
     "build": "rm -rf ./dist && tsc --build tsconfig.build.json",
     "dev": "tsc --watch -p tsconfig.json",
-    "test": "npm run build && jest"
+    "test": "npm run build && jest",
+    "start": "npm run build && node ./dist/src/main/javascript/rpc/server.js"
   },
   "dependencies": {
     "@akashrajpurohit/snowflake-id": "^2.0.0",
