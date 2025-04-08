@@ -27,11 +27,11 @@ import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings({"StatementWi«thEmptyBody", "ConstantConditions"})
-class ParenthesizeTest implements RewriteTest {
+class ParenthesizeVisitorTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new Parenthesize());
+        spec.cycles(1).expectedCyclesThatMakeChanges(1);
     }
 
     @DocumentExample
@@ -45,10 +45,9 @@ class ParenthesizeTest implements RewriteTest {
                   if (u.getExpression() instanceof J.Parentheses &&
                       ((J.Parentheses<?>) u.getExpression()).getTree() instanceof J.Binary) {
                       // Remove parentheses from binary expression inside unary
-                      J.Binary binary = (J.Binary) ((J.Parentheses<?>) u.getExpression()).getTree();
-                      return u.withExpression(binary);
+                      u = u.withExpression((Expression) ((J.Parentheses<?>) u.getExpression()).getTree());
                   }
-                  return u;
+                  return (J.Unary) new ParenthesizeVisitor().visit(u, ctx);
               }
           })),
           java(
@@ -65,7 +64,7 @@ class ParenthesizeTest implements RewriteTest {
 
               public class A {
                   static Set<String> set;
-                  static boolean notEmpty = !set == null || set.isEmpty();
+                  static boolean notEmpty = !(set == null || set.isEmpty());
               }
               """
           )
@@ -84,9 +83,9 @@ class ParenthesizeTest implements RewriteTest {
                       ((J.Parentheses<?>) b.getLeft()).getTree() instanceof J.Binary) {
                       // Remove parentheses from binary expression inside multiplication
                       J.Binary leftBinary = (J.Binary) ((J.Parentheses<?>) b.getLeft()).getTree();
-                      return b.withLeft(leftBinary);
+                      b = b.withLeft(leftBinary);
                   }
-                  return b;
+                  return (J.Binary) new ParenthesizeVisitor().visit(b, ctx);
               }
           })),
           java(
@@ -97,7 +96,7 @@ class ParenthesizeTest implements RewriteTest {
               """,
             """
               public class A {
-                  int result = 1 + 2 * 3;
+                  int result = (1 + 2) * 3;
               }
               """
           )
@@ -114,9 +113,9 @@ class ParenthesizeTest implements RewriteTest {
                   if (t.getTruePart() instanceof J.Parentheses) {
                       // Remove parentheses from true part of ternary
                       J.Parentheses<?> parentheses = (J.Parentheses<?>) t.getTruePart();
-                      return t.withTruePart((Expression) parentheses.getTree());
+                      t = t.withTruePart((Expression) parentheses.getTree());
                   }
-                  return t;
+                  return (J.Ternary) new ParenthesizeVisitor().visit(t, ctx);
               }
           })),
           java(
@@ -147,9 +146,9 @@ class ParenthesizeTest implements RewriteTest {
                       ((J.Parentheses<?>) u.getExpression()).getTree() instanceof J.InstanceOf) {
                       // Remove parentheses from instanceof expression inside unary
                       J.InstanceOf instanceOf = (J.InstanceOf) ((J.Parentheses<?>) u.getExpression()).getTree();
-                      return u.withExpression(instanceOf);
+                      u = u.withExpression(instanceOf);
                   }
-                  return u;
+                  return (J.Unary) new ParenthesizeVisitor().visit(u, ctx);
               }
           })),
           java(
@@ -162,7 +161,7 @@ class ParenthesizeTest implements RewriteTest {
             """
               public class A {
                   Object obj = new Object();
-                  boolean check = !obj instanceof String;
+                  boolean check = !(obj instanceof String);
               }
               """
           )
@@ -180,9 +179,9 @@ class ParenthesizeTest implements RewriteTest {
                       ((J.Parentheses<?>) u.getExpression()).getTree() instanceof J.Assignment) {
                       // Remove parentheses from assignment expression inside unary
                       J.Assignment assignment = (J.Assignment) ((J.Parentheses<?>) u.getExpression()).getTree();
-                      return u.withExpression(assignment);
+                      u = u.withExpression(assignment);
                   }
-                  return u;
+                  return (J.Unary) new ParenthesizeVisitor().visit(u, ctx);
               }
           })),
           java(
@@ -195,7 +194,7 @@ class ParenthesizeTest implements RewriteTest {
             """
               public class A {
                   boolean x;
-                  boolean result = !x = true;
+                  boolean result = !(x = true);
               }
               """
           )
