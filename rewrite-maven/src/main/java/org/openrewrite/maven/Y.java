@@ -16,5 +16,6 @@
 package org.openrewrite.maven;
 
 public class Y {
-    
+   
+   // comment    
 }
