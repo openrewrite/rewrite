@@ -21,6 +21,7 @@ import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.trait.Literal;
 import org.openrewrite.java.trait.Traits;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.SearchResult;
@@ -101,15 +102,13 @@ public class ChangePackage extends Recipe {
                 if (tree instanceof JavaSourceFile) {
                     JavaSourceFile cu = (JavaSourceFile) tree;
                     if (Boolean.TRUE.equals(visitStringLiterals)) {
-                        AtomicBoolean found = new AtomicBoolean(false);
-                        Traits.literal().asVisitor(lit -> {
+                        if (Traits.literal().asVisitor((Literal lit, AtomicBoolean bool) -> {
                             String string = lit.getString();
                             if (string != null && string.contains(oldPackageName)) {
-                                found.set(true);
+                                bool.set(true);
                             }
                             return lit.getTree();
-                        }).visit(cu, ctx, getCursor().getParentTreeCursor());
-                        if (found.get()) {
+                        }).reduce(cu, new AtomicBoolean(false), getCursor().getParentTreeCursor()).get()) {
                             return SearchResult.found(cu);
                         }
                     }
@@ -263,7 +262,7 @@ public class ChangePackage extends Recipe {
             boolean visitLiterals = Boolean.TRUE.equals(ChangePackage.this.visitStringLiterals);
             if (visitLiterals && literal.getType() == JavaType.Primitive.String) {
                 Pattern pat = Pattern.compile("(?:\\A|\\s)" + oldPackageName + "[.\\p{javaJavaIdentifierStart}]*(?:|\\s)");
-                if (pat.matcher((String)lit.getValue()).find()) {
+                if (lit.getValue() != null && pat.matcher((String)lit.getValue()).find()) {
                     lit = lit.withValue(((String)lit.getValue()).replace(oldPackageName, newPackageName)).withValueSource(lit.getValueSource().replace(oldPackageName, newPackageName));
                 }
             }

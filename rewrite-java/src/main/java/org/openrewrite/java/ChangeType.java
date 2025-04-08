@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.search.UsesType;
+import org.openrewrite.java.trait.Literal;
 import org.openrewrite.java.trait.Traits;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -106,16 +107,13 @@ public class ChangeType extends Recipe {
                         return SearchResult.found(cu);
                     }
                     if (Boolean.TRUE.equals(visitStringLiterals)) {
-                        AtomicBoolean found = new AtomicBoolean(false);
-                        Traits.literal().asVisitor(lit -> {
-                            stopAfterPreVisit();
+                        if (Traits.literal().asVisitor((Literal lit, AtomicBoolean bool) -> {
                             String string = lit.getString();
                             if (string != null && string.contains(oldFullyQualifiedTypeName)) {
-                                found.set(true);
+                                bool.set(true);
                             }
                             return lit.getTree();
-                        }).visit(cu, ctx, getCursor().getParentTreeCursor());
-                        if (found.get()) {
+                        }).reduce(cu, new AtomicBoolean(false), getCursor().getParentTreeCursor()).get()) {
                             return SearchResult.found(cu);
                         }
                     }
@@ -138,7 +136,7 @@ public class ChangeType extends Recipe {
             public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
                 if (tree instanceof J) {
-                    return new JavaChangeTypeVisitor(oldFullyQualifiedTypeName, newFullyQualifiedTypeName, ignoreDefinition).visit(tree, ctx, requireNonNull(getCursor().getParent()));
+                    return new JavaChangeTypeVisitor(oldFullyQualifiedTypeName, newFullyQualifiedTypeName, ignoreDefinition, visitStringLiterals).visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 } else if (tree instanceof SourceFileWithReferences) {
                     SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
                     SourceFileWithReferences.References references = sourceFile.getReferences();
@@ -154,22 +152,29 @@ public class ChangeType extends Recipe {
         });
     }
 
-    private class JavaChangeTypeVisitor extends JavaVisitor<ExecutionContext> {
+    private static class JavaChangeTypeVisitor extends JavaVisitor<ExecutionContext> {
         private final JavaType.Class originalType;
         private final JavaType targetType;
+        private final String  oldFullyQualifiedTypeName;
+        private final String  newFullyQualifiedTypeName;
 
         private J.@Nullable Identifier importAlias;
 
         @Nullable
         private final Boolean ignoreDefinition;
+        @Nullable
+        private final Boolean visitLiterals;
 
         private final Map<JavaType, JavaType> oldNameToChangedType = new IdentityHashMap<>();
         private final Set<String> topLevelClassnames = new HashSet<>();
 
-        private JavaChangeTypeVisitor(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName, @Nullable Boolean ignoreDefinition) {
+        private JavaChangeTypeVisitor(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName, @Nullable Boolean ignoreDefinition, @Nullable Boolean visitLiterals) {
+            this.oldFullyQualifiedTypeName = oldFullyQualifiedTypeName;
+            this.newFullyQualifiedTypeName = newFullyQualifiedTypeName;
             this.originalType = JavaType.ShallowClass.build(oldFullyQualifiedTypeName);
             this.targetType = JavaType.buildType(newFullyQualifiedTypeName);
             this.ignoreDefinition = ignoreDefinition;
+            this.visitLiterals = visitLiterals;
             importAlias = null;
         }
 
@@ -223,10 +228,9 @@ public class ChangeType extends Recipe {
         @Override
         public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
             J.Literal lit = literal;
-            boolean visitLiterals = Boolean.TRUE.equals(ChangeType.this.visitStringLiterals);
-            if (visitLiterals && literal.getType() == JavaType.Primitive.String) {
+            if (Boolean.TRUE.equals(visitLiterals) && literal.getType() == JavaType.Primitive.String) {
                 Pattern pat = Pattern.compile("(?:\\A|\\s)" + oldFullyQualifiedTypeName + "(?:|\\s)");
-                if (pat.matcher((String)lit.getValue()).find()) {
+                if (lit.getValue() != null && pat.matcher((String)lit.getValue()).find()) {
                     lit = lit.withValue(((String)lit.getValue()).replace(oldFullyQualifiedTypeName, newFullyQualifiedTypeName)).withValueSource(lit.getValueSource().replace(oldFullyQualifiedTypeName, newFullyQualifiedTypeName));
                 }
             }
