@@ -162,7 +162,6 @@ public class ChangeType extends Recipe {
 
         @Nullable
         private final Boolean ignoreDefinition;
-        @Nullable
         private final Boolean visitLiterals;
 
         private final Map<JavaType, JavaType> oldNameToChangedType = new IdentityHashMap<>();
