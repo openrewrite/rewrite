@@ -2090,20 +2090,20 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void changeTypeInLiteral() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("test.type.A", "test.type.B", true, true)),
+          spec -> spec.recipe(new ChangeType("javax.type.A", "jakarta.type.B", true, true)),
           java(
             """
               class Test {
-                  String ref = "test.type.A";
-                  String refNested = "test.test.type.A";
-                  String extendedRef = "there is a type reference here -> test.type.A <- hopefully it only replaces that";
+                  String ref = "javax.type.A";
+                  String refNested = "javax.type.other.A";
+                  String extendedRef = "there is a type reference here -> javax.type.A <- hopefully it only replaces that";
               }
               """,
             """
               class Test {
-                  String ref = "test.type.B";
-                  String refNested = "test.test.type.A";
-                  String extendedRef = "there is a type reference here -> test.type.B <- hopefully it only replaces that";
+                  String ref = "jakarta.type.B";
+                  String refNested = "javax.type.other.A";
+                  String extendedRef = "there is a type reference here -> jakarta.type.B <- hopefully it only replaces that";
               }
               """
           )

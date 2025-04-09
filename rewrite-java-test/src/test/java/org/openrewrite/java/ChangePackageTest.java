@@ -1782,18 +1782,18 @@ class ChangePackageTest implements RewriteTest {
     @Test
     void changePackageInLiteral() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePackage("test.type", "test.test.type", true, true)),
+          spec -> spec.recipe(new ChangePackage("javax.type", "jakarta.type", true, true)),
           java(
             """
               class Test {
-                  String ref = "test.type.A";
-                  String extendedRef = "there is a type reference here -> test.type.A <- hopefully it only replaces that";
+                  String ref = "javax.type.A";
+                  String extendedRef = "there is a type reference here -> javax.type.A <- hopefully it only replaces that";
               }
               """,
             """
               class Test {
-                  String ref = "test.test.type.A";
-                  String extendedRef = "there is a type reference here -> test.test.type.A <- hopefully it only replaces that";
+                  String ref = "jakarta.type.A";
+                  String extendedRef = "there is a type reference here -> jakarta.type.A <- hopefully it only replaces that";
               }
               """
           )

@@ -258,7 +258,7 @@ public class ChangePackage extends Recipe {
         public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
             J.Literal lit = literal;
             if (Boolean.TRUE.equals(visitStringLiterals) && literal.getType() == JavaType.Primitive.String) {
-                Pattern pat = Pattern.compile("(?:\\A|\\s)" + oldPackageName + "[.\\p{javaJavaIdentifierStart}]*(?:|\\s)");
+                Pattern pat = Pattern.compile("\\b" + oldPackageName + "\\b");
                 if (lit.getValue() != null && pat.matcher((String) lit.getValue()).find()) {
                     lit = lit.withValue(((String) lit.getValue()).replace(oldPackageName, newPackageName))
                             .withValueSource(lit.getValueSource().replace(oldPackageName, newPackageName));
