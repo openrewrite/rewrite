@@ -29,8 +29,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.gradle.Assertions.settingsGradle;
+import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
 import static org.openrewrite.properties.Assertions.properties;
 
@@ -1284,6 +1283,146 @@ class UpgradeDependencyVersionTest implements RewriteTest {
 
               dependencies {
                 /*~~(com.google.guava:guava failed. Unable to download metadata.)~~>*/implementation "com.google.guava:guava:29.0-jre"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinDslString() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation("com.google.guava:guava:29.0-jre")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation("com.google.guava:guava:30.1.1-jre")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinDslMap() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation(group = "com.google.guava", name = "guava", version = "29.0-jre")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation(group = "com.google.guava", name = "guava", version = "30.1.1-jre")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinDslVariable() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  val guavaVersion = "29.0-jre"
+                  implementation(group = "com.google.guava", name = "guava", version = guavaVersion)
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  val guavaVersion = "30.1.1-jre"
+                  implementation(group = "com.google.guava", name = "guava", version = guavaVersion)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinDslStringInterpolation() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  val guavaVersion = "29.0-jre"
+                  implementation("com.google.guava:guava:${guavaVersion}")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  val guavaVersion = "30.1.1-jre"
+                  implementation("com.google.guava:guava:${guavaVersion}")
               }
               """
           )
