@@ -28,9 +28,9 @@ class ResultOfMethodCallIgnoredTest implements RewriteTest {
     @Test
     void resultOfMethodCallIgnored() {
         rewriteRun(
-          spec -> spec.recipe(new ResultOfMethodCallIgnored("java.io.File mkdir*()", false)),
-          java(
-            """
+                spec -> spec.recipe(new ResultOfMethodCallIgnored("java.io.File mkdir*()", false)),
+                java(
+                        """
               import java.io.File;
               class Test {
                   void test() {
@@ -43,7 +43,7 @@ class ResultOfMethodCallIgnoredTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.io.File;
               class Test {
                   void test() {
@@ -56,7 +56,7 @@ class ResultOfMethodCallIgnoredTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

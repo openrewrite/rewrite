@@ -209,9 +209,11 @@ public class DeleteProperty extends Recipe {
     @With
     private static class ToBeRemoved implements Marker {
         UUID id;
+
         static <Y2 extends Yaml> Y2 withMarker(Y2 y) {
             return y.withMarkers(y.getMarkers().addIfAbsent(new ToBeRemoved(randomId())));
         }
+
         static boolean hasMarker(Yaml y) {
             return y.getMarkers().findFirst(ToBeRemoved.class).isPresent();
         }

@@ -30,7 +30,7 @@ class AddOrUpdateChildTagTest implements RewriteTest {
     void addsTagEverywhereWhenAbsent(Boolean replaceExisting) {
         rewriteRun(spec -> spec.recipe(new AddOrUpdateChildTag(
                         "/project//plugin[groupId='org.apache.maven.plugins' and artifactId='maven-resources-plugin']" +
-                        "//configuration",
+                                "//configuration",
                         "<skip>true</skip>",
                         replaceExisting)),
                 xml(
@@ -192,7 +192,7 @@ class AddOrUpdateChildTagTest implements RewriteTest {
     void updateTagEverywhere(Boolean replaceExisting) {
         rewriteRun(spec -> spec.recipe(new AddOrUpdateChildTag(
                         "/project//plugin[groupId='org.apache.maven.plugins' and artifactId='maven-resources-plugin']" +
-                        "//configuration",
+                                "//configuration",
                         "<skip>true</skip>",
                         replaceExisting)),
                 xml(
@@ -340,7 +340,7 @@ class AddOrUpdateChildTagTest implements RewriteTest {
     void dontUpdateIfReplaceIsDisabled() {
         rewriteRun(spec -> spec.recipe(new AddOrUpdateChildTag(
                         "/project//plugin[groupId='org.apache.maven.plugins' and artifactId='maven-resources-plugin']" +
-                        "//configuration",
+                                "//configuration",
                         "<skip>true</skip>",
                         false)),
                 xml(
@@ -422,7 +422,7 @@ class AddOrUpdateChildTagTest implements RewriteTest {
     void dontTouchAnythingElse(Boolean replaceExisting) {
         rewriteRun(spec -> spec.recipe(new AddOrUpdateChildTag(
                         "/project//plugin[groupId='org.apache.maven.plugins' and artifactId='maven-resources-plugin']" +
-                        "//configuration",
+                                "//configuration",
                         "<skip>true</skip>",
                         replaceExisting)),
                 xml(

@@ -29,49 +29,49 @@ class XsltTransformationTest implements RewriteTest {
     void transformFromParameter() {
         @Language("xml")
         String xslt = StringUtils.readFully(XsltTransformationTest.class
-          .getResourceAsStream("/org/openrewrite/xml/XsltTransformationTest.xslt"));
+                .getResourceAsStream("/org/openrewrite/xml/XsltTransformationTest.xslt"));
 
         rewriteRun(
-          spec -> spec.recipe(new XsltTransformation(xslt, null, "**/*.xml")),
-          xml(
-            """
+                spec -> spec.recipe(new XsltTransformation(xslt, null, "**/*.xml")),
+                xml(
+                        """
               <configuration>
                   <activeRecipes>
                       <recipe>org.openrewrite.java.cleanup.UnnecessaryThrows</recipe>
                   </activeRecipes>
               </configuration>
               """,
-            """
+                        """
               <configuration>
                   <activeRecipes>
                       <activeRecipe>org.openrewrite.java.cleanup.UnnecessaryThrows</activeRecipe>
                   </activeRecipes>
               </configuration>
               """
-          )
+                )
         );
     }
 
     @Test
     void transformFromClasspathResource() {
         rewriteRun(
-          spec -> spec.recipe(new XsltTransformation(null, "/org/openrewrite/xml/XsltTransformationTest.xslt", "**/*.xml")),
-          xml(
-            """
+                spec -> spec.recipe(new XsltTransformation(null, "/org/openrewrite/xml/XsltTransformationTest.xslt", "**/*.xml")),
+                xml(
+                        """
               <configuration>
                   <activeRecipes>
                       <recipe>org.openrewrite.java.cleanup.UnnecessaryThrows</recipe>
                   </activeRecipes>
               </configuration>
               """,
-            """
+                        """
               <configuration>
                   <activeRecipes>
                       <activeRecipe>org.openrewrite.java.cleanup.UnnecessaryThrows</activeRecipe>
                   </activeRecipes>
               </configuration>
               """
-          )
+                )
         );
     }
 }

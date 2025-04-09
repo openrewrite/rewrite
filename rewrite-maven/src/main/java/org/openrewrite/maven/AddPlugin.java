@@ -162,13 +162,13 @@ public class AddPlugin extends Recipe {
                 } else {
                     Xml.Tag pluginTag = Xml.Tag.build(
                             "<plugin>\n" +
-                            "<groupId>" + groupId + "</groupId>\n" +
-                            "<artifactId>" + artifactId + "</artifactId>\n" +
-                            (version != null ? "<version>" + version + "</version>\n" : "") +
-                            (executions != null ? executions.trim() + "\n" : "") +
-                            (configuration != null ? configuration.trim() + "\n" : "") +
-                            (dependencies != null ? dependencies.trim() + "\n" : "") +
-                            "</plugin>");
+                                    "<groupId>" + groupId + "</groupId>\n" +
+                                    "<artifactId>" + artifactId + "</artifactId>\n" +
+                                    (version != null ? "<version>" + version + "</version>\n" : "") +
+                                    (executions != null ? executions.trim() + "\n" : "") +
+                                    (configuration != null ? configuration.trim() + "\n" : "") +
+                                    (dependencies != null ? dependencies.trim() + "\n" : "") +
+                                    "</plugin>");
                     t = (Xml.Tag) new AddToTagVisitor<>(plugins, pluginTag).visitNonNull(t, ctx, getCursor().getParentOrThrow());
                 }
             }

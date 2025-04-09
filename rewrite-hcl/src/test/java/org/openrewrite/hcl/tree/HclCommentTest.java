@@ -27,8 +27,8 @@ class HclCommentTest implements RewriteTest {
     @Test
     void comment() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               # test
               /*
                multiline
@@ -39,15 +39,15 @@ class HclCommentTest implements RewriteTest {
                   a = 1
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void commentCrlf() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               # test
               /*
                multiline
@@ -58,7 +58,7 @@ class HclCommentTest implements RewriteTest {
                   a = 1
               }
               """.replace("\n", "\r\n")
-          )
+                )
         );
     }
 
@@ -66,8 +66,8 @@ class HclCommentTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/2079")
     void bracesInComment() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               locals {
                   myvar = {
                     # below {attributes}
@@ -77,15 +77,15 @@ class HclCommentTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void inLineCommentsNextLineAttribute() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               # test
               /*
                multiline
@@ -97,7 +97,7 @@ class HclCommentTest implements RewriteTest {
                   // test 3
               }
               """
-          )
+                )
         );
     }
 
@@ -106,14 +106,14 @@ class HclCommentTest implements RewriteTest {
     @Test
     void commentAsTheLastLine() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               locals {
                 a = 3
               }
               # Nice code, right?
               """
-          )
+                )
         );
     }
 }

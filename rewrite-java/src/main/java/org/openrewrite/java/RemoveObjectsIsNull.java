@@ -37,7 +37,7 @@ public class RemoveObjectsIsNull extends Recipe {
     @Override
     public String getDescription() {
         return "Replace calls to `Objects.isNull(..)` and `Objects.nonNull(..)` with a simple null check. " +
-               "Using these methods outside of stream predicates is not idiomatic.";
+                "Using these methods outside of stream predicates is not idiomatic.";
     }
 
     @Override
@@ -68,7 +68,7 @@ public class RemoveObjectsIsNull extends Recipe {
                 // Replace the method invocation with a simple null check
                 Cursor parentTreeCursor = getCursor().getParentTreeCursor();
                 if (!(parentTreeCursor.getValue() instanceof J.ControlParentheses) &&
-                    !(parentTreeCursor.getValue() instanceof J.Parentheses)) {
+                        !(parentTreeCursor.getValue() instanceof J.Parentheses)) {
                     pattern = '(' + pattern + ')';
                 }
                 parentTreeCursor.putMessage("SIMPLIFY_BOOLEAN_EXPRESSION", true);

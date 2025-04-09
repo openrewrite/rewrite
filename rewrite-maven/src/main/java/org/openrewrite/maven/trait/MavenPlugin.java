@@ -46,7 +46,7 @@ public class MavenPlugin implements Trait<Xml.Tag> {
 
                 // `XPathMatcher` is still a bit expensive
                 if (!"plugin".equals(tag.getName()) ||
-                    (!PLUGIN_MATCHER.matches(cursor))) {
+                        (!PLUGIN_MATCHER.matches(cursor))) {
                     return null;
                 }
 

@@ -63,30 +63,30 @@ class EffectiveMavenRepositoriesTest implements RewriteTest {
     @Test
     void emptyRepositories() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <groupId>org.openrewrite.example</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
               </project>
               """,
-            """
+                        """
               <!--~~(https://repo.maven.apache.org/maven2)~~>--><project>
                 <groupId>org.openrewrite.example</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void repositoryInPom() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <groupId>org.openrewrite.example</groupId>
                 <artifactId>my-app</artifactId>
@@ -99,7 +99,7 @@ class EffectiveMavenRepositoriesTest implements RewriteTest {
                 </repositories>
               </project>
               """,
-            """
+                        """
               <!--~~(https://repo.spring.io/milestone
               https://repo.maven.apache.org/maven2)~~>--><project>
                 <groupId>org.openrewrite.example</groupId>
@@ -113,24 +113,24 @@ class EffectiveMavenRepositoriesTest implements RewriteTest {
                 </repositories>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void fromExecutionContextSettings() {
         rewriteRun(
-          spec -> spec.executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
-            .setMavenSettings(SPRING_MILESTONES_SETTINGS, "repo")),
-          pomXml(
-            """
+                spec -> spec.executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
+                        .setMavenSettings(SPRING_MILESTONES_SETTINGS, "repo")),
+                pomXml(
+                        """
               <project>
                 <groupId>org.openrewrite.example</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
               </project>
               """,
-            """
+                        """
               <!--~~(https://repo.spring.io/milestone
               https://repo.maven.apache.org/maven2)~~>--><project>
                 <groupId>org.openrewrite.example</groupId>
@@ -138,26 +138,26 @@ class EffectiveMavenRepositoriesTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void fromMavenSettingsOnAst() {
         rewriteRun(
-          spec -> spec
-            .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
-              .setMavenSettings(SPRING_MILESTONES_SETTINGS, "repo"))
-            .recipeExecutionContext(new InMemoryExecutionContext()),
-          pomXml(
-            """
+                spec -> spec
+                        .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
+                                .setMavenSettings(SPRING_MILESTONES_SETTINGS, "repo"))
+                        .recipeExecutionContext(new InMemoryExecutionContext()),
+                pomXml(
+                        """
               <project>
                 <groupId>org.openrewrite.example</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
               </project>
               """,
-            """
+                        """
               <!--~~(https://repo.spring.io/milestone
               https://repo.maven.apache.org/maven2)~~>--><project>
                 <groupId>org.openrewrite.example</groupId>
@@ -165,27 +165,27 @@ class EffectiveMavenRepositoriesTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void producesDataTable() {
         rewriteRun(
-          spec -> spec
-            .recipe(new EffectiveMavenRepositories(false))
-            .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
-              .setMavenSettings(SPRING_MILESTONES_SETTINGS, "repo"))
-            .dataTableAsCsv(EffectiveMavenRepositoriesTable.class.getName(), """
+                spec -> spec
+                        .recipe(new EffectiveMavenRepositories(false))
+                        .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
+                                .setMavenSettings(SPRING_MILESTONES_SETTINGS, "repo"))
+                        .dataTableAsCsv(EffectiveMavenRepositoriesTable.class.getName(), """
               pomPath,repositoryUri
               pom.xml,"https://repo.spring.io/milestone"
               pom.xml,"https://repo.maven.apache.org/maven2"
               module/pom.xml,"https://repo.spring.io/milestone"
               module/pom.xml,"https://repo.maven.apache.org/maven2"
               """)
-            .recipeExecutionContext(new InMemoryExecutionContext()),
-          pomXml(
-            """
+                        .recipeExecutionContext(new InMemoryExecutionContext()),
+                pomXml(
+                        """
               <project>
                   <groupId>org.openrewrite.example</groupId>
                   <artifactId>my-app</artifactId>
@@ -195,18 +195,18 @@ class EffectiveMavenRepositoriesTest implements RewriteTest {
                   </modules>
               </project>
               """,
-            spec -> spec.path("pom.xml")
-          ),
-          pomXml(
-            """
+                        spec -> spec.path("pom.xml")
+                ),
+                pomXml(
+                        """
               <project>
                   <groupId>org.openrewrite.example</groupId>
                   <artifactId>module</artifactId>
                   <version>1</version>
               </project>
               """,
-            spec -> spec.path("module/pom.xml")
-          )
+                        spec -> spec.path("module/pom.xml")
+                )
         );
     }
 }

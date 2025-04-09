@@ -33,8 +33,8 @@ class RenamePropertyKeyTest implements RewriteTest {
     @Test
     void propertyInDependency() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -55,7 +55,7 @@ class RenamePropertyKeyTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -76,15 +76,15 @@ class RenamePropertyKeyTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void propertyInDependencyManagement() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -107,7 +107,7 @@ class RenamePropertyKeyTest implements RewriteTest {
                 </dependencyManagement>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -130,15 +130,15 @@ class RenamePropertyKeyTest implements RewriteTest {
                 </dependencyManagement>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void propertyInProperty() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -154,7 +154,7 @@ class RenamePropertyKeyTest implements RewriteTest {
                 <version>1</version>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -170,7 +170,7 @@ class RenamePropertyKeyTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -191,9 +191,9 @@ class RenamePropertyKeyTest implements RewriteTest {
                   newValue: "2.0"
           """;
         rewriteRun(
-          spec -> spec.recipeFromYaml(yamlRecipe, "org.openrewrite.RenamePropertyAndValue"),
-          pomXml(
-            """
+                spec -> spec.recipeFromYaml(yamlRecipe, "org.openrewrite.RenamePropertyAndValue"),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -206,7 +206,7 @@ class RenamePropertyKeyTest implements RewriteTest {
                 <version>1</version>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -219,15 +219,15 @@ class RenamePropertyKeyTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void nothingToRename() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -241,7 +241,7 @@ class RenamePropertyKeyTest implements RewriteTest {
                 </properties>
               </project>
               """
-          )
+                )
         );
     }
 

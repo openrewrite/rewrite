@@ -39,7 +39,7 @@ import static org.openrewrite.Tree.randomId;
  */
 @SuppressWarnings("unused")
 @Value
-@AllArgsConstructor(onConstructor_ = { @JsonCreator })
+@AllArgsConstructor(onConstructor_ = {@JsonCreator})
 @Builder
 public class GradleProject implements Marker, Serializable {
 

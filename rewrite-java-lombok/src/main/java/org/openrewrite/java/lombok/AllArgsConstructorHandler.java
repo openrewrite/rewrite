@@ -29,7 +29,7 @@ public class AllArgsConstructorHandler extends JavacAnnotationHandler<AllArgsCon
     public void handle(AnnotationValues<AllArgsConstructor> annotationValues, JCTree.JCAnnotation jcAnnotation, JavacNode javacNode) {
         // "staticName" and "access" should be retained, but onConstructor is not supported
         // Omit onConstructor to simplify AST -> LST translation
-        if(jcAnnotation.getArguments().isEmpty()) {
+        if (jcAnnotation.getArguments().isEmpty()) {
             new HandleConstructor.HandleAllArgsConstructor().handle(annotationValues, jcAnnotation, javacNode);
         } else {
             List<JCTree.JCExpression> originalArgs = jcAnnotation.getArguments();

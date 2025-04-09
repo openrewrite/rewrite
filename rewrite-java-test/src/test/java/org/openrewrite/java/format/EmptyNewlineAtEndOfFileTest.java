@@ -38,12 +38,12 @@ class EmptyNewlineAtEndOfFileTest implements RewriteTest {
     private static Consumer<RecipeSpec> generalFormat(@Nullable Boolean useCRLF) {
         return spec -> {
             spec.recipe(new EmptyNewlineAtEndOfFile());
-            if(useCRLF != null) {
+            if (useCRLF != null) {
                 spec.parser(JavaParser.fromJavaVersion().styles(singletonList(
-                    new NamedStyles(
-                      randomId(), "test", "test", "test", emptySet(),
-                      singletonList(new GeneralFormatStyle(useCRLF)))
-                  )
+                        new NamedStyles(
+                                randomId(), "test", "test", "test", emptySet(),
+                                singletonList(new GeneralFormatStyle(useCRLF)))
+                )
                 ));
             }
         };
@@ -53,12 +53,12 @@ class EmptyNewlineAtEndOfFileTest implements RewriteTest {
     @Test
     void usesCRLF() {
         rewriteRun(
-          generalFormat(true),
-          java(
-            "class Test {}",
-            "class Test {}\r\n",
-            SourceSpec::noTrim
-          )
+                generalFormat(true),
+                java(
+                        "class Test {}",
+                        "class Test {}\r\n",
+                        SourceSpec::noTrim
+                )
         );
     }
 
@@ -66,60 +66,60 @@ class EmptyNewlineAtEndOfFileTest implements RewriteTest {
     @Test
     void autodetectCRLF() {
         rewriteRun(
-          generalFormat(null),
-          java(
-            "class Test {\r\n}",
-            "class Test {\r\n}\r\n",
-            SourceSpec::noTrim
-          )
+                generalFormat(null),
+                java(
+                        "class Test {\r\n}",
+                        "class Test {\r\n}\r\n",
+                        SourceSpec::noTrim
+                )
         );
     }
 
     @Test
     void autodetectLF() {
         rewriteRun(
-          generalFormat(null),
-          java(
-            "class Test {\n}",
-            "class Test {\n}\n",
-            SourceSpec::noTrim
-          )
+                generalFormat(null),
+                java(
+                        "class Test {\n}",
+                        "class Test {\n}\n",
+                        SourceSpec::noTrim
+                )
         );
     }
 
     @Test
     void noComments() {
         rewriteRun(
-          generalFormat(false),
-          java(
-            "class Test {}",
-            "class Test {}\n",
-            SourceSpec::noTrim
-          )
+                generalFormat(false),
+                java(
+                        "class Test {}",
+                        "class Test {}\n",
+                        SourceSpec::noTrim
+                )
         );
     }
 
     @Test
     void comments() {
         rewriteRun(
-          generalFormat(false),
-          java(
-            "class Test {}\n/*comment*/",
-            "class Test {}\n/*comment*/\n",
-            SourceSpec::noTrim
-          )
+                generalFormat(false),
+                java(
+                        "class Test {}\n/*comment*/",
+                        "class Test {}\n/*comment*/\n",
+                        SourceSpec::noTrim
+                )
         );
     }
 
     @Test
     void multipleLinesToOne() {
         rewriteRun(
-          generalFormat(false),
-          java(
-            "class Test {}\n\n",
-            "class Test {}\n",
-            SourceSpec::noTrim
-          )
+                generalFormat(false),
+                java(
+                        "class Test {}\n\n",
+                        "class Test {}\n",
+                        SourceSpec::noTrim
+                )
         );
     }
 }

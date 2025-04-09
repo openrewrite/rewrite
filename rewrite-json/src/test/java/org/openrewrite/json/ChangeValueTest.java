@@ -28,12 +28,12 @@ class ChangeValueTest implements RewriteTest {
     @Test
     void changeNestedValue() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeValue(
-            "$.metadata.name",
-            "\"monitoring\""
-          )),
-          json(
-                """
+                spec -> spec.recipe(new ChangeValue(
+                        "$.metadata.name",
+                        "\"monitoring\""
+                )),
+                json(
+                        """
               {
                 "apiVersion": "v1",
                 "metadata": {
@@ -42,7 +42,7 @@ class ChangeValueTest implements RewriteTest {
                 }
               }
               """,
-            """
+                        """
               {
                 "apiVersion": "v1",
                 "metadata": {
@@ -51,19 +51,19 @@ class ChangeValueTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void changeArrayValue() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeValue(
-            "$.subjects.kind",
-            "\"Deployment\""
-          )),
-          json(
-                """
+                spec -> spec.recipe(new ChangeValue(
+                        "$.subjects.kind",
+                        "\"Deployment\""
+                )),
+                json(
+                        """
               {
                 "subjects": [
                   {
@@ -73,7 +73,7 @@ class ChangeValueTest implements RewriteTest {
                 ]
               }
               """,
-            """
+                        """
               {
                 "subjects": [
                   {
@@ -83,7 +83,7 @@ class ChangeValueTest implements RewriteTest {
                 ]
               }
               """
-          )
+                )
         );
     }
 }

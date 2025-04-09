@@ -27,15 +27,15 @@ class UseTreeRandomIdTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new UseTreeRandomId())
-          .parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()));
+                .parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()));
     }
 
     @Test
     @DocumentExample
     void replacesUUIDRandomId() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import org.openrewrite.java.tree.J;
               import org.openrewrite.java.tree.JavaType;
               import org.openrewrite.marker.Markers;
@@ -51,7 +51,7 @@ class UseTreeRandomIdTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import org.openrewrite.Tree;
               import org.openrewrite.java.tree.J;
               import org.openrewrite.java.tree.JavaType;
@@ -65,15 +65,15 @@ class UseTreeRandomIdTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doNotReplaceRegularUse() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import org.openrewrite.java.tree.J;
               import org.openrewrite.java.tree.JavaType;
               import org.openrewrite.marker.Markers;
@@ -90,7 +90,7 @@ class UseTreeRandomIdTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import org.openrewrite.Tree;
               import org.openrewrite.java.tree.J;
               import org.openrewrite.java.tree.JavaType;
@@ -108,7 +108,7 @@ class UseTreeRandomIdTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

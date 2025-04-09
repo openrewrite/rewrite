@@ -27,73 +27,73 @@ class NormalizeLineBreaksVisitorTest implements RewriteTest {
 
     @Language("yml")
     final String windows = "" +
-                           "root:\r\n" +
-                           "  - a: 0\r\n" +
-                           "    b: 0";
+            "root:\r\n" +
+            "  - a: 0\r\n" +
+            "    b: 0";
 
     @Language("yml")
     final String linux = "" +
-                         "root:\n" +
-                         "  - a: 0\n" +
-                         "    b: 0";
+            "root:\n" +
+            "  - a: 0\n" +
+            "    b: 0";
 
     @Language("yml")
     final String mixedLinux = "" +
-                              "root:\n" +
-                              "  - a: 0\n" +
-                              "  - b: 0\r\n" +
-                              "  - c: 0";
+            "root:\n" +
+            "  - a: 0\n" +
+            "  - b: 0\r\n" +
+            "  - c: 0";
 
     @Language("yml")
     final String formattedLinux = "" +
-                                  "root:\n" +
-                                  "  - a: 0\n" +
-                                  "  - b: 0\n" +
-                                  "  - c: 0";
+            "root:\n" +
+            "  - a: 0\n" +
+            "  - b: 0\n" +
+            "  - c: 0";
 
     @Language("yml")
     final String mixedWindows = "" +
-                                "root:\r\n" +
-                                "  - a: 0\n" +
-                                "  - b: 0\r\n" +
-                                "  - c: 0";
+            "root:\r\n" +
+            "  - a: 0\n" +
+            "  - b: 0\r\n" +
+            "  - c: 0";
 
     @Language("yml")
     final String formattedWindows = "" +
-                                    "root:\r\n" +
-                                    "  - a: 0\r\n" +
-                                    "  - b: 0\r\n" +
-                                    "  - c: 0";
+            "root:\r\n" +
+            "  - a: 0\r\n" +
+            "  - b: 0\r\n" +
+            "  - c: 0";
 
     @Test
     void windowsToLinux() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new NormalizeLineBreaksVisitor<>(new GeneralFormatStyle(false), null))),
-          yaml(windows, linux)
+                spec -> spec.recipe(toRecipe(() -> new NormalizeLineBreaksVisitor<>(new GeneralFormatStyle(false), null))),
+                yaml(windows, linux)
         );
     }
 
     @Test
     void linuxToWindows() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new NormalizeLineBreaksVisitor<>(new GeneralFormatStyle(true), null))),
-          yaml(linux, windows)
+                spec -> spec.recipe(toRecipe(() -> new NormalizeLineBreaksVisitor<>(new GeneralFormatStyle(true), null))),
+                yaml(linux, windows)
         );
     }
 
     @Test
     void autoDetectLinux() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AutoFormatVisitor<>(null))),
-          yaml(mixedLinux, formattedLinux)
+                spec -> spec.recipe(toRecipe(() -> new AutoFormatVisitor<>(null))),
+                yaml(mixedLinux, formattedLinux)
         );
     }
 
     @Test
     void autoDetectWindows() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AutoFormatVisitor<>(null))),
-          yaml(mixedWindows, formattedWindows)
+                spec -> spec.recipe(toRecipe(() -> new AutoFormatVisitor<>(null))),
+                yaml(mixedWindows, formattedWindows)
         );
     }
 }

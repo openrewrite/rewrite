@@ -31,19 +31,19 @@ class AddJUnitPlatformLauncherTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec
-          .beforeRecipe(withToolingApi())
-          .parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api"))
-          .recipeFromResources("org.openrewrite.gradle.AddJUnitPlatformLauncher");
+                .beforeRecipe(withToolingApi())
+                .parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api"))
+                .recipeFromResources("org.openrewrite.gradle.AddJUnitPlatformLauncher");
     }
 
     @DocumentExample
     @Test
     void addJUnitPlatformLauncher() {
         rewriteRun(
-          mavenProject("project",
-            srcTestJava(
-              java(
-                """
+                mavenProject("project",
+                        srcTestJava(
+                                java(
+                                        """
                   import org.junit.jupiter.api.Test;
                   public class A {
                       @Test
@@ -51,10 +51,10 @@ class AddJUnitPlatformLauncherTest implements RewriteTest {
                       }
                   }
                   """
-              )
-            ),
-            buildGradle(
-              """
+                                )
+                        ),
+                        buildGradle(
+                                """
                 plugins {
                     id "java-library"
                 }
@@ -63,12 +63,12 @@ class AddJUnitPlatformLauncherTest implements RewriteTest {
                     mavenCentral()
                 }
                 """,
-              spec -> spec.after(buildGradle -> {
-                  assertThat(buildGradle).contains("testRuntimeOnly \"org.junit.platform:junit-platform-launcher:");
-                  return buildGradle;
-              })
-            )
-          )
+                                spec -> spec.after(buildGradle -> {
+                                    assertThat(buildGradle).contains("testRuntimeOnly \"org.junit.platform:junit-platform-launcher:");
+                                    return buildGradle;
+                                })
+                        )
+                )
         );
     }
 }

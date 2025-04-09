@@ -29,12 +29,12 @@ class UsesAllMethodsTest implements RewriteTest {
     @Test
     void usesBothMethods() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesAllMethods<>(
-            new MethodMatcher("java.util.Collections emptyList()"),
-            new MethodMatcher("java.util.Collections emptySet()")
-          ))),
-          java(
-            """
+                spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesAllMethods<>(
+                        new MethodMatcher("java.util.Collections emptyList()"),
+                        new MethodMatcher("java.util.Collections emptySet()")
+                ))),
+                java(
+                        """
               import java.util.Collections;
               class Test {
                   {
@@ -43,7 +43,7 @@ class UsesAllMethodsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               /*~~>*/import java.util.Collections;
               class Test {
                   {
@@ -52,36 +52,36 @@ class UsesAllMethodsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void usesNeitherMethods() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesAllMethods<>(
-            new MethodMatcher("java.util.Collections emptyList()"),
-            new MethodMatcher("java.util.Collections emptySet()")
-          ))),
-          java(
-            """
+                spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesAllMethods<>(
+                        new MethodMatcher("java.util.Collections emptyList()"),
+                        new MethodMatcher("java.util.Collections emptySet()")
+                ))),
+                java(
+                        """
               import java.util.Collections;
               class Test {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void usesOneMethod() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesAllMethods<>(
-            new MethodMatcher("java.util.Collections emptyList()"),
-            new MethodMatcher("java.util.Collections emptySet()")
-          ))),
-          java(
-            """
+                spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesAllMethods<>(
+                        new MethodMatcher("java.util.Collections emptyList()"),
+                        new MethodMatcher("java.util.Collections emptySet()")
+                ))),
+                java(
+                        """
               import java.util.Collections;
               class Test {
                   {
@@ -89,19 +89,19 @@ class UsesAllMethodsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void usesBothExitEarlyMethods() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesAllMethods<>(
-            new MethodMatcher("java.util.Collections emptyList()"),
-            new MethodMatcher("java.util.Collections emptySet()")
-          ))),
-          java(
-            """
+                spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesAllMethods<>(
+                        new MethodMatcher("java.util.Collections emptyList()"),
+                        new MethodMatcher("java.util.Collections emptySet()")
+                ))),
+                java(
+                        """
               import java.util.Collections;
               class Test {
                   {
@@ -111,7 +111,7 @@ class UsesAllMethodsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               /*~~>*/import java.util.Collections;
               class Test {
                   {
@@ -121,20 +121,20 @@ class UsesAllMethodsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void matchesMultipleMethods() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesAllMethods<>(
-            new MethodMatcher("java.util.Collections emptyList()"),
-            new MethodMatcher("java.util.Collections *()"),
-            new MethodMatcher("java.util.Collections emptySet()")
-          ))),
-          java(
-            """
+                spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesAllMethods<>(
+                        new MethodMatcher("java.util.Collections emptyList()"),
+                        new MethodMatcher("java.util.Collections *()"),
+                        new MethodMatcher("java.util.Collections emptySet()")
+                ))),
+                java(
+                        """
               import java.util.Collections;
               class Test {
                   {
@@ -143,7 +143,7 @@ class UsesAllMethodsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               /*~~>*/import java.util.Collections;
               class Test {
                   {
@@ -152,7 +152,7 @@ class UsesAllMethodsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

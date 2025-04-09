@@ -36,43 +36,43 @@ class FindSourceFilesTest implements RewriteTest {
     @Test
     void findMatchingFile() {
         rewriteRun(
-          text(
-            "hello world!",
-            "~~>hello world!",
-            spec -> spec.path("a/b/hello.txt")
-          )
+                text(
+                        "hello world!",
+                        "~~>hello world!",
+                        spec -> spec.path("a/b/hello.txt")
+                )
         );
     }
 
     @Test
     void starStarMatchesAtRoot() {
         rewriteRun(
-          text(
-            "hello world!",
-            "~~>hello world!",
-            spec -> spec.path("hello.txt")
-          ),
-          text(
-            "hello world!",
-            "~~>hello world!",
-            spec -> spec.path("./hello.txt")
-          )
+                text(
+                        "hello world!",
+                        "~~>hello world!",
+                        spec -> spec.path("hello.txt")
+                ),
+                text(
+                        "hello world!",
+                        "~~>hello world!",
+                        spec -> spec.path("./hello.txt")
+                )
         );
     }
 
     @Test
     void windows() {
         rewriteRun(
-          text(
-            "hello world!",
-            "~~>hello world!",
-            spec -> spec.path("C:\\Windows\\hello.txt")
-          ),
-          text(
-            "hello world!",
-            "~~>hello world!",
-            spec -> spec.path("\\Windows\\hello.txt")
-          )
+                text(
+                        "hello world!",
+                        "~~>hello world!",
+                        spec -> spec.path("C:\\Windows\\hello.txt")
+                ),
+                text(
+                        "hello world!",
+                        "~~>hello world!",
+                        spec -> spec.path("\\Windows\\hello.txt")
+                )
         );
     }
 
@@ -80,16 +80,16 @@ class FindSourceFilesTest implements RewriteTest {
     @ValueSource(strings = {"hello.txt", "/hello.txt", "\\hello.txt", "./hello.txt", ".\\hello.txt"})
     void findRoot(String filePattern) {
         rewriteRun(
-          spec -> spec.recipe(new FindSourceFiles(filePattern)),
-          text(
-            "hello world!",
-            "~~>hello world!",
-            spec -> spec.path("hello.txt")
-          ),
-          text(
-            "hello world!",
-            spec -> spec.path("a/hello.txt")
-          )
+                spec -> spec.recipe(new FindSourceFiles(filePattern)),
+                text(
+                        "hello world!",
+                        "~~>hello world!",
+                        spec -> spec.path("hello.txt")
+                ),
+                text(
+                        "hello world!",
+                        spec -> spec.path("a/hello.txt")
+                )
         );
     }
 
@@ -98,36 +98,36 @@ class FindSourceFilesTest implements RewriteTest {
     @NullSource
     void blankMatchesEverything(String filePattern) {
         rewriteRun(
-          spec -> spec.recipe(new FindSourceFiles(filePattern)),
-          text(
-            "hello world!",
-            "~~>hello world!",
-            spec -> spec.path("hello.txt")
-          ),
-          text(
-            "hello world!",
-            "~~>hello world!",
-            spec -> spec.path("a/hello.txt")
-          ),
-          text(
-            "name: hello-world",
-            "~~>name: hello-world",
-            spec -> spec.path(".github/workflows/hello.yml")
-          ),
-          text(
-            "hello world!",
-            "~~>hello world!",
-            spec -> spec.path("C:\\Windows\\hello.txt")
-          )
+                spec -> spec.recipe(new FindSourceFiles(filePattern)),
+                text(
+                        "hello world!",
+                        "~~>hello world!",
+                        spec -> spec.path("hello.txt")
+                ),
+                text(
+                        "hello world!",
+                        "~~>hello world!",
+                        spec -> spec.path("a/hello.txt")
+                ),
+                text(
+                        "name: hello-world",
+                        "~~>name: hello-world",
+                        spec -> spec.path(".github/workflows/hello.yml")
+                ),
+                text(
+                        "hello world!",
+                        "~~>hello world!",
+                        spec -> spec.path("C:\\Windows\\hello.txt")
+                )
         );
     }
 
     @Test
     void findDotfiles() {
         rewriteRun(
-          spec -> spec.recipe(new FindSourceFiles(".github/workflows/*.yml")),
-          text(
-            """
+                spec -> spec.recipe(new FindSourceFiles(".github/workflows/*.yml")),
+                text(
+                        """
               name: hello-world
               on: push
               jobs:
@@ -137,7 +137,7 @@ class FindSourceFilesTest implements RewriteTest {
                     - name: my-step
                       run: echo "Hello World!"
               """,
-            """
+                        """
               ~~>name: hello-world
               on: push
               jobs:
@@ -147,8 +147,8 @@ class FindSourceFilesTest implements RewriteTest {
                     - name: my-step
                       run: echo "Hello World!"
               """,
-            spec -> spec.path(".github/workflows/hello.yml")
-          )
+                        spec -> spec.path(".github/workflows/hello.yml")
+                )
         );
     }
 
@@ -157,26 +157,26 @@ class FindSourceFilesTest implements RewriteTest {
     @Disabled("{} syntax not supported yet")
     void eitherOr() {
         rewriteRun(
-          spec -> spec.recipe(new FindSourceFiles("**/*.{md,txt}")),
-          text(
-            "hello world!",
-            "~~>hello world!",
-            spec -> spec.path("a/b/hello.md")
-          ),
-          text(
-            "hello world!",
-            "~~>hello world!",
-            spec -> spec.path("a/c/hello.txt")
-          )
+                spec -> spec.recipe(new FindSourceFiles("**/*.{md,txt}")),
+                text(
+                        "hello world!",
+                        "~~>hello world!",
+                        spec -> spec.path("a/b/hello.md")
+                ),
+                text(
+                        "hello world!",
+                        "~~>hello world!",
+                        spec -> spec.path("a/c/hello.txt")
+                )
         );
     }
 
     @Test
     void negation() {
         rewriteRun(
-          spec -> spec.recipe(new FindSourceFiles("!(**/not-this.txt)")),
-          text("not-this", spec -> spec.path("not-this.txt")),
-          text("this", "~~>this", spec -> spec.path("this.txt"))
+                spec -> spec.recipe(new FindSourceFiles("!(**/not-this.txt)")),
+                text("not-this", spec -> spec.path("not-this.txt")),
+                text("this", "~~>this", spec -> spec.path("this.txt"))
         );
     }
 }

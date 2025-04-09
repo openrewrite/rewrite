@@ -34,8 +34,8 @@ class AddPropertyTest implements RewriteTest {
     @Test
     void notIfParentHasDefined() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-parent</artifactId>
@@ -45,10 +45,10 @@ class AddPropertyTest implements RewriteTest {
                 </properties>
               </project>
               """
-          ),
-          mavenProject("my-app",
-            pomXml(
-       """
+                ),
+                mavenProject("my-app",
+                        pomXml(
+                                """
               <project>
                 <parent>
                   <groupId>com.mycompany.app</groupId>
@@ -59,8 +59,8 @@ class AddPropertyTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
-            )
-          )
+                        )
+                )
         );
     }
 
@@ -69,8 +69,8 @@ class AddPropertyTest implements RewriteTest {
     @Test
     void prefersToUpdateParent() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-parent</artifactId>
@@ -80,7 +80,7 @@ class AddPropertyTest implements RewriteTest {
                 </modules>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-parent</artifactId>
@@ -93,10 +93,10 @@ class AddPropertyTest implements RewriteTest {
                 </properties>
               </project>
               """
-          ),
-          mavenProject("my-app",
-            pomXml(
-        """
+                ),
+                mavenProject("my-app",
+                        pomXml(
+                                """
                <project>
                  <parent>
                    <groupId>com.mycompany.app</groupId>
@@ -111,7 +111,7 @@ class AddPropertyTest implements RewriteTest {
                  </properties>
                </project>
                """,
-          """
+                                """
                  <project>
                    <parent>
                      <groupId>com.mycompany.app</groupId>
@@ -123,17 +123,17 @@ class AddPropertyTest implements RewriteTest {
                    <version>1</version>
                  </project>
                  """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void trustParent() {
         rewriteRun(
-          spec -> spec.recipe(new AddProperty("key", "value", null, true)),
-          pomXml(
-            """
+                spec -> spec.recipe(new AddProperty("key", "value", null, true)),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-parent</artifactId>
@@ -143,11 +143,11 @@ class AddPropertyTest implements RewriteTest {
                 </properties>
               </project>
               """,
-            SourceSpec::skip
-          ),
-          mavenProject("my-app",
-            pomXml(
-        """
+                        SourceSpec::skip
+                ),
+                mavenProject("my-app",
+                        pomXml(
+                                """
               <project>
                 <parent>
                   <groupId>com.mycompany.app</groupId>
@@ -158,16 +158,16 @@ class AddPropertyTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void ifRemoteParentIsDefined() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <parent>
                   <groupId>org.springframework.boot</groupId>
@@ -179,7 +179,7 @@ class AddPropertyTest implements RewriteTest {
                 <version>1</version>
               </project>
               """,
-                """
+                        """
               <project>
                 <parent>
                   <groupId>org.springframework.boot</groupId>
@@ -195,15 +195,15 @@ class AddPropertyTest implements RewriteTest {
               </project>
               """
 
-          )
+                )
         );
     }
 
     @Test
     void ifRemoteParentIsDefined_2() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <parent>
                   <groupId>org.springframework.boot</groupId>
@@ -216,7 +216,7 @@ class AddPropertyTest implements RewriteTest {
                 <version>1</version>
               </project>
               """,
-                """
+                        """
               <project>
                 <parent>
                   <groupId>org.springframework.boot</groupId>
@@ -233,15 +233,15 @@ class AddPropertyTest implements RewriteTest {
               </project>
               """
 
-          )
+                )
         );
     }
 
     @Test
     void ifRemoteParentIsDefined_3() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <parent>
                   <groupId>org.springframework.boot</groupId>
@@ -254,7 +254,7 @@ class AddPropertyTest implements RewriteTest {
                 <version>1</version>
               </project>
               """,
-                """
+                        """
               <project>
                 <parent>
                   <groupId>org.springframework.boot</groupId>
@@ -271,7 +271,7 @@ class AddPropertyTest implements RewriteTest {
               </project>
               """
 
-          )
+                )
         );
     }
 
@@ -279,8 +279,8 @@ class AddPropertyTest implements RewriteTest {
     @Test
     void addFirstProperty() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -290,7 +290,7 @@ class AddPropertyTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -303,15 +303,15 @@ class AddPropertyTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void addPropertyInOrder() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -322,7 +322,7 @@ class AddPropertyTest implements RewriteTest {
                 </properties>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -334,15 +334,15 @@ class AddPropertyTest implements RewriteTest {
                 </properties>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void changeExistingPropertyWithDifferentValue() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -352,7 +352,7 @@ class AddPropertyTest implements RewriteTest {
                 </properties>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -362,16 +362,16 @@ class AddPropertyTest implements RewriteTest {
                 </properties>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void preserveExistingPropertyWithDifferentValue() {
         rewriteRun(
-          spec -> spec.recipe(new AddProperty("key", "value", true, false)),
-          pomXml(
-     """
+                spec -> spec.recipe(new AddProperty("key", "value", true, false)),
+                pomXml(
+                        """
             <project>
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
@@ -381,7 +381,7 @@ class AddPropertyTest implements RewriteTest {
               </properties>
             </project>
             """
-          )
+                )
         );
     }
 }

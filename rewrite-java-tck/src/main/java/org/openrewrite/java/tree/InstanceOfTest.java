@@ -28,15 +28,15 @@ class InstanceOfTest implements RewriteTest {
     @Test
     void instanceOf() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test(Object o) {
                       boolean b = o instanceof String;
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -44,8 +44,8 @@ class InstanceOfTest implements RewriteTest {
     @Test
     void patternMatch() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.*;
               class Test {
                 public void match(Collection<?> c) {
@@ -57,14 +57,14 @@ class InstanceOfTest implements RewriteTest {
                   }
               }
               """,
-            spec -> spec.afterRecipe(cu -> new JavaVisitor<Integer>() {
-                @Override
-                public J visitInstanceOf(J.InstanceOf instanceOf, Integer integer) {
-                    assertThat(instanceOf.getPattern()).isNotNull();
-                    return instanceOf;
-                }
-            }.visit(cu, 0))
-          )
+                        spec -> spec.afterRecipe(cu -> new JavaVisitor<Integer>() {
+                            @Override
+                            public J visitInstanceOf(J.InstanceOf instanceOf, Integer integer) {
+                                assertThat(instanceOf.getPattern()).isNotNull();
+                                return instanceOf;
+                            }
+                        }.visit(cu, 0))
+                )
         );
     }
 }

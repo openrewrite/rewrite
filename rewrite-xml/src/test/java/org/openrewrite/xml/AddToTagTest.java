@@ -34,112 +34,112 @@ class AddToTagTest implements RewriteTest {
     @Test
     void addElement() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
-              @Override
-              public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
-                  if (x.getRoot().getChildren().stream().noneMatch(c -> c.getAttributes().stream()
-                    .anyMatch(attr -> attr.getKey().getName().equals("id") && attr.getValueAsString().equals("myBean2")))) {
-                      doAfterVisit(new AddToTagVisitor<>(x.getRoot(), Xml.Tag.build("<bean id=\"myBean2\"/>")));
-                  }
-                  return super.visitDocument(x, ctx);
-              }
-          })),
-          xml(
-            """
+                spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
+                    @Override
+                    public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
+                        if (x.getRoot().getChildren().stream().noneMatch(c -> c.getAttributes().stream()
+                                .anyMatch(attr -> attr.getKey().getName().equals("id") && attr.getValueAsString().equals("myBean2")))) {
+                            doAfterVisit(new AddToTagVisitor<>(x.getRoot(), Xml.Tag.build("<bean id=\"myBean2\"/>")));
+                        }
+                        return super.visitDocument(x, ctx);
+                    }
+                })),
+                xml(
+                        """
               <beans>
                 <bean id="myBean"/>
               </beans>
               """,
-            """
+                        """
               <beans>
                 <bean id="myBean"/>
                 <bean id="myBean2"/>
               </beans>
               """
-          )
+                )
         );
     }
 
     @Test
     void addElementToSlashClosedTag() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
-              @Override
-              public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
-                  if (x.getRoot().getChildren().get(0).getChildren().size() == 0) {
-                      doAfterVisit(new AddToTagVisitor<>((Xml.Tag) requireNonNull(x.getRoot().getContent()).get(0),
-                        Xml.Tag.build("<property name=\"myprop\" ref=\"collaborator\"/>")));
-                  }
-                  return super.visitDocument(x, ctx);
-              }
-          })),
-          xml(
-            """
+                spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
+                    @Override
+                    public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
+                        if (x.getRoot().getChildren().get(0).getChildren().size() == 0) {
+                            doAfterVisit(new AddToTagVisitor<>((Xml.Tag) requireNonNull(x.getRoot().getContent()).get(0),
+                                    Xml.Tag.build("<property name=\"myprop\" ref=\"collaborator\"/>")));
+                        }
+                        return super.visitDocument(x, ctx);
+                    }
+                })),
+                xml(
+                        """
               <beans >
                 <bean id="myBean" />
               </beans>
               """,
-            """
+                        """
               <beans >
                 <bean id="myBean">
                   <property name="myprop" ref="collaborator"/>
                 </bean>
               </beans>
               """
-          )
+                )
         );
     }
 
     @Test
     void addElementToEmptyTagOnSameLine() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
-              @Override
-              public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
-                  if (x.getRoot().getChildren().isEmpty()) {
-                      doAfterVisit(new AddToTagVisitor<>(x.getRoot(), Xml.Tag.build("<bean id=\"myBean\"/>"), new TagNameComparator()));
-                  }
-                  return super.visitDocument(x, ctx);
-              }
-          })),
-          xml(
-            """
+                spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
+                    @Override
+                    public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
+                        if (x.getRoot().getChildren().isEmpty()) {
+                            doAfterVisit(new AddToTagVisitor<>(x.getRoot(), Xml.Tag.build("<bean id=\"myBean\"/>"), new TagNameComparator()));
+                        }
+                        return super.visitDocument(x, ctx);
+                    }
+                })),
+                xml(
+                        """
               <beans></beans>
               """,
-            """
+                        """
               <beans>
                 <bean id="myBean"/>
               </beans>
               """
-          )
+                )
         );
     }
 
     @Test
     void addElementInOrder() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
-              @Override
-              public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
-                  if (x.getRoot().getChildren().stream().noneMatch(c -> c.getName().equals("apple"))) {
-                      doAfterVisit(new AddToTagVisitor<>(x.getRoot(), Xml.Tag.build("<apple/>"), new TagNameComparator()));
-                  }
-                  return super.visitDocument(x, ctx);
-              }
-          })),
-          xml(
-            """
+                spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
+                    @Override
+                    public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
+                        if (x.getRoot().getChildren().stream().noneMatch(c -> c.getName().equals("apple"))) {
+                            doAfterVisit(new AddToTagVisitor<>(x.getRoot(), Xml.Tag.build("<apple/>"), new TagNameComparator()));
+                        }
+                        return super.visitDocument(x, ctx);
+                    }
+                })),
+                xml(
+                        """
               <beans >
                 <banana/>
               </beans>
               """,
-            """
+                        """
               <beans >
                 <apple/>
                 <banana/>
               </beans>
               """
-          )
+                )
         );
     }
 
@@ -147,24 +147,24 @@ class AddToTagTest implements RewriteTest {
     @Test
     void preserveNonTagContent() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
-              @Override
-              public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
-                  if (x.getRoot().getChildren().stream().noneMatch(c -> c.getName().equals("apple"))) {
-                      doAfterVisit(new AddToTagVisitor<>(x.getRoot(), Xml.Tag.build("<apple/>"), new TagNameComparator()));
-                  }
-                  return super.visitDocument(x, ctx);
-              }
-          })),
-          xml(
-            """
+                spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
+                    @Override
+                    public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
+                        if (x.getRoot().getChildren().stream().noneMatch(c -> c.getName().equals("apple"))) {
+                            doAfterVisit(new AddToTagVisitor<>(x.getRoot(), Xml.Tag.build("<apple/>"), new TagNameComparator()));
+                        }
+                        return super.visitDocument(x, ctx);
+                    }
+                })),
+                xml(
+                        """
               <beans>
                 <!-- comment -->
                 <?processing instruction?>
                 <banana/>
               </beans>
               """,
-            """
+                        """
               <beans>
                 <apple/>
                 <!-- comment -->
@@ -172,7 +172,7 @@ class AddToTagTest implements RewriteTest {
                 <banana/>
               </beans>
               """
-          )
+                )
         );
     }
 }

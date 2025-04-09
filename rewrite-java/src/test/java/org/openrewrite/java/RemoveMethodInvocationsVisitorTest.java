@@ -38,11 +38,11 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
     @Test
     void removeFromEnd() {
         rewriteRun(
-          spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder toString()"))
-          ,
-          //language=java
-          java(
-            """
+                spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder toString()"))
+        ,
+                //language=java
+                java(
+                        """
               public class Test {
                   void method() {
                       StringBuilder sb = new StringBuilder();
@@ -57,7 +57,7 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class Test {
                   void method() {
                       StringBuilder sb = new StringBuilder();
@@ -71,17 +71,17 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void removeMultipleMethodsFromEnd() {
         rewriteRun(
-          spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder toString()", "java.lang.StringBuilder append(java.lang.String)")),
-          //language=java
-          java(
-            """
+                spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder toString()", "java.lang.StringBuilder append(java.lang.String)")),
+                //language=java
+                java(
+                        """
               public class Test {
                   void method() {
                       StringBuilder sb = new StringBuilder();
@@ -96,7 +96,7 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class Test {
                   void method() {
                       StringBuilder sb = new StringBuilder();
@@ -105,17 +105,17 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void removeFromMiddle() {
         rewriteRun(
-          spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder reverse()")),
-          //language=java
-          java(
-            """
+                spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder reverse()")),
+                //language=java
+                java(
+                        """
               public class Test {
                   void method() {
                       StringBuilder sb = new StringBuilder();
@@ -130,7 +130,7 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class Test {
                   void method() {
                       StringBuilder sb = new StringBuilder();
@@ -143,17 +143,17 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void removeEntireStatement() {
         rewriteRun(
-          spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder append(java.lang.String)")),
-          //language=java
-          java(
-            """
+                spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder append(java.lang.String)")),
+                //language=java
+                java(
+                        """
               public class Test {
                   void method() {
                       StringBuilder sb = new StringBuilder();
@@ -161,24 +161,24 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class Test {
                   void method() {
                       StringBuilder sb = new StringBuilder();
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void removeWithoutSelect() {
         rewriteRun(
-          spec -> spec.recipe(createRemoveMethodsRecipe("Test foo()")),
-          //language=java
-          java(
-            """
+                spec -> spec.recipe(createRemoveMethodsRecipe("Test foo()")),
+                //language=java
+                java(
+                        """
               public class Test {
                   void foo() {}
                   void method() {
@@ -187,7 +187,7 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class Test {
                   void foo() {}
                   void method() {
@@ -195,17 +195,17 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void removeFromWithinArguments() {
         rewriteRun(
-          spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder append(java.lang.String)")),
-          //language=java
-          java(
-            """
+                spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder append(java.lang.String)")),
+                //language=java
+                java(
+                        """
               public class Test {
                   void method() {
                       StringBuilder sb = new StringBuilder();
@@ -221,7 +221,7 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class Test {
                   void method() {
                       StringBuilder sb = new StringBuilder();
@@ -236,17 +236,17 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void keepSelectForAssignment() {
         rewriteRun(
-          spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder append(java.lang.String)")),
-          //language=java
-          java(
-            """
+                spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder append(java.lang.String)")),
+                //language=java
+                java(
+                        """
               public class Test {
                   void method() {
                       StringBuilder sb = new StringBuilder();
@@ -256,7 +256,7 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class Test {
                   void method() {
                       StringBuilder sb = new StringBuilder();
@@ -265,17 +265,17 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void chainedCallsAsParameter() {
         rewriteRun(
-          spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder append(java.lang.String)")),
-          // language=java
-          java(
-            """
+                spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder append(java.lang.String)")),
+                // language=java
+                java(
+                        """
               class Test {
                   void method() {
                       print(new StringBuilder()
@@ -291,7 +291,7 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                   void print(String str) {}
               }
               """,
-            """
+                        """
               class Test {
                   void method() {
                       print(new StringBuilder()
@@ -302,17 +302,17 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                   void print(String str) {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void removeFromLambda() {
         rewriteRun(
-          spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder append(java.lang.String)")),
-          // language=java
-          java(
-            """
+                spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder append(java.lang.String)")),
+                // language=java
+                java(
+                        """
               import java.util.List;
 
               public class Test {
@@ -326,7 +326,7 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.List;
 
               public class Test {
@@ -337,17 +337,17 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void complexCase() {
         rewriteRun(
-          spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder append(java.lang.String)")),
-          // language=java
-          java(
-            """
+                spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder append(java.lang.String)")),
+                // language=java
+                java(
+                        """
               import java.util.List;
               import java.util.function.Consumer;
 
@@ -367,7 +367,7 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                   StringBuilder consume(Consumer<String> consumer) {return new StringBuilder();}
               }
               """,
-            """
+                        """
               import java.util.List;
               import java.util.function.Consumer;
 
@@ -384,17 +384,17 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                   StringBuilder consume(Consumer<String> consumer) {return new StringBuilder();}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void returnEmptyLambdaBody() {
         rewriteRun(
-          spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder append(java.lang.String)")),
-          // language=java
-          java(
-            """
+                spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder append(java.lang.String)")),
+                // language=java
+                java(
+                        """
               import java.util.function.Consumer;
 
               public class Test {
@@ -408,7 +408,7 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.function.Consumer;
 
               public class Test {
@@ -419,17 +419,17 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void lambdaAssignment() {
         rewriteRun(
-          spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder append(java.lang.String)")),
-          // language=java
-          java(
-            """
+                spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder append(java.lang.String)")),
+                // language=java
+                java(
+                        """
               import java.util.function.Consumer;
 
               public class Test {
@@ -442,7 +442,7 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.function.Consumer;
 
               public class Test {
@@ -454,17 +454,17 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void tryCatchBlocks() {
         rewriteRun(
-          spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder append(java.lang.String)")),
-          // language=java
-          java(
-            """
+                spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder append(java.lang.String)")),
+                // language=java
+                java(
+                        """
               public class Test {
                   public void method() {
                       StringBuilder sb = new StringBuilder();
@@ -478,7 +478,7 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class Test {
                   public void method() {
                       StringBuilder sb = new StringBuilder();
@@ -489,17 +489,17 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void removeStaticMethodFromImport() {
         rewriteRun(
-          spec -> spec.recipe(createRemoveMethodsRecipe("org.junit.jupiter.api.Assertions assertTrue(..)")),
-          // language=java
-          java(
-            """
+                spec -> spec.recipe(createRemoveMethodsRecipe("org.junit.jupiter.api.Assertions assertTrue(..)")),
+                // language=java
+                java(
+                        """
               import static org.junit.jupiter.api.Assertions.assertTrue;
               
               class Test {
@@ -508,23 +508,23 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   void method() {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void keepStaticMethodFromImportWithAssignment() {
         rewriteRun(
-          spec -> spec.recipe(createRemoveMethodsRecipe("java.util.Collections emptyList()")),
-          // language=java
-          java(
-            """
+                spec -> spec.recipe(createRemoveMethodsRecipe("java.util.Collections emptyList()")),
+                // language=java
+                java(
+                        """
               import java.util.List;
               
               import static java.util.Collections.emptyList;
@@ -536,17 +536,17 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void keepStaticMethodFromImportClassField() {
         rewriteRun(
-          spec -> spec.recipe(createRemoveMethodsRecipe("java.util.Collections emptyList()")),
-          // language=java
-          java(
-            """
+                spec -> spec.recipe(createRemoveMethodsRecipe("java.util.Collections emptyList()")),
+                // language=java
+                java(
+                        """
               import java.util.List;
               
               import static java.util.Collections.emptyList;
@@ -558,17 +558,17 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void removeStaticMethod() {
         rewriteRun(
-          spec -> spec.recipe(createRemoveMethodsRecipe("org.junit.jupiter.api.Assertions assertTrue(..)")),
-          // language=java
-          java(
-            """
+                spec -> spec.recipe(createRemoveMethodsRecipe("org.junit.jupiter.api.Assertions assertTrue(..)")),
+                // language=java
+                java(
+                        """
               import org.junit.jupiter.api.Assertions;
               
               class Test {
@@ -577,23 +577,23 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   void method() {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void keepStaticMethodWithAssignment() {
         rewriteRun(
-          spec -> spec.recipe(createRemoveMethodsRecipe("java.util.Collections emptyList()")),
-          // language=java
-          java(
-            """
+                spec -> spec.recipe(createRemoveMethodsRecipe("java.util.Collections emptyList()")),
+                // language=java
+                java(
+                        """
               import java.util.List;
               import java.util.Collections;
               
@@ -604,17 +604,17 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void keepStaticMethodClassField() {
         rewriteRun(
-          spec -> spec.recipe(createRemoveMethodsRecipe("java.util.Collections emptyList()")),
-          // language=java
-          java(
-            """
+                spec -> spec.recipe(createRemoveMethodsRecipe("java.util.Collections emptyList()")),
+                // language=java
+                java(
+                        """
               import java.util.List;
               import java.util.Collections;
               
@@ -625,7 +625,7 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

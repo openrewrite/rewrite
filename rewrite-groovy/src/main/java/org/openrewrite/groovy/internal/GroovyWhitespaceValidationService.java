@@ -29,7 +29,7 @@ public class GroovyWhitespaceValidationService implements WhitespaceValidationSe
         return new GroovyVisitor<ExecutionContext>() {
             @Override
             public Space visitSpace(Space space, GSpace.Location loc, ExecutionContext executionContext) {
-                if(!StringUtils.isBlank(space.getWhitespace())) {
+                if (!StringUtils.isBlank(space.getWhitespace())) {
                     return space.withWhitespace("~~(non-whitespace)~~>" + space.getWhitespace() + "<~~");
                 }
                 return space;
@@ -37,7 +37,7 @@ public class GroovyWhitespaceValidationService implements WhitespaceValidationSe
 
             @Override
             public Space visitSpace(Space space, Space.Location loc, ExecutionContext executionContext) {
-                if(!StringUtils.isBlank(space.getWhitespace())) {
+                if (!StringUtils.isBlank(space.getWhitespace())) {
                     return space.withWhitespace("~~(non-whitespace)~~>" + space.getWhitespace() + "<~~");
                 }
                 return space;

@@ -41,32 +41,32 @@ class ChangePackageAdaptabilityTest implements RewriteTest {
     @Test
     void changePackage() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               package a.b
               class Original {}
               """,
-            """
+                        """
               package x.y
               class Original {}
               """
-          ),
-          groovy(
-            """
+                ),
+                groovy(
+                        """
               import a.b.Original
               
               class A {
                   Original type
               }
               """,
-            """
+                        """
               import x.y.Original
               
               class A {
                   Original type
               }
               """
-          )
+                )
         );
     }
 
@@ -74,28 +74,28 @@ class ChangePackageAdaptabilityTest implements RewriteTest {
     @Test
     void fullyQualified() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               package a.b
               class Original {}
               """,
-            """
+                        """
               package x.y
               class Original {}
               """
-          ),
-          groovy(
-            """
+                ),
+                groovy(
+                        """
               class A {
                   a.b.Original type
               }
               """,
-            """
+                        """
               class A {
                   x.y.Original type
               }
               """
-          )
+                )
         );
     }
 
@@ -103,23 +103,23 @@ class ChangePackageAdaptabilityTest implements RewriteTest {
     @Test
     void renamePackageRecursive() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePackage("org.foo", "org.foo.test", true)),
-          groovy(
-            """
+                spec -> spec.recipe(new ChangePackage("org.foo", "org.foo.test", true)),
+                groovy(
+                        """
               package org.foo.internal
               class Test {
               }
               """,
-            """
+                        """
               package org.foo.test.internal
               class Test {
               }
               """,
-            spec -> spec.path("org/foo/internal/Test.groovy").afterRecipe(cu -> {
-                assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("org/foo/test/internal/Test.groovy");
-                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "org.foo.test.internal.Test")).isTrue();
-            })
-          )
+                        spec -> spec.path("org/foo/internal/Test.groovy").afterRecipe(cu -> {
+                            assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("org/foo/test/internal/Test.groovy");
+                            assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "org.foo.test.internal.Test")).isTrue();
+                        })
+                )
         );
     }
 
@@ -127,23 +127,23 @@ class ChangePackageAdaptabilityTest implements RewriteTest {
     @Test
     void changeDefinition() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePackage("org.foo", "x.y.z", false)),
-          groovy(
-            """
+                spec -> spec.recipe(new ChangePackage("org.foo", "x.y.z", false)),
+                groovy(
+                        """
               package org.foo
               class Test {
               }
               """,
-            """
+                        """
               package x.y.z
               class Test {
               }
               """,
-            spec -> spec.path("org/foo/Test.groovy").afterRecipe(cu -> {
-                assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("x/y/z/Test.groovy");
-                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "x.y.z.Test")).isTrue();
-            })
-          )
+                        spec -> spec.path("org/foo/Test.groovy").afterRecipe(cu -> {
+                            assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("x/y/z/Test.groovy");
+                            assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "x.y.z.Test")).isTrue();
+                        })
+                )
         );
     }
 }

@@ -114,9 +114,9 @@ public class RemoveDuplicateDependencies extends Recipe {
                         Dependency req = resolvedDependency.getRequested();
                         String reqGroup = req.getGroupId();
                         if ((reqGroup == null || reqGroup.equals(tag.getChildValue("groupId").orElse(null))) &&
-                            Objects.equals(req.getArtifactId(), tag.getChildValue("artifactId").orElse(null)) &&
-                            Objects.equals(Optional.ofNullable(req.getType()).orElse("jar"), tag.getChildValue("type").orElse("jar")) &&
-                            Objects.equals(req.getClassifier(), tag.getChildValue("classifier").orElse(null))) {
+                                Objects.equals(req.getArtifactId(), tag.getChildValue("artifactId").orElse(null)) &&
+                                Objects.equals(Optional.ofNullable(req.getType()).orElse("jar"), tag.getChildValue("type").orElse("jar")) &&
+                                Objects.equals(req.getClassifier(), tag.getChildValue("classifier").orElse(null))) {
                             return DependencyKey.from(resolvedDependency, scope);
                         }
                     }

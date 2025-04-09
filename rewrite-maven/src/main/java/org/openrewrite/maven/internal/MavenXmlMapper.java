@@ -60,10 +60,10 @@ public class MavenXmlMapper {
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         maybeAddKotlinModule(m);
         readMapper = m.setVisibility(m.getSerializationConfig().getDefaultVisibilityChecker()
-                        .withFieldVisibility(JsonAutoDetect.Visibility.NONE)
-                        .withGetterVisibility(JsonAutoDetect.Visibility.NONE)
-                        .withSetterVisibility(JsonAutoDetect.Visibility.NONE)
-                        .withCreatorVisibility(JsonAutoDetect.Visibility.PUBLIC_ONLY))
+                .withFieldVisibility(JsonAutoDetect.Visibility.NONE)
+                .withGetterVisibility(JsonAutoDetect.Visibility.NONE)
+                .withSetterVisibility(JsonAutoDetect.Visibility.NONE)
+                .withCreatorVisibility(JsonAutoDetect.Visibility.PUBLIC_ONLY))
                 .registerModule(new JavaTimeModule())
                 .registerModule(new StringTrimModule());
 

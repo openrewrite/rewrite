@@ -34,19 +34,19 @@ class FindClassHierarchyTest implements RewriteTest {
     @Test
     void basic() {
         rewriteRun(
-          spec -> spec.dataTable(ClassHierarchy.Row.class, rows ->
-            assertThat(rows).containsExactly(
-              new ClassHierarchy.Row(separatorsToSystem("src/main/java/A.java"), "A", "java.lang.Object", "java.io.Serializable"))),
+                spec -> spec.dataTable(ClassHierarchy.Row.class, rows ->
+                        assertThat(rows).containsExactly(
+                                new ClassHierarchy.Row(separatorsToSystem("src/main/java/A.java"), "A", "java.lang.Object", "java.io.Serializable"))),
 
-          java(
-            //language=java
-            """
+                java(
+                        //language=java
+                        """
               import java.io.Serializable;
               
               class A implements Serializable {
               }
               """,
-            spec -> spec.path("src/main/java/A.java"))
+                        spec -> spec.path("src/main/java/A.java"))
         );
     }
 }

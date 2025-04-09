@@ -79,10 +79,10 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
     private String resolvedVersion;
 
     public AddDependencyVisitor(String groupId, String artifactId, String version,
-                                @Nullable String versionPattern, @Nullable String scope,
-                                @Nullable Boolean releasesOnly, @Nullable String type,
-                                @Nullable String classifier, @Nullable Boolean optional,
-                                @Nullable Pattern familyRegex) {
+            @Nullable String versionPattern, @Nullable String scope,
+            @Nullable Boolean releasesOnly, @Nullable String type,
+            @Nullable String classifier, @Nullable Boolean optional,
+            @Nullable Pattern familyRegex) {
         this(groupId, artifactId, version, versionPattern, scope, releasesOnly, type,
                 classifier, optional, familyRegex, null);
     }
@@ -104,7 +104,7 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
     public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
         Xml.Document maven = super.visitDocument(document, executionContext);
 
-        if(getCursor().getMessage("alreadyHasDependency", false)) {
+        if (getCursor().getMessage("alreadyHasDependency", false)) {
             return document;
         }
 
@@ -163,18 +163,18 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
 
                 Xml.Tag dependencyTag = Xml.Tag.build(
                         "\n<dependency>\n" +
-                        "<groupId>" + groupId + "</groupId>\n" +
-                        "<artifactId>" + artifactId + "</artifactId>\n" +
-                        (versionToUse == null ? "" :
-                                "<version>" + versionToUse + "</version>\n") +
-                        (classifier == null ? "" :
-                                "<classifier>" + classifier + "</classifier>\n") +
-                        (type == null || "jar".equals(type) ? "" :
-                                "<type>" + type + "</type>\n") +
-                        (scope == null || "compile".equals(scope) ? "" :
-                                "<scope>" + scope + "</scope>\n") +
-                        (Boolean.TRUE.equals(optional) ? "<optional>true</optional>\n" : "") +
-                        "</dependency>"
+                                "<groupId>" + groupId + "</groupId>\n" +
+                                "<artifactId>" + artifactId + "</artifactId>\n" +
+                                (versionToUse == null ? "" :
+                                        "<version>" + versionToUse + "</version>\n") +
+                                (classifier == null ? "" :
+                                        "<classifier>" + classifier + "</classifier>\n") +
+                                (type == null || "jar".equals(type) ? "" :
+                                        "<type>" + type + "</type>\n") +
+                                (scope == null || "compile".equals(scope) ? "" :
+                                        "<scope>" + scope + "</scope>\n") +
+                                (Boolean.TRUE.equals(optional) ? "<optional>true</optional>\n" : "") +
+                                "</dependency>"
                 );
 
                 doAfterVisit(new AddToTagVisitor<>(tag, dependencyTag,

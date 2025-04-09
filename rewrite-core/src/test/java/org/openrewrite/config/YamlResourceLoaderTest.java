@@ -43,9 +43,9 @@ class YamlResourceLoaderTest implements RewriteTest {
     @Test
     void dataTables() {
         Environment env = Environment.builder()
-          .load(new YamlResourceLoader(new ByteArrayInputStream(
-            //language=yml
-            """
+                .load(new YamlResourceLoader(new ByteArrayInputStream(
+                        //language=yml
+                        """
               type: specs.openrewrite.org/v1beta/recipe
               name: test.ChangeTextToHello
               displayName: Change text to hello
@@ -53,8 +53,8 @@ class YamlResourceLoaderTest implements RewriteTest {
                   - org.openrewrite.text.ChangeText:
                       toText: Hello!
               """.getBytes()
-          ), URI.create("rewrite.yml"), new Properties()))
-          .build();
+                ), URI.create("rewrite.yml"), new Properties()))
+                .build();
 
         Collection<RecipeDescriptor> recipeDescriptors = env.listRecipeDescriptors();
         assertThat(recipeDescriptors).hasSize(1);
@@ -64,9 +64,9 @@ class YamlResourceLoaderTest implements RewriteTest {
     @Test
     void maintainers() {
         Environment env = Environment.builder()
-          .load(new YamlResourceLoader(new ByteArrayInputStream(
-            //language=yml
-            """
+                .load(new YamlResourceLoader(new ByteArrayInputStream(
+                        //language=yml
+                        """
               type: specs.openrewrite.org/v1beta/recipe
               name: test.ChangeTextToHello
               displayName: Change text to hello
@@ -78,8 +78,8 @@ class YamlResourceLoaderTest implements RewriteTest {
                     logo: https://sam.com/logo.svg
                   - maintainer: Jon
               """.getBytes()
-          ), URI.create("rewrite.yml"), new Properties()))
-          .build();
+                ), URI.create("rewrite.yml"), new Properties()))
+                .build();
 
         Collection<RecipeDescriptor> recipeDescriptors = env.listRecipeDescriptors();
         assertThat(recipeDescriptors).hasSize(1);
@@ -98,9 +98,9 @@ class YamlResourceLoaderTest implements RewriteTest {
     @Test
     void recipeContributorAttribution() {
         Environment env = Environment.builder()
-          .load(new YamlResourceLoader(new ByteArrayInputStream(
-            //language=yml
-            """
+                .load(new YamlResourceLoader(new ByteArrayInputStream(
+                        //language=yml
+                        """
               type: specs.openrewrite.org/v1beta/recipe
               name: test.ChangeTextToHello
               displayName: Change text to hello
@@ -108,10 +108,10 @@ class YamlResourceLoaderTest implements RewriteTest {
                   - org.openrewrite.text.ChangeText:
                       toText: Hello!
               """.getBytes()
-          ), URI.create("rewrite.yml"), new Properties()))
-          .load(new YamlResourceLoader(new ByteArrayInputStream(
-            //language=yml
-            """
+                ), URI.create("rewrite.yml"), new Properties()))
+                .load(new YamlResourceLoader(new ByteArrayInputStream(
+                        //language=yml
+                        """
               type: specs.openrewrite.org/v1beta/attribution
               recipeName: test.ChangeTextToHello
               contributors:
@@ -122,8 +122,8 @@ class YamlResourceLoaderTest implements RewriteTest {
                   email: "sam@moderne.io"
                   lineCount: 3
               """.getBytes()
-          ), URI.create("attribution/test.ChangeTextToHello.yml"), new Properties()))
-          .build();
+                ), URI.create("attribution/test.ChangeTextToHello.yml"), new Properties()))
+                .build();
         Collection<Recipe> recipes = env.listRecipes();
         assertThat(recipes).hasSize(1);
         Recipe recipe = recipes.iterator().next();
@@ -151,9 +151,9 @@ class YamlResourceLoaderTest implements RewriteTest {
     @Test
     void declarativeAttributionIncludesRecipeListContributors() {
         Environment env = Environment.builder()
-          .load(new YamlResourceLoader(new ByteArrayInputStream(
-            //language=yml
-            """
+                .load(new YamlResourceLoader(new ByteArrayInputStream(
+                        //language=yml
+                        """
               type: specs.openrewrite.org/v1beta/attribution
               recipeName: org.openrewrite.text.ChangeText
               contributors:
@@ -161,10 +161,10 @@ class YamlResourceLoaderTest implements RewriteTest {
                   email: "jon@moderne.io"
                   lineCount: 5
               """.getBytes()
-          ), URI.create("attribution/org.openrewrite.text.ChangeText.yml"), new Properties()))
-          .load(new YamlResourceLoader(new ByteArrayInputStream(
-            //language=yml
-            """
+                ), URI.create("attribution/org.openrewrite.text.ChangeText.yml"), new Properties()))
+                .load(new YamlResourceLoader(new ByteArrayInputStream(
+                        //language=yml
+                        """
               type: specs.openrewrite.org/v1beta/recipe
               name: test.ChangeTextToHello
               displayName: Change text to hello
@@ -172,15 +172,15 @@ class YamlResourceLoaderTest implements RewriteTest {
                   - org.openrewrite.text.ChangeText:
                       toText: Hello!
               """.getBytes()
-          ), URI.create("rewrite.yml"), new Properties()))
-          .build();
+                ), URI.create("rewrite.yml"), new Properties()))
+                .build();
         Collection<Recipe> recipes = env.listRecipes();
         assertThat(recipes).hasSize(1);
         Recipe recipe = recipes.iterator().next();
         Optional<Contributor> maybeJon = recipe.getContributors()
-          .stream()
-          .filter(c -> c.getName().equals("Jonathan Schneider"))
-          .findFirst();
+                .stream()
+                .filter(c -> c.getName().equals("Jonathan Schneider"))
+                .findFirst();
         assertThat(maybeJon).isPresent();
     }
 
@@ -188,9 +188,9 @@ class YamlResourceLoaderTest implements RewriteTest {
     @DocumentExample
     void recipeExamples() {
         Environment env = Environment.builder()
-          .load(new YamlResourceLoader(new ByteArrayInputStream(
-            //language=yml
-            """
+                .load(new YamlResourceLoader(new ByteArrayInputStream(
+                        //language=yml
+                        """
               type: specs.openrewrite.org/v1beta/recipe
               name: test.ChangeTextToHello
               displayName: Change text to hello
@@ -198,10 +198,10 @@ class YamlResourceLoaderTest implements RewriteTest {
                   - org.openrewrite.text.ChangeText:
                       toText: Hello!
               """.getBytes()
-          ), URI.create("rewrite.yml"), new Properties()))
-          .load(new YamlResourceLoader(new ByteArrayInputStream(
-            //language=yml
-            """
+                ), URI.create("rewrite.yml"), new Properties()))
+                .load(new YamlResourceLoader(new ByteArrayInputStream(
+                        //language=yml
+                        """
               type: specs.openrewrite.org/v1beta/example
               recipeName: test.ChangeTextToHello
               examples:
@@ -234,8 +234,8 @@ class YamlResourceLoaderTest implements RewriteTest {
                         }
                       language: java
               """.getBytes()
-          ), URI.create("attribution/test.ChangeTextToHello.yml"), new Properties()))
-          .build();
+                ), URI.create("attribution/test.ChangeTextToHello.yml"), new Properties()))
+                .build();
 
         Collection<Recipe> recipes = env.listRecipes();
         assertThat(recipes).singleElement().satisfies(r -> {
@@ -244,19 +244,19 @@ class YamlResourceLoaderTest implements RewriteTest {
                 assertThat(e.getDescription()).isEqualTo("Change World to Hello in a text file");
                 assertThat(e.getSources()).hasSize(2);
                 assertThat(e.getSources()).first().satisfies(s -> {
-                      assertThat(s.getBefore()).isEqualTo("World");
-                      assertThat(s.getAfter()).isEqualTo("Hello!");
-                      assertThat(s.getPath()).isEqualTo("1.txt");
-                      assertThat(s.getLanguage()).isEqualTo("text");
-                  }
+                            assertThat(s.getBefore()).isEqualTo("World");
+                            assertThat(s.getAfter()).isEqualTo("Hello!");
+                            assertThat(s.getPath()).isEqualTo("1.txt");
+                            assertThat(s.getLanguage()).isEqualTo("text");
+                        }
                 );
 
                 assertThat(e.getSources().get(1)).satisfies(s -> {
-                      assertThat(s.getBefore()).isEqualTo("World 2");
-                      assertThat(s.getAfter()).isEqualTo("Hello 2!");
-                      assertThat(s.getPath()).isEqualTo("2.txt");
-                      assertThat(s.getLanguage()).isEqualTo("text");
-                  }
+                            assertThat(s.getBefore()).isEqualTo("World 2");
+                            assertThat(s.getAfter()).isEqualTo("Hello 2!");
+                            assertThat(s.getPath()).isEqualTo("2.txt");
+                            assertThat(s.getLanguage()).isEqualTo("text");
+                        }
                 );
             });
             assertThat(r.getExamples().get(1)).satisfies(e -> {
@@ -300,9 +300,9 @@ class YamlResourceLoaderTest implements RewriteTest {
     @Test
     void caseInsensitiveEnums() {
         rewriteRun(
-          spec -> spec.recipeFromYaml(
-            //language=yml
-            """
+                spec -> spec.recipeFromYaml(
+                        //language=yml
+                        """
               ---
               type: specs.openrewrite.org/v1beta/recipe
               name: org.openrewrite.gradle.testCaseInsensitiveEnumInYaml
@@ -316,22 +316,22 @@ class YamlResourceLoaderTest implements RewriteTest {
                     appendNewline : false
                     existingFileStrategy: "cOnTiNuE"
               """,
-            "org.openrewrite.gradle.testCaseInsensitiveEnumInYaml"
-          ),
-          text("Hello", "Hello World!")
+                        "org.openrewrite.gradle.testCaseInsensitiveEnumInYaml"
+                ),
+                text("Hello", "Hello World!")
         );
     }
 
     @Test
     void loadRecipeWithRecipeDataStringThatThrowsNoClassDefFoundError() {
         assertRecipeWithRecipeDataThatThrowsNoClassDefFoundError(
-          RecipeWithBadStaticInitializer.class.getName());
+                RecipeWithBadStaticInitializer.class.getName());
     }
 
     @Test
     void loadRecipeWithRecipeDataMapThatThrowsNoClassDefFoundError() {
         assertRecipeWithRecipeDataThatThrowsNoClassDefFoundError(
-          Map.of(RecipeWithBadStaticInitializer.class.getName(), Map.of()));
+                Map.of(RecipeWithBadStaticInitializer.class.getName(), Map.of()));
     }
 
     private void assertRecipeWithRecipeDataThatThrowsNoClassDefFoundError(Object recipeData) {
@@ -339,23 +339,23 @@ class YamlResourceLoaderTest implements RewriteTest {
         YamlResourceLoader resourceLoader = createYamlResourceLoader();
 
         resourceLoader.loadRecipe(
-          "org.company.CustomRecipe",
-          0,
-          recipeData,
-          recipe -> {
-          },
-          recipe -> {
-          },
-          validated -> invalidRecipes.add(validated));
+                "org.company.CustomRecipe",
+                0,
+                recipeData,
+                recipe -> {
+                },
+                recipe -> {
+                },
+                validated -> invalidRecipes.add(validated));
 
         assertEquals(1, invalidRecipes.size());
     }
 
     private YamlResourceLoader createYamlResourceLoader() {
         return new YamlResourceLoader(
-          new ByteArrayInputStream("type: specs.openrewrite.org/v1beta/recipe".getBytes()),
-          URI.create("rewrite.yml"),
-          new Properties());
+                new ByteArrayInputStream("type: specs.openrewrite.org/v1beta/recipe".getBytes()),
+                URI.create("rewrite.yml"),
+                new Properties());
     }
 
     private static class RecipeWithBadStaticInitializer extends Recipe {

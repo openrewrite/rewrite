@@ -27,15 +27,15 @@ class RewriteTestClassesShouldNotBePublicTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()))
-          .recipe(new RewriteTestClassesShouldNotBePublic());
+                .recipe(new RewriteTestClassesShouldNotBePublic());
     }
 
     @Test
     @DocumentExample
     void rewriteTestThatOverridesDefaults() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import org.openrewrite.test.RecipeSpec;
               import org.openrewrite.test.RewriteTest;
               
@@ -46,7 +46,7 @@ class RewriteTestClassesShouldNotBePublicTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import org.openrewrite.test.RecipeSpec;
               import org.openrewrite.test.RewriteTest;
 
@@ -57,85 +57,85 @@ class RewriteTestClassesShouldNotBePublicTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void rewriteTestClassesNotPublic() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import org.openrewrite.test.RewriteTest;
               
               public class ATest implements RewriteTest {
               }
               """,
-            """
+                        """
               import org.openrewrite.test.RewriteTest;
 
               class ATest implements RewriteTest {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void noChangePublicStaticMethod() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import org.openrewrite.test.RewriteTest;
               
               public class ATest implements RewriteTest {
                   public static void helper() {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void noChangePublicStaticField() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import org.openrewrite.test.RewriteTest;
               
               public class ATest implements RewriteTest {
                   public static String helper = "helper";
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void noChangeNotPublic() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import org.openrewrite.test.RewriteTest;
 
               class ATest implements RewriteTest {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void noChangeNotRewriteTest() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class ATest {
                   void testMethod() {
                   }
               }
               """
-          )
+                )
         );
     }
 }

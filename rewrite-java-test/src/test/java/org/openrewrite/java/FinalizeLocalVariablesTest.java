@@ -42,15 +42,15 @@ class FinalizeLocalVariablesTest implements RewriteTest {
     }
 
     @ParameterizedTest
-    @ValueSource(ints = { 11, 17, 21 })
+    @ValueSource(ints = {11, 17, 21})
     @Issue("https://github.com/openrewrite/rewrite/issues/3744")
     void missingTypePlusVarNotMissingSpace(int javaVersion) {
         rewriteRun(
-          s -> s.typeValidationOptions(TypeValidation.none()),
-          //language=java
-          version(
-            java(
-              """
+                s -> s.typeValidationOptions(TypeValidation.none()),
+                //language=java
+                version(
+                        java(
+                                """
                 import foo.Unknown;
                 class Bar {
                     void test(Unknown b) {
@@ -58,7 +58,7 @@ class FinalizeLocalVariablesTest implements RewriteTest {
                     }
                 }
                 """,
-              """
+                                """
                 import foo.Unknown;
                 class Bar {
                     void test(Unknown b) {
@@ -66,36 +66,36 @@ class FinalizeLocalVariablesTest implements RewriteTest {
                     }
                 }
                 """
-            ), javaVersion
-          )
+                        ), javaVersion
+                )
         );
     }
 
     @ParameterizedTest
-    @ValueSource(ints = { 11, 17, 21 })
+    @ValueSource(ints = {11, 17, 21})
     @Issue("https://github.com/openrewrite/rewrite/issues/3744")
     void explicitTypePlusVarNotMissingSpace(int javaVersion) {
         rewriteRun(
-          s -> s.typeValidationOptions(TypeValidation.none()),
-          //language=java
-          version(
-            java(
-              """
+                s -> s.typeValidationOptions(TypeValidation.none()),
+                //language=java
+                version(
+                        java(
+                                """
                 class Bar {
                     void test(String b) {
                         var a = b;
                     }
                 }
                 """,
-              """
+                                """
                 class Bar {
                     void test(String b) {
                         final var a = b;
                     }
                 }
                 """
-            ), javaVersion
-          )
+                        ), javaVersion
+                )
         );
     }
 
@@ -115,7 +115,7 @@ class FinalizeLocalVariablesTest implements RewriteTest {
             return new JavaIsoVisitor<>() {
                 @Override
                 public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable,
-                                                                        ExecutionContext ctx) {
+                        ExecutionContext ctx) {
                     J.VariableDeclarations mv = super.visitVariableDeclarations(multiVariable, ctx);
 
                     // if this already has "final", we don't need to bother going any further; we're done
@@ -143,17 +143,17 @@ class FinalizeLocalVariablesTest implements RewriteTest {
                     }
 
                     if (mv.getVariables().stream()
-                          .noneMatch(v -> {
-                              Cursor declaringCursor = v.getDeclaringScope(getCursor());
-                              return FindAssignmentReferencesToVariable.find(declaringCursor.getValue(), v)
-                                                                       .get();
-                          })) {
+                            .noneMatch(v -> {
+                                Cursor declaringCursor = v.getDeclaringScope(getCursor());
+                                return FindAssignmentReferencesToVariable.find(declaringCursor.getValue(), v)
+                                        .get();
+                            })) {
                         mv = autoFormat(
-                          mv.withModifiers(
-                            ListUtils.concat(mv.getModifiers(),
-                                             new J.Modifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, null,
-                                                            J.Modifier.Type.Final, Collections.emptyList()))
-                          ), ctx);
+                                mv.withModifiers(
+                                        ListUtils.concat(mv.getModifiers(),
+                                                new J.Modifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, null,
+                                                        J.Modifier.Type.Final, Collections.emptyList()))
+                                ), ctx);
                     }
 
                     return mv;
@@ -161,14 +161,14 @@ class FinalizeLocalVariablesTest implements RewriteTest {
 
                 private Cursor getCursorToParentScope(final Cursor cursor) {
                     return cursor.dropParentUntil(
-                      is -> is instanceof J.NewClass || is instanceof J.ClassDeclaration);
+                            is -> is instanceof J.NewClass || is instanceof J.ClassDeclaration);
                 }
             };
         }
 
         private boolean isDeclaredInForLoopControl(Cursor cursor) {
             return cursor.getParentTreeCursor()
-                         .getValue() instanceof J.ForLoop.Control;
+                    .getValue() instanceof J.ForLoop.Control;
         }
 
         @Value
@@ -184,7 +184,7 @@ class FinalizeLocalVariablesTest implements RewriteTest {
              */
             static AtomicBoolean find(J j, J.VariableDeclarations.NamedVariable variable) {
                 return new FindAssignmentReferencesToVariable(variable)
-                  .reduce(j, new AtomicBoolean());
+                        .reduce(j, new AtomicBoolean());
             }
 
             @Override
@@ -204,7 +204,7 @@ class FinalizeLocalVariablesTest implements RewriteTest {
 
             @Override
             public J.AssignmentOperation visitAssignmentOperation(J.AssignmentOperation assignOp,
-                                                                  AtomicBoolean hasAssignment) {
+                    AtomicBoolean hasAssignment) {
                 if (hasAssignment.get()) {
                     return assignOp;
                 }

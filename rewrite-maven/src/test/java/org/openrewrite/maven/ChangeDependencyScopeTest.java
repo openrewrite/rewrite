@@ -33,8 +33,8 @@ class ChangeDependencyScopeTest implements RewriteTest {
     @Test
     void noScopeToScope() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -51,7 +51,7 @@ class ChangeDependencyScopeTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -69,15 +69,15 @@ class ChangeDependencyScopeTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void scopeToScope() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 
@@ -95,7 +95,7 @@ class ChangeDependencyScopeTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 
@@ -113,16 +113,16 @@ class ChangeDependencyScopeTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void scopeToNoScope() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyScope("com.google.guava", "guava", null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeDependencyScope("com.google.guava", "guava", null)),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 
@@ -140,7 +140,7 @@ class ChangeDependencyScopeTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 
@@ -157,7 +157,7 @@ class ChangeDependencyScopeTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 }

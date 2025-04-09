@@ -25,7 +25,7 @@ class HclParenthesesTest implements RewriteTest {
     @Test
     void parentheses() {
         rewriteRun(
-          hcl("a = ( 1 )")
+                hcl("a = ( 1 )")
         );
     }
 }

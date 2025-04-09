@@ -26,10 +26,10 @@ class AddSettingsPluginRepositoryTest implements RewriteTest {
     @Test
     void emptySettingsFile() {
         rewriteRun(
-          spec -> spec.recipe(new AddSettingsPluginRepository("maven", "https://repo.example.com/snapshots")),
-          settingsGradle(
-            "",
-            """
+                spec -> spec.recipe(new AddSettingsPluginRepository("maven", "https://repo.example.com/snapshots")),
+                settingsGradle(
+                        "",
+                        """
               pluginManagement {
                   repositories {
                       maven {
@@ -38,19 +38,19 @@ class AddSettingsPluginRepositoryTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void noPluginManagementBlock() {
         rewriteRun(
-          spec -> spec.recipe(new AddSettingsPluginRepository("maven", "https://repo.example.com/snapshots")),
-          settingsGradle(
-            """
+                spec -> spec.recipe(new AddSettingsPluginRepository("maven", "https://repo.example.com/snapshots")),
+                settingsGradle(
+                        """
               rootProject.name = "demo"
               """,
-            """
+                        """
               pluginManagement {
                   repositories {
                       maven {
@@ -61,23 +61,23 @@ class AddSettingsPluginRepositoryTest implements RewriteTest {
 
               rootProject.name = "demo"
               """
-          )
+                )
         );
     }
 
     @Test
     void existingPluginManagementBlock() {
         rewriteRun(
-          spec -> spec.recipe(new AddSettingsPluginRepository("maven", "https://repo.example.com/snapshots")),
-          settingsGradle(
-            """
+                spec -> spec.recipe(new AddSettingsPluginRepository("maven", "https://repo.example.com/snapshots")),
+                settingsGradle(
+                        """
               pluginManagement {
                   repositories {
                       mavenLocal()
                   }
               }
               """,
-            """
+                        """
               pluginManagement {
                   repositories {
                       mavenLocal()
@@ -87,32 +87,32 @@ class AddSettingsPluginRepositoryTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void skipWhenExists() {
         rewriteRun(
-          spec -> spec.recipe(new AddSettingsPluginRepository("maven", "https://repo.example.com/snapshots")),
-          settingsGradle(
-            """
+                spec -> spec.recipe(new AddSettingsPluginRepository("maven", "https://repo.example.com/snapshots")),
+                settingsGradle(
+                        """
               pluginManagement {
                   repositories {
                       maven { url = "https://repo.example.com/snapshots" }
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void addMavenLocal() {
         rewriteRun(
-          spec -> spec.recipe(new AddSettingsPluginRepository("mavenLocal", null)),
-          settingsGradle(
-            """
+                spec -> spec.recipe(new AddSettingsPluginRepository("mavenLocal", null)),
+                settingsGradle(
+                        """
               pluginManagement {
                   repositories {
                       maven {
@@ -121,7 +121,7 @@ class AddSettingsPluginRepositoryTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               pluginManagement {
                   repositories {
                       maven {
@@ -131,39 +131,39 @@ class AddSettingsPluginRepositoryTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void existingRepositoryUsingMethod() {
         rewriteRun(
-          spec -> spec.recipe(new AddSettingsPluginRepository("maven", "https://repo.example.com/snapshots")),
-          settingsGradle(
-            """
+                spec -> spec.recipe(new AddSettingsPluginRepository("maven", "https://repo.example.com/snapshots")),
+                settingsGradle(
+                        """
               pluginManagement {
                   repositories {
                       maven { url "https://repo.example.com/snapshots" }
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void existingRepositoryUsingMethodAndGroovyString() {
         rewriteRun(
-          spec -> spec.recipe(new AddSettingsPluginRepository("maven", "${NEXUS_URL}/snapshots")),
-          settingsGradle(
-            """
+                spec -> spec.recipe(new AddSettingsPluginRepository("maven", "${NEXUS_URL}/snapshots")),
+                settingsGradle(
+                        """
               pluginManagement {
                   repositories {
                       maven { url "${NEXUS_URL}/snapshots" }
                   }
               }
               """
-          )
+                )
         );
     }
 }

@@ -32,11 +32,11 @@ class ChangePropertyValueTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new ChangePropertyValue(
-          "management.metrics.binders.files.enabled",
-          "false",
-          null,
-          false,
-          null
+                "management.metrics.binders.files.enabled",
+                "false",
+                null,
+                false,
+                null
         ));
     }
 
@@ -44,16 +44,16 @@ class ChangePropertyValueTest implements RewriteTest {
     @Test
     void preserveComment() {
         rewriteRun(
-          properties(
-            """
+                properties(
+                        """
               management.metrics.binders.files.enabled=true
               # comment
               """,
-            """
+                        """
               management.metrics.binders.files.enabled=false
               # comment
               """
-          )
+                )
         );
     }
 
@@ -61,56 +61,56 @@ class ChangePropertyValueTest implements RewriteTest {
     @Test
     void changeValue() {
         rewriteRun(
-          properties(
-            "management.metrics.binders.files.enabled=true",
-            "management.metrics.binders.files.enabled=false"
-          )
+                properties(
+                        "management.metrics.binders.files.enabled=true",
+                        "management.metrics.binders.files.enabled=false"
+                )
         );
     }
 
     @Test
     void conditionallyChangeValue() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("quarkus.quartz.store-type", "jdbc-cmt", "db", false, null)),
-          properties(
-            "quarkus.quartz.store-type=db",
-            "quarkus.quartz.store-type=jdbc-cmt"
-          )
+                spec -> spec.recipe(new ChangePropertyValue("quarkus.quartz.store-type", "jdbc-cmt", "db", false, null)),
+                properties(
+                        "quarkus.quartz.store-type=db",
+                        "quarkus.quartz.store-type=jdbc-cmt"
+                )
         );
     }
 
     @Test
     void conditionallyChangeValueNoChange() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("quarkus.quartz.store-type", "jdbc-cmt", "cache", false, null)),
-          properties(
-            "quarkus.quartz.store-type=db"
-          )
+                spec -> spec.recipe(new ChangePropertyValue("quarkus.quartz.store-type", "jdbc-cmt", "cache", false, null)),
+                properties(
+                        "quarkus.quartz.store-type=db"
+                )
         );
     }
 
     @ParameterizedTest
     @ValueSource(strings = {
-      "acme.my-project.person.first-name",
-      "acme.myProject.person.firstName",
-      "acme.my_project.person.first_name",
+            "acme.my-project.person.first-name",
+            "acme.myProject.person.firstName",
+            "acme.my_project.person.first_name",
     })
     @Issue("https://github.com/openrewrite/rewrite/issues/1168")
     void relaxedBinding(String propertyKey) {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue(propertyKey, "updated", "example", false, null)),
-          properties(
-            """
+                spec -> spec.recipe(new ChangePropertyValue(propertyKey, "updated", "example", false, null)),
+                properties(
+                        """
               acme.my-project.person.first-name=example
               acme.myProject.person.firstName=example
               acme.my_project.person.first_name=example
               """,
-            """
+                        """
               acme.my-project.person.first-name=updated
               acme.myProject.person.firstName=updated
               acme.my_project.person.first_name=updated
               """
-          )
+                )
         );
     }
 
@@ -118,55 +118,55 @@ class ChangePropertyValueTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1168")
     void exactMatch() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue(
-            "acme.my-project.person.first-name",
-            "updated",
-            "example",
-            false,
-            false
-          )),
-          properties(
-            """
+                spec -> spec.recipe(new ChangePropertyValue(
+                        "acme.my-project.person.first-name",
+                        "updated",
+                        "example",
+                        false,
+                        false
+                )),
+                properties(
+                        """
               acme.my-project.person.first-name=example
               acme.myProject.person.firstName=example
               acme.my_project.person.first_name=example
               """,
-            """
+                        """
               acme.my-project.person.first-name=updated
               acme.myProject.person.firstName=example
               acme.my_project.person.first_name=example
               """
-          )
+                )
         );
     }
 
     @Test
     void regex() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar$1", "f(o+)", true, null)),
-          properties(
-            "my.prop=foooo",
-            "my.prop=baroooo"
-          )
+                spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar$1", "f(o+)", true, null)),
+                properties(
+                        "my.prop=foooo",
+                        "my.prop=baroooo"
+                )
         );
     }
 
     @Test
     void regexDefaultOff() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar$1", ".+", null, null)),
-          properties(
-            "my.prop=foo"
-          )
+                spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar$1", ".+", null, null)),
+                properties(
+                        "my.prop=foo"
+                )
         );
     }
 
     @Test
     void partialMatchRegex() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("*", "[replaced:$1]", "\\[replaceme:(.*?)]", true, null)),
-          properties(
-                """
+                spec -> spec.recipe(new ChangePropertyValue("*", "[replaced:$1]", "\\[replaceme:(.*?)]", true, null)),
+                properties(
+                        """
             multiple=[replaceme:1][replaceme:2]
             multiple-prefixed=test[replaceme:1]test[replaceme:2]
             multiple-suffixed=[replaceme:1]test[replaceme:2]test
@@ -183,9 +183,9 @@ class ChangePropertyValueTest implements RewriteTest {
     @Test
     void partialMatchNonRegex() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("*", "replaced", "replaceme", null, null)),
-          properties(
-                """
+                spec -> spec.recipe(new ChangePropertyValue("*", "replaced", "replaceme", null, null)),
+                properties(
+                        """
             multiple=[replaceme:1][replaceme:2]
             multiple-prefixed=test[replaceme:1]test[replaceme:2]
             multiple-suffixed=[replaceme:1]test[replaceme:2]test

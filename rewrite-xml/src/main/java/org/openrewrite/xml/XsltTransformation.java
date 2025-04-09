@@ -51,8 +51,8 @@ public class XsltTransformation extends Recipe {
 
     @Option(displayName = "File pattern",
             description = "A glob expression that can be used to constrain which directories or source files should be searched. " +
-                          "Multiple patterns may be specified, separated by a semicolon `;`. " +
-                          "If multiple patterns are supplied any of the patterns matching will be interpreted as a match.",
+                    "Multiple patterns may be specified, separated by a semicolon `;`. " +
+                    "If multiple patterns are supplied any of the patterns matching will be interpreted as a match.",
             example = "**/*.xml")
     String filePattern;
 
@@ -64,7 +64,7 @@ public class XsltTransformation extends Recipe {
     @Override
     public String getDescription() {
         return "Apply the specified XSLT transformation on matching files. " +
-               "Note that there are no format matching guarantees when running this recipe.";
+                "Note that there are no format matching guarantees when running this recipe.";
     }
 
     @Override
@@ -85,7 +85,7 @@ public class XsltTransformation extends Recipe {
         return super.validate()
                 .and(Validated.test("xslt", "set either xslt or xsltResource, but not both",
                         xslt, s -> StringUtils.isBlank(s) != StringUtils.isBlank(xsltResource) &&
-                                   !StringUtils.isBlank(loadResource(xslt, xsltResource))));
+                                !StringUtils.isBlank(loadResource(xslt, xsltResource))));
     }
 
     private static String loadResource(@Nullable String xslt, @Nullable String xsltResource) {

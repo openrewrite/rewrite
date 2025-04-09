@@ -42,34 +42,34 @@ class FindMethodsTest implements RewriteTest {
     @MethodSource("missingTypes")
     void anyTypeMatchesOnNullDeclaringType(JavaType.FullyQualified declaringType) {
         rewriteRun(
-          spec -> spec
-            .recipe(new FindMethods("*..* substring(..)", false))
-            .typeValidationOptions(TypeValidation.none()),
-          java(
-            """
+                spec -> spec
+                        .recipe(new FindMethods("*..* substring(..)", false))
+                        .typeValidationOptions(TypeValidation.none()),
+                java(
+                        """
               class Test {
                   String test(String s) {
                       return s.substring(1);
                   }
               }
               """,
-            """
+                        """
               class Test {
                   String test(String s) {
                       return /*~~>*/s.substring(1);
                   }
               }
               """,
-            spec -> spec.mapBeforeRecipe(cu -> (J.CompilationUnit) new JavaIsoVisitor<Integer>() {
-                @Override
-                public @Nullable JavaType visitType(@Nullable JavaType javaType, Integer integer) {
-                    // simulate declaring type being unavailable on type attribution
-                    return javaType instanceof JavaType.Method ?
-                      ((JavaType.Method) javaType).withDeclaringType(declaringType) :
-                      javaType;
-                }
-            }.visitNonNull(cu, 0))
-          )
+                        spec -> spec.mapBeforeRecipe(cu -> (J.CompilationUnit) new JavaIsoVisitor<Integer>() {
+                            @Override
+                            public @Nullable JavaType visitType(@Nullable JavaType javaType, Integer integer) {
+                                // simulate declaring type being unavailable on type attribution
+                                return javaType instanceof JavaType.Method ?
+                                        ((JavaType.Method) javaType).withDeclaringType(declaringType) :
+                                        javaType;
+                            }
+                        }.visitNonNull(cu, 0))
+                )
         );
     }
 
@@ -77,56 +77,56 @@ class FindMethodsTest implements RewriteTest {
     @Test
     void findConstructors() {
         rewriteRun(
-          spec -> spec.recipe(new FindMethods("A <constructor>(String)", false)),
-          java(
-            """
+                spec -> spec.recipe(new FindMethods("A <constructor>(String)", false)),
+                java(
+                        """
               class Test {
                   A a = new A("test");
               }
               """,
-            """
+                        """
               class Test {
                   A a = /*~~>*/new A("test");
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               class A {
                   public A(String s) {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void findMethodReferences() {
         rewriteRun(
-          spec -> spec.recipe(new FindMethods("A singleArg(String)", false)),
-          java(
-            """
+                spec -> spec.recipe(new FindMethods("A singleArg(String)", false)),
+                java(
+                        """
               class Test {
                   void test() {
                       new java.util.ArrayList<String>().forEach(new A()::singleArg);
                   }
               }
               """,
-            """
+                        """
               class Test {
                   void test() {
                       new java.util.ArrayList<String>().forEach(new A()::/*~~>*/singleArg);
                   }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               class A {
                   public void singleArg(String s) {}
               }
               """
-          )
+                )
         );
     }
 
@@ -134,192 +134,192 @@ class FindMethodsTest implements RewriteTest {
     @Test
     void findOverriddenMethodReferences() {
         rewriteRun(
-          spec -> spec.recipe(new FindMethods("java.util.Collection isEmpty()", true)),
-          java(
-            """
+                spec -> spec.recipe(new FindMethods("java.util.Collection isEmpty()", true)),
+                java(
+                        """
               class Test {
                   void test() {
                       new java.util.ArrayList<String>().isEmpty();
                   }
               }
               """,
-            """
+                        """
               class Test {
                   void test() {
                       /*~~>*/new java.util.ArrayList<String>().isEmpty();
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void findStaticMethodCalls() {
         rewriteRun(
-          spec -> spec.recipe(new FindMethods("java.util.Collections emptyList()", false)),
-          java(
-            """
+                spec -> spec.recipe(new FindMethods("java.util.Collections emptyList()", false)),
+                java(
+                        """
               import java.util.Collections;
               public class A {
                  Object o = Collections.emptyList();
               }
               """,
-            """
+                        """
               import java.util.Collections;
               public class A {
                  Object o = /*~~>*/Collections.emptyList();
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void findStaticallyImportedMethodCalls() {
         rewriteRun(
-          spec -> spec.recipe(new FindMethods("java.util.Collections emptyList()", false)),
-          java(
-            """
+                spec -> spec.recipe(new FindMethods("java.util.Collections emptyList()", false)),
+                java(
+                        """
               import static java.util.Collections.emptyList;
               public class A {
                  Object o = emptyList();
               }
               """,
-            """
+                        """
               import static java.util.Collections.emptyList;
               public class A {
                  Object o = /*~~>*/emptyList();
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void matchVarargs() {
         rewriteRun(
-          spec -> spec.recipe(new FindMethods("A foo(String, Object...)", false)),
-          java(
-            """
+                spec -> spec.recipe(new FindMethods("A foo(String, Object...)", false)),
+                java(
+                        """
               public class B {
                  public void test() {
                      new A().foo("s", "a", 1);
                  }
               }
               """,
-            """
+                        """
               public class B {
                  public void test() {
                      /*~~>*/new A().foo("s", "a", 1);
                  }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               public class A {
                   public void foo(String s, Object... o) {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void matchOnInnerClass() {
         rewriteRun(
-          spec -> spec.recipe(new FindMethods("B.C foo()", false)),
-          java(
-            """
+                spec -> spec.recipe(new FindMethods("B.C foo()", false)),
+                java(
+                        """
               public class A {
                  void test() {
                      new B.C().foo();
                  }
               }
               """,
-            """
+                        """
               public class A {
                  void test() {
                      /*~~>*/new B.C().foo();
                  }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               public class B {
                  public static class C {
                      public void foo() {}
                  }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void datatableFormat() {
         rewriteRun(
-          spec -> spec.dataTableAsCsv(MethodCalls.class.getName(),
-            """
+                spec -> spec.dataTableAsCsv(MethodCalls.class.getName(),
+                        """
               sourceFile,method,className,methodName,argumentTypes
               A.java,"new B.C().foo(bar, 123)","B$C",foo,"java.lang.String, int"
               """
-          ).recipe(new FindMethods("B.C foo(..)", false)),
-          java(
-            """
+                ).recipe(new FindMethods("B.C foo(..)", false)),
+                java(
+                        """
               public class B {
                  public static class C {
                      public void foo(String bar, int baz) {}
                  }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               public class A {
                    void test(String bar) {
                        new B.C().foo(bar, 123);
                    }
               }
               """,
-            """
+                        """
               public class A {
                    void test(String bar) {
                        /*~~>*/new B.C().foo(bar, 123);
                    }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void findAnnotationMethod() {
         rewriteRun(
-          spec -> spec.recipe(new FindMethods("Example description(..)", false)),
-          java(
-            """
+                spec -> spec.recipe(new FindMethods("Example description(..)", false)),
+                java(
+                        """
               public @interface Example {
                   String name() default "";
                             
                   String description() default "";
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               @Example(description = "test")
               public class A {
               }
               """,
-            """
+                        """
               @Example(/*~~>*/description = "test")
               public class A {
               }
               """
-          )
+                )
         );
     }
 }

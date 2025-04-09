@@ -44,7 +44,7 @@ public class PropertyPlaceholderHelper {
     private final String valueSeparator;
 
     public PropertyPlaceholderHelper(String placeholderPrefix, String placeholderSuffix,
-                                     @Nullable String valueSeparator) {
+            @Nullable String valueSeparator) {
         this.placeholderPrefix = placeholderPrefix;
         this.placeholderSuffix = placeholderSuffix;
         String simplePrefixForSuffix = wellKnownSimplePrefixes.get(this.placeholderSuffix);
@@ -73,7 +73,7 @@ public class PropertyPlaceholderHelper {
     }
 
     protected String parseStringValue(String value, Function<String, @Nullable String> placeholderResolver,
-                                      @Nullable Set<String> visitedPlaceholders) {
+            @Nullable Set<String> visitedPlaceholders) {
         int startIndex = value.indexOf(placeholderPrefix);
         if (startIndex == -1) {
             return value;

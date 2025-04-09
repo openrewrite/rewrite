@@ -33,13 +33,13 @@ class UseHttpsForRepositoriesTest implements RewriteTest {
     @Test
     void unchangedUseOfHttps() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               repositories {
                   maven { url 'https://repo.spring.example.com/libs-release-local' }
               }
               """
-          )
+                )
         );
     }
 
@@ -47,44 +47,44 @@ class UseHttpsForRepositoriesTest implements RewriteTest {
     @Test
     void updateUnwrappedInvocationToUseHttpsSingleQuote() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               repositories {
                   maven { url 'http://repo.spring.example.com/libs-release-local' }
               }
               """,
-            """
+                        """
               repositories {
                   maven { url 'https://repo.spring.example.com/libs-release-local' }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void updateUnwrappedInvocationToUseHttpsDoubleQuote() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               repositories {
                   maven { url "http://repo.spring.example.com/libs-release-local" }
               }
               """,
-            """
+                        """
               repositories {
                   maven { url "https://repo.spring.example.com/libs-release-local" }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void updateUnwrappedInvocationToUseHttpsGString() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               repositories {
                   maven {
                       def subRepo = properties.snapshot ? 'snapshot' : 'release'
@@ -92,7 +92,7 @@ class UseHttpsForRepositoriesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               repositories {
                   maven {
                       def subRepo = properties.snapshot ? 'snapshot' : 'release'
@@ -100,7 +100,7 @@ class UseHttpsForRepositoriesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

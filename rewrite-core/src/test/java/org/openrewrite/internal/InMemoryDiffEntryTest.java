@@ -38,12 +38,12 @@ class InMemoryDiffEntryTest {
     @Test
     void idempotent() {
         try (var diff = new InMemoryDiffEntry(
-          Paths.get("com/netflix/MyJavaClass.java"),
-          Paths.get("com/netflix/MyJavaClass.java"),
-          null,
-          "public class A {}",
-          "public class A {}",
-          emptySet()
+                Paths.get("com/netflix/MyJavaClass.java"),
+                Paths.get("com/netflix/MyJavaClass.java"),
+                null,
+                "public class A {}",
+                "public class A {}",
+                emptySet()
         )) {
             assertThat(diff.getDiff()).isEmpty();
         }
@@ -52,16 +52,16 @@ class InMemoryDiffEntryTest {
     @Test
     void ignoreWhitespace() {
         try (var diff = new InMemoryDiffEntry(
-          Paths.get("com/netflix/MyJavaClass.java"),
-          Paths.get("com/netflix/MyJavaClass.java"),
-          null,
-          "public class A {} ",
-          "public class A {}",
-          emptySet()
+                Paths.get("com/netflix/MyJavaClass.java"),
+                Paths.get("com/netflix/MyJavaClass.java"),
+                null,
+                "public class A {} ",
+                "public class A {}",
+                emptySet()
         )) {
             var diffNoWs = diff.getDiff(true);
             assertThat(
-              """
+                    """
                 diff --git a/com/netflix/MyJavaClass.java b/com/netflix/MyJavaClass.java
                 index 9bfeb36..efd7fa3 100644
                 --- a/com/netflix/MyJavaClass.java
@@ -74,20 +74,20 @@ class InMemoryDiffEntryTest {
     @Test
     void singleLineChange() {
         try (var result = new InMemoryDiffEntry(
-          filePath, filePath, null,
-          """
+                filePath, filePath, null,
+                """
             public void test() {
                logger.infof("some %s", 1);
             }
             """,
-          """
+                """
             public void test() {
                logger.info("some {}", 1);
             }
             """,
-          Set.of(toRecipe().withName("logger.Fix")))) {
+                Set.of(toRecipe().withName("logger.Fix")))) {
             assertThat(result.getDiff()).isEqualTo(
-              """
+                    """
                 diff --git %s %s
                 index 3490cbf..5d64ae4 100644
                 --- %s
@@ -105,8 +105,8 @@ class InMemoryDiffEntryTest {
     @Test
     void multipleChangesMoreThanThreeLinesApart() {
         try (var result = new InMemoryDiffEntry(
-          filePath, filePath, null,
-          """
+                filePath, filePath, null,
+                """
             public void test() {
                logger.infof("some %s", 1);
                System.out.println("1");
@@ -120,7 +120,7 @@ class InMemoryDiffEntryTest {
                logger.infof("some %s", 2);
             }
             """,
-          """
+                """
             public void test() {
                logger.info("some {}", 1);
                System.out.println("1");
@@ -134,13 +134,15 @@ class InMemoryDiffEntryTest {
                logger.info("some %s", 2);
             }
             """,
-          new LinkedHashSet<>() {{
-              add(toRecipe().withName("logger.Fix1"));
-              add(toRecipe().withName("logger.Fix2"));
-          }}
+                new LinkedHashSet<>() {
+                    {
+                        add(toRecipe().withName("logger.Fix1"));
+                        add(toRecipe().withName("logger.Fix2"));
+                    }
+                }
         )) {
             assertThat(result.getDiff()).isEqualTo(
-              """
+                    """
                 diff --git %s %s
                 index c17f051..bb2dfba 100644
                 --- %s
@@ -167,16 +169,16 @@ class InMemoryDiffEntryTest {
     @Test
     void addFile() {
         try (var result = new InMemoryDiffEntry(
-          null, filePath, null,
-          "",
-          """
+                null, filePath, null,
+                "",
+                """
             public void test() {
                logger.info("Hello Fred");
             }
             """,
-          Set.of(toRecipe().withName("logger.Fix1")))) {
+                Set.of(toRecipe().withName("logger.Fix1")))) {
             assertThat(result.getDiff()).isEqualTo(
-              """
+                    """
                 diff --git a/com/netflix/MyJavaClass.java b/com/netflix/MyJavaClass.java
                 new file mode 100644
                 index 0000000..efeb105
@@ -194,16 +196,16 @@ class InMemoryDiffEntryTest {
     @Test
     void deleteFile() {
         try (var result = new InMemoryDiffEntry(
-          filePath, null, null,
-          """
+                filePath, null, null,
+                """
             public void test() {
                logger.info("Hello Fred");
             }
             """,
-          "",
-          Set.of(toRecipe().withName("logger.Fix1")))) {
+                "",
+                Set.of(toRecipe().withName("logger.Fix1")))) {
             assertThat(result.getDiff()).isEqualTo(
-              """
+                    """
                 diff --git a/com/netflix/MyJavaClass.java b/com/netflix/MyJavaClass.java
                 deleted file mode 100644
                 index efeb105..0000000
@@ -217,20 +219,21 @@ class InMemoryDiffEntryTest {
             );
         }
     }
+
     @Disabled("Does not work with CI due to jgit shadowJar")
     @Test
     void executableFile() {
         try (var result = new InMemoryDiffEntry(
-          filePath, null, null,
-          """
+                filePath, null, null,
+                """
             public void test() {
                logger.info("Hello Fred");
             }
             """,
-          "",
-          Set.of(toRecipe().withName("logger.Fix1")), FileMode.EXECUTABLE_FILE, FileMode.EXECUTABLE_FILE)) {
+                "",
+                Set.of(toRecipe().withName("logger.Fix1")), FileMode.EXECUTABLE_FILE, FileMode.EXECUTABLE_FILE)) {
             assertThat(result.getDiff()).isEqualTo(
-              """
+                    """
                 diff --git a/com/netflix/MyJavaClass.java b/com/netflix/MyJavaClass.java
                 deleted file mode 100755
                 index efeb105..0000000

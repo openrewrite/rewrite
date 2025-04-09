@@ -27,46 +27,46 @@ class SetFilePermissionsTest implements RewriteTest {
     @Test
     void revokeReadPermissions() {
         rewriteRun(
-          spec -> spec.recipe(new SetFilePermissions("test.txt", false, true, true))
-            .afterRecipe(run -> run.getChangeset().getAllResults().forEach(r -> {
-                assertThat(r.getAfter()).isNotNull();
-                assertThat(r.getAfter().getFileAttributes()).isNotNull();
-                assertThat(r.getAfter().getFileAttributes().isReadable()).isFalse();
-                assertThat(r.getAfter().getFileAttributes().isWritable()).isTrue();
-                assertThat(r.getAfter().getFileAttributes().isExecutable()).isTrue();
-            })),
-          SourceSpecs.text("", "", spec -> spec.path("test.txt"))
+                spec -> spec.recipe(new SetFilePermissions("test.txt", false, true, true))
+                        .afterRecipe(run -> run.getChangeset().getAllResults().forEach(r -> {
+                            assertThat(r.getAfter()).isNotNull();
+                            assertThat(r.getAfter().getFileAttributes()).isNotNull();
+                            assertThat(r.getAfter().getFileAttributes().isReadable()).isFalse();
+                            assertThat(r.getAfter().getFileAttributes().isWritable()).isTrue();
+                            assertThat(r.getAfter().getFileAttributes().isExecutable()).isTrue();
+                        })),
+                SourceSpecs.text("", "", spec -> spec.path("test.txt"))
         );
     }
 
     @Test
     void revokeWritePermissions() {
         rewriteRun(
-          spec -> spec.recipe(new SetFilePermissions("test.txt", true, false, true))
-            .afterRecipe(run -> run.getChangeset().getAllResults().forEach(r -> {
-                assertThat(r.getAfter()).isNotNull();
-                assertThat(r.getAfter().getFileAttributes()).isNotNull();
-                assertThat(r.getAfter().getFileAttributes().isReadable()).isTrue();
-                assertThat(r.getAfter().getFileAttributes().isWritable()).isFalse();
-                assertThat(r.getAfter().getFileAttributes().isExecutable()).isTrue();
-            })),
-          SourceSpecs.text("", "", spec -> spec.path("test.txt"))
+                spec -> spec.recipe(new SetFilePermissions("test.txt", true, false, true))
+                        .afterRecipe(run -> run.getChangeset().getAllResults().forEach(r -> {
+                            assertThat(r.getAfter()).isNotNull();
+                            assertThat(r.getAfter().getFileAttributes()).isNotNull();
+                            assertThat(r.getAfter().getFileAttributes().isReadable()).isTrue();
+                            assertThat(r.getAfter().getFileAttributes().isWritable()).isFalse();
+                            assertThat(r.getAfter().getFileAttributes().isExecutable()).isTrue();
+                        })),
+                SourceSpecs.text("", "", spec -> spec.path("test.txt"))
         );
     }
 
     @Test
     void revokeExecutablePermissions() {
         rewriteRun(
-          spec ->
-            spec.recipe(new SetFilePermissions("test.txt", true, true, false))
-              .afterRecipe(run -> run.getChangeset().getAllResults().forEach(r -> {
-                  assertThat(r.getAfter()).isNotNull();
-                  assertThat(r.getAfter().getFileAttributes()).isNotNull();
-                  assertThat(r.getAfter().getFileAttributes().isReadable()).isTrue();
-                  assertThat(r.getAfter().getFileAttributes().isWritable()).isTrue();
-                  assertThat(r.getAfter().getFileAttributes().isExecutable()).isFalse();
-              })),
-          SourceSpecs.text("", "", spec -> spec.path("test.txt"))
+                spec ->
+                        spec.recipe(new SetFilePermissions("test.txt", true, true, false))
+                                .afterRecipe(run -> run.getChangeset().getAllResults().forEach(r -> {
+                                    assertThat(r.getAfter()).isNotNull();
+                                    assertThat(r.getAfter().getFileAttributes()).isNotNull();
+                                    assertThat(r.getAfter().getFileAttributes().isReadable()).isTrue();
+                                    assertThat(r.getAfter().getFileAttributes().isWritable()).isTrue();
+                                    assertThat(r.getAfter().getFileAttributes().isExecutable()).isFalse();
+                                })),
+                SourceSpecs.text("", "", spec -> spec.path("test.txt"))
         );
     }
 }

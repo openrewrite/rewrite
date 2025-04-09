@@ -35,9 +35,9 @@ class FindDeprecatedMethodsTest implements RewriteTest {
     @Test
     void ignoreDeprecationsInDeprecatedMethod() {
         rewriteRun(
-          spec -> spec.recipe(new FindDeprecatedMethods(null, true)),
-          java(
-            """
+                spec -> spec.recipe(new FindDeprecatedMethods(null, true)),
+                java(
+                        """
               class Test {
                   @Deprecated
                   void test(int n) {
@@ -47,7 +47,7 @@ class FindDeprecatedMethodsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -55,9 +55,9 @@ class FindDeprecatedMethodsTest implements RewriteTest {
     @Test
     void ignoreDeprecationsInDeprecatedClass() {
         rewriteRun(
-          spec -> spec.recipe(new FindDeprecatedMethods(null, true)),
-          java(
-            """
+                spec -> spec.recipe(new FindDeprecatedMethods(null, true)),
+                java(
+                        """
               @Deprecated
               class Test {
                   @Deprecated
@@ -72,7 +72,7 @@ class FindDeprecatedMethodsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -80,8 +80,8 @@ class FindDeprecatedMethodsTest implements RewriteTest {
     @Test
     void findDeprecations() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   @Deprecated
                   void test(int n) {
@@ -91,7 +91,7 @@ class FindDeprecatedMethodsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   @Deprecated
                   void test(int n) {
@@ -101,16 +101,16 @@ class FindDeprecatedMethodsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void matchOnMethod() {
         rewriteRun(
-          spec -> spec.recipe(new FindDeprecatedMethods("java.lang.* *(..)", false)),
-          java(
-            """
+                spec -> spec.recipe(new FindDeprecatedMethods("java.lang.* *(..)", false)),
+                java(
+                        """
               class Test {
                   @Deprecated
                   void test(int n) {
@@ -120,7 +120,7 @@ class FindDeprecatedMethodsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   @Deprecated
                   void test(int n) {
@@ -130,16 +130,16 @@ class FindDeprecatedMethodsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void dontMatchWhenMethodDoesntMatch() {
         rewriteRun(
-          spec -> spec.recipe(new FindDeprecatedMethods("org.junit.jupiter.api.* *(..)", false)),
-          java(
-            """
+                spec -> spec.recipe(new FindDeprecatedMethods("org.junit.jupiter.api.* *(..)", false)),
+                java(
+                        """
               class Test {
                   @Deprecated
                   void test(int n) {
@@ -149,7 +149,7 @@ class FindDeprecatedMethodsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -158,9 +158,9 @@ class FindDeprecatedMethodsTest implements RewriteTest {
     @NullAndEmptySource
     void noNPEWhenUsedFromDeprecatedUses(String typePattern) {
         rewriteRun(
-          spec -> spec.recipe(new FindDeprecatedUses(typePattern, null, null)),
-          java(
-            """
+                spec -> spec.recipe(new FindDeprecatedUses(typePattern, null, null)),
+                java(
+                        """
               class Test {
                   @Deprecated
                   void test(int n) {
@@ -170,7 +170,7 @@ class FindDeprecatedMethodsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   @Deprecated
                   void test(int n) {
@@ -180,16 +180,16 @@ class FindDeprecatedMethodsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void onlyFoo() {
         rewriteRun(
-          spec -> spec.recipe(new FindDeprecatedMethods("*..* foo(..)", false)),
-          java(
-            """
+                spec -> spec.recipe(new FindDeprecatedMethods("*..* foo(..)", false)),
+                java(
+                        """
               class Test {
                   @Deprecated
                   void test(int n) {
@@ -206,7 +206,7 @@ class FindDeprecatedMethodsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   @Deprecated
                   void test(int n) {
@@ -223,16 +223,16 @@ class FindDeprecatedMethodsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void hasImport() {
         rewriteRun(
-          spec -> spec.recipe(new FindDeprecatedMethods("", null)),
-          java(
-            """
+                spec -> spec.recipe(new FindDeprecatedMethods("", null)),
+                java(
+                        """
               package com.yourorg;
                             
               public class Foo {
@@ -241,9 +241,9 @@ class FindDeprecatedMethodsTest implements RewriteTest {
                   }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import com.yourorg.Foo;
               
               class A {
@@ -252,7 +252,7 @@ class FindDeprecatedMethodsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import com.yourorg.Foo;
               
               class A {
@@ -261,7 +261,7 @@ class FindDeprecatedMethodsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

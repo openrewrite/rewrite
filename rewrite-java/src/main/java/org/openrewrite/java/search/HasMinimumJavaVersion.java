@@ -40,7 +40,7 @@ public class HasMinimumJavaVersion extends ScanningRecipe<AtomicReference<JavaVe
 
     @Option(displayName = "Version check against target compatibility",
             description = "The source and target compatibility versions can be different. This option allows you to " +
-                          "check against the target compatibility version instead of the source compatibility version.",
+                    "check against the target compatibility version instead of the source compatibility version.",
             example = "17.X",
             required = false)
     @Nullable
@@ -54,11 +54,11 @@ public class HasMinimumJavaVersion extends ScanningRecipe<AtomicReference<JavaVe
     @Override
     public String getDescription() {
         return "The oldest Java version in use is the lowest Java " +
-               "version in use in any source set of any subproject of " +
-               "a repository. It is possible that, for example, the main " +
-               "source set of a project uses Java 8, but a test source set " +
-               "uses Java 17. In this case, the oldest Java version in use is " +
-               "Java 8.";
+                "version in use in any source set of any subproject of " +
+                "a repository. It is possible that, for example, the main " +
+                "source set of a project uses Java 8, but a test source set " +
+                "uses Java 17. In this case, the oldest Java version in use is " +
+                "Java 8.";
     }
 
     @SuppressWarnings("ConstantConditions")
@@ -82,12 +82,12 @@ public class HasMinimumJavaVersion extends ScanningRecipe<AtomicReference<JavaVe
             @Override
             public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
                 cu.getMarkers().findFirst(JavaVersion.class).ifPresent(javaVersion ->
-                    acc.updateAndGet(current -> {
-                        if (current == null || javaVersion.getMajorVersion() < current.getMajorVersion()) {
-                            return javaVersion;
-                        }
-                        return current;
-                    }));
+                        acc.updateAndGet(current -> {
+                            if (current == null || javaVersion.getMajorVersion() < current.getMajorVersion()) {
+                                return javaVersion;
+                            }
+                            return current;
+                        }));
                 return cu;
             }
         };

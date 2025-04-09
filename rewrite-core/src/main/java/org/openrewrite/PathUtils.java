@@ -152,7 +152,7 @@ public class PathUtils {
                 return false;
             }
             if (pattIdxEnd == (pattTokens.length - 1) &&
-                (isFileSeparator(pattern.charAt(pattern.length() - 1)) ^ isFileSeparator(path.charAt(path.length() - 1)))) {
+                    (isFileSeparator(pattern.charAt(pattern.length() - 1)) ^ isFileSeparator(path.charAt(path.length() - 1)))) {
                 return false;
             }
             pattIdxEnd--;

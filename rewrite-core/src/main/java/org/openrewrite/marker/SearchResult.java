@@ -91,9 +91,9 @@ public final class SearchResult implements Marker {
                         return s1;
                     }
                     if (s1.getDescription().equals(s2.getDescription()) ||
-                        s1.getDescription().startsWith(s2.getDescription() + delimiter) ||
-                        s1.getDescription().contains(delimiter + s2.getDescription() + delimiter) ||
-                        s1.getDescription().endsWith(s2.getDescription())) {
+                            s1.getDescription().startsWith(s2.getDescription() + delimiter) ||
+                            s1.getDescription().contains(delimiter + s2.getDescription() + delimiter) ||
+                            s1.getDescription().endsWith(s2.getDescription())) {
                         return s1;
                     }
                     return s1.withDescription(s1.getDescription() + delimiter + s2.getDescription());

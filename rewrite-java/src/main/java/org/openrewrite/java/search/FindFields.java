@@ -71,7 +71,7 @@ public class FindFields extends Recipe {
             public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
                 JavaType.Variable varType = fieldAccess.getName().getFieldType();
                 if (varType != null && new TypeMatcher(fullyQualifiedTypeName, Boolean.TRUE.equals(matchInherited)).matches(varType.getOwner()) &&
-                    StringUtils.matchesGlob(varType.getName(), fieldName)) {
+                        StringUtils.matchesGlob(varType.getName(), fieldName)) {
                     return SearchResult.found(fieldAccess);
                 }
                 return super.visitFieldAccess(fieldAccess, ctx);
@@ -82,7 +82,7 @@ public class FindFields extends Recipe {
                 J.Identifier i = super.visitIdentifier(identifier, ctx);
                 JavaType.Variable varType = identifier.getFieldType();
                 if (varType != null && new TypeMatcher(fullyQualifiedTypeName, Boolean.TRUE.equals(matchInherited)).matches(varType.getOwner()) &&
-                    StringUtils.matchesGlob(varType.getName(), fieldName)) {
+                        StringUtils.matchesGlob(varType.getName(), fieldName)) {
                     i = SearchResult.found(i);
                 }
                 return i;
@@ -93,7 +93,7 @@ public class FindFields extends Recipe {
                 J.MemberReference m = super.visitMemberReference(memberRef, ctx);
                 JavaType.Variable varType = memberRef.getVariableType();
                 if (varType != null && new TypeMatcher(fullyQualifiedTypeName, Boolean.TRUE.equals(matchInherited)).matches(varType.getOwner()) &&
-                    StringUtils.matchesGlob(varType.getName(), fieldName)) {
+                        StringUtils.matchesGlob(varType.getName(), fieldName)) {
                     m = m.withReference(SearchResult.found(m.getReference()));
                 }
                 return m;
@@ -108,7 +108,7 @@ public class FindFields extends Recipe {
                 J.FieldAccess f = super.visitFieldAccess(fieldAccess, vs);
                 JavaType.Variable varType = fieldAccess.getName().getFieldType();
                 if (varType != null && new TypeMatcher(fullyQualifiedTypeName, true).matches(varType.getOwner()) &&
-                    StringUtils.matchesGlob(varType.getName(), fieldName)) {
+                        StringUtils.matchesGlob(varType.getName(), fieldName)) {
                     vs.add(f);
                 }
                 return f;
@@ -119,7 +119,7 @@ public class FindFields extends Recipe {
                 J.Identifier i = super.visitIdentifier(identifier, vs);
                 JavaType.Variable varType = identifier.getFieldType();
                 if (varType != null && new TypeMatcher(fullyQualifiedTypeName, true).matches(varType.getOwner()) &&
-                    StringUtils.matchesGlob(varType.getName(), fieldName)) {
+                        StringUtils.matchesGlob(varType.getName(), fieldName)) {
                     vs.add(i);
                 }
                 return i;
@@ -130,7 +130,7 @@ public class FindFields extends Recipe {
                 J.MemberReference m = super.visitMemberReference(memberRef, vs);
                 JavaType.Variable varType = memberRef.getVariableType();
                 if (varType != null && new TypeMatcher(fullyQualifiedTypeName, true).matches(varType.getOwner()) &&
-                    StringUtils.matchesGlob(varType.getName(), fieldName)) {
+                        StringUtils.matchesGlob(varType.getName(), fieldName)) {
                     vs.add(m);
                 }
                 return m;

@@ -28,16 +28,16 @@ class NoMutableStaticFieldsInRecipesTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec
-          .recipe(new NoMutableStaticFieldsInRecipes())
-          .parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()));
+                .recipe(new NoMutableStaticFieldsInRecipes())
+                .parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()));
     }
 
     @Test
     @DocumentExample
     void removeNonFinalStaticFields() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import org.openrewrite.Recipe;
               
               public class A extends Recipe {
@@ -45,22 +45,22 @@ class NoMutableStaticFieldsInRecipesTest implements RewriteTest {
                   static int mutable = 0;
               }
               """,
-            """
+                        """
               import org.openrewrite.Recipe;
               
               public class A extends Recipe {
                   static final int immutable = 0;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void retainFieldsOutsideRecipes() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import org.openrewrite.Recipe;
               
               public class A {
@@ -68,15 +68,15 @@ class NoMutableStaticFieldsInRecipesTest implements RewriteTest {
                   static int mutable = 0;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void retainWhenWarningsSuppressed() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import org.openrewrite.Recipe;
               
               public class A extends Recipe {
@@ -85,7 +85,7 @@ class NoMutableStaticFieldsInRecipesTest implements RewriteTest {
                   static int mutable = 0;
               }
               """
-          )
+                )
         );
     }
 }

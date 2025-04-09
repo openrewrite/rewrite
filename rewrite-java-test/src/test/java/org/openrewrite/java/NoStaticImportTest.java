@@ -29,9 +29,9 @@ class NoStaticImportTest implements RewriteTest {
     @Test
     void replaceWithNoStaticImports() {
         rewriteRun(
-          spec -> spec.recipe(new NoStaticImport("java.util.Collections emptyList()")),
-          java(
-            """
+                spec -> spec.recipe(new NoStaticImport("java.util.Collections emptyList()")),
+                java(
+                        """
               import static java.util.Collections.emptyList;
               class Test {
                   void test() {
@@ -39,7 +39,7 @@ class NoStaticImportTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.Collections;
                               
               class Test {
@@ -48,16 +48,16 @@ class NoStaticImportTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void removeLocalImports() {
         rewriteRun(
-          spec -> spec.recipe(new NoStaticImport("*..* *(..)")),
-          java(
-            """
+                spec -> spec.recipe(new NoStaticImport("*..* *(..)")),
+                java(
+                        """
               package org.openrewrite.java;
                             
               import static org.openrewrite.java.TestNoStaticImport.method0;
@@ -72,7 +72,7 @@ class NoStaticImportTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package org.openrewrite.java;
 
               public class TestNoStaticImport {
@@ -85,7 +85,7 @@ class NoStaticImportTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -97,9 +97,9 @@ class NoStaticImportTest implements RewriteTest {
         @Test
         void getClassCallsNotChanged() {
             rewriteRun(
-              spec -> spec.recipe(NO_STATIC_IMPORT),
-              java(
-                    """
+                    spec -> spec.recipe(NO_STATIC_IMPORT),
+                    java(
+                            """
                 package org.openrewrite.java;
 
                 public class TestNoStaticImport0 {
@@ -118,9 +118,9 @@ class NoStaticImportTest implements RewriteTest {
         @Test
         void interfaceDefaultMethodNotUpdated() {
             rewriteRun(
-              spec -> spec.recipe(NO_STATIC_IMPORT),
-              java(
-                    """
+                    spec -> spec.recipe(NO_STATIC_IMPORT),
+                    java(
+                            """
                 package org.springframework.data.domain;
 
                 public interface Window {
@@ -136,9 +136,9 @@ class NoStaticImportTest implements RewriteTest {
         @Test
         void methodFromSuperClassNotUpdated() {
             rewriteRun(
-              spec -> spec.recipe(NO_STATIC_IMPORT),
-              java(
-                    """
+                    spec -> spec.recipe(NO_STATIC_IMPORT),
+                    java(
+                            """
                 package org.example;
                         
                 public abstract class AbstractClass {
@@ -147,8 +147,8 @@ class NoStaticImportTest implements RewriteTest {
                     }
                 }
                 """),
-              java(
-                    """
+                    java(
+                            """
                 package org.example;
 
                 public class SomeWindow extends AbstractClass {
@@ -162,9 +162,9 @@ class NoStaticImportTest implements RewriteTest {
         @Test
         void verifyInnerCallsAreNotUpdated() {
             rewriteRun(
-              spec -> spec.recipe(NO_STATIC_IMPORT),
-              java(
-                    """
+                    spec -> spec.recipe(NO_STATIC_IMPORT),
+                    java(
+                            """
                 package org.openrewrite.java;
 
                 public class TestNoStaticImport {
@@ -182,9 +182,9 @@ class NoStaticImportTest implements RewriteTest {
         @Test
         void superCallsNotChanged() {
             rewriteRun(
-              spec -> spec.recipe(NO_STATIC_IMPORT),
-              java(
-                    """
+                    spec -> spec.recipe(NO_STATIC_IMPORT),
+                    java(
+                            """
                 package org.openrewrite.java;
 
                 public class TestNoStaticImport {
@@ -199,9 +199,9 @@ class NoStaticImportTest implements RewriteTest {
         @Test
         void innerClassCallingOuterClassMethod() {
             rewriteRun(
-              spec -> spec.recipe(NO_STATIC_IMPORT),
-              java(
-                    """
+                    spec -> spec.recipe(NO_STATIC_IMPORT),
+                    java(
+                            """
                 package org.openrewrite.java;
 
                 public class TestNoStaticImport {
@@ -220,9 +220,9 @@ class NoStaticImportTest implements RewriteTest {
         @Test
         void staticInnerClassCallingOuterClassMethod() {
             rewriteRun(
-              spec -> spec.recipe(NO_STATIC_IMPORT),
-              java(
-                    """
+                    spec -> spec.recipe(NO_STATIC_IMPORT),
+                    java(
+                            """
                 package org.openrewrite.java;
 
                 public class TestNoStaticImport {
@@ -241,9 +241,9 @@ class NoStaticImportTest implements RewriteTest {
         @Test
         void outerClassCallingInnerClassMethod() {
             rewriteRun(
-              spec -> spec.recipe(NO_STATIC_IMPORT),
-              java(
-                    """
+                    spec -> spec.recipe(NO_STATIC_IMPORT),
+                    java(
+                            """
                 package org.openrewrite.java;
 
                 class TestNoStaticImport {
@@ -262,9 +262,9 @@ class NoStaticImportTest implements RewriteTest {
         @Test
         void runnableCallingOuterMethod() {
             rewriteRun(
-              spec -> spec.recipe(NO_STATIC_IMPORT),
-              java(
-                    """
+                    spec -> spec.recipe(NO_STATIC_IMPORT),
+                    java(
+                            """
                 package org.openrewrite.java;
 
                 public class TestNoStaticImport {
@@ -287,9 +287,9 @@ class NoStaticImportTest implements RewriteTest {
         @ExpectedToFail("static import not yet replaced with Nested.foo()")
         void localImport() {
             rewriteRun(
-              spec -> spec.recipe(NO_STATIC_IMPORT),
-              java(
-                    """
+                    spec -> spec.recipe(NO_STATIC_IMPORT),
+                    java(
+                            """
                 package org.openrewrite.java;
                                 
                 import static org.openrewrite.test.Test.Nested.foo;

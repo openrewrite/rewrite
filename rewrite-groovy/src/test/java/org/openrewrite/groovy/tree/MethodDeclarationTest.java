@@ -33,124 +33,125 @@ class MethodDeclarationTest implements RewriteTest {
     @Test
     void methodDeclarationDeclaringType() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               class A {
                   void method() {}
               }
               """,
-            spec -> spec.beforeRecipe(cu -> {
-                var method = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
-                JavaType.Method methodType = method.getMethodType();
-                assertThat(methodType).isNotNull();
-                assertThat(methodType.getName()).isEqualTo("method");
-                var declaring = methodType.getDeclaringType();
-                assertThat(declaring.getFullyQualifiedName()).isEqualTo("A");
-                assertThat(declaring.getMethods().stream()
-                  .filter(m -> m == methodType)
-                  .findAny()).isPresent();
-            })
-          )
+                        spec -> spec.beforeRecipe(cu -> {
+                            var method = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
+                            JavaType.Method methodType = method.getMethodType();
+                            assertThat(methodType).isNotNull();
+                            assertThat(methodType.getName()).isEqualTo("method");
+                            var declaring = methodType.getDeclaringType();
+                            assertThat(declaring.getFullyQualifiedName()).isEqualTo("A");
+                            assertThat(declaring.getMethods().stream()
+                                    .filter(m -> m == methodType)
+                                    .findAny()).isPresent();
+                        })
+                )
         );
     }
 
     @Test
     void methodDeclaration() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def accept(Map m) {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void primitiveReturn() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               static int accept(Map m) {
                   return 0
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void emptyArguments() {
         rewriteRun(
-          groovy("def foo( ) {}")
+                groovy("def foo( ) {}")
         );
     }
 
     @Test
     void methodThrows() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def foo(int a) throws Exception , RuntimeException {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void dynamicTypedArguments() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def foo(bar, baz) {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void defaultArgumentValues() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def confirmNextStepWithCredentials(String message /* = prefix */ = /* hello prefix */ "Hello" ) {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void returnNull() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               static def foo() {
                   return null
               }
               """
-          )
+                )
         );
     }
+
     @Test
     void arrayType() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def foo(String[][] s) {}
               """, spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
-                @Override
-                public J.ArrayType visitArrayType(J.ArrayType arrayType, Object o) {
-                    if (arrayType.getElementType() instanceof J.ArrayType) {
-                        assertThat(Objects.requireNonNull(arrayType.getElementType().getType()).toString()).isEqualTo("java.lang.String[]");
-                        assertThat(Objects.requireNonNull(arrayType.getType()).toString()).isEqualTo("java.lang.String[][]");
-                    }
-                    return super.visitArrayType(arrayType, o);
-                }
-            }.visit(cu, 0))
-          )
+                            @Override
+                            public J.ArrayType visitArrayType(J.ArrayType arrayType, Object o) {
+                                if (arrayType.getElementType() instanceof J.ArrayType) {
+                                    assertThat(Objects.requireNonNull(arrayType.getElementType().getType()).toString()).isEqualTo("java.lang.String[]");
+                                    assertThat(Objects.requireNonNull(arrayType.getType()).toString()).isEqualTo("java.lang.String[][]");
+                                }
+                                return super.visitArrayType(arrayType, o);
+                            }
+                        }.visit(cu, 0))
+                )
         );
     }
 
@@ -159,24 +160,24 @@ class MethodDeclarationTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3559")
     void escapedMethodNameTest() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def 'default'() {}
               'default'()
               """
-          )
+                )
         );
     }
 
     @Test
     void escapedMethodNameWithSpacesTest() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def 'some test scenario description'() {}
               'some test scenario description'()
               """
-          )
+                )
         );
     }
 
@@ -184,14 +185,14 @@ class MethodDeclarationTest implements RewriteTest {
     @Test
     void functionWithDefAndExplicitReturnType() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               class A {
                   def /*int*/ int one() { 1 }
                   def /*Object*/ Object two() { 2 }
               }
               """
-          )
+                )
         );
     }
 }

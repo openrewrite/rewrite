@@ -42,7 +42,7 @@ class UpdateSourcePositionsTest {
                     //noinspection PatternVariableCanBeUsed
                     Range r = (Range) marker;
                     return "[(" + r.getStart().getLine() + ", " + r.getStart().getColumn() + "), (" +
-                           r.getEnd().getLine() + ", " + r.getEnd().getColumn() + ")]";
+                            r.getEnd().getLine() + ", " + r.getEnd().getColumn() + ")]";
                 }
                 return "";
             }
@@ -53,7 +53,7 @@ class UpdateSourcePositionsTest {
     @Test
     void lambdaParameter() {
         List<SourceFile> cus = JavaParser.fromJavaVersion().build().parse(
-          """
+                """
             package org.test;
                           
             import java.util.function.Consumer;
@@ -70,7 +70,7 @@ class UpdateSourcePositionsTest {
         ).collect(Collectors.toList());
         Result result = new UpdateSourcePositions().run(new InMemoryLargeSourceSet(cus), new InMemoryExecutionContext(), 1).getChangeset().getAllResults().get(0);
         assertThat(printWithLines(result.getAfter())).isEqualTo(
-          """
+                """
             package [(1, 8), (1, 11)]org.[(1, 12), (1, 16)]test;
                         
             import [(3, 8), (3, 12)]java.[(3, 13), (3, 17)]util.[(3, 18), (3, 26)]function.[(3, 27), (3, 35)]Consumer;
@@ -90,7 +90,7 @@ class UpdateSourcePositionsTest {
     @Test
     void updateSourcePositions() {
         List<SourceFile> cus = JavaParser.fromJavaVersion().build().parse(
-          """ 
+                """ 
             class Test {
                 int n;
                 
@@ -101,7 +101,7 @@ class UpdateSourcePositionsTest {
         ).collect(Collectors.toList());
         Result result = new UpdateSourcePositions().run(new InMemoryLargeSourceSet(cus), new InMemoryExecutionContext(), 1).getChangeset().getAllResults().get(0);
         assertThat(printWithLines(result.getAfter())).isEqualTo(
-          """
+                """
             class[(1, 6), (1, 10)] Test {
                 int [(2, 9), (2, 10)]n;
                         

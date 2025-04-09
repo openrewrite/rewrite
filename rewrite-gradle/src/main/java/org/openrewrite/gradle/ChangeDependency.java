@@ -73,9 +73,9 @@ public class ChangeDependency extends Recipe {
 
     @Option(displayName = "New version",
             description = "An exact version number or node-style semver selector used to select the version number. " +
-                          "You can also use `latest.release` for the latest available version and `latest.patch` if " +
-                          "the current version is a valid semantic version. For more details, you can look at the documentation " +
-                          "page of [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors).",
+                    "You can also use `latest.release` for the latest available version and `latest.patch` if " +
+                    "the current version is a valid semantic version. For more details, you can look at the documentation " +
+                    "page of [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors).",
             example = "29.X",
             required = false)
     @Nullable
@@ -83,7 +83,7 @@ public class ChangeDependency extends Recipe {
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
@@ -91,8 +91,8 @@ public class ChangeDependency extends Recipe {
 
     @Option(displayName = "Override managed version",
             description = "If the old dependency has a managed version, this flag can be used to explicitly set the version on the new dependency. " +
-                          "WARNING: No check is done on the NEW dependency to verify if it is managed, it relies on whether the OLD dependency had a managed version. " +
-                          "The default for this flag is `false`.",
+                    "WARNING: No check is done on the NEW dependency to verify if it is managed, it relies on whether the OLD dependency had a managed version. " +
+                    "The default for this flag is `false`.",
             required = false)
     @Nullable
     Boolean overrideManagedVersion;
@@ -192,8 +192,8 @@ public class ChangeDependency extends Recipe {
                 if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry || depArgs.get(0) instanceof G.MapLiteral) {
                     m = updateDependency(m, ctx);
                 } else if (depArgs.get(0) instanceof J.MethodInvocation &&
-                           (((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("platform") ||
-                            ((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("enforcedPlatform"))) {
+                        (((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("platform") ||
+                                ((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("enforcedPlatform"))) {
                     m = m.withArguments(ListUtils.mapFirst(depArgs, platform -> updateDependency((J.MethodInvocation) platform, ctx)));
                 }
 
@@ -236,7 +236,7 @@ public class ChangeDependency extends Recipe {
                     G.GString gstring = (G.GString) depArgs.get(0);
                     List<J> strings = gstring.getStrings();
                     if (strings.size() >= 2 && strings.get(0) instanceof J.Literal &&
-                        ((J.Literal) strings.get(0)).getValue() != null) {
+                            ((J.Literal) strings.get(0)).getValue() != null) {
 
                         J.Literal literal = (J.Literal) strings.get(0);
                         Dependency original = DependencyStringNotationConverter.parse((String) requireNonNull(literal.getValue()));

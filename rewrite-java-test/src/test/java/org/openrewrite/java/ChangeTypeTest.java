@@ -63,11 +63,11 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void doNotAddJavaLangWrapperImports() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.lang.Integer", "java.lang.Long", true)),
-          java(
-            "public class ThinkPositive { private Integer fred = 1;}",
-            "public class ThinkPositive { private Long fred = 1;}"
-          )
+                spec -> spec.recipe(new ChangeType("java.lang.Integer", "java.lang.Long", true)),
+                java(
+                        "public class ThinkPositive { private Integer fred = 1;}",
+                        "public class ThinkPositive { private Long fred = 1;}"
+                )
         );
     }
 
@@ -75,24 +75,24 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void conflictingImports() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType(
-            "java.util.List", "kotlin.collections.Set", true)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType(
+                        "java.util.List", "kotlin.collections.Set", true)),
+                java(
+                        """
               import java.util.*;
               class Test {
                   Set<String> s;
                   List<String> s;
               }
               """,
-            """
+                        """
               import java.util.*;
               class Test {
                   Set<String> s;
                   kotlin.collections.Set<String> s;
               }
               """
-          )
+                )
         );
     }
 
@@ -100,9 +100,9 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void starImport() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.util.logging.LoggingMXBean", "java.lang.management.PlatformLoggingMXBean", true)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("java.util.logging.LoggingMXBean", "java.lang.management.PlatformLoggingMXBean", true)),
+                java(
+                        """
               import java.util.logging.*;
               
               class Test {
@@ -111,7 +111,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.lang.management.PlatformLoggingMXBean;
               import java.util.logging.*;
               
@@ -121,7 +121,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -129,9 +129,9 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void allowJavaLangSubpackages() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.util.logging.LoggingMXBean", "java.lang.management.PlatformLoggingMXBean", true)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("java.util.logging.LoggingMXBean", "java.lang.management.PlatformLoggingMXBean", true)),
+                java(
+                        """
               import java.util.logging.LoggingMXBean;
               
               class Test {
@@ -140,7 +140,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.lang.management.PlatformLoggingMXBean;
               
               class Test {
@@ -149,7 +149,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -158,9 +158,9 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void unnecessaryImport() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("test.Outer.Inner", "java.util.ArrayList", true)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("test.Outer.Inner", "java.util.ArrayList", true)),
+                java(
+                        """
               import test.Outer;
               
               class Test {
@@ -168,9 +168,9 @@ class ChangeTypeTest implements RewriteTest {
                   private Outer p2 = test.Outer.of();
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package test;
               
               public class Outer {
@@ -182,7 +182,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -191,9 +191,9 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void changeInnerClassToOuterClass() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.util.Map$Entry", "java.util.List", true)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("java.util.Map$Entry", "java.util.List", true)),
+                java(
+                        """
               import java.util.Map;
               import java.util.Map.Entry;
               
@@ -203,7 +203,7 @@ class ChangeTypeTest implements RewriteTest {
                   java.util.Map.Entry p3;
               }
               """,
-            """
+                        """
               import java.util.List;
               
               class Test {
@@ -212,7 +212,7 @@ class ChangeTypeTest implements RewriteTest {
                   java.util.List p3;
               }
               """
-          )
+                )
         );
     }
 
@@ -220,30 +220,30 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void changeStaticFieldAccess() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.io.File", "my.pkg.List", true)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("java.io.File", "my.pkg.List", true)),
+                java(
+                        """
               import java.io.File;
               
               class Test {
                   String p = File.separator;
               }
               """,
-            """
+                        """
               import my.pkg.List;
               
               class Test {
                   String p = List.separator;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void dontAddImportWhenNoChangesWereMade() {
         rewriteRun(
-          java("public class B {}")
+                java("public class B {}")
         );
     }
 
@@ -252,23 +252,23 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void replaceWithNestedType() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.io.File", "java.util.Map$Entry", true)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("java.io.File", "java.util.Map$Entry", true)),
+                java(
+                        """
               import java.io.File;
               
               class Test {
                   File p;
               }
               """,
-            """
+                        """
               import java.util.Map;
               
               class Test {
                   Map.Entry p;
               }
               """
-          )
+                )
         );
     }
 
@@ -276,23 +276,23 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void replacePrivateNestedType() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.A.B1", "a.A.B2", false)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("a.A.B1", "a.A.B2", false)),
+                java(
+                        """
               package a;
               
               class A {
                   private static class B1 {}
               }
               """,
-            """
+                        """
               package a;
               
               class A {
                   private static class B2 {}
               }
               """
-          )
+                )
         );
     }
 
@@ -300,9 +300,9 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void deeplyNestedInnerClass() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.A.B.C", "a.A.B.C2", false)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("a.A.B.C", "a.A.B.C2", false)),
+                java(
+                        """
               package a;
               
               class A {
@@ -312,7 +312,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package a;
               
               class A {
@@ -322,69 +322,69 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void simpleName() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import a.A1;
               
               public class B extends A1 {}
               """,
-            """
+                        """
               import a.A2;
               
               public class B extends A2 {}
               """
-          ),
-          java(a1),
-          java(a2)
+                ),
+                java(a1),
+                java(a2)
         );
     }
 
     @Test
     void fullyQualifiedName() {
         rewriteRun(
-          java(a1),
-          java(a2),
-          java(
-            "public class B extends a.A1 {}",
-            "public class B extends a.A2 {}"
-          )
+                java(a1),
+                java(a2),
+                java(
+                        "public class B extends a.A1 {}",
+                        "public class B extends a.A2 {}"
+                )
         );
     }
 
     @Test
     void annotation() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.b.c.A1", "a.b.d.A2", true)),
-          java("package a.b.c;\npublic @interface A1 {}"),
-          java("package a.b.d;\npublic @interface A2 {}"),
-          java(
-            "@a.b.c.A1 public class B {}",
-            "@a.b.d.A2 public class B {}"
-          )
+                spec -> spec.recipe(new ChangeType("a.b.c.A1", "a.b.d.A2", true)),
+                java("package a.b.c;\npublic @interface A1 {}"),
+                java("package a.b.d;\npublic @interface A2 {}"),
+                java(
+                        "@a.b.c.A1 public class B {}",
+                        "@a.b.d.A2 public class B {}"
+                )
         );
     }
 
     @Test
     void array2() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("com.acme.product.Pojo", "com.acme.product.v2.Pojo", true)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("com.acme.product.Pojo", "com.acme.product.v2.Pojo", true)),
+                java(
+                        """
               package com.acme.product;
               
               public class Pojo {
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package com.acme.project.impl;
               
               import com.acme.product.Pojo;
@@ -397,7 +397,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package com.acme.project.impl;
               
               import com.acme.product.v2.Pojo;
@@ -410,7 +410,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -418,78 +418,78 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void array() {
         rewriteRun(
-          java(a1),
-          java(a2),
-          java(
-            """
+                java(a1),
+                java(a2),
+                java(
+                        """
               import a.A1;
               
               public class B {
                  A1[] a = new A1[0];
               }
               """,
-            """
+                        """
               import a.A2;
               
               public class B {
                  A2[] a = new A2[0];
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void multiDimensionalArray() {
         rewriteRun(
-          java(a1),
-          java(a2),
-          java(
-            """
+                java(a1),
+                java(a2),
+                java(
+                        """
               import a.A1;
               
               public class A {
                   A1[][] multiDimensionalArray;
               }
               """,
-            """
+                        """
               import a.A2;
               
               public class A {
                   A2[][] multiDimensionalArray;
               }
               """,
-            spec -> spec.afterRecipe(cu -> {
-                assertThat(cu.findType("a.A1")).isEmpty();
-                assertThat(cu.findType("a.A2")).isNotEmpty();
-            })
-          )
+                        spec -> spec.afterRecipe(cu -> {
+                            assertThat(cu.findType("a.A1")).isEmpty();
+                            assertThat(cu.findType("a.A2")).isNotEmpty();
+                        })
+                )
         );
     }
 
     @Test
     void classDecl() {
         rewriteRun(
-          spec -> spec.recipes(
-            new ChangeType("a.A1", "a.A2", true),
-            new ChangeType("I1", "I2", true)
-          ),
-          java(a1),
-          java(a2),
-          java("public interface I1 {}"),
-          java("public interface I2 {}"),
-          java(
-            """
+                spec -> spec.recipes(
+                        new ChangeType("a.A1", "a.A2", true),
+                        new ChangeType("I1", "I2", true)
+                ),
+                java(a1),
+                java(a2),
+                java("public interface I1 {}"),
+                java("public interface I2 {}"),
+                java(
+                        """
               import a.A1;
               
               public class B extends A1 implements I1 {}
               """,
-            """
+                        """
               import a.A2;
               
               public class B extends A2 implements I2 {}
               """
-          )
+                )
         );
     }
 
@@ -497,34 +497,34 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void method() {
         rewriteRun(
-          java(a1),
-          java(a2),
-          java(
-            """
+                java(a1),
+                java(a2),
+                java(
+                        """
               import a.A1;
               
               public class B {
                  public A1 foo() throws A1 { return null; }
               }
               """,
-            """
+                        """
               import a.A2;
               
               public class B {
                  public A2 foo() throws A2 { return null; }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void methodInvocationTypeParametersAndWildcard() {
         rewriteRun(
-          java(a1),
-          java(a2),
-          java(
-            """
+                java(a1),
+                java(a2),
+                java(
+                        """
               import a.A1;
               
               public class B {
@@ -537,7 +537,7 @@ class ChangeTypeTest implements RewriteTest {
                  }
               }
               """,
-            """
+                        """
               import a.A2;
               
               public class B {
@@ -550,7 +550,7 @@ class ChangeTypeTest implements RewriteTest {
                  }
               }
               """
-          )
+                )
         );
     }
 
@@ -558,10 +558,10 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void multiCatch() {
         rewriteRun(
-          java(a1),
-          java(a2),
-          java(
-            """
+                java(a1),
+                java(a2),
+                java(
+                        """
               import a.A1;
               
               public class B {
@@ -571,7 +571,7 @@ class ChangeTypeTest implements RewriteTest {
                  }
               }
               """,
-            """
+                        """
               import a.A2;
               
               public class B {
@@ -581,55 +581,55 @@ class ChangeTypeTest implements RewriteTest {
                  }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void multiVariable() {
         rewriteRun(
-          java(a1),
-          java(a2),
-          java(
-            """
+                java(a1),
+                java(a2),
+                java(
+                        """
               import a.A1;
               
               public class B {
                  A1 f1, f2;
               }
               """,
-            """
+                        """
               import a.A2;
               
               public class B {
                  A2 f1, f2;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void newClass() {
         rewriteRun(
-          java(a1),
-          java(a2),
-          java(
-            """
+                java(a1),
+                java(a2),
+                java(
+                        """
               import a.A1;
               
               public class B {
                  A1 a = new A1();
               }
               """,
-            """
+                        """
               import a.A2;
               
               public class B {
                  A2 a = new A2();
               }
               """
-          )
+                )
         );
     }
 
@@ -639,10 +639,10 @@ class ChangeTypeTest implements RewriteTest {
     void updateAssignments() {
         //noinspection UnnecessaryLocalVariable
         rewriteRun(
-          java(a1),
-          java(a2),
-          java(
-            """
+                java(a1),
+                java(a2),
+                java(
+                        """
               import a.A1;
               
               class B {
@@ -651,7 +651,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import a.A2;
               
               class B {
@@ -660,17 +660,17 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void parameterizedType() {
         rewriteRun(
-          java(a1),
-          java(a2),
-          java(
-            """
+                java(a1),
+                java(a2),
+                java(
+                        """
               import a.A1;
               
               import java.util.Map;
@@ -679,7 +679,7 @@ class ChangeTypeTest implements RewriteTest {
                  Map<A1, A1> m;
               }
               """,
-            """
+                        """
               import a.A2;
               
               import java.util.Map;
@@ -688,7 +688,7 @@ class ChangeTypeTest implements RewriteTest {
                  Map<A2, A2> m;
               }
               """
-          )
+                )
         );
     }
 
@@ -696,58 +696,58 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void typeCast() {
         rewriteRun(
-          java(a1),
-          java(a2),
-          java(
-            """
+                java(a1),
+                java(a2),
+                java(
+                        """
               import a.A1;
               
               public class B {
                  A1 a = (A1) null;
               }
               """,
-            """
+                        """
               import a.A2;
               
               public class B {
                  A2 a = (A2) null;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void classReference() {
         rewriteRun(
-          java(a1),
-          java(a2),
-          java(
-            """
+                java(a1),
+                java(a2),
+                java(
+                        """
               import a.A1;
               
               public class A {
                   Class<?> clazz = A1.class;
               }
               """,
-            """
+                        """
               import a.A2;
               
               public class A {
                   Class<?> clazz = A2.class;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void methodSelect() {
         rewriteRun(
-          java(a1),
-          java(a2),
-          java(
-            """
+                java(a1),
+                java(a2),
+                java(
+                        """
               import a.A1;
               
               public class B {
@@ -755,7 +755,7 @@ class ChangeTypeTest implements RewriteTest {
                  public void test() { a.foo(); }
               }
               """,
-            """
+                        """
               import a.A2;
               
               public class B {
@@ -763,7 +763,7 @@ class ChangeTypeTest implements RewriteTest {
                  public void test() { a.foo(); }
               }
               """
-          )
+                )
         );
     }
 
@@ -771,10 +771,10 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void staticImport() {
         rewriteRun(
-          java(a1),
-          java(a2),
-          java(
-            """
+                java(a1),
+                java(a2),
+                java(
+                        """
               import static a.A1.stat;
               
               public class B {
@@ -783,7 +783,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import static a.A2.stat;
               
               public class B {
@@ -792,15 +792,15 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void staticImports2() {
         rewriteRun(spec -> spec.recipe(new ChangeType("com.acme.product.RunnableFactory", "com.acme.product.v2.RunnableFactory", true)),
-          java(
-            """
+                java(
+                        """
               package com.acme.product;
               
               public class RunnableFactory {
@@ -809,9 +809,9 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package com.acme.project.impl;
               
               import static com.acme.product.RunnableFactory.getString;
@@ -822,7 +822,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package com.acme.project.impl;
               
               import static com.acme.product.v2.RunnableFactory.getString;
@@ -833,25 +833,25 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void staticConstant() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("com.acme.product.RunnableFactory", "com.acme.product.v2.RunnableFactory", true)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("com.acme.product.RunnableFactory", "com.acme.product.v2.RunnableFactory", true)),
+                java(
+                        """
               package com.acme.product;
               
               public class RunnableFactory {
                   public static final String CONSTANT = "hello";
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package com.acme.project.impl;
               
               import static com.acme.product.RunnableFactory.CONSTANT;
@@ -862,7 +862,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package com.acme.project.impl;
               
               import static com.acme.product.v2.RunnableFactory.CONSTANT;
@@ -873,7 +873,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -881,9 +881,9 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void primitiveToClass() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("int", "java.lang.Integer", true)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("int", "java.lang.Integer", true)),
+                java(
+                        """
               class A {
                   int foo = 5;
                   int getFoo() {
@@ -891,7 +891,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class A {
                   Integer foo = 5;
                   Integer getFoo() {
@@ -899,16 +899,16 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void classToPrimitive() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.lang.Integer", "int", true)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("java.lang.Integer", "int", true)),
+                java(
+                        """
               class A {
                   Integer foo = 5;
                   Integer getFoo() {
@@ -916,7 +916,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class A {
                   int foo = 5;
                   int getFoo() {
@@ -924,7 +924,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -932,21 +932,21 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void importOrdering() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("com.yourorg.a.A", "com.myorg.b.B", true)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("com.yourorg.a.A", "com.myorg.b.B", true)),
+                java(
+                        """
               package com.yourorg.a;
               public class A {}
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package com.myorg.b;
               public class B {}
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package com.myorg;
               
               import java.util.ArrayList;
@@ -957,7 +957,7 @@ class ChangeTypeTest implements RewriteTest {
                   List<A> a = new ArrayList<>();
               }
               """,
-            """
+                        """
               package com.myorg;
               
               import com.myorg.b.B;
@@ -969,16 +969,16 @@ class ChangeTypeTest implements RewriteTest {
                   List<B> a = new ArrayList<>();
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void changeTypeWithInnerClass() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("com.acme.product.OuterClass", "com.acme.product.v2.OuterClass", true)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("com.acme.product.OuterClass", "com.acme.product.v2.OuterClass", true)),
+                java(
+                        """
               package com.acme.product;
               
               public class OuterClass {
@@ -987,9 +987,9 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package de;
               
               import com.acme.product.OuterClass;
@@ -1005,7 +1005,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package de;
               
               import com.acme.product.v2.OuterClass;
@@ -1021,7 +1021,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -1029,18 +1029,18 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void uppercaseInPackage() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("com.acme.product.util.accessDecision.AccessVote", "com.acme.product.v2.util.accessDecision.AccessVote", true)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("com.acme.product.util.accessDecision.AccessVote", "com.acme.product.v2.util.accessDecision.AccessVote", true)),
+                java(
+                        """
               package com.acme.product.util.accessDecision;
               
               public enum AccessVote {
                   ABSTAIN
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package de;
               
               import com.acme.product.util.accessDecision.AccessVote;
@@ -1051,7 +1051,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package de;
               
               import com.acme.product.v2.util.accessDecision.AccessVote;
@@ -1062,7 +1062,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -1070,17 +1070,17 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void lambda() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("com.acme.product.Procedure", "com.acme.product.Procedure2", true)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("com.acme.product.Procedure", "com.acme.product.Procedure2", true)),
+                java(
+                        """
               package com.acme.product;
               public interface Procedure {
                   void execute();
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import com.acme.product.Procedure;
               
               public abstract class Worker {
@@ -1091,7 +1091,7 @@ class ChangeTypeTest implements RewriteTest {
                   abstract void worker(Procedure callback);
               }
               """,
-            """
+                        """
               import com.acme.product.Procedure2;
               
               public abstract class Worker {
@@ -1102,7 +1102,7 @@ class ChangeTypeTest implements RewriteTest {
                   abstract void worker(Procedure2 callback);
               }
               """
-          )
+                )
         );
     }
 
@@ -1110,9 +1110,9 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void assignment() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("com.acme.product.util.accessDecision.AccessVote", "com.acme.product.v2.util.accessDecision.AccessVote", true)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("com.acme.product.util.accessDecision.AccessVote", "com.acme.product.v2.util.accessDecision.AccessVote", true)),
+                java(
+                        """
               package com.acme.product.util.accessDecision;
               
               public enum AccessVote {
@@ -1120,9 +1120,9 @@ class ChangeTypeTest implements RewriteTest {
                   GRANT
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package de;
               
               import com.acme.product.util.accessDecision.AccessVote;
@@ -1135,7 +1135,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package de;
               
               import com.acme.product.v2.util.accessDecision.AccessVote;
@@ -1148,7 +1148,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -1156,9 +1156,9 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void ternary() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("com.acme.product.util.accessDecision.AccessVote", "com.acme.product.v2.util.accessDecision.AccessVote", true)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("com.acme.product.util.accessDecision.AccessVote", "com.acme.product.v2.util.accessDecision.AccessVote", true)),
+                java(
+                        """
               package com.acme.product.util.accessDecision;
               
               public enum AccessVote {
@@ -1166,9 +1166,9 @@ class ChangeTypeTest implements RewriteTest {
                   GRANT
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package de;
               
               import com.acme.product.util.accessDecision.AccessVote;
@@ -1179,7 +1179,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package de;
               
               import com.acme.product.v2.util.accessDecision.AccessVote;
@@ -1190,7 +1190,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -1198,17 +1198,17 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void changeTypeInTypeDeclaration() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("de.Class2", "de.Class1", false)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("de.Class2", "de.Class1", false)),
+                java(
+                        """
               package de;
               public class Class2 {}
               """,
-            """
+                        """
               package de;
               public class Class1 {}
               """
-          )
+                )
         );
     }
 
@@ -1216,22 +1216,22 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void doNotChangeTypeInTypeDeclaration() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("de.Class2", "de.Class1", true)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("de.Class2", "de.Class1", true)),
+                java(
+                        """
               package de;
               public class Class2 {}
               """
-          )
+                )
         );
     }
 
     @Test
     void javadocs() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.util.List", "java.util.Collection", true)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("java.util.List", "java.util.Collection", true)),
+                java(
+                        """
               import java.util.List;
               
               /**
@@ -1241,7 +1241,7 @@ class ChangeTypeTest implements RewriteTest {
                   int n;
               }
               """,
-            """
+                        """
               import java.util.Collection;
               
               /**
@@ -1251,7 +1251,7 @@ class ChangeTypeTest implements RewriteTest {
                   int n;
               }
               """
-          )
+                )
         );
     }
 
@@ -1259,9 +1259,9 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void onlyUpdateApplicableImport() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("com.acme.product.factory.V1Factory", "com.acme.product.factory.V1FactoryA", true)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("com.acme.product.factory.V1Factory", "com.acme.product.factory.V1FactoryA", true)),
+                java(
+                        """
               package com.acme.product.factory;
               
               public class V1Factory {
@@ -1270,9 +1270,9 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package com.acme.product.factory;
               
               public class V2Factory {
@@ -1281,9 +1281,9 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import com.acme.product.factory.V1Factory;
               
               import static com.acme.product.factory.V2Factory.getItem;
@@ -1300,7 +1300,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import com.acme.product.factory.V1FactoryA;
               
               import static com.acme.product.factory.V2Factory.getItem;
@@ -1317,7 +1317,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -1325,16 +1325,16 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void filePathMatchWithNoMatchedClassFqn() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.b.Original", "x.y.Target", false)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("a.b.Original", "x.y.Target", false)),
+                java(
+                        """
               package a;
               public class NoMatch {
               }
               """,
-            spec -> spec.path("a/b/Original.java").afterRecipe(cu ->
-              assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("a/b/Original.java"))
-          )
+                        spec -> spec.path("a/b/Original.java").afterRecipe(cu ->
+                                assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("a/b/Original.java"))
+                )
         );
     }
 
@@ -1342,23 +1342,23 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void onlyChangeTypeWithoutMatchedFilePath() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.b.Original", "x.y.Target", false)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("a.b.Original", "x.y.Target", false)),
+                java(
+                        """
               package a.b;
               public class Original {
               }
               """,
-            """
+                        """
               package x.y;
               public class Target {
               }
               """,
-            spec -> spec.path("a/b/NoMatch.java").afterRecipe(cu -> {
-                assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("a/b/NoMatch.java");
-                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "x.y.Target")).isTrue();
-            })
-          )
+                        spec -> spec.path("a/b/NoMatch.java").afterRecipe(cu -> {
+                            assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("a/b/NoMatch.java");
+                            assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "x.y.Target")).isTrue();
+                        })
+                )
         );
     }
 
@@ -1366,23 +1366,23 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void renameClassAndFilePath() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.b.Original", "x.y.Target", false)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("a.b.Original", "x.y.Target", false)),
+                java(
+                        """
               package a.b;
               public class Original {
               }
               """,
-            """
+                        """
               package x.y;
               public class Target {
               }
               """,
-            spec -> spec.path("a/b/Original.java").afterRecipe(cu -> {
-                assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("x/y/Target.java");
-                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "x.y.Target")).isTrue();
-            })
-          )
+                        spec -> spec.path("a/b/Original.java").afterRecipe(cu -> {
+                            assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("x/y/Target.java");
+                            assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "x.y.Target")).isTrue();
+                        })
+                )
         );
     }
 
@@ -1390,9 +1390,9 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void updateImportPrefixWithEmptyPackage() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.b.Original", "Target", false)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("a.b.Original", "Target", false)),
+                java(
+                        """
               package a.b;
               
               import java.util.List;
@@ -1400,13 +1400,13 @@ class ChangeTypeTest implements RewriteTest {
               class Original {
               }
               """,
-            """
+                        """
               import java.util.List;
               
               class Target {
               }
               """
-          )
+                )
         );
     }
 
@@ -1414,19 +1414,19 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void updateClassPrefixWithEmptyPackage() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.b.Original", "Target", false)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("a.b.Original", "Target", false)),
+                java(
+                        """
               package a.b;
               
               class Original {
               }
               """,
-            """
+                        """
               class Target {
               }
               """
-          )
+                )
         );
     }
 
@@ -1434,23 +1434,23 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void renameInnerClass() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.b.C$Original", "a.b.C$Target", false)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("a.b.C$Original", "a.b.C$Target", false)),
+                java(
+                        """
               package a.b;
               public class C {
                   public static class Original {
                   }
               }
               """,
-            """
+                        """
               package a.b;
               public class C {
                   public static class Target {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -1458,24 +1458,24 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void changePathOfNonPublicClass() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.b.C", "x.y.Z", false)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("a.b.C", "x.y.Z", false)),
+                java(
+                        """
               package a.b;
               class C {
               }
               class D {
               }
               """,
-            """
+                        """
               package x.y;
               class Z {
               }
               class D {
               }
               """,
-            spec -> spec.path("x/y/Z.java")
-          )
+                        spec -> spec.path("x/y/Z.java")
+                )
         );
     }
 
@@ -1483,19 +1483,19 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void renamePackage() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.b.Original", "x.y.Original", false)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("a.b.Original", "x.y.Original", false)),
+                java(
+                        """
               package a.b;
               class Original {
               }
               """,
-            """
+                        """
               package x.y;
               class Original {
               }
               """
-          )
+                )
         );
     }
 
@@ -1503,40 +1503,40 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void renameClass() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.b.Original", "a.b.Target", false)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("a.b.Original", "a.b.Target", false)),
+                java(
+                        """
               package a.b;
               class Original {
               }
               """,
-            """
+                        """
               package a.b;
               class Target {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void updateMethodType() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", false)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("a.A1", "a.A2", false)),
+                java(
+                        """
               package a;
               public class A1 {
               }
               """,
-            """
+                        """
               package a;
               public class A2 {
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package org.foo;
               
               import a.A1;
@@ -1547,7 +1547,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package org.foo;
               
               import a.A2;
@@ -1558,9 +1558,9 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import a.A1;
               import org.foo.Example;
               
@@ -1568,7 +1568,7 @@ class ChangeTypeTest implements RewriteTest {
                   A1 local = new Example().method(null);
               }
               """,
-            """
+                        """
               import a.A2;
               import org.foo.Example;
               
@@ -1576,58 +1576,58 @@ class ChangeTypeTest implements RewriteTest {
                   A2 local = new Example().method(null);
               }
               """,
-            spec -> spec.afterRecipe(cu -> {
-                JavaType.Method methodType = cu.getTypesInUse().getUsedMethods().stream()
-                  .filter(m -> "a.A2".equals(TypeUtils.asFullyQualified(m.getReturnType()).getFullyQualifiedName()))
-                  .findAny()
-                  .orElseThrow(() -> new IllegalStateException("Not found"));
+                        spec -> spec.afterRecipe(cu -> {
+                            JavaType.Method methodType = cu.getTypesInUse().getUsedMethods().stream()
+                                    .filter(m -> "a.A2".equals(TypeUtils.asFullyQualified(m.getReturnType()).getFullyQualifiedName()))
+                                    .findAny()
+                                    .orElseThrow(() -> new IllegalStateException("Not found"));
 
-                assertThat(TypeUtils.asFullyQualified(methodType.getReturnType()).getFullyQualifiedName())
-                  .isEqualTo("a.A2");
-                assertThat(TypeUtils.asFullyQualified(methodType.getParameterTypes().get(0)).getFullyQualifiedName())
-                  .isEqualTo("a.A2");
-            })
-          )
+                            assertThat(TypeUtils.asFullyQualified(methodType.getReturnType()).getFullyQualifiedName())
+                                    .isEqualTo("a.A2");
+                            assertThat(TypeUtils.asFullyQualified(methodType.getParameterTypes().get(0)).getFullyQualifiedName())
+                                    .isEqualTo("a.A2");
+                        })
+                )
         );
     }
 
     @Test
     void updateVariableType() {
         rewriteRun(
-          java(a1),
-          java(a2),
-          java(
-            """
+                java(a1),
+                java(a2),
+                java(
+                        """
               import a.A1;
               
               public class Test {
                   A1 a;
               }
               """,
-            """
+                        """
               import a.A2;
               
               public class Test {
                   A2 a;
               }
               """,
-            spec -> spec.afterRecipe(cu -> {
-                assertThat(TypeUtils.asFullyQualified(cu.getTypesInUse().getVariables().iterator().next().getType())
-                  .getFullyQualifiedName()).isEqualTo("a.A2");
-                assertThat(cu.findType("a.A1")).isEmpty();
-                assertThat(cu.findType("a.A2")).isNotEmpty();
-            })
-          )
+                        spec -> spec.afterRecipe(cu -> {
+                            assertThat(TypeUtils.asFullyQualified(cu.getTypesInUse().getVariables().iterator().next().getType())
+                                    .getFullyQualifiedName()).isEqualTo("a.A2");
+                            assertThat(cu.findType("a.A1")).isEmpty();
+                            assertThat(cu.findType("a.A2")).isNotEmpty();
+                        })
+                )
         );
     }
 
     @Test
     void boundedGenericType() {
         rewriteRun(
-          java(a1),
-          java(a2),
-          java(
-            """
+                java(a1),
+                java(a2),
+                java(
+                        """
               import a.A1;
               
               public class Test {
@@ -1636,7 +1636,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import a.A2;
               
               public class Test {
@@ -1645,11 +1645,11 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """,
-            spec -> spec.afterRecipe(cu -> {
-                assertThat(cu.findType("a.A1")).isEmpty();
-                assertThat(cu.findType("a.A2")).isNotEmpty();
-            })
-          )
+                        spec -> spec.afterRecipe(cu -> {
+                            assertThat(cu.findType("a.A1")).isEmpty();
+                            assertThat(cu.findType("a.A2")).isNotEmpty();
+                        })
+                )
         );
     }
 
@@ -1657,9 +1657,9 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void changeConstructor() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.A1", "a.A2", false)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("a.A1", "a.A2", false)),
+                java(
+                        """
               package a;
               
               public class A1 {
@@ -1667,7 +1667,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package a;
               
               public class A2 {
@@ -1675,11 +1675,11 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """,
-            spec -> spec.afterRecipe(cu -> {
-                assertThat(cu.findType("a.A1")).isEmpty();
-                assertThat(cu.findType("a.A2")).isNotEmpty();
-            })
-          )
+                        spec -> spec.afterRecipe(cu -> {
+                            assertThat(cu.findType("a.A1")).isEmpty();
+                            assertThat(cu.findType("a.A2")).isNotEmpty();
+                        })
+                )
         );
     }
 
@@ -1688,9 +1688,9 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void updateJavaTypeClassKindAnnotation() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("org.openrewrite.Test1", "org.openrewrite.Test2", false)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("org.openrewrite.Test1", "org.openrewrite.Test2", false)),
+                java(
+                        """
               package org.openrewrite;
               
               import java.lang.annotation.ElementType;
@@ -1702,9 +1702,9 @@ class ChangeTypeTest implements RewriteTest {
               @Retention(RetentionPolicy.RUNTIME)
               public @interface Test1 {}
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package org.openrewrite;
               
               import java.lang.annotation.ElementType;
@@ -1716,9 +1716,9 @@ class ChangeTypeTest implements RewriteTest {
               @Retention(RetentionPolicy.RUNTIME)
               public @interface Test2 {}
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import org.openrewrite.Test1;
               
               public class A {
@@ -1726,7 +1726,7 @@ class ChangeTypeTest implements RewriteTest {
                   void method() {}
               }
               """,
-            """
+                        """
               import org.openrewrite.Test2;
               
               public class A {
@@ -1734,11 +1734,11 @@ class ChangeTypeTest implements RewriteTest {
                   void method() {}
               }
               """,
-            spec -> spec.afterRecipe(cu -> {
-                assertThat(cu.findType("org.openrewrite.Test1")).isEmpty();
-                assertThat(cu.findType("org.openrewrite.Test2")).isNotEmpty();
-            })
-          )
+                        spec -> spec.afterRecipe(cu -> {
+                            assertThat(cu.findType("org.openrewrite.Test1")).isEmpty();
+                            assertThat(cu.findType("org.openrewrite.Test2")).isNotEmpty();
+                        })
+                )
         );
     }
 
@@ -1748,25 +1748,25 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void changeJavaTypeClassKindEnum() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("org.openrewrite.MyEnum1", "org.openrewrite.MyEnum2", false)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("org.openrewrite.MyEnum1", "org.openrewrite.MyEnum2", false)),
+                java(
+                        """
               package org.openrewrite;
               public enum MyEnum1 {
                   A,
                   B
               }
               """,
-            """
+                        """
               package org.openrewrite;
               public enum MyEnum2 {
                   A,
                   B
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package org.openrewrite;
               import static org.openrewrite.MyEnum1.A;
               import static org.openrewrite.MyEnum1.B;
@@ -1777,7 +1777,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package org.openrewrite;
               import static org.openrewrite.MyEnum2.A;
               import static org.openrewrite.MyEnum2.B;
@@ -1788,21 +1788,21 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """,
-            spec ->
-              spec.afterRecipe(cu -> {
-                  assertThat(cu.findType("org.openrewrite.MyEnum1")).isEmpty();
-                  assertThat(cu.findType("org.openrewrite.MyEnum2")).isNotEmpty();
-              })
-          )
+                        spec ->
+                                spec.afterRecipe(cu -> {
+                                    assertThat(cu.findType("org.openrewrite.MyEnum1")).isEmpty();
+                                    assertThat(cu.findType("org.openrewrite.MyEnum2")).isNotEmpty();
+                                })
+                )
         );
     }
 
     @Test
     void doesNotModifyInnerClassesIfIgnoreDefinitionTrue() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("Test.InnerA", "Test.InnerB", true)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("Test.InnerA", "Test.InnerB", true)),
+                java(
+                        """
               public class Test {
                   private class InnerA {
                   }
@@ -1815,7 +1815,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class Test {
                   private class InnerA {
                   }
@@ -1828,7 +1828,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
 
     }
@@ -1837,21 +1837,21 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void doesNotModifyPackageOfSibling() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("org.openrewrite.Test", "org.openrewrite.subpackage.Test", false)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType("org.openrewrite.Test", "org.openrewrite.subpackage.Test", false)),
+                java(
+                        """
               package org.openrewrite;
               public class Test {
               }
               """,
-            """
+                        """
               package org.openrewrite.subpackage;
               public class Test {
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package org.openrewrite;
               
               import org.openrewrite.Test;
@@ -1862,7 +1862,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package org.openrewrite;
               
               import org.openrewrite.subpackage.Test;
@@ -1873,7 +1873,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -1881,16 +1881,16 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void changeTypeOfStaticImportOfNestedEnumValueUsed() {
         rewriteRun(
-          recipeSpec -> recipeSpec.recipes(
-            new ChangeType(
-              "org.codehaus.jackson.map.ObjectMapper",
-              "com.fasterxml.jackson.databind.ObjectMapper", true),
-            new ChangeType(
-              "org.codehaus.jackson.map.SerializationConfig$Feature",
-              "com.fasterxml.jackson.databind.SerializationFeature", true)
-          ),
-          java(
-            """
+                recipeSpec -> recipeSpec.recipes(
+                        new ChangeType(
+                                "org.codehaus.jackson.map.ObjectMapper",
+                                "com.fasterxml.jackson.databind.ObjectMapper", true),
+                        new ChangeType(
+                                "org.codehaus.jackson.map.SerializationConfig$Feature",
+                                "com.fasterxml.jackson.databind.SerializationFeature", true)
+                ),
+                java(
+                        """
               package org.codehaus.jackson.map;
               public class SerializationConfig {
                   public static enum Feature {
@@ -1898,10 +1898,10 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """,
-            SourceSpec::skip
-          ),
-          java(
-            """
+                        SourceSpec::skip
+                ),
+                java(
+                        """
               package org.codehaus.jackson.map;
               public class ObjectMapper {
                   public ObjectMapper configure(SerializationConfig.Feature f, boolean state) {
@@ -1909,10 +1909,10 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """,
-            SourceSpec::skip
-          ),
-          java(
-            """
+                        SourceSpec::skip
+                ),
+                java(
+                        """
               import org.codehaus.jackson.map.ObjectMapper;
               
               import static org.codehaus.jackson.map.SerializationConfig.Feature.WRAP_ROOT_VALUE;
@@ -1924,7 +1924,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import com.fasterxml.jackson.databind.ObjectMapper;
               
               import static com.fasterxml.jackson.databind.SerializationFeature.WRAP_ROOT_VALUE;
@@ -1936,7 +1936,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -1944,13 +1944,13 @@ class ChangeTypeTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/4452")
     void shouldFullyQualifyWhenNewTypeIsAmbiguous() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType(
-            "javax.annotation.Nonnull",
-            "org.checkerframework.checker.nullness.qual.NonNull",
-            null)),
-          // language=java
-          java(
-            """
+                spec -> spec.recipe(new ChangeType(
+                        "javax.annotation.Nonnull",
+                        "org.checkerframework.checker.nullness.qual.NonNull",
+                        null)),
+                // language=java
+                java(
+                        """
               import lombok.NonNull;
               import javax.annotation.Nonnull;
               import org.immutables.value.Value;
@@ -1961,7 +1961,7 @@ class ChangeTypeTest implements RewriteTest {
                       void lombokMethod(@NonNull final String lombokNonNull){}
               }
               """,
-            """
+                        """
               import lombok.NonNull;
               import org.immutables.value.Value;
               
@@ -1971,27 +1971,27 @@ class ChangeTypeTest implements RewriteTest {
                       void lombokMethod(@NonNull final String lombokNonNull){}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void shouldNotFullyQualifyWhenNewTypeIsAlreadyUsed() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType(
-            "org.a.A",
-            "org.ab.AB",
-            true)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeType(
+                        "org.a.A",
+                        "org.ab.AB",
+                        true)),
+                java(
+                        """
               package org.a;
               
               public class A {
                 public static String A = "A";
               }
               """),
-          java(
-            """
+                java(
+                        """
               package org.ab;
               
               public class AB {
@@ -1999,9 +1999,9 @@ class ChangeTypeTest implements RewriteTest {
                 public static String B = "B";
               }
               """),
-          // language=java
-          java(
-            """
+                // language=java
+                java(
+                        """
               import org.a.A;
               import org.ab.AB;
               
@@ -2010,7 +2010,7 @@ class ChangeTypeTest implements RewriteTest {
                 String b = AB.B;
               }
               """,
-            """
+                        """
               import org.ab.AB;
               
               class Letters {
@@ -2018,28 +2018,28 @@ class ChangeTypeTest implements RewriteTest {
                 String b = AB.B;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void changeTypeInSpringXml() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("test.type.A", "test.type.B", true)),
-          xml(
-            """
+                spec -> spec.recipe(new ChangeType("test.type.A", "test.type.B", true)),
+                xml(
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <beans xsi:schemaLocation="www.springframework.org/schema/beans">
                 <bean id="abc" class="test.type.A"/>
               </beans>
               """,
-            """
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <beans xsi:schemaLocation="www.springframework.org/schema/beans">
                 <bean id="abc" class="test.type.B"/>
               </beans>
               """
-          )
+                )
         );
 
     }
@@ -2047,35 +2047,35 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void changeTypeWorksOnDirectInvocations() {
         rewriteRun(
-          spec -> spec.recipe(Recipe.noop()), // do not run the default recipe
-          java(
-            """
+                spec -> spec.recipe(Recipe.noop()), // do not run the default recipe
+                java(
+                        """
               package hello;
               public class HelloClass {}
               """,
-            spec -> spec.beforeRecipe((source) -> {
-                TreeVisitor<?, ExecutionContext> visitor = new ChangeType("hello.HelloClass", "hello.GoodbyeClass", false).getVisitor();
+                        spec -> spec.beforeRecipe((source) -> {
+                            TreeVisitor<?, ExecutionContext> visitor = new ChangeType("hello.HelloClass", "hello.GoodbyeClass", false).getVisitor();
 
-                J.CompilationUnit cu = (J.CompilationUnit) visitor.visit(source, new InMemoryExecutionContext());
-                assertEquals("GoodbyeClass", cu.getClasses().get(0).getSimpleName());
+                            J.CompilationUnit cu = (J.CompilationUnit) visitor.visit(source, new InMemoryExecutionContext());
+                            assertEquals("GoodbyeClass", cu.getClasses().get(0).getSimpleName());
 
-                J.ClassDeclaration cd = (J.ClassDeclaration) visitor.visit(source.getClasses().get(0), new InMemoryExecutionContext());
-                assertEquals("GoodbyeClass", cd.getSimpleName());
-            }))
+                            J.ClassDeclaration cd = (J.ClassDeclaration) visitor.visit(source.getClasses().get(0), new InMemoryExecutionContext());
+                            assertEquals("GoodbyeClass", cd.getSimpleName());
+                        }))
         );
     }
 
     @Test
     void changeTypeInPropertiesFile() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.lang.String", "java.lang.Integer", true)),
-          properties(
-            """
+                spec -> spec.recipe(new ChangeType("java.lang.String", "java.lang.Integer", true)),
+                properties(
+                        """
               a.property=java.lang.String
               c.property=java.lang.StringBuilder
               b.property=String
               """,
-            """
+                        """
               a.property=java.lang.Integer
               c.property=java.lang.StringBuilder
               b.property=String
@@ -2086,24 +2086,24 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void changeTypeInYaml() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.lang.String", "java.lang.Integer", true)),
-          yaml(
-            """
+                spec -> spec.recipe(new ChangeType("java.lang.String", "java.lang.Integer", true)),
+                yaml(
+                        """
               root:
                   a: java.lang.String
                   b: java.lang.StringBuilder
                   c: java.lang.test.String
                   d: String
               """,
-            """
+                        """
               root:
                   a: java.lang.Integer
                   b: java.lang.StringBuilder
                   c: java.lang.test.String
                   d: String
               """,
-            spec -> spec.path("application.yaml")
-          )
+                        spec -> spec.path("application.yaml")
+                )
         );
     }
 
@@ -2111,24 +2111,24 @@ class ChangeTypeTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/4773")
     void noRenameOfTypeWithMatchingPrefix() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("org.codehaus.jackson.annotate.JsonIgnoreProperties", "com.fasterxml.jackson.annotation.JsonIgnoreProperties", false))
-            .parser(JavaParser.fromJavaVersion()
-              .dependsOn(
-                """
+                spec -> spec.recipe(new ChangeType("org.codehaus.jackson.annotate.JsonIgnoreProperties", "com.fasterxml.jackson.annotation.JsonIgnoreProperties", false))
+                        .parser(JavaParser.fromJavaVersion()
+                                .dependsOn(
+                                        """
                   package org.codehaus.jackson.annotate;
                   public @interface JsonIgnoreProperties {
                       boolean ignoreUnknown() default false;
                   }
                   """,
-                """
+                                        """
                   package org.codehaus.jackson.annotate;
                   public @interface JsonIgnore {
                   }
                   """
-              )
-            ),
-          java(
-            """
+                                )
+                        ),
+                java(
+                        """
               import org.codehaus.jackson.annotate.JsonIgnore;
               import org.codehaus.jackson.annotate.JsonIgnoreProperties;
               
@@ -2140,7 +2140,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
               import org.codehaus.jackson.annotate.JsonIgnore;
               
@@ -2152,7 +2152,7 @@ class ChangeTypeTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -2160,9 +2160,9 @@ class ChangeTypeTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/4764")
     void changeTypeOfInnerClass() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("foo.A$Builder", "bar.A$Builder", true))
-            .parser(JavaParser.fromJavaVersion().dependsOn(
-                """
+                spec -> spec.recipe(new ChangeType("foo.A$Builder", "bar.A$Builder", true))
+                        .parser(JavaParser.fromJavaVersion().dependsOn(
+                                """
                   package foo;
                   
                   public class A {
@@ -2177,7 +2177,7 @@ class ChangeTypeTest implements RewriteTest {
                     }
                   }
                   """,
-                """
+                                """
                   package bar;
                   
                   public class A {
@@ -2192,10 +2192,10 @@ class ChangeTypeTest implements RewriteTest {
                     }
                   }
                   """
-              )
-            ),
-          java(
-            """
+                        )
+                        ),
+                java(
+                        """
               import foo.A;
               import foo.A.Builder;
               
@@ -2215,7 +2215,7 @@ class ChangeTypeTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 }

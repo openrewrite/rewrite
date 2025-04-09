@@ -31,59 +31,59 @@ class LiteralTest implements RewriteTest {
     @Test
     void numericLiteral() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() ->
-              literal().asVisitor(lit -> {
-                  assertThat(lit.isNotNull()).isTrue();
-                  // NOTE: Jackson's coercion config allows us to
-                  // coerce various numeric literal types to an Integer
-                  // if we like
-                  return SearchResult.found(lit.getTree(),
-                    requireNonNull(lit.getValue(Integer.class)).toString());
-              })
-            )
-          ),
-          java(
-            """
+                spec -> spec.recipe(RewriteTest.toRecipe(() ->
+                        literal().asVisitor(lit -> {
+                            assertThat(lit.isNotNull()).isTrue();
+                            // NOTE: Jackson's coercion config allows us to
+                            // coerce various numeric literal types to an Integer
+                            // if we like
+                            return SearchResult.found(lit.getTree(),
+                                    requireNonNull(lit.getValue(Integer.class)).toString());
+                        })
+                )
+                ),
+                java(
+                        """
               class Test {
                 int n = 0;
                 int d = 0.0;
               }
               """,
-            """
+                        """
               class Test {
                 int n = /*~~(0)~~>*/0;
                 int d = /*~~(0)~~>*/0.0;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void arrayLiteral() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() ->
-              literal().asVisitor(lit -> {
-                  assertThat(lit.isNotNull()).isTrue();
-                  return SearchResult.found(lit.getTree(),
-                    String.join(",", lit.getStrings()));
-              })
-            )
-          ),
-          java(
-            """
+                spec -> spec.recipe(RewriteTest.toRecipe(() ->
+                        literal().asVisitor(lit -> {
+                            assertThat(lit.isNotNull()).isTrue();
+                            return SearchResult.found(lit.getTree(),
+                                    String.join(",", lit.getStrings()));
+                        })
+                )
+                ),
+                java(
+                        """
               class Test {
                 String[] s = new String[] { "a", "b", "c" };
                 int[] n = new int[] { 0, 1, 2 };
               }
               """,
-            """
+                        """
               class Test {
                 String[] s = /*~~(a,b,c)~~>*/new String[] { /*~~(a)~~>*/"a", /*~~(b)~~>*/"b", /*~~(c)~~>*/"c" };
                 int[] n = /*~~(0,1,2)~~>*/new int[] { /*~~(0)~~>*/0, /*~~(1)~~>*/1, /*~~(2)~~>*/2 };
               }
               """
-          )
+                )
         );
     }
 }

@@ -187,7 +187,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
      * @return The repositories to use for dependency resolution.
      */
     public List<MavenRepository> getRepositories(@Nullable MavenSettings mavenSettings,
-                                                 @Nullable List<String> activeProfiles) {
+            @Nullable List<String> activeProfiles) {
         if (mavenSettings != null) {
             return mapRepositories(mavenSettings, activeProfiles == null ? emptyList() : activeProfiles);
         }
@@ -243,8 +243,8 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
             return Arrays.asList(activeProfiles);
         }
         return Stream.concat(
-                        settings.getActiveProfiles().getActiveProfiles().stream(),
-                        Arrays.stream(activeProfiles))
+                settings.getActiveProfiles().getActiveProfiles().stream(),
+                Arrays.stream(activeProfiles))
                 .distinct()
                 .collect(Collectors.toList());
     }

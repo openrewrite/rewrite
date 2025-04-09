@@ -131,7 +131,8 @@ public class ReorderMethodArguments extends Recipe {
 
         private MethodCall visitMethodCall(MethodCall m) {
             if (methodMatcher.matches(m) && m.getMethodType() != null) {
-                @SuppressWarnings("ConstantConditions") List<String> paramNames =
+                @SuppressWarnings("ConstantConditions")
+                List<String> paramNames =
                         oldParameterNames == null || oldParameterNames.length == 0 ?
                                 m.getMethodType().getParameterNames() :
                                 asList(oldParameterNames);

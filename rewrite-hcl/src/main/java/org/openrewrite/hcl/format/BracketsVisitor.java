@@ -62,7 +62,7 @@ public class BracketsVisitor<P> extends HclIsoVisitor<P> {
                 if (!lastSpace.getLastWhitespace().contains("\n")) {
                     return container.withLastSpace(lastSpace.withLastWhitespace("\n"));
                 }
-            }else {
+            } else {
                 return container.withLastSpace(lastSpace.withLastWhitespace(" "));
             }
         }

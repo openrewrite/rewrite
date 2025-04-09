@@ -57,8 +57,8 @@ public class QuarkParser implements Parser {
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
                 if (!attrs.isSymbolicLink() && !attrs.isOther() &&
-                    !sourceFilePaths.contains(rootDir.relativize(file)) &&
-                    !isIgnored(file)) {
+                        !sourceFilePaths.contains(rootDir.relativize(file)) &&
+                        !isIgnored(file)) {
                     quarks.add(file);
                 }
                 return FileVisitResult.CONTINUE;
@@ -96,7 +96,7 @@ public class QuarkParser implements Parser {
                 while ((line = reader.readLine()) != null) {
                     if (!line.trim().startsWith("#") && !StringUtils.isBlank(line)) {
                         gitignorePaths.add(gitignore.toPath().getFileSystem().getPathMatcher("glob:**/" + line.trim() +
-                                                                                             (line.trim().endsWith("/") ? "**" : "")));
+                                (line.trim().endsWith("/") ? "**" : "")));
                     }
                 }
                 gitignores.add(gitignorePaths);
@@ -106,7 +106,7 @@ public class QuarkParser implements Parser {
 
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Parser.Input> sources, @Nullable Path relativeTo,
-                                     ExecutionContext ctx) {
+            ExecutionContext ctx) {
         return StreamSupport.stream(sources.spliterator(), false).map(source ->
                 new Quark(randomId(),
                         source.getRelativePath(relativeTo),

@@ -66,7 +66,7 @@ public class MavenParser implements Parser {
 
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo,
-                                          ExecutionContext ctx) {
+            ExecutionContext ctx) {
         List<SourceFile> parsed = new ArrayList<>();
 
         Map<Xml.Document, Pom> projectPoms = new LinkedHashMap<>();
@@ -141,7 +141,7 @@ public class MavenParser implements Parser {
         for (int i = 0; i < parsed.size(); i++) {
             SourceFile maven = parsed.get(i);
             Optional<MavenResolutionResult> maybeResolutionResult = maven.getMarkers().findFirst(MavenResolutionResult.class);
-            if(!maybeResolutionResult.isPresent()) {
+            if (!maybeResolutionResult.isPresent()) {
                 continue;
             }
             MavenResolutionResult resolutionResult = maybeResolutionResult.get();
@@ -151,15 +151,15 @@ public class MavenParser implements Parser {
                     continue;
                 }
                 Optional<MavenResolutionResult> maybeModuleResolutionResult = possibleModule.getMarkers().findFirst(MavenResolutionResult.class);
-                if(!maybeModuleResolutionResult.isPresent()) {
+                if (!maybeModuleResolutionResult.isPresent()) {
                     continue;
                 }
                 MavenResolutionResult moduleResolutionResult = maybeModuleResolutionResult.get();
                 Parent parent = moduleResolutionResult.getPom().getRequested().getParent();
                 if (parent != null &&
-                    resolutionResult.getPom().getGroupId().equals(resolutionResult.getPom().getValue(parent.getGroupId())) &&
-                    resolutionResult.getPom().getArtifactId().equals(resolutionResult.getPom().getValue(parent.getArtifactId())) &&
-                    Objects.equals(resolutionResult.getPom().getValue(resolutionResult.getPom().getVersion()), resolutionResult.getPom().getValue(parent.getVersion()))) {
+                        resolutionResult.getPom().getGroupId().equals(resolutionResult.getPom().getValue(parent.getGroupId())) &&
+                        resolutionResult.getPom().getArtifactId().equals(resolutionResult.getPom().getValue(parent.getArtifactId())) &&
+                        Objects.equals(resolutionResult.getPom().getValue(resolutionResult.getPom().getVersion()), resolutionResult.getPom().getValue(parent.getVersion()))) {
                     moduleResolutionResult.unsafeSetParent(resolutionResult);
                     modules.add(moduleResolutionResult);
                 }

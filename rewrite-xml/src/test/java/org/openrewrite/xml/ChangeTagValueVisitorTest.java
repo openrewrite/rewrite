@@ -31,74 +31,74 @@ class ChangeTagValueVisitorTest implements RewriteTest {
     @Test
     void changeTagValue() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
-              @Override
-              public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
-                  doAfterVisit(new ChangeTagValueVisitor<>((Xml.Tag) requireNonNull(x.getRoot().getContent()).get(0), "2.0"));
-                  return super.visitDocument(x, ctx);
-              }
-          })),
-          xml(
-            """
+                spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
+                    @Override
+                    public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
+                        doAfterVisit(new ChangeTagValueVisitor<>((Xml.Tag) requireNonNull(x.getRoot().getContent()).get(0), "2.0"));
+                        return super.visitDocument(x, ctx);
+                    }
+                })),
+                xml(
+                        """
               <dependency>
                   <version/>
               </dependency>
               """,
-            """
+                        """
               <dependency>
                   <version>2.0</version>
               </dependency>
               """
-          )
+                )
         );
     }
 
     @Test
     void noChangeIfAlreadyPresent() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
-              @Override
-              public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
-                  doAfterVisit(new ChangeTagValueVisitor<>((Xml.Tag) requireNonNull(x.getRoot().getContent()).get(0), "2.0"));
-                  return super.visitDocument(x, ctx);
-              }
-          })),
-          xml(
-            """
+                spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
+                    @Override
+                    public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
+                        doAfterVisit(new ChangeTagValueVisitor<>((Xml.Tag) requireNonNull(x.getRoot().getContent()).get(0), "2.0"));
+                        return super.visitDocument(x, ctx);
+                    }
+                })),
+                xml(
+                        """
               <dependency>
                   <version>2.0</version>
               </dependency>
               """
-          )
+                )
         );
     }
 
     @Test
     void preserveOriginalFormatting() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
-              @Override
-              public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
-                  doAfterVisit(new ChangeTagValueVisitor<>((Xml.Tag) requireNonNull(x.getRoot().getContent()).get(0), "3.0"));
-                  return super.visitDocument(x, ctx);
-              }
-          })),
-          xml(
-            """
+                spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
+                    @Override
+                    public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
+                        doAfterVisit(new ChangeTagValueVisitor<>((Xml.Tag) requireNonNull(x.getRoot().getContent()).get(0), "3.0"));
+                        return super.visitDocument(x, ctx);
+                    }
+                })),
+                xml(
+                        """
               <dependency>
                   <version>
                       2.0
                   </version>
               </dependency>
               """,
-            """
+                        """
               <dependency>
                   <version>
                       3.0
                   </version>
               </dependency>
               """
-          )
+                )
         );
     }
 }

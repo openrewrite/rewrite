@@ -41,10 +41,10 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void doNotOverrideImplicitProperty() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("io.dropwizard.metrics", "metrics-annotation", "4.2.9", null,
-            true, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeDependencyVersion("io.dropwizard.metrics", "metrics-annotation", "4.2.9", null,
+                        true, null)),
+                pomXml(
+                        """
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
@@ -86,7 +86,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencies>
               </project>
               """,
-            """
+                        """
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
@@ -129,7 +129,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -137,10 +137,10 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void updateManagedDependencyVersion() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("org.junit.jupiter", "junit-jupiter-api", "5.7.2", null,
-            null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeDependencyVersion("org.junit.jupiter", "junit-jupiter-api", "5.7.2", null,
+                        null, null)),
+                pomXml(
+                        """
               <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
@@ -157,7 +157,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
@@ -174,17 +174,17 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void forceUpgradeNonSemverVersion() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-dependencies", "2022.0.2", null,
-            false, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-dependencies", "2022.0.2", null,
+                        false, null)),
+                pomXml(
+                        """
               <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
@@ -202,7 +202,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
@@ -220,7 +220,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -228,9 +228,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @CsvSource(value = {"com.google.guava:guava", "*:*"}, delimiter = ':')
     void upgradeVersion(String groupId, String artifactId) {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion(groupId, artifactId, "latest.patch", null, null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeDependencyVersion(groupId, artifactId, "latest.patch", null, null, null)),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -244,7 +244,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -258,16 +258,16 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void overrideManagedDependency() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "14.0", "", true, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "14.0", "", true, null)),
+                pomXml(
+                        """
               <project>
                   <groupId>com.mycompany</groupId>
                   <artifactId>my-parent</artifactId>
@@ -283,11 +283,11 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """,
-            SourceSpec::skip
-          ),
-          mavenProject("my-child",
-            pomXml(
-              """
+                        SourceSpec::skip
+                ),
+                mavenProject("my-child",
+                        pomXml(
+                                """
                 <project>
                     <parent>
                         <groupId>com.mycompany</groupId>
@@ -305,7 +305,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     </dependencies>
                 </project>
                 """,
-              """
+                                """
                     <project>
                         <parent>
                             <groupId>com.mycompany</groupId>
@@ -324,8 +324,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
@@ -333,10 +333,10 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/739")
     void upgradeVersionWithGroupIdAndArtifactIdDefinedAsProperty() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("io.quarkus", "quarkus-universe-bom", "1.13.7.Final", null,
-            null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeDependencyVersion("io.quarkus", "quarkus-universe-bom", "1.13.7.Final", null,
+                        null, null)),
+                pomXml(
+                        """
               <project>
                   <groupId>org.openrewrite.example</groupId>
                   <artifactId>my-app</artifactId>
@@ -359,7 +359,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>org.openrewrite.example</groupId>
                   <artifactId>my-app</artifactId>
@@ -382,19 +382,19 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void upgradeVersionSuccessively() {
         rewriteRun(
-          spec -> spec.recipes(
-            new UpgradeDependencyVersion("com.google.guava", "*", "28.x", "-jre", null, null),
-            new UpgradeDependencyVersion("com.google.guava", "*", "29.x", "-jre", null, null)
-          ),
-          pomXml(
-            """
+                spec -> spec.recipes(
+                        new UpgradeDependencyVersion("com.google.guava", "*", "28.x", "-jre", null, null),
+                        new UpgradeDependencyVersion("com.google.guava", "*", "29.x", "-jre", null, null)
+                ),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -408,7 +408,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -422,7 +422,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -430,9 +430,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/565")
     void propertiesInDependencyGroupIdAndArtifactId() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "*", "latest.patch", null, null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "*", "latest.patch", null, null, null)),
+                pomXml(
+                        """
               <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
@@ -451,7 +451,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
@@ -470,16 +470,16 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void upgradeGuava() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "*", "25-28", "-android", null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "*", "25-28", "-android", null, null)),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -493,7 +493,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -507,16 +507,16 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void upgradePluginDependencies() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("org.openrewrite.recipe", "rewrite-spring", "5.0.6", "", null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeDependencyVersion("org.openrewrite.recipe", "rewrite-spring", "5.0.6", "", null, null)),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -539,7 +539,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 </build>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -562,17 +562,17 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 </build>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void upgradePluginDependenciesOnProperty() {
         rewriteRun(
-          // Using latest.patch to validate the version property resolution, since it's needed for matching the valid patch.
-          spec -> spec.recipe(new UpgradeDependencyVersion("org.openrewrite.recipe", "rewrite-spring", "latest.patch", "", null, null)),
-          pomXml(
-            """
+                // Using latest.patch to validate the version property resolution, since it's needed for matching the valid patch.
+                spec -> spec.recipe(new UpgradeDependencyVersion("org.openrewrite.recipe", "rewrite-spring", "latest.patch", "", null, null)),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -598,7 +598,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 </build>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -624,7 +624,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 </build>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -632,9 +632,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1334")
     void upgradeGuavaWithExplicitBlankVersionPattern() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "*", "latest.release", "", null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "*", "latest.release", "", null, null)),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -648,7 +648,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -662,16 +662,16 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void upgradeManagedInParent() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "*", "25-28", "-jre", false, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "*", "25-28", "-jre", false, null)),
+                pomXml(
+                        """
               <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
@@ -690,7 +690,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
@@ -709,10 +709,10 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          ),
-          mavenProject("my-app-server",
-            pomXml(
-              """
+                ),
+                mavenProject("my-app-server",
+                        pomXml(
+                                """
                     <project>
                         <parent>
                             <groupId>com.mycompany.app</groupId>
@@ -730,8 +730,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
@@ -739,9 +739,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/891")
     void upgradeDependencyOnlyTargetsSpecificDependencyProperty() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "*", "25-28", "-jre", null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "*", "25-28", "-jre", null, null)),
+                pomXml(
+                        """
               <project>
                   <groupId>org.openrewrite.example</groupId>
                   <artifactId>my-app</artifactId>
@@ -765,7 +765,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>org.openrewrite.example</groupId>
                   <artifactId>my-app</artifactId>
@@ -789,7 +789,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -797,9 +797,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void upgradeVersionDefinedViaPropertyInLocalParent() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "14.0", "", false, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "14.0", "", false, null)),
+                pomXml(
+                        """
               <project>
                   <groupId>com.mycompany</groupId>
                   <artifactId>my-parent</artifactId>
@@ -810,7 +810,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </properties>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>com.mycompany</groupId>
                   <artifactId>my-parent</artifactId>
@@ -821,10 +821,10 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </properties>
               </project>
               """
-          ),
-          mavenProject("my-child",
-            pomXml(
-              """
+                ),
+                mavenProject("my-child",
+                        pomXml(
+                                """
                 <project>
                     <parent>
                         <groupId>com.mycompany</groupId>
@@ -849,17 +849,17 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     </dependencies>
                 </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void upgradeVersionDefinedViaImplicitPropertyInDependencyManagementBom() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("org.flywaydb", "flyway-core", "10.15.0", "", true, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeDependencyVersion("org.flywaydb", "flyway-core", "10.15.0", "", true, null)),
+                pomXml(
+                        """
               <project>
                   <groupId>com.mycompany</groupId>
                   <artifactId>my-child</artifactId>
@@ -883,7 +883,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>com.mycompany</groupId>
                   <artifactId>my-child</artifactId>
@@ -908,7 +908,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -916,9 +916,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void upgradeVersionDefinedViaExplicitPropertyInDependencyManagement() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("org.projectlombok", "lombok", "1.18.30", "", true, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeDependencyVersion("org.projectlombok", "lombok", "1.18.30", "", true, null)),
+                pomXml(
+                        """
               <project>
                   <groupId>com.mycompany</groupId>
                   <artifactId>my-child</artifactId>
@@ -943,7 +943,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>com.mycompany</groupId>
                   <artifactId>my-child</artifactId>
@@ -968,7 +968,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -976,9 +976,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void upgradeVersionDefinedViaImplicitPropertyInRemoteParent() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("org.flywaydb", "flyway-core", "10.15.0", "", true, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeDependencyVersion("org.flywaydb", "flyway-core", "10.15.0", "", true, null)),
+                pomXml(
+                        """
               <project>
                   <parent>
                       <groupId>org.springframework.boot</groupId>
@@ -996,7 +996,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                   <parent>
                       <groupId>org.springframework.boot</groupId>
@@ -1017,7 +1017,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -1026,9 +1026,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void upgradeVersionDefinedViaExplicitPropertyInRemoteParent() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("org.flywaydb", "flyway-core", "10.15.x", "", true, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeDependencyVersion("org.flywaydb", "flyway-core", "10.15.x", "", true, null)),
+                pomXml(
+                        """
               <project>
                   <parent>
                       <groupId>org.springframework.boot</groupId>
@@ -1047,7 +1047,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                   <parent>
                       <groupId>org.springframework.boot</groupId>
@@ -1069,16 +1069,16 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void upgradeBomImport() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("io.micronaut", "micronaut-bom", "3.0.0-M5", null, null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeDependencyVersion("io.micronaut", "micronaut-bom", "3.0.0-M5", null, null, null)),
+                pomXml(
+                        """
               <project>
                 <groupId>org.openrewrite.example</groupId>
                 <artifactId>my-app-server</artifactId>
@@ -1096,7 +1096,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 </dependencyManagement>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>org.openrewrite.example</groupId>
                 <artifactId>my-app-server</artifactId>
@@ -1114,16 +1114,16 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 </dependencyManagement>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void upgradeAllManagedDependenciesToPatchReleases() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
+                pomXml(
+                        """
               <project>
                   <groupId>org.openrewrite.example</groupId>
                   <artifactId>my-app-server</artifactId>
@@ -1149,7 +1149,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>org.openrewrite.example</groupId>
                   <artifactId>my-app-server</artifactId>
@@ -1175,16 +1175,16 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void upgradeAllDependenciesToPatchReleases() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
+                pomXml(
+                        """
               <project>
                   <groupId>org.openrewrite.example</groupId>
                   <artifactId>my-app-server</artifactId>
@@ -1213,12 +1213,12 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencies>
               </project>
               """,
-            spec -> spec.after(after -> {
-                Matcher matcher = Pattern.compile("<spring\\.version>(.+)</spring\\.version>").matcher(after);
-                assertTrue(matcher.find());
-                String springVersion = matcher.group(1);
-                assertNotEquals("5.3.4", springVersion);
-                return """
+                        spec -> spec.after(after -> {
+                            Matcher matcher = Pattern.compile("<spring\\.version>(.+)</spring\\.version>").matcher(after);
+                            assertTrue(matcher.find());
+                            String springVersion = matcher.group(1);
+                            assertNotEquals("5.3.4", springVersion);
+                            return """
                   <project>
                       <groupId>org.openrewrite.example</groupId>
                       <artifactId>my-app-server</artifactId>
@@ -1247,17 +1247,17 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                       </dependencies>
                   </project>
                   """.formatted(springVersion);
-            })
-          )
+                        })
+                )
         );
     }
 
     @Test
     void dependencyManagementResolvedFromProperty() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("io.micronaut", "micronaut-bom", "3.0.0-M5", null, null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeDependencyVersion("io.micronaut", "micronaut-bom", "3.0.0-M5", null, null, null)),
+                pomXml(
+                        """
               <project>
                 <groupId>org.openrewrite</groupId>
                 <artifactId>my-app-server</artifactId>
@@ -1278,7 +1278,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 </dependencyManagement>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>org.openrewrite</groupId>
                 <artifactId>my-app-server</artifactId>
@@ -1299,7 +1299,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 </dependencyManagement>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -1308,10 +1308,10 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/4166")
     void upgradeToExactVersion(String version) {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("org.thymeleaf", "thymeleaf-spring5", version, null,
-            null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeDependencyVersion("org.thymeleaf", "thymeleaf-spring5", version, null,
+                        null, null)),
+                pomXml(
+                        """
               <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
@@ -1325,7 +1325,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
@@ -1339,7 +1339,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -1347,9 +1347,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void updateWithExactVersionRange() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("junit", "junit", "4.13", null, false, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeDependencyVersion("junit", "junit", "4.13", null, false, null)),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -1363,7 +1363,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """            
+                        """            
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -1377,16 +1377,16 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void deriveFromNexus() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
+                pomXml(
+                        """
               <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
@@ -1402,16 +1402,16 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void deriveFromNexusUpgrade() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
+                pomXml(
+                        """
               <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
@@ -1427,7 +1427,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
@@ -1443,16 +1443,16 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void noManagedVersion() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
+                pomXml(
+                        """
               <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
@@ -1467,16 +1467,16 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void removesRedundantExplicitVersionsMatchingOldImport() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("org.junit", "junit-bom", "5.9.1", null, true, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeDependencyVersion("org.junit", "junit-bom", "5.9.1", null, true, null)),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>com.mycompany.app</groupId>
@@ -1502,7 +1502,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>com.mycompany.app</groupId>
@@ -1527,16 +1527,16 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void removesRedundantExplicitVersionsMatchingNewImport() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("org.junit", "junit-bom", "5.9.1", null, true, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeDependencyVersion("org.junit", "junit-bom", "5.9.1", null, true, null)),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>com.mycompany.app</groupId>
@@ -1562,7 +1562,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>com.mycompany.app</groupId>
@@ -1587,16 +1587,16 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void keepsRedundantExplicitVersionsNotMatchingOldOrNewImport() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("org.junit", "junit-bom", "5.9.1", null, true, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeDependencyVersion("org.junit", "junit-bom", "5.9.1", null, true, null)),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>com.mycompany.app</groupId>
@@ -1622,7 +1622,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>com.mycompany.app</groupId>
@@ -1648,7 +1648,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -1659,8 +1659,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
         @Test
         void dependencyWithExplicitVersionRemovedFromDepMgmt() {
             rewriteRun(spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-config-dependencies", "3.1.4", null, true, Collections.singletonList("com.jcraft:jsch"))),
-              pomXml(
-                """
+                    pomXml(
+                            """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -1687,7 +1687,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     </dependencies>
                   </project>
                   """,
-                """
+                            """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -1714,15 +1714,15 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     </dependencies>
                   </project>
                   """
-              )
+                    )
             );
         }
 
         @Test
         void dependencyWithoutExplicitVersionRemovedFromDepMgmt() {
             rewriteRun(spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-config-dependencies", "3.1.4", null, true, Collections.singletonList("com.jcraft:jsch"))),
-              pomXml(
-                """
+                    pomXml(
+                            """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -1748,7 +1748,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     </dependencies>
                   </project>
                   """,
-                """
+                            """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -1775,15 +1775,15 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     </dependencies>
                   </project>
                   """
-              )
+                    )
             );
         }
 
         @Test
         void dependencyWithoutExplicitVersionRemovedFromDepMgmtRetainSpecificVersion() {
             rewriteRun(spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-config-dependencies", "3.1.4", null, true, Collections.singletonList("com.jcraft:jsch:0.1.50"))),
-              pomXml(
-                """
+                    pomXml(
+                            """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -1809,7 +1809,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     </dependencies>
                   </project>
                   """,
-                """
+                            """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -1836,18 +1836,18 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     </dependencies>
                   </project>
                   """
-              )
+                    )
             );
         }
 
         @Test
         void multipleRetainVersions() {
             rewriteRun(spec -> spec.recipe(
-                new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-dependencies", "2021.0.5", null,
-                  true,
-                  Lists.newArrayList("com.jcraft:jsch", "org.springframework.cloud:spring-cloud-schema-registry-*:1.1.1"))),
-              pomXml(
-                """
+                            new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-dependencies", "2021.0.5", null,
+                                    true,
+                                    Lists.newArrayList("com.jcraft:jsch", "org.springframework.cloud:spring-cloud-schema-registry-*:1.1.1"))),
+                    pomXml(
+                            """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -1877,7 +1877,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     </dependencies>
                   </project>
                   """,
-                """
+                            """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -1909,7 +1909,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     </dependencies>
                   </project>
                   """
-              )
+                    )
             );
         }
     }
@@ -1918,9 +1918,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/4333")
     void exactVersionWithPattern() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "29.0", "-jre", null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "29.0", "-jre", null, null)),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -1934,7 +1934,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -1948,17 +1948,17 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void exactVersionMissingInMavenMetadata() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("org.apache.hbase", "hbase-annotations", "1.4.14.1-mapr-640",
-            null, null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeDependencyVersion("org.apache.hbase", "hbase-annotations", "1.4.14.1-mapr-640",
+                        null, null, null)),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -1981,7 +1981,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -2004,7 +2004,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 }

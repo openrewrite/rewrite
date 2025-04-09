@@ -44,47 +44,47 @@ class AddNullMethodArgumentTest implements RewriteTest {
     @Test
     void addToMiddleArgument() {
         rewriteRun(
-          spec -> spec.recipe(new AddNullMethodArgument("B foo(Integer, Integer)", 1, "java.lang.Integer", "n2", false)),
-          java(
-            "class A {{ B.foo(0, 1); }}",
-            "class A {{ B.foo(0, null, 1); }}"
-          )
+                spec -> spec.recipe(new AddNullMethodArgument("B foo(Integer, Integer)", 1, "java.lang.Integer", "n2", false)),
+                java(
+                        "class A {{ B.foo(0, 1); }}",
+                        "class A {{ B.foo(0, null, 1); }}"
+                )
         );
     }
 
     @Test
     void addArgumentsConsecutively() {
         rewriteRun(
-          spec -> spec.recipes(
-            new AddNullMethodArgument("B foo(Integer)", 1, "java.lang.Integer", "n2", false),
-            new AddNullMethodArgument("B foo(Integer, Integer)", 1, "java.lang.Integer", "n2", false)
-          ),
-          java(
-            "class A {{ B.foo(0); }}",
-            "class A {{ B.foo(0, null, null); }}"
-          )
+                spec -> spec.recipes(
+                        new AddNullMethodArgument("B foo(Integer)", 1, "java.lang.Integer", "n2", false),
+                        new AddNullMethodArgument("B foo(Integer, Integer)", 1, "java.lang.Integer", "n2", false)
+                ),
+                java(
+                        "class A {{ B.foo(0); }}",
+                        "class A {{ B.foo(0, null, null); }}"
+                )
         );
     }
 
     @Test
     void addToConstructorArgument() {
         rewriteRun(
-          spec -> spec.recipe(new AddNullMethodArgument("B <constructor>()", 0, "java.lang.Integer", "arg", false)),
-          java(
-            "class A { B b = new B(); }",
-            "class A { B b = new B(null); }"
-          )
+                spec -> spec.recipe(new AddNullMethodArgument("B <constructor>()", 0, "java.lang.Integer", "arg", false)),
+                java(
+                        "class A { B b = new B(); }",
+                        "class A { B b = new B(null); }"
+                )
         );
     }
 
     @Test
     void addCastToConflictingArgumentType() {
         rewriteRun(
-          spec -> spec.recipe(new AddNullMethodArgument("B foo(Integer,Integer,Integer)", 3, "java.lang.String", "n2", true)),
-          java(
-            "class A {{ B.foo(0, 1, 2); }}",
-            "class A {{ B.foo(0, 1, 2, (java.lang.String) null); }}"
-          )
+                spec -> spec.recipe(new AddNullMethodArgument("B foo(Integer,Integer,Integer)", 3, "java.lang.String", "n2", true)),
+                java(
+                        "class A {{ B.foo(0, 1, 2); }}",
+                        "class A {{ B.foo(0, 1, 2, (java.lang.String) null); }}"
+                )
         );
     }
 

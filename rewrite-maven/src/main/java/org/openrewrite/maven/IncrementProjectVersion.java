@@ -47,7 +47,7 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, S
 
     @Option(displayName = "Semver digit",
             description = "`MAJOR` increments the first digit, `MINOR` increments the second digit, and `PATCH` " +
-                          "increments the third digit.",
+                    "increments the third digit.",
             example = "PATCH")
     SemverDigit digit;
 
@@ -70,7 +70,7 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, S
     @Override
     public String getDescription() {
         return "Increase Maven project version by incrementing either the major, minor, or patch version as defined by " +
-               "[semver](https://semver.org/). Other versioning schemes are not supported.";
+                "[semver](https://semver.org/). Other versioning schemes are not supported.";
     }
 
     @Override
@@ -92,7 +92,7 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, S
                 }
                 ResolvedPom resolvedPom = getResolutionResult().getPom();
                 if (!(matchesGlob(resolvedPom.getValue(t.getChildValue("groupId").orElse(null)), groupId) &&
-                      matchesGlob(resolvedPom.getValue(t.getChildValue("artifactId").orElse(null)), artifactId))) {
+                        matchesGlob(resolvedPom.getValue(t.getChildValue("artifactId").orElse(null)), artifactId))) {
                     return t;
                 }
                 Optional<Xml.Tag> versionTag = t.getChild("version");
@@ -161,7 +161,7 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, S
                 Xml.Tag t = super.visitTag(tag, ctx);
 
                 if (!(isProjectTag() || isParentTag()) ||
-                    t.getMarkers().findFirst(AlreadyIncremented.class).isPresent()) {
+                        t.getMarkers().findFirst(AlreadyIncremented.class).isPresent()) {
                     return t;
                 }
                 String newVersion = acc.get(new GroupArtifact(

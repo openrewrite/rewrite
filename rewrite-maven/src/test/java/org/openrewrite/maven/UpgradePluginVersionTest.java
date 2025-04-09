@@ -30,16 +30,16 @@ class UpgradePluginVersionTest implements RewriteTest {
     @Test
     void upgradeToExactVersion() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradePluginVersion(
-            "io.quarkus",
-            "quarkus-maven-plugin",
-            "1.13.5.Final",
-            null,
-            null,
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradePluginVersion(
+                        "io.quarkus",
+                        "quarkus-maven-plugin",
+                        "1.13.5.Final",
+                        null,
+                        null,
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
 
@@ -58,7 +58,7 @@ class UpgradePluginVersionTest implements RewriteTest {
                 </build>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
 
@@ -77,7 +77,7 @@ class UpgradePluginVersionTest implements RewriteTest {
                 </build>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -85,16 +85,16 @@ class UpgradePluginVersionTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/565")
     void handlesPropertyResolution() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradePluginVersion(
-            "io.quarkus",
-            "quarkus-maven-plugin",
-            "1.13.5.Final",
-            null,
-            null,
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradePluginVersion(
+                        "io.quarkus",
+                        "quarkus-maven-plugin",
+                        "1.13.5.Final",
+                        null,
+                        null,
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                 <groupId>org.openrewrite.example</groupId>
                 <artifactId>my-app</artifactId>
@@ -115,7 +115,7 @@ class UpgradePluginVersionTest implements RewriteTest {
                 </build>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>org.openrewrite.example</groupId>
                 <artifactId>my-app</artifactId>
@@ -136,7 +136,7 @@ class UpgradePluginVersionTest implements RewriteTest {
                 </build>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -144,16 +144,16 @@ class UpgradePluginVersionTest implements RewriteTest {
     @Issue("Should be changed/removed when this recipe supports dynamic version resolution")
     void ignorePluginWithoutExplicitVersionDeclared() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradePluginVersion(
-            "io.quarkus",
-            "quarkus-maven-plugin",
-            "1.13.5.Final",
-            null,
-            null,
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradePluginVersion(
+                        "io.quarkus",
+                        "quarkus-maven-plugin",
+                        "1.13.5.Final",
+                        null,
+                        null,
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
 
@@ -171,23 +171,23 @@ class UpgradePluginVersionTest implements RewriteTest {
                 </build>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void upgradeVersionDynamicallyUsingPattern() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradePluginVersion(
-            "org.openrewrite.maven",
-            "rewrite-maven-plugin",
-            "~4.2",
-            null,
-            null,
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradePluginVersion(
+                        "org.openrewrite.maven",
+                        "rewrite-maven-plugin",
+                        "~4.2",
+                        null,
+                        null,
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
 
@@ -206,7 +206,7 @@ class UpgradePluginVersionTest implements RewriteTest {
                 </build>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
 
@@ -225,23 +225,23 @@ class UpgradePluginVersionTest implements RewriteTest {
                 </build>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void upgradeVersionIgnoringParent() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradePluginVersion(
-            "org.openrewrite.maven",
-            "rewrite-maven-plugin",
-            "4.2.x",
-            null,
-            null,
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradePluginVersion(
+                        "org.openrewrite.maven",
+                        "rewrite-maven-plugin",
+                        "4.2.x",
+                        null,
+                        null,
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -263,7 +263,7 @@ class UpgradePluginVersionTest implements RewriteTest {
                 </build>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -285,10 +285,10 @@ class UpgradePluginVersionTest implements RewriteTest {
                 </build>
               </project>
               """
-          ),
-          mavenProject("server",
-            pomXml(
-              """
+                ),
+                mavenProject("server",
+                        pomXml(
+                                """
                     <project>
                       <parent>
                         <groupId>org.openrewrite.example</groupId>
@@ -309,7 +309,7 @@ class UpgradePluginVersionTest implements RewriteTest {
                       </build>
                     </project>
                 """,
-              """
+                                """
                     <project>
                       <parent>
                         <groupId>org.openrewrite.example</groupId>
@@ -330,8 +330,8 @@ class UpgradePluginVersionTest implements RewriteTest {
                       </build>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
@@ -339,16 +339,16 @@ class UpgradePluginVersionTest implements RewriteTest {
     @Disabled
     void trustParent() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradePluginVersion(
-            "org.openrewrite.maven",
-            "rewrite-maven-plugin",
-            "4.2.x",
-            null,
-            true,
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradePluginVersion(
+                        "org.openrewrite.maven",
+                        "rewrite-maven-plugin",
+                        "4.2.x",
+                        null,
+                        true,
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                 <groupId>org.openrewrite.example</groupId>
                 <artifactId>my-app-bom</artifactId>
@@ -366,10 +366,10 @@ class UpgradePluginVersionTest implements RewriteTest {
                 </build>
               </project>
               """
-          ),
-          mavenProject("server",
-            pomXml(
-              """
+                ),
+                mavenProject("server",
+                        pomXml(
+                                """
                     <project>
                       <modelVersion>4.0.0</modelVersion>
 
@@ -394,7 +394,7 @@ class UpgradePluginVersionTest implements RewriteTest {
                       </build>
                     </project>
                 """,
-              """
+                                """
                     <project>
                       <modelVersion>4.0.0</modelVersion>
 
@@ -419,8 +419,8 @@ class UpgradePluginVersionTest implements RewriteTest {
                       </build>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
@@ -428,16 +428,16 @@ class UpgradePluginVersionTest implements RewriteTest {
     @Disabled
     void upgradePluginInParent() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradePluginVersion(
-            "org.openrewrite.maven",
-            "rewrite-maven-plugin",
-            "4.2.3",
-            null,
-            null,
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradePluginVersion(
+                        "org.openrewrite.maven",
+                        "rewrite-maven-plugin",
+                        "4.2.3",
+                        null,
+                        null,
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
 
@@ -451,10 +451,10 @@ class UpgradePluginVersionTest implements RewriteTest {
                 </properties>
               </project>
               """
-          ),
-          mavenProject("server",
-            pomXml(
-              """
+                ),
+                mavenProject("server",
+                        pomXml(
+                                """
                     <project>
                       <modelVersion>4.0.0</modelVersion>
 
@@ -479,7 +479,7 @@ class UpgradePluginVersionTest implements RewriteTest {
                       </build>
                     </project>
                 """,
-              """
+                                """
                     <project>
                       <modelVersion>4.0.0</modelVersion>
 
@@ -493,24 +493,24 @@ class UpgradePluginVersionTest implements RewriteTest {
                       </properties>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void upgradeMultiplePluginsWithDifferentVersions() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradePluginVersion(
-            "*",
-            "*",
-            "2.4.x",
-            null,
-            null,
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradePluginVersion(
+                        "*",
+                        "*",
+                        "2.4.x",
+                        null,
+                        null,
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
 
@@ -534,7 +534,7 @@ class UpgradePluginVersionTest implements RewriteTest {
                 </build>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
 
@@ -558,23 +558,23 @@ class UpgradePluginVersionTest implements RewriteTest {
                 </build>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void upgradePluginsVersionOnProperties() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradePluginVersion(
-            "*",
-            "*",
-            "2.4.x",
-            null,
-            null,
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradePluginVersion(
+                        "*",
+                        "*",
+                        "2.4.x",
+                        null,
+                        null,
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
 
@@ -603,7 +603,7 @@ class UpgradePluginVersionTest implements RewriteTest {
                 </build>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
 
@@ -632,23 +632,23 @@ class UpgradePluginVersionTest implements RewriteTest {
                 </build>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void shouldAddVersionInOrder() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradePluginVersion(
-            "org.apache.maven.plugins",
-            "maven-compiler-plugin",
-            "3.11.0",
-            null,
-            null,
-            true
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradePluginVersion(
+                        "org.apache.maven.plugins",
+                        "maven-compiler-plugin",
+                        "3.11.0",
+                        null,
+                        null,
+                        true
+                )),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -667,7 +667,7 @@ class UpgradePluginVersionTest implements RewriteTest {
                 </build>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -687,23 +687,23 @@ class UpgradePluginVersionTest implements RewriteTest {
                 </build>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void defaultPluginGroupId() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradePluginVersion(
-            "org.apache.maven.plugins",
-            "maven-compiler-plugin",
-            "3.11.0",
-            null,
-            null,
-            false
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradePluginVersion(
+                        "org.apache.maven.plugins",
+                        "maven-compiler-plugin",
+                        "3.11.0",
+                        null,
+                        null,
+                        false
+                )),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -718,7 +718,7 @@ class UpgradePluginVersionTest implements RewriteTest {
                 </build>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -733,7 +733,7 @@ class UpgradePluginVersionTest implements RewriteTest {
                 </build>
               </project>
               """
-          )
+                )
         );
     }
 }

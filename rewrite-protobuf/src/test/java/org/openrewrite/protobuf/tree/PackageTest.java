@@ -25,12 +25,12 @@ class PackageTest implements RewriteTest {
     @Test
     void pkg() {
         rewriteRun(
-          proto(
-            """
+                proto(
+                        """
               syntax = 'proto2';
               package org . openrewrite.proto ;
               """
-          )
+                )
         );
     }
 }

@@ -47,9 +47,9 @@ class AddImportTest implements RewriteTest {
     @Test
     void addImportBeforeImportWithSameInsertIndex() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("org.junit.jupiter.api.Assertions", "assertFalse", false))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("org.junit.jupiter.api.Assertions", "assertFalse", false))),
+                java(
+                        """
               import static org.junit.jupiter.api.Assertions.assertTrue;
 
               import org.junit.Test;
@@ -57,7 +57,7 @@ class AddImportTest implements RewriteTest {
               public class MyTest {
               }
               """,
-            """
+                        """
               import static org.junit.jupiter.api.Assertions.assertFalse;
               import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -66,7 +66,7 @@ class AddImportTest implements RewriteTest {
               public class MyTest {
               }
               """
-          )
+                )
         );
     }
 
@@ -74,9 +74,9 @@ class AddImportTest implements RewriteTest {
     @Test
     void importIsAddedToCorrectBlock() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("org.mockito.junit.jupiter.MockitoExtension", null, false))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("org.mockito.junit.jupiter.MockitoExtension", null, false))),
+                java(
+                        """
               import java.util.List;
 
               import org.junit.jupiter.api.extension.ExtendWith;
@@ -85,7 +85,7 @@ class AddImportTest implements RewriteTest {
               public class MyTest {
               }
               """,
-            """
+                        """
               import java.util.List;
 
               import org.junit.jupiter.api.extension.ExtendWith;
@@ -95,35 +95,35 @@ class AddImportTest implements RewriteTest {
               public class MyTest {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void dontDuplicateImports() {
         rewriteRun(
-          spec -> spec.recipes(
-            toRecipe(() -> new AddImport<>("org.springframework.http.HttpStatus", null, false)),
-            toRecipe(() -> new AddImport<>("org.springframework.http.HttpStatus.Series", null, false))
-          ),
-          java(
-            "class A {}",
-            """
+                spec -> spec.recipes(
+                        toRecipe(() -> new AddImport<>("org.springframework.http.HttpStatus", null, false)),
+                        toRecipe(() -> new AddImport<>("org.springframework.http.HttpStatus.Series", null, false))
+                ),
+                java(
+                        "class A {}",
+                        """
               import org.springframework.http.HttpStatus;
               import org.springframework.http.HttpStatus.Series;
 
               class A {}
               """
-          )
+                )
         );
     }
 
     @Test
     void dontDuplicateImports2() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("org.junit.jupiter.api.Test", null, false))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("org.junit.jupiter.api.Test", null, false))),
+                java(
+                        """
               import org.junit.jupiter.api.AfterEach;
               import org.junit.jupiter.api.Assertions;
               import org.junit.jupiter.api.BeforeAll;
@@ -133,24 +133,24 @@ class AddImportTest implements RewriteTest {
 
               class A {}
               """,
-            """
+                        """
               import org.junit.jupiter.api.*;
               import org.slf4j.Logger;
               import org.slf4j.LoggerFactory;
 
               class A {}
               """
-          )
+                )
         );
     }
 
     @Test
     void dontDuplicateImports3() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("org.junit.jupiter.api.Assertions", "assertNull", false)))
-            .parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api")),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("org.junit.jupiter.api.Assertions", "assertNull", false)))
+                        .parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api")),
+                java(
+                        """
               import static org.junit.jupiter.api.Assertions.assertFalse;
               import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -158,29 +158,29 @@ class AddImportTest implements RewriteTest {
 
               class A {}
               """,
-            """
+                        """
               import static org.junit.jupiter.api.Assertions.*;
 
               import java.util.List;
 
               class A {}
               """
-          )
+                )
         );
     }
 
     @Test
     void dontImportYourself() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("com.myorg.A", null, false))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("com.myorg.A", null, false))),
+                java(
+                        """
               package com.myorg;
 
               class A {
               }
               """
-          )
+                )
         );
     }
 
@@ -189,17 +189,17 @@ class AddImportTest implements RewriteTest {
     void forceImportNonJavaLangRecord() {
         // Add import for a class named `Record`, even within the same package, to avoid conflicts with java.lang.Record
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("com.acme.bank.Record", null, false)))
-            .parser(JavaParser.fromJavaVersion().dependsOn("package com.acme.bank; public class Record {}")),
-          //language=java
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("com.acme.bank.Record", null, false)))
+                        .parser(JavaParser.fromJavaVersion().dependsOn("package com.acme.bank; public class Record {}")),
+                //language=java
+                java(
+                        """
               package com.acme.bank;
 
               class Foo {
               }
               """,
-            """
+                        """
               package com.acme.bank;
 
               import com.acme.bank.Record;
@@ -207,8 +207,8 @@ class AddImportTest implements RewriteTest {
               class Foo {
               }
               """,
-            spec -> spec.markers(javaVersion(11))
-          )
+                        spec -> spec.markers(javaVersion(11))
+                )
         );
     }
 
@@ -217,11 +217,11 @@ class AddImportTest implements RewriteTest {
     void forceImportNonJavaLangRecordFromWildcardImport() {
         // Add import for a class named `Record`, even within the same package, to avoid conflicts with java.lang.Record
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("com.acme.bank.Record", null, false)))
-            .parser(JavaParser.fromJavaVersion().dependsOn("package com.acme.bank; public class Record {}")),
-          //language=java
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("com.acme.bank.Record", null, false)))
+                        .parser(JavaParser.fromJavaVersion().dependsOn("package com.acme.bank; public class Record {}")),
+                //language=java
+                java(
+                        """
               package com.acme.bank;
               
               import com.acme.bank.*;
@@ -229,7 +229,7 @@ class AddImportTest implements RewriteTest {
               class Foo {
               }
               """,
-            """
+                        """
               package com.acme.bank;
               
               import com.acme.bank.*;
@@ -239,8 +239,8 @@ class AddImportTest implements RewriteTest {
               class Foo {
               }
               """,
-            spec -> spec.markers(javaVersion(11))
-          )
+                        spec -> spec.markers(javaVersion(11))
+                )
         );
     }
 
@@ -249,31 +249,32 @@ class AddImportTest implements RewriteTest {
     void notForceImportJavaRecord() {
         // Do not add import for java.lang.Record by default
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.lang.Record", null, false))),
-          //language=java
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.lang.Record", null, false))),
+                //language=java
+                java(
+                        """
               package com.acme.bank;
 
               class Foo {
               }
               """,
-            spec -> spec.markers(javaVersion(11))
-          )
+                        spec -> spec.markers(javaVersion(11))
+                )
         );
     }
+
     @Test
     void dontImportJavaLang() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.lang.String", null, false))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.lang.String", null, false))),
+                java(
+                        """
               package com.myorg;
 
               class A {
               }
               """
-          )
+                )
         );
     }
 
@@ -281,17 +282,17 @@ class AddImportTest implements RewriteTest {
     @Test
     void staticImportsFromJavaLangShouldWork() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.lang.System", "lineSeparator", false))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.lang.System", "lineSeparator", false))),
+                java(
+                        """
               class A {}
               """,
-            """
+                        """
               import static java.lang.System.lineSeparator;
 
               class A {}
               """
-          )
+                )
         );
     }
 
@@ -299,13 +300,13 @@ class AddImportTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1156")
     void dontImportJavaLangWhenUsingDefaultPackage() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.lang.String", null, false))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.lang.String", null, false))),
+                java(
+                        """
               class A {
               }
               """
-          )
+                )
         );
     }
 
@@ -313,23 +314,23 @@ class AddImportTest implements RewriteTest {
     @Test
     void dontImportFromSamePackage() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("com.myorg.B", null, false))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("com.myorg.B", null, false))),
+                java(
+                        """
               package com.myorg;
 
               class B {
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package com.myorg;
 
               class A {
               }
               """
-          )
+                )
         );
     }
 
@@ -337,15 +338,15 @@ class AddImportTest implements RewriteTest {
     @Test
     void importOrderingIssue() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("org.springframework.http.HttpHeaders", null, false))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("org.springframework.http.HttpHeaders", null, false))),
+                java(
+                        """
               import javax.ws.rs.core.Response.ResponseBuilder;
               import java.util.Locale;
 
               class A {}
               """,
-            """
+                        """
               import org.springframework.http.HttpHeaders;
 
               import javax.ws.rs.core.Response.ResponseBuilder;
@@ -353,65 +354,65 @@ class AddImportTest implements RewriteTest {
 
               class A {}
               """
-          )
+                )
         );
     }
 
     @Test
     void addMultipleImports() {
         rewriteRun(
-          spec -> spec.recipes(
-            toRecipe(() -> new AddImport<>("java.util.List", null, false)),
-            toRecipe(() -> new AddImport<>("java.util.Set", null, false))
-          ),
-          java(
-            """
+                spec -> spec.recipes(
+                        toRecipe(() -> new AddImport<>("java.util.List", null, false)),
+                        toRecipe(() -> new AddImport<>("java.util.Set", null, false))
+                ),
+                java(
+                        """
               class A {}
               """,
-            """
+                        """
               import java.util.List;
               import java.util.Set;
 
               class A {}
               """
-          )
+                )
         );
     }
 
     @Test
     void addNamedImport() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
-          java("class A {}",
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
+                java("class A {}",
+                        """
               import java.util.List;
 
               class A {}
               """
-          )
+                )
         );
     }
 
     @Test
     void doNotAddImportIfNotReferenced() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, true))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, true))),
+                java(
+                        """
               package a;
 
               class A {}
               """
-          )
+                )
         );
     }
 
     @Test
     void addImportInsertsNewMiddleBlock() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
+                java(
+                        """
               package a;
 
               import com.sun.naming.*;
@@ -420,7 +421,7 @@ class AddImportTest implements RewriteTest {
 
               class A {}
               """,
-            """
+                        """
               package a;
 
               import com.sun.naming.*;
@@ -431,28 +432,28 @@ class AddImportTest implements RewriteTest {
 
               class A {}
               """
-          )
+                )
         );
     }
 
     @Test
     void addFirstImport() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
+                java(
+                        """
               package a;
 
               class A {}
               """,
-            """
+                        """
               package a;
 
               import java.util.List;
 
               class A {}
               """
-          )
+                )
         );
     }
 
@@ -460,31 +461,31 @@ class AddImportTest implements RewriteTest {
     @Test
     void addImportIfReferenced() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() ->
-            new JavaIsoVisitor<>() {
-                @Override
-                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
-                    J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
-                    maybeAddImport("java.math.BigDecimal");
-                    maybeAddImport("java.math.RoundingMode");
-                    return JavaTemplate.builder("BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);")
-                      .imports("java.math.BigDecimal", "java.math.RoundingMode")
-                      .build()
-                      .apply(
-                        updateCursor(c),
-                        c.getBody().getCoordinates().lastStatement()
-                      );
-                }
-            }
-          ).withMaxCycles(1)),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() ->
+                        new JavaIsoVisitor<>() {
+                            @Override
+                            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                                J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
+                                maybeAddImport("java.math.BigDecimal");
+                                maybeAddImport("java.math.RoundingMode");
+                                return JavaTemplate.builder("BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);")
+                                        .imports("java.math.BigDecimal", "java.math.RoundingMode")
+                                        .build()
+                                        .apply(
+                                                updateCursor(c),
+                                                c.getBody().getCoordinates().lastStatement()
+                                        );
+                            }
+                        }
+                ).withMaxCycles(1)),
+                java(
+                        """
               package a;
 
               class A {
               }
               """,
-            """
+                        """
               package a;
 
               import java.math.BigDecimal;
@@ -494,30 +495,30 @@ class AddImportTest implements RewriteTest {
                   BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doNotAddWildcardImportIfNotReferenced() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.*", null, true))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.*", null, true))),
+                java(
+                        """
               package a;
 
               class A {}
               """
-          )
+                )
         );
     }
 
     @Test
     void lastImportWhenFirstClassDeclarationHasJavadoc() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.Collections", "*", false))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.Collections", "*", false))),
+                java(
+                        """
               import java.util.List;
 
               /**
@@ -525,7 +526,7 @@ class AddImportTest implements RewriteTest {
                */
               class A {}
               """,
-            """
+                        """
               import java.util.List;
 
               import static java.util.Collections.*;
@@ -535,27 +536,27 @@ class AddImportTest implements RewriteTest {
                */
               class A {}
               """
-          )
+                )
         );
     }
 
     @Test
     void namedImportAddedAfterPackageDeclaration() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
+                java(
+                        """
               package a;
               class A {}
               """,
-            """
+                        """
               package a;
 
               import java.util.List;
 
               class A {}
               """
-          )
+                )
         );
     }
 
@@ -581,16 +582,16 @@ class AddImportTest implements RewriteTest {
 
             List<SourceSpecs> sources = new ArrayList<>(otherImports);
             sources.add(java(
-              String.format("""
+                    String.format("""
                     package %s;
                     public class B {}
                 """, pkg),
-              SourceSpec::skip
+                    SourceSpec::skip
             ));
 
             sources.add(
-              java(
-                """
+                    java(
+                            """
                   package a;
     
                   import c.C0;
@@ -599,21 +600,21 @@ class AddImportTest implements RewriteTest {
     
                   class A {}
                   """,
-                String.format("""
+                            String.format("""
                     package a;
       
                     %s
       
                     class A {}
                     """,
-                  expectedImports.stream().map(i -> "import " + i + ";").collect(Collectors.joining("\n"))
-                )
-              )
+                                    expectedImports.stream().map(i -> "import " + i + ";").collect(Collectors.joining("\n"))
+                            )
+                    )
             );
 
             rewriteRun(
-              spec -> spec.recipe(toRecipe(() -> new AddImport<>(pkg, "B", null, null, false))),
-              sources.toArray(new SourceSpecs[0])
+                    spec -> spec.recipe(toRecipe(() -> new AddImport<>(pkg, "B", null, null, false))),
+                    sources.toArray(new SourceSpecs[0])
             );
         }
     }
@@ -621,61 +622,61 @@ class AddImportTest implements RewriteTest {
     @Test
     void doNotAddImportIfAlreadyExists() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
+                java(
+                        """
               package a;
 
               import java.util.List;
               class A {}
               """
-          )
+                )
         );
     }
 
     @Test
     void doNotAddImportIfCoveredByStarImport() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
+                java(
+                        """
               package a;
 
               import java.util.*;
               class A {}
               """
-          )
+                )
         );
     }
 
     @Test
     void dontAddImportWhenClassHasNoPackage() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("C", null, false))),
-          java("class A {}")
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("C", null, false))),
+                java("class A {}")
         );
     }
 
     @Test
     void dontAddImportForPrimitive() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("int", null, false))),
-          java("class A {}")
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("int", null, false))),
+                java("class A {}")
         );
     }
 
     @Test
     void addNamedImportIfStarStaticImportExists() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
+                java(
+                        """
               package a;
 
               import static java.util.List.*;
               class A {}
               """,
-            """
+                        """
               package a;
 
               import java.util.List;
@@ -684,27 +685,27 @@ class AddImportTest implements RewriteTest {
 
               class A {}
               """
-          )
+                )
         );
     }
 
     @Test
     void addNamedStaticImport() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.Collections", "emptyList", false))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.Collections", "emptyList", false))),
+                java(
+                        """
               import java.util.*;
               class A {}
               """,
-            """
+                        """
               import java.util.*;
 
               import static java.util.Collections.emptyList;
 
               class A {}
               """
-          )
+                )
         );
     }
 
@@ -712,24 +713,24 @@ class AddImportTest implements RewriteTest {
     @Test
     void addStaticImportForUnreferencedField() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("mycompany.Type", "FIELD", false))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("mycompany.Type", "FIELD", false))),
+                java(
+                        """
               package mycompany;
 
               public class Type {
                   public static String FIELD;
               }
               """
-          ),
-          java(
-            "class A {}",
-            """
+                ),
+                java(
+                        "class A {}",
+                        """
               import static mycompany.Type.FIELD;
 
               class A {}
               """
-          )
+                )
         );
     }
 
@@ -737,32 +738,32 @@ class AddImportTest implements RewriteTest {
     @Test
     void addStaticImportForReferencedField() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-                @Override
-                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
-                    if (!classDecl.getBody().getStatements().isEmpty()) {
-                        return classDecl;
-                    }
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                            @Override
+                            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                                if (!classDecl.getBody().getStatements().isEmpty()) {
+                                    return classDecl;
+                                }
 
-                    maybeAddImport("java.time.temporal.ChronoUnit");
-                    maybeAddImport("java.time.temporal.ChronoUnit", "MILLIS");
+                                maybeAddImport("java.time.temporal.ChronoUnit");
+                                maybeAddImport("java.time.temporal.ChronoUnit", "MILLIS");
 
-                    return JavaTemplate.builder("ChronoUnit unit = MILLIS;")
-                      .contextSensitive()
-                      .imports("java.time.temporal.ChronoUnit")
-                      .staticImports("java.time.temporal.ChronoUnit.MILLIS")
-                      .build()
-                      .apply(getCursor(), classDecl.getBody().getCoordinates().lastStatement());
-                }
-            }
-          )),
-          java(
-            """
+                                return JavaTemplate.builder("ChronoUnit unit = MILLIS;")
+                                        .contextSensitive()
+                                        .imports("java.time.temporal.ChronoUnit")
+                                        .staticImports("java.time.temporal.ChronoUnit.MILLIS")
+                                        .build()
+                                        .apply(getCursor(), classDecl.getBody().getCoordinates().lastStatement());
+                            }
+                        }
+                )),
+                java(
+                        """
               public class A {
 
               }
               """,
-            """
+                        """
               import java.time.temporal.ChronoUnit;
 
               import static java.time.temporal.ChronoUnit.MILLIS;
@@ -772,7 +773,7 @@ class AddImportTest implements RewriteTest {
 
               }
               """
-          )
+                )
         );
     }
 
@@ -780,9 +781,9 @@ class AddImportTest implements RewriteTest {
     @Test
     void dontAddImportToStaticFieldWithNamespaceConflict() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.time.temporal.ChronoUnit", "MILLIS", true))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.time.temporal.ChronoUnit", "MILLIS", true))),
+                java(
+                        """
               package a;
 
               import java.time.temporal.ChronoUnit;
@@ -792,38 +793,38 @@ class AddImportTest implements RewriteTest {
                   ChronoUnit unit = ChronoUnit.MILLIS;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void dontAddStaticWildcardImportIfNotReferenced() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.Collections", "*", true))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.Collections", "*", true))),
+                java(
+                        """
               package a;
 
               class A {}
               """
-          )
+                )
         );
     }
 
     @Test
     void addNamedStaticImportWhenReferenced() {
         rewriteRun(
-          spec -> spec.recipes(
-            toRecipe(() -> new JavaIsoVisitor<>() {
-                @Override
-                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                    return method.withSelect(null);
-                }
-            }),
-            toRecipe(() -> new AddImport<>("java.util.Collections", "emptyList", true))
-          ),
-          java(
-            """
+                spec -> spec.recipes(
+                        toRecipe(() -> new JavaIsoVisitor<>() {
+                            @Override
+                            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                                return method.withSelect(null);
+                            }
+                        }),
+                        toRecipe(() -> new AddImport<>("java.util.Collections", "emptyList", true))
+                ),
+                java(
+                        """
               package a;
 
               import java.util.List;
@@ -834,7 +835,7 @@ class AddImportTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package a;
 
               import java.util.List;
@@ -847,30 +848,30 @@ class AddImportTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void addNamedStaticImportWhenReferenced2() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
-                  method = super.visitMethodDeclaration(method, executionContext);
-                  method = JavaTemplate.builder("List<Builder> list = new ArrayList<>();")
-                    .imports("java.util.ArrayList", "java.util.List")
-                    .staticImports("java.util.Calendar.Builder")
-                    .build()
-                    .apply(getCursor(), method.getBody().getCoordinates().firstStatement());
-                  maybeAddImport("java.util.ArrayList");
-                  maybeAddImport("java.util.List");
-                  maybeAddImport("java.util.Calendar", "Builder");
-                  return method;
-              }
-          }).withMaxCycles(1)),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
+                        method = super.visitMethodDeclaration(method, executionContext);
+                        method = JavaTemplate.builder("List<Builder> list = new ArrayList<>();")
+                                .imports("java.util.ArrayList", "java.util.List")
+                                .staticImports("java.util.Calendar.Builder")
+                                .build()
+                                .apply(getCursor(), method.getBody().getCoordinates().firstStatement());
+                        maybeAddImport("java.util.ArrayList");
+                        maybeAddImport("java.util.List");
+                        maybeAddImport("java.util.Calendar", "Builder");
+                        return method;
+                    }
+                }).withMaxCycles(1)),
+                java(
+                        """
               import static java.util.Calendar.Builder;
 
               class A {
@@ -878,7 +879,7 @@ class AddImportTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.ArrayList;
               import java.util.List;
 
@@ -890,41 +891,41 @@ class AddImportTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doNotAddNamedStaticImportIfNotReferenced() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.Collections", "emptyList", true))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.Collections", "emptyList", true))),
+                java(
+                        """
               package a;
 
               class A {}
               """
-          )
+                )
         );
     }
 
     @Test
     void addStaticWildcardImportWhenReferenced() {
         rewriteRun(
-          spec -> spec.recipes(
-            toRecipe(() -> new JavaIsoVisitor<>() {
-                @Override
-                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                    if (method.getName().getSimpleName().equals("emptyList")) {
-                        return method.withSelect(null);
-                    }
-                    return method;
-                }
-            }),
-            toRecipe(() -> new AddImport<>("java.util.Collections", "*", true))
-          ),
-          java(
-            """
+                spec -> spec.recipes(
+                        toRecipe(() -> new JavaIsoVisitor<>() {
+                            @Override
+                            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                                if (method.getName().getSimpleName().equals("emptyList")) {
+                                    return method.withSelect(null);
+                                }
+                                return method;
+                            }
+                        }),
+                        toRecipe(() -> new AddImport<>("java.util.Collections", "*", true))
+                ),
+                java(
+                        """
               package a;
 
               import java.util.List;
@@ -935,7 +936,7 @@ class AddImportTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package a;
 
               import java.util.List;
@@ -948,7 +949,7 @@ class AddImportTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -956,30 +957,30 @@ class AddImportTest implements RewriteTest {
     @Test
     void dontAddImportForStaticImportsIndirectlyReferenced() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-                  maybeAddImport("java.io.File");
-                  return super.visitCompilationUnit(cu, ctx);
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                        maybeAddImport("java.io.File");
+                        return super.visitCompilationUnit(cu, ctx);
+                    }
+                })),
+                java(
+                        """
               import java.io.File;
               class Helper {
                   static File FILE;
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               class Test {
                   void test() {
                       Helper.FILE.exists();
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -987,19 +988,19 @@ class AddImportTest implements RewriteTest {
     @Test
     void addImportAndFoldIntoWildcard() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.ArrayList", null, false))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.ArrayList", null, false))),
+                java(
+                        """
               package foo;
               public class B {
               }
               public class C {
               }
               """,
-            SourceSpec::skip
-          ),
-          java(
-            """
+                        SourceSpec::skip
+                ),
+                java(
+                        """
               import foo.B;
               import foo.C;
 
@@ -1019,7 +1020,7 @@ class AddImportTest implements RewriteTest {
                   List<String> test2 = new java.util.ArrayList<>();
               }
               """,
-            """
+                        """
               import foo.B;
               import foo.C;
 
@@ -1034,7 +1035,7 @@ class AddImportTest implements RewriteTest {
                   List<String> test2 = new java.util.ArrayList<>();
               }
               """
-          )
+                )
         );
     }
 
@@ -1042,15 +1043,15 @@ class AddImportTest implements RewriteTest {
     @Test
     void addImportWhenDuplicatesExist() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("org.springframework.http.MediaType", null, false))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("org.springframework.http.MediaType", null, false))),
+                java(
+                        """
               import javax.ws.rs.Path;
               import javax.ws.rs.Path;
 
               class A {}
               """,
-            """
+                        """
               import org.springframework.http.MediaType;
 
               import javax.ws.rs.Path;
@@ -1058,7 +1059,7 @@ class AddImportTest implements RewriteTest {
 
               class A {}
               """
-          )
+                )
         );
     }
 
@@ -1066,15 +1067,15 @@ class AddImportTest implements RewriteTest {
     @Test
     void unorderedImportsWithNewBlock() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.time.Duration", null, false))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.time.Duration", null, false))),
+                java(
+                        """
               import org.foo.B;
               import org.foo.A;
 
               class A {}
               """,
-            """
+                        """
               import org.foo.B;
               import org.foo.A;
 
@@ -1082,7 +1083,7 @@ class AddImportTest implements RewriteTest {
 
               class A {}
               """
-          )
+                )
         );
     }
 
@@ -1090,11 +1091,11 @@ class AddImportTest implements RewriteTest {
     @Test
     void doNotFoldNormalImportWithNamespaceConflict() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false)))
-            .beforeRecipe(addTypesToSourceSet("main")),
-          srcMainJava(
-            java(
-              """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false)))
+                        .beforeRecipe(addTypesToSourceSet("main")),
+                srcMainJava(
+                        java(
+                                """
                 import java.awt.*; // contains a List class
                 import java.util.Collection;
                 import java.util.Collections;
@@ -1106,7 +1107,7 @@ class AddImportTest implements RewriteTest {
                     List list;
                 }
                 """,
-              """
+                                """
                 import java.awt.*; // contains a List class
                 import java.util.Collection;
                 import java.util.Collections;
@@ -1119,100 +1120,100 @@ class AddImportTest implements RewriteTest {
                     List list;
                 }
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     private static Consumer<RecipeSpec> importLayout(String type, @Nullable String statik, ImportLayoutStyle.Builder layout) {
         return spec -> spec.recipe(toRecipe(() -> new AddImport<>(type, statik, false)))
-          .parser(JavaParser.fromJavaVersion().styles(
-            singletonList(new NamedStyles(
-              Tree.randomId(), "test", "test", "test", emptySet(), singletonList(layout.build())
-            )))
-          );
+                .parser(JavaParser.fromJavaVersion().styles(
+                        singletonList(new NamedStyles(
+                                Tree.randomId(), "test", "test", "test", emptySet(), singletonList(layout.build())
+                        )))
+                );
     }
 
     @Test
     void foldPackageWithEmptyImports() {
         rewriteRun(
-          importLayout(
-            "java.util.List", null,
-            ImportLayoutStyle.builder()
-              .packageToFold("java.util.*", false)
-              .importAllOthers()
-              .importStaticAllOthers()),
-          java(
-            """
+                importLayout(
+                        "java.util.List", null,
+                        ImportLayoutStyle.builder()
+                                .packageToFold("java.util.*", false)
+                                .importAllOthers()
+                                .importStaticAllOthers()),
+                java(
+                        """
               """,
-            """
+                        """
               import java.util.*;
               """
-          )
+                )
         );
     }
 
     @Test
     void foldPackageWithExistingImports
-      () {
+            () {
         rewriteRun(
-          importLayout(
-            "java.util.Map", null,
-            ImportLayoutStyle.builder()
-              .packageToFold("java.util.*", false)
-              .importAllOthers()
-              .importStaticAllOthers()
-          ),
-          java(
-            """
+                importLayout(
+                        "java.util.Map", null,
+                        ImportLayoutStyle.builder()
+                                .packageToFold("java.util.*", false)
+                                .importAllOthers()
+                                .importStaticAllOthers()
+                ),
+                java(
+                        """
               import java.util.List;
               """,
-            """
+                        """
               import java.util.*;
               """
-          )
+                )
         );
     }
 
     @Test
     void foldSubPackageWithExistingImports() {
         rewriteRun(
-          importLayout(
-            "java.util.concurrent.ConcurrentHashMap", null,
-            ImportLayoutStyle.builder()
-              .packageToFold("java.util.*", true)
-              .importAllOthers()
-              .importStaticAllOthers()
-          ),
-          java(
-            """
+                importLayout(
+                        "java.util.concurrent.ConcurrentHashMap", null,
+                        ImportLayoutStyle.builder()
+                                .packageToFold("java.util.*", true)
+                                .importAllOthers()
+                                .importStaticAllOthers()
+                ),
+                java(
+                        """
               import java.util.List;
               """,
-            """
+                        """
               import java.util.List;
               import java.util.concurrent.*;
               """
-          )
+                )
         );
     }
 
     @Test
     void foldStaticSubPackageWithEmptyImports() {
         rewriteRun(
-          importLayout(
-            "java.util.Collections", "emptyMap",
-            ImportLayoutStyle.builder()
-              .staticPackageToFold("java.util.*", true)
-              .importAllOthers()
-              .importStaticAllOthers()
-          ),
-          java(
-            """
+                importLayout(
+                        "java.util.Collections", "emptyMap",
+                        ImportLayoutStyle.builder()
+                                .staticPackageToFold("java.util.*", true)
+                                .importAllOthers()
+                                .importStaticAllOthers()
+                ),
+                java(
+                        """
               """,
-            """
+                        """
               import static java.util.Collections.*;
               """
-          )
+                )
         );
     }
 
@@ -1220,81 +1221,81 @@ class AddImportTest implements RewriteTest {
     @Test
     void noImportLayout() {
         rewriteRun(
-          importLayout(
-            "java.util.List", null,
-            ImportLayoutStyle.builder()
-              .importAllOthers()
-              .importStaticAllOthers()
-              .classCountToUseStarImport(999)
-              .nameCountToUseStarImport(999)
-          ),
-          java(
-            """
+                importLayout(
+                        "java.util.List", null,
+                        ImportLayoutStyle.builder()
+                                .importAllOthers()
+                                .importStaticAllOthers()
+                                .classCountToUseStarImport(999)
+                                .nameCountToUseStarImport(999)
+                ),
+                java(
+                        """
               """,
-            """
+                        """
               import java.util.List;
               """
-          )
+                )
         );
     }
 
     @Test
     void foldStaticSubPackageWithExistingImports
-      () {
+            () {
         rewriteRun(
-          importLayout(
-            "java.util.Collections", "emptyMap",
-            ImportLayoutStyle.builder()
-              .staticPackageToFold("java.util.*", true)
-              .importAllOthers()
-              .importStaticAllOthers()
-          ),
-          java(
-            """
+                importLayout(
+                        "java.util.Collections", "emptyMap",
+                        ImportLayoutStyle.builder()
+                                .staticPackageToFold("java.util.*", true)
+                                .importAllOthers()
+                                .importStaticAllOthers()
+                ),
+                java(
+                        """
               import java.util.List;
               """,
-            """
+                        """
               import java.util.List;
 
               import static java.util.Collections.*;
               """
-          )
+                )
         );
     }
 
     @Test
     void crlfNewLinesWithoutPreviousImports() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
+                java(
+                        """
               package a;
               class A {}
               """.replace("\n", "\r\n"),
-            """
+                        """
               package a;
 
               import java.util.List;
 
               class A {}
               """.replace("\n", "\r\n")
-          )
+                )
         );
     }
 
     @Test
     void crlfNewLinesWithPreviousImports() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
+                java(
+                        """
               package a;
 
               import java.util.Set;
 
               class A {}
               """.replace("\n", "\r\n"),
-            """
+                        """
               package a;
 
               import java.util.List;
@@ -1302,76 +1303,76 @@ class AddImportTest implements RewriteTest {
 
               class A {}
               """.replace("\n", "\r\n")
-          )
+                )
         );
     }
 
     @Test
     void crlfNewLinesWithPreviousImportsNoPackage() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
+                java(
+                        """
               import java.util.Set;
 
               class A {}
               """.replace("\n", "\r\n"),
-            """        
+                        """        
               import java.util.List;
               import java.util.Set;
 
               class A {}
               """.replace("\n", "\r\n")
-          )
+                )
         );
     }
 
     @Test
     void crlfNewLinesWithPreviousImportsNoClass() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
+                java(
+                        """
               package a;
 
               import java.util.Arrays;
               import java.util.Set;
               """.replace("\n", "\r\n"),
-            """
+                        """
               package a;
 
               import java.util.Arrays;
               import java.util.List;
               import java.util.Set;
               """.replace("\n", "\r\n")
-          )
+                )
         );
     }
 
     @Test
     void crlfNewLinesWithPreviousImportsNoPackageNoClass() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
+                java(
+                        """
               import java.util.Arrays;
               import java.util.Set;
               """.replace("\n", "\r\n"),
-            """
+                        """
               import java.util.Arrays;
               import java.util.List;
               import java.util.Set;
               """.replace("\n", "\r\n")
-          )
+                )
         );
     }
 
     @Test
     void crlfNewLinesInComments() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
+                java(
+                        """
               /*
                * Copyright 2023 the original author or authors.
                * <p>
@@ -1388,11 +1389,11 @@ class AddImportTest implements RewriteTest {
                * limitations under the License.
                */
               """.replace("\n", "\r\n") +
-              """
+                                """
                 import java.util.Arrays;
                 import java.util.Set;
                 """,
-            """
+                        """
               /*
                * Copyright 2023 the original author or authors.
                * <p>
@@ -1412,21 +1413,21 @@ class AddImportTest implements RewriteTest {
               import java.util.List;
               import java.util.Set;
               """.replace("\n", "\r\n")
-          )
+                )
         );
     }
 
     @Test
     void crlfNewLinesInJavadoc() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
+                java(
+                        """
               import java.util.Arrays;
               import java.util.Set;
 
               """ +
-              """
+                                """
                 /**
                  * Copyright 2023 the original author or authors.
                  * <p>
@@ -1443,8 +1444,8 @@ class AddImportTest implements RewriteTest {
                  * limitations under the License.
                  */
                 """.replace("\n", "\r\n") +
-              "class Foo {}",
-            """
+                                "class Foo {}",
+                        """
               import java.util.Arrays;
               import java.util.List;
               import java.util.Set;
@@ -1466,7 +1467,7 @@ class AddImportTest implements RewriteTest {
                */
               class Foo {}
               """.replace("\n", "\r\n")
-          )
+                )
         );
     }
 }

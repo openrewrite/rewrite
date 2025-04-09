@@ -53,8 +53,8 @@ public class RemoveUnusedImports extends Recipe {
     @Override
     public String getDescription() {
         return "Remove imports for types that are not referenced. As a precaution against incorrect changes no imports " +
-               "will be removed from any source where unknown types are referenced. The most common cause of unknown " +
-               "types is the use of annotation processors not supported by OpenRewrite, such as lombok.";
+                "will be removed from any source where unknown types are referenced. The most common cause of unknown " +
+                "types is the use of annotation processors not supported by OpenRewrite, such as lombok.";
     }
 
     @Override
@@ -177,7 +177,7 @@ public class RemoveUnusedImports extends Recipe {
                             anImport.used = true;
                             usedStaticWildcardImports.add(elem.getTypeName());
                         } else if (((methodsAndFields == null ? 0 : methodsAndFields.size()) +
-                                    (staticClasses == null ? 0 : staticClasses.size())) < layoutStyle.getNameCountToUseStarImport()) {
+                                (staticClasses == null ? 0 : staticClasses.size())) < layoutStyle.getNameCountToUseStarImport()) {
                             // replacing the star with a series of unfolded imports
                             anImport.imports.clear();
 
@@ -207,8 +207,8 @@ public class RemoveUnusedImports extends Recipe {
                             usedStaticWildcardImports.add(elem.getTypeName());
                         }
                     } else if (staticClasses != null && staticClasses.stream().anyMatch(c -> elem.getTypeName().equals(c.getFullyQualifiedName())) ||
-                               (methodsAndFields != null && methodsAndFields.contains(qualid.getSimpleName())) ||
-                               (targetMethodsAndFields != null && targetMethodsAndFields.contains(qualid.getSimpleName()))) {
+                            (methodsAndFields != null && methodsAndFields.contains(qualid.getSimpleName())) ||
+                            (targetMethodsAndFields != null && targetMethodsAndFields.contains(qualid.getSimpleName()))) {
                         anImport.used = true;
                     } else {
                         anImport.used = false;
@@ -267,7 +267,7 @@ public class RemoveUnusedImports extends Recipe {
                 if (!"*".equals(elem.getQualid().getSimpleName())) {
                     if (elem.isStatic()) {
                         if (usedStaticWildcardImports.contains(elem.getTypeName()) &&
-                            !ambiguousStaticImportNames.contains(elem.getQualid().getSimpleName())) {
+                                !ambiguousStaticImportNames.contains(elem.getQualid().getSimpleName())) {
                             anImport.used = false;
                             changed = true;
                         }
@@ -289,7 +289,7 @@ public class RemoveUnusedImports extends Recipe {
                         for (int i = 0; i < importGroup.size(); i++) {
                             JRightPadded<J.Import> anImport = importGroup.get(i);
                             if (i == 0 && lastUnusedImportSpace != null && anImport.getElement().getPrefix().getLastWhitespace()
-                                                                                   .chars().filter(c -> c == '\n').count() <= 1) {
+                                    .chars().filter(c -> c == '\n').count() <= 1) {
                                 anImport = anImport.withElement(anImport.getElement().withPrefix(lastUnusedImportSpace));
                             }
                             imports.add(anImport);

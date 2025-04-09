@@ -183,12 +183,12 @@ public class Cursor {
     @Override
     public String toString() {
         return "Cursor{" +
-               stream(Spliterators.spliteratorUnknownSize(getPath(), 0), false)
-                       .map(t -> t instanceof Tree ?
-                               t.getClass().getSimpleName() :
-                               t.toString())
-                       .collect(Collectors.joining("->")) +
-               "}";
+                stream(Spliterators.spliteratorUnknownSize(getPath(), 0), false)
+                        .map(t -> t instanceof Tree ?
+                                t.getClass().getSimpleName() :
+                                t.toString())
+                        .collect(Collectors.joining("->")) +
+                "}";
     }
 
     public Cursor dropParentUntil(Predicate<Object> valuePredicate) {
@@ -256,7 +256,7 @@ public class Cursor {
 
     public boolean isScopeInPath(Tree scope) {
         return value instanceof Tree && ((Tree) value).getId().equals(scope.getId()) ||
-               getPathAsStream().anyMatch(p -> p instanceof Tree && ((Tree) p).getId().equals(scope.getId()));
+                getPathAsStream().anyMatch(p -> p instanceof Tree && ((Tree) p).getId().equals(scope.getId()));
     }
 
     public void putMessageOnFirstEnclosing(Class<?> enclosing, String key, Object value) {
@@ -290,12 +290,14 @@ public class Cursor {
      * @return The closest message matching the provided key in the cursor stack, or <code>null</code> if none.
      */
     public <T> @Nullable T getNearestMessage(String key) {
-        @SuppressWarnings("unchecked") T t = messages == null ? null : (T) messages.get(key);
+        @SuppressWarnings("unchecked")
+        T t = messages == null ? null : (T) messages.get(key);
         return t == null && parent != null ? parent.getNearestMessage(key) : t;
     }
 
     public <T> T getNearestMessage(String key, T defaultValue) {
-        @SuppressWarnings("unchecked") T t = messages == null ? null : (T) messages.get(key);
+        @SuppressWarnings("unchecked")
+        T t = messages == null ? null : (T) messages.get(key);
         if (t == null) {
             if (parent != null) {
                 return parent.getNearestMessage(key, defaultValue);
@@ -313,7 +315,8 @@ public class Cursor {
      * @return The closest message matching the provided key in the cursor stack, or <code>null</code> if none.
      */
     public <T> @Nullable T pollNearestMessage(String key) {
-        @SuppressWarnings("unchecked") T t = messages == null ? null : (T) messages.remove(key);
+        @SuppressWarnings("unchecked")
+        T t = messages == null ? null : (T) messages.remove(key);
         return t == null && parent != null ? parent.pollNearestMessage(key) : t;
     }
 

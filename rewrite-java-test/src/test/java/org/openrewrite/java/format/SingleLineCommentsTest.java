@@ -33,31 +33,31 @@ class SingleLineCommentsTest implements RewriteTest {
     @Test
     void startsWithWhitespace() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               //hi
               class Test {
               }
               """,
-            """
+                        """
               // hi
               class Test {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void emptyCommentLineDoesNotGetTrailingBlank() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               // Copyright
               //
               // Some long license text
               """
-          )
+                )
         );
     }
 }

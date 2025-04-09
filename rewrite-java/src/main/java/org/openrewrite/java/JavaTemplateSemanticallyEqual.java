@@ -76,7 +76,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
                     BaseErrorListener errorListener = new BaseErrorListener() {
                         @Override
                         public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol,
-                                                int line, int charPositionInLine, String msg, RecognitionException e) {
+                                int line, int charPositionInLine, String msg, RecognitionException e) {
                             throw new IllegalArgumentException(
                                     String.format("Syntax error at line %d:%d %s.", line, charPositionInLine, msg), e);
                         }
@@ -174,7 +174,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
                 }
 
                 if (TypeUtils.isObject(marker.getType()) ||
-                    TypeUtils.isAssignableTo(marker.getType(), ((TypedTree) j).getType())) {
+                        TypeUtils.isAssignableTo(marker.getType(), ((TypedTree) j).getType())) {
                     registerMatch(j, marker.getName());
                     return true;
                 }

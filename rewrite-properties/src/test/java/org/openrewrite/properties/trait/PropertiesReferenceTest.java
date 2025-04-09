@@ -35,45 +35,45 @@ class PropertiesReferenceTest implements RewriteTest {
 
     @ParameterizedTest
     @CsvSource({
-      "application.properties",
-      "application-test.properties",
-      "/foo/bar/application-test.properties",
+            "application.properties",
+            "application-test.properties",
+            "/foo/bar/application-test.properties",
     })
     void findJavaReferencesInApplicationProperties(String filename) {
         rewriteRun(
-          properties(
-            PROPERTIES,
-            spec -> spec.path(filename).afterRecipe(doc ->
-              assertThat(doc.getReferences().getReferences())
-                .satisfiesExactlyInAnyOrder(
-                  ref -> {
-                      assertThat(ref.getKind()).isEqualTo(Reference.Kind.TYPE);
-                      assertThat(ref.getValue()).isEqualTo("java.lang.String");
-                  },
-                  ref -> {
-                      assertThat(ref.getKind()).isEqualTo(Reference.Kind.PACKAGE);
-                      assertThat(ref.getValue()).isEqualTo("java.lang");
-                  }
+                properties(
+                        PROPERTIES,
+                        spec -> spec.path(filename).afterRecipe(doc ->
+                                assertThat(doc.getReferences().getReferences())
+                                        .satisfiesExactlyInAnyOrder(
+                                                ref -> {
+                                                    assertThat(ref.getKind()).isEqualTo(Reference.Kind.TYPE);
+                                                    assertThat(ref.getValue()).isEqualTo("java.lang.String");
+                                                },
+                                                ref -> {
+                                                    assertThat(ref.getKind()).isEqualTo(Reference.Kind.PACKAGE);
+                                                    assertThat(ref.getValue()).isEqualTo("java.lang");
+                                                }
+                                        )
+                        )
                 )
-            )
-          )
         );
     }
 
     @ParameterizedTest
     @CsvSource({
-      "application-.properties",
-      "application.test.properties",
-      "other-application.properties",
-      "other.properties",
-      "/foo/bar/other.properties"
+            "application-.properties",
+            "application.test.properties",
+            "other-application.properties",
+            "other.properties",
+            "/foo/bar/other.properties"
     })
     void noReferencesInMismatchedFilenames(String filename) {
         rewriteRun(
-          properties(
-            PROPERTIES,
-            spec -> spec.path(filename).afterRecipe(doc -> assertThat(doc.getReferences().getReferences()).isEmpty())
-          )
+                properties(
+                        PROPERTIES,
+                        spec -> spec.path(filename).afterRecipe(doc -> assertThat(doc.getReferences().getReferences()).isEmpty())
+                )
         );
     }
 }

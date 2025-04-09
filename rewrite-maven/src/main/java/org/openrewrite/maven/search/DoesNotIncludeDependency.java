@@ -84,10 +84,10 @@ public class DoesNotIncludeDependency extends Recipe {
     @SuppressWarnings("unchecked")
     private TreeVisitor<?, ExecutionContext>[] dependencyInsightVisitors() {
         if (scope == null) {
-            return new TreeVisitor[] {
-                new DependencyInsight(groupId, artifactId, null, null, onlyDirect).getVisitor(),
+            return new TreeVisitor[]{
+                    new DependencyInsight(groupId, artifactId, null, null, onlyDirect).getVisitor(),
             };
         }
-        return new TreeVisitor[] { new DependencyInsight(groupId, artifactId, scope, null, onlyDirect).getVisitor() };
+        return new TreeVisitor[]{new DependencyInsight(groupId, artifactId, scope, null, onlyDirect).getVisitor()};
     }
 }

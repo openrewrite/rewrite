@@ -48,7 +48,7 @@ public class HasBuildToolVersion extends Recipe {
     @Override
     public String getDescription() {
         return "Finds Java source files built with a particular build tool. " +
-               "This is useful especially as a precondition for other recipes.";
+                "This is useful especially as a precondition for other recipes.";
     }
 
     @SuppressWarnings("ConstantConditions")

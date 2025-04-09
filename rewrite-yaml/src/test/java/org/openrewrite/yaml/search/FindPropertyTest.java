@@ -31,55 +31,55 @@ class FindPropertyTest implements RewriteTest {
     @Test
     void findProperty() {
         rewriteRun(
-          spec -> spec.recipe(new FindProperty("management.metrics.binders.files.enabled", null, null)),
-          yaml(
-            "management.metrics.binders.files.enabled: true",
-            "management.metrics.binders.files.enabled: ~~>true"
-          )
+                spec -> spec.recipe(new FindProperty("management.metrics.binders.files.enabled", null, null)),
+                yaml(
+                        "management.metrics.binders.files.enabled: true",
+                        "management.metrics.binders.files.enabled: ~~>true"
+                )
         );
     }
 
     @Test
     void findGlobProperty() {
         rewriteRun(
-          spec -> spec.recipe(new FindProperty("management.metrics.binders.*.enabled", null, null)),
-          yaml(
-            "management.metrics.binders.files.enabled: true",
-            "management.metrics.binders.files.enabled: ~~>true"
-          )
+                spec -> spec.recipe(new FindProperty("management.metrics.binders.*.enabled", null, null)),
+                yaml(
+                        "management.metrics.binders.files.enabled: true",
+                        "management.metrics.binders.files.enabled: ~~>true"
+                )
         );
     }
 
     @Test
     void findPropertyWithSpecificValueMatch() {
         rewriteRun(
-          spec -> spec.recipe(new FindProperty("my.cool.property", null, "my-matching-value")),
-          yaml(
-            "my.cool.property: my-matching-value",
-            "my.cool.property: ~~>my-matching-value"
-          )
+                spec -> spec.recipe(new FindProperty("my.cool.property", null, "my-matching-value")),
+                yaml(
+                        "my.cool.property: my-matching-value",
+                        "my.cool.property: ~~>my-matching-value"
+                )
         );
     }
 
     @Test
     void findPropertyWithSpecificValueMatchSingleQuotes() {
         rewriteRun(
-          spec -> spec.recipe(new FindProperty("my.cool.property", null, "my-matching-value")),
-          yaml(
-            "my.cool.property: 'my-matching-value'",
-            "my.cool.property: ~~>'my-matching-value'"
-          )
+                spec -> spec.recipe(new FindProperty("my.cool.property", null, "my-matching-value")),
+                yaml(
+                        "my.cool.property: 'my-matching-value'",
+                        "my.cool.property: ~~>'my-matching-value'"
+                )
         );
     }
 
     @Test
     void findPropertyWithSpecificValueMatchDoubleQuotes() {
         rewriteRun(
-          spec -> spec.recipe(new FindProperty("my.cool.property", null, "my-matching-value")),
-          yaml(
-            "my.cool.property: \"my-matching-value\"",
-            "my.cool.property: ~~>\"my-matching-value\""
-          )
+                spec -> spec.recipe(new FindProperty("my.cool.property", null, "my-matching-value")),
+                yaml(
+                        "my.cool.property: \"my-matching-value\"",
+                        "my.cool.property: ~~>\"my-matching-value\""
+                )
         );
     }
 
@@ -87,36 +87,36 @@ class FindPropertyTest implements RewriteTest {
     @Disabled("how do I test that the search has no hits?")
     void findPropertyWithSpecificValueNoMatch() {
         rewriteRun(
-          spec -> spec.recipe(new FindProperty("my.cool.property", null, "my-non-matching-value")),
-          yaml(
-            "my.cool.property: my-matching-value",
-            "my.cool.property: my-matching-value"
-          )
+                spec -> spec.recipe(new FindProperty("my.cool.property", null, "my-non-matching-value")),
+                yaml(
+                        "my.cool.property: my-matching-value",
+                        "my.cool.property: my-matching-value"
+                )
         );
     }
 
     @ParameterizedTest
     @ValueSource(strings = {
-      "acme.my-project.person.first-name",
-      "acme.myProject.person.firstName",
-      "acme.my_project.person.first_name",
+            "acme.my-project.person.first-name",
+            "acme.myProject.person.firstName",
+            "acme.my_project.person.first_name",
     })
     @Issue("https://github.com/openrewrite/rewrite/issues/1168")
     void relaxedBinding(String propertyKey) {
         rewriteRun(
-          spec -> spec.recipe(new FindProperty(propertyKey, true, null)),
-          yaml(
-            """
+                spec -> spec.recipe(new FindProperty(propertyKey, true, null)),
+                yaml(
+                        """
               acme.my-project.person.first-name: example
               acme.myProject.person.firstName: example
               acme.my_project.person.first_name: example
               """,
-            """
+                        """
               acme.my-project.person.first-name: ~~>example
               acme.myProject.person.firstName: ~~>example
               acme.my_project.person.first_name: ~~>example
               """
-          )
+                )
         );
     }
 
@@ -124,19 +124,19 @@ class FindPropertyTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1168")
     void exactMatch() {
         rewriteRun(
-          spec -> spec.recipe(new FindProperty("acme.my-project.person.first-name", false, null)),
-          yaml(
-            """
+                spec -> spec.recipe(new FindProperty("acme.my-project.person.first-name", false, null)),
+                yaml(
+                        """
               acme.my-project.person.first-name: example
               acme.myProject.person.firstName: example
               acme.my_project.person.first_name: example
               """,
-            """
+                        """
               acme.my-project.person.first-name: ~~>example
               acme.myProject.person.firstName: example
               acme.my_project.person.first_name: example
               """
-          )
+                )
         );
     }
 }

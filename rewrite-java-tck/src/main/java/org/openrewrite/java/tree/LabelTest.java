@@ -26,8 +26,8 @@ class LabelTest implements RewriteTest {
     @Test
     void labeledWhileLoop() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       labeled : while(true) {
@@ -35,7 +35,7 @@ class LabelTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -43,8 +43,8 @@ class LabelTest implements RewriteTest {
     @Test
     void nonEmptyLabeledWhileLoop() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       outer : while(true) {
@@ -55,7 +55,7 @@ class LabelTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

@@ -29,62 +29,62 @@ class FindTagsTest implements RewriteTest {
     @Test
     void simpleElement() {
         rewriteRun(
-          spec -> spec.recipe(new FindTags("/dependencies/dependency")),
-          xml(
-            """
+                spec -> spec.recipe(new FindTags("/dependencies/dependency")),
+                xml(
+                        """
               <dependencies>
                   <dependency>
                       <artifactId scope="compile">org.openrewrite</artifactId>
                   </dependency>
               </dependencies>
               """,
-            """
+                        """
               <dependencies>
                   <!--~~>--><dependency>
                       <artifactId scope="compile">org.openrewrite</artifactId>
                   </dependency>
               </dependencies>
               """
-          )
+                )
         );
     }
 
     @Test
     void wildcard() {
         rewriteRun(
-          spec -> spec.recipe(new FindTags("/dependencies/*")),
-          xml(
-            """
+                spec -> spec.recipe(new FindTags("/dependencies/*")),
+                xml(
+                        """
               <dependencies>
                   <dependency>
                       <artifactId scope="compile">org.openrewrite</artifactId>
                   </dependency>
               </dependencies>
               """,
-            """
+                        """
               <dependencies>
                   <!--~~>--><dependency>
                       <artifactId scope="compile">org.openrewrite</artifactId>
                   </dependency>
               </dependencies>
               """
-          )
+                )
         );
     }
 
     @Test
     void noMatch() {
         rewriteRun(
-          spec -> spec.recipe(new FindTags("/dependencies/dne")),
-          xml(
-            """
+                spec -> spec.recipe(new FindTags("/dependencies/dne")),
+                xml(
+                        """
               <dependencies>
                   <dependency>
                       <artifactId scope="compile">org.openrewrite</artifactId>
                   </dependency>
               </dependencies>
               """
-          )
+                )
         );
     }
 
@@ -92,18 +92,18 @@ class FindTagsTest implements RewriteTest {
     void staticFind() {
         //noinspection ConstantConditions
         rewriteRun(
-          xml(
-            """
+                xml(
+                        """
             <dependencies>
                 <dependency>
                     <artifactId scope="compile">org.openrewrite</artifactId>
                 </dependency>
             </dependencies>
             """,
-            spec -> spec.beforeRecipe(xml -> assertThat(FindTags.find(xml, "/dependencies/dependency"))
-              .isNotEmpty()
-              .allMatch(tag -> tag instanceof Xml.Tag))
-          )
+                        spec -> spec.beforeRecipe(xml -> assertThat(FindTags.find(xml, "/dependencies/dependency"))
+                                .isNotEmpty()
+                                .allMatch(tag -> tag instanceof Xml.Tag))
+                )
         );
     }
 
@@ -111,9 +111,9 @@ class FindTagsTest implements RewriteTest {
     @Test
     void findRelativeTags() {
         rewriteRun(
-          spec -> spec.recipe(new FindTags("//configuration/agent")),
-          xml(
-            """
+                spec -> spec.recipe(new FindTags("//configuration/agent")),
+                xml(
+                        """
             <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>org.openrewrite.example</groupId>
@@ -132,7 +132,7 @@ class FindTagsTest implements RewriteTest {
                 </build>
             </project>
             """,
-            """
+                        """
             <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>org.openrewrite.example</groupId>
@@ -151,10 +151,10 @@ class FindTagsTest implements RewriteTest {
                 </build>
             </project>
             """,
-            spec -> spec.beforeRecipe(xml -> assertThat(FindTags.find(xml, "//configuration/agent"))
-              .hasSize(1))
+                        spec -> spec.beforeRecipe(xml -> assertThat(FindTags.find(xml, "//configuration/agent"))
+                                .hasSize(1))
 
-          )
+                )
         );
     }
 }

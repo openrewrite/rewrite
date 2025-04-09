@@ -30,7 +30,7 @@ public class AutodetectGeneralFormatStyle extends XmlVisitor<LineEndingsCount> {
     public static GeneralFormatStyle autodetectGeneralFormatStyle(Xml.Document x) {
         LineEndingsCount count = new LineEndingsCount();
         new AutodetectGeneralFormatStyle().visit(x, count);
-        if(count.lf >= count.crlf) {
+        if (count.lf >= count.crlf) {
             return new GeneralFormatStyle(false);
         } else {
             return new GeneralFormatStyle(true);
@@ -39,12 +39,12 @@ public class AutodetectGeneralFormatStyle extends XmlVisitor<LineEndingsCount> {
 
     @Override
     public @Nullable Xml visit(@Nullable Tree tree, LineEndingsCount count) {
-        if(tree instanceof Xml) {
+        if (tree instanceof Xml) {
             String s = ((Xml) tree).getPrefix();
             for (int i = 0; i < s.length(); i++) {
                 char current = s.charAt(i);
                 char next = '\0';
-                if(i < s.length() - 1) {
+                if (i < s.length() - 1) {
                     next = s.charAt(i + 1);
                 }
                 if (current == '\r' && next == '\n') {

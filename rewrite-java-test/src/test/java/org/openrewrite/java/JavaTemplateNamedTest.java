@@ -30,22 +30,22 @@ class JavaTemplateNamedTest implements RewriteTest {
     @Test
     void replaceSingleStatement() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              @Override
-              public J visitAssert(J.Assert anAssert, ExecutionContext p) {
-                  return JavaTemplate.builder(
-                      """
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    @Override
+                    public J visitAssert(J.Assert anAssert, ExecutionContext p) {
+                        return JavaTemplate.builder(
+                                """
                         if(#{name:any(int)} != #{}) {
                           #{name}++;
                         }"""
-                    )
-                    .build()
-                    .apply(getCursor(), anAssert.getCoordinates().replace(),
-                      ((J.Binary) anAssert.getCondition()).getLeft(), "1");
-              }
-          })),
-          java(
-            """
+                        )
+                        .build()
+                                .apply(getCursor(), anAssert.getCoordinates().replace(),
+                                        ((J.Binary) anAssert.getCondition()).getLeft(), "1");
+                    }
+                })),
+                java(
+                        """
               class Test {
                   int n;
                   void test() {
@@ -53,7 +53,7 @@ class JavaTemplateNamedTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   int n;
                   void test() {
@@ -63,7 +63,7 @@ class JavaTemplateNamedTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

@@ -219,7 +219,7 @@ public class Space {
 
     @SuppressWarnings("ConstantConditions")
     public static <P extends Proto> @Nullable List<ProtoRightPadded<P>> formatLastSuffix(@Nullable List<ProtoRightPadded<P>> trees,
-                                                                               Space suffix) {
+            Space suffix) {
         if (trees == null) {
             return null;
         }

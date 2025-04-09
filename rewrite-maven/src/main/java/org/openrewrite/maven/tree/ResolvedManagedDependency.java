@@ -69,7 +69,7 @@ public class ResolvedManagedDependency {
     }
 
     public boolean matches(@Nullable String groupId, String artifactId,
-                           @Nullable String type, @Nullable String classifier) {
+            @Nullable String type, @Nullable String classifier) {
         return Objects.equals(groupId, gav.getGroupId()) && artifactId.equals(gav.getArtifactId()) &&
                 (type == null ? "jar" : type).equals(this.type == null ? "jar" : this.type) &&
                 Objects.equals(classifier, this.classifier);

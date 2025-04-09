@@ -34,30 +34,30 @@ class IncrementProjectVersionTest implements RewriteTest {
     @Test
     void changeProjectVersion() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
                <project>
                    <groupId>org.openrewrite</groupId>
                    <artifactId>rewrite-maven</artifactId>
                    <version>8.40.1-SNAPSHOT</version>
                </project>
                """,
-            """
+                        """
               <project>
                   <groupId>org.openrewrite</groupId>
                   <artifactId>rewrite-maven</artifactId>
                   <version>8.41.0-SNAPSHOT</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void changeProjectVersionShouldNotUpdateDependencyVersion() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
                <project>
                    <groupId>org.openrewrite</groupId>
                    <artifactId>rewrite-maven</artifactId>
@@ -71,7 +71,7 @@ class IncrementProjectVersionTest implements RewriteTest {
                    </dependencies>
                </project>
                """,
-            """
+                        """
               <project>
                   <groupId>org.openrewrite</groupId>
                   <artifactId>rewrite-maven</artifactId>
@@ -85,54 +85,54 @@ class IncrementProjectVersionTest implements RewriteTest {
                   </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void extraFourthDigit() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <groupId>org.openrewrite</groupId>
                   <artifactId>rewrite-maven</artifactId>
                   <version>8.4.1.1-SNAPSHOT</version>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>org.openrewrite</groupId>
                   <artifactId>rewrite-maven</artifactId>
                   <version>8.5.0.0-SNAPSHOT</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void incrementParentVersion() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <groupId>com.mycompany</groupId>
                   <artifactId>my-parent</artifactId>
                   <version>1.0.0</version>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>com.mycompany</groupId>
                   <artifactId>my-parent</artifactId>
                   <version>1.1.0</version>
               </project>
               """
-          ),
-          mavenProject("my-child",
-            pomXml(
-              """
+                ),
+                mavenProject("my-child",
+                        pomXml(
+                                """
                 <project>
                     <parent>
                         <groupId>com.mycompany</groupId>
@@ -143,7 +143,7 @@ class IncrementProjectVersionTest implements RewriteTest {
                     <artifactId>my-child</artifactId>
                 </project>
                 """,
-              """
+                                """
                 <project>
                     <parent>
                         <groupId>com.mycompany</groupId>
@@ -154,8 +154,8 @@ class IncrementProjectVersionTest implements RewriteTest {
                     <artifactId>my-child</artifactId>
                 </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 }

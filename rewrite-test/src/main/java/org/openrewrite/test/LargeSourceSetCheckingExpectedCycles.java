@@ -92,7 +92,7 @@ class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
                     assertThat(after.printAllTrimmed())
                             .as(
                                     "Expected recipe to complete in " + expectedCyclesThatMakeChanges + " cycle" + (expectedCyclesThatMakeChanges == 1 ? "" : "s") + ", " +
-                                    "but took at least one more cycle. Between the last two executed cycles there were changes to \"" + before.getSourcePath() + "\""
+                                            "but took at least one more cycle. Between the last two executed cycles there were changes to \"" + before.getSourcePath() + "\""
                             )
                             .isEqualTo(before.printAllTrimmed());
                 }
@@ -119,8 +119,8 @@ class LargeSourceSetCheckingExpectedCycles extends InMemoryLargeSourceSet {
                 fail("Recipe was expected to make a change but made no changes.");
             } else if (cyclesThatResultedInChanges != expectedCyclesThatMakeChanges) {
                 fail("Expected recipe to complete in " + expectedCyclesThatMakeChanges + " cycle" + (expectedCyclesThatMakeChanges > 1 ? "s" : "") + ", " +
-                     "but took " + cyclesThatResultedInChanges + " cycle" + (cyclesThatResultedInChanges > 1 ? "s" : "") + ". " +
-                     "This usually indicates the recipe is making changes after it should have stabilized.");
+                        "but took " + cyclesThatResultedInChanges + " cycle" + (cyclesThatResultedInChanges > 1 ? "s" : "") + ". " +
+                        "This usually indicates the recipe is making changes after it should have stabilized.");
             }
         }
     }

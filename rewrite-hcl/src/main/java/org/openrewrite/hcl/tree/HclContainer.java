@@ -93,7 +93,7 @@ public class HclContainer<T> {
 
     public HclContainer<T> withLastSpace(Space space) {
         final List<HclRightPadded<T>> newElements = ListUtils.map(elements, (i, elem) -> {
-            if (i == elements.size() -1) {
+            if (i == elements.size() - 1) {
                 return elem.withAfter(space);
             }
             return elem;

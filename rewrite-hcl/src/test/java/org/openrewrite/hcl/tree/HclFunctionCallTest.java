@@ -25,12 +25,12 @@ class HclFunctionCallTest implements RewriteTest {
     @Test
     void functionCall() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               a = method (1, 2 )
               b = method ( )
               """
-          )
+                )
         );
     }
 }

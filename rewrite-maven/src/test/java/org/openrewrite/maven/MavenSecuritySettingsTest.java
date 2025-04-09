@@ -54,8 +54,8 @@ class MavenSecuritySettingsTest {
     void decryptCredentials() throws IOException {
         // Create settings-security.xml with master password
         Files.writeString(tempDir.resolve(".m2/settings-security.xml"),
-          //language=xml
-          """
+                //language=xml
+                """
             <?xml version="1.0" encoding="UTF-8"?>
             <settingsSecurity>
                 <master>{%s}</master>
@@ -64,8 +64,8 @@ class MavenSecuritySettingsTest {
 
         // Create settings.xml with encrypted password
         Files.writeString(tempDir.resolve(".m2/settings.xml"),
-          //language=xml
-          """
+                //language=xml
+                """
             <?xml version="1.0" encoding="UTF-8"?>
             <settings>
                 <servers>
@@ -85,13 +85,13 @@ class MavenSecuritySettingsTest {
         MavenSettings settings = MavenSettings.readMavenSettingsFromDisk(ctx);
         assert settings != null && settings.getServers() != null;
         assertThat(settings.getServers().getServers())
-          .hasSize(1)
-          .first()
-          .satisfies(server -> {
-              assertThat(server.getId()).isEqualTo("test-server");
-              assertThat(server.getUsername()).isEqualTo("admin");
-              assertThat(server.getPassword()).isEqualTo(USER_PASS_DECRYPTED);
-          });
+                .hasSize(1)
+                .first()
+                .satisfies(server -> {
+                    assertThat(server.getId()).isEqualTo("test-server");
+                    assertThat(server.getUsername()).isEqualTo("admin");
+                    assertThat(server.getPassword()).isEqualTo(USER_PASS_DECRYPTED);
+                });
     }
 
     @Test
@@ -99,8 +99,8 @@ class MavenSecuritySettingsTest {
         // Create settings-security.xml with relocation
         Path relocated = tempDir.resolve(".m2/relocation-settings-security.xml");
         Files.writeString(tempDir.resolve(".m2/settings-security.xml"),
-          //language=xml
-          """
+                //language=xml
+                """
             <?xml version="1.0" encoding="UTF-8"?>
             <settingsSecurity>
                 <relocation>%s</relocation>
@@ -108,8 +108,8 @@ class MavenSecuritySettingsTest {
             """.formatted(relocated));
         // Create relocation-settings-security.xml with master password
         Files.writeString(relocated,
-          //language=xml
-          """
+                //language=xml
+                """
             <?xml version="1.0" encoding="UTF-8"?>
             <settingsSecurity>
                 <master>{%s}</master>
@@ -118,8 +118,8 @@ class MavenSecuritySettingsTest {
 
         // Create settings.xml with encrypted password
         Files.writeString(tempDir.resolve(".m2/settings.xml"),
-          //language=xml
-          """
+                //language=xml
+                """
             <?xml version="1.0" encoding="UTF-8"?>
             <settings>
                 <servers>
@@ -139,21 +139,21 @@ class MavenSecuritySettingsTest {
         MavenSettings settings = MavenSettings.readMavenSettingsFromDisk(ctx);
         assert settings != null && settings.getServers() != null;
         assertThat(settings.getServers().getServers())
-          .hasSize(1)
-          .first()
-          .satisfies(server -> {
-              assertThat(server.getId()).isEqualTo("test-server");
-              assertThat(server.getUsername()).isEqualTo("admin");
-              assertThat(server.getPassword()).isEqualTo(USER_PASS_DECRYPTED);
-          });
+                .hasSize(1)
+                .first()
+                .satisfies(server -> {
+                    assertThat(server.getId()).isEqualTo("test-server");
+                    assertThat(server.getUsername()).isEqualTo("admin");
+                    assertThat(server.getPassword()).isEqualTo(USER_PASS_DECRYPTED);
+                });
     }
 
     @Test
     void handleInvalidEncryptedPassword() throws IOException {
         // Create settings-security.xml with master password
         Files.writeString(tempDir.resolve(".m2/settings-security.xml"),
-          //language=xml
-          """
+                //language=xml
+                """
             <?xml version="1.0" encoding="UTF-8"?>
             <settingsSecurity>
                 <master>{jSMOWnoPFgsHVpMvz5VrIt5kRbzGpI8u+9EF1iFQyJQ=}</master>
@@ -162,8 +162,8 @@ class MavenSecuritySettingsTest {
 
         // Create settings.xml with invalid encrypted password
         Files.writeString(tempDir.resolve(".m2/settings.xml"),
-          //language=xml
-          """
+                //language=xml
+                """
             <?xml version="1.0" encoding="UTF-8"?>
             <settings>
                 <servers>
@@ -182,16 +182,16 @@ class MavenSecuritySettingsTest {
         MavenSettings settings = MavenSettings.readMavenSettingsFromDisk(ctx);
         assert settings != null && settings.getServers() != null;
         assertThat(settings.getServers().getServers()).hasSize(1)
-          .first()
-          .satisfies(server -> assertThat(server.getPassword()).isEqualTo("{invalid_format}"));
+                .first()
+                .satisfies(server -> assertThat(server.getPassword()).isEqualTo("{invalid_format}"));
     }
 
     @Test
     void noSecuritySettingsNoDecryption() throws IOException {
         // Only create settings.xml without settings-security.xml
         Files.writeString(tempDir.resolve(".m2/settings.xml"),
-          //language=xml
-          """
+                //language=xml
+                """
             <?xml version="1.0" encoding="UTF-8"?>
             <settings>
                 <servers>
@@ -210,17 +210,17 @@ class MavenSecuritySettingsTest {
         MavenSettings settings = MavenSettings.readMavenSettingsFromDisk(ctx);
         assert settings != null && settings.getServers() != null;
         assertThat(settings.getServers().getServers())
-          .hasSize(1)
-          .first()
-          .satisfies(server -> assertThat(server.getPassword()).isEqualTo("{encrypted_password}"));
+                .hasSize(1)
+                .first()
+                .satisfies(server -> assertThat(server.getPassword()).isEqualTo("{encrypted_password}"));
     }
 
     @Test
     void decryptPasswordWithComments() throws IOException {
         // Create settings-security.xml with master password
         Files.writeString(tempDir.resolve(".m2/settings-security.xml"),
-          //language=xml
-          """
+                //language=xml
+                """
             <?xml version="1.0" encoding="UTF-8"?>
             <settingsSecurity>
                 <master>{%s}</master>
@@ -229,8 +229,8 @@ class MavenSecuritySettingsTest {
 
         // Create settings.xml with password containing comments
         Files.writeString(tempDir.resolve(".m2/settings.xml"),
-          //language=xml
-          """
+                //language=xml
+                """
             <?xml version="1.0" encoding="UTF-8"?>
             <settings>
                 <servers>
@@ -249,17 +249,17 @@ class MavenSecuritySettingsTest {
         MavenSettings settings = MavenSettings.readMavenSettingsFromDisk(ctx);
         assert settings != null && settings.getServers() != null;
         assertThat(settings.getServers().getServers())
-          .hasSize(1)
-          .first()
-          .satisfies(server -> assertThat(server.getPassword()).isEqualTo(USER_PASS_DECRYPTED));
+                .hasSize(1)
+                .first()
+                .satisfies(server -> assertThat(server.getPassword()).isEqualTo(USER_PASS_DECRYPTED));
     }
 
     @Test
     void invalidMasterPasswordButValidPasswordFormat() throws IOException {
         // Create settings-security.xml with invalid master password
         Files.writeString(tempDir.resolve(".m2/settings-security.xml"),
-          //language=xml
-          """
+                //language=xml
+                """
             <?xml version="1.0" encoding="UTF-8"?>
             <settingsSecurity>
                 <master>{invalid_master_password}</master>
@@ -268,8 +268,8 @@ class MavenSecuritySettingsTest {
 
         // Create settings.xml with valid encrypted password
         Files.writeString(tempDir.resolve(".m2/settings.xml"),
-          //language=xml
-          """
+                //language=xml
+                """
             <?xml version="1.0" encoding="UTF-8"?>
             <settings>
                 <servers>
@@ -288,10 +288,10 @@ class MavenSecuritySettingsTest {
         MavenSettings settings = MavenSettings.readMavenSettingsFromDisk(ctx);
         assert settings != null && settings.getServers() != null;
         assertThat(settings.getServers().getServers())
-          .hasSize(1)
-          .first()
-          .satisfies(server ->
-            // Password should remain in encrypted form since master password is invalid
-            assertThat(server.getPassword()).isEqualTo("{%s}".formatted(USER_PASS_ENCRYPTED)));
+                .hasSize(1)
+                .first()
+                .satisfies(server ->
+                        // Password should remain in encrypted form since master password is invalid
+                        assertThat(server.getPassword()).isEqualTo("{%s}".formatted(USER_PASS_ENCRYPTED)));
     }
 }

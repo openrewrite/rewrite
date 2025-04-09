@@ -29,11 +29,11 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void indentsAndContinuationIndents() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new TabsAndIndentsVisitor<>(
-            TabsAndIndentsStyle.DEFAULT.withIndentSize(2).withContinuationIndentSize(5)
-          ))),
-          xml(
-            """
+                spec -> spec.recipe(toRecipe(() -> new TabsAndIndentsVisitor<>(
+                        TabsAndIndentsStyle.DEFAULT.withIndentSize(2).withContinuationIndentSize(5)
+                ))),
+                xml(
+                        """
               <project xmlns="http://maven.apache.org/POM/4.0.0"
                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -41,7 +41,7 @@ class TabsAndIndentsTest implements RewriteTest {
                     <artifactId>quarkus-bootstrap-bom</artifactId>
               </project>
               """,
-            """
+                        """
               <project xmlns="http://maven.apache.org/POM/4.0.0"
                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -49,7 +49,7 @@ class TabsAndIndentsTest implements RewriteTest {
                 <artifactId>quarkus-bootstrap-bom</artifactId>
               </project>
               """
-          )
+                )
         );
     }
 }

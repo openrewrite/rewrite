@@ -26,6 +26,7 @@ public class LatestMinorTest {
     void isValidWhenCurrentIsNull() {
         assertThat(latestMinor.isValid(null, "1.0.0")).isTrue();
     }
+
     @Test
     void isValid() {
         assertThat(latestMinor.isValid("1.0.0", "1.0.0")).isTrue();

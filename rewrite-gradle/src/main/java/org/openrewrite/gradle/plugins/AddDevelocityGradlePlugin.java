@@ -52,10 +52,10 @@ public class AddDevelocityGradlePlugin extends Recipe {
 
     @Option(displayName = "Plugin version",
             description = "An exact version number or node-style semver selector used to select the version number. " +
-                          "You can also use `latest.release` for the latest available version and `latest.patch` if " +
-                          "the current version is a valid semantic version. For more details, you can look at the documentation " +
-                          "page of [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors). " +
-                          "Defaults to `latest.release`.",
+                    "You can also use `latest.release` for the latest available version and `latest.patch` if " +
+                    "the current version is a valid semantic version. For more details, you can look at the documentation " +
+                    "page of [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors). " +
+                    "Defaults to `latest.release`.",
             example = "3.x",
             required = false)
     @Nullable
@@ -70,7 +70,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
 
     @Option(displayName = "Allow untrusted server",
             description = "When set to `true` the plugin will be configured to allow unencrypted http connections with the server. " +
-                          "If set to `false` or omitted, the plugin will refuse to communicate without transport layer security enabled.",
+                    "If set to `false` or omitted, the plugin will refuse to communicate without transport layer security enabled.",
             required = false,
             example = "true")
     @Nullable
@@ -78,7 +78,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
 
     @Option(displayName = "Capture task input files",
             description = "When set to `true` the plugin will capture additional information about the inputs to Gradle tasks. " +
-                          "This increases the size of build scans, but is useful for diagnosing issues with task caching. ",
+                    "This increases the size of build scans, but is useful for diagnosing issues with task caching. ",
             required = false,
             example = "true")
     @Nullable
@@ -86,7 +86,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
 
     @Option(displayName = "Upload in background",
             description = "When set to `true` the plugin will capture additional information about the outputs of Gradle tasks. " +
-                          "This increases the size of build scans, but is useful for diagnosing issues with task caching. ",
+                    "This increases the size of build scans, but is useful for diagnosing issues with task caching. ",
             required = false,
             example = "true")
     @Nullable
@@ -94,8 +94,8 @@ public class AddDevelocityGradlePlugin extends Recipe {
 
     @Option(displayName = "Publish Criteria",
             description = "When set to `Always` the plugin will publish build scans of every single build. " +
-                          "When set to `Failure` the plugin will only publish build scans when the build fails. " +
-                          "When omitted scans will be published only when the `--scan` option is passed to the build.",
+                    "When set to `Failure` the plugin will only publish build scans when the build fails. " +
+                    "When omitted scans will be published only when the `--scan` option is passed to the build.",
             required = false,
             valid = {"Always", "Failure"},
             example = "Always")

@@ -25,14 +25,14 @@ class IdentifierTest implements RewriteTest {
     @Test
     void referToField() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   Integer n = 0;
                   Integer m = n;
               }
               """
-          )
+                )
         );
     }
 }

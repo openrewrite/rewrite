@@ -73,7 +73,8 @@ public class JsonPathMatcher {
         JsonPathParser.JsonPathContext ctx = parse();
         // The stop may be optimized by interpreting the ExpressionContext and pre-determining the last visit.
         JsonPathParser.ExpressionContext stop = (JsonPathParser.ExpressionContext) ctx.children.get(ctx.children.size() - 1);
-        @SuppressWarnings("ConstantConditions") JsonPathParserVisitor<Object> v = new JsonPathMatcher.JsonPathParserJsonVisitor(cursorPath, start, stop, false);
+        @SuppressWarnings("ConstantConditions")
+        JsonPathParserVisitor<Object> v = new JsonPathMatcher.JsonPathParserJsonVisitor(cursorPath, start, stop, false);
         Object result = v.visit(ctx);
 
         //noinspection unchecked
@@ -578,7 +579,7 @@ public class JsonPathMatcher {
 
             if (ctx.LOGICAL_OPERATOR() != null) {
                 String operator;
-                switch( ctx.LOGICAL_OPERATOR().getText()) {
+                switch (ctx.LOGICAL_OPERATOR().getText()) {
                     case ("&&"):
                         operator = "&&";
                         break;
@@ -788,4 +789,5 @@ public class JsonPathMatcher {
             }
             return "null".equals(literal) ? null : literal;
         }
-    }}
+    }
+}

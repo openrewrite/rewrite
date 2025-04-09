@@ -96,8 +96,8 @@ public class DeleteMethodArgument extends Recipe {
             MethodCall m = methodCall;
             List<Expression> originalArgs = m.getArguments();
             if (methodMatcher.matches(m) && originalArgs.stream()
-                                                    .filter(a -> !(a instanceof J.Empty))
-                                                    .count() >= argumentIndex + 1) {
+                    .filter(a -> !(a instanceof J.Empty))
+                    .count() >= argumentIndex + 1) {
                 List<Expression> args = new ArrayList<>(originalArgs);
 
                 Expression removed = args.remove(argumentIndex);

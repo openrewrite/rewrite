@@ -28,49 +28,49 @@ class DeleteKeyTest implements RewriteTest {
     @Test
     void deleteNestedKey() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteKey("$.metadata.name", null)),
-          yaml(
-            """
+                spec -> spec.recipe(new DeleteKey("$.metadata.name", null)),
+                yaml(
+                        """
                   apiVersion: v1
                   metadata:
                     name: monitoring-tools
                     namespace: monitoring-tools
               """,
-            """
+                        """
                   apiVersion: v1
                   metadata:
                     namespace: monitoring-tools
               """
-          )
+                )
         );
     }
 
     @Test
     void deleteRelativeKey() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteKey(".name", null)),
-          yaml(
-            """
+                spec -> spec.recipe(new DeleteKey(".name", null)),
+                yaml(
+                        """
                   apiVersion: v1
                   metadata:
                     name: monitoring-tools
                     namespace: monitoring-tools
               """,
-            """
+                        """
                   apiVersion: v1
                   metadata:
                     namespace: monitoring-tools
               """
-          )
+                )
         );
     }
 
     @Test
     void deleteSequenceEntry() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteKey("$.subjects[?(@.kind == 'User')]", null)),
-          yaml(
-            """
+                spec -> spec.recipe(new DeleteKey("$.subjects[?(@.kind == 'User')]", null)),
+                yaml(
+                        """
                   subjects:
                     - kind: User
                       name: some-user
@@ -79,21 +79,21 @@ class DeleteKeyTest implements RewriteTest {
                     - kind: ServiceAccount
                       name: monitoring-tools
               """,
-            """
+                        """
                   subjects:
                     - kind: ServiceAccount
                       name: monitoring-tools
               """
-          )
+                )
         );
     }
 
     @Test
     void deleteScalarSequenceEntry() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteKey("$.widget.list[?(@ == 'item 2')]", null)),
-          yaml(
-            """
+                spec -> spec.recipe(new DeleteKey("$.widget.list[?(@ == 'item 2')]", null)),
+                yaml(
+                        """
                   widget:
                     on: yes
                     list:
@@ -101,57 +101,57 @@ class DeleteKeyTest implements RewriteTest {
                       - item 2
                       - item 3
               """,
-            """
+                        """
                   widget:
                     on: yes
                     list:
                       - item 1
                       - item 3
               """
-          )
+                )
         );
     }
 
     @Test
     void deleteSequenceKeyByWildcard() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteKey("$.subjects[*].kind", null)),
-          yaml(
-            """
+                spec -> spec.recipe(new DeleteKey("$.subjects[*].kind", null)),
+                yaml(
+                        """
                   subjects:
                     - kind: User
                       name: some-user
                     - kind: ServiceAccount
                       name: monitoring-tools
               """,
-            """
+                        """
                   subjects:
                     - name: some-user
                     - name: monitoring-tools
               """
-          )
+                )
         );
     }
 
     @Test
     void deleteSubSequenceKeyByExactMatch() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteKey("$.subjects[?(@.kind == 'ServiceAccount')].kind", null)),
-          yaml(
-            """
+                spec -> spec.recipe(new DeleteKey("$.subjects[?(@.kind == 'ServiceAccount')].kind", null)),
+                yaml(
+                        """
                   subjects:
                     - kind: User
                       name: some-user
                     - kind: ServiceAccount
                       name: monitoring-tools
               """,
-            """
+                        """
                   subjects:
                     - kind: User
                       name: some-user
                     - name: monitoring-tools
               """
-          )
+                )
         );
     }
 
@@ -159,18 +159,18 @@ class DeleteKeyTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1175")
     void deleteNestedKeyRemovingUnusedKeysRecursively() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteKey("$.b.c.d", null)),
-          yaml(
-            """
+                spec -> spec.recipe(new DeleteKey("$.b.c.d", null)),
+                yaml(
+                        """
                   a: a-value
                   b:
                     c:
                       d: d-value
               """,
-            """
+                        """
               a: a-value
               """
-          )
+                )
         );
     }
 
@@ -178,9 +178,9 @@ class DeleteKeyTest implements RewriteTest {
     @Test
     void deleteKeyKeepingUnrelatedUnusedKeys() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteKey("$.jobs.build.strategy.fail-fast", null)),
-          yaml(
-            """
+                spec -> spec.recipe(new DeleteKey("$.jobs.build.strategy.fail-fast", null)),
+                yaml(
+                        """
                   on:
                     push:
                       branches:
@@ -201,7 +201,7 @@ class DeleteKeyTest implements RewriteTest {
                           java: ["11"]
                           os: ["ubuntu-latest"]
               """,
-            """
+                        """
                   on:
                     push:
                       branches:
@@ -221,7 +221,7 @@ class DeleteKeyTest implements RewriteTest {
                           java: ["11"]
                           os: ["ubuntu-latest"]
               """
-          )
+                )
         );
     }
 }

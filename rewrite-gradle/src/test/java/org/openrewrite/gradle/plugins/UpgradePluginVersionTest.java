@@ -42,44 +42,44 @@ class UpgradePluginVersionTest implements RewriteTest {
     @Test
     void upgradePlugin() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "latest.patch", null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "latest.patch", null)),
+                buildGradle(
+                        """
               plugins {
                   id 'org.openrewrite.rewrite' version '5.40.0'
                   id 'com.github.johnrengelman.shadow' version '6.1.0'
               }
               """,
-            """
+                        """
               plugins {
                   id 'org.openrewrite.rewrite' version '5.40.6'
                   id 'com.github.johnrengelman.shadow' version '6.1.0'
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void pluginManagementPlugin() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "latest.patch", null)),
-          settingsGradle(
-            """
+                spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "latest.patch", null)),
+                settingsGradle(
+                        """
               pluginManagement {
                   plugins {
                       id 'org.openrewrite.rewrite' version '5.40.0'
                   }
               }
               """,
-            """
+                        """
               pluginManagement {
                   plugins {
                       id 'org.openrewrite.rewrite' version '5.40.6'
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -87,118 +87,118 @@ class UpgradePluginVersionTest implements RewriteTest {
     @Test
     void upgradeGradleSettingsPlugin() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradePluginVersion("com.gradle.enterprise", "3.10.x", null)),
-          settingsGradle(
-            """
+                spec -> spec.recipe(new UpgradePluginVersion("com.gradle.enterprise", "3.10.x", null)),
+                settingsGradle(
+                        """
               plugins {
                   id 'com.gradle.enterprise' version '3.10'
               }
               """,
-            """
+                        """
               plugins {
                   id 'com.gradle.enterprise' version '3.10.3'
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void upgradePluginGlob() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.*", "5.40.X", null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.*", "5.40.X", null)),
+                buildGradle(
+                        """
               plugins {
                   id 'org.openrewrite.rewrite' version '5.40.0'
               }
               """,
-            """
+                        """
               plugins {
                   id 'org.openrewrite.rewrite' version '5.40.6'
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void exactVersionDoesNotHaveToBeResolvable() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "999.0", null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "999.0", null)),
+                buildGradle(
+                        """
               plugins {
                   id 'org.openrewrite.rewrite' version '5.34.0'
               }
               """,
-            """
+                        """
               plugins {
                   id 'org.openrewrite.rewrite' version '999.0'
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void defaultsToLatestRelease() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", null, null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", null, null)),
+                buildGradle(
+                        """
               plugins {
                   id 'org.openrewrite.rewrite' version '5.34.0'
               }
               """,
-            spec -> spec.after(after -> {
-                Matcher versionMatcher = Pattern.compile("id 'org\\.openrewrite\\.rewrite' version '(.*?)'").matcher(after);
-                assertThat(versionMatcher.find()).isTrue();
-                String version = versionMatcher.group(1);
-                VersionComparator versionComparator = requireNonNull(Semver.validate("[6.1.16,)", null).getValue());
-                assertThat(versionComparator.compare(null, "6.1.16", version)).isLessThanOrEqualTo(0);
+                        spec -> spec.after(after -> {
+                            Matcher versionMatcher = Pattern.compile("id 'org\\.openrewrite\\.rewrite' version '(.*?)'").matcher(after);
+                            assertThat(versionMatcher.find()).isTrue();
+                            String version = versionMatcher.group(1);
+                            VersionComparator versionComparator = requireNonNull(Semver.validate("[6.1.16,)", null).getValue());
+                            assertThat(versionComparator.compare(null, "6.1.16", version)).isLessThanOrEqualTo(0);
 
-                return """
+                            return """
                   plugins {
                       id 'org.openrewrite.rewrite' version '%s'
                   }
                   """.formatted(version);
-            })
-          )
+                        })
+                )
         );
     }
 
     @Test
     void dontDowngradeWhenExactVersion() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradePluginVersion("io.spring.dependency-management", "1.0.15.RELEASE", null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new UpgradePluginVersion("io.spring.dependency-management", "1.0.15.RELEASE", null)),
+                buildGradle(
+                        """
               plugins {
                   id 'io.spring.dependency-management' version '1.1.0'
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void dontDowngradeWhenExactVersionProperties() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradePluginVersion("io.spring.dependency-management", "1.0.15.RELEASE", null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new UpgradePluginVersion("io.spring.dependency-management", "1.0.15.RELEASE", null)),
+                buildGradle(
+                        """
               plugins {
                   id 'io.spring.dependency-management' version "$springDependencyManagementVersion"
               }
               """
-          ),
-          properties(
-            """
+                ),
+                properties(
+                        """
               springDependencyManagementVersion=1.1.0
               """,
-            spec -> spec.path("gradle.properties")
-          )
+                        spec -> spec.path("gradle.properties")
+                )
         );
     }
 
@@ -206,73 +206,73 @@ class UpgradePluginVersionTest implements RewriteTest {
     @Test
     void upgradePluginVersionInProperties() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "5.40.x", null)),
-          properties(
-            """
+                spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "5.40.x", null)),
+                properties(
+                        """
               rewriteVersion=5.40.0
               """,
-            """
+                        """
               rewriteVersion=5.40.6
               """,
-            spec -> spec.path("gradle.properties")
-          ),
-          buildGradle(
-            """
+                        spec -> spec.path("gradle.properties")
+                ),
+                buildGradle(
+                        """
               plugins {
                   id 'org.openrewrite.rewrite' version "$rewriteVersion"
                   id 'com.github.johnrengelman.shadow' version '6.1.0'
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void upgradePluginVersionInPropertiesWhenUsingGlobs() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.*", "5.40.X", null)),
-          properties(
-            """
+                spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.*", "5.40.X", null)),
+                properties(
+                        """
               rewriteVersion=5.40.0
               """,
-            """
+                        """
               rewriteVersion=5.40.6
               """,
-            spec -> spec.path("gradle.properties")
-          ),
-          buildGradle(
-            """
+                        spec -> spec.path("gradle.properties")
+                ),
+                buildGradle(
+                        """
               plugins {
                   id 'org.openrewrite.rewrite' version "$rewriteVersion"
                   id 'com.github.johnrengelman.shadow' version '6.1.0'
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void upgradePluginVersionInBuildGradleNotProperties() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "5.40.7", null)),
-          properties(
-            """
+                spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "5.40.7", null)),
+                properties(
+                        """
               org.openrewrite.rewrite=5.40.0
               """,
-            spec -> spec.path("gradle.properties")
-          ),
-          buildGradle(
-            """
+                        spec -> spec.path("gradle.properties")
+                ),
+                buildGradle(
+                        """
               plugins {
                   id 'org.openrewrite.rewrite' version "5.40.0"
               }
               """,
-            """
+                        """
               plugins {
                   id 'org.openrewrite.rewrite' version "5.40.7"
               }
               """
-          )
+                )
         );
     }
 }

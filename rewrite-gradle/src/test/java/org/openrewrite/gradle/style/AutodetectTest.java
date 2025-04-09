@@ -32,8 +32,8 @@ class AutodetectTest implements RewriteTest {
     @Test
     void gradleTabsAndIndents() {
         Stream<SourceFile> parse = GroovyParser.builder().build()
-          .parse(
-            """
+                .parse(
+                        """
               plugins {
                 id 'groovy-gradle-plugin'
               }
@@ -46,7 +46,7 @@ class AutodetectTest implements RewriteTest {
                 implementation 'com.github.spotbugs.snom:spotbugs-gradle-plugin:5.0.13'
               }
               """
-          );
+                );
         var detector = Autodetect.detector();
         parse.forEach(detector::sample);
         var styles = detector.build();

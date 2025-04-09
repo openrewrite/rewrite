@@ -22,6 +22,7 @@ import java.util.Map;
 
 public class ReplaceAliasWithAnchorValueVisitor<P> extends YamlVisitor<P> {
     Map<String, Yaml> anchorValues = new HashMap<>();
+
     @Override
     public Yaml visitMapping(Yaml.Mapping mapping, P p) {
         if (mapping.getAnchor() != null) {

@@ -89,6 +89,7 @@ public interface JavaSourceFile extends J, SourceFile {
 
     interface Padding {
         List<JRightPadded<Import>> getImports();
+
         JavaSourceFile withImports(List<JRightPadded<Import>> imports);
     }
 }

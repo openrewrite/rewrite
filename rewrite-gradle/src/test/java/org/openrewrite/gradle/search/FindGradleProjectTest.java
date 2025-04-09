@@ -38,20 +38,20 @@ class FindGradleProjectTest implements RewriteTest {
     @EnumSource(FindGradleProject.SearchCriteria.class)
     void isGradleGroovyProject(FindGradleProject.SearchCriteria criteria) {
         rewriteRun(
-          spec -> spec.beforeRecipe(withToolingApi())
-            .recipe(new FindGradleProject(criteria)),
-          buildGradle(
-            """
+                spec -> spec.beforeRecipe(withToolingApi())
+                        .recipe(new FindGradleProject(criteria)),
+                buildGradle(
+                        """
               plugins {
                   id 'java'
               }
               """,
-            """
+                        """
               /*~~>*/plugins {
                   id 'java'
               }
               """
-          )
+                )
         );
     }
 
@@ -59,34 +59,34 @@ class FindGradleProjectTest implements RewriteTest {
     @Test
     void isGradleKotlinProject() {
         rewriteRun(
-          text(
-            """
+                text(
+                        """
               plugins {
                   id("java")
               }
               """,
-            """
+                        """
               ~~>plugins {
                   id("java")
               }
               """,
-            spec -> spec.path("build.gradle.kts")
-          )
+                        spec -> spec.path("build.gradle.kts")
+                )
         );
     }
 
     @Test
     void mavenProject() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <groupId>org.openrewrite</groupId>
                   <artifactId>maven-project</artifactId>
                   <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 }

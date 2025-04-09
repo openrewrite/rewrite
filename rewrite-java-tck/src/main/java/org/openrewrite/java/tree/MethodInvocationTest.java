@@ -32,34 +32,34 @@ class MethodInvocationTest implements RewriteTest {
     @Test
     void methodInvocation() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                  if (method.getSimpleName().equals("foo")) {
-                      assertThat("foo").isEqualTo(method.getSimpleName());
-                      assertThat("java.lang.Integer").isEqualTo(TypeUtils.asFullyQualified(method.getType())
-                        .getFullyQualifiedName());
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                        if (method.getSimpleName().equals("foo")) {
+                            assertThat("foo").isEqualTo(method.getSimpleName());
+                            assertThat("java.lang.Integer").isEqualTo(TypeUtils.asFullyQualified(method.getType())
+                                    .getFullyQualifiedName());
 
-                      var effectParams = method.getMethodType().getParameterTypes();
-                      assertThat("java.lang.Integer").isEqualTo(TypeUtils.asFullyQualified(effectParams.get(0))
-                        .getFullyQualifiedName());
-                      assertThat("java.lang.Integer").isEqualTo(TypeUtils.asFullyQualified(TypeUtils.asArray(effectParams.get(1))
-                        .getElemType()).getFullyQualifiedName());
+                            var effectParams = method.getMethodType().getParameterTypes();
+                            assertThat("java.lang.Integer").isEqualTo(TypeUtils.asFullyQualified(effectParams.get(0))
+                                    .getFullyQualifiedName());
+                            assertThat("java.lang.Integer").isEqualTo(TypeUtils.asFullyQualified(TypeUtils.asArray(effectParams.get(1))
+                                    .getElemType()).getFullyQualifiedName());
 
-                      assertThat(method.getMethodType().getDeclaringType().getFullyQualifiedName()).isEqualTo("A");
-                  }
-                  return method;
-              }
-          })),
-          java(
-            """
+                            assertThat(method.getMethodType().getDeclaringType().getFullyQualifiedName()).isEqualTo("A");
+                        }
+                        return method;
+                    }
+                })),
+                java(
+                        """
               public class A {
                   Integer m = foo ( 0, 1, 2 );
               
                   public Integer foo(Integer n, Integer... ns) { return n; }
               }
               """
-          )
+                )
         );
     }
 
@@ -67,23 +67,23 @@ class MethodInvocationTest implements RewriteTest {
     @Test
     void genericMethodInvocation() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                  if (method.getSimpleName().equals("generic")) {
-                      var methType = method.getMethodType();
-                      assertThat(TypeUtils.asFullyQualified(methType.getReturnType()).getFullyQualifiedName())
-                        .isEqualTo("java.lang.Integer");
-                      assertThat(TypeUtils.asFullyQualified(methType.getParameterTypes().get(0)).getFullyQualifiedName())
-                        .isEqualTo("java.lang.Integer");
-                      assertThat(TypeUtils.asFullyQualified(TypeUtils.asArray(methType.getParameterTypes().get(1)).getElemType())
-                        .getFullyQualifiedName()).isEqualTo("java.lang.Integer");
-                  }
-                  return method;
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                        if (method.getSimpleName().equals("generic")) {
+                            var methType = method.getMethodType();
+                            assertThat(TypeUtils.asFullyQualified(methType.getReturnType()).getFullyQualifiedName())
+                                    .isEqualTo("java.lang.Integer");
+                            assertThat(TypeUtils.asFullyQualified(methType.getParameterTypes().get(0)).getFullyQualifiedName())
+                                    .isEqualTo("java.lang.Integer");
+                            assertThat(TypeUtils.asFullyQualified(TypeUtils.asArray(methType.getParameterTypes().get(1)).getElemType())
+                                    .getFullyQualifiedName()).isEqualTo("java.lang.Integer");
+                        }
+                        return method;
+                    }
+                })),
+                java(
+                        """
               public class A {
                   Integer o = generic ( 0, 1, 2 );
                   Integer p = this . < Integer > generic ( 0, 1, 2 );
@@ -91,31 +91,31 @@ class MethodInvocationTest implements RewriteTest {
                   public <TTTT> TTTT generic(TTTT n, TTTT... ns) { return n; }
               }
               """, spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
-                @Override
-                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Object o) {
-                    if ("ns".equals(variable.getSimpleName())) {
-                        assertThat(variable.getPrefix().getWhitespace()).isEqualTo(" ");
-                    }
-                    return super.visitVariable(variable, o);
-                }
-            })
-          )
+                            @Override
+                            public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Object o) {
+                                if ("ns".equals(variable.getSimpleName())) {
+                                    assertThat(variable.getPrefix().getWhitespace()).isEqualTo(" ");
+                                }
+                                return super.visitVariable(variable, o);
+                            }
+                        })
+                )
         );
     }
 
     @Test
     void intersectionTypeSignature() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  JavaType.Method methodType = method.getMethodType();
-                  Optional<JavaType.Method> ignore = findDeclaredMethod(methodType.getDeclaringType(), methodType.getName(), methodType.getParameterTypes());
-                  return method;
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                        JavaType.Method methodType = method.getMethodType();
+                        Optional<JavaType.Method> ignore = findDeclaredMethod(methodType.getDeclaringType(), methodType.getName(), methodType.getParameterTypes());
+                        return method;
+                    }
+                })),
+                java(
+                        """
               import java.util.Collections;
               import java.util.HashSet;
               import java.util.Set;
@@ -128,7 +128,7 @@ class MethodInvocationTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

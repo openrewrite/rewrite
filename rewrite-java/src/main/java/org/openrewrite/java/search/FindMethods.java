@@ -75,11 +75,11 @@ public class FindMethods extends Recipe {
             public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
                 // In an annotation @Example(value = "") the identifier "value" may have a method type
                 J.Identifier i = super.visitIdentifier(identifier, ctx);
-                if(i.getType() instanceof JavaType.Method && methodMatcher.matches((JavaType.Method) i.getType()) &&
-                   !(getCursor().getParentTreeCursor().getValue() instanceof J.MethodInvocation)) {
+                if (i.getType() instanceof JavaType.Method && methodMatcher.matches((JavaType.Method) i.getType()) &&
+                        !(getCursor().getParentTreeCursor().getValue() instanceof J.MethodInvocation)) {
                     JavaType.Method m = (JavaType.Method) i.getType();
                     JavaSourceFile javaSourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-                    if(javaSourceFile != null) {
+                    if (javaSourceFile != null) {
                         methodCalls.insertRow(ctx, new MethodCalls.Row(
                                 javaSourceFile.getSourcePath().toString(),
                                 m.getName(),
@@ -178,11 +178,11 @@ public class FindMethods extends Recipe {
         FindMethods findMethods = new FindMethods(methodPattern, matchOverrides);
         findMethods.methodCalls.setEnabled(false);
         return TreeVisitor.collect(
-                        findMethods.getVisitor(),
-                        j,
-                        new HashSet<>()
-                )
-                .stream()
+                findMethods.getVisitor(),
+                j,
+                new HashSet<>()
+        )
+        .stream()
                 .filter(t -> t instanceof J.MethodInvocation || t instanceof J.MemberReference || t instanceof J.NewClass)
                 .map(t -> (J) t)
                 .collect(Collectors.toSet());
@@ -194,24 +194,24 @@ public class FindMethods extends Recipe {
 
     public static Set<J.MethodDeclaration> findDeclaration(J j, String methodPattern, boolean matchOverrides) {
         return TreeVisitor.collect(
-                        new JavaIsoVisitor<ExecutionContext>() {
-                            final MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides);
+                new JavaIsoVisitor<ExecutionContext>() {
+                    final MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides);
 
-                            @Override
-                            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                                J.ClassDeclaration enclosingClass = getCursor().firstEnclosing(J.ClassDeclaration.class);
-                                if (enclosingClass != null && methodMatcher.matches(method, getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class))) {
-                                    return SearchResult.found(method);
-                                } else if (methodMatcher.matches(method.getMethodType())) {
-                                    return SearchResult.found(method);
-                                }
-                                return super.visitMethodDeclaration(method, ctx);
-                            }
-                        },
-                        j,
-                        new HashSet<>()
-                )
-                .stream()
+                    @Override
+                    public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                        J.ClassDeclaration enclosingClass = getCursor().firstEnclosing(J.ClassDeclaration.class);
+                        if (enclosingClass != null && methodMatcher.matches(method, getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class))) {
+                            return SearchResult.found(method);
+                        } else if (methodMatcher.matches(method.getMethodType())) {
+                            return SearchResult.found(method);
+                        }
+                        return super.visitMethodDeclaration(method, ctx);
+                    }
+                },
+                j,
+                new HashSet<>()
+        )
+        .stream()
                 .filter(J.MethodDeclaration.class::isInstance)
                 .map(J.MethodDeclaration.class::cast)
                 .collect(Collectors.toSet());

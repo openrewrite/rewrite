@@ -65,7 +65,7 @@ public class JavaSourceSet implements SourceSet {
      */
     @Deprecated
     public static JavaSourceSet build(String sourceSetName, Collection<Path> classpath,
-                                      JavaTypeCache ignore, boolean fullTypeInformation) {
+            JavaTypeCache ignore, boolean fullTypeInformation) {
         if (fullTypeInformation) {
             throw new UnsupportedOperationException();
         }
@@ -237,9 +237,9 @@ public class JavaSourceSet implements SourceSet {
             // Maven repository root will have a "repository.xml" file
             StringBuilder groupIdBuilder = new StringBuilder();
             int i = pathParts.size() - 3;
-            while(i > 0) {
+            while (i > 0) {
                 Path maybeRepositoryRoot = Paths.get(String.join("/", pathParts.subList(0, i)));
-                if(maybeRepositoryRoot.endsWith("repository") || Files.exists(maybeRepositoryRoot.resolve("repository.xml"))) {
+                if (maybeRepositoryRoot.endsWith("repository") || Files.exists(maybeRepositoryRoot.resolve("repository.xml"))) {
                     groupId = groupIdBuilder.substring(1); // Trim off the preceding "."
                     break;
                 }
@@ -247,7 +247,7 @@ public class JavaSourceSet implements SourceSet {
                 i--;
             }
         }
-        if(groupId == null || artifactId == null || version == null) {
+        if (groupId == null || artifactId == null || version == null) {
             return null;
         }
         return groupId + ":" + artifactId + ":" + version;
@@ -263,11 +263,11 @@ public class JavaSourceSet implements SourceSet {
             if (Files.isRegularFile(path)) {
                 try (JarFile jarFile = new JarFile(path.toFile())) {
                     Enumeration<JarEntry> entries = jarFile.entries();
-                    while(entries.hasMoreElements()) {
+                    while (entries.hasMoreElements()) {
                         String entryName = entries.nextElement().getName();
-                        if(entryName.endsWith(".class")) {
+                        if (entryName.endsWith(".class")) {
                             String s = entryNameToClassName(entryName);
-                            if(isDeclarable(s)) {
+                            if (isDeclarable(s)) {
                                 types.add(JavaType.ShallowClass.build(s));
                             }
                         }
@@ -280,7 +280,7 @@ public class JavaSourceSet implements SourceSet {
                         String pathStr = file.toString();
                         if (pathStr.endsWith(".class")) {
                             String s = entryNameToClassName(pathStr);
-                            if((acceptPackage == null || s.startsWith(acceptPackage)) &&isDeclarable(s)) {
+                            if ((acceptPackage == null || s.startsWith(acceptPackage)) && isDeclarable(s)) {
                                 types.add(JavaType.ShallowClass.build(s));
                             }
                         }
@@ -297,7 +297,7 @@ public class JavaSourceSet implements SourceSet {
     private static List<JavaType.FullyQualified> getJavaStandardLibraryTypes() {
         List<JavaType.FullyQualified> javaStandardLibraryTypes = new ArrayList<>();
         Path toolsJar = Paths.get(System.getProperty("java.home")).resolve("../lib/tools.jar");
-        if(Files.exists(toolsJar)) {
+        if (Files.exists(toolsJar)) {
             javaStandardLibraryTypes.addAll(typesFromPath(toolsJar, "java"));
         } else {
             javaStandardLibraryTypes.addAll(typesFromPath(
@@ -309,7 +309,7 @@ public class JavaSourceSet implements SourceSet {
 
     private static String entryNameToClassName(String entryName) {
         String result = entryName;
-        if(entryName.startsWith("modules/java.base/")) {
+        if (entryName.startsWith("modules/java.base/")) {
             result = entryName.substring("modules/java.base/".length());
         }
         return result.substring(0, result.length() - ".class".length())
@@ -320,7 +320,7 @@ public class JavaSourceSet implements SourceSet {
         int dotIndex = Math.max(className.lastIndexOf("."), className.lastIndexOf('$'));
         className = className.substring(dotIndex + 1);
         return !className.isEmpty() &&
-               Character.isJavaIdentifierPart(className.charAt(0)) &&
-               !Character.isDigit(className.charAt(0));
+                Character.isJavaIdentifierPart(className.charAt(0)) &&
+                !Character.isDigit(className.charAt(0));
     }
 }

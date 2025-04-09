@@ -22,92 +22,94 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.xml.Assertions.xml;
 
- class RemoveXmlTagTest implements RewriteTest {
+class RemoveXmlTagTest implements RewriteTest {
     @Override
-    public void defaults(RecipeSpec spec) {spec.recipe(new RemoveXmlTag("//bean", "**/beans.xml"));}
+    public void defaults(RecipeSpec spec) {
+        spec.recipe(new RemoveXmlTag("//bean", "**/beans.xml"));
+    }
 
 
     @DocumentExample
     @Test
     void removeMatchingElementInMatchingFile() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveXmlTag("//bean", "**/beans.xml")),
-          xml(
-            """
+                spec -> spec.recipe(new RemoveXmlTag("//bean", "**/beans.xml")),
+                xml(
+                        """
               <beans>
                   <bean id='myBean.subpackage.subpackage2'/>
                   <other id='myBean.subpackage.subpackage2'/>
               </beans>
               """,
-            """
+                        """
               <beans>
                   <other id='myBean.subpackage.subpackage2'/>
               </beans>
               """,
-            documentSourceSpec -> documentSourceSpec.path("my/project/beans.xml")
+                        documentSourceSpec -> documentSourceSpec.path("my/project/beans.xml")
 
-          )
+                )
         );
     }
 
     @Test
     void elementNotMatched() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveXmlTag("//notBean", null)),
-          xml(
-            """
+                spec -> spec.recipe(new RemoveXmlTag("//notBean", null)),
+                xml(
+                        """
               <beans>
                   <bean notBean='myBean.subpackage.subpackage2'/>
                   <other id='myBean.subpackage.subpackage2'/>
               </beans>
               """
-          )
+                )
         );
     }
 
     @Test
     void fileNotMatched() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveXmlTag("//bean", "**/beans.xml")),
-          xml(
-            """
+                spec -> spec.recipe(new RemoveXmlTag("//bean", "**/beans.xml")),
+                xml(
+                        """
               <beans>
                   <bean id='myBean.subpackage.subpackage2'/>
                   <other id='myBean.subpackage.subpackage2'/>
               </beans>
               """,
-            documentSourceSpec -> documentSourceSpec.path("my/project/notBeans.xml")
-          )
+                        documentSourceSpec -> documentSourceSpec.path("my/project/notBeans.xml")
+                )
         );
     }
 
     @Test
     void fileMatcherEmpty() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveXmlTag("//bean", null)),
-          xml(
-            """
+                spec -> spec.recipe(new RemoveXmlTag("//bean", null)),
+                xml(
+                        """
               <beans>
                   <bean id='myBean.subpackage.subpackage2'/>
                   <other id='myBean.subpackage.subpackage2'/>
               </beans>
               """,
-            """
+                        """
               <beans>
                   <other id='myBean.subpackage.subpackage2'/>
               </beans>
               """,
-            documentSourceSpec -> documentSourceSpec.path("my/project/notBeans.xml")
-          )
+                        documentSourceSpec -> documentSourceSpec.path("my/project/notBeans.xml")
+                )
         );
     }
 
     @Test
     void removeEmptyParentTag() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveXmlTag("//project/build/pluginManagement/plugins/plugin", null)),
-          xml(
-            """
+                spec -> spec.recipe(new RemoveXmlTag("//project/build/pluginManagement/plugins/plugin", null)),
+                xml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.example</groupId>
@@ -135,7 +137,7 @@ import static org.openrewrite.xml.Assertions.xml;
                   </build>
               </project>
               """,
-            """
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.example</groupId>
@@ -154,7 +156,7 @@ import static org.openrewrite.xml.Assertions.xml;
                   </build>
               </project>
               """
-          )
+                )
         );
     }
 }

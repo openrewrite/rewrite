@@ -25,36 +25,36 @@ class ImportTest implements RewriteTest {
     @Test
     void anImport() {
         rewriteRun(
-          proto(
-            """
+                proto(
+                        """
               syntax = 'proto2';
               import 'org/openrewrite.proto';
               """
-          )
+                )
         );
     }
 
     @Test
     void importPublic() {
         rewriteRun(
-          proto(
-            """
+                proto(
+                        """
               syntax = 'proto2';
               import public "org/openrewrite.proto";
               """
-          )
+                )
         );
     }
 
     @Test
     void importWeak() {
         rewriteRun(
-          proto(
-            """
+                proto(
+                        """
               syntax = 'proto2';
               import weak 'org/openrewrite.proto';
               """
-          )
+                )
         );
     }
 }

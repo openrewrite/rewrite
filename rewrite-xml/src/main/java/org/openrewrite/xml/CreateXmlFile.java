@@ -45,9 +45,9 @@ public class CreateXmlFile extends ScanningRecipe<AtomicBoolean> {
     @Option(displayName = "File contents",
             description = "Multiline text content for the file.",
             example = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-                      "<root>\n" +
-                      "    <child>1</child>" +
-                      "</root>",
+                    "<root>\n" +
+                    "    <child>1</child>" +
+                    "</root>",
             required = false)
     @Nullable
     String fileContents;

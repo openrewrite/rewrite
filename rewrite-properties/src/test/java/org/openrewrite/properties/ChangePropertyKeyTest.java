@@ -31,26 +31,26 @@ class ChangePropertyKeyTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new ChangePropertyKey(
-          "management.metrics.binders.files.enabled",
-          "management.metrics.enable.process.files",
-          null,
-          null));
+                "management.metrics.binders.files.enabled",
+                "management.metrics.enable.process.files",
+                null,
+                null));
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/575")
     @Test
     void preserveComment() {
         rewriteRun(
-          properties(
-            """
+                properties(
+                        """
               # comment
               management.metrics.binders.files.enabled=true
               """,
-            """
+                        """
               # comment
               management.metrics.enable.process.files=true
               """
-          )
+                )
         );
     }
 
@@ -58,37 +58,37 @@ class ChangePropertyKeyTest implements RewriteTest {
     @Test
     void changeKey() {
         rewriteRun(
-          properties(
-            "management.metrics.binders.files.enabled=true",
-            "management.metrics.enable.process.files=true"
-          )
+                properties(
+                        "management.metrics.binders.files.enabled=true",
+                        "management.metrics.enable.process.files=true"
+                )
         );
     }
 
     @ParameterizedTest
     @ValueSource(strings = {
-      "acme.my-project.person.first-name",
-      "acme.myProject.person.firstName",
-      "acme.my_project.person.first_name",
+            "acme.my-project.person.first-name",
+            "acme.myProject.person.firstName",
+            "acme.my_project.person.first_name",
     })
     @Issue("https://github.com/openrewrite/rewrite/issues/1168")
     void relaxedBinding(String propertyKey) {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyKey(
-            propertyKey,
-            "acme.my-project.person.change-to",
-            true,
-            null)),
-          properties(
-            """
+                spec -> spec.recipe(new ChangePropertyKey(
+                        propertyKey,
+                        "acme.my-project.person.change-to",
+                        true,
+                        null)),
+                properties(
+                        """
               acme.my-project.person.first-name=example
               management.contextPath=/manage
               """,
-            """
+                        """
               acme.my-project.person.change-to=example
               management.contextPath=/manage
               """
-          )
+                )
         );
     }
 
@@ -96,37 +96,37 @@ class ChangePropertyKeyTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1168")
     void exactMatch() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyKey(
-            "acme.my-project.person.first-name",
-            "acme.my-project.person.change-to",
-            false,
-            null)),
-          properties(
-            """
+                spec -> spec.recipe(new ChangePropertyKey(
+                        "acme.my-project.person.first-name",
+                        "acme.my-project.person.change-to",
+                        false,
+                        null)),
+                properties(
+                        """
               acme.my-project.person.first-name=example
               acme.myProject.person.firstName=example
               acme.my_project.person.first_name=example
               """,
-            """
+                        """
               acme.my-project.person.change-to=example
               acme.myProject.person.firstName=example
               acme.my_project.person.first_name=example
               """
-          )
+                )
         );
     }
 
     @Test
     void regexMatch() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyKey("spring\\.resources\\.(.+)", "spring.web.resources.$1", null, true)),
-          properties(
-            "spring.resources.chain.strategy.content.enabled=true",
-            "spring.web.resources.chain.strategy.content.enabled=true"
-          ),
-          properties(
-            "springzresourceszchain.strategy.content.enabled=true"
-          )
+                spec -> spec.recipe(new ChangePropertyKey("spring\\.resources\\.(.+)", "spring.web.resources.$1", null, true)),
+                properties(
+                        "spring.resources.chain.strategy.content.enabled=true",
+                        "spring.web.resources.chain.strategy.content.enabled=true"
+                ),
+                properties(
+                        "springzresourceszchain.strategy.content.enabled=true"
+                )
         );
     }
 
@@ -134,10 +134,10 @@ class ChangePropertyKeyTest implements RewriteTest {
     @Test
     void regexMatchDefaultDisabled() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyKey("spring\\.resources\\.(.+)", "spring.web.resources.$1", null, null)),
-          properties(
-            "spring.resources.chain.strategy.content.enabled=true"
-          )
+                spec -> spec.recipe(new ChangePropertyKey("spring\\.resources\\.(.+)", "spring.web.resources.$1", null, null)),
+                properties(
+                        "spring.resources.chain.strategy.content.enabled=true"
+                )
         );
     }
 }

@@ -52,7 +52,7 @@ public class FindRecipes extends Recipe {
     @Override
     public String getDescription() {
         return "This recipe finds all OpenRewrite recipes, primarily to produce a data table that is being used " +
-               "to experiment with fine-tuning a large language model to produce more recipes.";
+                "to experiment with fine-tuning a large language model to produce more recipes.";
     }
 
     @Override

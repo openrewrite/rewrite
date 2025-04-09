@@ -25,28 +25,28 @@ class ServiceTest implements RewriteTest {
     @Test
     void options() {
         rewriteRun(
-          proto(
-            """
+                proto(
+                        """
               syntax = 'proto2';
               service MyService {
                 option my_option = "test";
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void rpc() {
         rewriteRun(
-          proto(
-            """
+                proto(
+                        """
               syntax = 'proto2';
               service SearchService {
                 rpc Search ( SearchRequest ) returns ( SearchResponse );
               }
               """
-          )
+                )
         );
     }
 }

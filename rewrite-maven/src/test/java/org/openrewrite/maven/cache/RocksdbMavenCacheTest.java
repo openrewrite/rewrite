@@ -38,7 +38,7 @@ class RocksdbMavenCacheTest {
 
             //Add a pom:
             Pom pom = parsePomXml(
-              """
+                    """
                 <project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>com.foo</groupId>
@@ -75,7 +75,7 @@ class RocksdbMavenCacheTest {
 
             //Add a pom:
             Pom pom = parsePomXml(
-              """
+                    """
                 <project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>com.foo</groupId>

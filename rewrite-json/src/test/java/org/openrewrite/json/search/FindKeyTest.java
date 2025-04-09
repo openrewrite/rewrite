@@ -29,9 +29,9 @@ class FindKeyTest implements RewriteTest {
     @Test
     void findKey() {
         rewriteRun(
-          spec -> spec.recipe(new FindKey("$.metadata.name")),
-          json(
-                """
+                spec -> spec.recipe(new FindKey("$.metadata.name")),
+                json(
+                        """
               {
                 "apiVersion": "v1",
                 "metadata": {
@@ -40,7 +40,7 @@ class FindKeyTest implements RewriteTest {
                 }
               }
               """,
-            """
+                        """
               {
                 "apiVersion": "v1",
                 "metadata": {
@@ -49,7 +49,7 @@ class FindKeyTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 
@@ -57,9 +57,9 @@ class FindKeyTest implements RewriteTest {
     @Test
     void findKeyWithMultipleBinaryExpressions() {
         rewriteRun(
-          spec -> spec.recipe(new FindKey("$.foo.bar[?(@.types == 'something' && @.group == 'group' && @.category == 'match' && @.type == 'type')].pattern")),
-          json(
-                """
+                spec -> spec.recipe(new FindKey("$.foo.bar[?(@.types == 'something' && @.group == 'group' && @.category == 'match' && @.type == 'type')].pattern")),
+                json(
+                        """
               {
                 "foo": {
                   "bar": [
@@ -81,7 +81,7 @@ class FindKeyTest implements RewriteTest {
                 }
               }
               """,
-            """
+                        """
               {
                 "foo": {
                   "bar": [
@@ -103,7 +103,7 @@ class FindKeyTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 }

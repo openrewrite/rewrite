@@ -32,7 +32,7 @@ class ListUtilsTest {
         void flatMap() {
             var l = List.of(1.0, 2.0, 3.0);
             assertThat(ListUtils.flatMap(l, l2 -> l2.intValue() % 2 == 0 ? List.of(2.0, 2.1, 2.2) : l2))
-              .containsExactly(1.0, 2.0, 2.1, 2.2, 3.0);
+                    .containsExactly(1.0, 2.0, 2.1, 2.2, 3.0);
         }
 
         @Test
@@ -53,28 +53,28 @@ class ListUtilsTest {
         void replaceSingleWithMultipleAtPosition0() {
             var l = List.of(1);
             assertThat(ListUtils.flatMap(l, l2 -> List.of(2, 3)))
-              .containsExactly(2, 3);
+                    .containsExactly(2, 3);
         }
 
         @Test
         void removeSingleItem() {
             var l = List.of(1, 2, 3);
             assertThat(ListUtils.flatMap(l, l1 -> l1.equals(2) ? null : l1))
-              .containsExactly(1, 3);
+                    .containsExactly(1, 3);
         }
 
         @Test
         void replaceItemWithCollectionThenRemoveNextItem() {
             var l = List.of(2, 0);
             assertThat(ListUtils.flatMap(l, l1 -> l1.equals(2) ? List.of(10, 11) : null))
-              .containsExactly(10, 11);
+                    .containsExactly(10, 11);
         }
 
         @Test
         void removeByAddingEmptyCollection() {
             var l = List.of(2, 0);
             assertThat(ListUtils.flatMap(l, l1 -> l1.equals(2) ? List.of(10, 11) : List.of()))
-              .containsExactly(10, 11);
+                    .containsExactly(10, 11);
         }
     }
 
@@ -85,16 +85,19 @@ class ListUtilsTest {
             var l = Arrays.asList(1, 2, 3);
             assertThat(ListUtils.map(l, (i, e) -> e)).isSameAs(l);
         }
+
         @Test
         void identityMapWithNulls() {
             var l = Arrays.asList(1, null, 3);
             assertThat(ListUtils.map(l, (i, e) -> e)).isSameAs(l);
         }
+
         @Test
         void removeElements() {
             var l = Arrays.asList(1, 2, 3);
             assertThat(ListUtils.map(l, (i, e) -> i % 2 == 0 ? null : e)).isEqualTo(List.of(2));
         }
+
         @Test
         void removeElementsWithNulls() {
             var l = Arrays.asList(0, 1, 2, null, 4, 5);

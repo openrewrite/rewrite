@@ -27,15 +27,15 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withToolingApi())
-          .recipe(new RemoveRedundantDependencyVersions(null, null, null, null));
+                .recipe(new RemoveRedundantDependencyVersions(null, null, null, null));
     }
 
     @DocumentExample
     @Test
     void literal() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id "java"
               }
@@ -49,7 +49,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   implementation("org.apache.commons:commons-lang3:3.14.0")
               }
               """,
-            """
+                        """
               plugins {
                   id "java"
               }
@@ -63,15 +63,15 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   implementation("org.apache.commons:commons-lang3")
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void mapEntry() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id "java"
               }
@@ -85,7 +85,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   implementation(group: "org.apache.commons", name: "commons-lang3", version: "3.14.0")
               }
               """,
-            """
+                        """
               plugins {
                   id "java"
               }
@@ -99,15 +99,15 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   implementation(group: "org.apache.commons", name: "commons-lang3")
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void mapLiteral() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id "java"
               }
@@ -121,7 +121,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   implementation([group: "org.apache.commons", name: "commons-lang3", version: "3.14.0"])
               }
               """,
-            """
+                        """
               plugins {
                   id "java"
               }
@@ -135,15 +135,15 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   implementation([group: "org.apache.commons", name: "commons-lang3"])
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void enforcedPlatform() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id "java"
               }
@@ -157,7 +157,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   implementation("org.apache.commons:commons-lang3:3.14.0")
               }
               """,
-            """
+                        """
               plugins {
                   id "java"
               }
@@ -171,15 +171,15 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   implementation("org.apache.commons:commons-lang3")
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void platformUsingMapEntry() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id "java"
               }
@@ -193,7 +193,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   implementation("org.apache.commons:commons-lang3:3.14.0")
               }
               """,
-            """
+                        """
               plugins {
                   id "java"
               }
@@ -207,15 +207,15 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   implementation("org.apache.commons:commons-lang3")
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void freestandingScript() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               repositories {
                   mavenCentral()
               }
@@ -225,7 +225,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   implementation("org.apache.commons:commons-lang3:3.14.0")
               }
               """,
-            """
+                        """
               repositories {
                   mavenCentral()
               }
@@ -235,25 +235,25 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   implementation("org.apache.commons:commons-lang3")
               }
               """,
-            spec -> spec.path("dependencies.gradle")
-          ),
-          buildGradle(
-            """
+                        spec -> spec.path("dependencies.gradle")
+                ),
+                buildGradle(
+                        """
               plugins {
                   id("java")
               }
               
               apply from: 'dependencies.gradle'
               """
-          )
+                )
         );
     }
 
     @Test
     void transitiveConfiguration() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id "java-library"
               }
@@ -267,7 +267,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   implementation("org.apache.commons:commons-lang3:3.14.0")
               }
               """,
-            """
+                        """
               plugins {
                   id "java-library"
               }
@@ -281,15 +281,15 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   implementation("org.apache.commons:commons-lang3")
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unmanagedDependency() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id "java"
               }
@@ -304,7 +304,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   testImplementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
               }
               """
-          )
+                )
         );
     }
 }

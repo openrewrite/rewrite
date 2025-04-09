@@ -31,18 +31,18 @@ class HasJavaVersionTest implements RewriteTest {
     @ValueSource(strings = {"[8,17)", "11", "11.x"})
     void matches(String version) {
         rewriteRun(
-          spec -> spec.recipe(new HasJavaVersion(version, false)),
-          java(
-            """
+                spec -> spec.recipe(new HasJavaVersion(version, false)),
+                java(
+                        """
               class Test {
               }
               """,
-            """
+                        """
               /*~~>*/class Test {
               }
               """,
-            spec -> spec.markers(javaVersion(11))
-          )
+                        spec -> spec.markers(javaVersion(11))
+                )
         );
     }
 
@@ -50,21 +50,21 @@ class HasJavaVersionTest implements RewriteTest {
     @ValueSource(strings = {"[8,17)", "11"})
     void noMatch(String version) {
         rewriteRun(
-          spec -> spec.recipe(new HasJavaVersion(version, false)),
-          java(
-            """
+                spec -> spec.recipe(new HasJavaVersion(version, false)),
+                java(
+                        """
               class Test {
               }
               """,
-            spec -> spec.markers(javaVersion(17))
-          )
+                        spec -> spec.markers(javaVersion(17))
+                )
         );
     }
 
     @Test
     void declarativePrecondition() {
         rewriteRun(
-          spec -> spec.recipeFromYaml("""
+                spec -> spec.recipeFromYaml("""
             ---
             type: specs.openrewrite.org/v1beta/recipe
             name: org.openrewrite.PreconditionTest
@@ -76,7 +76,7 @@ class HasJavaVersionTest implements RewriteTest {
               - org.openrewrite.text.ChangeText:
                  toText: 2
             """, "org.openrewrite.PreconditionTest"),
-          text("1")
+                text("1")
         );
     }
 
@@ -84,7 +84,7 @@ class HasJavaVersionTest implements RewriteTest {
     @Test
     void declarativePreconditionMatch() {
         rewriteRun(
-          spec -> spec.recipeFromYaml("""
+                spec -> spec.recipeFromYaml("""
             ---
             type: specs.openrewrite.org/v1beta/recipe
             name: org.openrewrite.PreconditionTest
@@ -96,14 +96,14 @@ class HasJavaVersionTest implements RewriteTest {
               - org.openrewrite.text.ChangeText:
                  toText: 2
             """, "org.openrewrite.PreconditionTest"),
-          text("1", "2", spec -> spec.markers(javaVersion(11)))
+                text("1", "2", spec -> spec.markers(javaVersion(11)))
         );
     }
 
     @Test
     void combinedWithFindMethod() {
         rewriteRun(
-          spec -> spec.recipeFromYaml("""
+                spec -> spec.recipeFromYaml("""
             ---
             type: specs.openrewrite.org/v1beta/recipe
             name: org.openrewrite.CombinedWithFindMethod
@@ -114,8 +114,8 @@ class HasJavaVersionTest implements RewriteTest {
               - org.openrewrite.java.search.FindMethods:
                   methodPattern: java.util.List add(..)
             """, "org.openrewrite.CombinedWithFindMethod"),
-          java(
-            """
+                java(
+                        """
               import java.util.List;
               import java.util.ArrayList;
               class Test {
@@ -125,7 +125,7 @@ class HasJavaVersionTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               /*~~>*/import java.util.List;
               import java.util.ArrayList;
               class Test {
@@ -141,7 +141,7 @@ class HasJavaVersionTest implements RewriteTest {
     @Test
     void combinedWithFindMethodFirst() {
         rewriteRun(
-          spec -> spec.recipeFromYaml("""
+                spec -> spec.recipeFromYaml("""
             ---
             type: specs.openrewrite.org/v1beta/recipe
             name: org.openrewrite.CombinedWithFindMethod
@@ -153,8 +153,8 @@ class HasJavaVersionTest implements RewriteTest {
                   version: 11
 
             """, "org.openrewrite.CombinedWithFindMethod"),
-          java(
-            """
+                java(
+                        """
               import java.util.List;
               import java.util.ArrayList;
               class Test {
@@ -164,7 +164,7 @@ class HasJavaVersionTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               /*~~>*/import java.util.List;
               import java.util.ArrayList;
               class Test {

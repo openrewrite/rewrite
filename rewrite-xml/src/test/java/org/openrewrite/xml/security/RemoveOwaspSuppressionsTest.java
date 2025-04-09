@@ -47,7 +47,7 @@ class RemoveOwaspSuppressionsTest implements RewriteTest {
                                         </notes>
                                     </suppress>
                                 </suppressions>"""
-                                .formatted(dayBeforeYesterdayString),
+                        .formatted(dayBeforeYesterdayString),
                         """
                                 <?xml version="1.0" encoding="UTF-8" ?>
                                 <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
@@ -77,7 +77,7 @@ class RemoveOwaspSuppressionsTest implements RewriteTest {
                                         </notes>
                                     </suppress>
                                 </suppressions>""")
-                                .formatted(tomorrowString, dayBeforeYesterdayString),
+                        .formatted(tomorrowString, dayBeforeYesterdayString),
                         """
                                 <?xml version="1.0" encoding="UTF-8" ?>
                                 <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
@@ -111,7 +111,7 @@ class RemoveOwaspSuppressionsTest implements RewriteTest {
                                         </notes>
                                     </suppress>
                                 </suppressions>""")
-                                .formatted(dayBeforeYesterdayString, dayBeforeYesterdayStringNoZ),
+                        .formatted(dayBeforeYesterdayString, dayBeforeYesterdayStringNoZ),
                         """
                                 <?xml version="1.0" encoding="UTF-8" ?>
                                 <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
@@ -143,7 +143,7 @@ class RemoveOwaspSuppressionsTest implements RewriteTest {
                                         </notes>
                                     </suppress>
                                 </suppressions>""")
-                                .formatted(dayBeforeYesterdayString),
+                        .formatted(dayBeforeYesterdayString),
                         """
                                 <?xml version="1.0" encoding="UTF-8" ?>
                                 <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">

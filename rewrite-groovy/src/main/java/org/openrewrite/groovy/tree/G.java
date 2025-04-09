@@ -383,7 +383,7 @@ public interface G extends J {
         @Override
         public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
             J j = v.visit(getExpression(), p);
-            if(j instanceof ExpressionStatement) {
+            if (j instanceof ExpressionStatement) {
                 return j;
             } else if (j instanceof Expression) {
                 return withExpression((Expression) j);
@@ -418,7 +418,7 @@ public interface G extends J {
 
         @Override
         public <T extends J> T withType(@Nullable JavaType type) {
-            if(expression instanceof J.MethodInvocation) {
+            if (expression instanceof J.MethodInvocation) {
                 if (!(type instanceof JavaType.Method)) {
                     return (T) this;
                 }

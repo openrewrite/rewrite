@@ -43,7 +43,7 @@ class StringUtilsTest {
           """)).isFalse();
         assertThat(containsOnlyWhitespaceAndComments("a//")).isFalse();
         assertThat(containsOnlyWhitespaceAndComments(
-          """
+                """
                 /*
                 */
                 a
@@ -119,16 +119,16 @@ class StringUtilsTest {
     @Test
     void greatestCommonMargin() {
         assertThat(StringUtils.greatestCommonMargin(
-          "" +
-          "  \n" +
-          "   \n" +
-          "     \n")).isEqualTo("  ");
+                "" +
+                        "  \n" +
+                        "   \n" +
+                        "     \n")).isEqualTo("  ");
 
         assertThat(StringUtils.greatestCommonMargin(
-          "" +
-          "   \n" +
-          "  s \n" +
-          "    \n")).isEqualTo("  ");
+                "" +
+                        "   \n" +
+                        "  s \n" +
+                        "    \n")).isEqualTo("  ");
 
         assertThat(StringUtils.greatestCommonMargin("")).isEqualTo("");
         assertThat(StringUtils.greatestCommonMargin("\n\n")).isEqualTo("");

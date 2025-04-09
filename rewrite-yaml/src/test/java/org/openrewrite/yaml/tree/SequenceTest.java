@@ -26,47 +26,47 @@ class SequenceTest implements RewriteTest {
     @Test
     void blockSequence() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               - apples
               - oranges
               """,
-            spec -> spec.afterRecipe(y -> {
-                assertThat(((Yaml.Sequence) (y.getDocuments().get(0).getBlock())).getEntries().stream()
-                  .map(Yaml.Sequence.Entry::getBlock)
-                  .map(block -> ((Yaml.Scalar) block).getValue()))
-                  .containsExactly("apples", "oranges");
-            })
-          )
+                        spec -> spec.afterRecipe(y -> {
+                            assertThat(((Yaml.Sequence) (y.getDocuments().get(0).getBlock())).getEntries().stream()
+                                    .map(Yaml.Sequence.Entry::getBlock)
+                                    .map(block -> ((Yaml.Scalar) block).getValue()))
+                                    .containsExactly("apples", "oranges");
+                        })
+                )
         );
     }
 
     @Test
     void blockSequenceOfMappings() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
                       - name: Fred
                         age: 45
                       - name: Barney
                         age: 25
               """
-          )
+                )
         );
     }
 
     @Test
     void multiLineInlineSequenceWithFunnyIndentation() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               [
                   a,
               b,
                       c,
               ]
               """
-          )
+                )
         );
     }
 
@@ -93,21 +93,21 @@ class SequenceTest implements RewriteTest {
     @Test
     void sequencesOfSequencesOfSequences() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               [[],
               [1, 2, 3, []],
               [ [ ] ],]
               """
-          )
+                )
         );
     }
 
     @Test
     void sequenceOfMixedSequences() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
                   - []
                   - [ 1 ]
                   - foo: []
@@ -115,22 +115,22 @@ class SequenceTest implements RewriteTest {
                   - baz: [
                       a]
               """
-          )
+                )
         );
     }
 
     @Test
     void inlineSequenceWithWhitespaceBeforeCommas() {
         rewriteRun(
-          yaml(
-            "[1 ,2  ,0]",
-            spec -> spec.afterRecipe(y -> {
-                Yaml.Sequence seq = (Yaml.Sequence) y.getDocuments().get(0).getBlock();
-                assertThat(seq.getEntries().get(0).getTrailingCommaPrefix()).isEqualTo(" ");
-                assertThat(seq.getEntries().get(1).getTrailingCommaPrefix()).isEqualTo("  ");
-                assertThat(seq.getEntries().get(2).getTrailingCommaPrefix()).isNull();
-            })
-          )
+                yaml(
+                        "[1 ,2  ,0]",
+                        spec -> spec.afterRecipe(y -> {
+                            Yaml.Sequence seq = (Yaml.Sequence) y.getDocuments().get(0).getBlock();
+                            assertThat(seq.getEntries().get(0).getTrailingCommaPrefix()).isEqualTo(" ");
+                            assertThat(seq.getEntries().get(1).getTrailingCommaPrefix()).isEqualTo("  ");
+                            assertThat(seq.getEntries().get(2).getTrailingCommaPrefix()).isNull();
+                        })
+                )
         );
     }
 }

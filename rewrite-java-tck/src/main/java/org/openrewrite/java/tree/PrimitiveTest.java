@@ -25,14 +25,14 @@ class PrimitiveTest implements RewriteTest {
     @Test
     void primitiveField() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   int n = 0;
                   char c = 'a';
               }
               """
-          )
+                )
         );
     }
 }

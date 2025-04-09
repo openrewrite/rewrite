@@ -29,27 +29,27 @@ class HclBlockTest implements RewriteTest {
     @Test
     void blockExpression() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               tags = {
                 git_file = "terraform/aws/ec2.tf"
                 git_repo = "terragoat"
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void blockUnquotedLabel() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               resource azurerm_monitor_log_profile "logging_profile" {
                 device_name = "/dev/sdh"
               }
               """
-          )
+                )
         );
     }
 
@@ -57,21 +57,21 @@ class HclBlockTest implements RewriteTest {
     @Test
     void binaryOperator() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
                create_vnic_details {
                  assign_public_ip = (var.instance_visibility == "Private") ? false : true
                }
                """
-          )
+                )
         );
     }
 
     @Test
     void block() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               resource "aws_volume_attachment" "ebs_att" {
                 device_name = "/dev/sdh"
                 volume_id   = "aws_ebs_volume.web_host_storage.id"
@@ -83,18 +83,18 @@ class HclBlockTest implements RewriteTest {
                 route_table_id = aws_route_table.web_rtb.id
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void oneLineBlock() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               resource "aws_volume_attachment" "ebs_att" { device_name = "/dev/sdh" }
               """
-          )
+                )
         );
     }
 }

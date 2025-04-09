@@ -29,17 +29,17 @@ class GradleDependencyTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec
-          .beforeRecipe(withToolingApi())
-          .recipe(RewriteTest.toRecipe(() -> gradleDependency().asVisitor(dep ->
-            SearchResult.found(dep.getTree(), dep.getResolvedDependency().getGav().toString()))));
+                .beforeRecipe(withToolingApi())
+                .recipe(RewriteTest.toRecipe(() -> gradleDependency().asVisitor(dep ->
+                        SearchResult.found(dep.getTree(), dep.getResolvedDependency().getGav().toString()))));
     }
 
     @DocumentExample
     @Test
     void literal() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id "java"
               }
@@ -52,7 +52,7 @@ class GradleDependencyTest implements RewriteTest {
                   implementation "com.google.guava:guava:28.2-jre"
               }
               """,
-            """
+                        """
               plugins {
                   id "java"
               }
@@ -65,15 +65,15 @@ class GradleDependencyTest implements RewriteTest {
                   /*~~(com.google.guava:guava:28.2-jre)~~>*/implementation "com.google.guava:guava:28.2-jre"
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void groovyString() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id "java"
               }
@@ -87,7 +87,7 @@ class GradleDependencyTest implements RewriteTest {
                   implementation "com.google.guava:guava:${version}"
               }
               """,
-            """
+                        """
               plugins {
                   id "java"
               }
@@ -101,15 +101,15 @@ class GradleDependencyTest implements RewriteTest {
                   /*~~(com.google.guava:guava:28.2-jre)~~>*/implementation "com.google.guava:guava:${version}"
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void groovyMapEntry() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id "java"
               }
@@ -122,7 +122,7 @@ class GradleDependencyTest implements RewriteTest {
                   implementation group: "com.google.guava", name: "guava", version: "28.2-jre"
               }
               """,
-            """
+                        """
               plugins {
                   id "java"
               }
@@ -135,15 +135,15 @@ class GradleDependencyTest implements RewriteTest {
                   /*~~(com.google.guava:guava:28.2-jre)~~>*/implementation group: "com.google.guava", name: "guava", version: "28.2-jre"
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void platform() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id "java"
               }
@@ -156,7 +156,7 @@ class GradleDependencyTest implements RewriteTest {
                   implementation(platform("com.google.guava:guava:28.2-jre"))
               }
               """,
-            """
+                        """
               plugins {
                   id "java"
               }
@@ -169,15 +169,15 @@ class GradleDependencyTest implements RewriteTest {
                   /*~~(com.google.guava:guava:28.2-jre)~~>*/implementation(platform("com.google.guava:guava:28.2-jre"))
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void enforcedPlatform() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id "java"
               }
@@ -190,7 +190,7 @@ class GradleDependencyTest implements RewriteTest {
                   implementation(enforcedPlatform("com.google.guava:guava:28.2-jre"))
               }
               """,
-            """
+                        """
               plugins {
                   id "java"
               }
@@ -203,7 +203,7 @@ class GradleDependencyTest implements RewriteTest {
                   /*~~(com.google.guava:guava:28.2-jre)~~>*/implementation(enforcedPlatform("com.google.guava:guava:28.2-jre"))
               }
               """
-          )
+                )
         );
     }
 }

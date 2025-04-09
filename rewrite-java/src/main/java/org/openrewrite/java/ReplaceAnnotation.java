@@ -56,7 +56,7 @@ public class ReplaceAnnotation extends Recipe {
     @Override
     public String getDescription() {
         return "Replace an Annotation with another one if the annotation pattern matches. " +
-               "Only fixed parameters can be set in the replacement.";
+                "Only fixed parameters can be set in the replacement.";
     }
 
     @Override

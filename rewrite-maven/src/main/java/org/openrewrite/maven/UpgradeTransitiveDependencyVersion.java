@@ -44,9 +44,9 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<AddManage
     @Override
     public String getDescription() {
         return "Upgrades the version of a transitive dependency in a Maven pom file. " +
-               "Leaves direct dependencies unmodified. " +
-               "Can be paired with the regular Upgrade Dependency Version recipe to upgrade a dependency everywhere, " +
-               "regardless of whether it is direct or transitive.";
+                "Leaves direct dependencies unmodified. " +
+                "Can be paired with the regular Upgrade Dependency Version recipe to upgrade a dependency everywhere, " +
+                "regardless of whether it is direct or transitive.";
     }
 
     @Option(displayName = "Group",
@@ -89,7 +89,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<AddManage
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select 29.0-jre",
+                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
@@ -138,7 +138,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<AddManage
                         .stream()
                         .filter(dep -> dep.getDepth() > 0)
                         .collect(toCollection(LinkedHashSet::new));
-                if(matchingDependencies.isEmpty()) {
+                if (matchingDependencies.isEmpty()) {
                     return document;
                 }
                 Xml.Document d = document;

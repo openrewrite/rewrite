@@ -34,65 +34,65 @@ class JavaTemplateTest3Test implements RewriteTest {
     @Test
     void replacePackage() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.Package visitPackage(J.Package pkg, ExecutionContext p) {
-                  if (pkg.getExpression().printTrimmed(getCursor()).equals("a")) {
-                      return JavaTemplate.builder("b").contextSensitive().build()
-                        .apply(getCursor(), pkg.getCoordinates().replace());
-                  }
-                  return super.visitPackage(pkg, p);
-              }
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.Package visitPackage(J.Package pkg, ExecutionContext p) {
+                        if (pkg.getExpression().printTrimmed(getCursor()).equals("a")) {
+                            return JavaTemplate.builder("b").contextSensitive().build()
+                                    .apply(getCursor(), pkg.getCoordinates().replace());
+                        }
+                        return super.visitPackage(pkg, p);
+                    }
 
-              @Override
-              public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext p) {
-                  var cd = super.visitClassDeclaration(classDecl, p);
-                  if (classDecl.getType().getPackageName().equals("a")) {
-                      cd = cd.withType(cd.getType().withFullyQualifiedName("b.${cd.getSimpleName()}"));
-                  }
-                  return cd;
-              }
-          })),
-          java(
-            """
+                    @Override
+                    public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext p) {
+                        var cd = super.visitClassDeclaration(classDecl, p);
+                        if (classDecl.getType().getPackageName().equals("a")) {
+                            cd = cd.withType(cd.getType().withFullyQualifiedName("b.${cd.getSimpleName()}"));
+                        }
+                        return cd;
+                    }
+                })),
+                java(
+                        """
               package a;
               class Test {
               }
               """,
-            """
+                        """
               package b;
               class Test {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void replaceMethod() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
-                  if (method.getSimpleName().equals("test")) {
-                      return JavaTemplate.apply("int test2(int n) { return n; }", getCursor(), method.getCoordinates().replace());
-                  }
-                  return super.visitMethodDeclaration(method, p);
-              }
-          })).afterRecipe(run -> {
-              J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().get(0).getAfter();
-              var methodType = ((J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0)).getMethodType();
-              assertThat(methodType.getReturnType()).isEqualTo(JavaType.Primitive.Int);
-              assertThat(methodType.getParameterTypes()).containsExactly(JavaType.Primitive.Int);
-          }),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+                        if (method.getSimpleName().equals("test")) {
+                            return JavaTemplate.apply("int test2(int n) { return n; }", getCursor(), method.getCoordinates().replace());
+                        }
+                        return super.visitMethodDeclaration(method, p);
+                    }
+                })).afterRecipe(run -> {
+                    J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().get(0).getAfter();
+                    var methodType = ((J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0)).getMethodType();
+                    assertThat(methodType.getReturnType()).isEqualTo(JavaType.Primitive.Int);
+                    assertThat(methodType.getParameterTypes()).containsExactly(JavaType.Primitive.Int);
+                }),
+                java(
+                        """
               class Test {
                   void test() {
                   }
               }
               """,
-            """
+                        """
               class Test {
                             
                   int test2(int n) {
@@ -100,7 +100,7 @@ class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -108,31 +108,31 @@ class JavaTemplateTest3Test implements RewriteTest {
     @Test
     void replaceLambdaWithMethodReference() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              @Override
-              public J visitLambda(J.Lambda lambda, ExecutionContext p) {
-                  return JavaTemplate.builder("Object::toString")
-                    .contextSensitive()
-                    .build()
-                    .apply(getCursor(), lambda.getCoordinates().replace());
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    @Override
+                    public J visitLambda(J.Lambda lambda, ExecutionContext p) {
+                        return JavaTemplate.builder("Object::toString")
+                                .contextSensitive()
+                                .build()
+                                .apply(getCursor(), lambda.getCoordinates().replace());
+                    }
+                })),
+                java(
+                        """
               import java.util.function.Function;
 
               class Test {
                   Function<Object, String> toString = it -> it.toString();
               }
               """,
-            """
+                        """
               import java.util.function.Function;
 
               class Test {
                   Function<Object, String> toString = Object::toString;
               }
               """
-          )
+                )
         );
     }
 
@@ -141,23 +141,23 @@ class JavaTemplateTest3Test implements RewriteTest {
     @SuppressWarnings({"ResultOfMethodCallIgnored", "CodeBlock2Expr"})
     void replaceStatementInLambdaBodySingleStatementBlock() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("return n == 1;").contextSensitive().build();
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    final JavaTemplate t = JavaTemplate.builder("return n == 1;").contextSensitive().build();
 
-              @Override
-              public J visitReturn(J.Return return_, ExecutionContext p) {
-                  if (return_.getExpression() instanceof J.Binary) {
-                      J.Binary binary = (J.Binary) return_.getExpression();
-                      if (binary.getRight() instanceof J.Literal &&
-                          ((J.Literal) binary.getRight()).getValue().equals(0)) {
-                          return t.apply(getCursor(), return_.getCoordinates().replace());
-                      }
-                  }
-                  return return_;
-              }
-          })),
-          java(
-            """
+                    @Override
+                    public J visitReturn(J.Return return_, ExecutionContext p) {
+                        if (return_.getExpression() instanceof J.Binary) {
+                            J.Binary binary = (J.Binary) return_.getExpression();
+                            if (binary.getRight() instanceof J.Literal &&
+                                    ((J.Literal) binary.getRight()).getValue().equals(0)) {
+                                return t.apply(getCursor(), return_.getCoordinates().replace());
+                            }
+                        }
+                        return return_;
+                    }
+                })),
+                java(
+                        """
               import java.util.stream.Stream;
 
               class Test {
@@ -170,7 +170,7 @@ class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.stream.Stream;
 
               class Test {
@@ -183,7 +183,7 @@ class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -192,22 +192,22 @@ class JavaTemplateTest3Test implements RewriteTest {
     @SuppressWarnings({"ResultOfMethodCallIgnored", "ConstantConditions"})
     void replaceStatementInLambdaBodyWithVariableDeclaredInBlock() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("return n == 1;").contextSensitive().build();
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    final JavaTemplate t = JavaTemplate.builder("return n == 1;").contextSensitive().build();
 
-              @Override
-              public J visitReturn(J.Return return_, ExecutionContext p) {
-                  if (return_.getExpression() instanceof J.Binary) {
-                      J.Binary binary = (J.Binary) return_.getExpression();
-                      if (binary.getRight() instanceof J.Literal && ((J.Literal) binary.getRight()).getValue().equals(0)) {
-                          return t.apply(getCursor(), return_.getCoordinates().replace());
-                      }
-                  }
-                  return return_;
-              }
-          })),
-          java(
-            """
+                    @Override
+                    public J visitReturn(J.Return return_, ExecutionContext p) {
+                        if (return_.getExpression() instanceof J.Binary) {
+                            J.Binary binary = (J.Binary) return_.getExpression();
+                            if (binary.getRight() instanceof J.Literal && ((J.Literal) binary.getRight()).getValue().equals(0)) {
+                                return t.apply(getCursor(), return_.getCoordinates().replace());
+                            }
+                        }
+                        return return_;
+                    }
+                })),
+                java(
+                        """
               import java.util.stream.Stream;
 
               class Test {
@@ -219,7 +219,7 @@ class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.stream.Stream;
 
               class Test {
@@ -231,7 +231,7 @@ class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -239,19 +239,19 @@ class JavaTemplateTest3Test implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1120")
     void replaceStatementInLambdaBodyMultiStatementBlock() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("#{any(java.lang.String)}.toUpperCase()").build();
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    final JavaTemplate t = JavaTemplate.builder("#{any(java.lang.String)}.toUpperCase()").build();
 
-              @Override
-              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
-                  if (method.getSimpleName().equals("toLowerCase")) {
-                      return t.apply(getCursor(), method.getCoordinates().replace(), method.getSelect());
-                  }
-                  return super.visitMethodInvocation(method, p);
-              }
-          })),
-          java(
-            """
+                    @Override
+                    public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
+                        if (method.getSimpleName().equals("toLowerCase")) {
+                            return t.apply(getCursor(), method.getCoordinates().replace(), method.getSelect());
+                        }
+                        return super.visitMethodInvocation(method, p);
+                    }
+                })),
+                java(
+                        """
               import java.util.stream.Stream;
 
               class Test {
@@ -264,7 +264,7 @@ class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.stream.Stream;
 
               class Test {
@@ -277,7 +277,7 @@ class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -286,18 +286,18 @@ class JavaTemplateTest3Test implements RewriteTest {
     @SuppressWarnings({"ResultOfMethodCallIgnored", "SizeReplaceableByIsEmpty"})
     void replaceSingleExpressionInLambdaBody() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              @Override
-              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
-                  if (method.getSimpleName().equals("toLowerCase")) {
-                      return JavaTemplate.apply("#{any(java.lang.String)}.toUpperCase()", getCursor(),
-                        method.getCoordinates().replace(), method.getSelect());
-                  }
-                  return super.visitMethodInvocation(method, p);
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    @Override
+                    public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
+                        if (method.getSimpleName().equals("toLowerCase")) {
+                            return JavaTemplate.apply("#{any(java.lang.String)}.toUpperCase()", getCursor(),
+                                    method.getCoordinates().replace(), method.getSelect());
+                        }
+                        return super.visitMethodInvocation(method, p);
+                    }
+                })),
+                java(
+                        """
               import java.util.stream.Stream;
 
               class Test {
@@ -306,7 +306,7 @@ class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.stream.Stream;
 
               class Test {
@@ -315,7 +315,7 @@ class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -323,20 +323,20 @@ class JavaTemplateTest3Test implements RewriteTest {
     @Test
     void replaceSingleExpressionInLambdaBodyWithExpression() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final MethodMatcher enumEquals = new MethodMatcher("java.lang.Enum equals(java.lang.Object)");
-              final JavaTemplate t = JavaTemplate.builder("#{any()} == #{any()}").build();
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    final MethodMatcher enumEquals = new MethodMatcher("java.lang.Enum equals(java.lang.Object)");
+                    final JavaTemplate t = JavaTemplate.builder("#{any()} == #{any()}").build();
 
-              @Override
-              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
-                  if (enumEquals.matches(method)) {
-                      return t.apply(getCursor(), method.getCoordinates().replace(), method.getSelect(), method.getArguments().get(0));
-                  }
-                  return super.visitMethodInvocation(method, p);
-              }
-          })),
-          java(
-            """
+                    @Override
+                    public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
+                        if (enumEquals.matches(method)) {
+                            return t.apply(getCursor(), method.getCoordinates().replace(), method.getSelect(), method.getArguments().get(0));
+                        }
+                        return super.visitMethodInvocation(method, p);
+                    }
+                })),
+                java(
+                        """
               import java.util.stream.Stream;
 
               class Test {
@@ -346,7 +346,7 @@ class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.stream.Stream;
 
               class Test {
@@ -356,7 +356,7 @@ class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -364,15 +364,15 @@ class JavaTemplateTest3Test implements RewriteTest {
     @Test
     void replaceMethodNameAndArgumentsSimultaneously() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
-                  if (mi.getSimpleName().equals("acceptInteger")) {
-                      mi = JavaTemplate.builder("acceptString(#{any()}.toString())").contextSensitive()
-                        .javaParser(JavaParser.fromJavaVersion()
-                          .dependsOn(
-                            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                        J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                        if (mi.getSimpleName().equals("acceptInteger")) {
+                            mi = JavaTemplate.builder("acceptString(#{any()}.toString())").contextSensitive()
+                                    .javaParser(JavaParser.fromJavaVersion()
+                                            .dependsOn(
+                                                    """
                                   package org.openrewrite;
                                   public class A {
                                       public A acceptInteger(Integer i) { return this; }
@@ -380,17 +380,17 @@ class JavaTemplateTest3Test implements RewriteTest {
                                       public A someOtherMethod() { return this; }
                                   }
                               """
-                          )
-                        )
-                        .build()
-                        .apply(updateCursor(mi), mi.getCoordinates().replaceMethod(), mi.getArguments().get(0));
-                      mi = mi.withName(mi.getName().withType(mi.getMethodType()));
-                  }
-                  return mi;
-              }
-          })),
-          java(
-            """
+                                            )
+                                    )
+                                    .build()
+                                    .apply(updateCursor(mi), mi.getCoordinates().replaceMethod(), mi.getArguments().get(0));
+                            mi = mi.withName(mi.getName().withType(mi.getMethodType()));
+                        }
+                        return mi;
+                    }
+                })),
+                java(
+                        """
               package org.openrewrite;
               public class A {
                   public A acceptInteger(Integer i) { return this; }
@@ -398,9 +398,9 @@ class JavaTemplateTest3Test implements RewriteTest {
                   public A someOtherMethod() { return this; }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package org.openrewrite;
                             
               public class Foo {
@@ -412,7 +412,7 @@ class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package org.openrewrite;
                             
               public class Foo {
@@ -424,34 +424,34 @@ class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void replaceMethodInvocationWithArray() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
-                  J.MethodInvocation m = super.visitMethodInvocation(method, p);
-                  if (m.getSimpleName().equals("method") && m.getArguments().size() == 2) {
-                      m = JavaTemplate.apply("#{anyArray(int)}", getCursor(), m.getCoordinates().replaceArguments(), m.getArguments().get(0));
-                  }
-                  return m;
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
+                        J.MethodInvocation m = super.visitMethodInvocation(method, p);
+                        if (m.getSimpleName().equals("method") && m.getArguments().size() == 2) {
+                            m = JavaTemplate.apply("#{anyArray(int)}", getCursor(), m.getCoordinates().replaceArguments(), m.getArguments().get(0));
+                        }
+                        return m;
+                    }
+                })),
+                java(
+                        """
               package org.openrewrite;
               public class Test {
                   public void method(int[] val) {}
                   public void method(int[] val1, String val2) {}
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import org.openrewrite.Test;
               class A {
                   public void method() {
@@ -461,7 +461,7 @@ class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import org.openrewrite.Test;
               class A {
                   public void method() {
@@ -471,7 +471,7 @@ class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -479,17 +479,17 @@ class JavaTemplateTest3Test implements RewriteTest {
     @Test
     void replaceMethodInvocationWithMethodReference() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              @Override
-              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
-                  return JavaTemplate.builder("Object::toString")
-                    .contextSensitive()
-                    .build()
-                    .apply(getCursor(), method.getCoordinates().replace());
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    @Override
+                    public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
+                        return JavaTemplate.builder("Object::toString")
+                                .contextSensitive()
+                                .build()
+                                .apply(getCursor(), method.getCoordinates().replace());
+                    }
+                })),
+                java(
+                        """
               import java.util.function.Function;
 
               class Test {
@@ -500,7 +500,7 @@ class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.function.Function;
 
               class Test {
@@ -511,7 +511,7 @@ class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

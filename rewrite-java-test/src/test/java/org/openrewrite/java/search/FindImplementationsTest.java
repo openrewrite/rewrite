@@ -27,38 +27,38 @@ class FindImplementationsTest implements RewriteTest {
     @Test
     void found() {
         rewriteRun(
-          spec -> spec.recipe(new FindImplementations("java.lang.Runnable")),
-          java(
-            """
+                spec -> spec.recipe(new FindImplementations("java.lang.Runnable")),
+                java(
+                        """
               class Test implements Runnable {
                   @Override
                   public void run() {
                   }
               }
               """,
-            """
+                        """
               /*~~>*/class Test implements Runnable {
                   @Override
                   public void run() {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void notFound() {
         rewriteRun(
-          spec -> spec.recipe(new FindImplementations("java.lang.Runnable")),
-          java(
-            """
+                spec -> spec.recipe(new FindImplementations("java.lang.Runnable")),
+                java(
+                        """
               class Test  {
                   public void run() {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -66,9 +66,9 @@ class FindImplementationsTest implements RewriteTest {
     @Test
     void genericType() {
         rewriteRun(
-          spec -> spec.recipe(new FindImplementations("java.lang.Comparable<java.lang.String>")),
-          java(
-            """
+                spec -> spec.recipe(new FindImplementations("java.lang.Comparable<java.lang.String>")),
+                java(
+                        """
               class Test implements Comparable<String> {
                   @Override
                   public int compareTo(String o) {
@@ -76,7 +76,7 @@ class FindImplementationsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               /*~~>*/class Test implements Comparable<String> {
                   @Override
                   public int compareTo(String o) {
@@ -84,7 +84,7 @@ class FindImplementationsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -92,9 +92,9 @@ class FindImplementationsTest implements RewriteTest {
     @Test
     void genericType2() {
         rewriteRun(
-          spec -> spec.recipe(new FindImplementations("java.lang.Comparable")),
-          java(
-            """
+                spec -> spec.recipe(new FindImplementations("java.lang.Comparable")),
+                java(
+                        """
               class Test implements Comparable<String> {
                   @Override
                   public int compareTo(String o) {
@@ -102,7 +102,7 @@ class FindImplementationsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               /*~~>*/class Test implements Comparable<String> {
                   @Override
                   public int compareTo(String o) {
@@ -110,7 +110,7 @@ class FindImplementationsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -118,9 +118,9 @@ class FindImplementationsTest implements RewriteTest {
     @Test
     void unmatchedGenericType() {
         rewriteRun(
-          spec -> spec.recipe(new FindImplementations("java.lang.Comparable<java.lang.Runnable>")),
-          java(
-            """
+                spec -> spec.recipe(new FindImplementations("java.lang.Comparable<java.lang.Runnable>")),
+                java(
+                        """
               class Test implements Comparable<String> {
                   @Override
                   public int compareTo(String o) {
@@ -128,39 +128,39 @@ class FindImplementationsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void transitiveImplementsExtends() {
         rewriteRun(
-          spec -> spec.recipe(new FindImplementations("org.x.A")),
-          java(
-            """
+                spec -> spec.recipe(new FindImplementations("org.x.A")),
+                java(
+                        """
               package org.x;
               interface A {
                   void foo();
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package org.x;
               interface B extends A {
                   void bar();
               }
               """
-            ,
-            """
+                ,
+                        """
               package org.x;
               /*~~>*/interface B extends A {
                   void bar();
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package org.x;
               public class C implements B {
                   @Override
@@ -172,8 +172,8 @@ class FindImplementationsTest implements RewriteTest {
                   }
               }
               """
-            ,
-            """
+                ,
+                        """
               package org.x;
               /*~~>*/public class C implements B {
                   @Override
@@ -185,24 +185,24 @@ class FindImplementationsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void transitiveExtendsImplements() {
         rewriteRun(
-          spec -> spec.recipe(new FindImplementations("org.x.A")),
-          java(
-            """
+                spec -> spec.recipe(new FindImplementations("org.x.A")),
+                java(
+                        """
               package org.x;
               interface A {
                   void foo();
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package org.x;
               class B implements A {
                   @Override
@@ -210,8 +210,8 @@ class FindImplementationsTest implements RewriteTest {
                   }
               }
               """
-            ,
-            """
+                ,
+                        """
               package org.x;
               /*~~>*/class B implements A {
                   @Override
@@ -219,9 +219,9 @@ class FindImplementationsTest implements RewriteTest {
                   }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package org.x;
               public class C extends B {
                   @Override
@@ -229,8 +229,8 @@ class FindImplementationsTest implements RewriteTest {
                   }
               }
               """
-            ,
-            """
+                ,
+                        """
               package org.x;
               /*~~>*/public class C extends B {
                   @Override
@@ -238,7 +238,7 @@ class FindImplementationsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

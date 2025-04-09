@@ -45,12 +45,12 @@ public class InMemoryDiffEntry extends DiffEntry implements AutoCloseable {
     private final Set<Recipe> recipesThatMadeChanges;
 
     public InMemoryDiffEntry(@Nullable Path originalFilePath, @Nullable Path filePath, @Nullable Path relativeTo, String oldSource,
-                             String newSource, Set<Recipe> recipesThatMadeChanges) {
+            String newSource, Set<Recipe> recipesThatMadeChanges) {
         this(originalFilePath, filePath, relativeTo, oldSource, newSource, recipesThatMadeChanges, FileMode.REGULAR_FILE, FileMode.REGULAR_FILE);
     }
 
     public InMemoryDiffEntry(@Nullable Path originalFilePath, @Nullable Path filePath, @Nullable Path relativeTo, String oldSource,
-                             String newSource, Set<Recipe> recipesThatMadeChanges, FileMode oldMode, FileMode newMode) {
+            String newSource, Set<Recipe> recipesThatMadeChanges, FileMode oldMode, FileMode newMode) {
 
         this.recipesThatMadeChanges = recipesThatMadeChanges;
 
@@ -124,24 +124,24 @@ public class InMemoryDiffEntry extends DiffEntry implements AutoCloseable {
         AtomicBoolean addedComment = new AtomicBoolean(false);
         // NOTE: String.lines() would remove empty lines which we don't want
         return Arrays.stream(diff.split("\n"))
-                       .map(l -> {
-                           if (!addedComment.get() && l.startsWith("@@") && l.endsWith("@@")) {
-                               addedComment.set(true);
+                .map(l -> {
+                    if (!addedComment.get() && l.startsWith("@@") && l.endsWith("@@")) {
+                        addedComment.set(true);
 
-                               Set<String> sortedRecipeNames = new LinkedHashSet<>();
-                               for (Recipe recipesThatMadeChange : recipesThatMadeChanges) {
-                                   sortedRecipeNames.add(recipesThatMadeChange.getName());
-                               }
-                               StringJoiner joinedRecipeNames = new StringJoiner(", ", " ", "");
-                               for (String name : sortedRecipeNames) {
-                                   joinedRecipeNames.add(name);
-                               }
+                        Set<String> sortedRecipeNames = new LinkedHashSet<>();
+                        for (Recipe recipesThatMadeChange : recipesThatMadeChanges) {
+                            sortedRecipeNames.add(recipesThatMadeChange.getName());
+                        }
+                        StringJoiner joinedRecipeNames = new StringJoiner(", ", " ", "");
+                        for (String name : sortedRecipeNames) {
+                            joinedRecipeNames.add(name);
+                        }
 
-                               return l + joinedRecipeNames;
-                           }
-                           return l;
-                       })
-                       .collect(Collectors.joining("\n")) + "\n";
+                        return l + joinedRecipeNames;
+                    }
+                    return l;
+                })
+                .collect(Collectors.joining("\n")) + "\n";
     }
 
     @Override

@@ -24,12 +24,12 @@ class PackageTest implements RewriteTest {
     @Test
     void packageFormatting() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /*comment*/package a ;
               class A {}
               """
-          )
+                )
         );
     }
 }

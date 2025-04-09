@@ -27,14 +27,14 @@ class MapEntryTest implements RewriteTest {
     @Test
     void mapEntryMethodArguments() {
         rewriteRun(
-          groovy("apply plugin: 'java'")
+                groovy("apply plugin: 'java'")
         );
     }
 
     @Test
     void multipleEntries() {
         rewriteRun(
-          groovy("exclude(group: 'g', module: 'm')")
+                groovy("exclude(group: 'g', module: 'm')")
         );
     }
 
@@ -42,8 +42,8 @@ class MapEntryTest implements RewriteTest {
     @Test
     void genericMaps() {
         rewriteRun(
-          groovy("Map<String, String> m = new HashMap<String, String>()"),
-          groovy("Map<String, String> n = new HashMap<>()")
+                groovy("Map<String, String> m = new HashMap<String, String>()"),
+                groovy("Map<String, String> n = new HashMap<>()")
         );
     }
 
@@ -51,21 +51,21 @@ class MapEntryTest implements RewriteTest {
     @Test
     void emptyMapLiteral() {
         rewriteRun(
-          groovy("Map m =  [  :  ]")
+                groovy("Map m =  [  :  ]")
         );
     }
 
     @Test
     void emptyMapLiteralWithParentheses() {
         rewriteRun(
-          groovy("Map m =  ([  :  ])")
+                groovy("Map m =  ([  :  ])")
         );
     }
 
     @Test
     void mapAccess() {
         rewriteRun(
-          groovy("def a = someMap /*[*/ [ /*'*/ 'someKey' /*]*/ ]")
+                groovy("def a = someMap /*[*/ [ /*'*/ 'someKey' /*]*/ ]")
         );
     }
 }

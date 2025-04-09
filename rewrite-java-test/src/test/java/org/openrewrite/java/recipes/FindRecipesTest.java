@@ -37,16 +37,16 @@ class FindRecipesTest implements RewriteTest {
     @Test
     void findRecipes() {
         rewriteRun(
-          spec -> spec
-            .dataTable(RewriteRecipeSource.Row.class, rows -> {
-                assertThat(rows).hasSize(1);
-                RewriteRecipeSource.Row row = rows.get(0);
-                assertThat(row.getDisplayName()).isEqualTo("My recipe");
-                assertThat(row.getDescription()).isEqualTo("This is my recipe.");
-                assertThat(row.getOptions()).isEqualTo("[{\"name\":\"methodPattern\",\"displayName\":\"Method pattern\",\"description\":\"A method pattern that is used to find matching method declarations/invocations.\",\"example\":\"org.mockito.Matchers anyVararg()\"},{\"name\":\"newAccessLevel\",\"displayName\":\"New access level\",\"description\":\"New method access level to apply to the method, like \\\"public\\\".\",\"example\":\"public\",\"valid\":[\"private\",\"protected\",\"package\",\"public\"],\"required\":false}]");
-            }),
-          java(
-            """
+                spec -> spec
+                        .dataTable(RewriteRecipeSource.Row.class, rows -> {
+                            assertThat(rows).hasSize(1);
+                            RewriteRecipeSource.Row row = rows.get(0);
+                            assertThat(row.getDisplayName()).isEqualTo("My recipe");
+                            assertThat(row.getDescription()).isEqualTo("This is my recipe.");
+                            assertThat(row.getOptions()).isEqualTo("[{\"name\":\"methodPattern\",\"displayName\":\"Method pattern\",\"description\":\"A method pattern that is used to find matching method declarations/invocations.\",\"example\":\"org.mockito.Matchers anyVararg()\"},{\"name\":\"newAccessLevel\",\"displayName\":\"New access level\",\"description\":\"New method access level to apply to the method, like \\\"public\\\".\",\"example\":\"public\",\"valid\":[\"private\",\"protected\",\"package\",\"public\"],\"required\":false}]");
+                        }),
+                java(
+                        """
               import org.openrewrite.Option;
               import org.openrewrite.internal.lang.NonNullApi;
               import org.openrewrite.Recipe;
@@ -77,7 +77,7 @@ class FindRecipesTest implements RewriteTest {
                 }
               }
               """,
-            """
+                        """
               import org.openrewrite.Option;
               import org.openrewrite.internal.lang.NonNullApi;
               import org.openrewrite.Recipe;
@@ -108,15 +108,15 @@ class FindRecipesTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void returnInLambda() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.function.UnaryOperator;
               
               class SomeTest {
@@ -126,15 +126,15 @@ class FindRecipesTest implements RewriteTest {
                   };
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void findRefasterRecipe() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().dependsOn(
-              """
+                spec -> spec.parser(JavaParser.fromJavaVersion().dependsOn(
+                        """
                 package org.openrewrite.java.template;
                 import java.lang.annotation.ElementType;
                 import java.lang.annotation.Target;
@@ -144,15 +144,15 @@ class FindRecipesTest implements RewriteTest {
                     String description();
                 }
                 """
-            ))
-            .dataTable(RewriteRecipeSource.Row.class, rows -> {
-                assertThat(rows).hasSize(1);
-                RewriteRecipeSource.Row row = rows.get(0);
-                assertThat(row.getDisplayName()).isEqualTo("Some refaster rule");
-                assertThat(row.getDescription()).isEqualTo("This is a refaster rule.");
-            }),
-          java(
-            """
+                ))
+                        .dataTable(RewriteRecipeSource.Row.class, rows -> {
+                            assertThat(rows).hasSize(1);
+                            RewriteRecipeSource.Row row = rows.get(0);
+                            assertThat(row.getDisplayName()).isEqualTo("Some refaster rule");
+                            assertThat(row.getDescription()).isEqualTo("This is a refaster rule.");
+                        }),
+                java(
+                        """
               import org.openrewrite.java.template.RecipeDescriptor;
               
               @RecipeDescriptor(
@@ -162,7 +162,7 @@ class FindRecipesTest implements RewriteTest {
               class SomeRefasterRule {
               }
               """,
-            """
+                        """
               import org.openrewrite.java.template.RecipeDescriptor;
               
               /*~~>*/@RecipeDescriptor(
@@ -172,15 +172,15 @@ class FindRecipesTest implements RewriteTest {
               class SomeRefasterRule {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void findYamlRecipe() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().dependsOn(
-              """
+                spec -> spec.parser(JavaParser.fromJavaVersion().dependsOn(
+                        """
                 package org.openrewrite.java.template;
                 import java.lang.annotation.ElementType;
                 import java.lang.annotation.Target;
@@ -190,18 +190,18 @@ class FindRecipesTest implements RewriteTest {
                     String description();
                 }
                 """
-            ))
-            .dataTable(RewriteRecipeSource.Row.class, rows -> {
-                assertThat(rows).hasSize(2);
-                assertThat(rows.get(0).getDisplayName()).isEqualTo("Migrates to Apache Commons Lang 3.x");
-                assertThat(rows.get(0).getSourceCode()).startsWith(
-                  "---\ntype: specs.openrewrite.org/v1beta/recipe\nname: org.openrewrite.apache.commons.lang.UpgradeApacheCommonsLang_2_3");
-                assertThat(rows.get(1).getDisplayName()).isEqualTo("Migrates to Apache POI 3.17");
-                assertThat(rows.get(1).getSourceCode()).startsWith(
-                  "---\ntype: specs.openrewrite.org/v1beta/recipe\nname: org.openrewrite.apache.poi.UpgradeApachePoi_3_17");
-            }),
-          yaml(
-            """
+                ))
+                        .dataTable(RewriteRecipeSource.Row.class, rows -> {
+                            assertThat(rows).hasSize(2);
+                            assertThat(rows.get(0).getDisplayName()).isEqualTo("Migrates to Apache Commons Lang 3.x");
+                            assertThat(rows.get(0).getSourceCode()).startsWith(
+                                    "---\ntype: specs.openrewrite.org/v1beta/recipe\nname: org.openrewrite.apache.commons.lang.UpgradeApacheCommonsLang_2_3");
+                            assertThat(rows.get(1).getDisplayName()).isEqualTo("Migrates to Apache POI 3.17");
+                            assertThat(rows.get(1).getSourceCode()).startsWith(
+                                    "---\ntype: specs.openrewrite.org/v1beta/recipe\nname: org.openrewrite.apache.poi.UpgradeApachePoi_3_17");
+                        }),
+                yaml(
+                        """
               # Apache Commons Lang
               ---
               type: specs.openrewrite.org/v1beta/recipe
@@ -240,11 +240,11 @@ class FindRecipesTest implements RewriteTest {
                     newArtifactId: poi
                     newVersion: 3.x
               """,
-            spec -> spec.path("rewrite.yml").after(after -> {
-                assertThat(after).contains("~~>");
-                return after;
-            })
-          )
+                        spec -> spec.path("rewrite.yml").after(after -> {
+                            assertThat(after).contains("~~>");
+                            return after;
+                        })
+                )
         );
     }
 }

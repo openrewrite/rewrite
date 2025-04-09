@@ -34,9 +34,9 @@ class ChangePluginVersionTest implements RewriteTest {
     @Test
     void change() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePluginVersion("org.openrewrite.rewrite", "5.x", null)),
-          settingsGradle(
-            """
+                spec -> spec.recipe(new ChangePluginVersion("org.openrewrite.rewrite", "5.x", null)),
+                settingsGradle(
+                        """
               pluginManagement {
                   plugins {
                       String v = '5.40.0'
@@ -44,7 +44,7 @@ class ChangePluginVersionTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               pluginManagement {
                   plugins {
                       String v = '5.40.0'
@@ -52,7 +52,7 @@ class ChangePluginVersionTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

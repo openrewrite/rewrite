@@ -29,16 +29,16 @@ class RemoveAnnotationTest implements RewriteTest {
     @Test
     void removeLastAnnotationFromClassDeclaration() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveAnnotation("@java.lang.Deprecated")),
-          java(
-            """
+                spec -> spec.recipe(new RemoveAnnotation("@java.lang.Deprecated")),
+                java(
+                        """
               @Deprecated
               interface Test {}
               """,
-            """
+                        """
               interface Test {}
               """
-          )
+                )
         );
     }
 
@@ -46,9 +46,9 @@ class RemoveAnnotationTest implements RewriteTest {
     @Test
     void removeAnnotation() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveAnnotation("@java.lang.Deprecated")),
-          java(
-            """
+                spec -> spec.recipe(new RemoveAnnotation("@java.lang.Deprecated")),
+                java(
+                        """
               import java.util.List;
 
               @Deprecated
@@ -59,7 +59,7 @@ class RemoveAnnotationTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.List;
 
               public class Test {
@@ -68,7 +68,7 @@ class RemoveAnnotationTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -76,9 +76,9 @@ class RemoveAnnotationTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/105")
     void removeFullyQualifiedJavaLangAnnotation() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveAnnotation("@java.lang.Deprecated")),
-          java(
-            """
+                spec -> spec.recipe(new RemoveAnnotation("@java.lang.Deprecated")),
+                java(
+                        """
               import java.util.List;
 
               @java.lang.Deprecated
@@ -89,7 +89,7 @@ class RemoveAnnotationTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.List;
 
               public class Test {
@@ -98,7 +98,7 @@ class RemoveAnnotationTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -106,9 +106,9 @@ class RemoveAnnotationTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/105")
     void removeFullyQualifiedCustomAnnotation() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveAnnotation("@org.b.ThirdAnnotation")),
-          java(
-            """
+                spec -> spec.recipe(new RemoveAnnotation("@org.b.ThirdAnnotation")),
+                java(
+                        """
               package org.b;
                           
               import java.lang.annotation.Target;
@@ -118,9 +118,9 @@ class RemoveAnnotationTest implements RewriteTest {
               public @interface ThirdAnnotation {
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import java.util.List;
 
               @org.b.ThirdAnnotation
@@ -131,7 +131,7 @@ class RemoveAnnotationTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.List;
 
               public class Test {
@@ -140,7 +140,7 @@ class RemoveAnnotationTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -148,9 +148,9 @@ class RemoveAnnotationTest implements RewriteTest {
     @Test
     void preserveWhitespaceOnModifiers() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveAnnotation("@java.lang.Deprecated")),
-          java(
-            """
+                spec -> spec.recipe(new RemoveAnnotation("@java.lang.Deprecated")),
+                java(
+                        """
               import java.util.List;
 
               @Deprecated
@@ -159,14 +159,14 @@ class RemoveAnnotationTest implements RewriteTest {
                   private final Integer value = 0;
               }
               """,
-            """
+                        """
               import java.util.List;
 
               public class Test {
                   private final Integer value = 0;
               }
               """
-          )
+                )
         );
     }
 
@@ -174,9 +174,9 @@ class RemoveAnnotationTest implements RewriteTest {
     @Test
     void multipleAnnotationsOnClass() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveAnnotation("@java.lang.Deprecated")),
-          java(
-            """
+                spec -> spec.recipe(new RemoveAnnotation("@java.lang.Deprecated")),
+                java(
+                        """
               package org.b;
                           
               import java.lang.annotation.Target;
@@ -186,9 +186,9 @@ class RemoveAnnotationTest implements RewriteTest {
               public @interface ThirdAnnotation {
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import org.b.ThirdAnnotation;
 
               @Deprecated @SuppressWarnings("") @ThirdAnnotation
@@ -215,7 +215,7 @@ class RemoveAnnotationTest implements RewriteTest {
               class PosThreeNoModifier {
               }
               """,
-            """
+                        """
               import org.b.ThirdAnnotation;
 
               @SuppressWarnings("") @ThirdAnnotation
@@ -242,7 +242,7 @@ class RemoveAnnotationTest implements RewriteTest {
               class PosThreeNoModifier {
               }
               """
-          )
+                )
         );
     }
 
@@ -250,9 +250,9 @@ class RemoveAnnotationTest implements RewriteTest {
     @Test
     void multipleAnnotationsOnMethod() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveAnnotation("@java.lang.Deprecated")),
-          java(
-            """
+                spec -> spec.recipe(new RemoveAnnotation("@java.lang.Deprecated")),
+                java(
+                        """
               package org.b;
                           
               import java.lang.annotation.Target;
@@ -262,9 +262,9 @@ class RemoveAnnotationTest implements RewriteTest {
               public @interface ThirdAnnotation {
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import org.b.ThirdAnnotation;
                             
               public class RemoveAnnotation {
@@ -362,7 +362,7 @@ class RemoveAnnotationTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import org.b.ThirdAnnotation;
                             
               public class RemoveAnnotation {
@@ -448,7 +448,7 @@ class RemoveAnnotationTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -456,9 +456,9 @@ class RemoveAnnotationTest implements RewriteTest {
     @Test
     void multipleAnnotationsOnVariable() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveAnnotation("@java.lang.Deprecated")),
-          java(
-            """
+                spec -> spec.recipe(new RemoveAnnotation("@java.lang.Deprecated")),
+                java(
+                        """
               package org.b;
                             
               import java.lang.annotation.Target;
@@ -468,9 +468,9 @@ class RemoveAnnotationTest implements RewriteTest {
               public @interface ThirdAnnotation {
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import org.b.ThirdAnnotation;
                             
               public class RemoveAnnotation {
@@ -506,7 +506,7 @@ class RemoveAnnotationTest implements RewriteTest {
                   Integer pos3NoModifiers;
               }
               """,
-            """
+                        """
               import org.b.ThirdAnnotation;
                             
               public class RemoveAnnotation {
@@ -536,16 +536,16 @@ class RemoveAnnotationTest implements RewriteTest {
                   Integer pos3NoModifiers;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unusedAnnotationParameterImports() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveAnnotation("@javax.ejb.TransactionAttribute")),
-          java(
-            """
+                spec -> spec.recipe(new RemoveAnnotation("@javax.ejb.TransactionAttribute")),
+                java(
+                        """
               package javax.ejb;
                
               import java.lang.annotation.ElementType;
@@ -562,9 +562,9 @@ class RemoveAnnotationTest implements RewriteTest {
                   TransactionAttributeType value() default TransactionAttributeType.REQUIRED;
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package javax.ejb;
                         
               /**
@@ -579,9 +579,9 @@ class RemoveAnnotationTest implements RewriteTest {
                   NEVER
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import javax.ejb.TransactionAttributeType;
               import javax.ejb.TransactionAttribute;
                             
@@ -590,14 +590,14 @@ class RemoveAnnotationTest implements RewriteTest {
                   public void doWork() {}
               }
               """,
-            """
+                        """
               public class ClassAnnotatedTransactionalService {
                   public void doWork() {}
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import javax.ejb.TransactionAttributeType;
               import javax.ejb.TransactionAttribute;
                             
@@ -606,22 +606,22 @@ class RemoveAnnotationTest implements RewriteTest {
                   public void doWork() {}
               }
               """,
-            """
+                        """
               public class MethodAnnotatedTransactionalService {
                   public void doWork() {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unusedPrimitiveOrArraysOrConstantsParameters() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveAnnotation("@annotations.pkg.TestAnnotation"))
-            .typeValidationOptions(TypeValidation.builder().build()),
-          java(
-            """
+                spec -> spec.recipe(new RemoveAnnotation("@annotations.pkg.TestAnnotation"))
+                        .typeValidationOptions(TypeValidation.builder().build()),
+                java(
+                        """
               package constants.pkg;
                
               public class TestConstants {
@@ -629,9 +629,9 @@ class RemoveAnnotationTest implements RewriteTest {
                   public static final String CONSTANT_2 = "Test";
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package annotations.pkg;
                
               import java.lang.annotation.ElementType;
@@ -651,17 +651,17 @@ class RemoveAnnotationTest implements RewriteTest {
                   Class<?>[] classArray() default {};
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package sample.pkg;
                
               public class TestArrayClass {
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package another.pkg;
                             
               import annotations.pkg.TestAnnotation;
@@ -675,7 +675,7 @@ class RemoveAnnotationTest implements RewriteTest {
                   String testField;
               }
               """,
-            """
+                        """
               package another.pkg;
                             
               public class AnnotatedClass {
@@ -683,17 +683,17 @@ class RemoveAnnotationTest implements RewriteTest {
                   String testField;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unusedStaticImportsFromAnnotationParameters() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveAnnotation("@annotations.pkg.TestAnnotation"))
-            .typeValidationOptions(TypeValidation.builder().build()),
-          java(
-            """
+                spec -> spec.recipe(new RemoveAnnotation("@annotations.pkg.TestAnnotation"))
+                        .typeValidationOptions(TypeValidation.builder().build()),
+                java(
+                        """
               package constants.pkg;
                
               public class TestConstants {
@@ -701,9 +701,9 @@ class RemoveAnnotationTest implements RewriteTest {
                   public static final String CONSTANT_2 = "Test";
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package annotations.pkg;
                
               import java.lang.annotation.ElementType;
@@ -717,9 +717,9 @@ class RemoveAnnotationTest implements RewriteTest {
                   String text() default "";
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package another.pkg;
               
               import annotations.pkg.TestAnnotation;
@@ -733,7 +733,7 @@ class RemoveAnnotationTest implements RewriteTest {
                   String constant = CONSTANT_2;
               }
               """,
-            """
+                        """
               package another.pkg;
 
               import static constants.pkg.TestConstants.CONSTANT_2;
@@ -743,7 +743,7 @@ class RemoveAnnotationTest implements RewriteTest {
                   String constant = CONSTANT_2;
               }
               """
-          )
+                )
         );
     }
 }

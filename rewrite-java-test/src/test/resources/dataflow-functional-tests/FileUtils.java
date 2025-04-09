@@ -299,7 +299,7 @@ public class FileUtils {
      * @param filter the filter to apply to files and directories.
      */
     private static void innerListFiles(Collection<File> files, File directory,
-                                       IOFileFilter filter) {
+            IOFileFilter filter) {
         File[] found = directory.listFiles((FileFilter) filter);
         if (found != null) {
             for (File file : found) {
@@ -546,7 +546,7 @@ public class FileUtils {
             int n = url.length();
             StringBuffer buffer = new StringBuffer();
             ByteBuffer bytes = ByteBuffer.allocate(n);
-            for (int i = 0; i < n;) {
+            for (int i = 0; i < n; ) {
                 if (url.charAt(i) == '%') {
                     try {
                         do {
@@ -741,7 +741,7 @@ public class FileUtils {
      * @see #copyFileToDirectory(File, File, boolean)
      */
     public static void copyFile(File srcFile, File destFile,
-                                boolean preserveFileDate) throws IOException {
+            boolean preserveFileDate) throws IOException {
         if (srcFile == null) {
             throw new NullPointerException("Source must not be null");
         }
@@ -788,7 +788,7 @@ public class FileUtils {
         try {
             fis = new FileInputStream(srcFile);
             fos = new FileOutputStream(destFile);
-            input  = fis.getChannel();
+            input = fis.getChannel();
             output = fos.getChannel();
             long size = input.size();
             long pos = 0;
@@ -806,7 +806,7 @@ public class FileUtils {
 
         if (srcFile.length() != destFile.length()) {
             throw new IOException("Failed to copy full contents from '" +
-                                  srcFile + "' to '" + destFile + "'");
+                    srcFile + "' to '" + destFile + "'");
         }
         if (preserveFileDate) {
             destFile.setLastModified(srcFile.lastModified());
@@ -908,7 +908,7 @@ public class FileUtils {
      * @since Commons IO 1.1
      */
     public static void copyDirectory(File srcDir, File destDir,
-                                     boolean preserveFileDate) throws IOException {
+            boolean preserveFileDate) throws IOException {
         copyDirectory(srcDir, destDir, null, preserveFileDate);
     }
 
@@ -957,7 +957,7 @@ public class FileUtils {
      * @since Commons IO 1.4
      */
     public static void copyDirectory(File srcDir, File destDir,
-                                     FileFilter filter) throws IOException {
+            FileFilter filter) throws IOException {
         copyDirectory(srcDir, destDir, filter, true);
     }
 
@@ -1008,7 +1008,7 @@ public class FileUtils {
      * @since Commons IO 1.4
      */
     public static void copyDirectory(File srcDir, File destDir,
-                                     FileFilter filter, boolean preserveFileDate) throws IOException {
+            FileFilter filter, boolean preserveFileDate) throws IOException {
         if (srcDir == null) {
             throw new NullPointerException("Source must not be null");
         }
@@ -1053,7 +1053,7 @@ public class FileUtils {
      * @since Commons IO 1.1
      */
     private static void doCopyDirectory(File srcDir, File destDir, FileFilter filter,
-                                        boolean preserveFileDate, List<String> exclusionList) throws IOException {
+            boolean preserveFileDate, List<String> exclusionList) throws IOException {
         // recurse
         File[] files = filter == null ? srcDir.listFiles() : srcDir.listFiles(filter);
         if (files == null) {  // null if security restricted
@@ -1134,7 +1134,7 @@ public class FileUtils {
      * @since Commons IO 2.0
      */
     public static void copyURLToFile(URL source, File destination,
-                                     int connectionTimeout, int readTimeout) throws IOException {
+            int connectionTimeout, int readTimeout) throws IOException {
         URLConnection connection = source.openConnection();
         connection.setConnectTimeout(connectionTimeout);
         connection.setReadTimeout(readTimeout);
@@ -1621,7 +1621,7 @@ public class FileUtils {
         } else {
             boolean filePresent = file.exists();
             if (!file.delete()) {
-                if (!filePresent){
+                if (!filePresent) {
                     throw new FileNotFoundException("File does not exist: " + file);
                 }
                 String message =
@@ -1630,8 +1630,6 @@ public class FileUtils {
             }
         }
     }
-
-
 
 
     /**
@@ -1721,9 +1719,9 @@ public class FileUtils {
             if (!directory.isDirectory()) {
                 String message =
                         "File " +
-                        directory +
-                        " exists and is " +
-                        "not a directory. Unable to create directory.";
+                                directory +
+                                " exists and is " +
+                                "not a directory. Unable to create directory.";
                 throw new IOException(message);
             }
         } else {
@@ -1825,7 +1823,7 @@ public class FileUtils {
         }
         if (!reference.exists()) {
             throw new IllegalArgumentException("The reference file '" +
-                                               reference + "' doesn't exist");
+                    reference + "' doesn't exist");
         }
         return isFileNewer(file, reference.lastModified());
     }
@@ -1892,7 +1890,7 @@ public class FileUtils {
         }
         if (!reference.exists()) {
             throw new IllegalArgumentException("The reference file '" +
-                                               reference + "' doesn't exist");
+                    reference + "' doesn't exist");
         }
         return isFileOlder(file, reference.lastModified());
     }
@@ -2017,11 +2015,11 @@ public class FileUtils {
         }
         boolean rename = srcDir.renameTo(destDir);
         if (!rename) {
-            copyDirectory( srcDir, destDir );
-            deleteDirectory( srcDir );
+            copyDirectory(srcDir, destDir);
+            deleteDirectory(srcDir);
             if (srcDir.exists()) {
                 throw new IOException("Failed to delete original directory '" + srcDir +
-                                      "' after copy to '" + destDir + "'");
+                        "' after copy to '" + destDir + "'");
             }
         }
     }
@@ -2050,7 +2048,7 @@ public class FileUtils {
         }
         if (!destDir.exists()) {
             throw new FileNotFoundException("Destination directory '" + destDir +
-                                            "' does not exist [createDestDir=" + createDestDir +"]");
+                    "' does not exist [createDestDir=" + createDestDir + "]");
         }
         if (!destDir.isDirectory()) {
             throw new IOException("Destination '" + destDir + "' is not a directory");
@@ -2092,11 +2090,11 @@ public class FileUtils {
         }
         boolean rename = srcFile.renameTo(destFile);
         if (!rename) {
-            copyFile( srcFile, destFile );
+            copyFile(srcFile, destFile);
             if (!srcFile.delete()) {
                 FileUtils.deleteQuietly(destFile);
                 throw new IOException("Failed to delete original file '" + srcFile +
-                                      "' after copy to '" + destFile + "'");
+                        "' after copy to '" + destFile + "'");
             }
         }
     }
@@ -2125,7 +2123,7 @@ public class FileUtils {
         }
         if (!destDir.exists()) {
             throw new FileNotFoundException("Destination directory '" + destDir +
-                                            "' does not exist [createDestDir=" + createDestDir +"]");
+                    "' does not exist [createDestDir=" + createDestDir + "]");
         }
         if (!destDir.isDirectory()) {
             throw new IOException("Destination '" + destDir + "' is not a directory");

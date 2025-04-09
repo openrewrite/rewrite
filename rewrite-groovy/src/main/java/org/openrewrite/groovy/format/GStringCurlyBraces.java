@@ -31,7 +31,7 @@ public class GStringCurlyBraces extends Recipe {
     @Override
     public String getDescription() {
         return "In Groovy [GStrings](https://docs.groovy-lang.org/latest/html/api/groovy/lang/GString.html), curly braces are optional for single variable expressions. " +
-               "This recipe adds them, so that the expression is always surrounded by curly braces.";
+                "This recipe adds them, so that the expression is always surrounded by curly braces.";
     }
 
     @Override

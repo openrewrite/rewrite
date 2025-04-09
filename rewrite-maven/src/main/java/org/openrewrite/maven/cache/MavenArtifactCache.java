@@ -50,7 +50,7 @@ public interface MavenArtifactCache {
     Path putArtifact(ResolvedDependency dependency, InputStream is, Consumer<Throwable> onError);
 
     default @Nullable Path computeArtifact(ResolvedDependency dependency, Callable<@Nullable InputStream> artifactStream,
-                                 Consumer<Throwable> onError) {
+            Consumer<Throwable> onError) {
         Path artifact = getArtifact(dependency);
         if (artifact == null) {
             try {

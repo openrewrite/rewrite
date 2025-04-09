@@ -47,7 +47,7 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
 
     public JavaType type(com.sun.tools.javac.code.@Nullable Type type) {
         if (type == null || type instanceof Type.ErrorType || type instanceof Type.PackageType || type instanceof Type.UnknownType ||
-            type instanceof NullType) {
+                type instanceof NullType) {
             return JavaType.Class.Unknown.getInstance();
         }
 
@@ -593,15 +593,15 @@ class ReloadableJava21TypeMapping implements JavaTypeMapping<Tree> {
                 }
             }
             List<String> defaultValues = null;
-            if(methodSymbol.getDefaultValue() != null) {
-                if(methodSymbol.getDefaultValue() instanceof Attribute.Array) {
+            if (methodSymbol.getDefaultValue() != null) {
+                if (methodSymbol.getDefaultValue() instanceof Attribute.Array) {
                     defaultValues = ((Attribute.Array) methodSymbol.getDefaultValue()).getValue().stream()
                             .map(attr -> attr.getValue().toString())
                             .collect(Collectors.toList());
                 } else {
                     try {
                         defaultValues = Collections.singletonList(methodSymbol.getDefaultValue().getValue().toString());
-                    } catch(UnsupportedOperationException e) {
+                    } catch (UnsupportedOperationException e) {
                         // not all Attribute implementations define `getValue()`
                     }
                 }

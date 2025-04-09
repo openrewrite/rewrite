@@ -29,14 +29,14 @@ class GenerateGetterAndSetterVisitorTest implements RewriteTest {
     @Test
     void getterAndSetterForPrimitiveInteger() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new GenerateGetterAndSetterVisitor<>("counter"))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new GenerateGetterAndSetterVisitor<>("counter"))),
+                java(
+                        """
               class T {
                   int counter;
               }
               """,
-            """
+                        """
               class T {
                   int counter;
                   public int getCounter() {
@@ -47,7 +47,7 @@ class GenerateGetterAndSetterVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -55,14 +55,14 @@ class GenerateGetterAndSetterVisitorTest implements RewriteTest {
     @Test
     void getterAndSetterForNonPrimitive() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new GenerateGetterAndSetterVisitor<>("size"))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new GenerateGetterAndSetterVisitor<>("size"))),
+                java(
+                        """
               class T {
                   Float size;
               }
               """,
-            """
+                        """
               class T {
                   Float size;
                   public Float getSize() {
@@ -73,21 +73,21 @@ class GenerateGetterAndSetterVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void getterAndSetterPrimitiveBoolean() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new GenerateGetterAndSetterVisitor<>("valid"))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new GenerateGetterAndSetterVisitor<>("valid"))),
+                java(
+                        """
               class T {
                   boolean valid;
               }
               """,
-            """
+                        """
               class T {
                   boolean valid;
                   public boolean isValid() {
@@ -98,7 +98,7 @@ class GenerateGetterAndSetterVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

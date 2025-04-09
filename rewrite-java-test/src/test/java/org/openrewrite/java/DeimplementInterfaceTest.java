@@ -28,9 +28,9 @@ class DeimplementInterfaceTest implements RewriteTest {
     @Test
     void deimplementCloseable() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new DeimplementInterface<>("java.io.Closeable"))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new DeimplementInterface<>("java.io.Closeable"))),
+                java(
+                        """
               import java.io.Closeable;
                             
               class Test implements Closeable {
@@ -40,12 +40,12 @@ class DeimplementInterfaceTest implements RewriteTest {
                   public void close() {}
               }
               """,
-            """
+                        """
               class Test {
                   public void test() {}
               }
               """
-          )
+                )
         );
     }
 }

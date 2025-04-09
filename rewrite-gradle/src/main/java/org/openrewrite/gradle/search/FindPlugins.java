@@ -76,7 +76,7 @@ public class FindPlugins extends Recipe {
                             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                                 if (pluginMatcher.matches(method)) {
                                     if (method.getArguments().get(0) instanceof J.Literal &&
-                                        pluginId.equals(((J.Literal) method.getArguments().get(0)).getValue())) {
+                                            pluginId.equals(((J.Literal) method.getArguments().get(0)).getValue())) {
                                         found.set(true);
                                         return SearchResult.found(method);
                                     }

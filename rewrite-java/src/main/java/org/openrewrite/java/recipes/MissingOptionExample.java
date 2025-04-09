@@ -72,8 +72,8 @@ public class MissingOptionExample extends Recipe {
                                 JavaType type = variableDeclarations.getTypeExpression().getType();
                                 if (!TypeUtils.isString(type)) {
                                     if (type instanceof JavaType.Primitive ||
-                                        type instanceof JavaType.FullyQualified &&
-                                        "java.lang".equals(((JavaType.FullyQualified) type).getPackageName())) {
+                                            type instanceof JavaType.FullyQualified &&
+                                                    "java.lang".equals(((JavaType.FullyQualified) type).getPackageName())) {
                                         return an;
                                     }
                                 }

@@ -38,25 +38,25 @@ class RecipeListTest implements RewriteTest {
     @Test
     void declarativeRecipeInCode() {
         rewriteRun(
-          specs -> specs.recipe(new FormalHello("jon", "jonathan"))
-            .expectedCyclesThatMakeChanges(1).cycles(1),
-          text(
-            "hi jon",
-            "hello jonathan",
-            spec -> spec.afterRecipe(txt -> {
-                Optional<Stream<String>> recipeNames = txt.getMarkers().findFirst(RecipesThatMadeChanges.class)
-                  .map(recipes -> recipes.getRecipes().stream()
-                    .map(stack -> stack.stream().map(Recipe::getDescriptor).map(RecipeDescriptor::getName)
-                      .collect(Collectors.joining("->")))
-                  );
+                specs -> specs.recipe(new FormalHello("jon", "jonathan"))
+                        .expectedCyclesThatMakeChanges(1).cycles(1),
+                text(
+                        "hi jon",
+                        "hello jonathan",
+                        spec -> spec.afterRecipe(txt -> {
+                            Optional<Stream<String>> recipeNames = txt.getMarkers().findFirst(RecipesThatMadeChanges.class)
+                                    .map(recipes -> recipes.getRecipes().stream()
+                                                    .map(stack -> stack.stream().map(Recipe::getDescriptor).map(RecipeDescriptor::getName)
+                                                            .collect(Collectors.joining("->")))
+                                    );
 
-                assertThat(recipeNames).isPresent();
-                assertThat(recipeNames.get()).containsExactly(
-                  "org.openrewrite.FormalHello->org.openrewrite.text.FindAndReplace",
-                  "org.openrewrite.FormalHello->org.openrewrite.FormalHello$1"
-                );
-            })
-          )
+                            assertThat(recipeNames).isPresent();
+                            assertThat(recipeNames.get()).containsExactly(
+                                    "org.openrewrite.FormalHello->org.openrewrite.text.FindAndReplace",
+                                    "org.openrewrite.FormalHello->org.openrewrite.FormalHello$1"
+                            );
+                        })
+                )
         );
     }
 }
@@ -85,21 +85,21 @@ class FormalHello extends Recipe {
     @Override
     public void buildRecipeList(RecipeList list) {
         list
-          // TODO would these large option-set recipes
-          //  benefit from builders?
-          .recipe(new FindAndReplace(
-            "hi", "hello", null, false, null,
-            null, null, null)
-          )
-          .recipe(
-            "Say my name, say my name",
-            "It's late and I'm making bad jokes.",
-            new PlainTextVisitor<>() {
-                @Override
-                public PlainText visitText(PlainText text, ExecutionContext ctx) {
-                    return text.withText(text.getText().replace(beforeName, afterName));
-                }
-            }
-          );
+                // TODO would these large option-set recipes
+                //  benefit from builders?
+                .recipe(new FindAndReplace(
+                        "hi", "hello", null, false, null,
+                        null, null, null)
+                )
+                .recipe(
+                        "Say my name, say my name",
+                        "It's late and I'm making bad jokes.",
+                        new PlainTextVisitor<>() {
+                            @Override
+                            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                                return text.withText(text.getText().replace(beforeName, afterName));
+                            }
+                        }
+                );
     }
 }

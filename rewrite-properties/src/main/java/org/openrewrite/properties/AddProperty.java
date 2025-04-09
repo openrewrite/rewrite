@@ -66,8 +66,8 @@ public class AddProperty extends Recipe {
     @Override
     public String getDescription() {
         return "Adds a new property to a property file. " +
-               "Attempts to place the new property in alphabetical order by the property keys. " +
-               "Whitespace before and after the `=` must be included in the property and value.";
+                "Attempts to place the new property in alphabetical order by the property keys. " +
+                "Whitespace before and after the `=` must be included in the property and value.";
     }
 
     @Override
@@ -98,7 +98,7 @@ public class AddProperty extends Recipe {
                 int insertionIndex = sortedInsertionIndex(entry, p.getContent());
 
                 List<Properties.Content> newContents;
-                if(StringUtils.isBlank(comment)) {
+                if (StringUtils.isBlank(comment)) {
                     newContents = Collections.singletonList(entry);
                 } else {
                     newContents = Arrays.asList(
@@ -107,7 +107,7 @@ public class AddProperty extends Recipe {
                                     "\n",
                                     Markers.EMPTY,
                                     Properties.Comment.Delimiter.HASH_TAG,
-                                " " + comment.trim()),
+                                    " " + comment.trim()),
                             entry);
                 }
 
@@ -118,9 +118,9 @@ public class AddProperty extends Recipe {
 
                 // First entry in the file does not need a newline, but every other entry does
                 contentList = ListUtils.map(contentList, (i, c) -> {
-                    if(i == 0) {
+                    if (i == 0) {
                         return (Properties.Content) c.withPrefix("");
-                    } else if(!c.getPrefix().contains("\n")) {
+                    } else if (!c.getPrefix().contains("\n")) {
                         return (Properties.Content) c.withPrefix("\n" + c.getPrefix());
                     }
                     return c;
@@ -138,10 +138,10 @@ public class AddProperty extends Recipe {
         }
         List<Properties.Entry> sorted =
                 Stream.concat(
-                                Stream.of(entry),
-                                contentsList.stream()
-                                        .filter(Properties.Entry.class::isInstance)
-                                        .map(Properties.Entry.class::cast))
+                        Stream.of(entry),
+                        contentsList.stream()
+                                .filter(Properties.Entry.class::isInstance)
+                                .map(Properties.Entry.class::cast))
                         .sorted(Comparator.comparing(Properties.Entry::getKey))
                         .collect(Collectors.toList());
         int indexInSorted = sorted.indexOf(entry);

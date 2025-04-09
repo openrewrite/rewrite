@@ -45,18 +45,18 @@ class RawPomTest {
     @Test
     void profileActivationByAbsenceOfProperty() {
         assertThat(
-          new ProfileActivation(
-            false, null,
-            new ProfileActivation.Property("!inactive", null)
-          ).isActive()
+                new ProfileActivation(
+                        false, null,
+                        new ProfileActivation.Property("!inactive", null)
+                ).isActive()
         ).isTrue();
     }
 
     @Test
     void repositoriesSerializationAndDeserialization() {
         RawPom pom = RawPom.parse(
-          //language=xml
-          new ByteArrayInputStream("""
+                //language=xml
+                new ByteArrayInputStream("""
                 <project>
                   `<modelVersion>4.0.0</modelVersion>
             
@@ -73,7 +73,7 @@ class RawPomTest {
                   </repositories>
                 </project>
             """.getBytes()),
-          null
+                null
         );
 
         //noinspection DataFlowIssue
@@ -84,8 +84,8 @@ class RawPomTest {
     @Test
     void modulesAndSubProjects() {
         RawPom pom = RawPom.parse(
-          //language=xml
-          new ByteArrayInputStream("""
+                //language=xml
+                new ByteArrayInputStream("""
                 <project>
                   <modelVersion>4.0.0</modelVersion>
             
@@ -104,7 +104,7 @@ class RawPomTest {
                   </subprojects>
                 </project>
             """.getBytes()),
-          null
+                null
         );
 
         assertThat(pom).isNotNull();
@@ -119,8 +119,8 @@ class RawPomTest {
     @Test
     void serializePluginFlags() {
         RawPom pom = RawPom.parse(
-          //language=xml
-          new ByteArrayInputStream("""
+                //language=xml
+                new ByteArrayInputStream("""
                 <project>
                     <modelVersion>4.0.0</modelVersion>
             
@@ -185,7 +185,7 @@ class RawPomTest {
                     </build>
                 </project>
             """.getBytes()),
-          null
+                null
         );
 
         for (Plugin plugin : pom.toPom(null, null).getPlugins()) {
@@ -432,36 +432,36 @@ class RawPomTest {
         assertThat(model.getPackaging()).isEqualTo("jar");
         assertThat(model.getDependencies().get(0).getGroupId()).isEqualTo("org.junit.jupiter");
         assertThat(model.getDependencies().get(0).getExclusions().get(0).getGroupId())
-          .isEqualTo("com.google.guava");
+                .isEqualTo("com.google.guava");
         assertThat(model.getDependencyManagement().get(0).getGroupId())
-          .isEqualTo("org.springframework.cloud");
+                .isEqualTo("org.springframework.cloud");
         assertThat(model.getPlugins()).hasSize(2);
 
         Plugin surefirePlugin = model.getPlugins().stream()
-          .filter(p -> p.getArtifactId().equals("maven-surefire-plugin"))
-          .findFirst()
-          .orElseThrow();
+                .filter(p -> p.getArtifactId().equals("maven-surefire-plugin"))
+                .findFirst()
+                .orElseThrow();
 
         assertThat(surefirePlugin.getConfigurationList("includes", String.class))
-          .hasSize(2)
-          .contains("**/*Test.java", "**/*Tests.java");
+                .hasSize(2)
+                .contains("**/*Test.java", "**/*Tests.java");
 
         assertThat(surefirePlugin.getConfigurationList("excludes", String.class))
-          .hasSize(1)
-          .contains("**/Abstract*.java");
+                .hasSize(1)
+                .contains("**/Abstract*.java");
 
         assertThat(surefirePlugin.getConfigurationStringValue("argLine")).isEqualTo("hello");
         Plugin jacocoPlugin = model.getPlugins().stream()
-          .filter(p -> p.getArtifactId().equals("jacoco-maven-plugin"))
-          .findAny()
-          .orElseThrow();
+                .filter(p -> p.getArtifactId().equals("jacoco-maven-plugin"))
+                .findAny()
+                .orElseThrow();
 
         assertThat(jacocoPlugin.getExecutions()).hasSize(2);
 
         var rewritePlugin = model.getPluginManagement().stream()
-          .filter(p -> p.getArtifactId().equals("rewrite-maven-plugin"))
-          .findAny()
-          .orElseThrow();
+                .filter(p -> p.getArtifactId().equals("rewrite-maven-plugin"))
+                .findAny()
+                .orElseThrow();
 
         assertThat(rewritePlugin.getDependencies()).hasSize(1);
         assertThat(rewritePlugin.getDependencies().get(0).getGroupId()).isEqualTo("org.openrewrite.recipe");
@@ -471,46 +471,46 @@ class RawPomTest {
 
         var activeRecipes = rewritePlugin.getConfigurationList("activeRecipes.recipe", String.class);
         assertThat(activeRecipes).contains(
-          "org.openrewrite.java.format.AutoFormat",
-          "com.yourorg.VetToVeterinary",
-          "org.openrewrite.java.spring.boot2.SpringBoot2JUnit4to5Migration"
+                "org.openrewrite.java.format.AutoFormat",
+                "com.yourorg.VetToVeterinary",
+                "org.openrewrite.java.spring.boot2.SpringBoot2JUnit4to5Migration"
         );
 
         assertThat(model.getLicenses().get(0).getName())
-          .isEqualTo("Apache License, Version 2.0");
+                .isEqualTo("Apache License, Version 2.0");
 
         assertThat(model.getRepositories().get(0).getUri())
-          .isEqualTo("https://oss.sonatype.org/content/repositories/snapshots");
+                .isEqualTo("https://oss.sonatype.org/content/repositories/snapshots");
 
         Profile java9Profile = model.getProfiles().stream()
-          .filter(p -> "java9+".equals(p.getId()))
-          .findAny()
-          .orElseThrow();
+                .filter(p -> "java9+".equals(p.getId()))
+                .findAny()
+                .orElseThrow();
 
         Profile java11Profile = model.getProfiles().stream()
-          .filter(p -> "java11+".equals(p.getId()))
-          .findAny()
-          .orElseThrow();
+                .filter(p -> "java11+".equals(p.getId()))
+                .findAny()
+                .orElseThrow();
         assertThat(java9Profile.getDependencies().get(0).getGroupId()).isEqualTo("javax.xml.bind");
         assertThat(java11Profile.getDependencies()).isEmpty();
 
         Profile rewriteProfile = model.getProfiles().stream()
-          .filter(p -> "plugin-stuff".equals(p.getId()))
-          .findAny()
-          .orElseThrow();
+                .filter(p -> "plugin-stuff".equals(p.getId()))
+                .findAny()
+                .orElseThrow();
 
         assertThat(rewriteProfile.getPlugins()).hasSize(2);
         jacocoPlugin = rewriteProfile.getPlugins().stream()
-          .filter(p -> p.getArtifactId().equals("jacoco-maven-plugin"))
-          .findAny()
-          .orElseThrow();
+                .filter(p -> p.getArtifactId().equals("jacoco-maven-plugin"))
+                .findAny()
+                .orElseThrow();
 
         assertThat(jacocoPlugin.getExecutions()).hasSize(2);
 
         rewritePlugin = rewriteProfile.getPluginManagement().stream()
-          .filter(p -> p.getArtifactId().equals("rewrite-maven-plugin"))
-          .findAny()
-          .orElseThrow();
+                .filter(p -> p.getArtifactId().equals("rewrite-maven-plugin"))
+                .findAny()
+                .orElseThrow();
 
         assertThat(rewritePlugin.getDependencies()).hasSize(1);
         assertThat(rewritePlugin.getDependencies().get(0).getGroupId()).isEqualTo("org.openrewrite.recipe");
@@ -520,16 +520,17 @@ class RawPomTest {
 
         activeRecipes = rewritePlugin.getConfigurationList("activeRecipes", String.class);
         assertThat(activeRecipes).contains(
-          "org.openrewrite.java.format.AutoFormat",
-          "com.yourorg.VetToVeterinary",
-          "org.openrewrite.java.spring.boot2.SpringBoot2JUnit4to5Migration"
+                "org.openrewrite.java.format.AutoFormat",
+                "com.yourorg.VetToVeterinary",
+                "org.openrewrite.java.spring.boot2.SpringBoot2JUnit4to5Migration"
         );
     }
 
     @SuppressWarnings("ConstantConditions")
     @Test
     void deserializePluginConfiguration() throws JsonProcessingException {
-        @Language("xml") String pomString = """
+        @Language("xml")
+        String pomString = """
               <project>
                   <modelVersion>4.0.0</modelVersion>
           
@@ -581,11 +582,11 @@ class RawPomTest {
 
         assertThat(plugin.getConfigurationList("includes", String.class)).hasSize(2).contains("fred", "hello");
         assertThat(plugin.getConfigurationList("activeRecipes", String.class)).hasSize(2)
-          .contains("cool-recipe-1", "cool-recipe-2");
+                .contains("cool-recipe-1", "cool-recipe-2");
 
         assertThat(plugin.getConfigurationList("includes", String.class)).hasSize(2).contains("fred", "hello");
         assertThat(plugin.getConfigurationList("activeRecipes", String.class)).hasSize(2)
-          .contains("cool-recipe-1", "cool-recipe-2");
+                .contains("cool-recipe-1", "cool-recipe-2");
 
         assertThat(plugin.getConfigurationStringValue("string-value")).isEqualTo("fred");
         assertThat(plugin.getConfigurationStringValue("int-value")).isEqualTo("123");
@@ -595,6 +596,6 @@ class RawPomTest {
         assertThat(child.getStringValue()).isEqualTo("fred");
         assertThat(child.getIntValue()).isEqualTo(123);
         assertThat(plugin.getConfigurationList("grandparent.parent.child.stringList", String.class)).hasSize(4)
-          .contains("f", "r", "e", "d");
+                .contains("f", "r", "e", "d");
     }
 }

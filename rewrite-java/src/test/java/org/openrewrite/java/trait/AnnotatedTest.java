@@ -27,15 +27,15 @@ class AnnotatedTest implements RewriteTest {
     @Test
     void attributes() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() ->
-            annotated("@Example").asVisitor(a -> SearchResult.found(a.getTree(),
-              a.getDefaultAttribute("name")
-                .map(lit -> lit.getValue(String.class))
-                .orElse("unknown"))
-            )
-          )),
-          java(
-            """
+                spec -> spec.recipe(RewriteTest.toRecipe(() ->
+                        annotated("@Example").asVisitor(a -> SearchResult.found(a.getTree(),
+                                        a.getDefaultAttribute("name")
+                                                .map(lit -> lit.getValue(String.class))
+                                                .orElse("unknown"))
+                        )
+                )),
+                java(
+                        """
               import java.lang.annotation.Repeatable;
               @Repeatable
               @interface Example {
@@ -43,23 +43,23 @@ class AnnotatedTest implements RewriteTest {
                   String name() default "";
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               @Example("test")
               @Example(value = "test")
               @Example(name = "test")
               class Test {
               }
               """,
-            """
+                        """
               /*~~(test)~~>*/@Example("test")
               /*~~(test)~~>*/@Example(value = "test")
               /*~~(test)~~>*/@Example(name = "test")
               class Test {
               }
               """
-          )
+                )
         );
     }
 }

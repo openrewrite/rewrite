@@ -34,7 +34,7 @@ public class ChangeFieldType<P> extends JavaIsoVisitor<P> {
 
     public ChangeFieldType(JavaType.FullyQualified oldFieldType, JavaType.FullyQualified newFieldType) {
         this.oldFullyQualifiedTypeName = oldFieldType.getFullyQualifiedName();
-        this.newFieldType  = newFieldType;
+        this.newFieldType = newFieldType;
     }
 
     @Override

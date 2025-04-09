@@ -26,25 +26,25 @@ class TypeParameterAndWildcardTest implements RewriteTest {
     @Test
     void annotatedTypeParametersOnWildcardBounds() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).build()),
-          java(
-            """
+                spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).build()),
+                java(
+                        """
               import java.util.List;
               interface B {}
               class A {
                   List<? extends @NotNull B> checks;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void annotatedTypeParametersOnReturnTypeExpression() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).build()),
-          java(
-            """
+                spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).build()),
+                java(
+                        """
               import java.util.List;
               interface B {}
               class A {
@@ -56,15 +56,15 @@ class TypeParameterAndWildcardTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void extendsAndSuper() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.List;
               interface B {}
               interface C {}
@@ -72,49 +72,49 @@ class TypeParameterAndWildcardTest implements RewriteTest {
                   public <P  extends B> void foo(List<P> out, List<? super C> in) {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void multipleExtends() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               interface B {}
               interface C {}
               public class A< T extends  B & C > {}
               """
-          )
+                )
         );
     }
 
     @Test
     void wildcardExtends() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.*;
               interface B {}
               public class A {
                   List< ?  extends  B > bs;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void emptyWildcard() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.*;
               public class A {
                   List< ? > a;
               }
               """
-          )
+                )
         );
     }
 }

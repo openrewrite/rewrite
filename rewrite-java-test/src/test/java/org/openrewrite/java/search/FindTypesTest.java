@@ -47,21 +47,21 @@ class FindTypesTest implements RewriteTest {
     @Test
     void simpleName() {
         rewriteRun(
-          spec -> spec.dataTable(TypeUses.Row.class, rows -> assertThat(rows)
-            .containsExactly(
-              new TypeUses.Row("B.java", "A1", "a.A1")
-            )),
-          java(
-            """
+                spec -> spec.dataTable(TypeUses.Row.class, rows -> assertThat(rows)
+                        .containsExactly(
+                                new TypeUses.Row("B.java", "A1", "a.A1")
+                        )),
+                java(
+                        """
               import a.A1;
               public class B extends A1 {}
               """,
-            """
+                        """
               import a.A1;
               public class B extends /*~~>*/A1 {}
               """
-          ),
-          java(a1)
+                ),
+                java(a1)
         );
     }
 
@@ -69,155 +69,155 @@ class FindTypesTest implements RewriteTest {
     @Test
     void wildcard() {
         rewriteRun(
-          spec -> spec.recipe(new FindTypes("java.io..*", false)),
-          java(
-            """
+                spec -> spec.recipe(new FindTypes("java.io..*", false)),
+                java(
+                        """
               import java.io.File;
               public class Test {
                   File file;
               }
               """,
-            """
+                        """
               import java.io.File;
               public class Test {
                   /*~~>*/File file;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void fullyQualifiedName() {
         rewriteRun(
-          java(
-            "public class B extends a.A1 {}",
-            "public class B extends /*~~>*/a.A1 {}"
-          ),
-          java(a1)
+                java(
+                        "public class B extends a.A1 {}",
+                        "public class B extends /*~~>*/a.A1 {}"
+                ),
+                java(a1)
         );
     }
 
     @Test
     void annotation() {
         rewriteRun(
-          spec -> spec.recipe(new FindTypes("A1", false)),
-          java(
-            "@A1 public class B {}",
-            "@/*~~>*/A1 public class B {}"
-          ),
-          java("public @interface A1 {}")
+                spec -> spec.recipe(new FindTypes("A1", false)),
+                java(
+                        "@A1 public class B {}",
+                        "@/*~~>*/A1 public class B {}"
+                ),
+                java("public @interface A1 {}")
         );
     }
 
     @Test
     void array() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import a.A1;
               public class B {
                  A1[] a = new A1[0];
               }
               """,
-            """
+                        """
               import a.A1;
               public class B {
                  /*~~>*/A1[] a = new /*~~>*/A1[0];
               }
               """
-          ),
-          java(a1)
+                ),
+                java(a1)
         );
     }
 
     @Test
     void multiDimensionalArray() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import a.A1;
               public class B {
                  A1[][] a = new A1[0][0];
               }
               """,
-            """
+                        """
               import a.A1;
               public class B {
                  /*~~>*/A1[][] a = new /*~~>*/A1[0][0];
               }
               """
-          ),
-          java(a1)
+                ),
+                java(a1)
         );
     }
 
     @Test
     void dataTable() {
         rewriteRun(
-          spec -> spec.recipe(new FindTypes("java.util.Collection", true))
-            .dataTable(TypeUses.Row.class, rows -> {
-                assertThat(rows).hasSize(1);
-                assertThat(rows.get(0).getConcreteType()).isEqualTo("java.util.List");
-                assertThat(rows.get(0).getCode()).isEqualTo("List<String>");
-            }),
-          java(
-            """
+                spec -> spec.recipe(new FindTypes("java.util.Collection", true))
+                        .dataTable(TypeUses.Row.class, rows -> {
+                            assertThat(rows).hasSize(1);
+                            assertThat(rows.get(0).getConcreteType()).isEqualTo("java.util.List");
+                            assertThat(rows.get(0).getCode()).isEqualTo("List<String>");
+                        }),
+                java(
+                        """
               import java.util.List;
               public class B {
                   List<String> l;
               }
               """,
-            """
+                        """
               import java.util.List;
               public class B {
                   /*~~>*/List<String> l;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void classDecl() {
         rewriteRun(
-          spec -> spec.recipes(
-            new FindTypes("I1", false),
-            new FindTypes("a.A1", false)
-          ),
-          java(
-            """
+                spec -> spec.recipes(
+                        new FindTypes("I1", false),
+                        new FindTypes("a.A1", false)
+                ),
+                java(
+                        """
               import a.A1;
               public class B extends A1 implements I1 {}
               """,
-            """
+                        """
               import a.A1;
               public class B extends /*~~>*/A1 implements /*~~>*/I1 {}
               """
-          ),
-          java(a1),
-          java("public interface I1 {}")
+                ),
+                java(a1),
+                java("public interface I1 {}")
         );
     }
 
     @Test
     void method() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import a.A1;
               public class B {
                  public A1 foo() throws A1 { return null; }
               }
               """,
-            """
+                        """
               import a.A1;
               public class B {
                  public /*~~>*/A1 foo() throws /*~~>*/A1 { return null; }
               }
               """
-          ),
-          java(a1)
+                ),
+                java(a1)
         );
     }
 
@@ -225,29 +225,29 @@ class FindTypesTest implements RewriteTest {
     @Test
     void methodWithParameterizedType() {
         rewriteRun(
-          spec -> spec.recipe(new FindTypes("java.util.List", false)),
-          java(
-            """
+                spec -> spec.recipe(new FindTypes("java.util.List", false)),
+                java(
+                        """
               import java.util.List;
               public class B {
                  public List<String> foo() { return null; }
               }
               """,
-            """
+                        """
               import java.util.List;
               public class B {
                  public /*~~>*/List<String> foo() { return null; }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void methodInvocationTypeParametersAndWildcard() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import a.A1;
               import java.util.List;
               public class B {
@@ -258,7 +258,7 @@ class FindTypesTest implements RewriteTest {
                  }
               }
               """,
-            """
+                        """
               import a.A1;
               import java.util.List;
               public class B {
@@ -269,8 +269,8 @@ class FindTypesTest implements RewriteTest {
                  }
               }
               """
-          ),
-          java(a1)
+                ),
+                java(a1)
         );
     }
 
@@ -278,8 +278,8 @@ class FindTypesTest implements RewriteTest {
     @Test
     void multiCatch() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import a.A1;
               public class B {
                  public void test() {
@@ -288,7 +288,7 @@ class FindTypesTest implements RewriteTest {
                  }
               }
               """,
-            """
+                        """
               import a.A1;
               public class B {
                  public void test() {
@@ -297,94 +297,94 @@ class FindTypesTest implements RewriteTest {
                  }
               }
               """
-          ),
-          java(a1)
+                ),
+                java(a1)
         );
     }
 
     @Test
     void multiVariable() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import a.A1;
               public class B {
                  A1 f1, f2;
               }
               """,
-            """
+                        """
               import a.A1;
               public class B {
                  /*~~>*/A1 f1, f2;
               }
               """
-          ),
-          java(a1)
+                ),
+                java(a1)
         );
     }
 
     @Test
     void newClass() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import a.A1;
               public class B {
                  A1 a = new A1();
               }
               """,
-            """
+                        """
               import a.A1;
               public class B {
                  /*~~>*/A1 a = new /*~~>*/A1();
               }
               """
-          ),
-          java(a1)
+                ),
+                java(a1)
         );
     }
 
     @Test
     void parameterizedType() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import a.A1;
               import java.util.Map;
               public class B {
                  Map<A1, A1> m;
               }
               """,
-            """
+                        """
               import a.A1;
               import java.util.Map;
               public class B {
                  Map</*~~>*/A1, /*~~>*/A1> m;
               }
               """
-          ),
-          java(a1)
+                ),
+                java(a1)
         );
     }
 
     @Test
     void assignableTypes() {
         rewriteRun(
-          spec -> spec.recipe(new FindTypes("java.util.Collection", true)),
-          java(
-            """
+                spec -> spec.recipe(new FindTypes("java.util.Collection", true)),
+                java(
+                        """
               import java.util.List;
               public class B {
                  List<String> l;
               }
               """,
-            """
+                        """
               import java.util.List;
               public class B {
                  /*~~>*/List<String> l;
               }
               """
-          )
+                )
         );
     }
 
@@ -392,51 +392,51 @@ class FindTypesTest implements RewriteTest {
     @Test
     void typeCast() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import a.A1;
               public class B {
                  A1 a = (A1) null;
               }
               """,
-            """
+                        """
               import a.A1;
               public class B {
                  /*~~>*/A1 a = (/*~~>*/A1) null;
               }
               """
-          ),
-          java(a1)
+                ),
+                java(a1)
         );
     }
 
     @Test
     void classReference() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import a.A1;
               class B {
                   Class<?> clazz = A1.class;
               }
               """,
-            """
+                        """
               import a.A1;
               class B {
                   Class<?> clazz = /*~~>*/A1.class;
               }
               """
-          ),
-          java(a1)
+                ),
+                java(a1)
         );
     }
 
     @Test
     void springXml() {
         rewriteRun(
-          spec -> spec.recipe(new FindTypes("a.A1", false)),
-          xml(
-            """
+                spec -> spec.recipe(new FindTypes("a.A1", false)),
+                xml(
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <beans xmlns="http://www.springframework.org/schema/beans"
                   xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
@@ -453,7 +453,7 @@ class FindTypesTest implements RewriteTest {
                 </bean>
               </beans>
               """,
-            """
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <beans xmlns="http://www.springframework.org/schema/beans"
                   xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
@@ -470,16 +470,16 @@ class FindTypesTest implements RewriteTest {
                 </bean>
               </beans>
               """
-          )
+                )
         );
     }
 
     @Test
     void javadocComment() {
         rewriteRun(
-          spec -> spec.recipe(new FindTypes("java.lang.String", true)),
-          java(
-            """
+                spec -> spec.recipe(new FindTypes("java.lang.String", true)),
+                java(
+                        """
                     public class A {
                       /**
                         * JavaDoc comment with {{@link String#trim()}}
@@ -490,7 +490,7 @@ class FindTypesTest implements RewriteTest {
                       }
                     }
                     """,
-            """
+                        """
                     public class A {
                       /**
                         * JavaDoc comment with {{@link ~~>String#trim()}}
@@ -501,7 +501,7 @@ class FindTypesTest implements RewriteTest {
                       }
                     }
                     """
-          )
+                )
         );
     }
 }

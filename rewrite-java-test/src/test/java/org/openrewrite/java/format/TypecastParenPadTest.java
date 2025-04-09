@@ -50,9 +50,9 @@ class TypecastParenPadTest implements RewriteTest {
     @Test
     void addTypecastPadding() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(namedStyles(singletonList(new TypecastParenPadStyle(true))))),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(namedStyles(singletonList(new TypecastParenPadStyle(true))))),
+                java(
+                        """
               class Test {
                   static void method() {
                       long m = 0L;
@@ -63,7 +63,7 @@ class TypecastParenPadTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   static void method() {
                       long m = 0L;
@@ -74,17 +74,17 @@ class TypecastParenPadTest implements RewriteTest {
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
     @Test
     void removeTypecastPadding() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(namedStyles(singletonList(new TypecastParenPadStyle(false))))),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(namedStyles(singletonList(new TypecastParenPadStyle(false))))),
+                java(
+                        """
               class Test {
                   static void method() {
                       long m = 0L;
@@ -95,7 +95,7 @@ class TypecastParenPadTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   static void method() {
                       long m = 0L;
@@ -106,13 +106,13 @@ class TypecastParenPadTest implements RewriteTest {
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
     private static Consumer<SourceSpec<J.CompilationUnit>> autoFormatIsIdempotent() {
         return spec -> spec.afterRecipe(cu ->
-          Assertions.assertThat(new AutoFormatVisitor<>().visit(cu, 0)).isEqualTo(cu));
+                Assertions.assertThat(new AutoFormatVisitor<>().visit(cu, 0)).isEqualTo(cu));
     }
 }

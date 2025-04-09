@@ -206,6 +206,7 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         private final Options options;
         private final WriteOptions writeOptions;
         private final String cacheFolder;
+
         RocksCache(String pomCacheDir) {
             try {
                 options = new Options();
@@ -317,7 +318,7 @@ public class RocksdbMavenPomCache implements MavenPomCache {
             if (Files.exists(Paths.get(cacheFolder))) {
                 //Attempting to close the database if the file has been deleted underneath it prevents the process
                 //from exiting.
-                try(FlushOptions flushOptions = new FlushOptions()) {
+                try (FlushOptions flushOptions = new FlushOptions()) {
                     database.flush(flushOptions);
                 } catch (RocksDBException e) {
                     //Error while flushing the database (before close), this means that any interim changes in memory

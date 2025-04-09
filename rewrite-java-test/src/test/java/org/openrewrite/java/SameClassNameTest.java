@@ -25,18 +25,18 @@ class SameClassNameTest implements RewriteTest {
     @Test
     void canParseTheSameJavaClass() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package a.b.c;
               class Bar {}
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package d.e.f;
               class Bar {}
               """
-          )
+                )
         );
     }
 }

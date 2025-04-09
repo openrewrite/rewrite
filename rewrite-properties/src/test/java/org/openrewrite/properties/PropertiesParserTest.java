@@ -40,34 +40,34 @@ class PropertiesParserTest implements RewriteTest {
     @Test
     void noEndOfFile() {
         rewriteRun(
-          properties(
-            "key=value",
-            spec -> spec.beforeRecipe(p -> assertThat(p.getEof()).isEmpty())
-          )
+                properties(
+                        "key=value",
+                        spec -> spec.beforeRecipe(p -> assertThat(p.getEof()).isEmpty())
+                )
         );
     }
 
     @Test
     void endOfFile() {
         rewriteRun(
-          properties(
-            "key=value\n",
-            spec -> spec
-              .noTrim()
-              .beforeRecipe(p -> assertThat(p.getEof()).isEqualTo("\n"))
-          )
+                properties(
+                        "key=value\n",
+                        spec -> spec
+                                .noTrim()
+                                .beforeRecipe(p -> assertThat(p.getEof()).isEqualTo("\n"))
+                )
         );
     }
 
     @Test
     void extraneousCharactersAtEndOfFile() {
         rewriteRun(
-          properties(
-            "key=value\nasdf\n",
-            spec -> spec
-              .noTrim()
-              .beforeRecipe(p -> assertThat(p.getEof()).isEqualTo("\nasdf\n"))
-          )
+                properties(
+                        "key=value\nasdf\n",
+                        spec -> spec
+                                .noTrim()
+                                .beforeRecipe(p -> assertThat(p.getEof()).isEqualTo("\nasdf\n"))
+                )
         );
     }
 
@@ -76,20 +76,20 @@ class PropertiesParserTest implements RewriteTest {
     @ValueSource(strings = {"#", "!"})
     void commentThenEntry(String commentStyle) {
         rewriteRun(
-          properties(
-            """
+                properties(
+                        """
               %s this is a comment
               key=value
               """.formatted(commentStyle),
-            spec -> spec.beforeRecipe(p -> {
-                assertThat(p.getContent().get(0))
-                  .isInstanceOf(Properties.Comment.class)
-                  .matches(comment -> ((Properties.Comment) comment).getMessage().equals(" this is a comment"));
-                assertThat(p.getContent().get(1))
-                  .isInstanceOf(Properties.Entry.class)
-                  .matches(e -> e.getPrefix().equals("\n"));
-            })
-          )
+                        spec -> spec.beforeRecipe(p -> {
+                            assertThat(p.getContent().get(0))
+                                    .isInstanceOf(Properties.Comment.class)
+                                    .matches(comment -> ((Properties.Comment) comment).getMessage().equals(" this is a comment"));
+                            assertThat(p.getContent().get(1))
+                                    .isInstanceOf(Properties.Entry.class)
+                                    .matches(e -> e.getPrefix().equals("\n"));
+                        })
+                )
         );
     }
 
@@ -98,33 +98,33 @@ class PropertiesParserTest implements RewriteTest {
     @ValueSource(strings = {"#", "!"})
     void entryValueThenComment(String commentStyle) {
         rewriteRun(
-          properties(
-            """
+                properties(
+                        """
               key=value %s this is a comment
               """.formatted(commentStyle),
-            spec -> spec.beforeRecipe(p -> {
-                assertThat(p.getContent().get(0))
-                  .isInstanceOf(Properties.Entry.class)
-                  .extracting(e -> ((Properties.Entry) e).getValue().getText())
-                  .isEqualTo("value");
-                assertThat(p.getContent().get(1))
-                  .isInstanceOf(Properties.Comment.class)
-                  .matches(comment -> ((Properties.Comment) comment).getMessage().equals(" this is a comment"));
-            })
-          )
+                        spec -> spec.beforeRecipe(p -> {
+                            assertThat(p.getContent().get(0))
+                                    .isInstanceOf(Properties.Entry.class)
+                                    .extracting(e -> ((Properties.Entry) e).getValue().getText())
+                                    .isEqualTo("value");
+                            assertThat(p.getContent().get(1))
+                                    .isInstanceOf(Properties.Comment.class)
+                                    .matches(comment -> ((Properties.Comment) comment).getMessage().equals(" this is a comment"));
+                        })
+                )
         );
     }
 
     @Test
     void multipleEntries() {
         rewriteRun(
-          properties(
-            """
+                properties(
+                        """
               key=value1
               key2 = value2
               """,
-            containsValues("value1", "value2")
-          )
+                        containsValues("value1", "value2")
+                )
         );
     }
 
@@ -133,15 +133,15 @@ class PropertiesParserTest implements RewriteTest {
     @Test
     void escapedEndOfLine() {
         rewriteRun(
-          properties(
-            """
+                properties(
+                        """
               key=val\\
                         ue1
               ke\\
                   y2 = value2
               """,
-            containsValues("value1", "value2")
-          )
+                        containsValues("value1", "value2")
+                )
         );
     }
 
@@ -149,8 +149,8 @@ class PropertiesParserTest implements RewriteTest {
     @Test
     void commentsWithMultipleDelimiters() {
         rewriteRun(
-          properties(
-            """
+                properties(
+                        """
               ########################
               #
               ########################
@@ -163,8 +163,8 @@ class PropertiesParserTest implements RewriteTest {
               
               key2=value2
               """,
-            containsValues("value1", "value2")
-          )
+                        containsValues("value1", "value2")
+                )
         );
     }
 
@@ -173,13 +173,13 @@ class PropertiesParserTest implements RewriteTest {
     @Test
     void delimitedByWhitespace() {
         rewriteRun(
-          properties(
-            """
+                properties(
+                        """
               key1         value1
               key2:value2
               """,
-            containsValues("value1", "value2")
-          )
+                        containsValues("value1", "value2")
+                )
         );
     }
 
@@ -187,15 +187,15 @@ class PropertiesParserTest implements RewriteTest {
     @Test
     void escapedEntryDelimiters() {
         rewriteRun(
-          properties(
-            """
+                properties(
+                        """
               ke\\=y=value1
               key\\:2=value2
               key3=val\\=ue3
               key4=val\\:ue4
               """,
-            containsValues("value1", "value2", "val\\=ue3", "val\\:ue4")
-          )
+                        containsValues("value1", "value2", "val\\=ue3", "val\\:ue4")
+                )
         );
     }
 
@@ -203,25 +203,25 @@ class PropertiesParserTest implements RewriteTest {
     @Test
     void printWithNullDelimiter() {
         rewriteRun(
-          properties(
-            """
+                properties(
+                        """
               ke\\=y=value1
               key\\:2=value2
               key3=val\\=ue3
               key4=val\\:ue4
               """,
-            spec -> spec.beforeRecipe(props -> {
-                Properties.File p = (Properties.File) new PropertiesVisitor<Integer>() {
-                    @Override
-                    public Properties visitEntry(Properties.Entry entry, Integer integer) {
-                        return entry.withDelimiter(null);
-                    }
-                }.visitNonNull(props, 1);
+                        spec -> spec.beforeRecipe(props -> {
+                            Properties.File p = (Properties.File) new PropertiesVisitor<Integer>() {
+                                @Override
+                                public Properties visitEntry(Properties.Entry entry, Integer integer) {
+                                    return entry.withDelimiter(null);
+                                }
+                            }.visitNonNull(props, 1);
 
-                p.printAll();
+                            p.printAll();
 
-            })
-          )
+                        })
+                )
         );
     }
 
@@ -229,14 +229,14 @@ class PropertiesParserTest implements RewriteTest {
     @Test
     void windowsPaths() {
         rewriteRun(
-          properties(
-            """
+                properties(
+                        """
               ws.gson.debug.dump=true
               ws.gson.debug.mode=CONSOLE
               ws.gson.debug.path=C:\\\\Temp\\\\dump_foo\\\\
               """,
-            containsValues("true", "CONSOLE", "C:\\\\Temp\\\\dump_foo\\\\")
-          )
+                        containsValues("true", "CONSOLE", "C:\\\\Temp\\\\dump_foo\\\\")
+                )
         );
     }
 
@@ -244,15 +244,15 @@ class PropertiesParserTest implements RewriteTest {
     @Test
     void trailingDoubleSlash() {
         rewriteRun(
-          properties(
-            """
+                properties(
+                        """
               foo=C:\\
               
               """,
-            spec -> spec.afterRecipe(file -> {
-                assertThat(file).isInstanceOf(Properties.File.class);
-            })
-          )
+                        spec -> spec.afterRecipe(file -> {
+                            assertThat(file).isInstanceOf(Properties.File.class);
+                        })
+                )
         );
     }
 
@@ -260,16 +260,16 @@ class PropertiesParserTest implements RewriteTest {
     @Test
     void repeatedDelimiter() {
         rewriteRun(
-          properties(
-            """
+                properties(
+                        """
               key1==value1
               key2::value2
               key3======value3
               key4=:value4
               key5 = = value5
               """,
-            containsValues("=value1", ":value2", "=====value3", ":value4", "= value5")
-          )
+                        containsValues("=value1", ":value2", "=====value3", ":value4", "= value5")
+                )
         );
     }
 

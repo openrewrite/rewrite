@@ -32,8 +32,8 @@ class OrderPomElementsTest implements RewriteTest {
     @Test
     void validOrderNoChange() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
 
@@ -65,7 +65,7 @@ class OrderPomElementsTest implements RewriteTest {
                   </build>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -73,8 +73,8 @@ class OrderPomElementsTest implements RewriteTest {
     @Test
     void updateOrder() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <parent>
                       <groupId>jpl</groupId>
@@ -121,7 +121,7 @@ class OrderPomElementsTest implements RewriteTest {
                   </build>
               </project>
               """,
-            """
+                        """
               <project>
                   <!-- modelVersion1 -->
               
@@ -168,7 +168,7 @@ class OrderPomElementsTest implements RewriteTest {
                   </build>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -176,8 +176,8 @@ class OrderPomElementsTest implements RewriteTest {
     @Test
     void updateOrderCorrectNewLines() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <parent>
                       <groupId>jpl</groupId>
@@ -228,7 +228,7 @@ class OrderPomElementsTest implements RewriteTest {
                   </build>
               </project>
               """,
-            """
+                        """
               <project>
                   <!-- model version comment -->
               
@@ -279,7 +279,7 @@ class OrderPomElementsTest implements RewriteTest {
                   </build>
               </project>
               """
-          )
+                )
         );
     }
 }

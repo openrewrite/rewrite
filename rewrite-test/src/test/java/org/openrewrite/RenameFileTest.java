@@ -34,21 +34,21 @@ class RenameFileTest implements RewriteTest {
     @Test
     void hasFileMatch() {
         rewriteRun(
-          text(
-            "hello world",
-            "hello world",
-            spec ->
-                spec
-                  .path("a/b/hello.txt")
-                  .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("a/b/goodbye.txt")))
-          )
+                text(
+                        "hello world",
+                        "hello world",
+                        spec ->
+                                spec
+                                        .path("a/b/hello.txt")
+                                        .afterRecipe(pt -> assertThat(pt.getSourcePath()).isEqualTo(Paths.get("a/b/goodbye.txt")))
+                )
         );
     }
 
     @Test
     void hasNoFileMatch() {
         rewriteRun(
-          text("hello world", spec -> spec.path("a/b/goodbye.txt"))
+                text("hello world", spec -> spec.path("a/b/goodbye.txt"))
         );
     }
 }

@@ -25,14 +25,14 @@ class HclSplatTest implements RewriteTest {
     @Test
     void attributeSplat() {
         rewriteRun(
-          hcl("a = tuple . *.foo.bar[0]")
+                hcl("a = tuple . *.foo.bar[0]")
         );
     }
 
     @Test
     void fullSplat() {
         rewriteRun(
-          hcl("b = tuple [ * ].foo.bar[0]")
+                hcl("b = tuple [ * ].foo.bar[0]")
         );
     }
 }

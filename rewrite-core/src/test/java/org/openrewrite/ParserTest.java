@@ -47,10 +47,10 @@ class ParserTest implements RewriteTest {
     @Test
     void canPrintParseError() {
         ParseError pe = ParseError.build(new PlainTextParser(),
-          Parser.Input.fromString("bad file"),
-          null,
-          new InMemoryExecutionContext(),
-          new RuntimeException("bad file!!"));
+                Parser.Input.fromString("bad file"),
+                null,
+                new InMemoryExecutionContext(),
+                new RuntimeException("bad file!!"));
 
         assertThat(pe.printAll()).isEqualTo("bad file");
     }

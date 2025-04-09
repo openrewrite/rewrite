@@ -25,15 +25,15 @@ class ReturnTest implements RewriteTest {
     @Test
     void returnValue() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   public String string() {
                       return "";
                   }
                 }
               """
-          )
+                )
         );
     }
 
@@ -41,15 +41,15 @@ class ReturnTest implements RewriteTest {
     @Test
     void returnVoid() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   public void nothing() {
                       return ;
                   }
               }
               """
-          )
+                )
         );
     }
 }

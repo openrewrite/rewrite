@@ -27,15 +27,15 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new UpgradeTransitiveDependencyVersion(
-          "com.fasterxml*", "jackson-core", "2.12.5", null, null, null, null, null, null, null));
+                "com.fasterxml*", "jackson-core", "2.12.5", null, null, null, null, null, null, null));
     }
 
     @DocumentExample
     @Test
     void singleProject() {
         rewriteRun(
-          pomXml(
-                """
+                pomXml(
+                        """
             <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>org.openrewrite</groupId>
@@ -50,7 +50,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                 </dependencies>
             </project>
             """,
-            """
+                        """
             <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>org.openrewrite</groupId>
@@ -80,8 +80,8 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     @Test
     void leavesDirectDependencyUntouched() {
         rewriteRun(
-          pomXml(
-                """
+                pomXml(
+                        """
             <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>org.openrewrite</groupId>

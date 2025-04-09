@@ -28,46 +28,46 @@ class HasMinimumJavaVersionTest implements RewriteTest {
     @Test
     void matches() {
         rewriteRun(
-          spec -> spec.recipe(new HasMinimumJavaVersion("8-21", false)),
-          java(
-            """
+                spec -> spec.recipe(new HasMinimumJavaVersion("8-21", false)),
+                java(
+                        """
               class Test {
               }
               """,
-            """
+                        """
               /*~~(Java version 8)~~>*/class Test {
               }
               """,
-            spec -> spec.markers(javaVersion(8))
-          ),
-          java(
-            """
+                        spec -> spec.markers(javaVersion(8))
+                ),
+                java(
+                        """
               class Higher {
               }
               """,
-            spec -> spec.markers(javaVersion(17))
-          )
+                        spec -> spec.markers(javaVersion(17))
+                )
         );
     }
 
     @Test
     void noMatch() {
         rewriteRun(
-          spec -> spec.recipe(new HasMinimumJavaVersion("17-21", false)),
-          java(
-            """
+                spec -> spec.recipe(new HasMinimumJavaVersion("17-21", false)),
+                java(
+                        """
               class Test {
               }
               """,
-            spec -> spec.markers(javaVersion(8))
-          ),
-          java(
-            """
+                        spec -> spec.markers(javaVersion(8))
+                ),
+                java(
+                        """
               class Higher {
               }
               """,
-            spec -> spec.markers(javaVersion(19))
-          )
+                        spec -> spec.markers(javaVersion(19))
+                )
         );
     }
 }

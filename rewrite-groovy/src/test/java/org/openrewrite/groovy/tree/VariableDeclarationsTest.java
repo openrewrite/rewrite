@@ -38,77 +38,77 @@ class VariableDeclarationsTest implements RewriteTest {
     @Test
     void varKeyword() {
         rewriteRun(
-          groovy("var a = 1")
+                groovy("var a = 1")
         );
     }
 
     @Test
     void finalKeyword() {
         rewriteRun(
-          groovy("final a = 1")
+                groovy("final a = 1")
         );
     }
 
     @Test
     void nestedGenerics() {
         rewriteRun(
-          groovy("final map = new HashMap<String, List<String>>()")
+                groovy("final map = new HashMap<String, List<String>>()")
         );
     }
 
     @Test
     void singleVariableDeclaration() {
         rewriteRun(
-          groovy("Integer a = 1")
+                groovy("Integer a = 1")
         );
     }
 
     @Test
     void singleVariableDeclarationStaticallyTyped() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               int a = 1
               List<String> l
               """
-          )
+                )
         );
     }
 
     @Test
     void wildcardWithUpperBound() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               List<? extends String> l
               """,
-            spec -> spec.beforeRecipe(cu -> {
-                var varDecl = (J.VariableDeclarations) cu.getStatements().get(0);
-                assertThat(varDecl.getTypeExpression()).isInstanceOf(J.ParameterizedType.class);
-                var typeExpression = requireNonNull(requireNonNull((J.ParameterizedType) varDecl.getTypeExpression())
-                  .getTypeParameters()).get(0);
-                assertThat(typeExpression).isInstanceOf(J.Wildcard.class);
-                assertThat(((J.Wildcard) typeExpression).getBound()).isEqualTo(J.Wildcard.Bound.Extends);
-            })
-          )
+                        spec -> spec.beforeRecipe(cu -> {
+                            var varDecl = (J.VariableDeclarations) cu.getStatements().get(0);
+                            assertThat(varDecl.getTypeExpression()).isInstanceOf(J.ParameterizedType.class);
+                            var typeExpression = requireNonNull(requireNonNull((J.ParameterizedType) varDecl.getTypeExpression())
+                                    .getTypeParameters()).get(0);
+                            assertThat(typeExpression).isInstanceOf(J.Wildcard.class);
+                            assertThat(((J.Wildcard) typeExpression).getBound()).isEqualTo(J.Wildcard.Bound.Extends);
+                        })
+                )
         );
     }
 
     @Test
     void wildcardWithLowerBound() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               List<? super String> l
               """
-          )
+                )
         );
     }
 
     @Test
     void diamondOperator() {
         rewriteRun(
-          groovy("List<String> l = new ArrayList< /* */ >()")
+                groovy("List<String> l = new ArrayList< /* */ >()")
         );
     }
 
@@ -116,8 +116,8 @@ class VariableDeclarationsTest implements RewriteTest {
     @Test
     void numericValueWithUnderscores() {
         rewriteRun(
-          groovy(
-                """
+                groovy(
+                        """
           def l1 = 10_000L
           def l2 = 10_000l
           def i = 10_000
@@ -133,7 +133,7 @@ class VariableDeclarationsTest implements RewriteTest {
     @Test
     void singleTypeMultipleVariableDeclaration() {
         rewriteRun(
-          groovy("def a = 1, b = 1")
+                groovy("def a = 1, b = 1")
         );
     }
 
@@ -141,51 +141,51 @@ class VariableDeclarationsTest implements RewriteTest {
     @Test
     void multipleTypeMultipleVariableDeclaration() {
         rewriteRun(
-          groovy("def a = 1, b = 's'")
+                groovy("def a = 1, b = 's'")
         );
     }
 
     @Test
     void genericVariableDeclaration() {
         rewriteRun(
-          groovy("def a = new HashMap<String, String>()")
+                groovy("def a = new HashMap<String, String>()")
         );
     }
 
     @Test
     void anonymousClass() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def a = new Object( ) {
                   def b = new Object() { }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void annotatedField() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               class Example {
                   @Deprecated
                   Object fred = new Object()
               }
               """,
-            spec -> spec.beforeRecipe(
-              cu -> {
-                List<J.VariableDeclarations> variables = TreeVisitor.collect(new JavaVisitor<>() {
-                    @Override
-                    public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext executionContext) {
-                        return SearchResult.found(multiVariable);
-                    }
-                }, cu, new ArrayList<>(), J.VariableDeclarations.class, v -> v);
-                assertThat(variables.get(0).getLeadingAnnotations()).hasSize(1);
-            })
-          )
+                        spec -> spec.beforeRecipe(
+                                cu -> {
+                                    List<J.VariableDeclarations> variables = TreeVisitor.collect(new JavaVisitor<>() {
+                                        @Override
+                                        public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext executionContext) {
+                                            return SearchResult.found(multiVariable);
+                                        }
+                                    }, cu, new ArrayList<>(), J.VariableDeclarations.class, v -> v);
+                                    assertThat(variables.get(0).getLeadingAnnotations()).hasSize(1);
+                                })
+                )
         );
     }
 
@@ -194,13 +194,13 @@ class VariableDeclarationsTest implements RewriteTest {
     @Test
     void nestedTypeParameters() {
         rewriteRun(
-          groovy(
-                """
+                groovy(
+                        """
             class A {
                 def map = new HashMap<String, List<String>>()
             }
             """
-          )
+                )
         );
     }
 
@@ -208,12 +208,12 @@ class VariableDeclarationsTest implements RewriteTest {
     @Test
     void defAndExplicitReturnType() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def /*int*/ int one = 1
               def /*Object*/ Object two = 2
               """
-          )
+                )
         );
     }
 }

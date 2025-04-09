@@ -77,7 +77,7 @@ public class FindInheritedFields {
                     return true;
                 }
             }
-        } else if(type instanceof JavaType.Parameterized) {
+        } else if (type instanceof JavaType.Parameterized) {
             JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
             return hasElementTypeAssignable(parameterized.getType(), fullyQualifiedName);
         }

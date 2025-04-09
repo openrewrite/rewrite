@@ -29,15 +29,15 @@ class MavenPluginTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(RewriteTest.toRecipe(() -> mavenPlugin().asVisitor(plugin ->
-          SearchResult.found(plugin.getTree(), plugin.getGroupId() + ":" + plugin.getArtifactId()))));
+                SearchResult.found(plugin.getTree(), plugin.getGroupId() + ":" + plugin.getArtifactId()))));
     }
 
     @DocumentExample
     @Test
     void findMavenPlugin() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
@@ -53,7 +53,7 @@ class MavenPluginTest implements RewriteTest {
                   </build>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
@@ -69,7 +69,7 @@ class MavenPluginTest implements RewriteTest {
                   </build>
               </project>
               """
-          )
+                )
         );
     }
 }

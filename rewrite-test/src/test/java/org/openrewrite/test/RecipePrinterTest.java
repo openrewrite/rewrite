@@ -41,9 +41,9 @@ class RecipePrinterTest implements RewriteTest {
     @Test
     void printRecipeTreeForSimpleRecipe() {
         rewriteRun(
-          spec -> spec
-            .recipe(new SelectRecipeExamples())
-            .printRecipe(() -> sb::append)
+                spec -> spec
+                        .recipe(new SelectRecipeExamples())
+                        .printRecipe(() -> sb::append)
         );
 
         assertThat(sb.toString()).isEqualTo(SelectRecipeExamples.class.getName() + System.lineSeparator());
@@ -52,25 +52,25 @@ class RecipePrinterTest implements RewriteTest {
     @Test
     void printRecipeTreeForRecipeWithNestedRecipes() {
         Recipe recipe = new CompositeRecipe(Arrays.asList(
-          new TestRecipe("the option"),
-          new SelectRecipeExamples(),
-          new CompositeRecipe(Collections.singletonList(new SelectRecipeExamples()))
+                new TestRecipe("the option"),
+                new SelectRecipeExamples(),
+                new CompositeRecipe(Collections.singletonList(new SelectRecipeExamples()))
         ));
         rewriteRun(
-          spec -> spec
-            .recipe(recipe)
-            .printRecipe(() -> sb::append)
+                spec -> spec
+                        .recipe(recipe)
+                        .printRecipe(() -> sb::append)
         );
 
         String output = sb.toString();
 
         String expected = String.format(
-          "%1$s%n" +
-          "  %2$s: {theOption=the option}%n" +
-          "  %3$s%n" +
-          "  %1$s%n" +
-          "    %3$s%n",
-          CompositeRecipe.class.getName(), TestRecipe.class.getName(), SelectRecipeExamples.class.getName()
+                "%1$s%n" +
+                        "  %2$s: {theOption=the option}%n" +
+                        "  %3$s%n" +
+                        "  %1$s%n" +
+                        "    %3$s%n",
+                CompositeRecipe.class.getName(), TestRecipe.class.getName(), SelectRecipeExamples.class.getName()
         );
 
         assertThat(output).isEqualTo(expected);
@@ -81,8 +81,8 @@ class RecipePrinterTest implements RewriteTest {
     private static class TestRecipe extends Recipe {
 
         @Option(displayName = "An option",
-          description = "A sample option.",
-          example = "Some text.")
+                description = "A sample option.",
+                example = "Some text.")
         String theOption;
 
         @Override

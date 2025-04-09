@@ -17,7 +17,7 @@ package org.openrewrite;
 
 import org.openrewrite.tree.ParseError;
 
-public class ParseErrorVisitor <P> extends TreeVisitor<Tree, P> {
+public class ParseErrorVisitor<P> extends TreeVisitor<Tree, P> {
 
     @Override
     public boolean isAcceptable(SourceFile sourceFile, P p) {

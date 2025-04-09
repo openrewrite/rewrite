@@ -18,7 +18,7 @@ package org.openrewrite.binary;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 
-public class BinaryVisitor <P> extends TreeVisitor<Binary, P> {
+public class BinaryVisitor<P> extends TreeVisitor<Binary, P> {
 
     @Override
     public boolean isAcceptable(SourceFile sourceFile, P p) {

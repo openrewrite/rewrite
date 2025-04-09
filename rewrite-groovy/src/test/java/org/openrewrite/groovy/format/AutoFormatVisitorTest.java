@@ -33,8 +33,8 @@ class AutoFormatVisitorTest implements RewriteTest {
     @Test
     void keepMaximumBetweenHeaderAndPackage() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               /*
                * This is a sample file.
                */
@@ -47,7 +47,7 @@ class AutoFormatVisitorTest implements RewriteTest {
               class Test {
               }
               """,
-            """
+                        """
               /*
                * This is a sample file.
                */
@@ -58,7 +58,7 @@ class AutoFormatVisitorTest implements RewriteTest {
               class Test {
               }
               """
-          )
+                )
         );
     }
 }

@@ -27,7 +27,7 @@ class DoesNotUseTypeTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipeFromYaml(
-          """
+                """
             type: specs.openrewrite.org/v1beta/recipe
             name: org.acme.RemoveUnusedImportsIfNotUsingString
             description: Test.
@@ -38,7 +38,7 @@ class DoesNotUseTypeTest implements RewriteTest {
             recipeList:
               - org.openrewrite.java.RemoveUnusedImports
             """,
-          "org.acme.RemoveUnusedImportsIfNotUsingString"
+                "org.acme.RemoveUnusedImportsIfNotUsingString"
         );
     }
 
@@ -46,35 +46,35 @@ class DoesNotUseTypeTest implements RewriteTest {
     @Test
     void importRemovedWhenTypeNotFound() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.lang.StringBuilder;
 
               class Foo {
                   int bla = 123;
               }
               """,
-            """
+                        """
               class Foo {
                   int bla = 123;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void importRetainedWhenTypeInUse() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.lang.StringBuilder;
 
               class Foo {
                   String bla = "bla";
               }
               """
-          )
+                )
         );
     }
 }

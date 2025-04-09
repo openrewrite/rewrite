@@ -40,17 +40,17 @@ class MavenRepositoryMirrorTest {
         MavenRepositoryMirror oneMirror = new MavenRepositoryMirror("mirror", "https://mirror", "one", true, true, null);
 
         MavenRepository one = MavenRepository.builder()
-          .id("one")
-          .uri("https://one")
-          .build();
+                .id("one")
+                .uri("https://one")
+                .build();
 
         MavenRepository two = MavenRepository.builder()
-          .id("two")
-          .uri("https://two")
-          .build();
+                .id("two")
+                .uri("https://two")
+                .build();
 
         assertThat(oneMirror.apply(two))
-          .isEqualTo(two);
+                .isEqualTo(two);
 
         MavenRepository oneMirrored = oneMirror.apply(one);
         assertThat(oneMirrored).extracting(MavenRepository::getId).isEqualTo("mirror");
@@ -61,17 +61,17 @@ class MavenRepositoryMirrorTest {
     void excludeFromWildcard() {
         MavenRepositoryMirror oneMirror = new MavenRepositoryMirror("mirror", "https://mirror", "*,!two", true, true, null);
         MavenRepository one = MavenRepository.builder()
-          .id("one")
-          .uri("https://one")
-          .build();
+                .id("one")
+                .uri("https://one")
+                .build();
 
         MavenRepository two = MavenRepository.builder()
-          .id("two")
-          .uri("https://two")
-          .build();
+                .id("two")
+                .uri("https://two")
+                .build();
 
         assertThat(oneMirror.apply(two))
-          .isEqualTo(two);
+                .isEqualTo(two);
 
         MavenRepository oneMirrored = oneMirror.apply(one);
         assertThat(oneMirrored).extracting(MavenRepository::getId).isEqualTo("mirror");

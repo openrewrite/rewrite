@@ -26,8 +26,8 @@ class IfTest implements RewriteTest {
     @Test
     void ifElse() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       int n = 0;
@@ -40,15 +40,15 @@ class IfTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void noElse() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       int n = 0;
@@ -57,15 +57,15 @@ class IfTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void singleLineIfElseStatements() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       int n = 0;
@@ -75,7 +75,7 @@ class IfTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -83,8 +83,8 @@ class IfTest implements RewriteTest {
     @Test
     void elseWithTrailingSpace() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       if (true) {
@@ -95,7 +95,7 @@ class IfTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

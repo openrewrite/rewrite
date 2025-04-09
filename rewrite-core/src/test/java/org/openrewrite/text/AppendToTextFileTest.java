@@ -31,14 +31,14 @@ class AppendToTextFileTest implements RewriteTest {
     @Test
     void createsFileIfNeeded() {
         rewriteRun(
-          spec -> spec.recipe(new AppendToTextFile("file.txt", "content", "preamble", true, AppendToTextFile.Strategy.Leave)),
-          text(
-            null,
-            """
+                spec -> spec.recipe(new AppendToTextFile("file.txt", "content", "preamble", true, AppendToTextFile.Strategy.Leave)),
+                text(
+                        null,
+                        """
               preamble
               content
               """
-          )
+                )
         );
     }
 
@@ -46,15 +46,15 @@ class AppendToTextFileTest implements RewriteTest {
     void createsFileIfNeededWithMultipleInstances() {
         Supplier<Recipe> r = () -> new AppendToTextFile("file.txt", "content", "preamble", true, AppendToTextFile.Strategy.Leave);
         rewriteRun(
-          spec -> spec.recipes(r.get(), r.get()),
-          text(
-            null,
-            """
+                spec -> spec.recipes(r.get(), r.get()),
+                text(
+                        null,
+                        """
               preamble
               content
               """,
-            spec -> spec.path("file.txt")
-          )
+                        spec -> spec.path("file.txt")
+                )
         );
     }
 
@@ -62,103 +62,103 @@ class AppendToTextFileTest implements RewriteTest {
     @Test
     void replacesFileIfRequested() {
         rewriteRun(
-          spec -> spec.recipe(new AppendToTextFile("file.txt", "content", "preamble", true, AppendToTextFile.Strategy.Replace)),
-          text(
-            """
+                spec -> spec.recipe(new AppendToTextFile("file.txt", "content", "preamble", true, AppendToTextFile.Strategy.Replace)),
+                text(
+                        """
               existing
               """,
-            """
+                        """
               preamble
               content
               """,
-            spec -> spec.path("file.txt").noTrim()
-          )
+                        spec -> spec.path("file.txt").noTrim()
+                )
         );
     }
 
     @Test
     void continuesFileIfRequested() {
         rewriteRun(
-          spec -> spec.recipe(new AppendToTextFile("file.txt", "content", "preamble", true, AppendToTextFile.Strategy.Continue)),
-          text(
-            """
+                spec -> spec.recipe(new AppendToTextFile("file.txt", "content", "preamble", true, AppendToTextFile.Strategy.Continue)),
+                text(
+                        """
               existing
               """,
-            """
+                        """
               existing
               content
               """,
-            spec -> spec.path("file.txt").noTrim()
-          )
+                        spec -> spec.path("file.txt").noTrim()
+                )
         );
     }
 
     @Test
     void leavesFileIfRequested() {
         rewriteRun(
-          spec -> spec.recipe(new AppendToTextFile("file.txt", "content", "preamble", true, AppendToTextFile.Strategy.Leave)),
-          text("existing", spec -> spec.path("file.txt"))
+                spec -> spec.recipe(new AppendToTextFile("file.txt", "content", "preamble", true, AppendToTextFile.Strategy.Leave)),
+                text("existing", spec -> spec.path("file.txt"))
         );
     }
 
     @Test
     void multipleInstancesCanAppend() {
         rewriteRun(
-          spec -> spec.recipes(
-            new AppendToTextFile("file.txt", "content", "preamble", true, AppendToTextFile.Strategy.Continue),
-            new AppendToTextFile("file.txt", "content", "preamble", true, AppendToTextFile.Strategy.Continue)
-          ),
-          text(
-            "existing",
-            """
+                spec -> spec.recipes(
+                        new AppendToTextFile("file.txt", "content", "preamble", true, AppendToTextFile.Strategy.Continue),
+                        new AppendToTextFile("file.txt", "content", "preamble", true, AppendToTextFile.Strategy.Continue)
+                ),
+                text(
+                        "existing",
+                        """
               existing
               content
               content
               """,
-            spec -> spec.path("file.txt").noTrim()
-          )
+                        spec -> spec.path("file.txt").noTrim()
+                )
         );
     }
 
     @Test
     void noLeadingNewlineIfNoPreamble() {
         rewriteRun(
-          spec -> spec.recipe(new AppendToTextFile("file.txt", "content", null, true, AppendToTextFile.Strategy.Replace)),
-          text(
-            """
+                spec -> spec.recipe(new AppendToTextFile("file.txt", "content", null, true, AppendToTextFile.Strategy.Replace)),
+                text(
+                        """
               existing
               """,
-            """
+                        """
               content
               """,
-            spec -> spec.path("file.txt").noTrim()
-          )
+                        spec -> spec.path("file.txt").noTrim()
+                )
         );
     }
 
     @Test
     void multipleFiles() {
         rewriteRun(
-          spec -> spec.recipes(
-            new AppendToTextFile("file1.txt", "content1", "preamble1", true, AppendToTextFile.Strategy.Replace),
-            new AppendToTextFile("file2.txt", "content2", "preamble2", true, AppendToTextFile.Strategy.Replace)
-          ),
-          text(
-            "existing1",
-            """
+                spec -> spec.recipes(
+                        new AppendToTextFile("file1.txt", "content1", "preamble1", true, AppendToTextFile.Strategy.Replace),
+                        new AppendToTextFile("file2.txt", "content2", "preamble2", true, AppendToTextFile.Strategy.Replace)
+                ),
+                text(
+                        "existing1",
+                        """
               preamble1
               content1
               """,
-            spec -> spec.path("file1.txt").noTrim()
-          ),
-          text(
-            "existing2",
-            """
+                        spec -> spec.path("file1.txt").noTrim()
+                ),
+                text(
+                        "existing2",
+                        """
               preamble2
               content2
               """,
-            spec -> spec.path("file2.txt").noTrim()
-          )
+                        spec -> spec.path("file2.txt").noTrim()
+                )
         );
     }
 
@@ -166,73 +166,73 @@ class AppendToTextFileTest implements RewriteTest {
     @Test
     void missingExpectedGeneratedFiles() {
         assertThatExceptionOfType(AssertionError.class).isThrownBy(() ->
-          rewriteRun(
-            spec -> spec.recipes(
-              new AppendToTextFile("file1.txt", "content1", "preamble1", true, AppendToTextFile.Strategy.Replace),
-              new AppendToTextFile("file2.txt", "content2", "preamble2", true, AppendToTextFile.Strategy.Replace)
-            ),
-            text(
-              "existing2",
-              """
+                rewriteRun(
+                        spec -> spec.recipes(
+                                new AppendToTextFile("file1.txt", "content1", "preamble1", true, AppendToTextFile.Strategy.Replace),
+                                new AppendToTextFile("file2.txt", "content2", "preamble2", true, AppendToTextFile.Strategy.Replace)
+                        ),
+                        text(
+                                "existing2",
+                                """
                 preamble2
                 content2
                 """,
-              spec -> spec.path("file2.txt").noTrim()
-            )
-          ));
+                                spec -> spec.path("file2.txt").noTrim()
+                        )
+                ));
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2796")
     @Test
     void changeAndCreatedFilesIfNeeded() {
         rewriteRun(
-          spec -> spec.recipes(
-            new AppendToTextFile("file1.txt", "content1", "preamble1", true, AppendToTextFile.Strategy.Replace),
-            new AppendToTextFile("file2.txt", "content2", "preamble2", true, AppendToTextFile.Strategy.Replace)
-          ),
-          text(
-            "existing2",
-            """
+                spec -> spec.recipes(
+                        new AppendToTextFile("file1.txt", "content1", "preamble1", true, AppendToTextFile.Strategy.Replace),
+                        new AppendToTextFile("file2.txt", "content2", "preamble2", true, AppendToTextFile.Strategy.Replace)
+                ),
+                text(
+                        "existing2",
+                        """
               preamble2
               content2
               """,
-            spec -> spec.path("file2.txt").noTrim()
-          ),
-          text(
-            null,
-            """
+                        spec -> spec.path("file2.txt").noTrim()
+                ),
+                text(
+                        null,
+                        """
               preamble1
               content1
               """
-          )
+                )
         );
     }
 
     @Test
     void multipleInstancesOnMultipleFiles() {
         rewriteRun(
-          spec -> spec.recipes(
-            new AppendToTextFile("file1.txt", "content1", "preamble1", true, AppendToTextFile.Strategy.Replace),
-            new AppendToTextFile("file2.txt", "content2", "preamble2", true, AppendToTextFile.Strategy.Replace),
-            new AppendToTextFile("file1.txt", "content1", "preamble1", true, AppendToTextFile.Strategy.Replace),
-            new AppendToTextFile("file2.txt", "content2", "preamble2", true, AppendToTextFile.Strategy.Replace)
-          ),
-          text(
-            "existing1",
-            """
+                spec -> spec.recipes(
+                        new AppendToTextFile("file1.txt", "content1", "preamble1", true, AppendToTextFile.Strategy.Replace),
+                        new AppendToTextFile("file2.txt", "content2", "preamble2", true, AppendToTextFile.Strategy.Replace),
+                        new AppendToTextFile("file1.txt", "content1", "preamble1", true, AppendToTextFile.Strategy.Replace),
+                        new AppendToTextFile("file2.txt", "content2", "preamble2", true, AppendToTextFile.Strategy.Replace)
+                ),
+                text(
+                        "existing1",
+                        """
               preamble1
               content1
               """,
-            spec -> spec.path("file1.txt").noTrim()
-          ),
-          text(
-            "existing2",
-            """
+                        spec -> spec.path("file1.txt").noTrim()
+                ),
+                text(
+                        "existing2",
+                        """
               preamble2
               content2
               """,
-            spec -> spec.path("file2.txt").noTrim()
-          )
+                        spec -> spec.path("file2.txt").noTrim()
+                )
         );
     }
 }

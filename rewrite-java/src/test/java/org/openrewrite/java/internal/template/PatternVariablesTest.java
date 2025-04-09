@@ -86,7 +86,8 @@ class PatternVariablesTest {
                     .map(J.CompilationUnit.class::cast)
                     .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
             J.MethodDeclaration method = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
-            @SuppressWarnings("DataFlowIssue") J.If ifStatement = (J.If) method.getBody().getStatements().get(0);
+            @SuppressWarnings("DataFlowIssue")
+            J.If ifStatement = (J.If) method.getBody().getStatements().get(0);
             return simplifiedPatternVariableCondition(ifStatement.getIfCondition().getTree(), null);
         }
     }

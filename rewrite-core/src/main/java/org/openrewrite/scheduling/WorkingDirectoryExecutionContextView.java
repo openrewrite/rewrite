@@ -54,7 +54,7 @@ public class WorkingDirectoryExecutionContextView extends DelegatingExecutionCon
     public void setRoot(Path path) {
         if (getMessage(CURRENT_CYCLE) != null) {
             throw new IllegalStateException("The root working directory cannot be set once " +
-                                            "recipe execution has begun.");
+                    "recipe execution has begun.");
         }
         putMessage(WORKING_DIRECTORY_ROOT, path);
     }
@@ -72,7 +72,7 @@ public class WorkingDirectoryExecutionContextView extends DelegatingExecutionCon
             }
             RecipeRunCycle<?> cycle = getCycleDetails();
             return Files.createDirectories(root.resolve("cycle" + cycle.getCycle() + "_" +
-                                                        "recipe" + cycle.getRecipePosition()));
+                    "recipe" + cycle.getRecipePosition()));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

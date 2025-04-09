@@ -44,21 +44,21 @@ class RecipeRunStatsTest implements RewriteTest {
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
             return Preconditions.check(
-              new PlainTextVisitor<>() {
-                  @Override
-                  public PlainText visitText(PlainText text, ExecutionContext ctx) {
-                      if (!"sam".equals(text.getText())) {
-                          return SearchResult.found(text);
-                      }
-                      return text;
-                  }
-              },
-              new PlainTextVisitor<>() {
-                  @Override
-                  public PlainText visitText(PlainText tree, ExecutionContext ctx) {
-                      return tree.withText("sam");
-                  }
-              });
+                    new PlainTextVisitor<>() {
+                        @Override
+                        public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                            if (!"sam".equals(text.getText())) {
+                                return SearchResult.found(text);
+                            }
+                            return text;
+                        }
+                    },
+                    new PlainTextVisitor<>() {
+                        @Override
+                        public PlainText visitText(PlainText tree, ExecutionContext ctx) {
+                            return tree.withText("sam");
+                        }
+                    });
         }
     }
 
@@ -71,22 +71,22 @@ class RecipeRunStatsTest implements RewriteTest {
     @Test
     void singleRow() {
         rewriteRun(
-          spec -> spec.dataTable(RecipeRunStats.Row.class, rows -> {
-              assertThat(rows)
-                .as("Running a single recipe on a single source should produce a single row in the RecipeRunStats table")
-                .hasSize(1);
-              RecipeRunStats.Row row = rows.get(0);
-              assertThat(row.getRecipe()).endsWith("RecipeWithApplicabilityTest");
-              assertThat(row.getSourceFiles())
-                .as("Test framework will invoke the recipe once when it is expected to make a change, " +
-                    "then once again when it is expected to make no change")
-                .isEqualTo(2);
-              assertThat(row.getEditMax()).isGreaterThan(0);
-              assertThat(row.getEditTotalTime())
-                .as("Cumulative time should be greater than any single visit time")
-                .isGreaterThan(row.getEditMax());
-          }),
-          text("samuel", "sam")
+                spec -> spec.dataTable(RecipeRunStats.Row.class, rows -> {
+                    assertThat(rows)
+                            .as("Running a single recipe on a single source should produce a single row in the RecipeRunStats table")
+                            .hasSize(1);
+                    RecipeRunStats.Row row = rows.get(0);
+                    assertThat(row.getRecipe()).endsWith("RecipeWithApplicabilityTest");
+                    assertThat(row.getSourceFiles())
+                            .as("Test framework will invoke the recipe once when it is expected to make a change, " +
+                                    "then once again when it is expected to make no change")
+                            .isEqualTo(2);
+                    assertThat(row.getEditMax()).isGreaterThan(0);
+                    assertThat(row.getEditTotalTime())
+                            .as("Cumulative time should be greater than any single visit time")
+                            .isGreaterThan(row.getEditMax());
+                }),
+                text("samuel", "sam")
         );
     }
 }

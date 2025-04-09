@@ -31,148 +31,148 @@ class AppendToSequenceTest implements RewriteTest {
     @Test
     void appendToSequenceHasDashTrue() {
         rewriteRun(
-          spec -> spec
-            .recipe(new AppendToSequence(
-              "$.things.fruit",
-              "strawberry",
-              null,
-              null
-            )),
-          yaml(
-            """
+                spec -> spec
+                        .recipe(new AppendToSequence(
+                                "$.things.fruit",
+                                "strawberry",
+                                null,
+                                null
+                        )),
+                yaml(
+                        """
               things:
                 fruit:
                   - apple
                   - blueberry
               """,
-            """
+                        """
               things:
                 fruit:
                   - apple
                   - blueberry
                   - strawberry
               """
-          )
+                )
         );
     }
 
     @Test
     void appendToSequenceOfSingleQuotedValuesHasDashTrue() {
         rewriteRun(
-          spec -> spec
-            .recipe(new AppendToSequence(
-              "$.things.fruit",
-              "strawberry",
-              List.of("apple", "blueberry"),
-              true
-            )),
-          yaml(
-            """
+                spec -> spec
+                        .recipe(new AppendToSequence(
+                                "$.things.fruit",
+                                "strawberry",
+                                List.of("apple", "blueberry"),
+                                true
+                        )),
+                yaml(
+                        """
               things:
                 fruit:
                   - 'apple'
                   - 'blueberry'
               """,
-            """
+                        """
               things:
                 fruit:
                   - 'apple'
                   - 'blueberry'
                   - 'strawberry'
               """
-          )
+                )
         );
     }
 
     @Test
     void appendToSequenceWhenExistingSequenceValuesMatchInExactOrder() {
         rewriteRun(
-          spec -> spec
-            .recipe(new AppendToSequence(
-              "$.things.fruit",
-              "strawberry",
-              List.of("apple", "blueberry"),
-              false
-            )),
-          yaml(
-            """
+                spec -> spec
+                        .recipe(new AppendToSequence(
+                                "$.things.fruit",
+                                "strawberry",
+                                List.of("apple", "blueberry"),
+                                false
+                        )),
+                yaml(
+                        """
               things:
                 fruit:
                   - apple
                   - blueberry
               """,
-            """
+                        """
               things:
                 fruit:
                   - apple
                   - blueberry
                   - strawberry
               """
-          )
+                )
         );
     }
 
     @Test
     void appendToSequenceWhenExistingSequenceValuesMatchInAnyOrder() {
         rewriteRun(
-          spec -> spec
-            .recipe(new AppendToSequence(
-              "$.things.fruit",
-              "strawberry",
-              List.of("blueberry", "apple"),
-              true
-            )),
-          yaml(
-            """
+                spec -> spec
+                        .recipe(new AppendToSequence(
+                                "$.things.fruit",
+                                "strawberry",
+                                List.of("blueberry", "apple"),
+                                true
+                        )),
+                yaml(
+                        """
               things:
                 fruit:
                   - apple
                   - blueberry
               """,
-            """
+                        """
               things:
                 fruit:
                   - apple
                   - blueberry
                   - strawberry
               """
-          )
+                )
         );
     }
 
     @Test
     void doNotAppendToSequenceWhenExistingSequenceValuesDoNotMatch() {
         rewriteRun(
-          spec -> spec
-            .recipe(new AppendToSequence(
-              "$.things.fruit",
-              "strawberry",
-              List.of("zzz"),
-              false
-            )),
-          yaml(
-            """
+                spec -> spec
+                        .recipe(new AppendToSequence(
+                                "$.things.fruit",
+                                "strawberry",
+                                List.of("zzz"),
+                                false
+                        )),
+                yaml(
+                        """
               things:
                 fruit:
                   - apple
                   - blueberry
               """
-          )
+                )
         );
     }
 
     @Test
     void appendToSequenceOfNameValuePair() {
         rewriteRun(
-          spec -> spec
-            .recipe(new AppendToSequence(
-              "$.things.fruit",
-              "name: strawberry",
-              null,
-              null
-            )),
-          yaml(
-            """
+                spec -> spec
+                        .recipe(new AppendToSequence(
+                                "$.things.fruit",
+                                "name: strawberry",
+                                null,
+                                null
+                        )),
+                yaml(
+                        """
               things:
                 fruit:
                   - name: apple
@@ -181,7 +181,7 @@ class AppendToSequenceTest implements RewriteTest {
                   - cat
                   - dog
               """,
-            """
+                        """
               things:
                 fruit:
                   - name: apple
@@ -191,22 +191,22 @@ class AppendToSequenceTest implements RewriteTest {
                   - cat
                   - dog
               """
-          )
+                )
         );
     }
 
     @Test
     void appendToSequenceOfNameValuePairMatchExistingValuesInAnyOrder() {
         rewriteRun(
-          spec -> spec
-            .recipe(new AppendToSequence(
-              "$.things.fruit",
-              "name: strawberry",
-              List.of("name: blueberry", "name: apple"),
-              true
-            )),
-          yaml(
-            """
+                spec -> spec
+                        .recipe(new AppendToSequence(
+                                "$.things.fruit",
+                                "name: strawberry",
+                                List.of("name: blueberry", "name: apple"),
+                                true
+                        )),
+                yaml(
+                        """
               things:
                 fruit:
                   - name: apple
@@ -215,7 +215,7 @@ class AppendToSequenceTest implements RewriteTest {
                   - cat
                   - dog
               """,
-            """
+                        """
               things:
                 fruit:
                   - name: apple
@@ -225,132 +225,132 @@ class AppendToSequenceTest implements RewriteTest {
                   - cat
                   - dog
               """
-          )
+                )
         );
     }
 
     @Test
     void appendToSequenceOfLiteralsHasDashFalse() {
         rewriteRun(
-          spec -> spec
-            .recipe(new AppendToSequence(
-              "$.things.fruit",
-              "strawberry",
-              null,
-              null
-            )),
-          yaml(
-            """
+                spec -> spec
+                        .recipe(new AppendToSequence(
+                                "$.things.fruit",
+                                "strawberry",
+                                null,
+                                null
+                        )),
+                yaml(
+                        """
               things:
                 fruit: [apple, blueberry]
                 animals:
                   - cat
                   - dog
               """,
-            """
+                        """
               things:
                 fruit: [apple, blueberry, strawberry]
                 animals:
                   - cat
                   - dog
               """
-          )
+                )
         );
     }
 
     @Test
     void appendToSequenceOfSingleQuotedValuesHasDashFalse() {
         rewriteRun(
-          spec -> spec
-            .recipe(new AppendToSequence(
-              "$.things.fruit",
-              "strawberry",
-              null,
-              null
-            )),
-          yaml(
-            """
+                spec -> spec
+                        .recipe(new AppendToSequence(
+                                "$.things.fruit",
+                                "strawberry",
+                                null,
+                                null
+                        )),
+                yaml(
+                        """
               things:
                 fruit: ['apple', 'blueberry']
                 animals:
                   - cat
                   - dog
               """,
-            """
+                        """
               things:
                 fruit: ['apple', 'blueberry', 'strawberry']
                 animals:
                   - cat
                   - dog
               """
-          )
+                )
         );
     }
 
     @Test
     void appendToSequenceOfDoubleQuotedValuesHasDashFalse() {
         rewriteRun(
-          spec -> spec
-            .recipe(new AppendToSequence(
-              "$.things.fruit",
-              "strawberry",
-              null,
-              null
-            )),
-          yaml(
-            """
+                spec -> spec
+                        .recipe(new AppendToSequence(
+                                "$.things.fruit",
+                                "strawberry",
+                                null,
+                                null
+                        )),
+                yaml(
+                        """
               things:
                 fruit: ["apple", "blueberry"]
                 animals:
                   - cat
                   - dog
               """,
-            """
+                        """
               things:
                 fruit: ["apple", "blueberry", "strawberry"]
                 animals:
                   - cat
                   - dog
               """
-          )
+                )
         );
     }
 
     @Test
     void appendToEmptySequence() {
         rewriteRun(
-          spec -> spec
-            .recipe(new AppendToSequence(
-              "$.things.fruit",
-              "strawberry",
-              null,
-              null
-            )),
-          yaml(
-            """
+                spec -> spec
+                        .recipe(new AppendToSequence(
+                                "$.things.fruit",
+                                "strawberry",
+                                null,
+                                null
+                        )),
+                yaml(
+                        """
               things:
                 fruit: []
               """,
-            """
+                        """
               things:
                 fruit: [strawberry]
               """
-          )
+                )
         );
     }
 
     @Test
     void modifyRegionList() {
         rewriteRun(
-          spec -> spec
-            .recipe(new AppendToSequence(
-              "$.prod.regions",
-              "name: us-foo-2",
-              List.of("name: us-foo-1", "name: us-bar-1"),
-              true
-            )),
-          yaml(
-            """
+                spec -> spec
+                        .recipe(new AppendToSequence(
+                                "$.prod.regions",
+                                "name: us-foo-2",
+                                List.of("name: us-foo-1", "name: us-bar-1"),
+                                true
+                        )),
+                yaml(
+                        """
               prod:
                 regions:
                   - name: us-bar-1
@@ -358,7 +358,7 @@ class AppendToSequenceTest implements RewriteTest {
                 other:
                   - name: outerspace-1
               """,
-            """
+                        """
               prod:
                 regions:
                   - name: us-bar-1
@@ -367,22 +367,22 @@ class AppendToSequenceTest implements RewriteTest {
                 other:
                   - name: outerspace-1
               """
-          )
+                )
         );
     }
 
     @Test
     void doesNotModifyRegionListBecauseValueIsAlreadyPresent() {
         rewriteRun(
-          spec -> spec
-            .recipe(new AppendToSequence(
-              "$.prod.regions",
-              "name: us-foo-2",
-              List.of("name: us-foo-1", "name: us-bar-1"),
-              true
-            )),
-          yaml(
-            """
+                spec -> spec
+                        .recipe(new AppendToSequence(
+                                "$.prod.regions",
+                                "name: us-foo-2",
+                                List.of("name: us-foo-1", "name: us-bar-1"),
+                                true
+                        )),
+                yaml(
+                        """
               prod:
                 regions:
                   - name: us-bar-1
@@ -391,7 +391,7 @@ class AppendToSequenceTest implements RewriteTest {
                 other:
                   - name: outerspace-1
               """
-          )
+                )
         );
     }
 
@@ -400,7 +400,7 @@ class AppendToSequenceTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3215")
     void appendTwice() {
         rewriteRun(
-          spec -> spec.recipeFromYaml("""
+                spec -> spec.recipeFromYaml("""
             type: specs.openrewrite.org/v1beta/recipe
             name: "com.demo.migration-not-working"
             displayName: "this recipe only add first entry"
@@ -415,8 +415,8 @@ class AppendToSequenceTest implements RewriteTest {
                   value: "name: \\"env-var-3\\"\\n    value: \\"value-3\\""
                   fileMatcher: devops/deploy/dev-vars.yaml
             """, "com.demo.migration-not-working"),
-          yaml(
-                """
+                yaml(
+                        """
               name_squad: "squad1"
               azure_keyvault: "yupiyouh2"
               replicas_plan:
@@ -427,7 +427,7 @@ class AppendToSequenceTest implements RewriteTest {
                   value: "value-1"
               other_attribute: "yesyupiyou"
               """,
-            """
+                        """
               name_squad: "squad1"
               azure_keyvault: "yupiyouh2"
               replicas_plan:
@@ -442,6 +442,6 @@ class AppendToSequenceTest implements RewriteTest {
                   value: "value-3"
               other_attribute: "yesyupiyou"
               """,
-            sourceSpec -> sourceSpec.path("devops/deploy/dev-vars.yaml")));
+                        sourceSpec -> sourceSpec.path("devops/deploy/dev-vars.yaml")));
     }
 }

@@ -34,8 +34,8 @@ class ChangeExtraPropertyTest implements RewriteTest {
     @Test
     void closureStyle() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               buildscript {
                   ext {
                       foo = "bar"
@@ -45,7 +45,7 @@ class ChangeExtraPropertyTest implements RewriteTest {
                   foo = "bar"
               }
               """,
-            """
+                        """
               buildscript {
                   ext {
                       foo = "baz"
@@ -61,12 +61,12 @@ class ChangeExtraPropertyTest implements RewriteTest {
     @Test
     void propertyAssignment() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               project.ext.foo = "bar"
               ext.foo = "bar"
               """,
-            """
+                        """
               project.ext.foo = "baz"
               ext.foo = "baz"
               """)
@@ -76,13 +76,13 @@ class ChangeExtraPropertyTest implements RewriteTest {
     @Test
     void maintainQuoteStyle() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               ext {
                 foo = 'bar'
               }
               """,
-            """
+                        """
               ext {
                 foo = 'baz'
               }

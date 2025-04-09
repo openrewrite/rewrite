@@ -29,9 +29,9 @@ class MemberReferenceTest implements RewriteTest {
     @Test
     void unknownDeclaringType() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).methodInvocations(false).build()),
-          java(
-            """
+                spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).methodInvocations(false).build()),
+                java(
+                        """
               package com.company.pkg;
 
               import java.util.concurrent.CompletableFuture;
@@ -51,7 +51,7 @@ class MemberReferenceTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 
@@ -59,8 +59,8 @@ class MemberReferenceTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/608")
     void memberReferenceWithTypeParameter() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.List;
               import java.util.Map;
               import java.util.Set;
@@ -104,15 +104,15 @@ class MemberReferenceTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void staticFunctionReference() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.stream.Stream;
 
               public class StaticLambdaRef {
@@ -125,16 +125,16 @@ class MemberReferenceTest implements RewriteTest {
                   static void func(String s) {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void constructorMethodReference() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.builder().methodInvocations(false).build()),
-          java(
-            """
+                spec -> spec.typeValidationOptions(TypeValidation.builder().methodInvocations(false).build()),
+                java(
+                        """
               import java.util.HashSet;
               import java.util.Set;
               import java.util.stream.Stream;
@@ -144,7 +144,7 @@ class MemberReferenceTest implements RewriteTest {
                   Set<Integer> n2 = n.collect(HashSet < Integer > :: new, HashSet :: add);
               }
               """
-          )
+                )
         );
     }
 }

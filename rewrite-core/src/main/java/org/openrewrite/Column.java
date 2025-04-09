@@ -25,6 +25,9 @@ import java.lang.annotation.Target;
 @Target({ElementType.FIELD, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Column {
-    @Language("markdown") String displayName();
-    @Language("markdown") String description();
+    @Language("markdown")
+    String displayName();
+
+    @Language("markdown")
+    String description();
 }

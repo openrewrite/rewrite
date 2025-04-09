@@ -79,7 +79,7 @@ public class AddSettingsPluginRepository extends Recipe {
                     } else {
                         Statement statement = statements.get(0);
                         if (statement instanceof J.MethodInvocation &&
-                            ((J.MethodInvocation) statement).getSimpleName().equals("pluginManagement")) {
+                                ((J.MethodInvocation) statement).getSimpleName().equals("pluginManagement")) {
                             J.MethodInvocation m = (J.MethodInvocation) statement;
                             m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
                                 if (arg instanceof J.Lambda && ((J.Lambda) arg).getBody() instanceof J.Block) {
@@ -87,7 +87,7 @@ public class AddSettingsPluginRepository extends Recipe {
                                     J.Block block = (J.Block) lambda.getBody();
                                     return lambda.withBody(block.withStatements(ListUtils.map(block.getStatements(), statement2 -> {
                                         if ((statement2 instanceof J.MethodInvocation && ((J.MethodInvocation) statement2).getSimpleName().equals("repositories")) ||
-                                            (statement2 instanceof J.Return && ((J.Return) statement2).getExpression() instanceof J.MethodInvocation && ((J.MethodInvocation) ((J.Return) statement2).getExpression()).getSimpleName().equals("repositories"))) {
+                                                (statement2 instanceof J.Return && ((J.Return) statement2).getExpression() instanceof J.MethodInvocation && ((J.MethodInvocation) ((J.Return) statement2).getExpression()).getSimpleName().equals("repositories"))) {
                                             J.MethodInvocation m2 = (J.MethodInvocation) (statement2 instanceof J.Return ? ((J.Return) statement2).getExpression() : statement2);
                                             return m2.withArguments(ListUtils.mapFirst(m2.getArguments(), arg2 -> {
                                                 if (arg2 instanceof J.Lambda && ((J.Lambda) arg2).getBody() instanceof J.Block) {
@@ -120,18 +120,18 @@ public class AddSettingsPluginRepository extends Recipe {
                 String code;
                 if (url == null) {
                     code = "pluginManagement {" +
-                           "    repositories {" +
-                           "        " + type + "()" +
-                           "    }" +
-                           "}";
+                            "    repositories {" +
+                            "        " + type + "()" +
+                            "    }" +
+                            "}";
                 } else {
                     code = "pluginManagement {" +
-                           "    repositories {" +
-                           "        " + type + " {" +
-                           "            url = \"" + url + "\"" +
-                           "        }" +
-                           "    }" +
-                           "}";
+                            "    repositories {" +
+                            "        " + type + " {" +
+                            "            url = \"" + url + "\"" +
+                            "        }" +
+                            "    }" +
+                            "}";
                 }
 
                 return (J.MethodInvocation) GradleParser.builder().build().parseInputs(Collections.singletonList(Parser.Input.fromString(Paths.get("settings.gradle"), code)), null, ctx)

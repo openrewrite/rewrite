@@ -29,23 +29,23 @@ class FindTest implements RewriteTest {
     @Test
     void dataTable() {
         rewriteRun(
-          spec -> spec.recipe(new Find("text", null, null, null, null, null))
-            .dataTable(TextMatches.Row.class, rows -> {
-                assertThat(rows).hasSize(1);
-                assertThat(rows.get(0).getMatch()).isEqualTo("This is ~~>text.");
-            }),
-          text(
-            """
+                spec -> spec.recipe(new Find("text", null, null, null, null, null))
+                        .dataTable(TextMatches.Row.class, rows -> {
+                            assertThat(rows).hasSize(1);
+                            assertThat(rows.get(0).getMatch()).isEqualTo("This is ~~>text.");
+                        }),
+                text(
+                        """
               This is a line above.
               This is text.
               This is a line below.
               """,
-            """
+                        """
               This is a line above.
               This is ~~>text.
               This is a line below.
               """
-          )
+                )
         );
     }
 
@@ -53,179 +53,179 @@ class FindTest implements RewriteTest {
     @Test
     void regex() {
         rewriteRun(
-          spec -> spec.recipe(new Find("[T\\s]", true, true, null, null, null)),
-          text(
-            """
+                spec -> spec.recipe(new Find("[T\\s]", true, true, null, null, null)),
+                text(
+                        """
               This is\ttext.
               """,
-            """
+                        """
               ~~>This~~> is~~>\ttext.
               """
-          )
+                )
         );
     }
 
     @Test
     void plainText() {
         rewriteRun(
-          spec -> spec.recipe(new Find("\\s", null, null, null, null, null)),
-          text(
-            """
+                spec -> spec.recipe(new Find("\\s", null, null, null, null, null)),
+                text(
+                        """
               This i\\s text.
               """,
-            """
+                        """
               This i~~>\\s text.
               """
-          )
+                )
         );
     }
 
     @Test
     void caseInsensitive() {
         rewriteRun(
-          spec -> spec.recipe(new Find("text", null, null, null, null, "**/foo/**;**/baz/**")),
-          dir("foo",
-            text(
-              """
+                spec -> spec.recipe(new Find("text", null, null, null, null, "**/foo/**;**/baz/**")),
+                dir("foo",
+                        text(
+                                """
                 TEXT
                 """,
-              """
+                                """
                 ~~>TEXT
                 """
-            )
-          ),
-          dir("bar",
-            text("""
+                        )
+                ),
+                dir("bar",
+                        text("""
               TEXT
               """)
-          ),
-          dir("baz",
-            text(
-              """
+                ),
+                dir("baz",
+                        text(
+                                """
                 TEXT
                 """,
-              """
+                                """
                 ~~>TEXT
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void regexBasicMultiLine() {
         rewriteRun(
-          spec -> spec.recipe(new Find("[T\\s]", true, true, true, null, null)),
-          text(
-            """
+                spec -> spec.recipe(new Find("[T\\s]", true, true, true, null, null)),
+                text(
+                        """
               This is\ttext.
               This is\ttext.
               """,
-            """
+                        """
               ~~>This~~> is~~>\ttext.~~>
               ~~>This~~> is~~>\ttext.
               """
-          )
+                )
         );
     }
 
     @Test
     void regexWithoutMultilineAndDotall() {
         rewriteRun(
-          spec -> spec.recipe(new Find("^This.*below\\.$", true, true, false, false, null)),
-          text(
-            """
+                spec -> spec.recipe(new Find("^This.*below\\.$", true, true, false, false, null)),
+                text(
+                        """
               This is text.
               This is a line below.
               This is a line above.
               This is text.
               This is a line below.
               """
-          )
+                )
         );
     }
 
     @Test
     void regexMatchingWhitespaceWithoutMultilineWithDotall() {
         rewriteRun(
-          spec -> spec.recipe(new Find("One.Two$", true, true, false, true, null)),
-          //language=csv
-          text( // the `.` above matches the space character on the same line
-            """
+                spec -> spec.recipe(new Find("One.Two$", true, true, false, true, null)),
+                //language=csv
+                text( // the `.` above matches the space character on the same line
+                        """
               Zero
               One Two
               Three
               """
-          )
+                )
         );
     }
 
     @Test
     void regexWithoutMultilineAndWithDotAll() {
         rewriteRun(
-          spec -> spec.recipe(new Find("^This.*below\\.$", true, true, false, true, null)),
-          text(
-            """
+                spec -> spec.recipe(new Find("^This.*below\\.$", true, true, false, true, null)),
+                text(
+                        """
               This is text.
               This is a line below.
               This is a line above.
               This is text.
               This is a line below.
               """,
-            """
+                        """
               ~~>This is text.
               This is a line below.
               This is a line above.
               This is text.
               This is a line below.
               """
-          )
+                )
         );
     }
 
     @Test
     void regexWithMultilineAndWithoutDotall() {
         rewriteRun(
-          spec -> spec.recipe(new Find("^This.*below\\.$", true, true, true, false, null)),
-          text(
-            """
+                spec -> spec.recipe(new Find("^This.*below\\.$", true, true, true, false, null)),
+                text(
+                        """
               This is text.
               This is a line below.
               This is a line above.
               This is text.
               This is a line below.
               """,
-            """
+                        """
               This is text.
               ~~>This is a line below.
               This is a line above.
               This is text.
               ~~>This is a line below.
               """
-          )
+                )
         );
     }
 
     @Test
     void regexWithBothMultilineAndDotAll() {
         rewriteRun(
-          spec -> spec.recipe(new Find("^This.*below\\.$", true, true, true, true, null)),
-          text(
-            """
+                spec -> spec.recipe(new Find("^This.*below\\.$", true, true, true, true, null)),
+                text(
+                        """
               The first line.
               This is a line below.
               This is a line above.
               This is text.
               This is a line below.
               """,
-            """
+                        """
               The first line.
               ~~>This is a line below.
               This is a line above.
               This is text.
               This is a line below.
               """
-          )
+                )
         );
     }
 }

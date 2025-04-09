@@ -79,12 +79,12 @@ public class ReloadableJava21Parser implements JavaParser {
     private final Collection<NamedStyles> styles;
 
     private ReloadableJava21Parser(boolean logCompilationWarningsAndErrors,
-                                   @Nullable Collection<Path> classpath,
-                                   Collection<byte[]> classBytesClasspath,
-                                   @Nullable Collection<Input> dependsOn,
-                                   Charset charset,
-                                   Collection<NamedStyles> styles,
-                                   JavaTypeCache typeCache) {
+            @Nullable Collection<Path> classpath,
+            Collection<byte[]> classBytesClasspath,
+            @Nullable Collection<Input> dependsOn,
+            Charset charset,
+            Collection<NamedStyles> styles,
+            JavaTypeCache typeCache) {
         this.classpath = classpath;
         this.dependsOn = dependsOn;
         this.styles = styles;
@@ -196,8 +196,8 @@ public class ReloadableJava21Parser implements JavaParser {
                 if ("endPosTable already set".equals(e.getMessage())) {
                     throw new IllegalStateException(
                             "Call reset() on JavaParser before parsing another set of source files that " +
-                            "have some of the same fully qualified names. Source file [" +
-                            input1.getPath() + "]\n[\n" + StringUtils.readFully(input1.getSource(ctx), getCharset(ctx)) + "\n]", e);
+                                    "have some of the same fully qualified names. Source file [" +
+                                    input1.getPath() + "]\n[\n" + StringUtils.readFully(input1.getSource(ctx), getCharset(ctx)) + "\n]", e);
                 }
                 throw e;
             }
@@ -310,9 +310,9 @@ public class ReloadableJava21Parser implements JavaParser {
         private final List<PackageAwareJavaFileObject> classByteClasspath;
 
         public ByteArrayCapableJavacFileManager(Context context,
-                                                boolean register,
-                                                Charset charset,
-                                                Collection<byte[]> classByteClasspath) {
+                boolean register,
+                Charset charset,
+                Collection<byte[]> classByteClasspath) {
             super(context, register, charset);
             this.classByteClasspath = classByteClasspath.stream()
                     .map(PackageAwareJavaFileObject::new)
@@ -333,9 +333,9 @@ public class ReloadableJava21Parser implements JavaParser {
                 Iterable<JavaFileObject> listed = super.list(location, packageName, kinds, recurse);
                 return classByteClasspath.isEmpty() ? listed :
                         Stream.concat(classByteClasspath.stream()
-                                .filter(jfo -> jfo.getPackage().equals(packageName)),
-                        StreamSupport.stream(listed.spliterator(), false)
-                ).collect(toList());
+                                        .filter(jfo -> jfo.getPackage().equals(packageName)),
+                                StreamSupport.stream(listed.spliterator(), false)
+                        ).collect(toList());
             }
             return super.list(location, packageName, kinds, recurse);
         }

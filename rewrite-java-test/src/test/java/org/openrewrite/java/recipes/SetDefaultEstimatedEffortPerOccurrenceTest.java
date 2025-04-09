@@ -26,9 +26,9 @@ class SetDefaultEstimatedEffortPerOccurrenceTest implements RewriteTest {
     @Test
     void setDefault() {
         rewriteRun(
-          spec -> spec.recipe(new SetDefaultEstimatedEffortPerOccurrence()),
-          java(
-            """
+                spec -> spec.recipe(new SetDefaultEstimatedEffortPerOccurrence()),
+                java(
+                        """
               package org.openrewrite;
               import java.time.Duration;
 
@@ -38,9 +38,9 @@ class SetDefaultEstimatedEffortPerOccurrenceTest implements RewriteTest {
                   }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import org.openrewrite.Recipe;
               class SampleRecipe extends Recipe {
                   public String getDisplayName() { return null; }
@@ -48,7 +48,7 @@ class SetDefaultEstimatedEffortPerOccurrenceTest implements RewriteTest {
                   public Object getVisitor() { return null; }
               }
               """,
-            """
+                        """
               import org.openrewrite.Recipe;
               
               import java.time.Duration;
@@ -64,7 +64,7 @@ class SetDefaultEstimatedEffortPerOccurrenceTest implements RewriteTest {
                   public Object getVisitor() { return null; }
               }
               """
-          )
+                )
         );
     }
 }

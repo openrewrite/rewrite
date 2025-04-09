@@ -26,8 +26,8 @@ class CursorTest {
     @Test
     void peekMessages() {
         var t = PlainText.builder()
-          .text("test")
-          .build();
+                .text("test")
+                .build();
         var cursor = new Cursor(null, t);
 
         cursor.putMessage("key", 1);
@@ -40,9 +40,9 @@ class CursorTest {
     @Test
     void pollMessages() {
         var t = PlainText.builder()
-          .sourcePath(Paths.get("test.txt"))
-          .text("test")
-          .build();
+                .sourcePath(Paths.get("test.txt"))
+                .text("test")
+                .build();
         var cursor = new Cursor(null, t);
 
         cursor.putMessage("key", 1);
@@ -57,9 +57,9 @@ class CursorTest {
     @Test
     void pathPredicates() {
         var t = PlainText.builder()
-          .sourcePath(Paths.get("test.txt"))
-          .text("test")
-          .build();
+                .sourcePath(Paths.get("test.txt"))
+                .text("test")
+                .build();
         var cursor = new Cursor(new Cursor(new Cursor(null, 1), t), 2);
         assertThat(cursor.getPath(v -> v instanceof PlainText).next()).isSameAs(t);
     }
@@ -67,9 +67,9 @@ class CursorTest {
     @Test
     void pathAsStreamPredicates() {
         var t = PlainText.builder()
-          .sourcePath(Paths.get("test.txt"))
-          .text("test")
-          .build();
+                .sourcePath(Paths.get("test.txt"))
+                .text("test")
+                .build();
         var cursor = new Cursor(new Cursor(new Cursor(null, 1), t), 2);
         assertThat(cursor.getPathAsStream(v -> v instanceof PlainText).toList()).containsExactly(t);
     }

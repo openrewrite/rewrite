@@ -27,9 +27,9 @@ class FindMethodDeclarationTest implements RewriteTest {
     @Test
     void find() {
         rewriteRun(
-          spec -> spec.recipe(new FindMethodDeclaration("A a(int)", false)),
-          java(
-            """
+                spec -> spec.recipe(new FindMethodDeclaration("A a(int)", false)),
+                java(
+                        """
               class A {
                   void a(int n) {
                     a(1);
@@ -38,7 +38,7 @@ class FindMethodDeclarationTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class A {
                   /*~~>*/void a(int n) {
                     a(1);

@@ -28,24 +28,24 @@ class FindDeprecatedClassesTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.parser(JavaParser.fromJavaVersion().dependsOn(
-          """
+                """
             package org.old.types;
             @Deprecated public class D {}
             """,
-          """
+                """
             package org.old.types;
             public class E extends D {}
             """
-          )
+        )
         );
     }
 
     @Test
     void ignoreDeprecationsInDeprecatedMethod() {
         rewriteRun(
-          spec -> spec.recipe(new FindDeprecatedClasses("org.old..*", false, true)),
-          java(
-            """
+                spec -> spec.recipe(new FindDeprecatedClasses("org.old..*", false, true)),
+                java(
+                        """
               import org.old.types.D;
               class Test {
                   @Deprecated
@@ -54,23 +54,23 @@ class FindDeprecatedClassesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void ignoreDeprecationsInDeprecatedClass() {
         rewriteRun(
-          spec -> spec.recipe(new FindDeprecatedClasses("org.old..*", false, true)),
-          java(
-            """
+                spec -> spec.recipe(new FindDeprecatedClasses("org.old..*", false, true)),
+                java(
+                        """
               import org.old.types.D;
               @Deprecated
               class Test {
                   D d;
               }
               """
-          )
+                )
         );
     }
 
@@ -78,42 +78,42 @@ class FindDeprecatedClassesTest implements RewriteTest {
     @Test
     void findDeprecations() {
         rewriteRun(
-          spec -> spec.recipe(new FindDeprecatedClasses("org.old..*", false, true)),
-          java(
-            """
+                spec -> spec.recipe(new FindDeprecatedClasses("org.old..*", false, true)),
+                java(
+                        """
               import org.old.types.D;
               class Test {
                   D d;
               }
               """,
-            """
+                        """
               import org.old.types.D;
               class Test {
                   /*~~>*/D d;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void findTypesInheritingFromDeprecations() {
         rewriteRun(
-          spec -> spec.recipe(new FindDeprecatedClasses("org.old..*", true, null)),
-          java(
-            """
+                spec -> spec.recipe(new FindDeprecatedClasses("org.old..*", true, null)),
+                java(
+                        """
               import org.old.types.D;
               class Test {
                   D d;
               }
               """,
-            """
+                        """
               import org.old.types.D;
               class Test {
                   /*~~>*/D d;
               }
               """
-          )
+                )
         );
     }
 }

@@ -14,5 +14,5 @@
  * limitations under the License.
  */
 public interface InterfaceB {
-	void methodB();
+    void methodB();
 }

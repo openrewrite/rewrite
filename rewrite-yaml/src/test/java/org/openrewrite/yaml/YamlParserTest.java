@@ -55,13 +55,13 @@ class YamlParserTest implements RewriteTest {
     @Test
     void fourBytesUnicode() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               root:
                 - value1: 🛠
                   value2: check
               """
-          )
+                )
         );
     }
 
@@ -69,8 +69,8 @@ class YamlParserTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/4176")
     void listsAndListsOfLists() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               root:
                 normalListOfScalars:
                 - a
@@ -100,20 +100,20 @@ class YamlParserTest implements RewriteTest {
                   - - [mno, pqr ]
                     -  [stu , vwx]
               """
-          )
+                )
         );
     }
 
     @SuppressWarnings("OptionalGetWithoutIsPresent")
     @ParameterizedTest
     @ValueSource(strings = {
-      "b",
-      " 🛠",
-      " 🛠🛠",
-      "🛠 🛠",
-      "hello🛠world",
-      "你好世界",
-      "你好🛠世界"
+            "b",
+            " 🛠",
+            " 🛠🛠",
+            "🛠 🛠",
+            "hello🛠world",
+            "你好世界",
+            "你好🛠世界"
     })
     void parseYamlWithUnicode(String input) {
         Stream<SourceFile> yamlSources = YamlParser.builder().build().parse("a: %s\n".formatted(input));
@@ -132,48 +132,48 @@ class YamlParserTest implements RewriteTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-      "🛠 :  🛠",
-      "你a好b🛠世c界d :  你a🛠好b🛠世c🛠界d"
+            "🛠 :  🛠",
+            "你a好b🛠世c界d :  你a🛠好b🛠世c🛠界d"
     })
     void unicodeCharacterSpanningMultipleBytes(@Language("yml") String input) {
         rewriteRun(
-          yaml(input)
+                yaml(input)
         );
     }
 
     @Test
     void newlinesCombinedWithUnniCode() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               {
                 "data": {
                   "pro🛠metheus.y🛠ml": "global:\\n  scrape_🛠interval: 10s🛠\\n  sc🛠rape_timeout: 9s"
                 }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unicodeEscapes() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               root:
                 "nul": "\\u0000"
                 "reverse-solidus": "\\u005c"
               """
-          )
+                )
         );
     }
 
     @Test
     void troublesomeYaml() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               configDefinitions:
                 appConfig:
                   description: "App config for consumer."
@@ -213,7 +213,7 @@ class YamlParserTest implements RewriteTest {
                       rules:
                         possibleValues: []
               """
-          )
+                )
         );
     }
 }

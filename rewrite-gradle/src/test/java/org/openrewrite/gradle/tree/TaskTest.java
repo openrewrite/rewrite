@@ -28,15 +28,15 @@ class TaskTest implements RewriteTest {
     @Test
     void declareTaskOldStyle() {
         rewriteRun(
-          spec -> spec.afterTypeValidationOptions(TypeValidation.none()),
-          buildGradle(
-            """
+                spec -> spec.afterTypeValidationOptions(TypeValidation.none()),
+                buildGradle(
+                        """
               task(testWithCloud, type: Test) {
                 useTestNG()
                 options.excludeGroups = [] as Set
               }
               """
-          )
+                )
         );
     }
 
@@ -44,9 +44,9 @@ class TaskTest implements RewriteTest {
     @Test
     void dsl() {
         rewriteRun(
-          spec -> spec.afterTypeValidationOptions(TypeValidation.none()),
-          buildGradle(
-            """
+                spec -> spec.afterTypeValidationOptions(TypeValidation.none()),
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -59,7 +59,7 @@ class TaskTest implements RewriteTest {
                   dependsOn('buildDeps')
               }
               """
-          )
+                )
         );
     }
 }

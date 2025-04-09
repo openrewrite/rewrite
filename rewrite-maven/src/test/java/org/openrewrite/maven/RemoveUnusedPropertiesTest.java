@@ -38,8 +38,8 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
     @Test
     void removesWholePropertiesSection() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <modelVersion>4.0.0</modelVersion>
@@ -54,7 +54,7 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
               
               </project>
               """,
-            """
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <modelVersion>4.0.0</modelVersion>
@@ -64,15 +64,15 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
               
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void ignoresMavenDefaultProperties() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <modelVersion>4.0.0</modelVersion>
@@ -86,16 +86,16 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
               
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void regexPropertyPattern() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveUnusedProperties(".+\\.version")),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveUnusedProperties(".+\\.version")),
+                pomXml(
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <modelVersion>4.0.0</modelVersion>
@@ -111,7 +111,7 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
               
               </project>
               """,
-            """
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <modelVersion>4.0.0</modelVersion>
@@ -125,16 +125,16 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
               
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void regexPropertyPatternNegativeLookahead() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveUnusedProperties("(?!java.|spring.).+")),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveUnusedProperties("(?!java.|spring.).+")),
+                pomXml(
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <modelVersion>4.0.0</modelVersion>
@@ -151,7 +151,7 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
               
               </project>
               """,
-            """
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <modelVersion>4.0.0</modelVersion>
@@ -166,16 +166,16 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
               
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void requiresCyclesForCascadingRemovals() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
-          pomXml(
-            """
+                spec -> spec.expectedCyclesThatMakeChanges(2),
+                pomXml(
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <modelVersion>4.0.0</modelVersion>
@@ -190,7 +190,7 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
               
               </project>
               """,
-            """
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <modelVersion>4.0.0</modelVersion>
@@ -200,15 +200,15 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
               
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void keepsUsedProperty() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <modelVersion>4.0.0</modelVersion>
@@ -231,7 +231,7 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
               
               </project>
               """,
-            """
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <modelVersion>4.0.0</modelVersion>
@@ -253,15 +253,15 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
               
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void catchesMultiplePropertyUsagesInSameElement() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <modelVersion>4.0.0</modelVersion>
@@ -285,7 +285,7 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
               
               </project>
               """,
-            """
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <modelVersion>4.0.0</modelVersion>
@@ -308,15 +308,15 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
               
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void keepsOverrideOfParentProperty() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <modelVersion>4.0.0</modelVersion>
@@ -337,16 +337,16 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
               
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void keepsPropertyUsedByChild() {
         rewriteRun(
-          mavenProject("parent",
-            pomXml(
-              """
+                mavenProject("parent",
+                        pomXml(
+                                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
@@ -364,10 +364,10 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
                 
                 </project>
                 """
-            ),
-            mavenProject("module1",
-              pomXml(
-                """
+                        ),
+                        mavenProject("module1",
+                                pomXml(
+                                        """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -387,21 +387,21 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
                     </dependencies>
                   </project>
                   """
-              ))
-          )
+                                ))
+                )
         );
     }
 
     @ParameterizedTest
     @ValueSource(strings = {
-      "Hello ${a}",
-      "Hello @a@"
+            "Hello ${a}",
+            "Hello @a@"
     })
     void keepsPropertyUsedByFilteredResource(String text) {
         rewriteRun(
-          mavenProject("my-project",
-            pomXml(
-              """
+                mavenProject("my-project",
+                        pomXml(
+                                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
@@ -425,7 +425,7 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
                 
                 </project>
                 """,
-                """
+                                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
@@ -448,20 +448,20 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
                 
                 </project>
                 """
-            ),
-            srcMainResources(
-              text(text)
-            )
-          )
+                        ),
+                        srcMainResources(
+                                text(text)
+                        )
+                )
         );
     }
 
     @Test
     void removesPropertyUsedByNonFilteredResource_filteringFalse() {
         rewriteRun(
-          mavenProject("my-project",
-            pomXml(
-              """
+                mavenProject("my-project",
+                        pomXml(
+                                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
@@ -503,20 +503,20 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
                 
                 </project>
                 """
-            ),
-            srcMainResources(
-              text("Hello ${a}")
-            )
-          )
+                        ),
+                        srcMainResources(
+                                text("Hello ${a}")
+                        )
+                )
         );
     }
 
     @Test
     void removesPropertyUsedByNonFilteredResource_noFiltering() {
         rewriteRun(
-          mavenProject("my-project",
-            pomXml(
-              """
+                mavenProject("my-project",
+                        pomXml(
+                                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
@@ -540,20 +540,20 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
                 
                 </project>
                 """
-            ),
-            srcMainResources(
-              text("Hello ${a}")
-            )
-          )
+                        ),
+                        srcMainResources(
+                                text("Hello ${a}")
+                        )
+                )
         );
     }
 
     @Test
     void removesPropertyUsedByNonFilteredResource_wrongDir() {
         rewriteRun(
-          mavenProject("my-project",
-            pomXml(
-              """
+                mavenProject("my-project",
+                        pomXml(
+                                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
@@ -595,20 +595,20 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
                 
                 </project>
                 """
-            ),
-            srcMainResources(
-              text("Hello ${a}")
-            )
-          )
+                        ),
+                        srcMainResources(
+                                text("Hello ${a}")
+                        )
+                )
         );
     }
 
     @Test
     void keepsMultiplePropertiesUsedBySameFilteredResource() {
         rewriteRun(
-          mavenProject("my-project",
-            pomXml(
-              """
+                mavenProject("my-project",
+                        pomXml(
+                                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
@@ -656,20 +656,20 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
                 
                 </project>
                 """
-            ),
-            srcMainResources(
-              text("Hello ${a} ${c}")
-            )
-          )
+                        ),
+                        srcMainResources(
+                                text("Hello ${a} ${c}")
+                        )
+                )
         );
     }
 
     @Test
     void keepsPropertyUsedByResourceFilter_Xml() {
         rewriteRun(
-          mavenProject("my-project",
-            pomXml(
-              """
+                mavenProject("my-project",
+                        pomXml(
+                                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
@@ -692,25 +692,25 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
                 
                 </project>
                 """
-            ),
-            srcMainResources(
-              xml("""
+                        ),
+                        srcMainResources(
+                                xml("""
               <?xml version="1.0" encoding="UTF-8"?>
               <elements>
                 <element>${spring.version}</element>
               </elements>
               """)
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void removesIrrelevantPropertyDeclaration() {
         rewriteRun(
-          mavenProject("parent",
-            pomXml(
-              """
+                mavenProject("parent",
+                        pomXml(
+                                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
@@ -725,10 +725,10 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
                 
                 </project>
                 """
-            ),
-            mavenProject("module1",
-              pomXml(
-                """
+                        ),
+                        mavenProject("module1",
+                                pomXml(
+                                        """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -752,10 +752,10 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
                     </dependencies>
                   </project>
                   """
-              )),
-            mavenProject("module2",
-              pomXml(
-                """
+                                )),
+                        mavenProject("module2",
+                                pomXml(
+                                        """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -782,18 +782,18 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
                     <artifactId>module2</artifactId>
                   </project>
                   """
-              )
-            )
-          )
+                                )
+                        )
+                )
         );
     }
 
     @Test
     void removesIrrelevantPropertyDeclarationForFilteredResourceUsage() {
         rewriteRun(
-          mavenProject("parent",
-            pomXml(
-              """
+                mavenProject("parent",
+                        pomXml(
+                                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
@@ -808,10 +808,10 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
                 
                 </project>
                 """
-            ),
-            mavenProject("module1",
-              pomXml(
-                """
+                        ),
+                        mavenProject("module1",
+                                pomXml(
+                                        """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -837,14 +837,14 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
                   
                   </project>
                   """
-              ),
-              srcMainResources(
-                text("Hello ${a}")
-              )
-            ),
-            mavenProject("module2",
-              pomXml(
-                """
+                                ),
+                                srcMainResources(
+                                        text("Hello ${a}")
+                                )
+                        ),
+                        mavenProject("module2",
+                                pomXml(
+                                        """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -871,9 +871,9 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
                     <artifactId>module2</artifactId>
                   </project>
                   """
-              )
-            )
-          )
+                                )
+                        )
+                )
         );
     }
 }

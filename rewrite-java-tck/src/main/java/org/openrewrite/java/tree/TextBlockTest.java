@@ -27,8 +27,8 @@ class TextBlockTest implements RewriteTest {
     @Test
     void textBlock() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class Test {
                   String s = \"""
                       Hello
@@ -36,7 +36,7 @@ class TextBlockTest implements RewriteTest {
                       \""";
               }
               """
-          )
+                )
         );
     }
 }

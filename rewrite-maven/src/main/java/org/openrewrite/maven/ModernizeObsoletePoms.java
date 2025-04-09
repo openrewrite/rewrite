@@ -31,8 +31,8 @@ public class ModernizeObsoletePoms extends Recipe {
     @Override
     public String getDescription() {
         return "Very old Maven poms are no longer supported by current versions of Maven. " +
-               "This recipe updates poms with `<pomVersion>3</pomVersion>` to `<modelVersion>4.0.0</modelVersion>` of the Maven pom schema. " +
-               "This does not attempt to upgrade old dependencies or plugins and is best regarded as the starting point of a migration rather than an end-point.";
+                "This recipe updates poms with `<pomVersion>3</pomVersion>` to `<modelVersion>4.0.0</modelVersion>` of the Maven pom schema. " +
+                "This does not attempt to upgrade old dependencies or plugins and is best regarded as the starting point of a migration rather than an end-point.";
     }
 
     private static final XPathMatcher POM_VERSION = new XPathMatcher("/project/pomVersion");
@@ -62,12 +62,12 @@ public class ModernizeObsoletePoms extends Recipe {
                     if (t.getChildValue("url").isPresent()) {
                         t = autoFormat(
                                 Xml.Tag.build("" +
-                                              "<repositories>\n" +
-                                              "    <repository>\n" +
-                                              "        <id>repo</id>\n" +
-                                              "        <url>" + t.getChildValue("url").get() + "</url>\n" +
-                                              "    </repository>\n" +
-                                              "</repositories>\n"),
+                                        "<repositories>\n" +
+                                        "    <repository>\n" +
+                                        "        <id>repo</id>\n" +
+                                        "        <url>" + t.getChildValue("url").get() + "</url>\n" +
+                                        "    </repository>\n" +
+                                        "</repositories>\n"),
                                 ctx, c.getParentTreeCursor());
                     } else {
                         return null;
@@ -76,17 +76,17 @@ public class ModernizeObsoletePoms extends Recipe {
                     if (t.getValue().isPresent()) {
                         t = autoFormat(
                                 Xml.Tag.build("" +
-                                              "<issueManagement>\n" +
-                                              "    <system>IssueTracker</system>\n" +
-                                              "    <url>" + t.getValue().get() + "</url>\n" +
-                                              "</issueManagement>\n"),
+                                        "<issueManagement>\n" +
+                                        "    <system>IssueTracker</system>\n" +
+                                        "    <url>" + t.getValue().get() + "</url>\n" +
+                                        "</issueManagement>\n"),
                                 ctx, c.getParentTreeCursor());
                     } else {
                         return null;
                     }
                 } else if (LOGO.matches(c) ||
-                           UNIT_TEST.matches(c) ||
-                           PACKAGE.matches(c)) {
+                        UNIT_TEST.matches(c) ||
+                        PACKAGE.matches(c)) {
                     return null;
                 }
                 return t;

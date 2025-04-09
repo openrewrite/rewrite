@@ -30,15 +30,15 @@ class AddParentPomTest implements RewriteTest {
     @Test
     void addParent() {
         rewriteRun(
-          spec -> spec.recipe(new AddParentPom(
-            "org.springframework.boot",
-            "spring-boot-starter-parent",
-            "1.5.12.RELEASE",
-            null,
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new AddParentPom(
+                        "org.springframework.boot",
+                        "spring-boot-starter-parent",
+                        "1.5.12.RELEASE",
+                        null,
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
 
@@ -47,7 +47,7 @@ class AddParentPomTest implements RewriteTest {
                 <version>1</version>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 <parent>
@@ -61,26 +61,26 @@ class AddParentPomTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @ParameterizedTest
     @ValueSource(strings = {
-      "1.5.99.RELEASE",
-      "~1.9"
+            "1.5.99.RELEASE",
+            "~1.9"
     })
     void shoudNotAddInvalidParentPomVersion(String version) {
         rewriteRun(
-          spec -> spec.recipe(new AddParentPom(
-            "org.springframework.boot",
-            "spring-boot-starter-parent",
-            version,
-            null,
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new AddParentPom(
+                        "org.springframework.boot",
+                        "spring-boot-starter-parent",
+                        version,
+                        null,
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
 
@@ -89,22 +89,22 @@ class AddParentPomTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void addParentWithRelativePath() {
         rewriteRun(
-          spec -> spec.recipe(new AddParentPom(
-            "org.springframework.boot",
-            "spring-boot-starter-parent",
-            "1.5.12.RELEASE",
-            "../../pom.xml",
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new AddParentPom(
+                        "org.springframework.boot",
+                        "spring-boot-starter-parent",
+                        "1.5.12.RELEASE",
+                        "../../pom.xml",
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
 
@@ -113,7 +113,7 @@ class AddParentPomTest implements RewriteTest {
                 <version>1</version>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 <parent>
@@ -128,22 +128,22 @@ class AddParentPomTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void addParentWithRelativePathEmptyValue() {
         rewriteRun(
-          spec -> spec.recipe(new AddParentPom(
-            "org.springframework.boot",
-            "spring-boot-starter-parent",
-            "1.5.12.RELEASE",
-            "",
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new AddParentPom(
+                        "org.springframework.boot",
+                        "spring-boot-starter-parent",
+                        "1.5.12.RELEASE",
+                        "",
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
 
@@ -152,7 +152,7 @@ class AddParentPomTest implements RewriteTest {
                 <version>1</version>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 <parent>
@@ -167,7 +167,7 @@ class AddParentPomTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -175,10 +175,10 @@ class AddParentPomTest implements RewriteTest {
     void multiModuleRelativePath() {
         AddParentPom recipe = new AddParentPom("org.springframework.boot", "spring-boot-starter-parent", "1.5.12.RELEASE", "", null);
         rewriteRun(
-          spec -> spec.recipe(recipe),
-          mavenProject("parent",
-            pomXml(
-              """
+                spec -> spec.recipe(recipe),
+                mavenProject("parent",
+                        pomXml(
+                                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
@@ -192,7 +192,7 @@ class AddParentPomTest implements RewriteTest {
                   </modules>
                 </project>
                 """,
-              """
+                                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
@@ -212,10 +212,10 @@ class AddParentPomTest implements RewriteTest {
                   </modules>
                 </project>
                 """
-            ),
-            mavenProject("module1",
-              pomXml(
-                """
+                        ),
+                        mavenProject("module1",
+                                pomXml(
+                                        """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -227,10 +227,10 @@ class AddParentPomTest implements RewriteTest {
                     <artifactId>module1</artifactId>
                   </project>
                   """
-              )),
-            mavenProject("module2",
-              pomXml(
-                """
+                                )),
+                        mavenProject("module2",
+                                pomXml(
+                                        """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -242,23 +242,23 @@ class AddParentPomTest implements RewriteTest {
                     <artifactId>module2</artifactId>
                   </project>
                   """
-              )
-            )
-          )
+                                )
+                        )
+                )
         );
     }
 
     @Test
     void multiModuleShouldOnlyChangeRoot() {
         rewriteRun(
-          spec -> spec.recipe(new AddParentPom(
-            "org.springframework.boot",
-            "spring-boot-starter-parent",
-            "1.5.12.RELEASE",
-            null, null)),
-          mavenProject("parent",
-            pomXml(
-              """
+                spec -> spec.recipe(new AddParentPom(
+                        "org.springframework.boot",
+                        "spring-boot-starter-parent",
+                        "1.5.12.RELEASE",
+                        null, null)),
+                mavenProject("parent",
+                        pomXml(
+                                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
@@ -272,7 +272,7 @@ class AddParentPomTest implements RewriteTest {
                   </modules>
                 </project>
                 """,
-              """
+                                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
@@ -291,10 +291,10 @@ class AddParentPomTest implements RewriteTest {
                   </modules>
                 </project>
                 """
-            ),
-            mavenProject("module1",
-              pomXml(
-                """
+                        ),
+                        mavenProject("module1",
+                                pomXml(
+                                        """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -306,10 +306,10 @@ class AddParentPomTest implements RewriteTest {
                     <artifactId>module1</artifactId>
                   </project>
                   """
-              )),
-            mavenProject("module2",
-              pomXml(
-                """
+                                )),
+                        mavenProject("module2",
+                                pomXml(
+                                        """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -321,24 +321,24 @@ class AddParentPomTest implements RewriteTest {
                     <artifactId>module2</artifactId>
                   </project>
                   """
-              )
-            )
-          )
+                                )
+                        )
+                )
         );
     }
 
     @Test
     void shouldResolveWildcardVersion() {
         rewriteRun(
-          spec -> spec.recipe(new AddParentPom(
-            "org.springframework.boot",
-            "spring-boot-starter-parent",
-            "~1.5",
-            null,
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new AddParentPom(
+                        "org.springframework.boot",
+                        "spring-boot-starter-parent",
+                        "~1.5",
+                        null,
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
 
@@ -347,7 +347,7 @@ class AddParentPomTest implements RewriteTest {
                 <version>1</version>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 <parent>
@@ -361,22 +361,22 @@ class AddParentPomTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void removesRedundantExplicitVersionsMatchingNewParent() {
         rewriteRun(
-          spec -> spec.recipe(new AddParentPom(
-            "org.junit",
-            "junit-bom",
-            "5.9.1",
-            "",
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new AddParentPom(
+                        "org.junit",
+                        "junit-bom",
+                        "5.9.1",
+                        "",
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
 
@@ -393,7 +393,7 @@ class AddParentPomTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 <parent>
@@ -415,22 +415,22 @@ class AddParentPomTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void takesNewVersionFromParent() {
         rewriteRun(
-          spec -> spec.recipe(new AddParentPom(
-            "org.junit",
-            "junit-bom",
-            "5.9.1",
-            "",
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new AddParentPom(
+                        "org.junit",
+                        "junit-bom",
+                        "5.9.1",
+                        "",
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
 
@@ -447,7 +447,7 @@ class AddParentPomTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 <parent>
@@ -469,7 +469,7 @@ class AddParentPomTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 }

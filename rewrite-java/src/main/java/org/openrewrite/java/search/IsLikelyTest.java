@@ -37,8 +37,8 @@ public class IsLikelyTest extends Recipe {
     @Override
     public String getDescription() {
         return "Sources that contain indicators of being, or being exclusively for the use in tests. " +
-               "This recipe is not exhaustive, but is intended to be a good starting point for finding test sources. " +
-               "Looks at the source set name, and types in use; for example looks for uses of JUnit & TestNG annotations/assertions.";
+                "This recipe is not exhaustive, but is intended to be a good starting point for finding test sources. " +
+                "Looks at the source set name, and types in use; for example looks for uses of JUnit & TestNG annotations/assertions.";
     }
 
     @Override

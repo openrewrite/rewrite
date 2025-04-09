@@ -25,21 +25,21 @@ class AttributeTest implements RewriteTest {
     @Test
     void attribute() {
         rewriteRun(
-          groovy("new User('Bob').@name")
+                groovy("new User('Bob').@name")
         );
     }
 
     @Test
     void attributeInClosure() {
         rewriteRun(
-          groovy("[new User('Bob')].collect { it.@name }")
+                groovy("[new User('Bob')].collect { it.@name }")
         );
     }
 
     @Test
     void attributeWithParentheses() {
         rewriteRun(
-          groovy("(new User('Bob').@name)")
+                groovy("(new User('Bob').@name)")
         );
     }
 }

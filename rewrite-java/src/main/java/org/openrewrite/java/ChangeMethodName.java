@@ -45,7 +45,7 @@ public class ChangeMethodName extends Recipe {
 
     @Option(displayName = "Ignore type definition",
             description = "When set to `true` the definition of the old type will be left untouched. " +
-                          "This is useful when you're replacing usage of a class but don't want to rename it.",
+                    "This is useful when you're replacing usage of a class but don't want to rename it.",
             required = false)
     @Nullable
     Boolean ignoreDefinition;
@@ -99,7 +99,7 @@ public class ChangeMethodName extends Recipe {
                 J.NewClass newClass = getCursor().firstEnclosing(J.NewClass.class);
                 J.ClassDeclaration classDecl = getCursor().firstEnclosing(J.ClassDeclaration.class);
                 boolean methodMatches = newClass != null && methodMatcher.matches(method, newClass) ||
-                                        classDecl != null && methodMatcher.matches(method, classDecl);
+                        classDecl != null && methodMatcher.matches(method, classDecl);
                 if (methodMatches) {
                     JavaType.Method type = m.getMethodType();
                     if (type != null) {

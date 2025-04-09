@@ -25,8 +25,8 @@ class HclHeredocTest implements RewriteTest {
     @Test
     void heredoc() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               user_data = <<EOF
                   #! /bin/bash
                   sudo apt-get update
@@ -34,49 +34,49 @@ class HclHeredocTest implements RewriteTest {
               ${a}
               EOF
               """
-          )
+                )
         );
     }
 
     @Test
     void heredocWithQuote() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               user_data = <<EOF
               hello
               EOF
               a = 1
               """
-          )
+                )
         );
     }
 
     @Test
     void heredocInsideBlock() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               resource {
                 user_data = <<EOF
                   hello
                 EOF
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void heredocTemplateExpression() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               a = <<EOF
                 ${b}
               EOF
               """
-          )
+                )
         );
     }
 }

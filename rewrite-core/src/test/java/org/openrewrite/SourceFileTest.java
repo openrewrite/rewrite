@@ -29,11 +29,11 @@ class SourceFileTest {
         ExecutionContext ctx = new InMemoryExecutionContext();
         Parser.Input input = Parser.Input.fromString("äö");
         SourceFile sourceFile = PlainText.builder()
-          .text("äö")
-          .build();
+                .text("äö")
+                .build();
 
         assertThat(sourceFile.printEqualsInput(input, ctx))
-          .isTrue();
+                .isTrue();
     }
 
     @Test
@@ -41,12 +41,12 @@ class SourceFileTest {
         ExecutionContext ctx = new InMemoryExecutionContext();
         Parser.Input input = Parser.Input.fromString("äö", StandardCharsets.ISO_8859_1);
         SourceFile sourceFile = PlainText.builder()
-          .text("äö")
-          .charsetName("ISO-8859-1")
-          .build();
+                .text("äö")
+                .charsetName("ISO-8859-1")
+                .build();
 
         assertThat(sourceFile.printEqualsInput(input, ctx))
-          .isTrue();
+                .isTrue();
     }
 
     @Test
@@ -54,12 +54,12 @@ class SourceFileTest {
         ExecutionContext ctx = new InMemoryExecutionContext();
         Parser.Input input = Parser.Input.fromString("äö");
         SourceFile sourceFile = PlainText.builder()
-          .text("äö")
-          .charsetName("ISO-8859-1")
-          .build();
+                .text("äö")
+                .charsetName("ISO-8859-1")
+                .build();
 
         assertThat(sourceFile.printEqualsInput(input, ctx))
-          .isFalse();
+                .isFalse();
     }
 
 }

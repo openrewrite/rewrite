@@ -25,14 +25,14 @@ class MapFieldTest implements RewriteTest {
     @Test
     void mapField() {
         rewriteRun(
-          proto(
-            """
+                proto(
+                        """
               syntax = 'proto2';
               message MyMessage {
                 map < string , Project > projects = 3 [packed=true];
               }
               """
-          )
+                )
         );
     }
 }

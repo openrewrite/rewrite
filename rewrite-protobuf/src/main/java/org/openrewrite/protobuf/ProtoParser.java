@@ -44,46 +44,46 @@ public class ProtoParser implements Parser {
     public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         return acceptedInputs(sourceFiles).map(input -> {
-                    parsingListener.startedParsing(input);
-                    Path path = input.getRelativePath(relativeTo);
-                    try {
-                        EncodingDetectingInputStream is = input.getSource(ctx);
-                        String sourceStr = is.readFully();
-                        Protobuf2Parser parser = new Protobuf2Parser(new CommonTokenStream(new Protobuf2Lexer(
-                                CharStreams.fromString(sourceStr))));
+            parsingListener.startedParsing(input);
+            Path path = input.getRelativePath(relativeTo);
+            try {
+                EncodingDetectingInputStream is = input.getSource(ctx);
+                String sourceStr = is.readFully();
+                Protobuf2Parser parser = new Protobuf2Parser(new CommonTokenStream(new Protobuf2Lexer(
+                        CharStreams.fromString(sourceStr))));
 
-                        parser.removeErrorListeners();
-                        parser.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
+                parser.removeErrorListeners();
+                parser.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
 
-                        if (sourceStr.contains("proto3")) {
-                            // Pending Proto3 support, the best we can do is plain text & not skip files
-                            return new PlainText(
-                                    randomId(),
-                                    path,
-                                    Markers.EMPTY,
-                                    is.getCharset().name(),
-                                    is.isCharsetBomMarked(),
-                                    input.getFileAttributes(),
-                                    null,
-                                    sourceStr,
-                                    null
-                            );
-                        }
+                if (sourceStr.contains("proto3")) {
+                    // Pending Proto3 support, the best we can do is plain text & not skip files
+                    return new PlainText(
+                            randomId(),
+                            path,
+                            Markers.EMPTY,
+                            is.getCharset().name(),
+                            is.isCharsetBomMarked(),
+                            input.getFileAttributes(),
+                            null,
+                            sourceStr,
+                            null
+                    );
+                }
 
-                        Proto.Document document = new ProtoParserVisitor(
-                                path,
-                                input.getFileAttributes(),
-                                sourceStr,
-                                is.getCharset(),
-                                is.isCharsetBomMarked()
-                        ).visitProto(parser.proto());
-                        parsingListener.parsed(input, document);
-                        return requirePrintEqualsInput(document, input, relativeTo, ctx);
-                    } catch (Throwable t) {
-                        ctx.getOnError().accept(t);
-                        return ParseError.build(this, input, relativeTo, ctx, t);
-                    }
-                });
+                Proto.Document document = new ProtoParserVisitor(
+                        path,
+                        input.getFileAttributes(),
+                        sourceStr,
+                        is.getCharset(),
+                        is.isCharsetBomMarked()
+                ).visitProto(parser.proto());
+                parsingListener.parsed(input, document);
+                return requirePrintEqualsInput(document, input, relativeTo, ctx);
+            } catch (Throwable t) {
+                ctx.getOnError().accept(t);
+                return ParseError.build(this, input, relativeTo, ctx, t);
+            }
+        });
     }
 
     @Override
@@ -112,7 +112,7 @@ public class ProtoParser implements Parser {
 
         @Override
         public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol,
-                                int line, int charPositionInLine, String msg, RecognitionException e) {
+                int line, int charPositionInLine, String msg, RecognitionException e) {
             ctx.getOnError().accept(new ProtoParsingException(sourcePath,
                     String.format("Syntax error in %s at line %d:%d %s.", sourcePath, line, charPositionInLine, msg), e));
         }

@@ -54,7 +54,7 @@ public class LatestIntegration extends LatestRelease {
 
     @Override
     public int compare(@Nullable String currentVersion, String v1, String v2) {
-        if(currentVersion == null) {
+        if (currentVersion == null) {
             return new LatestRelease(null)
                     .compare(null, v1, v2);
         }

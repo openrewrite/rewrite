@@ -25,20 +25,20 @@ class ReorderMethodArgumentsTest implements RewriteTest {
     @Test
     void reorderArguments() {
         rewriteRun(
-          spec -> spec.recipes(
-            new ReorderMethodArguments("a.A foo(String, Integer, Integer)",
-              new String[]{"n", "m", "s"}, null, null, null)),
-          java(
-            """
+                spec -> spec.recipes(
+                        new ReorderMethodArguments("a.A foo(String, Integer, Integer)",
+                                new String[]{"n", "m", "s"}, null, null, null)),
+                java(
+                        """
               package a;
               public class A {
                  public void foo(String s, Integer m, Integer n) {}
                  public void foo(Integer n, Integer m, String s) {}
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import a.*;
               public class B {
                  A a;
@@ -51,7 +51,7 @@ class ReorderMethodArgumentsTest implements RewriteTest {
                  }
               }
               """,
-            """
+                        """
               import a.*;
               public class B {
                  A a;
@@ -64,26 +64,26 @@ class ReorderMethodArgumentsTest implements RewriteTest {
                  }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void reorderArgumentsWithNoSourceAttachment() {
         rewriteRun(
-          spec -> spec.recipe(new ReorderMethodArguments("a.A foo(String,..)",
-            new String[]{"s", "n"}, new String[]{"n", "s"}, null, null)),
-          java(
-            """
+                spec -> spec.recipe(new ReorderMethodArguments("a.A foo(String,..)",
+                        new String[]{"s", "n"}, new String[]{"n", "s"}, null, null)),
+                java(
+                        """
               package a;
               public class A {
                  public void foo(String arg0, Integer... arg1) {}
                  public void foo(Integer arg0, Integer arg1, String arg2) {}
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import a.*;
               public class B {
                  A a;
@@ -92,7 +92,7 @@ class ReorderMethodArgumentsTest implements RewriteTest {
                  }
               }
               """,
-            """
+                        """
               import a.*;
               public class B {
                  A a;
@@ -101,26 +101,26 @@ class ReorderMethodArgumentsTest implements RewriteTest {
                  }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void reorderArgumentsWhereOneOfTheOriginalArgumentsIsVararg() {
         rewriteRun(
-          spec -> spec.recipe(new ReorderMethodArguments("a.A foo(String,Integer,..)",
-            new String[]{"s", "o", "n"}, null, null, null)),
-          java(
-            """
+                spec -> spec.recipe(new ReorderMethodArguments("a.A foo(String,Integer,..)",
+                        new String[]{"s", "o", "n"}, null, null, null)),
+                java(
+                        """
               package a;
               public class A {
                  public void foo(String s, Integer n, Object... o) {}
                  public void foo(String s, Object... o) {}
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import a.*;
               public class B {
                  A a;
@@ -129,7 +129,7 @@ class ReorderMethodArgumentsTest implements RewriteTest {
                  }
               }
               """,
-            """
+                        """
               import a.*;
               public class B {
                  A a;
@@ -138,25 +138,25 @@ class ReorderMethodArgumentsTest implements RewriteTest {
                  }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void reorderArgumentsWhereTheLastArgumentIsVarargAndNotPresentInInvocation() {
         rewriteRun(
-          spec -> spec.recipe(new ReorderMethodArguments("a.A foo(..)",
-            new String[]{"o", "s"}, null, null, null)),
-          java(
-            """
+                spec -> spec.recipe(new ReorderMethodArguments("a.A foo(..)",
+                        new String[]{"o", "s"}, null, null, null)),
+                java(
+                        """
               package a;
               public class A {
                  public void foo(String s, Object... o) {}
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import a.*;
               public class B {
                  public void test() {
@@ -164,27 +164,27 @@ class ReorderMethodArgumentsTest implements RewriteTest {
                  }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void reorderArgumentsInConstructors() {
         rewriteRun(
-          spec -> spec.recipes(
-            new ReorderMethodArguments("a.A <constructor>(String, Integer, Integer)",
-              new String[]{"n", "m", "s"}, null, null, null)),
-          java(
-            """
+                spec -> spec.recipes(
+                        new ReorderMethodArguments("a.A <constructor>(String, Integer, Integer)",
+                                new String[]{"n", "m", "s"}, null, null, null)),
+                java(
+                        """
               package a;
               public class A {
                  public A(String s, Integer m, Integer n) {}
                  public A(Integer n, Integer m, String s) {}
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import a.*;
               public class B {
                  public void test() {
@@ -196,7 +196,7 @@ class ReorderMethodArgumentsTest implements RewriteTest {
                  }
               }
               """,
-            """
+                        """
               import a.*;
               public class B {
                  public void test() {
@@ -208,7 +208,7 @@ class ReorderMethodArgumentsTest implements RewriteTest {
                  }
               }
               """
-          )
+                )
         );
     }
 

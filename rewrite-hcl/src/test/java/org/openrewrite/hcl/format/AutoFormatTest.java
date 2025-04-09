@@ -33,13 +33,13 @@ class AutoFormatTest implements RewriteTest {
     @Test
     void forLoops() {
         rewriteRun(
-          hcl(
-          """
+                hcl(
+                        """
           a = [for v in ["a", "b"] : v]
           b = [for i, v in ["a", "b"] : i]
           c = [for i, v in ["a", "b", "c"]: v if 1 && !0]
           """
-          )
+                )
         );
     }
 
@@ -47,8 +47,8 @@ class AutoFormatTest implements RewriteTest {
     @Test
     void objectValues() {
         rewriteRun(
-          hcl(
-        """
+                hcl(
+                        """
               locals {
                 object = {
                        string_attr = "value1"
@@ -56,7 +56,7 @@ class AutoFormatTest implements RewriteTest {
                 }
               }
               """,
-            """
+                        """
               locals {
                 object = {
                   string_attr = "value1"
@@ -64,15 +64,15 @@ class AutoFormatTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void objectValuesCommas() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               locals {
                 object = {
                        string_attr = "value1"   ,   
@@ -80,7 +80,7 @@ class AutoFormatTest implements RewriteTest {
                 }
               }
               """,
-            """
+                        """
               locals {
                 object = {
                   string_attr = "value1",
@@ -88,7 +88,7 @@ class AutoFormatTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 
@@ -96,22 +96,22 @@ class AutoFormatTest implements RewriteTest {
     @Test
     void lineComments() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               # a hash comment with # or // is still 1 line.
               // a slash comment with # or // is still 1 line.
               resource {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void blankLines() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               r1 {
               }
               
@@ -120,14 +120,14 @@ class AutoFormatTest implements RewriteTest {
               r2 {
               }
               """,
-            """
+                        """
               r1 {
               }
               
               r2 {
               }
               """
-          )
+                )
         );
     }
 }

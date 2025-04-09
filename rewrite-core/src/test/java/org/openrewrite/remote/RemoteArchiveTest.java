@@ -44,11 +44,11 @@ class RemoteArchiveTest {
         ExecutionContext ctx = new InMemoryExecutionContext();
 
         RemoteArchive remoteArchive = Remote
-          .builder(
-            Paths.get("gradle/wrapper/gradle-wrapper.jar"),
-            distributionUrl.toURI()
-          )
-          .build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar");
+                .builder(
+                        Paths.get("gradle/wrapper/gradle-wrapper.jar"),
+                        distributionUrl.toURI()
+                )
+                .build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar");
 
         long actual = getInputStreamSize(remoteArchive.getInputStream(ctx));
         assertThat(actual).isGreaterThan(50_000);
@@ -60,18 +60,18 @@ class RemoteArchiveTest {
         ExecutionContext ctx = new InMemoryExecutionContext();
 
         HttpSenderExecutionContextView.view(ctx)
-          .setLargeFileHttpSender(new MockHttpSender(408));
+                .setLargeFileHttpSender(new MockHttpSender(408));
 
         RemoteArchive remoteArchive = Remote
-          .builder(
-            Paths.get("gradle/wrapper/gradle-wrapper.jar"),
-            distributionUrl.toURI()
-          )
-          .build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar");
+                .builder(
+                        Paths.get("gradle/wrapper/gradle-wrapper.jar"),
+                        distributionUrl.toURI()
+                )
+                .build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar");
 
         assertThatThrownBy(() -> getInputStreamSize(remoteArchive.getInputStream(ctx)))
-          .isInstanceOf(IllegalStateException.class)
-          .hasMessage("Failed to download " + distributionUrl.toURI() + " to artifact cache");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Failed to download " + distributionUrl.toURI() + " to artifact cache");
     }
 
     @ParameterizedTest
@@ -81,24 +81,24 @@ class RemoteArchiveTest {
         ExecutorService executorService = Executors.newFixedThreadPool(executionCount);
         CompletionService<Long> completionService = new ExecutorCompletionService<>(executorService);
         LocalRemoteArtifactCache localRemoteArtifactCache = new LocalRemoteArtifactCache(
-          Paths.get(System.getProperty("user.home") + "/.rewrite/remote/gradleWrapperConcurrent"));
+                Paths.get(System.getProperty("user.home") + "/.rewrite/remote/gradleWrapperConcurrent"));
 
         for (int i = 0; i < executionCount; i++) {
             completionService.submit(() -> {
                 URL distributionUrl = requireNonNull(RemoteArchiveTest.class.getClassLoader()
-                  .getResource("gradle-" + version + "-bin.zip"));
+                        .getResource("gradle-" + version + "-bin.zip"));
 
                 ExecutionContext ctx = new InMemoryExecutionContext();
                 RemoteExecutionContextView.view(ctx).setArtifactCache(localRemoteArtifactCache);
                 HttpSenderExecutionContextView.view(ctx)
-                  .setLargeFileHttpSender(new MockHttpSender(distributionUrl::openStream));
+                        .setLargeFileHttpSender(new MockHttpSender(distributionUrl::openStream));
 
                 RemoteArchive remoteArchive = Remote
-                  .builder(
-                    Paths.get("gradle/wrapper/gradle-wrapper.jar"),
-                    distributionUrl.toURI()
-                  )
-                  .build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar");
+                        .builder(
+                                Paths.get("gradle/wrapper/gradle-wrapper.jar"),
+                                distributionUrl.toURI()
+                        )
+                        .build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar");
 
                 return getInputStreamSize(remoteArchive.getInputStream(ctx));
             });
@@ -118,11 +118,11 @@ class RemoteArchiveTest {
         URL zipUrl = requireNonNull(RemoteArchiveTest.class.getClassLoader().getResource("zipfile.zip"));
 
         RemoteArchive remoteArchive = Remote
-          .builder(
-            Paths.get("content.txt"),
-            zipUrl.toURI()
-          )
-          .build("content.txt");
+                .builder(
+                        Paths.get("content.txt"),
+                        zipUrl.toURI()
+                )
+                .build("content.txt");
 
         String printed = remoteArchive.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.DEFAULT));
         assertThat(printed).isEqualTo("this is a zipped file");

@@ -47,66 +47,66 @@ class DeleteMethodArgumentTest implements RewriteTest {
     @Test
     void deleteMiddleArgumentDeclarative() {
         rewriteRun(
-          spec -> spec.recipes(new DeleteMethodArgument("B foo(int, int, int)", 1)),
-          java(
-            "public class A {{ B.foo(0, 1, 2); }}",
-            "public class A {{ B.foo(0, 2); }}"
-          )
+                spec -> spec.recipes(new DeleteMethodArgument("B foo(int, int, int)", 1)),
+                java(
+                        "public class A {{ B.foo(0, 1, 2); }}",
+                        "public class A {{ B.foo(0, 2); }}"
+                )
         );
     }
 
     @Test
     void deleteMiddleArgument() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteMethodArgument("B foo(int, int, int)", 1)),
-          java(
-            "public class A {{ B.foo(0, 1, 2); }}",
-            "public class A {{ B.foo(0, 2); }}"
-          )
+                spec -> spec.recipe(new DeleteMethodArgument("B foo(int, int, int)", 1)),
+                java(
+                        "public class A {{ B.foo(0, 1, 2); }}",
+                        "public class A {{ B.foo(0, 2); }}"
+                )
         );
     }
 
     @Test
     void deleteArgumentsConsecutively() {
         rewriteRun(
-          spec -> spec.recipes(
-            new DeleteMethodArgument("B foo(int, int, int)", 1),
-            new DeleteMethodArgument("B foo(int, int)", 1)
-          ),
-          java(
-            "public class A {{ B.foo(0, 1, 2); }}",
-            "public class A {{ B.foo(0); }}"
-          )
+                spec -> spec.recipes(
+                        new DeleteMethodArgument("B foo(int, int, int)", 1),
+                        new DeleteMethodArgument("B foo(int, int)", 1)
+                ),
+                java(
+                        "public class A {{ B.foo(0, 1, 2); }}",
+                        "public class A {{ B.foo(0); }}"
+                )
         );
     }
 
     @Test
     void doNotDeleteEmptyContainingFormatting() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteMethodArgument("B foo(..)", 0)),
-          java("public class A {{ B.foo( ); }}")
+                spec -> spec.recipe(new DeleteMethodArgument("B foo(..)", 0)),
+                java("public class A {{ B.foo( ); }}")
         );
     }
 
     @Test
     void insertEmptyWhenLastArgumentIsDeleted() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteMethodArgument("B foo(..)", 0)),
-          java(
-            "public class A {{ B.foo(1); }}",
-            "public class A {{ B.foo(); }}"
-          )
+                spec -> spec.recipe(new DeleteMethodArgument("B foo(..)", 0)),
+                java(
+                        "public class A {{ B.foo(1); }}",
+                        "public class A {{ B.foo(); }}"
+                )
         );
     }
 
     @Test
     void deleteConstructorArgument() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteMethodArgument("B <constructor>(int)", 0)),
-          java(
-            "public class A { B b = new B(0); }",
-            "public class A { B b = new B(); }"
-          )
+                spec -> spec.recipe(new DeleteMethodArgument("B <constructor>(int)", 0)),
+                java(
+                        "public class A { B b = new B(0); }",
+                        "public class A { B b = new B(); }"
+                )
         );
     }
 
@@ -114,15 +114,15 @@ class DeleteMethodArgumentTest implements RewriteTest {
     @Test
     void deleteFirstArgument() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteMethodArgument("B foo(int, int, int)", 0)),
-          java(
-            "public class A {{ B.foo(0, 1, 2); }}",
-            "public class A {{ B.foo(1, 2); }}"
-          ),
-          java(
-            "public class C {{ B.foo(\n\t\t0, 1, 2); }}",
-            "public class C {{ B.foo(\n\t\t1, 2); }}"
-          )
+                spec -> spec.recipe(new DeleteMethodArgument("B foo(int, int, int)", 0)),
+                java(
+                        "public class A {{ B.foo(0, 1, 2); }}",
+                        "public class A {{ B.foo(1, 2); }}"
+                ),
+                java(
+                        "public class C {{ B.foo(\n\t\t0, 1, 2); }}",
+                        "public class C {{ B.foo(\n\t\t1, 2); }}"
+                )
         );
     }
 }

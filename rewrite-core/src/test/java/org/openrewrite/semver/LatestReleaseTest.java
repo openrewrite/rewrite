@@ -132,7 +132,7 @@ class LatestReleaseTest {
 
     @Test
     @Disabled("https://github.com/openrewrite/rewrite/issues/1204")
-        // feel free to move this under "guavaVariants", todo
+    // feel free to move this under "guavaVariants", todo
     void guavaVariantsMetadataBoundaries() {
         assertThat(latestRelease.compare("1.0", "25", "25.0-jre")).isEqualTo(0);
     }
@@ -166,7 +166,7 @@ class LatestReleaseTest {
     @Test
     void datedSnapshotVersions() {
         assertThat(latestRelease.compare(null, "7.17.0-20211102.000501-28",
-          "7.17.0-20211102.012229-29")).isLessThan(0);
+                "7.17.0-20211102.012229-29")).isLessThan(0);
     }
 
     @Test

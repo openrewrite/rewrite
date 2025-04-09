@@ -59,20 +59,20 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
                         return c.withSuffix(suffix);
                     }));
                 } else {
-                /*
-                 if comments are empty and package is present, leading whitespace is on the compilation unit and
-                 should be removed
-                 */
+                    /*
+                     if comments are empty and package is present, leading whitespace is on the compilation unit and
+                     should be removed
+                     */
                     cu = cu.withPrefix(Space.EMPTY);
                 }
             }
 
             if (cu.getPackageDeclaration() == null) {
                 if (cu.getComments().isEmpty()) {
-                /*
-                if package decl and comments are null/empty, leading whitespace is on the
-                compilation unit and should be removed
-                 */
+                    /*
+                    if package decl and comments are null/empty, leading whitespace is on the
+                    compilation unit and should be removed
+                     */
                     cu = cu.withPrefix(Space.EMPTY);
                 } else {
                     cu = cu.withComments(ListUtils.mapLast(cu.getComments(), c ->
@@ -288,10 +288,10 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
             return prefix;
         }
         if (prefix.getComments().isEmpty() ||
-            prefix.getWhitespace().contains("\n") ||
-            prefix.getComments().get(0) instanceof Javadoc ||
-            (prefix.getComments().get(0).isMultiline() && prefix.getComments().get(0)
-                    .printComment(getCursor()).contains("\n"))) {
+                prefix.getWhitespace().contains("\n") ||
+                prefix.getComments().get(0) instanceof Javadoc ||
+                (prefix.getComments().get(0).isMultiline() && prefix.getComments().get(0)
+                        .printComment(getCursor()).contains("\n"))) {
             return prefix.withWhitespace(minimumLines(prefix.getWhitespace(), min));
         }
 

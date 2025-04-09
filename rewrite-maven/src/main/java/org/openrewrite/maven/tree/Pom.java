@@ -170,15 +170,15 @@ public class Pom {
      * @throws MavenDownloadingException When problems are encountered downloading dependencies or parents.
      */
     public ResolvedPom resolve(Iterable<String> activeProfiles,
-                               MavenPomDownloader downloader,
-                               ExecutionContext ctx) throws MavenDownloadingException {
+            MavenPomDownloader downloader,
+            ExecutionContext ctx) throws MavenDownloadingException {
         return resolve(activeProfiles, downloader, emptyList(), ctx);
     }
 
     public ResolvedPom resolve(Iterable<String> activeProfiles,
-                               MavenPomDownloader downloader,
-                               List<MavenRepository> initialRepositories,
-                               ExecutionContext ctx) throws MavenDownloadingException {
+            MavenPomDownloader downloader,
+            List<MavenRepository> initialRepositories,
+            ExecutionContext ctx) throws MavenDownloadingException {
         return new ResolvedPom(
                 this,
                 activeProfiles,

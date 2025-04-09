@@ -28,14 +28,14 @@ class RecipeRunTest implements RewriteTest {
     @Test
     void printDatatable() {
         rewriteRun(
-          recipeSpec -> recipeSpec.recipe(new FindAndReplace("replace_me", "replacement", null, null, null, null, null, null))
-            .afterRecipe(recipeRun -> {
-                StringBuilder output = new StringBuilder();
-                final String dataTableName = SourcesFileResults.class.getName();
-                RecipeRun.exportCsv(new InMemoryExecutionContext(), recipeRun.getDataTable(dataTableName),
-                  s -> output.append(s).append("\n"), recipeRun.getDataTableRows(dataTableName));
-                assertThat(output.toString()).contains("org.openrewrite.text.FindAndReplace");
-            }), text(
+                recipeSpec -> recipeSpec.recipe(new FindAndReplace("replace_me", "replacement", null, null, null, null, null, null))
+                        .afterRecipe(recipeRun -> {
+                            StringBuilder output = new StringBuilder();
+                            final String dataTableName = SourcesFileResults.class.getName();
+                            RecipeRun.exportCsv(new InMemoryExecutionContext(), recipeRun.getDataTable(dataTableName),
+                                    s -> output.append(s).append("\n"), recipeRun.getDataTableRows(dataTableName));
+                            assertThat(output.toString()).contains("org.openrewrite.text.FindAndReplace");
+                        }), text(
                 """
             replace_me
             """, """

@@ -218,7 +218,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         if (nameTrees == null) {
             return null;
         }
-        @SuppressWarnings("unchecked") List<JRightPadded<J2>> js = ListUtils.map(nameTrees.getPadding().getElements(),
+        @SuppressWarnings("unchecked")
+        List<JRightPadded<J2>> js = ListUtils.map(nameTrees.getPadding().getElements(),
                 t -> t.getElement() instanceof NameTree ? (JRightPadded<J2>) visitTypeName((JRightPadded<NameTree>) t, p) : t);
         return js == nameTrees.getPadding().getElements() ? nameTrees : JContainer.build(nameTrees.getBefore(), js, Markers.EMPTY);
     }
@@ -897,7 +898,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             m = (J.MethodInvocation) temp2;
         }
         if (m.getPadding().getSelect() != null && m.getPadding().getSelect().getElement() instanceof NameTree &&
-            method.getMethodType() != null && method.getMethodType().hasFlags(Flag.Static)) {
+                method.getMethodType() != null && method.getMethodType().hasFlags(Flag.Static)) {
             //noinspection unchecked
             m = m.getPadding().withSelect(
                     (JRightPadded<Expression>) (JRightPadded<?>)
@@ -1406,7 +1407,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     public <J2 extends J> @Nullable JContainer<J2> visitContainer(@Nullable JContainer<J2> container,
-                                                        JContainer.Location loc, P p) {
+            JContainer.Location loc, P p) {
         if (container == null) {
             //noinspection ConstantConditions
             return null;
@@ -1453,10 +1454,10 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     protected boolean isInSameNameScope(Cursor base, Cursor child) {
         //First establish the base scope by finding the first enclosing element.
         Tree baseScope = base.dropParentUntil(t -> t instanceof J.Block ||
-                                                   t instanceof J.MethodDeclaration ||
-                                                   t instanceof J.Try ||
-                                                   t instanceof J.ForLoop ||
-                                                   t instanceof J.ForEachLoop).getValue();
+                t instanceof J.MethodDeclaration ||
+                t instanceof J.Try ||
+                t instanceof J.ForLoop ||
+                t instanceof J.ForEachLoop).getValue();
 
         //Now walk up the child path looking for the base scope.
         for (Iterator<Object> it = child.getPath(); it.hasNext(); ) {
@@ -1464,7 +1465,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             if (childScope instanceof J.ClassDeclaration) {
                 J.ClassDeclaration childClass = (J.ClassDeclaration) childScope;
                 if (!(childClass.getKind().equals(J.ClassDeclaration.Kind.Type.Class)) ||
-                    childClass.hasModifier(J.Modifier.Type.Static)) {
+                        childClass.hasModifier(J.Modifier.Type.Static)) {
                     //Short circuit the search if a terminating element is encountered.
                     return false;
                 }

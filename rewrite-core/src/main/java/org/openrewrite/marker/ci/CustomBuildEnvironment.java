@@ -48,8 +48,8 @@ public class CustomBuildEnvironment implements BuildEnvironment {
     @Override
     public GitProvenance buildGitProvenance() throws IncompleteGitConfigException {
         if (StringUtils.isBlank(cloneURL) ||
-            StringUtils.isBlank(ref) ||
-            StringUtils.isBlank(sha)) {
+                StringUtils.isBlank(ref) ||
+                StringUtils.isBlank(sha)) {
             throw new IncompleteGitConfigException();
         } else {
             return new GitProvenance(UUID.randomUUID(), cloneURL, ref, sha,

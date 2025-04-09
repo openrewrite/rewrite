@@ -53,8 +53,8 @@ class RepeatTest implements RewriteTest {
     @Test
     void repeatInPreVisit() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(VerifyCursorWellFormedInRepeat::new)),
-          java("class A {}")
+                spec -> spec.recipe(RewriteTest.toRecipe(VerifyCursorWellFormedInRepeat::new)),
+                java("class A {}")
         );
     }
 
@@ -78,8 +78,8 @@ class RepeatTest implements RewriteTest {
     @Test
     void repeatInRecipe() {
         rewriteRun(
-          spec -> spec.recipe(new VerifyCursorWellFormedRecipe()),
-          java("class A {}")
+                spec -> spec.recipe(new VerifyCursorWellFormedRecipe()),
+                java("class A {}")
         );
     }
 
@@ -93,18 +93,18 @@ class RepeatTest implements RewriteTest {
     @Test
     void repeatValidatesCursorIsPassed() {
         AssertionError assertionError = assertThrows(AssertionError.class, () ->
-            rewriteRun(
-              spec -> spec.recipe(RewriteTest.toRecipe(VisitorThatFailsToSetCursor::new)),
-              java("class A {}")
-            ));
+                rewriteRun(
+                        spec -> spec.recipe(RewriteTest.toRecipe(VisitorThatFailsToSetCursor::new)),
+                        java("class A {}")
+                ));
         assertThat(assertionError).cause().isInstanceOf(RecipeRunException.class);
         RecipeRunException e = (RecipeRunException) assertionError.getCause();
         assertThat(e.getMessage())
-          .contains(
-            "Repeat visitor called on a non-source file tree without a cursor pointing to the root of the tree. " +
-            "Passed tree type: `org.openrewrite.java.tree.J$ClassDeclaration`. " +
-            "This is likely a bug in the calling code. " +
-            "Use a `visit` method that accepts a cursor instead."
-          );
+                .contains(
+                        "Repeat visitor called on a non-source file tree without a cursor pointing to the root of the tree. " +
+                                "Passed tree type: `org.openrewrite.java.tree.J$ClassDeclaration`. " +
+                                "This is likely a bug in the calling code. " +
+                                "Use a `visit` method that accepts a cursor instead."
+                );
     }
 }

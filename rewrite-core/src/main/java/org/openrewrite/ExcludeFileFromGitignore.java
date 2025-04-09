@@ -53,8 +53,8 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
     @Override
     public String getDescription() {
         return "This recipe will remove a file or directory from the .gitignore file. " +
-               "If the file or directory is already in the .gitignore file, it will be removed or negated. " +
-               "If the file or directory is not in the .gitignore file, no action will be taken.";
+                "If the file or directory is already in the .gitignore file, it will be removed or negated. " +
+                "If the file or directory is not in the .gitignore file, no action will be taken.";
     }
 
     @Override
@@ -234,7 +234,7 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
         }
 
         public boolean isMatch(String path) {
-            return rule.isMatch(path, true, false) ||  rule.isMatch(path, true, true);
+            return rule.isMatch(path, true, false) || rule.isMatch(path, true, true);
         }
 
         public boolean getResult() {
@@ -366,7 +366,7 @@ public class ExcludeFileFromGitignore extends ScanningRecipe<Repository> {
             String rule = originalRule;
             ArrayList<FastIgnoreRule> traversedRemainingRules = new ArrayList<>();
             if (wildcardSuffix != null && rule.endsWith(wildcardSuffix)) {
-                rule = rule.substring(0, rule.length()-wildcardSuffix.length());
+                rule = rule.substring(0, rule.length() - wildcardSuffix.length());
             }
             if (wildcardPrefix != null && rule.startsWith(wildcardPrefix)) {
                 rule = path.substring(0, path.indexOf(rule.substring(wildcardPrefix.length()))) + rule.substring(wildcardPrefix.length());

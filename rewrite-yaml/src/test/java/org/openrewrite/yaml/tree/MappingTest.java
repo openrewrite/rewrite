@@ -32,66 +32,66 @@ class MappingTest implements RewriteTest {
     @Test
     void emptyObject() {
         rewriteRun(
-          yaml("workflow_dispatch: {}"));
+                yaml("workflow_dispatch: {}"));
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/423")
     @Test
     void flowStyleMapping() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               {
                 "data": {
                   "prometheus.yml": "global:\\n  scrape_interval: 10s\\n  scrape_timeout: 9s"
                 }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void multipleEntries() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               type : specs.openrewrite.org/v1beta/visitor # comment with colon :
               name : org.openrewrite.text.ChangeTextToJon
               """,
-            spec -> spec.afterRecipe(y -> {
-                assertThat(((Yaml.Mapping) (y.getDocuments().get(0).getBlock())).getEntries().stream()
-                  .map(e -> (Scalar) e.getKey())
-                  .map(Scalar::getValue)).containsExactly("type", "name");
-            })
-          )
+                        spec -> spec.afterRecipe(y -> {
+                            assertThat(((Yaml.Mapping) (y.getDocuments().get(0).getBlock())).getEntries().stream()
+                                    .map(e -> (Scalar) e.getKey())
+                                    .map(Scalar::getValue)).containsExactly("type", "name");
+                        })
+                )
         );
     }
 
     @Test
     void deep() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               type:
                       name: org.openrewrite.text.ChangeTextToJon
               """,
-            spec -> spec.afterRecipe(y -> {
-                Yaml.Mapping mapping = (Yaml.Mapping) y.getDocuments().get(0).getBlock();
-                assertThat(mapping.getEntries().stream()
-                  .map(e -> (Scalar) e.getKey())
-                  .map(Scalar::getValue)).containsExactly("type");
-                assertThat(mapping.getEntries().get(0).getValue()).isInstanceOf(Yaml.Mapping.class);
-            })
-          )
+                        spec -> spec.afterRecipe(y -> {
+                            Yaml.Mapping mapping = (Yaml.Mapping) y.getDocuments().get(0).getBlock();
+                            assertThat(mapping.getEntries().stream()
+                                    .map(e -> (Scalar) e.getKey())
+                                    .map(Scalar::getValue)).containsExactly("type");
+                            assertThat(mapping.getEntries().get(0).getValue()).isInstanceOf(Yaml.Mapping.class);
+                        })
+                )
         );
     }
 
     @Test
     void largeScalar() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               spring:
                 cloud:
                   config:
@@ -114,41 +114,41 @@ class MappingTest implements RewriteTest {
                                 69pcVH/4rmLbXdcmNYGm6iu+MlPQk4BUZknHSmVHIFdJ0EPupVaQ8RHT
                                 -----END RSA PRIVATE KEY-----
               """
-          )
+                )
         );
     }
 
     @Test
     void mappingContainingSequence() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               foo:
                 - bar: qwer
                   asdf: hjkl
               """
-          )
+                )
         );
     }
 
     @Test
     void commentWithColon() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               for: bar
               # Comment with a colon:
               baz: foo
               """,
-            spec -> spec.afterRecipe(documents -> {
-                var doc = documents.getDocuments().get(0);
-                Yaml.Mapping mapping = (Yaml.Mapping) doc.getBlock();
-                assertThat(mapping.getEntries().size()).isEqualTo(2);
+                        spec -> spec.afterRecipe(documents -> {
+                            var doc = documents.getDocuments().get(0);
+                            Yaml.Mapping mapping = (Yaml.Mapping) doc.getBlock();
+                            assertThat(mapping.getEntries().size()).isEqualTo(2);
 
-                var bazFooEntry = mapping.getEntries().get(1);
-                assertThat(bazFooEntry.getPrefix()).isEqualTo("\n# Comment with a colon:\n");
-            })
-          )
+                            var bazFooEntry = mapping.getEntries().get(1);
+                            assertThat(bazFooEntry.getPrefix()).isEqualTo("\n# Comment with a colon:\n");
+                        })
+                )
         );
     }
 
@@ -156,18 +156,18 @@ class MappingTest implements RewriteTest {
     @Test
     void emptyDocument() {
         rewriteRun(
-          yaml(
-            "",
-            spec -> spec.afterRecipe(documents -> assertThat(documents.getDocuments()).isNotEmpty())
-          )
+                yaml(
+                        "",
+                        spec -> spec.afterRecipe(documents -> assertThat(documents.getDocuments()).isNotEmpty())
+                )
         );
     }
 
     @Test
     void multiDocOnlyComments() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               # doc-1-pre
               ---
               # doc-1-end
@@ -175,31 +175,31 @@ class MappingTest implements RewriteTest {
               ---
               # doc-2-pre
               """,
-            spec -> spec.afterRecipe(docs -> {
-                assertThat(docs.getDocuments().size()).isEqualTo(2);
-                var doc = docs.getDocuments().get(0);
-                assertThat(doc.getPrefix()).isEqualTo("# doc-1-pre\n");
-                assertThat(doc.getEnd().getPrefix()).isEqualTo("\n# doc-1-end\n");
-                var doc2 = docs.getDocuments().get(1);
-                assertThat(doc2.getEnd().getPrefix()).isEqualTo("\n# doc-2-pre");
-            })
-          )
+                        spec -> spec.afterRecipe(docs -> {
+                            assertThat(docs.getDocuments().size()).isEqualTo(2);
+                            var doc = docs.getDocuments().get(0);
+                            assertThat(doc.getPrefix()).isEqualTo("# doc-1-pre\n");
+                            assertThat(doc.getEnd().getPrefix()).isEqualTo("\n# doc-1-end\n");
+                            var doc2 = docs.getDocuments().get(1);
+                            assertThat(doc2.getEnd().getPrefix()).isEqualTo("\n# doc-2-pre");
+                        })
+                )
         );
     }
 
     @Test
     void singleDocOnlyComments() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               # doc-1-pre
               """,
-            spec -> spec.afterRecipe(docs -> {
-                assertThat(docs.getDocuments().size()).isEqualTo(1);
-                var doc = docs.getDocuments().get(0);
-                assertThat(doc.getPrefix()).isEqualTo("# doc-1-pre");
-            })
-          )
+                        spec -> spec.afterRecipe(docs -> {
+                            assertThat(docs.getDocuments().size()).isEqualTo(1);
+                            var doc = docs.getDocuments().get(0);
+                            assertThat(doc.getPrefix()).isEqualTo("# doc-1-pre");
+                        })
+                )
         );
     }
 
@@ -207,12 +207,12 @@ class MappingTest implements RewriteTest {
     @Test
     void valueStartsWithAt() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               date: @build.timestamp@
               version: @project.version@
               """
-          )
+                )
         );
     }
 
@@ -220,12 +220,12 @@ class MappingTest implements RewriteTest {
     @Test
     void suffixBeforeColon() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
                     data :
                       test : 0
               """
-          )
+                )
         );
     }
 
@@ -233,21 +233,21 @@ class MappingTest implements RewriteTest {
     @Test
     void multilineScalar() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               data: &anc |
                   @this is a long string@
               bar: *anc
               """
-          )
+                )
         );
     }
 
     @Test
     void literals() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               data:
                 prometheus.yml: |-
                   global:
@@ -255,147 +255,147 @@ class MappingTest implements RewriteTest {
                     scrape_timeout: 9s
                     evaluation_interval: 10s
               """
-          )
+                )
         );
     }
 
     @Test
     void scalarValue() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               default: &default test
               stage: *default
               """
-          )
+                )
         );
     }
 
     @Test
     void scalarValueInBrackets() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               defaults: [&first A, &stage test, &last Z]
               config: [first: *first, stage: *stage, last: *last]
               """
-          )
+                )
         );
     }
 
     @Test
     void scalarKeyAnchor() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               foo:
                 - start: start
                 - &anchor buz: buz
                 - *anchor: baz
                 - end: end
               """
-          )
+                )
         );
     }
 
     @Test
     void scalarEntryValue() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               foo:
                - start: start
                - buz: &anchor ooo
                - fuz: *anchor
                - end: end
               """
-          )
+                )
         );
     }
 
     @Test
     void aliasEntryKey() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               bar:
                 &abc yo: friend
               baz:
                 *abc: friendly
               """
-          )
+                )
         );
     }
 
     @Test
     void scalarKeyAnchorInBrackets() {
         rewriteRun(
-          yaml("foo: [start: start, &anchor buz: buz, *anchor: baz, end: end]"));
+                yaml("foo: [start: start, &anchor buz: buz, *anchor: baz, end: end]"));
     }
 
     @Test
     void scalarEntryValueAnchorInBrackets() {
         rewriteRun(
-          yaml("foo: [start: start, &anchor buz: buz, baz: *anchor, end: end]"));
+                yaml("foo: [start: start, &anchor buz: buz, baz: *anchor, end: end]"));
     }
 
     @Test
     void sequenceAnchor() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               defaults: &defaults
                 - A: 1
                 - B: 2
               key: *defaults
               """
-          )
+                )
         );
     }
 
     @Test
     void sequenceAnchorFlowStyle() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               defaults: &defaults [A:1, B:2] # comment
               key: *defaults
               """
-          )
+                )
         );
     }
 
     @Test
     void sequenceAnchorWithComments() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               defaults: &defaults # sequence start comment
                 - A: 1 # A comment
                 - B: 2 # B comment
               key: *defaults
               """
-          )
+                )
         );
     }
 
     @Test
     void sequenceAnchorInBrackets() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               defaults: &defaults [A: 1, B: 2]
               mapping: *defaults
               """
-          )
+                )
         );
     }
 
     @Test
     void mappingAnchor() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               defaults: &defaults
                 A: 1
                 B: 2
@@ -404,40 +404,40 @@ class MappingTest implements RewriteTest {
                 A: 23
                 C: 99
               """
-          )
+                )
         );
     }
 
     // https://github.com/yaml/yaml-grammar/blob/master/yaml-spec-1.2.txt#L1914
     @ParameterizedTest
     @ValueSource(strings = {
-      " '\\n' ",
-      " '\n' ",
-      " \n ",
-      " \"\\0\" ",
-      " \"\\0\" ",
-      " \"\\a\" ",
-      " \"\\a\" ",
-      " \"\\b\" ",
-      " \"\\t\" ",
-      " \"\t\" ",
-      " \"\\n\" ",
-      " \"\n\" ",
-      " \"\\v\" ",
-      " \"\\f\" ",
-      " \"\\r\" ",
-      " \"\r\" ",
-      " \"\\e\" ",
-      " \"\\\\\" ",
-      " \"\\\"\" ",
-      " \"\\N\" ",
-      " \"\\_\" ",
-      " \"\\L\" ",
-      " \"\\P\" ",
+            " '\\n' ",
+            " '\n' ",
+            " \n ",
+            " \"\\0\" ",
+            " \"\\0\" ",
+            " \"\\a\" ",
+            " \"\\a\" ",
+            " \"\\b\" ",
+            " \"\\t\" ",
+            " \"\t\" ",
+            " \"\\n\" ",
+            " \"\n\" ",
+            " \"\\v\" ",
+            " \"\\f\" ",
+            " \"\\r\" ",
+            " \"\r\" ",
+            " \"\\e\" ",
+            " \"\\\\\" ",
+            " \"\\\"\" ",
+            " \"\\N\" ",
+            " \"\\_\" ",
+            " \"\\L\" ",
+            " \"\\P\" ",
     })
     void escapeSequences(String str) {
         rewriteRun(
-          yaml("escaped-value: " + str)
+                yaml("escaped-value: " + str)
         );
     }
 }

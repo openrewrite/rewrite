@@ -33,8 +33,8 @@ class ModernizeObsoletePomsTest implements RewriteTest {
     @Test
     void oldPom() {
         rewriteRun(
-          pomXml(
-                """
+                pomXml(
+                        """
           <project>
               <pomVersion>3</pomVersion>
               <groupId>org.jvnet.staxex</groupId>
@@ -66,7 +66,7 @@ class ModernizeObsoletePomsTest implements RewriteTest {
               </build>
           </project>
           """,
-          """
+                        """
           <project>
               <modelVersion>4.0.0</modelVersion>
               <groupId>org.jvnet.staxex</groupId>

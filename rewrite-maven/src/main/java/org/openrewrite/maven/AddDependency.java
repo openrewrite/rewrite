@@ -68,7 +68,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
@@ -76,7 +76,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     @Option(displayName = "Scope",
             description = "A scope to use when it is not what can be inferred from usage. Most of the time this will be left empty, but " +
-                          "is used when adding a runtime, provided, or import dependency.",
+                    "is used when adding a runtime, provided, or import dependency.",
             example = "runtime",
             valid = {"import", "runtime", "provided"},
             required = false)
@@ -122,7 +122,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
      */
     @Option(displayName = "Family pattern",
             description = "A pattern, applied to groupIds, used to determine which other dependencies should have aligned version numbers. " +
-                          "Accepts '*' as a wildcard character.",
+                    "Accepts '*' as a wildcard character.",
             example = "com.fasterxml.jackson*",
             required = false)
     @Nullable
@@ -185,8 +185,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         JavaSourceSet javaSourceSet = sourceFile.getMarkers().findFirst(JavaSourceSet.class).orElse(null);
                         if (javaProject != null && javaSourceSet != null) {
                             acc.scopeByProject.compute(javaProject, (jp, scope) -> "compile".equals(scope) ?
-                                    scope /* a `compile` scope dependency will also be available in test source set */ :
-                                    "test".equals(javaSourceSet.getName()) ? "test" : "compile"
+                                            scope /* a `compile` scope dependency will also be available in test source set */ :
+                                            "test".equals(javaSourceSet.getName()) ? "test" : "compile"
                             );
                         }
                     }
@@ -222,7 +222,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                 // If the dependency is already in compile scope it will be available everywhere, no need to continue
                 for (ResolvedDependency d : getResolutionResult().getDependencies().get(Scope.Compile)) {
                     if (hasAcceptableTransitivity(d, acc) &&
-                        groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
+                            groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
                         return maven;
                     }
                 }
@@ -232,7 +232,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                 if (resolvedScopeEnum == Scope.Provided || resolvedScopeEnum == Scope.Test) {
                     for (ResolvedDependency d : getResolutionResult().getDependencies().get(resolvedScopeEnum)) {
                         if (hasAcceptableTransitivity(d, acc) &&
-                            groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
+                                groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
                             return maven;
                         }
                     }
@@ -252,7 +252,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
             private boolean isSubprojectOfParentInRepository(Scanned acc) {
                 return getResolutionResult().getParent() != null &&
-                       acc.pomsDefinedInCurrentRepository.contains(getResolutionResult().getParent().getPom().getGav());
+                        acc.pomsDefinedInCurrentRepository.contains(getResolutionResult().getParent().getPom().getGav());
             }
 
             private boolean isAggregatorNotUsedAsParent() {

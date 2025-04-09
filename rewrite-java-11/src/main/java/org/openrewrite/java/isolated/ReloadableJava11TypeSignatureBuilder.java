@@ -241,7 +241,7 @@ class ReloadableJava11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             s += "{name=<constructor>,return=" + s;
         } else {
             s += "{name=" + symbol.getSimpleName().toString() +
-                 ",return=" + signature(selectType.getReturnType());
+                    ",return=" + signature(selectType.getReturnType());
         }
 
         return s + ",parameters=" + methodArgumentSignature(selectType) + '}';
@@ -261,7 +261,7 @@ class ReloadableJava11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
             s += "{name=<constructor>,return=" + s;
         } else {
             s += "{name=" + symbol.getSimpleName().toString() +
-                 ",return=" + returnType;
+                    ",return=" + returnType;
         }
 
         return s + ",parameters=" + methodArgumentSignature(symbol) + '}';

@@ -26,15 +26,15 @@ class BinaryTest implements RewriteTest {
     @Test
     void arithmetic() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                   int n = 0 + 1;
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -46,23 +46,23 @@ class BinaryTest implements RewriteTest {
     @Test
     void formatFoldableStrings() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       String n = "a" + "b";
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void endOfLineBreaks() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.Objects;
 
               class Test {
@@ -73,7 +73,7 @@ class BinaryTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

@@ -45,7 +45,7 @@ public class ChangePropertyValue extends Recipe {
 
     @Option(displayName = "Trust parent POM",
             description = "Even if the parent defines a property with the same key, trust it even if the value isn't the same. " +
-                          "Useful when you want to wait for the parent to have its value changed first. The parent is not trusted by default.",
+                    "Useful when you want to wait for the parent to have its value changed first. The parent is not trusted by default.",
             required = false)
     @Nullable
     Boolean trustParent;
@@ -97,7 +97,7 @@ public class ChangePropertyValue extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (isPropertyTag() && propertyName.equals(tag.getName()) &&
-                    !newValue.equals(tag.getValue().orElse(null))) {
+                        !newValue.equals(tag.getValue().orElse(null))) {
                     doAfterVisit(new ChangeTagValueVisitor<>(tag, newValue));
                     maybeUpdateModel();
                 }

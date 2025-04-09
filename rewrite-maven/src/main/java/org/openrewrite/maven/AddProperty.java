@@ -48,7 +48,7 @@ public class AddProperty extends Recipe {
 
     @Option(displayName = "Trust parent POM",
             description = "If the parent defines a property with the same key, trust it even if the value isn't the same. " +
-                          "Useful when you want to wait for the parent to have its value changed first. The parent is not trusted by default.",
+                    "Useful when you want to wait for the parent to have its value changed first. The parent is not trusted by default.",
             required = false)
     @Nullable
     Boolean trustParent;
@@ -66,7 +66,7 @@ public class AddProperty extends Recipe {
     @Override
     public String getDescription() {
         return "Add a new property to the Maven project property. " +
-               "Prefers to add the property to the parent if the project has multiple modules.";
+                "Prefers to add the property to the parent if the project has multiple modules.";
     }
 
     @Override

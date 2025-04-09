@@ -26,45 +26,45 @@ class ListTest implements RewriteTest {
     @Test
     void emptyListLiteral() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def a = []
               def b = [   ]
               """
-          )
+                )
         );
     }
 
     @Test
     void emptyListLiteralWithParentheses() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def y = ([])
               """
-          )
+                )
         );
     }
 
     @Test
     void listLiteral() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def numbers = [1, 2, 3]
               """
-          )
+                )
         );
     }
 
     @Test
     void listLiteralTrailingComma() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def a = [ "foo" /* "foo" suffix */ , /* "]" prefix */ ]
               """
-          )
+                )
         );
     }
 }

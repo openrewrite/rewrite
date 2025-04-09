@@ -27,18 +27,18 @@ class AddRepositoryTest implements RewriteTest {
     @Test
     void addSimpleRepo() {
         rewriteRun(
-          spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
-            null, null, null,
-            null, null, null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
+                        null, null, null,
+                        null, null, null, null)),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -51,25 +51,25 @@ class AddRepositoryTest implements RewriteTest {
                 </repositories>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void addSimplePluginRepo() {
         rewriteRun(
-          spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
-            null, null, null,
-            null, null, null, AddRepository.Type.PluginRepository)),
-          pomXml(
-            """
+                spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
+                        null, null, null,
+                        null, null, null, AddRepository.Type.PluginRepository)),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -82,18 +82,18 @@ class AddRepositoryTest implements RewriteTest {
                 </pluginRepositories>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void updateExistingRepo() {
         rewriteRun(
-          spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", "bb", null,
-            null, null, null,
-            null, null, null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", "bb", null,
+                        null, null, null,
+                        null, null, null, null)),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -107,7 +107,7 @@ class AddRepositoryTest implements RewriteTest {
                 </repositories>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -121,18 +121,18 @@ class AddRepositoryTest implements RewriteTest {
                 </repositories>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void doNotRemoveRepoName() {
         rewriteRun(
-          spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
-            null, null, null,
-            null, null, null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
+                        null, null, null,
+                        null, null, null, null)),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -146,18 +146,18 @@ class AddRepositoryTest implements RewriteTest {
                 </repositories>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void removeSnapshots() {
         rewriteRun(
-          spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
-            null, null, null,
-            null, null, null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
+                        null, null, null,
+                        null, null, null, null)),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -173,7 +173,7 @@ class AddRepositoryTest implements RewriteTest {
                 </repositories>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -186,18 +186,18 @@ class AddRepositoryTest implements RewriteTest {
                 </repositories>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void updateSnapshots1() {
         rewriteRun(
-          spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
-            false, "whatever", null,
-            null, null, null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
+                        false, "whatever", null,
+                        null, null, null, null)),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -213,7 +213,7 @@ class AddRepositoryTest implements RewriteTest {
                 </repositories>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -230,18 +230,18 @@ class AddRepositoryTest implements RewriteTest {
                 </repositories>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void updateSnapshots2() {
         rewriteRun(
-          spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
-            null, "whatever", null,
-            null, null, null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
+                        null, "whatever", null,
+                        null, null, null, null)),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -257,7 +257,7 @@ class AddRepositoryTest implements RewriteTest {
                 </repositories>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -273,18 +273,18 @@ class AddRepositoryTest implements RewriteTest {
                 </repositories>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void noIdMatch1SameSnapshots() {
         rewriteRun(
-          spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
-            true, null, null,
-            null, null, null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
+                        true, null, null,
+                        null, null, null, null)),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -300,7 +300,7 @@ class AddRepositoryTest implements RewriteTest {
                 </repositories>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -308,14 +308,14 @@ class AddRepositoryTest implements RewriteTest {
     void updateToSpringBoot30Snapshot() {
 
         rewriteRun(
-          spec -> spec.recipes(
-            new AddRepository("boot-snapshots", "https://repo.spring.io/snapshot", null, null,
-              true, null, null,
-              null, null, null, null),
-            new UpgradeParentVersion("org.springframework.boot", "spring-boot-starter-parent", "3.0.0-SNAPSHOT", null, null)
-          ),
-          pomXml(
-            """
+                spec -> spec.recipes(
+                        new AddRepository("boot-snapshots", "https://repo.spring.io/snapshot", null, null,
+                                true, null, null,
+                                null, null, null, null),
+                        new UpgradeParentVersion("org.springframework.boot", "spring-boot-starter-parent", "3.0.0-SNAPSHOT", null, null)
+                ),
+                pomXml(
+                        """
               <project>
                 <parent>
                   <groupId>org.springframework.boot</groupId>
@@ -327,7 +327,7 @@ class AddRepositoryTest implements RewriteTest {
                 <version>1</version>
               </project>
               """,
-            """
+                        """
               <project>
                 <parent>
                   <groupId>org.springframework.boot</groupId>
@@ -348,7 +348,7 @@ class AddRepositoryTest implements RewriteTest {
                 </repositories>
               </project>
               """
-          )
+                )
         );
     }
 }

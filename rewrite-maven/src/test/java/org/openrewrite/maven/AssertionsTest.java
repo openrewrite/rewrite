@@ -44,9 +44,9 @@ class AssertionsTest implements RewriteTest {
     @Test
     void xmlAndPomXmlUseCorrectParserWhenPomXmlIsFirst() {
         rewriteRun(
-          spec -> spec.recipe(new MavenOnlyRecipe()),
-          pomXml(
-            """
+                spec -> spec.recipe(new MavenOnlyRecipe()),
+                pomXml(
+                        """
               <project>
                   <groupId>org.openrewrite</groupId>
                   <artifactId>test</artifactId>
@@ -60,12 +60,12 @@ class AssertionsTest implements RewriteTest {
                   </dependencies>
               </project>
               """
-          ),
-          xml("""
+                ),
+                xml("""
               <?xml version="1.0" encoding="UTF-8" ?>
               <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
               </suppressions>""",
-            spec -> spec.path("suppressions.xml"))
+                        spec -> spec.path("suppressions.xml"))
         );
         assertThat(xmlCount.get()).isEqualTo(2);
     }
@@ -73,15 +73,15 @@ class AssertionsTest implements RewriteTest {
     @Test
     void xmlAndPomXmlUseCorrectParserWhenPomXmlIsLast() {
         rewriteRun(
-          spec -> spec.recipe(new MavenOnlyRecipe()),
-          xml("""
+                spec -> spec.recipe(new MavenOnlyRecipe()),
+                xml("""
               <?xml version="1.0" encoding="UTF-8" ?>
               <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
               </suppressions>""",
-            spec -> spec.path("suppressions.xml")
-          ),
-          pomXml(
-            """
+                        spec -> spec.path("suppressions.xml")
+                ),
+                pomXml(
+                        """
               <project>
                   <groupId>org.openrewrite</groupId>
                   <artifactId>test</artifactId>
@@ -95,7 +95,7 @@ class AssertionsTest implements RewriteTest {
                   </dependencies>
               </project>
               """
-          )
+                )
         );
         assertThat(xmlCount.get()).isEqualTo(2);
     }

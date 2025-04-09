@@ -60,19 +60,19 @@ class GitProvenanceTest {
 
     private static Stream<Arguments> remotes() {
         return Stream.of(
-          Arguments.of("ssh://git@github.com/openrewrite/rewrite.git", "openrewrite", "rewrite"),
-          Arguments.of("https://github.com/openrewrite/rewrite.git", "openrewrite", "rewrite"),
-          Arguments.of("file:///openrewrite/rewrite.git", "openrewrite", "rewrite"),
-          Arguments.of("http://localhost:7990/scm/openrewrite/rewrite.git", "openrewrite", "rewrite"),
-          Arguments.of("http://localhost:7990/scm/some/openrewrite/rewrite.git", "openrewrite", "rewrite"),
-          Arguments.of("git@github.com:openrewrite/rewrite.git", "openrewrite", "rewrite"),
-          Arguments.of("org-12345678@github.com:openrewrite/rewrite.git", "openrewrite", "rewrite"),
-          Arguments.of("https://dev.azure.com/openrewrite/rewrite/_git/rewrite", "openrewrite/rewrite", "rewrite"),
-          Arguments.of("https://openrewrite@dev.azure.com/openrewrite/rewrite/_git/rewrite",
-            "openrewrite/rewrite",
-            "rewrite"),
-          Arguments.of("git@ssh.dev.azure.com:v3/openrewrite/rewrite/rewrite", "openrewrite/rewrite", "rewrite"),
-          Arguments.of("ssh://git@ssh.dev.azure.com/v3/openrewrite/rewrite/rewrite", "openrewrite/rewrite", "rewrite")
+                Arguments.of("ssh://git@github.com/openrewrite/rewrite.git", "openrewrite", "rewrite"),
+                Arguments.of("https://github.com/openrewrite/rewrite.git", "openrewrite", "rewrite"),
+                Arguments.of("file:///openrewrite/rewrite.git", "openrewrite", "rewrite"),
+                Arguments.of("http://localhost:7990/scm/openrewrite/rewrite.git", "openrewrite", "rewrite"),
+                Arguments.of("http://localhost:7990/scm/some/openrewrite/rewrite.git", "openrewrite", "rewrite"),
+                Arguments.of("git@github.com:openrewrite/rewrite.git", "openrewrite", "rewrite"),
+                Arguments.of("org-12345678@github.com:openrewrite/rewrite.git", "openrewrite", "rewrite"),
+                Arguments.of("https://dev.azure.com/openrewrite/rewrite/_git/rewrite", "openrewrite/rewrite", "rewrite"),
+                Arguments.of("https://openrewrite@dev.azure.com/openrewrite/rewrite/_git/rewrite",
+                        "openrewrite/rewrite",
+                        "rewrite"),
+                Arguments.of("git@ssh.dev.azure.com:v3/openrewrite/rewrite/rewrite", "openrewrite/rewrite", "rewrite"),
+                Arguments.of("ssh://git@ssh.dev.azure.com/v3/openrewrite/rewrite/rewrite", "openrewrite/rewrite", "rewrite")
         );
     }
 
@@ -97,26 +97,26 @@ class GitProvenanceTest {
 
     @ParameterizedTest
     @CsvSource({
-      "https://github.com/organization/repository, https://github.com, GitHub, organization",
-      "git@gitlab.acme.com/organization/subgroup/repository.git, https://gitlab.acme.com, GitLab, organization/subgroup",
-      "git@gitlab.acme.com/organization/subgroup/repository.git, git@gitlab.acme.com, GitLab, organization/subgroup",
-      "git@gitlab.acme.com:organization/subgroup/repository.git, ssh://git@gitlab.acme.com, GitLab, organization/subgroup",
-      "https://dev.azure.com/organization/project/_git/repository, https://dev.azure.com, AzureDevOps, organization/project",
-      "https://organization@dev.azure.com/organization/project/_git/repository, https://dev.azure.com, AzureDevOps, organization/project",
-      "git@ssh.dev.azure.com:v3/organization/project/repository, git@ssh.dev.azure.com, AzureDevOps, organization/project"
+            "https://github.com/organization/repository, https://github.com, GitHub, organization",
+            "git@gitlab.acme.com/organization/subgroup/repository.git, https://gitlab.acme.com, GitLab, organization/subgroup",
+            "git@gitlab.acme.com/organization/subgroup/repository.git, git@gitlab.acme.com, GitLab, organization/subgroup",
+            "git@gitlab.acme.com:organization/subgroup/repository.git, ssh://git@gitlab.acme.com, GitLab, organization/subgroup",
+            "https://dev.azure.com/organization/project/_git/repository, https://dev.azure.com, AzureDevOps, organization/project",
+            "https://organization@dev.azure.com/organization/project/_git/repository, https://dev.azure.com, AzureDevOps, organization/project",
+            "git@ssh.dev.azure.com:v3/organization/project/repository, git@ssh.dev.azure.com, AzureDevOps, organization/project"
     })
     void getOrganizationName(String gitOrigin, String baseUrl, GitRemote.Service service, String organizationName) {
         GitRemote.Parser parser = new GitRemote.Parser();
         parser.registerRemote(service, baseUrl);
         assertThat(new GitProvenance(randomId(), gitOrigin, "main", "123", null, null, emptyList(), parser.parse(gitOrigin)).getOrganizationName())
-          .isEqualTo(organizationName);
+                .isEqualTo(organizationName);
     }
 
     @ParameterizedTest
     @MethodSource("remotes")
     void getRepositoryName(String remote) {
         assertThat(new GitProvenance(randomId(), remote, "main", "123", null, null, emptyList(), null).getRepositoryName())
-          .isEqualTo("rewrite");
+                .isEqualTo("rewrite");
     }
 
     @Test
@@ -146,7 +146,7 @@ class GitProvenanceTest {
         try (Git git = initGitWithOneCommit(projectDir)) {
             git.checkout().setName(git.getRepository().resolve(Constants.HEAD).getName()).call();
             assertThat(GitProvenance.fromProjectDirectory(projectDir, null).getBranch())
-              .isEqualTo("main");
+                    .isEqualTo("main");
         }
     }
 
@@ -155,13 +155,13 @@ class GitProvenanceTest {
         try (Git git = initGitWithOneCommit(projectDir)) {
             git.checkout().setName(git.getRepository().resolve(Constants.HEAD).getName()).call();
             assertThat(
-              GitProvenance.fromProjectDirectory(
-                projectDir,
-                new JenkinsBuildEnvironment(
-                  randomId(), "1", "1", "https://jenkins/job/1",
-                  "https://jenkins", "job", "main", "origin/main"
-                )
-              ).getBranch()
+                    GitProvenance.fromProjectDirectory(
+                            projectDir,
+                            new JenkinsBuildEnvironment(
+                                    randomId(), "1", "1", "https://jenkins/job/1",
+                                    "https://jenkins", "job", "main", "origin/main"
+                            )
+                    ).getBranch()
             ).isEqualTo("main");
         }
     }
@@ -171,11 +171,11 @@ class GitProvenanceTest {
         try (Git git = initGitWithOneCommit(projectDir)) {
             git.checkout().setName(git.getRepository().resolve(Constants.HEAD).getName()).call();
             assertThat(
-              GitProvenance.fromProjectDirectory(
-                projectDir,
-                new JenkinsBuildEnvironment(randomId(), "1", "1", "https://jenkins/job/1",
-                  "https://jenkins", "job", null, "origin/main")
-              ).getBranch()
+                    GitProvenance.fromProjectDirectory(
+                            projectDir,
+                            new JenkinsBuildEnvironment(randomId(), "1", "1", "https://jenkins/job/1",
+                                    "https://jenkins", "job", null, "origin/main")
+                    ).getBranch()
             ).isEqualTo("main");
         }
     }
@@ -213,7 +213,7 @@ class GitProvenanceTest {
             git.checkout().setName(commit1).call();
 
             assertThat(GitProvenance.fromProjectDirectory(projectDir, null).getBranch())
-              .isEqualTo("main");
+                    .isEqualTo("main");
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -221,9 +221,9 @@ class GitProvenanceTest {
 
     private static Stream<String> baseUrls() {
         return Stream.of(
-          "ssh://git@gitlab.com",
-          "http://gitlab.com/",
-          "gitlab.com"
+                "ssh://git@gitlab.com",
+                "http://gitlab.com/",
+                "gitlab.com"
         );
     }
 
@@ -232,13 +232,13 @@ class GitProvenanceTest {
     @MethodSource("baseUrls")
     void multiplePathSegments(String baseUrl) {
         GitProvenance provenance = new GitProvenance(randomId(),
-          "http://gitlab.com/group/subgroup1/subgroup2/repo.git",
-          "master",
-          "1234567890abcdef1234567890abcdef12345678",
-          null,
-          null,
-          emptyList(),
-          null);
+                "http://gitlab.com/group/subgroup1/subgroup2/repo.git",
+                "master",
+                "1234567890abcdef1234567890abcdef12345678",
+                null,
+                null,
+                emptyList(),
+                null);
 
         assertThat(provenance.getOrganizationName(baseUrl)).isEqualTo("group/subgroup1/subgroup2");
         assertThat(provenance.getRepositoryName()).isEqualTo("repo");
@@ -263,14 +263,14 @@ class GitProvenanceTest {
 
                 // shallow clone the remote to another directory
                 runCommand(projectDir, "git clone file:///%s shallowClone --depth 1 --branch main"
-                  .formatted(remoteRepo.getDirectory().getAbsolutePath()));
+                        .formatted(remoteRepo.getDirectory().getAbsolutePath()));
                 try (var git2 = Git.open(projectDir.resolve("shallowClone").toFile())) {
                     // creates detached head
                     git2.checkout().setName(commit).call();
 
                     assumeTrue(GitProvenance.fromProjectDirectory(projectDir.resolve("shallowClone"), null) != null);
                     assertThat(GitProvenance.fromProjectDirectory(projectDir.resolve("shallowClone"), null).getBranch())
-                      .isEqualTo("main");
+                            .isEqualTo("main");
                 }
             }
         }
@@ -304,7 +304,7 @@ class GitProvenanceTest {
 
         assumeTrue(GitProvenance.fromProjectDirectory(projectDir.resolve("workspace"), null) != null);
         assertThat(GitProvenance.fromProjectDirectory(projectDir.resolve("workspace"), null).getBranch())
-          .isEqualTo("main");
+                .isEqualTo("main");
     }
 
     @Test
@@ -317,7 +317,7 @@ class GitProvenanceTest {
         envVars.put("GITHUB_HEAD_REF", "");
 
         GitProvenance prov = GitProvenance.fromProjectDirectory(projectDir,
-          GithubActionsBuildEnvironment.build(envVars::get));
+                GithubActionsBuildEnvironment.build(envVars::get));
         assertThat(prov).isNotNull();
         assertThat(prov.getOrigin()).isEqualTo("https://github.com/octocat/Hello-World.git");
         assertThat(prov.getBranch()).isEqualTo("main");
@@ -334,7 +334,7 @@ class GitProvenanceTest {
         envVars.put("GITHUB_HEAD_REF", "");
         try (Git ignored = Git.init().setDirectory(projectDir.toFile()).setInitialBranch("main").call()) {
             GitProvenance prov = GitProvenance.fromProjectDirectory(projectDir,
-              GithubActionsBuildEnvironment.build(envVars::get));
+                    GithubActionsBuildEnvironment.build(envVars::get));
             assertThat(prov).isNotNull();
             assertThat(prov.getOrigin()).isNotEqualTo("https://github.com/octocat/Hello-World.git");
             assertThat(prov.getBranch()).isEqualTo("main");
@@ -350,7 +350,7 @@ class GitProvenanceTest {
         envVars.put("CUSTOM_GIT_SHA", "287364287357");
 
         GitProvenance prov = GitProvenance.fromProjectDirectory(projectDir,
-          CustomBuildEnvironment.build(envVars::get));
+                CustomBuildEnvironment.build(envVars::get));
 
         assertThat(prov).isNotNull();
         assertThat(prov.getOrigin()).isEqualTo("https://github.com/octocat/Hello-World.git");
@@ -366,7 +366,7 @@ class GitProvenanceTest {
         envVars.put("CI_COMMIT_SHA", "287364287357");
 
         GitProvenance prov = GitProvenance.fromProjectDirectory(projectDir,
-          GitlabBuildEnvironment.build(envVars::get));
+                GitlabBuildEnvironment.build(envVars::get));
 
         assertThat(prov).isNotNull();
         assertThat(prov.getOrigin()).isEqualTo("https://github.com/octocat/Hello-World.git");
@@ -383,7 +383,7 @@ class GitProvenanceTest {
         envVars.put("DRONE_COMMIT_SHA", "287364287357");
 
         GitProvenance prov = GitProvenance.fromProjectDirectory(projectDir,
-          DroneBuildEnvironment.build(envVars::get));
+                DroneBuildEnvironment.build(envVars::get));
 
         assertThat(prov).isNotNull();
         assertThat(prov.getOrigin()).isEqualTo("https://github.com/octocat/Hello-World.git");
@@ -405,9 +405,9 @@ class GitProvenanceTest {
     void serialization() throws JsonProcessingException {
         GitProvenance gitProvenance = new GitProvenance(randomId(), "https://github.com/octocat/Hello-World.git", "main", "123", null, null, List.of());
         ObjectMapper mapper = new ObjectMapper()
-          .findAndRegisterModules()
-          .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-          .enable(INCLUDE_SOURCE_IN_LOCATION);
+                .findAndRegisterModules()
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .enable(INCLUDE_SOURCE_IN_LOCATION);
         String json = mapper.writeValueAsString(gitProvenance);
         GitProvenance read = mapper.readValue(json, GitProvenance.class);
         assertThat(read).isEqualTo(gitProvenance);
@@ -418,11 +418,11 @@ class GitProvenanceTest {
         workingDir.toFile().mkdirs();
         try {
             new ProcessBuilder(command.split(" "))
-              .directory(workingDir.toFile())
-              .redirectOutput(ProcessBuilder.Redirect.INHERIT)
-              .redirectError(ProcessBuilder.Redirect.INHERIT)
-              .start()
-              .waitFor(5, TimeUnit.SECONDS);
+                    .directory(workingDir.toFile())
+                    .redirectOutput(ProcessBuilder.Redirect.INHERIT)
+                    .redirectError(ProcessBuilder.Redirect.INHERIT)
+                    .start()
+                    .waitFor(5, TimeUnit.SECONDS);
         } catch (InterruptedException | IOException e) {
             throw new RuntimeException(e);
         }

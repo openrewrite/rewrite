@@ -32,7 +32,8 @@ public class AddPropertyVisitor extends MavenIsoVisitor<ExecutionContext> {
     String key;
     String value;
 
-    @Nullable Boolean preserveExistingValue;
+    @Nullable
+    Boolean preserveExistingValue;
 
     @Override
     public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
@@ -55,8 +56,8 @@ public class AddPropertyVisitor extends MavenIsoVisitor<ExecutionContext> {
     @Override
     public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
         if (!Boolean.TRUE.equals(preserveExistingValue) &&
-            isPropertyTag() && key.equals(tag.getName()) &&
-            !value.equals(tag.getValue().orElse(null))) {
+                isPropertyTag() && key.equals(tag.getName()) &&
+                !value.equals(tag.getValue().orElse(null))) {
             doAfterVisit(new ChangeTagValueVisitor<>(tag, value));
         }
         return super.visitTag(tag, ctx);

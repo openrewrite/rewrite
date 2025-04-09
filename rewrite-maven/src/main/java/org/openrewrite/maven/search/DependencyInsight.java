@@ -64,8 +64,8 @@ public class DependencyInsight extends Recipe {
 
     @Option(displayName = "Version",
             description = "Match only dependencies with the specified version. " +
-                          "Node-style [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors) may be used." +
-                          "All versions are searched by default.",
+                    "Node-style [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors) may be used." +
+                    "All versions are searched by default.",
             example = "1.x",
             required = false)
     @Nullable
@@ -102,7 +102,7 @@ public class DependencyInsight extends Recipe {
     @Override
     public String getDescription() {
         return "Find direct and transitive dependencies matching a group, artifact, and scope. " +
-               "Results include dependencies that either directly match or transitively include a matching dependency.";
+                "Results include dependencies that either directly match or transitively include a matching dependency.";
     }
 
     @Override
@@ -113,23 +113,23 @@ public class DependencyInsight extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
-                if(!isDependencyTag()) {
+                if (!isDependencyTag()) {
                     return t;
                 }
                 ResolvedDependency dependency = findDependency(t, aScope);
-                if(dependency == null) {
+                if (dependency == null) {
                     return t;
                 }
                 ResolvedDependency match = dependency.findDependency(groupIdPattern, artifactIdPattern);
-                if(match == null) {
+                if (match == null) {
                     return t;
                 }
-                if(version != null) {
+                if (version != null) {
                     VersionComparator versionComparator = Semver.validate(version, null).getValue();
-                    if(versionComparator == null) {
+                    if (versionComparator == null) {
                         t = Markup.warn(t, new IllegalArgumentException("Could not construct a valid version comparator from " + version + "."));
                     } else {
-                        if(!versionComparator.isValid(null, match.getVersion())) {
+                        if (!versionComparator.isValid(null, match.getVersion())) {
                             return t;
                         }
                     }

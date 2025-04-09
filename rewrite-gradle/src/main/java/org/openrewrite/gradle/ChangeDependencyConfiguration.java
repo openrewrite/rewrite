@@ -70,7 +70,7 @@ public class ChangeDependencyConfiguration extends Recipe {
     @Override
     public String getDescription() {
         return "A common example is the need to change `compile` to `api`/`implementation` as " +
-               "[part of the move](https://docs.gradle.org/current/userguide/upgrading_version_6.html) to Gradle 7.x and later.";
+                "[part of the move](https://docs.gradle.org/current/userguide/upgrading_version_6.html) to Gradle 7.x and later.";
     }
 
     @Override

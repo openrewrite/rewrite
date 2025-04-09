@@ -36,9 +36,9 @@ class ChangeDependencyClassifierTest implements RewriteTest {
     @Test
     void worksWithEmptyStringConfig() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyClassifier("org.openrewrite", "*", "classified", "")),
-          buildGradle(
-            """
+                spec -> spec.recipe(new ChangeDependencyClassifier("org.openrewrite", "*", "classified", "")),
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -51,7 +51,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                   api 'org.openrewrite:rewrite-gradle:latest.release:javadoc'
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -64,7 +64,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                   api 'org.openrewrite:rewrite-gradle:latest.release:classified'
               }
               """
-          )
+                )
         );
     }
 
@@ -72,9 +72,9 @@ class ChangeDependencyClassifierTest implements RewriteTest {
     @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
     void findDependency(String group, String artifact) {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyClassifier(group, artifact, "classified", null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new ChangeDependencyClassifier(group, artifact, "classified", null)),
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -88,7 +88,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                   api "org.openrewrite:rewrite-core:latest.release:javadoc"
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -102,7 +102,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                   api "org.openrewrite:rewrite-core:latest.release:classified"
               }
               """
-          )
+                )
         );
     }
 
@@ -110,9 +110,9 @@ class ChangeDependencyClassifierTest implements RewriteTest {
     @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
     void findMapStyleDependency(String group, String artifact) {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyClassifier(group, artifact, "classified", null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new ChangeDependencyClassifier(group, artifact, "classified", null)),
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -126,7 +126,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                   api group: "org.openrewrite", name: "rewrite-core", version: "latest.release", classifier: "javadoc"
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -140,7 +140,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                   api group: "org.openrewrite", name: "rewrite-core", version: "latest.release", classifier: "classified"
               }
               """
-          )
+                )
         );
     }
 
@@ -148,9 +148,9 @@ class ChangeDependencyClassifierTest implements RewriteTest {
     @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
     void worksWithoutVersion(String group, String artifact) {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyClassifier(group, artifact, "classified", null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new ChangeDependencyClassifier(group, artifact, "classified", null)),
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -165,7 +165,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                   api group: 'org.openrewrite', name: 'rewrite-core', classifier: 'javadoc'
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -180,7 +180,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                   api group: 'org.openrewrite', name: 'rewrite-core', classifier: 'classified'
               }
               """
-          )
+                )
         );
     }
 
@@ -188,9 +188,9 @@ class ChangeDependencyClassifierTest implements RewriteTest {
     @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
     void worksWithClassifier(String group, String artifact) {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyClassifier(group, artifact, "classified", null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new ChangeDependencyClassifier(group, artifact, "classified", null)),
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -206,7 +206,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                   api group: "org.openrewrite", name: "rewrite-core", version: "latest.release", classifier: "javadoc"
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -222,7 +222,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                   api group: "org.openrewrite", name: "rewrite-core", version: "latest.release", classifier: "classified"
               }
               """
-          )
+                )
         );
     }
 
@@ -230,9 +230,9 @@ class ChangeDependencyClassifierTest implements RewriteTest {
     @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
     void worksWithExt(String group, String artifact) {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyClassifier(group, artifact, "classified", null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new ChangeDependencyClassifier(group, artifact, "classified", null)),
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -252,7 +252,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                   api group: "org.openrewrite", name: "rewrite-core", version: "latest.release", classifier: "javadoc", ext: "jar"
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -272,16 +272,16 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                   api group: "org.openrewrite", name: "rewrite-core", version: "latest.release", classifier: "classified", ext: "jar"
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void noPreviousClassifier_1() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyClassifier("org.openrewrite", "*", "classified", "")),
-          buildGradle(
-            """
+                spec -> spec.recipe(new ChangeDependencyClassifier("org.openrewrite", "*", "classified", "")),
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -294,7 +294,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                   api 'org.openrewrite:rewrite-gradle:latest.release'
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -307,7 +307,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                   api 'org.openrewrite:rewrite-gradle:latest.release:classified'
               }
               """
-          )
+                )
         );
     }
 
@@ -315,9 +315,9 @@ class ChangeDependencyClassifierTest implements RewriteTest {
     @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
     void noPreviousClassifier_2(String group, String artifact) {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyClassifier(group, artifact, "classified", null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new ChangeDependencyClassifier(group, artifact, "classified", null)),
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -331,7 +331,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                   api(group: "org.openrewrite", name: "rewrite-core", version: "latest.release")
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -345,16 +345,16 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                   api(group: "org.openrewrite", name: "rewrite-core", version: "latest.release", classifier: "classified")
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void noNewClassifier_1() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyClassifier("org.openrewrite", "*", null, "")),
-          buildGradle(
-            """
+                spec -> spec.recipe(new ChangeDependencyClassifier("org.openrewrite", "*", null, "")),
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -367,7 +367,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                   api 'org.openrewrite:rewrite-gradle:latest.release:classified'
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -380,7 +380,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                   api 'org.openrewrite:rewrite-gradle:latest.release'
               }
               """
-          )
+                )
         );
     }
 
@@ -388,9 +388,9 @@ class ChangeDependencyClassifierTest implements RewriteTest {
     @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
     void noNewClassifier_2(String group, String artifact) {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyClassifier(group, artifact, null, null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new ChangeDependencyClassifier(group, artifact, null, null)),
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -404,7 +404,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                   api(group: "org.openrewrite", name: "rewrite-core", version: "latest.release", classifier: "classified")
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -418,16 +418,16 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                   api(group: "org.openrewrite", name: "rewrite-core", version: "latest.release")
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void worksWithDependencyDefinedInJvmTestSuite() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyClassifier("org.openrewrite", "*", "classified", "")),
-          buildGradle(
-            """
+                spec -> spec.recipe(new ChangeDependencyClassifier("org.openrewrite", "*", "classified", "")),
+                buildGradle(
+                        """
               plugins {
                   id "java-library"
                   id 'jvm-test-suite'
@@ -447,7 +447,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               plugins {
                   id "java-library"
                   id 'jvm-test-suite'
@@ -467,16 +467,16 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void worksWithDependencyDefinedInBuildScript() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyClassifier("org.openrewrite", "*", "classified", "")),
-          buildGradle(
-            """
+                spec -> spec.recipe(new ChangeDependencyClassifier("org.openrewrite", "*", "classified", "")),
+                buildGradle(
+                        """
               buildscript {
                   repositories {
                       gradlePluginPortal()
@@ -486,7 +486,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               buildscript {
                   repositories {
                       gradlePluginPortal()
@@ -496,16 +496,16 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void dependenciesBlockInFreestandingScript() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyClassifier("org.openrewrite", "*", "classified", "")),
-          buildGradle(
-            """
+                spec -> spec.recipe(new ChangeDependencyClassifier("org.openrewrite", "*", "classified", "")),
+                buildGradle(
+                        """
               repositories {
                   mavenLocal()
                   mavenCentral()
@@ -517,7 +517,7 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                   implementation("org.openrewrite:rewrite-gradle:latest.release:javadoc")
               }
               """,
-            """
+                        """
               repositories {
                   mavenLocal()
                   mavenCentral()
@@ -529,16 +529,16 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                   implementation("org.openrewrite:rewrite-gradle:latest.release:classified")
               }
               """,
-            spec -> spec.path("dependencies.gradle")
-          ),
-          buildGradle(
-            """
+                        spec -> spec.path("dependencies.gradle")
+                ),
+                buildGradle(
+                        """
               plugins {
                   id("java")
               }
               apply from: 'dependencies.gradle'
               """
-          )
+                )
         );
     }
 }

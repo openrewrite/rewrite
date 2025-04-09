@@ -34,25 +34,25 @@ class DeleteStatementTest implements RewriteTest {
     @Test
     void deleteField() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              @Override
-              public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-                  doAfterVisit(new DeleteStatement<>(multiVariable));
-                  return super.visitVariableDeclarations(multiVariable, ctx);
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    @Override
+                    public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                        doAfterVisit(new DeleteStatement<>(multiVariable));
+                        return super.visitVariableDeclarations(multiVariable, ctx);
+                    }
+                })),
+                java(
+                        """
               import java.util.List;
               public class A {
                  List collection = null;
               }
               """,
-            """
+                        """
               public class A {
               }
               """
-          )
+                )
         );
     }
 
@@ -61,25 +61,25 @@ class DeleteStatementTest implements RewriteTest {
     void deleteSecondStatement() {
         //noinspection UnusedAssignment
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
-                  J.Block b = super.visitBlock(block, ctx);
-                  if (b.getStatements().size() != 4) {
-                      return b;
-                  }
-                  List<Statement> statements = b.getStatements();
-                  for (int i = 0; i < statements.size(); i++) {
-                      Statement s = statements.get(i);
-                      if (i == 1) {
-                          doAfterVisit(new DeleteStatement<>(s));
-                      }
-                  }
-                  return b;
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
+                        J.Block b = super.visitBlock(block, ctx);
+                        if (b.getStatements().size() != 4) {
+                            return b;
+                        }
+                        List<Statement> statements = b.getStatements();
+                        for (int i = 0; i < statements.size(); i++) {
+                            Statement s = statements.get(i);
+                            if (i == 1) {
+                                doAfterVisit(new DeleteStatement<>(s));
+                            }
+                        }
+                        return b;
+                    }
+                })),
+                java(
+                        """
               public class A {
                  {
                     String s = "";
@@ -89,7 +89,7 @@ class DeleteStatementTest implements RewriteTest {
                  }
               }
               """,
-            """
+                        """
               public class A {
                  {
                     String s = "";
@@ -98,7 +98,7 @@ class DeleteStatementTest implements RewriteTest {
                  }
               }
               """
-          )
+                )
         );
     }
 
@@ -106,25 +106,25 @@ class DeleteStatementTest implements RewriteTest {
     @Test
     void deleteSecondAndFourthStatement() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
-                  J.Block b = super.visitBlock(block, ctx);
-                  if (b.getStatements().size() != 4) {
-                      return b;
-                  }
-                  List<Statement> statements = b.getStatements();
-                  for (int i = 0; i < statements.size(); i++) {
-                      Statement s = statements.get(i);
-                      if (i == 1 || i == 3) {
-                          doAfterVisit(new DeleteStatement<>(s));
-                      }
-                  }
-                  return b;
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
+                        J.Block b = super.visitBlock(block, ctx);
+                        if (b.getStatements().size() != 4) {
+                            return b;
+                        }
+                        List<Statement> statements = b.getStatements();
+                        for (int i = 0; i < statements.size(); i++) {
+                            Statement s = statements.get(i);
+                            if (i == 1 || i == 3) {
+                                doAfterVisit(new DeleteStatement<>(s));
+                            }
+                        }
+                        return b;
+                    }
+                })),
+                java(
+                        """
               public class A {
                  {
                     String s = "";
@@ -134,7 +134,7 @@ class DeleteStatementTest implements RewriteTest {
                  }
               }
               """,
-            """
+                        """
               public class A {
                  {
                     String s = "";
@@ -142,25 +142,25 @@ class DeleteStatementTest implements RewriteTest {
                  }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void deleteIfThenBody() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.If visitIf(J.If iff, ExecutionContext ctx) {
-                  J.If i = super.visitIf(iff, ctx);
-                  if (!((J.Block) i.getThenPart()).getStatements().isEmpty()) {
-                      doAfterVisit(new DeleteStatement<>(i.getThenPart()));
-                  }
-                  return i;
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.If visitIf(J.If iff, ExecutionContext ctx) {
+                        J.If i = super.visitIf(iff, ctx);
+                        if (!((J.Block) i.getThenPart()).getStatements().isEmpty()) {
+                            doAfterVisit(new DeleteStatement<>(i.getThenPart()));
+                        }
+                        return i;
+                    }
+                })),
+                java(
+                        """
               public class A {
                   public void a() {
                       if (true) {
@@ -169,32 +169,32 @@ class DeleteStatementTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   public void a() {
                       if (true){}
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void deleteIfElseBody() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.If visitIf(J.If iff, ExecutionContext ctx) {
-                  J.If i = super.visitIf(iff, ctx);
-                  if (!((J.Block) i.getElsePart().getBody()).getStatements().isEmpty()) {
-                      doAfterVisit(new DeleteStatement<>(i.getElsePart().getBody()));
-                  }
-                  return i;
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.If visitIf(J.If iff, ExecutionContext ctx) {
+                        J.If i = super.visitIf(iff, ctx);
+                        if (!((J.Block) i.getElsePart().getBody()).getStatements().isEmpty()) {
+                            doAfterVisit(new DeleteStatement<>(i.getElsePart().getBody()));
+                        }
+                        return i;
+                    }
+                })),
+                java(
+                        """
               public class A {
                   public void a() {
                       if (false) {
@@ -205,7 +205,7 @@ class DeleteStatementTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   public void a() {
                       if (false) {
@@ -214,25 +214,25 @@ class DeleteStatementTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void deleteForBody() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.ForLoop visitForLoop(J.ForLoop forLoop, ExecutionContext ctx) {
-                  J.ForLoop f = super.visitForLoop(forLoop, ctx);
-                  if (!((J.Block) f.getBody()).getStatements().isEmpty()) {
-                      doAfterVisit(new DeleteStatement<>(f.getBody()));
-                  }
-                  return f;
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.ForLoop visitForLoop(J.ForLoop forLoop, ExecutionContext ctx) {
+                        J.ForLoop f = super.visitForLoop(forLoop, ctx);
+                        if (!((J.Block) f.getBody()).getStatements().isEmpty()) {
+                            doAfterVisit(new DeleteStatement<>(f.getBody()));
+                        }
+                        return f;
+                    }
+                })),
+                java(
+                        """
               public class A {
                   public void a() {
                       for (int i = 0; i < 1; i++) {
@@ -241,31 +241,31 @@ class DeleteStatementTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   public void a() {
                       for (int i = 0; i < 1; i++){}
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void dontDeleteForControl() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.ForLoop visitForLoop(J.ForLoop forLoop, ExecutionContext ctx) {
-                  J.ForLoop f = super.visitForLoop(forLoop, ctx);
-                  doAfterVisit(new DeleteStatement<>(f.getControl().getInit().get(0)));
-                  doAfterVisit(new DeleteStatement<>(f.getControl().getUpdate().get(0)));
-                  return f;
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.ForLoop visitForLoop(J.ForLoop forLoop, ExecutionContext ctx) {
+                        J.ForLoop f = super.visitForLoop(forLoop, ctx);
+                        doAfterVisit(new DeleteStatement<>(f.getControl().getInit().get(0)));
+                        doAfterVisit(new DeleteStatement<>(f.getControl().getUpdate().get(0)));
+                        return f;
+                    }
+                })),
+                java(
+                        """
               public class A {
                   public void a() {
                       for (int i = 0; i < 1; i++) {
@@ -274,23 +274,23 @@ class DeleteStatementTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void deleteForEachBody() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.ForEachLoop visitForEachLoop(J.ForEachLoop forLoop, ExecutionContext ctx) {
-                  J.ForEachLoop f = super.visitForEachLoop(forLoop, ctx);
-                  doAfterVisit(new DeleteStatement<>(f.getControl().getVariable()));
-                  return f;
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.ForEachLoop visitForEachLoop(J.ForEachLoop forLoop, ExecutionContext ctx) {
+                        J.ForEachLoop f = super.visitForEachLoop(forLoop, ctx);
+                        doAfterVisit(new DeleteStatement<>(f.getControl().getVariable()));
+                        return f;
+                    }
+                })),
+                java(
+                        """
               public class A {
                   public void a() {
                       for (int i : new int[]{ 1 }) {
@@ -299,25 +299,25 @@ class DeleteStatementTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void dontDeleteForEachControl() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.ForEachLoop visitForEachLoop(J.ForEachLoop forLoop, ExecutionContext ctx) {
-                  J.ForEachLoop f = super.visitForEachLoop(forLoop, ctx);
-                  if (!((J.Block) f.getBody()).getStatements().isEmpty()) {
-                      doAfterVisit(new DeleteStatement<>(f.getBody()));
-                  }
-                  return f;
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.ForEachLoop visitForEachLoop(J.ForEachLoop forLoop, ExecutionContext ctx) {
+                        J.ForEachLoop f = super.visitForEachLoop(forLoop, ctx);
+                        if (!((J.Block) f.getBody()).getStatements().isEmpty()) {
+                            doAfterVisit(new DeleteStatement<>(f.getBody()));
+                        }
+                        return f;
+                    }
+                })),
+                java(
+                        """
               public class A {
                   public void a() {
                       for (int i : new int[]{ 1 }) {
@@ -326,32 +326,32 @@ class DeleteStatementTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   public void a() {
                       for (int i : new int[]{ 1 }){}
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void deleteWhileBody() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.WhileLoop visitWhileLoop(J.WhileLoop whileLoop, ExecutionContext ctx) {
-                  J.WhileLoop w = super.visitWhileLoop(whileLoop, ctx);
-                  if (!((J.Block) w.getBody()).getStatements().isEmpty()) {
-                      doAfterVisit(new DeleteStatement<>(w.getBody()));
-                  }
-                  return w;
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.WhileLoop visitWhileLoop(J.WhileLoop whileLoop, ExecutionContext ctx) {
+                        J.WhileLoop w = super.visitWhileLoop(whileLoop, ctx);
+                        if (!((J.Block) w.getBody()).getStatements().isEmpty()) {
+                            doAfterVisit(new DeleteStatement<>(w.getBody()));
+                        }
+                        return w;
+                    }
+                })),
+                java(
+                        """
               public class A {
                   public void a() {
                       while (true) {
@@ -360,32 +360,32 @@ class DeleteStatementTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   public void a() {
                       while (true){}
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void deleteDoWhileBody() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.DoWhileLoop visitDoWhileLoop(J.DoWhileLoop doWhileLoop, ExecutionContext ctx) {
-                  J.DoWhileLoop w = super.visitDoWhileLoop(doWhileLoop, ctx);
-                  if (!((J.Block) w.getBody()).getStatements().isEmpty()) {
-                      doAfterVisit(new DeleteStatement<>(w.getBody()));
-                  }
-                  return w;
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.DoWhileLoop visitDoWhileLoop(J.DoWhileLoop doWhileLoop, ExecutionContext ctx) {
+                        J.DoWhileLoop w = super.visitDoWhileLoop(doWhileLoop, ctx);
+                        if (!((J.Block) w.getBody()).getStatements().isEmpty()) {
+                            doAfterVisit(new DeleteStatement<>(w.getBody()));
+                        }
+                        return w;
+                    }
+                })),
+                java(
+                        """
               public class A {
                   public void a() {
                       do {
@@ -394,32 +394,32 @@ class DeleteStatementTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   public void a() {
                       do{} while (true);
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void deleteStatementInNegation() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                  J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
-                  if (m.getSimpleName().equals("b")) {
-                      doAfterVisit(new DeleteStatement<>(m));
-                  }
-                  return m;
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                        J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
+                        if (m.getSimpleName().equals("b")) {
+                            doAfterVisit(new DeleteStatement<>(m));
+                        }
+                        return m;
+                    }
+                })),
+                java(
+                        """
               public abstract class A {
                   public void a() {
                       boolean a = !b();
@@ -428,7 +428,7 @@ class DeleteStatementTest implements RewriteTest {
                   abstract boolean b();
               }
               """
-          )
+                )
         );
     }
 }

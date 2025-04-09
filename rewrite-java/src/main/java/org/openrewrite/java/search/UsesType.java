@@ -136,7 +136,7 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
         }
 
         if (typePattern != null && TypeUtils.isAssignableTo(typePattern, type) ||
-            fullyQualifiedType != null && TypeUtils.isAssignableTo(fullyQualifiedType, type)) {
+                fullyQualifiedType != null && TypeUtils.isAssignableTo(fullyQualifiedType, type)) {
             return SearchResult.found(c);
         }
 
@@ -156,9 +156,9 @@ public class UsesType<P> extends TreeVisitor<Tree, P> {
 
     private static Predicate<JavaType> packagePattern(String name) {
         return type -> type instanceof JavaType.FullyQualified &&
-                       // optimization to avoid unnecessary memory allocations
-                       ((JavaType.FullyQualified) type).getFullyQualifiedName().startsWith(name) &&
-                       ((JavaType.FullyQualified) type).getPackageName().equals(name);
+                // optimization to avoid unnecessary memory allocations
+                ((JavaType.FullyQualified) type).getFullyQualifiedName().startsWith(name) &&
+                ((JavaType.FullyQualified) type).getPackageName().equals(name);
     }
 
     private static Predicate<JavaType> packagePrefixPattern(String prefix) {

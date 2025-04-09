@@ -34,7 +34,7 @@ public class NoWhitespaceBefore extends Recipe {
     @Override
     public String getDescription() {
         return "Removes unnecessary whitespace preceding a token. " +
-               "A linebreak before a token will be removed unless `allowLineBreaks` is set to `true`.";
+                "A linebreak before a token will be removed unless `allowLineBreaks` is set to `true`.";
     }
 
     @Override
@@ -134,7 +134,7 @@ public class NoWhitespaceBefore extends Recipe {
             J.Unary u = super.visitUnary(unary, ctx);
             J.Unary.Type op = u.getOperator();
             if ((Boolean.TRUE.equals(noWhitespaceBeforeStyle.getPostInc()) && op == J.Unary.Type.PostIncrement) ||
-                (Boolean.TRUE.equals(noWhitespaceBeforeStyle.getPostDec() && op == J.Unary.Type.PostDecrement))) {
+                    (Boolean.TRUE.equals(noWhitespaceBeforeStyle.getPostDec() && op == J.Unary.Type.PostDecrement))) {
                 if (Boolean.FALSE.equals(noWhitespaceBeforeStyle.getAllowLineBreaks()) && u.getPadding().getOperator().getBefore().getWhitespace().contains("\n")) {
                     u = u.getPadding().withOperator(u.getPadding().getOperator().withBefore(u.getPadding().getOperator().getBefore().withWhitespace("")));
                 }

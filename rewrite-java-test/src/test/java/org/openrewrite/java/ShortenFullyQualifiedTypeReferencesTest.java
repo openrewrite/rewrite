@@ -38,62 +38,62 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
     @Test
     void redundantImport() {
         rewriteRun(
-          //language=java
-          java(
-            """
+                //language=java
+                java(
+                        """
               import java.util.List;
               
               class T {
                   java.util.List<String> list;
               }
               """,
-            """
+                        """
               import java.util.List;
               
               class T {
                   List<String> list;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void nestedTypeReference() {
         rewriteRun(
-          //language=java
-          java(
-            """
+                //language=java
+                java(
+                        """
               class T {
                   java.util.Map.Entry<String, String> mapEntry;
               }
               """,
-            """
+                        """
               import java.util.Map;
               
               class T {
                   Map.Entry<String, String> mapEntry;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void conflictingTypeInSamePackage() {
         rewriteRun(
-          //language=java
-          java(
-            """
+                //language=java
+                java(
+                        """
               package a;
               
               class String {
               }
               """
-          ),
-          //language=java
-          java(
-            """
+                ),
+                //language=java
+                java(
+                        """
               package a;
               
               class T {
@@ -101,116 +101,116 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
                   java.lang.String s2;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void withinStaticFieldAccess() {
         rewriteRun(
-          //language=java
-          java(
-            """
+                //language=java
+                java(
+                        """
               class T {
                   int dotall = java.util.regex.Pattern.DOTALL;
               }
               """,
-            """
+                        """
               import java.util.regex.Pattern;
               
               class T {
                   int dotall = Pattern.DOTALL;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void inGenericTypeParameter() {
         rewriteRun(
-          //language=java
-          java(
-            """
+                //language=java
+                java(
+                        """
               import java.util.List;
               
               class T {
                   List<java.util.List<String>> list;
               }
               """,
-            """
+                        """
               import java.util.List;
               
               class T {
                   List<List<String>> list;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void equalType() {
         rewriteRun(
-          java(
-            //language=java
-            """
+                java(
+                        //language=java
+                        """
               import java.util.List;
               
               class T {
                   java.util.List list;
               }
               """,
-            """
+                        """
               import java.util.List;
               
               class T {
                   List list;
               }
               """,
-            spec -> spec.mapBeforeRecipe(cu -> (J.CompilationUnit) new JavaIsoVisitor<>() {
-                @Override
-                public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, Object o) {
-                    return multiVariable.withType(JavaType.ShallowClass.build("java.util.List"));
-                }
-            }.visit(cu, 0))
-          )
+                        spec -> spec.mapBeforeRecipe(cu -> (J.CompilationUnit) new JavaIsoVisitor<>() {
+                            @Override
+                            public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, Object o) {
+                                return multiVariable.withType(JavaType.ShallowClass.build("java.util.List"));
+                            }
+                        }.visit(cu, 0))
+                )
         );
     }
 
     @Test
     void noImport() {
         rewriteRun(
-          //language=java
-          java(
-            """
+                //language=java
+                java(
+                        """
               class T {
                   java.util.List<String> list;
               }
               """,
-            """
+                        """
               import java.util.List;
               
               class T {
                   List<String> list;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void multipleConflictingTypesWithoutImport() {
         rewriteRun(
-          //language=java
-          java(
-            """
+                //language=java
+                java(
+                        """
               class T {
                   java.util.List<String> list;
                   java.awt.List list2;
               }
               """,
-            """
+                        """
               import java.util.List;
               
               class T {
@@ -218,26 +218,26 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
                   java.awt.List list2;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void visitSubtreeOnly() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              @SuppressWarnings("DataFlowIssue")
-              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                  if (method.getSimpleName().equals("m1")) {
-                      return (J.MethodDeclaration) ShortenFullyQualifiedTypeReferences.modifyOnly(method).visit(method, ctx, getCursor().getParent());
-                  }
-                  return super.visitMethodDeclaration(method, ctx);
-              }
-          })),
-          //language=java
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    @SuppressWarnings("DataFlowIssue")
+                    public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                        if (method.getSimpleName().equals("m1")) {
+                            return (J.MethodDeclaration) ShortenFullyQualifiedTypeReferences.modifyOnly(method).visit(method, ctx, getCursor().getParent());
+                        }
+                        return super.visitMethodDeclaration(method, ctx);
+                    }
+                })),
+                //language=java
+                java(
+                        """
               class T {
                   void m1(java.util.List<String> list) {
                   }
@@ -245,7 +245,7 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class T {
                   void m1(List<String> list) {
                   }
@@ -253,32 +253,32 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void conflictWithLocalType() {
         rewriteRun(
-          //language=java
-          java(
-            """
+                //language=java
+                java(
+                        """
               class T {
                   java.util.List<String> list;
                   class List {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void dontModifyThisReference() {
         rewriteRun(
-          //language=java
-          java(
-            """
+                //language=java
+                java(
+                        """
               class T {
                   Object f;
                   T() {
@@ -286,16 +286,16 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void dontModifyJavadoc() {
         rewriteRun(
-          //language=java
-          java(
-            """
+                //language=java
+                java(
+                        """
               /**
                * See {@link java.util.List}.
                *
@@ -304,68 +304,68 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
               class T {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void dontModifyQualifiedJavaLangTypes() {
         rewriteRun(
-          //language=java
-          java(
-            """
+                //language=java
+                java(
+                        """
               class T {
                   java.lang.String s;
                   java.lang.Integer i;
                   java.lang.Object o;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void shortenQualifiedJavaLangTypesWhenAlreadyPresentElsewhere() {
         rewriteRun(
-          //language=java
-          java(
-            """
+                //language=java
+                java(
+                        """
               class T {
                   java.lang.String s1;
                   String s2;
               }
               """,
-            """
+                        """
               class T {
                   String s1;
                   String s2;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void conflictExistingImport() {
         rewriteRun(
-          //language=java
-          java(
-            """
+                //language=java
+                java(
+                        """
               import java.awt.List;
               class T {
                   java.util.List<String> list;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void conflictGenericVariable() {
         rewriteRun(
-          //language=java
-          java(
-            """
+                //language=java
+                java(
+                        """
               import java.util.List;
               
               class T<String> {
@@ -373,7 +373,7 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
                   List<String> list;
               }
               """
-          )
+                )
         );
     }
 
@@ -381,9 +381,9 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
     @SuppressWarnings("TypeParameterHidesVisibleType")
     void conflictGenericVariableOnMethod() {
         rewriteRun(
-          //language=java
-          java(
-            """
+                //language=java
+                java(
+                        """
               import java.util.List;
               
               class T {
@@ -391,16 +391,16 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void qualifiedMethodReference() {
         rewriteRun(
-          java(
-            //language=java
-            """
+                java(
+                        //language=java
+                        """
               import java.util.Collection;
               import java.util.function.Function;
               
@@ -410,7 +410,7 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.Collection;
               import java.util.function.Function;
               
@@ -420,24 +420,24 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void subtree() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                  if (method.getSimpleName().equals("m1")) {
-                      doAfterVisit(service(ImportService.class).shortenFullyQualifiedTypeReferencesIn(method));
-                  }
-                  return super.visitMethodDeclaration(method, ctx);
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                        if (method.getSimpleName().equals("m1")) {
+                            doAfterVisit(service(ImportService.class).shortenFullyQualifiedTypeReferencesIn(method));
+                        }
+                        return super.visitMethodDeclaration(method, ctx);
+                    }
+                })),
+                java(
+                        """
               import java.util.Collection;
               import java.util.function.Function;
               
@@ -450,7 +450,7 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.Collection;
               import java.util.function.Function;
               
@@ -463,22 +463,22 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void nestedReferenceCollision() {
         rewriteRun(
-          java(
-            """            
+                java(
+                        """            
               class List {
                   class A {
                   }
               }
               """),
-          java(
-            """
+                java(
+                        """
               import java.util.ArrayList;
               
               class Test {
@@ -493,8 +493,8 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
     @Test
     void deeperNestedReferenceCollision() {
         rewriteRun(
-          java(
-            """            
+                java(
+                        """            
               class List {
                   class A {
                       class B {
@@ -502,8 +502,8 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
                   }
               }
               """),
-          java(
-            """
+                java(
+                        """
               import java.util.ArrayList;
               
               class Test {
@@ -518,8 +518,8 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
     @Test
     void importWithLeadingComment() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package foo;
               
               /* comment */
@@ -529,7 +529,7 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
                   List<String> l = new java.util.ArrayList<>();
               }
               """,
-            """
+                        """
               package foo;
               
               /* comment */
@@ -540,16 +540,16 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
                   List<String> l = new ArrayList<>();
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void annotatedFieldAccess() {
         rewriteRun(
-          //language=java
-          java(
-            """
+                //language=java
+                java(
+                        """
               import java.lang.annotation.ElementType;
               import java.lang.annotation.Target;
               
@@ -559,7 +559,7 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
               @Target(ElementType.TYPE_USE)
               @interface Anno {}
               """,
-            """
+                        """
               import java.lang.annotation.ElementType;
               import java.lang.annotation.Target;
               import java.util.List;
@@ -570,7 +570,7 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
               @Target(ElementType.TYPE_USE)
               @interface Anno {}
               """
-          )
+                )
         );
     }
 
@@ -578,8 +578,8 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
     @Test
     void typeFullyQualifiedAnnotatedField() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.sql.DatabaseMetaData;
               import java.util.List;
               import java.lang.annotation.*;
@@ -592,7 +592,7 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.sql.DatabaseMetaData;
               import java.util.List;
               import java.lang.annotation.*;
@@ -605,21 +605,21 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void annotation() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class TypeAnnotationTest {
                   @org.jetbrains.annotations.NotNull
                   String test() {}
               }
               """,
-            """
+                        """
               import org.jetbrains.annotations.NotNull;
               
               class TypeAnnotationTest {
@@ -627,7 +627,7 @@ class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
                   String test() {}
               }
               """
-          )
+                )
         );
     }
 }

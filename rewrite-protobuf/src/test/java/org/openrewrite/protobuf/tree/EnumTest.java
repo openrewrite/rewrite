@@ -26,14 +26,14 @@ class EnumTest implements RewriteTest {
     @Test
     void one() {
         rewriteRun(
-          proto(
-            """
+                proto(
+                        """
               syntax = 'proto2';
               enum MyEnum {
                 One = 1;
               }
               """
-          )
+                )
         );
     }
 
@@ -41,8 +41,8 @@ class EnumTest implements RewriteTest {
     @Test
     void multipleValues() {
         rewriteRun(
-          proto(
-            """
+                proto(
+                        """
               syntax = 'proto2';
               enum MyEnum {
                 One = 1;
@@ -50,7 +50,7 @@ class EnumTest implements RewriteTest {
                 Three = 3;
               }
               """
-          )
+                )
         );
     }
 }

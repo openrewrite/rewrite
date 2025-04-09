@@ -31,9 +31,9 @@ class UsesMethodTest implements RewriteTest {
     @Test
     void emptyConstructor() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new UsesMethod<>("abc.Thing newConcurrentHashSet()"))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new UsesMethod<>("abc.Thing newConcurrentHashSet()"))),
+                java(
+                        """
               package abc;
                             
               import java.util.Set;
@@ -48,10 +48,10 @@ class UsesMethodTest implements RewriteTest {
                   }
               }
               """,
-            SourceSpec::skip
-          ),
-          java(
-            """
+                        SourceSpec::skip
+                ),
+                java(
+                        """
               package abc;
                             
               import java.util.Set;
@@ -59,7 +59,7 @@ class UsesMethodTest implements RewriteTest {
                   Set<String> s = Thing.newConcurrentHashSet();
               }
               """,
-            """
+                        """
               /*~~>*/package abc;
                             
               import java.util.Set;
@@ -67,7 +67,7 @@ class UsesMethodTest implements RewriteTest {
                   Set<String> s = Thing.newConcurrentHashSet();
               }
               """
-          )
+                )
         );
     }
 
@@ -75,134 +75,134 @@ class UsesMethodTest implements RewriteTest {
     @Test
     void usesMethodReferences() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new UsesMethod<>("A singleArg(String)"))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new UsesMethod<>("A singleArg(String)"))),
+                java(
+                        """
               class Test {
                   void test() {
                       new java.util.ArrayList<String>().forEach(new A()::singleArg);
                   }
               }
               """,
-            """
+                        """
               /*~~>*/class Test {
                   void test() {
                       new java.util.ArrayList<String>().forEach(new A()::singleArg);
                   }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               class A {
                   public void singleArg(String s) {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void usesStaticMethodCalls() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new UsesMethod<>("java.util.Collections emptyList()"))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new UsesMethod<>("java.util.Collections emptyList()"))),
+                java(
+                        """
               import java.util.Collections;
               public class A {
                  Object o = Collections.emptyList();
               }
               """,
-            """
+                        """
               /*~~>*/import java.util.Collections;
               public class A {
                  Object o = Collections.emptyList();
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void usesStaticallyImportedMethodCalls() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new UsesMethod<>("java.util.Collections emptyList()"))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new UsesMethod<>("java.util.Collections emptyList()"))),
+                java(
+                        """
               import static java.util.Collections.emptyList;
               public class A {
                  Object o = emptyList();
               }
               """,
-            """
+                        """
               /*~~>*/import static java.util.Collections.emptyList;
               public class A {
                  Object o = emptyList();
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void matchVarargs() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new UsesMethod<>("A foo(String, Object...)"))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new UsesMethod<>("A foo(String, Object...)"))),
+                java(
+                        """
               public class B {
                  public void test() {
                      new A().foo("s", "a", 1);
                  }
               }
               """,
-            """
+                        """
               /*~~>*/public class B {
                  public void test() {
                      new A().foo("s", "a", 1);
                  }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               public class A {
                   public void foo(String s, Object... o) {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void matchOnInnerClass() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new UsesMethod<>("B.C foo()"))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new UsesMethod<>("B.C foo()"))),
+                java(
+                        """
               public class A {
                  void test() {
                      new B.C().foo();
                  }
               }
               """,
-            """
+                        """
               /*~~>*/public class A {
                  void test() {
                      new B.C().foo();
                  }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               public class B {
                  public static class C {
                      public void foo() {}
                  }
               }
               """
-          )
+                )
         );
     }
 }

@@ -45,7 +45,7 @@ public class Assertions {
     }
 
     public static SourceSpecs json(@Language("json") @Nullable String before, @Language("json") @Nullable String after,
-                             Consumer<SourceSpec<Json.Document>> spec) {
+            Consumer<SourceSpec<Json.Document>> spec) {
         SourceSpec<Json.Document> json = new SourceSpec<>(Json.Document.class, null, JsonParser.builder(), before, s -> after);
         spec.accept(json);
         return json;

@@ -32,8 +32,8 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
     @Test
     void notApplicable() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -42,7 +42,7 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -50,8 +50,8 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
     @Test
     void removeSingleDuplicate() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -79,7 +79,7 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -102,15 +102,15 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void preservesComments() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -141,7 +141,7 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -167,15 +167,15 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void removeMultipleDuplicates() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -208,7 +208,7 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -231,15 +231,15 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void removeDependencyWithDifferentVersion() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -277,15 +277,15 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void keepDependencyWithClassifier() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -308,15 +308,15 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void keepDependencyWithType() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -339,15 +339,15 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void keepDependencyManagementWithType() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
                 <project>
               <modelVersion>4.0.0</modelVersion>
               
@@ -372,15 +372,15 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
               </dependencyManagement>
                </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void keepDependencyWithDifferentScope() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -404,15 +404,15 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void removeDuplicatedDependencyWithImportScope() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
               
@@ -440,7 +440,7 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """,
-            """
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
               
@@ -461,15 +461,15 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void removeDependencyWithDefaultType() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -492,7 +492,7 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -509,7 +509,7 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -517,8 +517,8 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3832")
     void retainDuplicateManagedDependenciesWithDifferentClassifier() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -550,7 +550,7 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
                 </dependencyManagement>
               </project>
               """
-          )
+                )
         );
     }
 }

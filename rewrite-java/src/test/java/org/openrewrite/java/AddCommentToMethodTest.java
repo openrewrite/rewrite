@@ -30,62 +30,62 @@ class AddCommentToMethodTest implements RewriteTest {
     @Test
     void addSingleLineComment() {
         rewriteRun(
-          spec -> spec.recipe(new AddCommentToMethod(SHORT_COMMENT, "foo.Foo bar(..)", false)),
-          //language=java
-          java(
-            """
+                spec -> spec.recipe(new AddCommentToMethod(SHORT_COMMENT, "foo.Foo bar(..)", false)),
+                //language=java
+                java(
+                        """
               package foo;
               public class Foo {
                   public void bar(String arg) {}
               }
               """,
-            """
+                        """
               package foo;
               public class Foo {
                   // Short comment to add
                   public void bar(String arg) {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void addLongComment() {
         rewriteRun(
-          spec -> spec.recipe(new AddCommentToMethod(LONG_COMMENT, "foo.Foo bar(..)", true)),
-          //language=java
-          java(
-            """
+                spec -> spec.recipe(new AddCommentToMethod(LONG_COMMENT, "foo.Foo bar(..)", true)),
+                //language=java
+                java(
+                        """
               package foo;
               public class Foo {
                   public void bar(String arg) {}
               }
               """,
-            """
+                        """
               package foo;
               public class Foo {
                   /* This is a very long comment to add. The comment uses multiline comments, not single line.*/
                   public void bar(String arg) {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void addMultilineComment() {
         rewriteRun(
-          spec -> spec.recipe(new AddCommentToMethod("\nLine 1\nLine 2\nLine 3\n", "foo.Foo bar(..)", true)),
-          //language=java
-          java(
-            """
+                spec -> spec.recipe(new AddCommentToMethod("\nLine 1\nLine 2\nLine 3\n", "foo.Foo bar(..)", true)),
+                //language=java
+                java(
+                        """
               package foo;
               public class Foo {
                   public void bar(String arg) {}
               }
               """,
-            """
+                        """
               package foo;
               public class Foo {
                   /*
@@ -96,40 +96,40 @@ class AddCommentToMethodTest implements RewriteTest {
                   public void bar(String arg) {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void addMultilineCommentOnSingleLine() {
         rewriteRun(
-          spec -> spec.recipe(new AddCommentToMethod("\nLine 1\nLine 2\nLine 3\n", "foo.Foo bar(..)", false)),
-          //language=java
-          java(
-            """
+                spec -> spec.recipe(new AddCommentToMethod("\nLine 1\nLine 2\nLine 3\n", "foo.Foo bar(..)", false)),
+                //language=java
+                java(
+                        """
               package foo;
               public class Foo {
                   public void bar(String arg) {}
               }
               """,
-            """
+                        """
               package foo;
               public class Foo {
                   // Line 1 Line 2 Line 3\s
                   public void bar(String arg) {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void addSingleLineCommentToExistingSingleLineComments() {
         rewriteRun(
-          spec -> spec.recipe(new AddCommentToMethod(SHORT_COMMENT, "foo.Foo bar(..)", false)),
-          //language=java
-          java(
-            """
+                spec -> spec.recipe(new AddCommentToMethod(SHORT_COMMENT, "foo.Foo bar(..)", false)),
+                //language=java
+                java(
+                        """
               package foo;
               public class Foo {
                   // Existing single line comment
@@ -137,7 +137,7 @@ class AddCommentToMethodTest implements RewriteTest {
                   public void bar(String arg) {}
               }
               """,
-            """
+                        """
               package foo;
               public class Foo {
                   // Existing single line comment
@@ -146,17 +146,17 @@ class AddCommentToMethodTest implements RewriteTest {
                   public void bar(String arg) {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void addSingleLineCommentToExistingMultiLineComment() {
         rewriteRun(
-          spec -> spec.recipe(new AddCommentToMethod(SHORT_COMMENT, "foo.Foo bar(..)", false)),
-          //language=java
-          java(
-            """
+                spec -> spec.recipe(new AddCommentToMethod(SHORT_COMMENT, "foo.Foo bar(..)", false)),
+                //language=java
+                java(
+                        """
               package foo;
               public class Foo {
                   /**
@@ -166,7 +166,7 @@ class AddCommentToMethodTest implements RewriteTest {
                   public void bar(String arg) {}
               }
               """,
-            """
+                        """
               package foo;
               public class Foo {
                   /**
@@ -177,17 +177,17 @@ class AddCommentToMethodTest implements RewriteTest {
                   public void bar(String arg) {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void addLongCommentToExistingMultiLineComment() {
         rewriteRun(
-          spec -> spec.recipe(new AddCommentToMethod(LONG_COMMENT, "foo.Foo bar(..)", true)),
-          //language=java
-          java(
-            """
+                spec -> spec.recipe(new AddCommentToMethod(LONG_COMMENT, "foo.Foo bar(..)", true)),
+                //language=java
+                java(
+                        """
               package foo;
               public class Foo {
                   /**
@@ -197,7 +197,7 @@ class AddCommentToMethodTest implements RewriteTest {
                   public void bar(String arg) {}
               }
               """,
-            """
+                        """
               package foo;
               public class Foo {
                   /**
@@ -208,7 +208,7 @@ class AddCommentToMethodTest implements RewriteTest {
                   public void bar(String arg) {}
               }
               """
-          )
+                )
         );
     }
 }

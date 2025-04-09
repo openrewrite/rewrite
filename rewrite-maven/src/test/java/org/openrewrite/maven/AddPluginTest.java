@@ -34,18 +34,18 @@ class AddPluginTest implements RewriteTest {
     @Test
     void addPluginWithConfiguration() {
         rewriteRun(
-          spec -> spec.recipe(new AddPlugin("org.openrewrite.maven", "rewrite-maven-plugin", "100.0",
-            "<configuration>\n<activeRecipes>\n<recipe>io.moderne.FindTest</recipe>\n</activeRecipes>\n</configuration>",
-            null, null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new AddPlugin("org.openrewrite.maven", "rewrite-maven-plugin", "100.0",
+                        "<configuration>\n<activeRecipes>\n<recipe>io.moderne.FindTest</recipe>\n</activeRecipes>\n</configuration>",
+                        null, null, null)),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -66,15 +66,15 @@ class AddPluginTest implements RewriteTest {
                 </build>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void addPluginWithDependencies() {
         rewriteRun(
-          spec -> spec.recipe(new AddPlugin("org.openrewrite.maven", "rewrite-maven-plugin", "100.0", null,
-            """
+                spec -> spec.recipe(new AddPlugin("org.openrewrite.maven", "rewrite-maven-plugin", "100.0", null,
+                        """
                   <dependencies>
                       <dependency>
                           <groupId>org.openrewrite.maven</groupId>
@@ -83,15 +83,15 @@ class AddPluginTest implements RewriteTest {
                       </dependency>
                   </dependencies>
               """, null, null)),
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -114,15 +114,15 @@ class AddPluginTest implements RewriteTest {
                 </build>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void addPluginWithExecutions() {
         rewriteRun(
-          spec -> spec.recipe(new AddPlugin("org.openrewrite.maven", "rewrite-maven-plugin", "100.0", null, null,
-            """
+                spec -> spec.recipe(new AddPlugin("org.openrewrite.maven", "rewrite-maven-plugin", "100.0", null, null,
+                        """
                   <executions>
                     <execution>
                       <id>xjc</id>
@@ -139,15 +139,15 @@ class AddPluginTest implements RewriteTest {
                     </execution>
                   </executions>
               """, null)),
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -178,22 +178,22 @@ class AddPluginTest implements RewriteTest {
                 </build>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void addPlugin() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -209,15 +209,15 @@ class AddPluginTest implements RewriteTest {
                 </build>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void updatePluginVersion() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -233,7 +233,7 @@ class AddPluginTest implements RewriteTest {
                 </build>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -249,23 +249,23 @@ class AddPluginTest implements RewriteTest {
                 </build>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void addPluginWithoutVersion() {
         rewriteRun(
-          spec -> spec.recipe(new AddPlugin("org.openrewrite.maven", "rewrite-maven-plugin", null, null, null, null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new AddPlugin("org.openrewrite.maven", "rewrite-maven-plugin", null, null, null, null, null)),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -280,23 +280,23 @@ class AddPluginTest implements RewriteTest {
                 </build>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void addPluginWithMatchingFilePattern() {
         rewriteRun(
-          spec -> spec.recipe(new AddPlugin("org.openrewrite.maven", "rewrite-maven-plugin", null, null, null, null, "dir/pom.xml")),
-          pomXml(
-            """
+                spec -> spec.recipe(new AddPlugin("org.openrewrite.maven", "rewrite-maven-plugin", null, null, null, null, "dir/pom.xml")),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -311,34 +311,34 @@ class AddPluginTest implements RewriteTest {
                 </build>
               </project>
               """,
-            spec -> spec.path("dir/pom.xml")
-          )
+                        spec -> spec.path("dir/pom.xml")
+                )
         );
     }
 
     @Test
     void addPluginWithNonMatchingFilePattern() {
         rewriteRun(
-          spec -> spec.recipe(new AddPlugin("org.openrewrite.maven", "rewrite-maven-plugin", null, null, null, null, "dir/pom.xml")),
-          pomXml(
-            """
+                spec -> spec.recipe(new AddPlugin("org.openrewrite.maven", "rewrite-maven-plugin", null, null, null, null, "dir/pom.xml")),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
               </project>
               """,
-            spec -> spec.path("pom.xml")
-          )
+                        spec -> spec.path("pom.xml")
+                )
         );
     }
 
     @Test
     void addPluginWithExistingPlugin() {
         rewriteRun(
-          spec -> spec.recipe(new AddPlugin("org.springframework.boot", "spring-boot-maven-plugin", "3.1.5", null, null, null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new AddPlugin("org.springframework.boot", "spring-boot-maven-plugin", "3.1.5", null, null, null, null)),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -358,17 +358,17 @@ class AddPluginTest implements RewriteTest {
                 </build>
               </project>
               """,
-            spec -> spec.path("pom.xml")
-          )
+                        spec -> spec.path("pom.xml")
+                )
         );
     }
 
     @Test
     void addPluginOnlyToRootPom() {
         rewriteRun(
-          spec -> spec.recipe(new AddPlugin("org.springframework.boot", "spring-boot-maven-plugin", "3.1.5", null, null, null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new AddPlugin("org.springframework.boot", "spring-boot-maven-plugin", "3.1.5", null, null, null, null)),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -379,7 +379,7 @@ class AddPluginTest implements RewriteTest {
                 </build>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -395,11 +395,11 @@ class AddPluginTest implements RewriteTest {
                 </build>
               </project>
               """,
-            spec -> spec.path("pom.xml")
-          ),
-          mavenProject("my-app-child",
-            pomXml(
-              """
+                        spec -> spec.path("pom.xml")
+                ),
+                mavenProject("my-app-child",
+                        pomXml(
+                                """
                 <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app-child</artifactId>
@@ -421,9 +421,9 @@ class AddPluginTest implements RewriteTest {
     @Test
     void addPluginOnlyToRootPomWithParent() {
         rewriteRun(
-          spec -> spec.recipe(new AddPlugin("org.springframework.boot", "spring-boot-maven-plugin", "3.1.5", null, null, null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new AddPlugin("org.springframework.boot", "spring-boot-maven-plugin", "3.1.5", null, null, null, null)),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -439,7 +439,7 @@ class AddPluginTest implements RewriteTest {
                 </build>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -460,11 +460,11 @@ class AddPluginTest implements RewriteTest {
                 </build>
               </project>
               """,
-            spec -> spec.path("pom.xml")
-          ),
-          mavenProject("my-app-child",
-            pomXml(
-              """
+                        spec -> spec.path("pom.xml")
+                ),
+                mavenProject("my-app-child",
+                        pomXml(
+                                """
                 <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app-child</artifactId>

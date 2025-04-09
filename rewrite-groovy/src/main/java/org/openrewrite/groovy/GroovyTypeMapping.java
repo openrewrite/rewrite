@@ -100,7 +100,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
             JavaType.FullyQualified owner = TypeUtils.asFullyQualified(type(node.getOuterClass()));
 
             List<JavaType.Variable> fields = null;
-            if(node.getFields().size() > 0) {
+            if (node.getFields().size() > 0) {
                 fields = new ArrayList<>(node.getFields().size());
                 for (FieldNode field : node.getFields()) {
                     if (!field.isSynthetic()) {
@@ -110,7 +110,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
             }
 
             List<JavaType.Method> methods = null;
-            if(node.getAllDeclaredMethods().size() > 0) {
+            if (node.getAllDeclaredMethods().size() > 0) {
                 methods = new ArrayList<>(node.getAllDeclaredMethods().size());
                 for (MethodNode method : node.getAllDeclaredMethods()) {
                     if (!method.isSynthetic()) {
@@ -245,7 +245,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
         }
 
         List<JavaType.FullyQualified> thrownExceptions = null;
-        if(node.getExceptions() != null) {
+        if (node.getExceptions() != null) {
             for (ClassNode e : node.getExceptions()) {
                 thrownExceptions = new ArrayList<>(node.getExceptions().length);
                 JavaType.FullyQualified qualified = TypeUtils.asFullyQualified(type(e));

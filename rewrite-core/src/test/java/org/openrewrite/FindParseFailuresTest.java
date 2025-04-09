@@ -39,26 +39,26 @@ class FindParseFailuresTest implements RewriteTest {
     void findParseFailures() {
         ParseExceptionResult per = ParseExceptionResult.build(PlainTextParser.class, new RuntimeException("boom"), null);
         rewriteRun(
-          spec -> spec.dataTable(ParseFailures.Row.class, rows -> {
-              assertThat(rows).hasSize(1);
-              ParseFailures.Row row = rows.get(0);
-              assertThat(row.getParser()).isEqualTo("PlainTextParser");
-              assertThat(row.getSourcePath()).isEqualTo("file.txt");
-              assertThat(row.getExceptionType()).isEqualTo("RuntimeException");
-              assertThat(row.getSnippet()).isEqualTo("hello");
-          }),
-          text(
-            "hello world!",
-            "~~(%s)~~>hello world!".formatted(per.getMessage()),
-            spec -> spec
-              .mapBeforeRecipe(pt -> pt
-                .withSnippets(List.of(new PlainText.Snippet(
-                  Tree.randomId(),
-                  new Markers(Tree.randomId(), List.of(per)),
-                  pt.getText())))
-                .withText("")
-              )
-          )
+                spec -> spec.dataTable(ParseFailures.Row.class, rows -> {
+                    assertThat(rows).hasSize(1);
+                    ParseFailures.Row row = rows.get(0);
+                    assertThat(row.getParser()).isEqualTo("PlainTextParser");
+                    assertThat(row.getSourcePath()).isEqualTo("file.txt");
+                    assertThat(row.getExceptionType()).isEqualTo("RuntimeException");
+                    assertThat(row.getSnippet()).isEqualTo("hello");
+                }),
+                text(
+                        "hello world!",
+                        "~~(%s)~~>hello world!".formatted(per.getMessage()),
+                        spec -> spec
+                                .mapBeforeRecipe(pt -> pt
+                                                .withSnippets(List.of(new PlainText.Snippet(
+                                                        Tree.randomId(),
+                                                        new Markers(Tree.randomId(), List.of(per)),
+                                                        pt.getText())))
+                                                .withText("")
+                                )
+                )
         );
     }
 }

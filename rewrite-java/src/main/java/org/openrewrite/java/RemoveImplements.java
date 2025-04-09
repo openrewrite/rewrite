@@ -42,7 +42,7 @@ public class RemoveImplements extends Recipe {
     @Override
     public String getDescription() {
         return "Removes `implements` clauses from classes implementing the specified interface. " +
-               "Removes `@Overrides` annotations from methods which no longer override anything.";
+                "Removes `@Overrides` annotations from methods which no longer override anything.";
     }
 
     @Option(displayName = "Interface Type",
@@ -52,7 +52,7 @@ public class RemoveImplements extends Recipe {
 
     @Option(displayName = "Filter",
             description = "Only apply the interface removal to classes with fully qualified names that begin with this filter. " +
-                          "`null` or empty matches all classes.",
+                    "`null` or empty matches all classes.",
             example = "com.yourorg.",
             required = false)
     @Nullable
@@ -79,7 +79,7 @@ public class RemoveImplements extends Recipe {
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration cd, ExecutionContext ctx) {
                 if (annotationService == null) {
-                     annotationService = service(AnnotationService.class);
+                    annotationService = service(AnnotationService.class);
                 }
                 if (!(cd.getType() instanceof JavaType.Class) || cd.getImplements() == null) {
                     return super.visitClassDeclaration(cd, ctx);

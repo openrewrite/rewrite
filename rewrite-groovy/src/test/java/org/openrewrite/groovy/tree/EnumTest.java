@@ -27,14 +27,14 @@ class EnumTest implements RewriteTest {
     @Test
     void enumDefinition() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               enum A {
                   B, C,
                   D;
               }
               """
-          )
+                )
         );
     }
 
@@ -42,15 +42,15 @@ class EnumTest implements RewriteTest {
     @Test
     void innerEnum() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               class A {
                   enum B {
                       C
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -58,8 +58,8 @@ class EnumTest implements RewriteTest {
     @Test
     void enumWithAnnotations() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               enum Test {
                   @Deprecated(since = "now")
                   One,
@@ -68,7 +68,7 @@ class EnumTest implements RewriteTest {
                   Two;
               }
               """
-          )
+                )
         );
     }
 
@@ -76,8 +76,8 @@ class EnumTest implements RewriteTest {
     @Test
     void anonymousClassInitializer() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               enum A {
                   A1(1) {
                       @Deprecated
@@ -95,7 +95,7 @@ class EnumTest implements RewriteTest {
                   abstract void foo();
               }
               """
-          )
+                )
         );
     }
 
@@ -103,8 +103,8 @@ class EnumTest implements RewriteTest {
     @Test
     void enumConstructor() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               class Outer {
                   enum A {
                       A1(1);
@@ -119,7 +119,7 @@ class EnumTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -127,13 +127,13 @@ class EnumTest implements RewriteTest {
     @Test
     void noArguments() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               enum A {
                   A1, A2();
               }
               """
-          )
+                )
         );
     }
 
@@ -141,8 +141,8 @@ class EnumTest implements RewriteTest {
     @Test
     void enumWithParameters() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               enum A {
                   ONE(1),
                   TWO(2);
@@ -150,7 +150,7 @@ class EnumTest implements RewriteTest {
                   A(int n) {}
               }
               """
-          )
+                )
         );
     }
 
@@ -158,9 +158,9 @@ class EnumTest implements RewriteTest {
     @Test
     void enumWithoutParameters() {
         rewriteRun(
-          groovy(
-            "enum A { ONE, TWO }"
-          )
+                groovy(
+                        "enum A { ONE, TWO }"
+                )
         );
     }
 
@@ -168,9 +168,9 @@ class EnumTest implements RewriteTest {
     @Test
     void enumUnnecessarilyTerminatedWithSemicolon() {
         rewriteRun(
-          groovy(
-            "enum A { ONE ; }"
-          )
+                groovy(
+                        "enum A { ONE ; }"
+                )
         );
     }
 
@@ -178,9 +178,9 @@ class EnumTest implements RewriteTest {
     @Test
     void enumWithEmptyParameters() {
         rewriteRun(
-          groovy(
-            "enum A { ONE ( ), TWO ( ) }"
-          )
+                groovy(
+                        "enum A { ONE ( ), TWO ( ) }"
+                )
         );
     }
 }

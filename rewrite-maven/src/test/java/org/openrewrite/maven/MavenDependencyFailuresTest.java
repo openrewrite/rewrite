@@ -43,17 +43,17 @@ class MavenDependencyFailuresTest implements RewriteTest {
     @Test
     void unresolvableMavenMetadata() {
         rewriteRun(
-          spec -> spec
-            .recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null))
-            .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
-              .setRepositories(List.of(MavenRepository.builder().id("jenkins").uri("https://repo.jenkins-ci.org/public").build())))
-            .recipeExecutionContext(new InMemoryExecutionContext())
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1)
-            .dataTable(MavenMetadataFailures.Row.class, failures ->
-                assertThat(failures.stream().map(MavenMetadataFailures.Row::getMavenRepositoryUri).distinct()).containsExactlyInAnyOrder("https://repo.maven.apache.org/maven2")),
-          pomXml(
-            """
+                spec -> spec
+                        .recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null))
+                        .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
+                                .setRepositories(List.of(MavenRepository.builder().id("jenkins").uri("https://repo.jenkins-ci.org/public").build())))
+                        .recipeExecutionContext(new InMemoryExecutionContext())
+                        .cycles(1)
+                        .expectedCyclesThatMakeChanges(1)
+                        .dataTable(MavenMetadataFailures.Row.class, failures ->
+                                assertThat(failures.stream().map(MavenMetadataFailures.Row::getMavenRepositoryUri).distinct()).containsExactlyInAnyOrder("https://repo.maven.apache.org/maven2")),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -72,12 +72,12 @@ class MavenDependencyFailuresTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            spec -> spec.after(after -> {
-                //There should be two errors (one for each failed metadata download)
-                assertThat(after.split("Unable to download metadata")).hasSize(3);
-                return after;
-            })
-          )
+                        spec -> spec.after(after -> {
+                            //There should be two errors (one for each failed metadata download)
+                            assertThat(after.split("Unable to download metadata")).hasSize(3);
+                            return after;
+                        })
+                )
         );
     }
 
@@ -85,15 +85,15 @@ class MavenDependencyFailuresTest implements RewriteTest {
     @Test
     void unresolvableParent() { // Dad said he was heading to the corner store for cigarettes, and hasn't been resolvable for the past 20 years :'(
         rewriteRun(
-          spec -> spec
-            .recipe(new UpgradeParentVersion("*", "*", "latest.patch", null, null))
-            .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
-              .setRepositories(List.of(MavenRepository.builder().id("jenkins").uri("https://repo.jenkins-ci.org/public").knownToExist(true).build())))
-            .recipeExecutionContext(new InMemoryExecutionContext())
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1),
-          pomXml(
-            """
+                spec -> spec
+                        .recipe(new UpgradeParentVersion("*", "*", "latest.patch", null, null))
+                        .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
+                                .setRepositories(List.of(MavenRepository.builder().id("jenkins").uri("https://repo.jenkins-ci.org/public").knownToExist(true).build())))
+                        .recipeExecutionContext(new InMemoryExecutionContext())
+                        .cycles(1)
+                        .expectedCyclesThatMakeChanges(1),
+                pomXml(
+                        """
               <project>
                 <parent>
                     <groupId>org.jenkins-ci.plugins</groupId>
@@ -105,7 +105,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
                 <version>1</version>
               </project>
               """,
-            """
+                        """
               <project>
                 <!--~~(org.jenkins-ci.plugins:credentials failed. Unable to download metadata. Tried repositories:
               https://repo.maven.apache.org/maven2: HTTP 404)~~>--><parent>
@@ -118,7 +118,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -133,8 +133,8 @@ class MavenDependencyFailuresTest implements RewriteTest {
         Path localPom = localRepository.resolve("com/bad/bad-artifact/1/bad-artifact-1.pom");
         assertThat(localPom.getParent().toFile().mkdirs()).isTrue();
         Files.writeString(localPom,
-          //language=xml
-          """
+                //language=xml
+                """
              <project>
                <groupId>com.bad</groupId>
                <artifactId>bad-artifact</artifactId>
@@ -146,22 +146,22 @@ class MavenDependencyFailuresTest implements RewriteTest {
         Files.writeString(localJar, "dummy");
 
         MavenRepository mavenLocal = MavenRepository.builder().id("local").uri(localRepository.toUri().toString())
-          .snapshots(false).knownToExist(true).build();
+                .snapshots(false).knownToExist(true).build();
 
         rewriteRun(
-          spec -> spec
-            .recipe(updateModel())
-            .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
-              .setLocalRepository(mavenLocal)
-            )
-            .recipeExecutionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
-              .setLocalRepository(mavenLocal)
-              .setPomCache(new InMemoryMavenPomCache())
-            )
-            .cycles(1)
-            .expectedCyclesThatMakeChanges(1),
-          pomXml(
-            """
+                spec -> spec
+                        .recipe(updateModel())
+                        .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
+                                .setLocalRepository(mavenLocal)
+                        )
+                        .recipeExecutionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
+                                .setLocalRepository(mavenLocal)
+                                .setPomCache(new InMemoryMavenPomCache())
+                        )
+                        .cycles(1)
+                        .expectedCyclesThatMakeChanges(1),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -175,7 +175,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -191,11 +191,11 @@ class MavenDependencyFailuresTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            spec -> spec.beforeRecipe(maven -> {
-                // make the local pom bad before running the recipe
-                Files.writeString(localPom,
-                  //language=xml
-                  """
+                        spec -> spec.beforeRecipe(maven -> {
+                            // make the local pom bad before running the recipe
+                            Files.writeString(localPom,
+                                    //language=xml
+                                    """
                      <project>
                        <groupId>com.bad</groupId>
                        <artifactId>bad-artifact</artifactId>
@@ -214,22 +214,22 @@ class MavenDependencyFailuresTest implements RewriteTest {
                        </dependencies>
                      </project>
                     """
-                );
-            })
-          )
+                            );
+                        })
+                )
         );
     }
 
     @Test
     void unresolvableDependency() {
         rewriteRun(
-          spec -> spec.executionContext(new InMemoryExecutionContext())
-            .typeValidationOptions(TypeValidation.builder()
-              // Skip test framework validation that a MavenResolutionResult is present since this tests exercises error handling
-              .dependencyModel(false)
-              .build()),
-          pomXml(
-            """
+                spec -> spec.executionContext(new InMemoryExecutionContext())
+                        .typeValidationOptions(TypeValidation.builder()
+                                // Skip test framework validation that a MavenResolutionResult is present since this tests exercises error handling
+                                .dependencyModel(false)
+                                .build()),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -252,20 +252,20 @@ class MavenDependencyFailuresTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            spec -> spec
-              .afterRecipe(after -> {
-                Optional<ParseExceptionResult> maybeParseException = after.getMarkers().findFirst(ParseExceptionResult.class);
-                assertThat(maybeParseException).hasValueSatisfying(per -> assertThat(per.getMessage()).contains("Unable to download POM: com.google.guava:guava:doesnotexist. Tried repositories"));
-            })
-          )
+                        spec -> spec
+                                .afterRecipe(after -> {
+                                    Optional<ParseExceptionResult> maybeParseException = after.getMarkers().findFirst(ParseExceptionResult.class);
+                                    assertThat(maybeParseException).hasValueSatisfying(per -> assertThat(per.getMessage()).contains("Unable to download POM: com.google.guava:guava:doesnotexist. Tried repositories"));
+                                })
+                )
         );
     }
 
     @Test
     void unreachableRepository() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -285,15 +285,15 @@ class MavenDependencyFailuresTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void oldPomVersionNoDependencyResolution() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <pomVersion>3</pomVersion>
                 <groupId>com.mycompany.app</groupId>
@@ -315,8 +315,8 @@ class MavenDependencyFailuresTest implements RewriteTest {
     @Test
     void unresolvableTransitiveDependencyDueToInvalidPom() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -331,16 +331,16 @@ class MavenDependencyFailuresTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            spec -> spec.afterRecipe(pom ->
-              assertThat(pom.getMarkers().findFirst(MavenResolutionResult.class))
-                .isPresent()
-                .get()
-                .extracting(mrr -> mrr.getDependencies().get(Scope.Compile))
-                .matches(deps -> deps.size() == 1)
-                .extracting(deps -> deps.get(0))
-                .matches(dep -> dep.getGroupId().equals("org.jvnet.staxex") &&
-                  dep.getArtifactId().equals("stax-ex") &&
-                  dep.getVersion().equals("1.0"))))
+                        spec -> spec.afterRecipe(pom ->
+                                assertThat(pom.getMarkers().findFirst(MavenResolutionResult.class))
+                                        .isPresent()
+                                        .get()
+                                        .extracting(mrr -> mrr.getDependencies().get(Scope.Compile))
+                                        .matches(deps -> deps.size() == 1)
+                                        .extracting(deps -> deps.get(0))
+                                        .matches(dep -> dep.getGroupId().equals("org.jvnet.staxex") &&
+                                                dep.getArtifactId().equals("stax-ex") &&
+                                                dep.getVersion().equals("1.0"))))
         );
     }
 

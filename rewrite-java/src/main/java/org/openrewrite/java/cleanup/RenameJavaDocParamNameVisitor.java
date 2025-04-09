@@ -32,8 +32,8 @@ public class RenameJavaDocParamNameVisitor<P> extends JavaIsoVisitor<P> {
     private final String newName;
 
     public RenameJavaDocParamNameVisitor(J.MethodDeclaration targetScope,
-                                         String oldName,
-                                         String newName) {
+            String oldName,
+            String newName) {
         String methodPattern = MethodMatcher.methodPattern(targetScope);
         this.methodMatcher = new MethodMatcher(methodPattern);
         this.oldName = oldName;
@@ -60,7 +60,7 @@ public class RenameJavaDocParamNameVisitor<P> extends JavaIsoVisitor<P> {
         private final String newName;
 
         public RenameParamVisitor(String oldName,
-                                  String newName) {
+                String newName) {
             super(new JavaVisitor<>());
             this.oldName = oldName;
             this.newName = newName;

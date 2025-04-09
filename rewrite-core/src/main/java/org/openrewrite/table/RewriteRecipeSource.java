@@ -28,7 +28,7 @@ public class RewriteRecipeSource extends DataTable<RewriteRecipeSource.Row> {
         super(recipe,
                 "Rewrite recipe source code",
                 "This table contains the source code of recipes along with their metadata " +
-                "for use in an experiment fine-tuning large language models to produce more recipes."
+                        "for use in an experiment fine-tuning large language models to produce more recipes."
         );
     }
 
@@ -41,7 +41,7 @@ public class RewriteRecipeSource extends DataTable<RewriteRecipeSource.Row> {
         String description;
 
         @Column(displayName = "Recipe type", description = "Differentiate between Java and YAML recipes, as they may be " +
-                                                           "two independent data sets used in LLM fine-tuning.")
+                "two independent data sets used in LLM fine-tuning.")
         RecipeType recipeType;
 
         @Column(displayName = "Recipe source code", description = "The full source code of the recipe.")

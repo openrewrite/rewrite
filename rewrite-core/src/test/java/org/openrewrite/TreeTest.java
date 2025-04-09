@@ -31,22 +31,22 @@ class TreeTest implements RewriteTest {
     @Test
     void customMarkerPrinting() {
         rewriteRun(
-          text("hello",
-            spec -> spec.afterRecipe(pt -> {
-                String printed = Markup.info(pt, "jon").printAll(new PrintOutputCapture<>(0,
-                  new PrintOutputCapture.MarkerPrinter() {
-                      @Override
-                      public String afterSyntax(Marker marker, Cursor cursor, UnaryOperator<String> commentWrapper) {
-                          if (marker instanceof Markup.Info markup) {
-                              return " " + requireNonNull(markup.getMessage());
-                          }
-                          return "";
-                      }
-                  })
-                );
-                assertThat(printed).isEqualTo("hello jon");
-            })
-          )
+                text("hello",
+                        spec -> spec.afterRecipe(pt -> {
+                            String printed = Markup.info(pt, "jon").printAll(new PrintOutputCapture<>(0,
+                                    new PrintOutputCapture.MarkerPrinter() {
+                                        @Override
+                                        public String afterSyntax(Marker marker, Cursor cursor, UnaryOperator<String> commentWrapper) {
+                                            if (marker instanceof Markup.Info markup) {
+                                                return " " + requireNonNull(markup.getMessage());
+                                            }
+                                            return "";
+                                        }
+                                    })
+                            );
+                            assertThat(printed).isEqualTo("hello jon");
+                        })
+                )
         );
     }
 }

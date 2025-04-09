@@ -52,7 +52,7 @@ public interface SourceSpecs extends Iterable<SourceSpec<?>> {
     }
 
     static SourceSpecs other(@Nullable String before, @Nullable String after,
-                             Consumer<SourceSpec<Quark>> spec) {
+            Consumer<SourceSpec<Quark>> spec) {
         SourceSpec<Quark> quark = new SourceSpec<>(Quark.class, null, QuarkParser.builder(), before, s -> after);
         spec.accept(quark);
         return quark;
@@ -75,8 +75,8 @@ public interface SourceSpecs extends Iterable<SourceSpec<?>> {
     }
 
     static SourceSpecs text(@Nullable String before, @Nullable String after,
-                            Consumer<SourceSpec<PlainText>> spec) {
-        SourceSpec<PlainText> text = new SourceSpec<>(PlainText.class, null, PlainTextParser.builder(), before, s-> after);
+            Consumer<SourceSpec<PlainText>> spec) {
+        SourceSpec<PlainText> text = new SourceSpec<>(PlainText.class, null, PlainTextParser.builder(), before, s -> after);
         spec.accept(text);
         return text;
     }

@@ -24,7 +24,7 @@ public class CountLinesVisitor extends ProtoVisitor<AtomicInteger> {
 
     @Override
     public Space visitSpace(Space space, AtomicInteger count) {
-        if(space.getWhitespace().contains("\n")) {
+        if (space.getWhitespace().contains("\n")) {
             count.incrementAndGet();
         }
         return super.visitSpace(space, count);

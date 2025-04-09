@@ -27,64 +27,64 @@ class RemoveAnnotationAttributeTest implements RewriteTest {
     @Test
     void removeNamedAttribute() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveAnnotationAttribute("java.lang.Deprecated", "since")),
-          java(
-            """
+                spec -> spec.recipe(new RemoveAnnotationAttribute("java.lang.Deprecated", "since")),
+                java(
+                        """
               @Deprecated(since = "1.0", forRemoval = true)
               class A {}
               """,
-            """
+                        """
               @Deprecated(forRemoval = true)
               class A {}
               """
-          )
+                )
         );
     }
 
     @Test
     void removeLastAttribute() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveAnnotationAttribute("java.lang.Deprecated", "since")),
-          java(
-            """
+                spec -> spec.recipe(new RemoveAnnotationAttribute("java.lang.Deprecated", "since")),
+                java(
+                        """
               @Deprecated(since = "1.0")
               class A {}
               """,
-            """
+                        """
               @Deprecated
               class A {}
               """
-          )
+                )
         );
     }
 
     @Test
     void doNotChangeIfNameDoesNotMatch() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveAnnotationAttribute("java.lang.Deprecated", "forRemoval")),
-          java(
-            """
+                spec -> spec.recipe(new RemoveAnnotationAttribute("java.lang.Deprecated", "forRemoval")),
+                java(
+                        """
               @Deprecated(since = "1.0")
               class A {}
               """
-          )
+                )
         );
     }
 
     @Test
     void removeValueAttribute() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveAnnotationAttribute("java.lang.SuppressWarnings", "value")),
-          java(
-            """
+                spec -> spec.recipe(new RemoveAnnotationAttribute("java.lang.SuppressWarnings", "value")),
+                java(
+                        """
               @SuppressWarnings({"foo", "bar"})
               class A {}
               """,
-            """
+                        """
               @SuppressWarnings
               class A {}
               """
-          )
+                )
         );
     }
 }

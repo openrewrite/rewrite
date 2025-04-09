@@ -39,7 +39,7 @@ public class ChangeMethodTargetToStatic extends Recipe {
      */
     @Option(displayName = "Method pattern",
             description = "A method pattern that is used to find matching method invocations. " +
-                          "The original method call may or may not be a static method invocation.",
+                    "The original method call may or may not be a static method invocation.",
             example = "com.google.common.collect.ImmutableSet of(..)")
     String methodPattern;
 
@@ -63,14 +63,14 @@ public class ChangeMethodTargetToStatic extends Recipe {
 
     @Option(displayName = "Match unknown types",
             description = "When enabled, include method invocations which appear to match if full type information is missing. " +
-                          "Using matchUnknownTypes can improve recipe resiliency for an AST with missing type information, but " +
-                          "also increases the risk of false-positive matches on unrelated method invocations.",
+                    "Using matchUnknownTypes can improve recipe resiliency for an AST with missing type information, but " +
+                    "also increases the risk of false-positive matches on unrelated method invocations.",
             required = false)
     @Nullable
     Boolean matchUnknownTypes;
 
     public ChangeMethodTargetToStatic(String methodPattern, String fullyQualifiedTargetTypeName,
-                                      @Nullable String returnType, @Nullable Boolean matchOverrides) {
+            @Nullable String returnType, @Nullable Boolean matchOverrides) {
         this(methodPattern, fullyQualifiedTargetTypeName, returnType, matchOverrides, false);
     }
 
@@ -118,7 +118,7 @@ public class ChangeMethodTargetToStatic extends Recipe {
             boolean isSameReceiverType = select != null && TypeUtils.isOfClassType(select.getType(), fullyQualifiedTargetTypeName);
             boolean calledOnTargetType = select instanceof J.Identifier && ((J.Identifier) select).getFieldType() == null;
             if ((!isStatic || !isSameReceiverType || !calledOnTargetType) &&
-                methodMatcher.matches(method, matchUnknownTypes)) {
+                    methodMatcher.matches(method, matchUnknownTypes)) {
                 JavaType.Method transformedType = null;
                 if (method.getMethodType() != null) {
                     maybeRemoveImport(method.getMethodType().getDeclaringType());

@@ -27,44 +27,44 @@ class FindInheritedFieldsTest implements RewriteTest {
     @Test
     void findInheritedField() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.*;
               public class A {
                  protected List<?> list;
                  private Set<?> set;
               }
               """
-          ),
-          java(
-            "public class B extends A { }",
-            spec -> spec.afterRecipe(cu -> {
-                assertThat(FindInheritedFields.find(cu.getClasses().get(0), "java.util.List").stream()
-                  .map(JavaType.Variable::getName)).containsExactly("list");
-                // the Set field is not considered to be inherited because it is private
-                assertThat(FindInheritedFields.find(cu.getClasses().get(0), "java.util.Set")).isEmpty();
-            })
-          )
+                ),
+                java(
+                        "public class B extends A { }",
+                        spec -> spec.afterRecipe(cu -> {
+                            assertThat(FindInheritedFields.find(cu.getClasses().get(0), "java.util.List").stream()
+                                    .map(JavaType.Variable::getName)).containsExactly("list");
+                            // the Set field is not considered to be inherited because it is private
+                            assertThat(FindInheritedFields.find(cu.getClasses().get(0), "java.util.Set")).isEmpty();
+                        })
+                )
         );
     }
 
     @Test
     void findArrayOfType() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                  String[] s;
               }
               """
-          ),
-          java(
-            "public class B extends A {}",
-            spec -> spec.afterRecipe(cu -> {
-                assertThat(FindInheritedFields.find(cu.getClasses().get(0), "java.lang.String").stream()
-                  .map(JavaType.Variable::getName)).containsExactly("s");
-            })
-          )
+                ),
+                java(
+                        "public class B extends A {}",
+                        spec -> spec.afterRecipe(cu -> {
+                            assertThat(FindInheritedFields.find(cu.getClasses().get(0), "java.lang.String").stream()
+                                    .map(JavaType.Variable::getName)).containsExactly("s");
+                        })
+                )
         );
     }
 }

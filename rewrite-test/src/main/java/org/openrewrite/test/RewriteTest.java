@@ -158,9 +158,9 @@ public interface RewriteTest extends SourceSpecs {
                 testMethodSpec.recipe;
 
         if (!(recipe instanceof AdHocRecipe) && !(recipe instanceof AdHocScanningRecipe) &&
-            !(recipe instanceof CompositeRecipe) && !(recipe.equals(Recipe.noop())) &&
-            testClassSpec.serializationValidation &&
-            testMethodSpec.serializationValidation) {
+                !(recipe instanceof CompositeRecipe) && !(recipe.equals(Recipe.noop())) &&
+                testClassSpec.serializationValidation &&
+                testMethodSpec.serializationValidation) {
             RecipeSerializer recipeSerializer = new RecipeSerializer();
             assertThat(recipeSerializer.read(recipeSerializer.write(recipe)))
                     .as("Recipe must be serializable/deserializable")
@@ -312,16 +312,16 @@ public interface RewriteTest extends SourceSpecs {
                                 StringUtils.readFully(input.getSource(ctx), parser.getCharset(ctx)),
                                 sourceFile.printAll(out.clone()),
                                 "When parsing and printing the source code back to text without modifications, " +
-                                "the printed source didn't match the original source code. This means there is a bug in the " +
-                                "parser implementation itself. Please open an issue to report this, providing a sample of the " +
-                                "code that generated this error for"
+                                        "the printed source didn't match the original source code. This means there is a bug in the " +
+                                        "parser implementation itself. Please open an issue to report this, providing a sample of the " +
+                                        "code that generated this error for"
                         );
                         try {
                             WhitespaceValidationService service = sourceFile.service(WhitespaceValidationService.class);
                             SourceFile whitespaceValidated = (SourceFile) service.getVisitor().visit(sourceFile, ctx);
-                            if(whitespaceValidated != null && whitespaceValidated != sourceFile) {
+                            if (whitespaceValidated != null && whitespaceValidated != sourceFile) {
                                 fail("Source file was parsed into an LST that contains non-whitespace characters in its whitespace. " +
-                                     "This is indicative of a bug in the parser. \n" + whitespaceValidated.printAll());
+                                        "This is indicative of a bug in the parser. \n" + whitespaceValidated.printAll());
                             }
                         } catch (UnsupportedOperationException e) {
                             // Language/parser does not provide whitespace validation and that's OK for now
@@ -372,7 +372,7 @@ public interface RewriteTest extends SourceSpecs {
 
         CursorValidatingExecutionContextView.view(recipeCtx)
                 .setValidateCursorAcyclic(TypeValidation.before(testMethodSpec, testClassSpec)
-                .cursorAcyclic());
+                        .cursorAcyclic());
         RecipeRun recipeRun = recipe.run(
                 lss,
                 recipeCtx,
@@ -434,7 +434,7 @@ public interface RewriteTest extends SourceSpecs {
                         })
                         .collect(Collectors.joining("\n"));
                 fail("Expected a new source file with the source path: " + sourceSpec.getSourcePath() +
-                     "\nAll source file paths, before and after recipe run:\n" + paths);
+                        "\nAll source file paths, before and after recipe run:\n" + paths);
             }
 
             // If the source spec has not defined a source path, look for a result with the exact contents. This logic
@@ -585,9 +585,9 @@ public interface RewriteTest extends SourceSpecs {
 
         Map<Result, Boolean> resultToUnexpected = allResults.stream()
                 .collect(Collectors.toMap(result -> result, result -> result.getBefore() == null &&
-                                                                      !(result.getAfter() instanceof Remote) &&
-                                                                      !expectedNewResults.contains(result) &&
-                                                                      testMethodSpec.afterRecipes.isEmpty()));
+                        !(result.getAfter() instanceof Remote) &&
+                        !expectedNewResults.contains(result) &&
+                        testMethodSpec.afterRecipes.isEmpty()));
         if (resultToUnexpected.values().stream().anyMatch(unexpected -> unexpected)) {
             String paths = resultToUnexpected.entrySet().stream()
                     .map(it -> {
@@ -600,8 +600,8 @@ public interface RewriteTest extends SourceSpecs {
                     })
                     .collect(Collectors.joining("\n"));
             fail("The recipe generated source files the test did not expect.\n" +
-                 "Source file paths before recipe, after recipe, and whether the test expected that result:\n" +
-                 "    before | after | expected\n" + paths);
+                    "Source file paths before recipe, after recipe, and whether the test expected that result:\n" +
+                    "    before | after | expected\n" + paths);
         }
     }
 
@@ -711,7 +711,8 @@ class DelegateSourceFileForDiff implements SourceFile {
         return out.getOut();
     }
 
-    @SuppressWarnings("unused") // Lombok delegate exclude
+    @SuppressWarnings("unused")
+    // Lombok delegate exclude
     interface PrintAll {
         <P> String printAll(PrintOutputCapture<P> out);
     }

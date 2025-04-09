@@ -60,10 +60,10 @@ class JContainerTest {
         var t = new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY);
         var t2 = new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY);
         var trees = JContainer.build(
-            List.of(
-                new JRightPadded<>(t, Space.EMPTY, Markers.EMPTY),
-                new JRightPadded<>(t2, Space.EMPTY, Markers.EMPTY)
-            )
+                List.of(
+                        new JRightPadded<>(t, Space.EMPTY, Markers.EMPTY),
+                        new JRightPadded<>(t2, Space.EMPTY, Markers.EMPTY)
+                )
         );
         assertThat(JContainer.withElements(trees, List.of(t2, t))).isNotSameAs(trees);
     }
@@ -80,6 +80,6 @@ class JContainerTest {
         var t = new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY);
         var trees = JContainer.build(List.of(new JRightPadded<>(t, Space.EMPTY, Markers.EMPTY)));
         assertThat(JContainer.withElements(trees, List.of(t.withPrefix(Space.format(" ")))))
-            .isNotSameAs(trees);
+                .isNotSameAs(trees);
     }
 }

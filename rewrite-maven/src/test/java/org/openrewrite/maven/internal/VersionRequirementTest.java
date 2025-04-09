@@ -30,34 +30,34 @@ class VersionRequirementTest {
     @Test
     void rangeSet() throws MavenDownloadingException {
         assertThat(VersionRequirement.fromVersion("[1,11)", 0).resolve(this::available))
-          .isEqualTo("10");
+                .isEqualTo("10");
     }
 
     @Test
     void multipleSoftRequirements() throws MavenDownloadingException {
         assertThat(VersionRequirement.fromVersion("1", 1).addRequirement("2").resolve(this::available))
-          .isEqualTo("1");
+                .isEqualTo("1");
     }
 
     @Test
     void softRequirementThenHardRequirement() throws MavenDownloadingException {
         assertThat(VersionRequirement.fromVersion("1", 1).addRequirement("[1,11]")
-          .resolve(this::available))
-          .isEqualTo("10");
+                .resolve(this::available))
+                .isEqualTo("10");
     }
 
     @Test
     void hardRequirementThenSoftRequirement() throws MavenDownloadingException {
         assertThat(VersionRequirement.fromVersion("[1,11]", 1).addRequirement("1")
-          .resolve(this::available))
-          .isEqualTo("10");
+                .resolve(this::available))
+                .isEqualTo("10");
     }
 
     @Test
     void nearestRangeWins() throws MavenDownloadingException {
         assertThat(VersionRequirement.fromVersion("[1,2]", 1).addRequirement("[9,10]")
-          .resolve(this::available))
-          .isEqualTo("2");
+                .resolve(this::available))
+                .isEqualTo("2");
     }
 
     @Test

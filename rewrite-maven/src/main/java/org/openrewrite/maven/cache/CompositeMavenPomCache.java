@@ -32,11 +32,11 @@ public class CompositeMavenPomCache implements MavenPomCache {
     @Override
     public @Nullable ResolvedPom getResolvedDependencyPom(ResolvedGroupArtifactVersion dependency) {
         ResolvedPom l1r = l1.getResolvedDependencyPom(dependency);
-        if(l1r != null) {
+        if (l1r != null) {
             return l1r;
         }
         ResolvedPom l2r = l2.getResolvedDependencyPom(dependency);
-        if(l2r != null) {
+        if (l2r != null) {
             l1.putResolvedDependencyPom(dependency, l2r);
         }
         return l2r;
@@ -51,11 +51,11 @@ public class CompositeMavenPomCache implements MavenPomCache {
     @Override
     public @Nullable Optional<MavenMetadata> getMavenMetadata(URI repo, GroupArtifactVersion gav) {
         Optional<MavenMetadata> l1m = l1.getMavenMetadata(repo, gav);
-        if(l1m != null) {
+        if (l1m != null) {
             return l1m;
         }
         Optional<MavenMetadata> l2m = l2.getMavenMetadata(repo, gav);
-        if(l2m != null && l2m.isPresent()) {
+        if (l2m != null && l2m.isPresent()) {
             l1.putMavenMetadata(repo, gav, l2m.get());
         }
         return l2m;
@@ -70,11 +70,11 @@ public class CompositeMavenPomCache implements MavenPomCache {
     @Override
     public @Nullable Optional<Pom> getPom(ResolvedGroupArtifactVersion gav) throws MavenDownloadingException {
         Optional<Pom> l1p = l1.getPom(gav);
-        if(l1p != null) {
+        if (l1p != null) {
             return l1p;
         }
         Optional<Pom> l2p = l2.getPom(gav);
-        if(l2p != null && l2p.isPresent()) {
+        if (l2p != null && l2p.isPresent()) {
             l1.putPom(gav, l2p.get());
         }
         return l2p;
@@ -89,11 +89,11 @@ public class CompositeMavenPomCache implements MavenPomCache {
     @Override
     public @Nullable Optional<MavenRepository> getNormalizedRepository(MavenRepository repository) {
         Optional<MavenRepository> l1r = l1.getNormalizedRepository(repository);
-        if(l1r != null) {
+        if (l1r != null) {
             return l1r;
         }
         Optional<MavenRepository> l2r = l2.getNormalizedRepository(repository);
-        if(l2r != null && l2r.isPresent()) {
+        if (l2r != null && l2r.isPresent()) {
             l1.putNormalizedRepository(repository, l2r.get());
         }
         return l2r;

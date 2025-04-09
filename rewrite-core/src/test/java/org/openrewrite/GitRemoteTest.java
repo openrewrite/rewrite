@@ -127,13 +127,13 @@ public class GitRemoteTest {
       """)
     void parseRegisteredRemoteServer(String cloneUrl) {
         GitRemote.Parser parser = new GitRemote.Parser()
-          .registerRemote(GitRemote.Service.Bitbucket, URI.create("https://scm.company.com/very/long/context/path/"), List.of(
-            URI.create("https://scm.company.com:8443/very/long/context/path/"),
-            URI.create("http://scm.company.com/very/long/context/path/"),
-            URI.create("ssh://scm.company.com:7999/very/long/context/path"),
-            URI.create("ssh://scm.company.com:222/very/long/context/path"),
-            URI.create("ssh://scm.company.com/very/long/context/path")
-          ));
+                .registerRemote(GitRemote.Service.Bitbucket, URI.create("https://scm.company.com/very/long/context/path/"), List.of(
+                        URI.create("https://scm.company.com:8443/very/long/context/path/"),
+                        URI.create("http://scm.company.com/very/long/context/path/"),
+                        URI.create("ssh://scm.company.com:7999/very/long/context/path"),
+                        URI.create("ssh://scm.company.com:222/very/long/context/path"),
+                        URI.create("ssh://scm.company.com/very/long/context/path")
+                ));
         GitRemote remote = parser.parse(cloneUrl);
         String origin = "scm.company.com/very/long/context/path";
         String expectedPath = "org/repo";
@@ -209,12 +209,12 @@ public class GitRemoteTest {
     void buildUri(GitRemote.Service service, String origin, String path, String protocol, String expectedUri) {
         GitRemote remote = new GitRemote(service, null, origin, path, null, null);
         URI uri = new GitRemote.Parser()
-          .registerRemote(GitRemote.Service.Bitbucket, URI.create("https://scm.company.com/context/bitbucket/"), List.of(URI.create("http://scm.company.com/context/bitbucket/"), URI.create("ssh://git@scm.company.com:7999/context/bitbucket")))
-          .registerRemote(GitRemote.Service.GitHub, URI.create("https://scm.company.com/context/github"), List.of(URI.create("ssh://git@scm.company.com/context/github/")))
-          .registerRemote(GitRemote.Service.GitLab, URI.create("https://scm.company.com/context/gitlab/"), List.of(URI.create("ssh://git@scm.company.com:8022/context/gitlab")))
-          .registerRemote(GitRemote.Service.GitLab, URI.create("https://scm.company.com:8443/context/gitlab"), List.of(URI.create("https://scm.company.com/context/gitlab/")))
-          .registerRemote(GitRemote.Service.Bitbucket, URI.create("https://scm.company.com:12345/context/bitbucket"), List.of(URI.create("https://scm.company.com:12346/context/bitbucket/")))
-          .toUri(remote, protocol);
+                .registerRemote(GitRemote.Service.Bitbucket, URI.create("https://scm.company.com/context/bitbucket/"), List.of(URI.create("http://scm.company.com/context/bitbucket/"), URI.create("ssh://git@scm.company.com:7999/context/bitbucket")))
+                .registerRemote(GitRemote.Service.GitHub, URI.create("https://scm.company.com/context/github"), List.of(URI.create("ssh://git@scm.company.com/context/github/")))
+                .registerRemote(GitRemote.Service.GitLab, URI.create("https://scm.company.com/context/gitlab/"), List.of(URI.create("ssh://git@scm.company.com:8022/context/gitlab")))
+                .registerRemote(GitRemote.Service.GitLab, URI.create("https://scm.company.com:8443/context/gitlab"), List.of(URI.create("https://scm.company.com/context/gitlab/")))
+                .registerRemote(GitRemote.Service.Bitbucket, URI.create("https://scm.company.com:12345/context/bitbucket"), List.of(URI.create("https://scm.company.com:12346/context/bitbucket/")))
+                .toUri(remote, protocol);
         assertThat(uri).isEqualTo(URI.create(expectedUri));
     }
 
@@ -233,18 +233,18 @@ public class GitRemoteTest {
     }
 
     @Test
-    void shouldNotReplaceExistingWellKnownServer(){
+    void shouldNotReplaceExistingWellKnownServer() {
         GitRemote.Parser parser = new GitRemote.Parser()
-          .registerRemote(GitRemote.Service.GitHub, URI.create("https://github.com"), List.of(URI.create("ssh://notgithub.com")));
+                .registerRemote(GitRemote.Service.GitHub, URI.create("https://github.com"), List.of(URI.create("ssh://notgithub.com")));
 
         assertThat(parser.findRemoteServer("github.com").getUris())
-          .containsExactlyInAnyOrder(URI.create("https://github.com"), URI.create("ssh://git@github.com"));
+                .containsExactlyInAnyOrder(URI.create("https://github.com"), URI.create("ssh://git@github.com"));
     }
 
     @Test
     void findRemote() {
         GitRemote.Parser parser = new GitRemote.Parser()
-          .registerRemote(GitRemote.Service.Bitbucket, URI.create("scm.company.com/stash"), Collections.emptyList());
+                .registerRemote(GitRemote.Service.Bitbucket, URI.create("scm.company.com/stash"), Collections.emptyList());
         assertThat(parser.findRemoteServer("github.com").getService()).isEqualTo(GitRemote.Service.GitHub);
         assertThat(parser.findRemoteServer("https://github.com").getService()).isEqualTo(GitRemote.Service.GitHub);
         assertThat(parser.findRemoteServer("gitlab.com").getService()).isEqualTo(GitRemote.Service.GitLab);
@@ -293,12 +293,12 @@ public class GitRemoteTest {
     @Test
     void equalsIgnoresCase() {
         assertThat(new GitRemote(GitRemote.Service.GitHub, "https://github.com/org/repo", "github.com", "org/repo", "org", "repo"))
-          .isEqualTo(new GitRemote(GitRemote.Service.GitHub, "https://GITHUB.COM/ORG/REPO", "GITHUB.COM", "ORG/REPO", "ORG", "REPO"));
+                .isEqualTo(new GitRemote(GitRemote.Service.GitHub, "https://GITHUB.COM/ORG/REPO", "GITHUB.COM", "ORG/REPO", "ORG", "REPO"));
     }
 
     @Test
     void hashCodeIgnoresCase() {
         assertThat(new GitRemote(GitRemote.Service.GitHub, "https://github.com/org/repo", "github.com", "org/repo", "org", "repo"))
-          .hasSameHashCodeAs(new GitRemote(GitRemote.Service.GitHub, "https://GITHUB.COM/ORG/REPO", "GITHUB.COM", "ORG/REPO", "ORG", "REPO"));
+                .hasSameHashCodeAs(new GitRemote(GitRemote.Service.GitHub, "https://GITHUB.COM/ORG/REPO", "GITHUB.COM", "ORG/REPO", "ORG", "REPO"));
     }
 }

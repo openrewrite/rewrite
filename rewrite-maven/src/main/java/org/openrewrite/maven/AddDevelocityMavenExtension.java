@@ -60,15 +60,15 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
 
     @Language("xml")
     private static final String EXTENSIONS_XML_FORMAT = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-                                                        "<extensions>\n" +
-                                                        "</extensions>";
+            "<extensions>\n" +
+            "</extensions>";
 
     @Language("xml")
     private static final String EXTENSION_TAG_FORMAT = "<extension>\n" +
-                                                        "  <groupId>com.gradle</groupId>\n" +
-                                                        "  <artifactId>%s</artifactId>\n" +
-                                                        "  <version>%s</version>\n" +
-                                                        "</extension>";
+            "  <groupId>com.gradle</groupId>\n" +
+            "  <artifactId>%s</artifactId>\n" +
+            "  <version>%s</version>\n" +
+            "</extension>";
 
     @Option(displayName = "Extension version",
             description = "A maven-compatible version number to select the gradle-enterprise-maven-extension version.",
@@ -84,7 +84,7 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
 
     @Option(displayName = "Allow untrusted server",
             description = "When set to `true` the extension will be configured to allow unencrypted http connections with the server. " +
-                          "If set to `false` or omitted, the extension will refuse to communicate without transport layer security enabled.",
+                    "If set to `false` or omitted, the extension will refuse to communicate without transport layer security enabled.",
             required = false,
             example = "true")
     @Nullable
@@ -92,7 +92,7 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
 
     @Option(displayName = "Capture file fingerprints",
             description = "When set to `true` the extension will capture additional information about the inputs to Maven goals. " +
-                          "This increases the size of build scans, but is useful for diagnosing issues with goal caching. ",
+                    "This increases the size of build scans, but is useful for diagnosing issues with goal caching. ",
             required = false,
             example = "true")
     @Nullable
@@ -100,7 +100,7 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
 
     @Option(displayName = "Upload in background",
             description = "When set to `false` the extension will not upload build scan in the background. " +
-                          "By default, build scans are uploaded in the background after the build has finished to avoid blocking the build process.",
+                    "By default, build scans are uploaded in the background after the build has finished to avoid blocking the build process.",
             required = false,
             example = "false")
     @Nullable
@@ -108,9 +108,9 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
 
     @Option(displayName = "Publish Criteria",
             description = "When set to `Always` the extension will publish build scans of every single build. " +
-                          "This is the default behavior when omitted." +
-                          "When set to `Failure` the extension will only publish build scans when the build fails. " +
-                          "When set to `Demand` the extension will only publish build scans when explicitly requested.",
+                    "This is the default behavior when omitted." +
+                    "When set to `Failure` the extension will only publish build scans when the build fails. " +
+                    "When set to `Demand` the extension will only publish build scans when explicitly requested.",
             required = false,
             valid = {"Always", "Failure", "Demand"},
             example = "Always")
@@ -137,8 +137,8 @@ public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMav
     @Override
     public String getDescription() {
         return "To integrate the Develocity Maven extension into Maven projects, ensure that the " +
-               "`develocity-maven-extension` is added to the `.mvn/extensions.xml` file if not already present. " +
-               "Additionally, configure the extension by adding the `.mvn/develocity.xml` configuration file.";
+                "`develocity-maven-extension` is added to the `.mvn/extensions.xml` file if not already present. " +
+                "Additionally, configure the extension by adding the `.mvn/develocity.xml` configuration file.";
     }
 
     @Data

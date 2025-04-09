@@ -27,79 +27,79 @@ class ChangeTagAttributeTest implements RewriteTest {
     @Test
     void alterAttributeWhenElementAndAttributeMatch() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeTagAttribute("bean", "id", "myBean2.subpackage", "myBean.subpackage", null)),
-          xml(
-            """
+                spec -> spec.recipe(new ChangeTagAttribute("bean", "id", "myBean2.subpackage", "myBean.subpackage", null)),
+                xml(
+                        """
               <beans>
                   <bean id='myBean.subpackage.subpackage2'/>
                   <other id='myBean.subpackage.subpackage2'/>
               </beans>
               """,
-            """
+                        """
               <beans>
                   <bean id='myBean2.subpackage.subpackage2'/>
                   <other id='myBean.subpackage.subpackage2'/>
               </beans>
               """
-          )
+                )
         );
     }
 
     @Test
     void alterAttributeWithNullOldValue() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeTagAttribute("bean", "id", "myBean2.subpackage", null, null))
-            .expectedCyclesThatMakeChanges(2),
-          xml(
-            """
+                spec -> spec.recipe(new ChangeTagAttribute("bean", "id", "myBean2.subpackage", null, null))
+                        .expectedCyclesThatMakeChanges(2),
+                xml(
+                        """
               <beans>
                   <bean id='myBean.subpackage.subpackage2'/>
                   <other id='myBean.subpackage.subpackage2'/>
               </beans>
               """,
-            """
+                        """
               <beans>
                   <bean id='myBean2.subpackage'/>
                   <other id='myBean.subpackage.subpackage2'/>
               </beans>
               """
-          )
+                )
         );
     }
 
     @Test
     void removeAttribute() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeTagAttribute("bean", "id", null, "myBean.subpackage", null)),
-          xml(
-            """
+                spec -> spec.recipe(new ChangeTagAttribute("bean", "id", null, "myBean.subpackage", null)),
+                xml(
+                        """
               <beans>
                   <bean id='myBean.subpackage.subpackage2'/>
                   <other id='myBean.subpackage.subpackage2'/>
               </beans>
               """,
-            """
+                        """
               <beans>
                   <bean/>
                   <other id='myBean.subpackage.subpackage2'/>
               </beans>
               """
-          )
+                )
         );
     }
 
     @Test
     void attributeNotMatched() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeTagAttribute("bean", "id", "myBean2.subpackage", "not.matched", null)),
-          xml(
-            """
+                spec -> spec.recipe(new ChangeTagAttribute("bean", "id", "myBean2.subpackage", "not.matched", null)),
+                xml(
+                        """
               <beans>
                   <bean id='myBean.subpackage.subpackage2'/>
                   <other id='myBean.subpackage.subpackage2'/>
               </beans>
               """
-          )
+                )
         );
     }
 
@@ -107,21 +107,21 @@ class ChangeTagAttributeTest implements RewriteTest {
     @Test
     void alterAttributeWithRegex() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeTagAttribute("bean", "id", "myBean2.$1", "myBean\\.(.*)", true)),
-          xml(
-            """
+                spec -> spec.recipe(new ChangeTagAttribute("bean", "id", "myBean2.$1", "myBean\\.(.*)", true)),
+                xml(
+                        """
               <beans>
                   <bean id='myBean.subpackage.subpackage2'/>
                   <other id='myBean.subpackage.subpackage2'/>
               </beans>
               """,
-            """
+                        """
               <beans>
                   <bean id='myBean2.subpackage.subpackage2'/>
                   <other id='myBean.subpackage.subpackage2'/>
               </beans>
               """
-          )
+                )
         );
     }
 }

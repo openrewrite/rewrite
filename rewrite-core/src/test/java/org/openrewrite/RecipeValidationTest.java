@@ -27,7 +27,7 @@ class RecipeValidationTest {
     @Test
     void validate() {
         assertThat(new JSpecifyAnnotatedRecipeOptions(null).validate().isValid())
-          .isTrue();
+                .isTrue();
     }
 
     @Value

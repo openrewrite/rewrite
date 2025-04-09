@@ -33,29 +33,29 @@ class DeleteStatementTest implements RewriteTest {
     @Test
     void deleteStatement() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new GroovyIsoVisitor<>() {
-              @Override
-              public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
-                  G.CompilationUnit g = super.visitCompilationUnit(cu, ctx);
-                  List<Statement> statements = g.getStatements();
-                  for (int i = 0; i < statements.size(); i++) {
-                      Statement s = statements.get(i);
-                      if (i == 1) {
-                          g = (G.CompilationUnit) new DeleteStatement<>(s).visit(cu, ctx);
-                      }
-                  }
-                  return g;
-              }
-          })),
-          groovy(
-            """
+                spec -> spec.recipe(toRecipe(() -> new GroovyIsoVisitor<>() {
+                    @Override
+                    public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
+                        G.CompilationUnit g = super.visitCompilationUnit(cu, ctx);
+                        List<Statement> statements = g.getStatements();
+                        for (int i = 0; i < statements.size(); i++) {
+                            Statement s = statements.get(i);
+                            if (i == 1) {
+                                g = (G.CompilationUnit) new DeleteStatement<>(s).visit(cu, ctx);
+                            }
+                        }
+                        return g;
+                    }
+                })),
+                groovy(
+                        """
               int i = 0
               i = 1
               """,
-            """
+                        """
               int i = 0
               """
-          )
+                )
         );
     }
 }

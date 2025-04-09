@@ -34,9 +34,9 @@ public class RecipeEqualsAndHashCodeCallSuper extends Recipe {
     @Override
     public String getDescription() {
         return "Recipes are value objects, so should use `@EqualsAndHashCode(callSuper = false)`. " +
-               "While in most cases recipes do not extend other classes and so the option is moot, as " +
-               "a matter of stylistic consistency and to enforce the idea that recipes are value objects, " +
-               "this value should be set to `false`.";
+                "While in most cases recipes do not extend other classes and so the option is moot, as " +
+                "a matter of stylistic consistency and to enforce the idea that recipes are value objects, " +
+                "this value should be set to `false`.";
     }
 
     @Override
@@ -47,13 +47,13 @@ public class RecipeEqualsAndHashCodeCallSuper extends Recipe {
                     @Override
                     public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
                         if (TypeUtils.isOfClassType(annotation.getType(), "lombok.EqualsAndHashCode") &&
-                            getCursor().getParentTreeCursor().getValue() instanceof J.ClassDeclaration) {
+                                getCursor().getParentTreeCursor().getValue() instanceof J.ClassDeclaration) {
                             return (J.Annotation) new JavaIsoVisitor<ExecutionContext>() {
                                 @Override
                                 public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
                                     if (assignment.getVariable() instanceof J.Identifier &&
-                                        "callSuper".equals(((J.Identifier) assignment.getVariable()).getSimpleName()) &&
-                                        J.Literal.isLiteralValue(assignment.getAssignment(), true)) {
+                                            "callSuper".equals(((J.Identifier) assignment.getVariable()).getSimpleName()) &&
+                                            J.Literal.isLiteralValue(assignment.getAssignment(), true)) {
                                         return assignment.withAssignment(((J.Literal) assignment.getAssignment())
                                                 .withValue(false).withValueSource("false"));
                                     }

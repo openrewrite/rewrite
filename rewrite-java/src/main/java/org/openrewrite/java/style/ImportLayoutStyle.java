@@ -106,8 +106,8 @@ public class ImportLayoutStyle implements JavaStyle {
      * @return The import list with a new import added.
      */
     public List<JRightPadded<J.Import>> addImport(List<JRightPadded<J.Import>> originalImports,
-                                                  J.Import toAdd, J.@Nullable Package pkg,
-                                                  Collection<JavaType.FullyQualified> classpath) {
+            J.Import toAdd, J.@Nullable Package pkg,
+            Collection<JavaType.FullyQualified> classpath) {
         JRightPadded<J.Import> paddedToAdd = new JRightPadded<>(toAdd, Space.EMPTY, Markers.EMPTY);
 
         if (originalImports.isEmpty()) {
@@ -548,7 +548,7 @@ public class ImportLayoutStyle implements JavaStyle {
             for (JRightPadded<J.Import> anImport : originalImports) {
                 checkPackageForClasses.add(packageOrOuterClassName(anImport));
                 nameToPackages.computeIfAbsent(anImport.getElement().getClassName(), p -> new HashSet<>(3))
-                                .add(anImport.getElement().getPackageName());
+                        .add(anImport.getElement().getPackageName());
             }
 
             for (JavaType.FullyQualified classGraphFqn : classpath) {
@@ -891,7 +891,8 @@ class Serializer extends JsonSerializer<ImportLayoutStyle> {
         gen.writeNumberField("classCountToUseStarImport", value.getClassCountToUseStarImport());
         gen.writeNumberField("nameCountToUseStarImport", value.getNameCountToUseStarImport());
 
-        @SuppressWarnings("SuspiciousToArrayCall") String[] blocks = value.getLayout().stream()
+        @SuppressWarnings("SuspiciousToArrayCall")
+        String[] blocks = value.getLayout().stream()
                 .map(block -> {
                     if (block instanceof ImportLayoutStyle.Block.BlankLines) {
                         return "<blank line>";
@@ -910,7 +911,8 @@ class Serializer extends JsonSerializer<ImportLayoutStyle> {
                 })
                 .toArray(String[]::new);
 
-        @SuppressWarnings("SuspiciousToArrayCall") String[] packagesToFold = value.getPackagesToFold().stream()
+        @SuppressWarnings("SuspiciousToArrayCall")
+        String[] packagesToFold = value.getPackagesToFold().stream()
                 .map(block -> {
                     if (block instanceof ImportLayoutStyle.Block.ImportPackage) {
                         ImportLayoutStyle.Block.ImportPackage importPackage = (ImportLayoutStyle.Block.ImportPackage) block;
@@ -918,7 +920,7 @@ class Serializer extends JsonSerializer<ImportLayoutStyle> {
                         return "import " + (importPackage.isStatic() ? "static " : "") + importPackage.getPackageWildcard().pattern()
                                 .replace("\\.", ".")
                                 .replace(".+", "*")
-                                .replace("[^.]+", "*")  + withSubpackages;
+                                .replace("[^.]+", "*") + withSubpackages;
                     }
                     return new UnsupportedOperationException("Unknown block type " + block.getClass().getName());
                 })

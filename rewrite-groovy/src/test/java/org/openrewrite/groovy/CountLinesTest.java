@@ -26,8 +26,8 @@ class CountLinesTest implements RewriteTest {
     @Test
     void countsLines() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               package com.whatever
               
               import java.util.List
@@ -40,9 +40,9 @@ class CountLinesTest implements RewriteTest {
                   }
               }
               """,
-            spec -> spec.afterRecipe(cu ->
-              assertThat(CountLinesVisitor.countLines(cu)).isEqualTo(4))
-          )
+                        spec -> spec.afterRecipe(cu ->
+                                assertThat(CountLinesVisitor.countLines(cu)).isEqualTo(4))
+                )
         );
     }
 }

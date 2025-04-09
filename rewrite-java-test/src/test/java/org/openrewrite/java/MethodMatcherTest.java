@@ -57,21 +57,21 @@ class MethodMatcherTest implements RewriteTest {
     @SuppressWarnings("rawtypes")
     void matchesSuperclassTypeOfInterfaces() {
         rewriteRun(
-          java(
-            "class Test { java.util.List l; }",
-            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
-                @Override
-                public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, Object o) {
-                    JavaType.FullyQualified listType = multiVariable.getTypeAsFullyQualified();
-                    assertTrue(new MethodMatcher("java.util.Collection size()", true).matchesTargetType(listType));
-                    assertFalse(new MethodMatcher("java.util.Collection size()").matchesTargetType(listType));
-                    // ensuring subtypes do not match parents, regardless of matchOverrides
-                    assertFalse(new MethodMatcher("java.util.List size()", true).matchesTargetType(build("java.util.Collection")));
-                    assertFalse(new MethodMatcher("java.util.List size()").matchesTargetType(build("java.util.Collection")));
-                    return multiVariable;
-                }
-            }.visit(cu, 0))
-          )
+                java(
+                        "class Test { java.util.List l; }",
+                        spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                            @Override
+                            public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, Object o) {
+                                JavaType.FullyQualified listType = multiVariable.getTypeAsFullyQualified();
+                                assertTrue(new MethodMatcher("java.util.Collection size()", true).matchesTargetType(listType));
+                                assertFalse(new MethodMatcher("java.util.Collection size()").matchesTargetType(listType));
+                                // ensuring subtypes do not match parents, regardless of matchOverrides
+                                assertFalse(new MethodMatcher("java.util.List size()", true).matchesTargetType(build("java.util.Collection")));
+                                assertFalse(new MethodMatcher("java.util.List size()").matchesTargetType(build("java.util.Collection")));
+                                return multiVariable;
+                            }
+                        }.visit(cu, 0))
+                )
         );
     }
 
@@ -172,15 +172,15 @@ class MethodMatcherTest implements RewriteTest {
     @ValueSource(strings = {"a.A <constructor>()", "a.A *()"})
     void matchesConstructorUsage(String methodPattern) {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package a;
               class A {
                   A a = new A();
               }
               """,
-            spec -> spec.afterRecipe(cu -> assertThat(FindMethods.find(cu, methodPattern)).isNotEmpty())
-          )
+                        spec -> spec.afterRecipe(cu -> assertThat(FindMethods.find(cu, methodPattern)).isNotEmpty())
+                )
         );
     }
 
@@ -188,8 +188,8 @@ class MethodMatcherTest implements RewriteTest {
     @ValueSource(strings = {"a.A <constructor>()", "a.A *()"})
     void matchesMemberReferenceAsExpressionUsage(String methodPattern) {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package a;
               import java.util.function.Supplier;
                             
@@ -197,16 +197,16 @@ class MethodMatcherTest implements RewriteTest {
                   Supplier<A> a = A::new;
               }
               """,
-            spec -> spec.afterRecipe(cu -> assertThat(FindMethods.find(cu, methodPattern)).isNotEmpty())
-          )
+                        spec -> spec.afterRecipe(cu -> assertThat(FindMethods.find(cu, methodPattern)).isNotEmpty())
+                )
         );
     }
 
     @Test
     void matchesMethod() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package a;
 
               class A {
@@ -216,13 +216,13 @@ class MethodMatcherTest implements RewriteTest {
                   Integer getInteger(){}
               }
               """,
-            spec -> spec.afterRecipe(cu -> {
-                assertThat(FindMethods.findDeclaration(cu, "a.A setInt(int)")).isNotEmpty();
-                assertThat(FindMethods.findDeclaration(cu, "a.A getInt()")).isNotEmpty();
-                assertThat(FindMethods.findDeclaration(cu, "a.A setInteger(Integer)")).isNotEmpty();
-                assertThat(FindMethods.findDeclaration(cu, "a.A getInteger()")).isNotEmpty();
-            })
-          )
+                        spec -> spec.afterRecipe(cu -> {
+                            assertThat(FindMethods.findDeclaration(cu, "a.A setInt(int)")).isNotEmpty();
+                            assertThat(FindMethods.findDeclaration(cu, "a.A getInt()")).isNotEmpty();
+                            assertThat(FindMethods.findDeclaration(cu, "a.A setInteger(Integer)")).isNotEmpty();
+                            assertThat(FindMethods.findDeclaration(cu, "a.A getInteger()")).isNotEmpty();
+                        })
+                )
         );
     }
 
@@ -230,8 +230,8 @@ class MethodMatcherTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1215")
     void strictMatchMethodOverride() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package com.abc;
 
               class Parent {
@@ -245,12 +245,12 @@ class MethodMatcherTest implements RewriteTest {
                   }
               }
               """,
-            spec -> spec.afterRecipe(cu -> {
-                assertThat(FindMethods.findDeclaration(cu, "com.abc.Parent method(String)", false)).hasSize(1);
-                assertThat(FindMethods.findDeclaration(cu, "com.abc.Parent method(String)", true)).hasSize(2);
-                assertThat(FindMethods.findDeclaration(cu, "com.abc.Test method(String)", false)).hasSize(1);
-            })
-          )
+                        spec -> spec.afterRecipe(cu -> {
+                            assertThat(FindMethods.findDeclaration(cu, "com.abc.Parent method(String)", false)).hasSize(1);
+                            assertThat(FindMethods.findDeclaration(cu, "com.abc.Parent method(String)", true)).hasSize(2);
+                            assertThat(FindMethods.findDeclaration(cu, "com.abc.Test method(String)", false)).hasSize(1);
+                        })
+                )
         );
     }
 
@@ -258,30 +258,30 @@ class MethodMatcherTest implements RewriteTest {
     @Test
     void matchesMethodWithWildcardForClassInPackage() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package a;
 
               class A {
                   void foo() {}
               }
               """,
-            spec -> spec.afterRecipe(cu -> assertThat(FindMethods.findDeclaration(cu, "* foo(..)")).isNotEmpty())
-          )
+                        spec -> spec.afterRecipe(cu -> assertThat(FindMethods.findDeclaration(cu, "* foo(..)")).isNotEmpty())
+                )
         );
     }
 
     @Test
     void matchesMethodWithWildcardForClassNotInPackage() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class A {
                   void foo() {}
               }
               """,
-            spec -> spec.afterRecipe(cu -> assertThat(FindMethods.findDeclaration(cu, "* foo(..)")).isNotEmpty())
-          )
+                        spec -> spec.afterRecipe(cu -> assertThat(FindMethods.findDeclaration(cu, "* foo(..)")).isNotEmpty())
+                )
         );
     }
 
@@ -302,8 +302,8 @@ class MethodMatcherTest implements RewriteTest {
     @Test
     void siteExample() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package com.yourorg;
 
               class Foo {
@@ -313,8 +313,8 @@ class MethodMatcherTest implements RewriteTest {
                   }
               }
               """,
-            spec -> spec.afterRecipe(cu -> assertThat(FindMethods.find(cu, "com.yourorg.Foo bar(int, String)")).isNotEmpty())
-          )
+                        spec -> spec.afterRecipe(cu -> assertThat(FindMethods.find(cu, "com.yourorg.Foo bar(int, String)")).isNotEmpty())
+                )
         );
     }
 
@@ -398,17 +398,17 @@ class MethodMatcherTest implements RewriteTest {
 
     static J.MethodInvocation asMethodInvocation(String code) {
         var cu = JavaParser.fromJavaVersion().build().parse(
-            String.format("""
+                String.format("""
               class MyTest {
                   void test() {
                       %s
                   }
               }
               """, code)
-          )
-          .findFirst()
-          .map(J.CompilationUnit.class::cast)
-          .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
+        )
+        .findFirst()
+                .map(J.CompilationUnit.class::cast)
+                .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
         var classDecl = cu.getClasses().get(0);
         J.MethodDeclaration testMethod = (J.MethodDeclaration) classDecl.getBody().getStatements().get(0);
         return (J.MethodInvocation) testMethod.getBody().getStatements().get(0);
@@ -417,8 +417,8 @@ class MethodMatcherTest implements RewriteTest {
     @Test
     void arrayExample() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package com.yourorg;
 
               class Foo {
@@ -428,8 +428,8 @@ class MethodMatcherTest implements RewriteTest {
                   }
               }
               """,
-            spec -> spec.afterRecipe(cu -> assertThat(FindMethods.find(cu, "com.yourorg.Foo bar(String[])")).isNotEmpty())
-          )
+                        spec -> spec.afterRecipe(cu -> assertThat(FindMethods.find(cu, "com.yourorg.Foo bar(String[])")).isNotEmpty())
+                )
         );
     }
 
@@ -437,21 +437,21 @@ class MethodMatcherTest implements RewriteTest {
     @Test
     void matcherForUnknownType() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
-          java(
-            """
+                spec -> spec.typeValidationOptions(TypeValidation.none()),
+                java(
+                        """
               class Test {
                   void foo(Unknown u) {}
               }
               """,
-            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
-                @Override
-                public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Object o) {
-                    assertThat(new MethodMatcher(MethodMatcher.methodPattern(method)).matches(method.getMethodType())).isTrue();
-                    return super.visitMethodDeclaration(method, o);
-                }
-            })
-          )
+                        spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                            @Override
+                            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Object o) {
+                                assertThat(new MethodMatcher(MethodMatcher.methodPattern(method)).matches(method.getMethodType())).isTrue();
+                                return super.visitMethodDeclaration(method, o);
+                            }
+                        })
+                )
         );
     }
 }

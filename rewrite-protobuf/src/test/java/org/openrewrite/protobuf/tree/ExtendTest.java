@@ -25,15 +25,15 @@ class ExtendTest implements RewriteTest {
     @Test
     void extend() {
         rewriteRun(
-          proto(
-            """
+                proto(
+                        """
               syntax = 'proto2';
               extend google.protobuf.FieldOptions {
                             
                 optional bool redacted = 22200;
               }
               """
-          )
+                )
         );
     }
 }

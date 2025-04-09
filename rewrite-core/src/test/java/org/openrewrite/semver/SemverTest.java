@@ -23,26 +23,26 @@ class SemverTest {
     @Test
     void validToVersion() {
         assertThat(Semver.validate("latest.release", null).getValue())
-          .isInstanceOf(LatestRelease.class);
+                .isInstanceOf(LatestRelease.class);
         assertThat(Semver.validate("latest.integration", null).getValue())
-          .isInstanceOf(LatestIntegration.class);
+                .isInstanceOf(LatestIntegration.class);
         assertThat(Semver.validate("latest.snapshot", null).getValue())
-          .isInstanceOf(LatestIntegration.class);
+                .isInstanceOf(LatestIntegration.class);
         assertThat(Semver.validate("1.5 - 2", null).getValue())
-          .isInstanceOf(HyphenRange.class);
+                .isInstanceOf(HyphenRange.class);
         assertThat(Semver.validate("1.x", null).getValue())
-          .isInstanceOf(XRange.class);
+                .isInstanceOf(XRange.class);
         assertThat(Semver.validate("~1.5", null).getValue())
-          .isInstanceOf(TildeRange.class);
+                .isInstanceOf(TildeRange.class);
         assertThat(Semver.validate("^1.5", null).getValue())
-          .isInstanceOf(CaretRange.class);
+                .isInstanceOf(CaretRange.class);
         assertThat(Semver.validate("[1.5,2)", null).getValue())
-          .isInstanceOf(SetRange.class);
+                .isInstanceOf(SetRange.class);
         assertThat(Semver.validate("1.5.1", null).getValue())
-          .isInstanceOf(ExactVersion.class);
+                .isInstanceOf(ExactVersion.class);
         assertThat(Semver.validate("=1.5.1", null).getValue())
-          .isInstanceOf(ExactVersion.class);
+                .isInstanceOf(ExactVersion.class);
         assertThat(Semver.validate("=1.5-1", null).getValue())
-          .isInstanceOf(ExactVersion.class);
+                .isInstanceOf(ExactVersion.class);
     }
 }

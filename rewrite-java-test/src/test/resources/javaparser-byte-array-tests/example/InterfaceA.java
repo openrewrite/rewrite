@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 package example;
+
 public interface InterfaceA {
-	void methodA();
+    void methodA();
 }

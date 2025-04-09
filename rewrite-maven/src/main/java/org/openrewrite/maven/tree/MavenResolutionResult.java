@@ -137,8 +137,8 @@ public class MavenResolutionResult implements Marker {
     }
 
     public void unsafeSet(UUID id, ResolvedPom pom, List<MavenResolutionResult> modules,
-                          @Nullable MavenResolutionResult parent,
-                          Map<Scope, List<ResolvedDependency>> dependencies) {
+            @Nullable MavenResolutionResult parent,
+            Map<Scope, List<ResolvedDependency>> dependencies) {
         this.id = id;
         this.pom = pom;
         this.modules = modules;

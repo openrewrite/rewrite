@@ -44,8 +44,8 @@ class UnwrapParenthesesTest implements RewriteTest {
     @Test
     void unwrapAssignment() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   boolean a;
                   {
@@ -53,7 +53,7 @@ class UnwrapParenthesesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   boolean a;
                   {
@@ -61,37 +61,37 @@ class UnwrapParenthesesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unwrapIfCondition() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   {
                       if((true)) {}
                   }
               }
               """,
-            """
+                        """
               public class A {
                   {
                       if(true) {}
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unwrapOnUnaryWithWrappedPreIncrement() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   static boolean count = 0;
                   static {
@@ -99,7 +99,7 @@ class UnwrapParenthesesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   static boolean count = 0;
                   static {
@@ -107,15 +107,15 @@ class UnwrapParenthesesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unwrapOnUnaryWithWrappedPostIncrement() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   static boolean count = 0;
                   static {
@@ -123,7 +123,7 @@ class UnwrapParenthesesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   static boolean count = 0;
                   static {
@@ -131,15 +131,15 @@ class UnwrapParenthesesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unwrapOnUnaryWithWrappedPreDecrement() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   static boolean count = 0;
                   static {
@@ -147,7 +147,7 @@ class UnwrapParenthesesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   static boolean count = 0;
                   static {
@@ -155,15 +155,15 @@ class UnwrapParenthesesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unwrapOnUnaryWithWrappedPostDecrement() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   static boolean count = 0;
                   static {
@@ -171,7 +171,7 @@ class UnwrapParenthesesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   static boolean count = 0;
                   static {
@@ -179,44 +179,44 @@ class UnwrapParenthesesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void keepParenthesesOnUnaryWithWrappedBinary() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.HashSet;
               public class A {
                   static HashSet<String> set = new HashSet<>();
                   static boolean notEmpty = !(set == null || set.isEmpty());
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unwrapOnUnaryWithWrappedMethodCall() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.HashSet;
               
               public class A {
                   static boolean notEmpty = !(new HashSet<>().isEmpty());
               }
               """,
-            """
+                        """
               import java.util.HashSet;
               
               public class A {
                   static boolean notEmpty = !new HashSet<>().isEmpty();
               }
               """
-          )
+                )
         );
     }
 
@@ -224,8 +224,8 @@ class UnwrapParenthesesTest implements RewriteTest {
     @Test
     void unwrapOnUnaryWithWrappedSwitch() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   static int count = 100;
                   static boolean uncategorized = !(
@@ -239,7 +239,7 @@ class UnwrapParenthesesTest implements RewriteTest {
                   );
               }
               """,
-            """
+                        """
               public class A {
                   static int count = 100;
                   static boolean uncategorized = !switch (count) {
@@ -251,7 +251,7 @@ class UnwrapParenthesesTest implements RewriteTest {
                   };
               }
               """
-          )
+                )
         );
     }
 }

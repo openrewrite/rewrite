@@ -27,19 +27,19 @@ class ConstructorTest implements RewriteTest {
     @Test
     void inParens() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               ( new String("foo") )
               """
-          )
+                )
         );
     }
 
     @Test
     void declaration() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               class Pair {
                   String first
                   String second
@@ -49,15 +49,15 @@ class ConstructorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void anonymousClassDeclarationClosedOverVariable() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               int i = 1
               new Object() {
                   int one() {
@@ -65,7 +65,7 @@ class ConstructorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -73,14 +73,14 @@ class ConstructorTest implements RewriteTest {
     @Disabled("Fails to parse")
     void implicitPublic() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               class T {
                   T(int a, int b, int c) {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -88,14 +88,14 @@ class ConstructorTest implements RewriteTest {
     @Disabled("Fails to parse")
     void defaultConstructorArguments() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               class T {
                   T(int a = 1) {
                   }
               }
               """
-          )
+                )
         );
     }
 }

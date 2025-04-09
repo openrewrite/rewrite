@@ -35,8 +35,8 @@ class RemoveEnableFeaturePreviewTest implements RewriteTest {
     void singleQuotes() {
         //language=gradle
         rewriteRun(
-          settingsGradle(
-            """
+                settingsGradle(
+                        """
               pluginManagement {
                   repositories {
                       gradlePluginPortal()
@@ -46,7 +46,7 @@ class RemoveEnableFeaturePreviewTest implements RewriteTest {
               rootProject.name = 'merge-service'
               enableFeaturePreview('ONE_LOCKFILE_PER_PROJECT')
               """,
-            """
+                        """
               pluginManagement {
                   repositories {
                       gradlePluginPortal()
@@ -55,7 +55,7 @@ class RemoveEnableFeaturePreviewTest implements RewriteTest {
             
               rootProject.name = 'merge-service'
               """
-          )
+                )
         );
     }
 
@@ -63,8 +63,8 @@ class RemoveEnableFeaturePreviewTest implements RewriteTest {
     void doubleQuotes() {
         //language=gradle
         rewriteRun(
-          settingsGradle(
-            """
+                settingsGradle(
+                        """
               pluginManagement {
                   repositories {
                       gradlePluginPortal()
@@ -76,7 +76,7 @@ class RemoveEnableFeaturePreviewTest implements RewriteTest {
               
               include 'service'
               """,
-            """
+                        """
               pluginManagement {
                   repositories {
                       gradlePluginPortal()
@@ -87,7 +87,7 @@ class RemoveEnableFeaturePreviewTest implements RewriteTest {
               
               include 'service'
               """
-          )
+                )
         );
     }
 
@@ -97,8 +97,8 @@ class RemoveEnableFeaturePreviewTest implements RewriteTest {
         void differentFeature() {
             //language=gradle
             rewriteRun(
-              settingsGradle(
-                """
+                    settingsGradle(
+                            """
                   pluginManagement {
                       repositories {
                           gradlePluginPortal()
@@ -111,7 +111,7 @@ class RemoveEnableFeaturePreviewTest implements RewriteTest {
                   
                   include 'service'
                   """
-              )
+                    )
             );
         }
 
@@ -119,8 +119,8 @@ class RemoveEnableFeaturePreviewTest implements RewriteTest {
         void nullArgument() {
             //language=gradle
             rewriteRun(
-              settingsGradle(
-                """
+                    settingsGradle(
+                            """
                   pluginManagement {
                       repositories {
                           gradlePluginPortal()
@@ -133,7 +133,7 @@ class RemoveEnableFeaturePreviewTest implements RewriteTest {
                   
                   include 'service'
                   """
-              )
+                    )
             );
         }
     }

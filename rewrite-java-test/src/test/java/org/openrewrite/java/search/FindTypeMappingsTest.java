@@ -34,14 +34,14 @@ class FindTypeMappingsTest implements RewriteTest {
     @Test
     void findTypeMappings() {
         rewriteRun(
-          spec -> spec.dataTable(Row.class, table -> {
-              assertThat(table.stream()
-                .map(row -> "%-3s%-38s%-15s%d%s".formatted(row.getCompilationUnitName(), row.getTreeName(), row.getTypeName(), row.getCount(),
-                  row.getNearestNonNullTreeName() == null ? "" : "  " + row.getNearestNonNullTreeName()))
-                .sorted()
-                .collect(Collectors.joining("\n", "", "\n")))
-                .isEqualTo(
-                  """
+                spec -> spec.dataTable(Row.class, table -> {
+                    assertThat(table.stream()
+                            .map(row -> "%-3s%-38s%-15s%d%s".formatted(row.getCompilationUnitName(), row.getTreeName(), row.getTypeName(), row.getCount(),
+                                    row.getNearestNonNullTreeName() == null ? "" : "  " + row.getNearestNonNullTreeName()))
+                            .sorted()
+                            .collect(Collectors.joining("\n", "", "\n")))
+                            .isEqualTo(
+                                    """
                     J  J$ClassDeclaration                    Class          1
                     J  J$FieldAccess                         Class          2
                     J  J$FieldAccess                         Unknown        2
@@ -54,10 +54,10 @@ class FindTypeMappingsTest implements RewriteTest {
                     J  J$ParameterizedType                   Parameterized  2
                     J  J$VariableDeclarations$NamedVariable  Variable       1
                     """
-                );
-          }),
-          java(
-            """
+                            );
+                }),
+                java(
+                        """
               import java.util.ArrayList;
               import java.util.List;
                             
@@ -65,7 +65,7 @@ class FindTypeMappingsTest implements RewriteTest {
                   List<String> l = new ArrayList<>();
               }
               """
-          )
+                )
         );
     }
 }

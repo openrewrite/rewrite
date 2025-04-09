@@ -25,8 +25,8 @@ class ArrayTest implements RewriteTest {
     @Test
     void array() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               root:
                 oauth2:
                   isam:
@@ -39,7 +39,7 @@ class ArrayTest implements RewriteTest {
                           audience:
                             - otherAudience
               """
-          )
+                )
         );
     }
 }

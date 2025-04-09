@@ -169,9 +169,9 @@ public class ChangePackage extends Recipe {
             if (((J.FieldAccess) f).isFullyQualifiedClassReference(oldPackageName)) {
                 Cursor parent = getCursor().getParent();
                 if (parent != null &&
-                    // Ensure the parent isn't a J.FieldAccess OR the parent doesn't match the target package name.
-                    (!(parent.getValue() instanceof J.FieldAccess) ||
-                     (!(((J.FieldAccess) parent.getValue()).isFullyQualifiedClassReference(newPackageName))))) {
+                        // Ensure the parent isn't a J.FieldAccess OR the parent doesn't match the target package name.
+                        (!(parent.getValue() instanceof J.FieldAccess) ||
+                                (!(((J.FieldAccess) parent.getValue()).isFullyQualifiedClassReference(newPackageName))))) {
 
                     f = TypeTree.build(((JavaType.FullyQualified) newPackageType).getFullyQualifiedName())
                             .withPrefix(f.getPrefix());
@@ -373,14 +373,14 @@ public class ChangePackage extends Recipe {
 
         private boolean isTargetFullyQualifiedType(JavaType.@Nullable FullyQualified fq) {
             return fq != null &&
-                   (fq.getPackageName().equals(oldPackageName) && !fq.getClassName().isEmpty() ||
-                    isTargetRecursivePackageName(fq.getPackageName()));
+                    (fq.getPackageName().equals(oldPackageName) && !fq.getClassName().isEmpty() ||
+                            isTargetRecursivePackageName(fq.getPackageName()));
         }
 
         private boolean isTargetRecursivePackageName(String packageName) {
             return (recursive == null || recursive) &&
-                   packageName.startsWith(oldPackageName + ".") &&
-                   !packageName.startsWith(newPackageName);
+                    packageName.startsWith(oldPackageName + ".") &&
+                    !packageName.startsWith(newPackageName);
         }
 
     }

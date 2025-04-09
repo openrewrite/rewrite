@@ -51,7 +51,7 @@ public class FindManagedDependency extends Recipe {
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
@@ -62,13 +62,13 @@ public class FindManagedDependency extends Recipe {
     }
 
     public static Set<Xml.Tag> find(Xml.Document maven, String groupId, String artifactId,
-                                    @Nullable String version, @Nullable String versionPattern) {
+            @Nullable String version, @Nullable String versionPattern) {
         Set<Xml.Tag> ds = new HashSet<>();
         new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (isManagedDependencyTag(groupId, artifactId) &&
-                    versionIsValid(version, tag.getChildValue("version").orElse(null), versionPattern)) {
+                        versionIsValid(version, tag.getChildValue("version").orElse(null), versionPattern)) {
                     ds.add(tag);
                 }
                 return super.visitTag(tag, ctx);
@@ -99,7 +99,7 @@ public class FindManagedDependency extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (isManagedDependencyTag(groupId, artifactId) &&
-                    versionIsValid(version, tag.getChildValue("version").orElse(null), versionPattern)) {
+                        versionIsValid(version, tag.getChildValue("version").orElse(null), versionPattern)) {
                     return SearchResult.found(tag);
                 }
                 return super.visitTag(tag, ctx);
@@ -108,7 +108,7 @@ public class FindManagedDependency extends Recipe {
     }
 
     private static boolean versionIsValid(@Nullable String desiredVersion, @Nullable String actualVersion,
-                                          @Nullable String versionPattern) {
+            @Nullable String versionPattern) {
         if (desiredVersion == null) {
             return true;
         }

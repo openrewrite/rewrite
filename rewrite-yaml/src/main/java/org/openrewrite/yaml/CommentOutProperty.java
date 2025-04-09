@@ -98,7 +98,7 @@ public class CommentOutProperty extends Recipe {
 
             @Override
             public Yaml.Sequence.Entry visitSequenceEntry(Yaml.Sequence.Entry entry,
-                                                          ExecutionContext ctx) {
+                    ExecutionContext ctx) {
                 indentation = entry.getPrefix();
                 if (Boolean.FALSE.equals(commentOutProperty)) {
                     return addBockCommentIfNecessary(entry, ctx);

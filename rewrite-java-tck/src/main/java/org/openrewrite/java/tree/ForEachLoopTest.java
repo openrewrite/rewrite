@@ -26,8 +26,8 @@ class ForEachLoopTest implements RewriteTest {
     @Test
     void format() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       for(Integer n: new Integer[] { 0, 1 }) {
@@ -35,15 +35,15 @@ class ForEachLoopTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void statementTerminatorForSingleLineForLoops() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test(int[] n) {
                       for(Integer i : n) test();
@@ -52,7 +52,7 @@ class ForEachLoopTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

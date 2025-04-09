@@ -185,7 +185,7 @@ public class VariableNameUtils {
         @Override
         public @Nullable J preVisit(J tree, Set<String> namesInScope) {
             // visit value from scope rather than `tree`, since calling recipe may have modified it already
-            return scope.<J> getValue().isScope(tree) ? scope.getValue() : super.preVisit(tree, namesInScope);
+            return scope.<J>getValue().isScope(tree) ? scope.getValue() : super.preVisit(tree, namesInScope);
         }
 
         // Stop after the tree has been processed to ensure all the names in scope have been collected.
@@ -248,7 +248,7 @@ public class VariableNameUtils {
             if (instanceOf.getPattern() instanceof J.Identifier) {
                 Set<String> names = nameScopes.get(currentScope.peek());
                 if (names != null) {
-                    names.add(((J.Identifier)instanceOf.getPattern()).getSimpleName());
+                    names.add(((J.Identifier) instanceOf.getPattern()).getSimpleName());
                 }
             }
             return super.visitInstanceOf(instanceOf, strings);

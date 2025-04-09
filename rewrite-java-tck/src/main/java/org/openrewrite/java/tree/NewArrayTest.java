@@ -26,26 +26,26 @@ class NewArrayTest implements RewriteTest {
     @Test
     void newArray() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   int[] n = new int[0];
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void initializers() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   int[] n = new int[] { 0, 1, 2 };
               }
               """
-          )
+                )
         );
     }
 
@@ -53,47 +53,47 @@ class NewArrayTest implements RewriteTest {
     @Disabled("int[] n = new int[] { 0, 1, 2~~(non-whitespace)~~>, <~~};")
     void initializersWithTrailingComma() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   int[] n = new int[] { 0, 1, 2, };
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void dimensions() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   int[][] n = new int [ 0 ] [ 1 ];
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void emptyDimension() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   int[][] n = new int [ 0 ] [ ];
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void newArrayShortcut() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.lang.annotation.*;
               @Target({ElementType.TYPE})
               public @interface Produces {
@@ -102,7 +102,7 @@ class NewArrayTest implements RewriteTest {
               
               @Produces({"something"}) class A {}
               """
-          )
+                )
         );
     }
 }

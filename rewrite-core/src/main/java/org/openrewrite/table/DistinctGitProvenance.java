@@ -29,8 +29,8 @@ public class DistinctGitProvenance extends DataTable<DistinctGitProvenance.Row> 
         super(recipe,
                 "Distinct Git Provenance",
                 "List out the contents of each unique `GitProvenance` marker in the set of source files. " +
-                "When everything is working correctly, exactly one such marker should be printed as all source files are " +
-                "expected to come from the same repository / branch / commit hash."
+                        "When everything is working correctly, exactly one such marker should be printed as all source files are " +
+                        "expected to come from the same repository / branch / commit hash."
         );
     }
 

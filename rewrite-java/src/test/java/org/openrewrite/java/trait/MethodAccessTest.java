@@ -33,15 +33,15 @@ class MethodAccessTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(markMethodAccesses(methodAccess(
-          new MethodMatcher("java.util.List add(..)", true))));
+                new MethodMatcher("java.util.List add(..)", true))));
     }
 
     @DocumentExample
     @Test
     void methodAccesses() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.List;
               class Test {
                  void test(List<String> names) {
@@ -49,7 +49,7 @@ class MethodAccessTest implements RewriteTest {
                  }
               }
               """,
-            """
+                        """
               import java.util.List;
               class Test {
                  void test(List<String> names) {
@@ -57,7 +57,7 @@ class MethodAccessTest implements RewriteTest {
                  }
               }
               """
-          )
+                )
         );
     }
 

@@ -49,8 +49,8 @@ public class ChangePluginDependencies extends Recipe {
 
     @Option(displayName = "Dependencies",
             description = "Plugin dependencies provided as dependency coordinates of format \"groupId:artifactId:version\". " +
-                          "When supplying multiple coordinates separate them with \",\". " +
-                          "Supplying `null` will remove any existing plugin dependencies.",
+                    "When supplying multiple coordinates separate them with \",\". " +
+                    "Supplying `null` will remove any existing plugin dependencies.",
             example = "org.openrewrite.recipe:rewrite-spring:1.0.0, org.openrewrite.recipe:rewrite-testing-frameworks:1.0.0",
             required = false)
     @Nullable
@@ -79,14 +79,14 @@ public class ChangePluginDependencies extends Recipe {
         } else {
             dependenciesTag = Xml.Tag.build(
                     "<dependencies>\n" +
-                    Arrays.stream(dependencies.split(","))
-                            .map(String::trim)
-                            .map(gav -> {
-                                String[] gavs = gav.split(":");
-                                return "<dependency>\n<groupId>" + gavs[0] + "</groupId>\n<artifactId>" + gavs[1] +
-                                       "</artifactId>\n<version>" + gavs[2] + "</version>\n</dependency>";
-                            }).collect(Collectors.joining("\n")) +
-                    "\n</dependencies>\n");
+                            Arrays.stream(dependencies.split(","))
+                                    .map(String::trim)
+                                    .map(gav -> {
+                                        String[] gavs = gav.split(":");
+                                        return "<dependency>\n<groupId>" + gavs[0] + "</groupId>\n<artifactId>" + gavs[1] +
+                                                "</artifactId>\n<version>" + gavs[2] + "</version>\n</dependency>";
+                                    }).collect(Collectors.joining("\n")) +
+                            "\n</dependencies>\n");
         }
         return new MavenVisitor<ExecutionContext>() {
             @Override
@@ -96,8 +96,8 @@ public class ChangePluginDependencies extends Recipe {
                     Optional<Xml.Tag> maybePlugin = plugins.getChildren().stream()
                             .filter(plugin ->
                                     "plugin".equals(plugin.getName()) &&
-                                    groupId.equals(plugin.getChildValue("groupId").orElse(null)) &&
-                                    artifactId.equals(plugin.getChildValue("artifactId").orElse(null))
+                                            groupId.equals(plugin.getChildValue("groupId").orElse(null)) &&
+                                            artifactId.equals(plugin.getChildValue("artifactId").orElse(null))
                             )
                             .findAny();
                     if (maybePlugin.isPresent()) {

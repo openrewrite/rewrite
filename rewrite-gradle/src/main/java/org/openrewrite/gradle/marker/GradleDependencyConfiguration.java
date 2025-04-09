@@ -112,7 +112,7 @@ public class GradleDependencyConfiguration implements Serializable {
     public @Nullable Dependency findRequestedDependency(String groupId, String artifactId) {
         for (Dependency d : requested) {
             if (StringUtils.matchesGlob(d.getGav().getGroupId(), groupId) &&
-                StringUtils.matchesGlob(d.getGav().getArtifactId(), artifactId)) {
+                    StringUtils.matchesGlob(d.getGav().getArtifactId(), artifactId)) {
                 return d;
             }
         }

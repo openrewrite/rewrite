@@ -25,8 +25,8 @@ class MethodInvocationTest implements RewriteTest {
     @Test
     void gradle() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -41,7 +41,7 @@ class MethodInvocationTest implements RewriteTest {
                   testImplementation 'junit:junit:4.+'
               }
               """
-          )
+                )
         );
     }
 
@@ -49,34 +49,34 @@ class MethodInvocationTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/4615")
     void gradleWithParentheses() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               plugins {
                   id 'java-library'
               }
               def version = (rootProject.jobName.startsWith('a')) ? "latest.release" : "3.0"
               """
-          )
+                )
         );
     }
 
     @Test
     void emptyArgsWithParens() {
         rewriteRun(
-          groovy("mavenCentral()")
+                groovy("mavenCentral()")
         );
     }
 
     @Test
     void noParentheses() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               class SomeObject {}
               def foo(String a, int b, SomeObject c, String d) {}
               foo "a", 3, new SomeObject(), "d"
               """
-          )
+                )
         );
     }
 
@@ -84,95 +84,95 @@ class MethodInvocationTest implements RewriteTest {
     @SuppressWarnings("GroovyVariableNotAssigned")
     void nullSafeDereference() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               Map m
               m?.clear()
               """
-          )
+                )
         );
     }
 
     @Test
     void mapLiteralFirstArgument() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               foo(["foo" : "bar"])
               """
-          )
+                )
         );
     }
 
     @Test
     void namedArgumentsInDeclaredOrder() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def acceptsNamedArguments (Map a, int i) { }
               acceptsNamedArguments(foo: "bar", 1)
               """
-          )
+                )
         );
     }
 
     @Test
     void namedArgumentsAfterPositionalArguments() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def acceptsNamedArguments (Map a, int i) { }
               acceptsNamedArguments(1, foo: "bar")
               """
-          )
+                )
         );
     }
 
     @Test
     void namedArgumentBeforeClosure() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def acceptsNamedArguments(Map a, int i, Closure c) {}
               acceptsNamedArguments(1, foo: "bar") { }
               """
-          )
+                )
         );
     }
 
     @Test
     void namedArgumentsBeforeClosure() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def acceptsNamedArguments(Map a, Closure c) {}
               acceptsNamedArguments(foo: "bar", bar: "baz") { }
               """
-          )
+                )
         );
     }
 
     @Test
     void namedArgumentsBetweenPositionalArguments() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def acceptsNamedArguments(Map a, int n, int m) { }
               acceptsNamedArguments(1, foo: "bar", 2)
               """
-          )
+                )
         );
     }
 
     @Test
     void namedArgumentsAllOverThePlace() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def acceptsNamedArguments(Map a, int n, int m) { }
               acceptsNamedArguments(1, foo: "bar", 2, bar: "baz")
               """
-          )
+                )
         );
     }
 
@@ -180,14 +180,14 @@ class MethodInvocationTest implements RewriteTest {
     @SuppressWarnings("GroovyAssignabilityCheck")
     void closureWithImplicitParameter() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def acceptsClosure(Closure cl) {}
               acceptsClosure {
                   println(it)
               }
               """
-          )
+                )
         );
     }
 
@@ -195,65 +195,65 @@ class MethodInvocationTest implements RewriteTest {
     @Test
     void gradleFileWithMultipleClosuresWithoutParentheses() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               copySpec {
                   from { 'src/main/webapp' } { exclude "**/*.jpg" }
                   rename '(.+)-staging(.+)', '$1$2'
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void multipleClosureArgumentsWithoutParentheses() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def foo(Closure a, Closure b, Closure c) {}
               foo {     }    {        } {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void multipleClosureArgumentsWithParentheses() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def foo(Closure a, Closure b, Closure c) {}
               foo({ }, { }, {
               })
               """
-          )
+                )
         );
     }
 
     @Test
     void multipleArgumentsWithClosuresAndNonClosuresWithoutParentheses() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def foo(String a, Closure b, Closure c, String d) {}
               foo "a", { },            {
               }, "d"
               """
-          )
+                )
         );
     }
 
     @Test
     void trailingClosures() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def foo(String a, int b, String c, Closure d, Closure e, Closure f) {}
               foo("bar", 3, "baz") {       }           { } {}
               """
-          )
+                )
         );
     }
 
@@ -262,65 +262,65 @@ class MethodInvocationTest implements RewriteTest {
     @SuppressWarnings("GroovyAssignabilityCheck")
     void closureWithNamedParameter() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def acceptsClosure(Closure cl) {}
               acceptsClosure { foo ->
                   println(foo)
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void closureWithNamedParameterAndType() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def acceptsClosure(Closure cl) {}
               acceptsClosure { String foo ->
                   println(foo)
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void closureArgumentInParens() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def acceptsClosure(Closure cl) {}
               acceptsClosure({})
               """
-          )
+                )
         );
     }
 
     @Test
     void closureArgumentAfterEmptyParens() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def acceptsClosure(Closure cl) {}
               acceptsClosure ( /* () */ ) { /* {} */ }
               """
-          )
+                )
         );
     }
 
     @Test
     void closureReturn() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               foo {
                   return
               }
               """
-          )
+                )
         );
     }
 
@@ -328,21 +328,21 @@ class MethodInvocationTest implements RewriteTest {
     @Test
     void closureInvocation() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def closure = {}
               closure()
               closure.call()
               """
-          )
+                )
         );
     }
 
     @Test
     void staticMethodInvocation() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               class StringUtils {
                 static boolean isEmpty(String value) {
                   return value == null || value.isEmpty()
@@ -353,7 +353,7 @@ class MethodInvocationTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 
@@ -361,22 +361,22 @@ class MethodInvocationTest implements RewriteTest {
     @Test
     void insideParenthesesSimple() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               ((a.invoke "b" ))
               """
-          )
+                )
         );
     }
 
     @Test
     void lotOfSpacesAroundConstantWithParentheses() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               (  ( (    "x"         )        ).toString()       )
               """
-          )
+                )
         );
     }
 
@@ -384,29 +384,29 @@ class MethodInvocationTest implements RewriteTest {
     @Test
     void insideParentheses() {
         rewriteRun(
-          groovy(
-            """              
+                groovy(
+                        """              
               static def foo(Map map) {
                   ((map.containsKey("foo"))
                       && ((map.get("foo")).equals("bar")))
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void insideParenthesesWithNewline() {
         rewriteRun(
-          groovy(
-            """              
+                groovy(
+                        """              
               static def foo(Map map) {
                   ((
                   map.containsKey("foo"))
                       && ((map.get("foo")).equals("bar")))
               }
               """
-          )
+                )
         );
     }
 
@@ -414,24 +414,24 @@ class MethodInvocationTest implements RewriteTest {
     @Test
     void insideParenthesesWithoutNewLineAndEscapedMethodName() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               static def foo(Map someMap) {((((((someMap.get("(bar")))) ).'equals' "baz" )   )      }
               """
-          )
+                )
         );
     }
 
     @Test
     void insideFourParenthesesAndEnters() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               ((((
                 something(a)
               ))))
               """
-          )
+                )
         );
     }
 }

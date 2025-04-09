@@ -31,95 +31,95 @@ class SearchResultsTest implements RewriteTest {
     @Test
     void searchResultIsOnlyAddedOnceEvenWhenRunMultipleTimesByScheduler() {
         rewriteRun(spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-            @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                return SearchResult.mergingFound(super.visitMethodInvocation(method, executionContext), method.getSimpleName());
-            }
-        })),
-          java(
-            """
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                        return SearchResult.mergingFound(super.visitMethodInvocation(method, executionContext), method.getSimpleName());
+                    }
+                })),
+                java(
+                        """
               class Test {
                   void test() {
                       System.out.println("Hello, world!");
                   }
               }
               """,
-            """
+                        """
               class Test {
                   void test() {
                       /*~~(println)~~>*/System.out.println("Hello, world!");
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void multipleSearchResultIsOnlyAddedOnceEvenWhenRunMultipleTimesByScheduler() {
         rewriteRun(spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-            @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                return SearchResult.mergingFound(
-                  SearchResult.mergingFound(
-                    SearchResult.mergingFound(
-                      super.visitMethodInvocation(method, executionContext),
-                      "42"
-                    ),
-                    "Hello, world!"
-                  ),
-                  method.getSimpleName()
-                );
-            }
-        })),
-          java(
-            """
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                        return SearchResult.mergingFound(
+                                SearchResult.mergingFound(
+                                        SearchResult.mergingFound(
+                                                super.visitMethodInvocation(method, executionContext),
+                                                "42"
+                                        ),
+                                        "Hello, world!"
+                                ),
+                                method.getSimpleName()
+                        );
+                    }
+                })),
+                java(
+                        """
               class Test {
                   void test() {
                       System.out.println("Hello, world!");
                   }
               }
               """,
-            """
+                        """
               class Test {
                   void test() {
                       /*~~(42, Hello, world!, println)~~>*/System.out.println("Hello, world!");
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void foundSearchResultsShouldNotClobberResultsWithDescription() {
         rewriteRun(spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-            @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                return SearchResult.found(
-                  SearchResult.found(
-                    super.visitMethodInvocation(method, executionContext),
-                    "Hello, world!"
-                  )
-                );
-            }
-        })),
-          java(
-            """
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                        return SearchResult.found(
+                                SearchResult.found(
+                                        super.visitMethodInvocation(method, executionContext),
+                                        "Hello, world!"
+                                )
+                        );
+                    }
+                })),
+                java(
+                        """
               class Test {
                   void test() {
                       System.out.println("Hello, world!");
                   }
               }
               """,
-            """
+                        """
               class Test {
                   void test() {
                       /*~~(Hello, world!)~~>*//*~~>*/System.out.println("Hello, world!");
                   }
               }
               """
-          )
+                )
         );
     }
 }

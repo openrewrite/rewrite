@@ -42,82 +42,82 @@ class NormalizeFormatTest implements RewriteTest {
     @Test
     void removeAnnotationFromMethod() {
         rewriteRun(
-          spec -> spec.recipes(
-            removeAnnotation,
-            new NormalizeFormat(),
-            new RemoveTrailingWhitespace(),
-            new TabsAndIndents()
-          ),
-          java(
-            """
+                spec -> spec.recipes(
+                        removeAnnotation,
+                        new NormalizeFormat(),
+                        new RemoveTrailingWhitespace(),
+                        new TabsAndIndents()
+                ),
+                java(
+                        """
               class Test {
                   @Deprecated
                   public void method(Test t) {
                   }
               }
               """,
-            """
+                        """
               class Test {
                             
                   public void method(Test t) {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void removeAnnotationFromClass() {
         rewriteRun(
-          spec -> spec.recipes(
-            removeAnnotation,
-            new NormalizeFormat(),
-            new RemoveTrailingWhitespace(),
-            new TabsAndIndents()
-          ),
-          java(
-            """
+                spec -> spec.recipes(
+                        removeAnnotation,
+                        new NormalizeFormat(),
+                        new RemoveTrailingWhitespace(),
+                        new TabsAndIndents()
+                ),
+                java(
+                        """
               class Test {
                   @Deprecated
                   class A {
                   }
               }
               """,
-            """
+                        """
               class Test {
                             
                   class A {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void removeAnnotationFromVariable() {
         rewriteRun(
-          spec -> spec.recipes(
-            removeAnnotation,
-            new NormalizeFormat(),
-            new RemoveTrailingWhitespace(),
-            new TabsAndIndents()
-          ),
-          java(
-            """
+                spec -> spec.recipes(
+                        removeAnnotation,
+                        new NormalizeFormat(),
+                        new RemoveTrailingWhitespace(),
+                        new TabsAndIndents()
+                ),
+                java(
+                        """
               class Test {
                   @Deprecated
                   public String s;
               }
               """,
-            """
+                        """
               class Test {
                             
                   public String s;
               }
               """
-          )
+                )
         );
     }
 }

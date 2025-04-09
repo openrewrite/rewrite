@@ -83,8 +83,8 @@ class CaretRangeTest {
     @Test
     void updateNothing() {
         CaretRange caretRange = CaretRange
-            .build("^0.0.3", null)
-            .getValue();
+                .build("^0.0.3", null)
+                .getValue();
 
         assertThat(caretRange).isNotNull();
         assertThat(caretRange.isValid("1.0", "0.0.3")).isFalse();

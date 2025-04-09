@@ -27,9 +27,9 @@ class ChangePluginDependenciesTest implements RewriteTest {
     @Test
     void removeDependencies() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePluginDependencies("org.openrewrite.maven", "rewrite-maven-plugin", null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangePluginDependencies("org.openrewrite.maven", "rewrite-maven-plugin", null)),
+                pomXml(
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
@@ -53,7 +53,7 @@ class ChangePluginDependenciesTest implements RewriteTest {
                   </build>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
@@ -70,19 +70,19 @@ class ChangePluginDependenciesTest implements RewriteTest {
                   </build>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void addDependencies() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePluginDependencies(
-            "org.openrewrite.maven",
-            "rewrite-maven-plugin",
-            "org.openrewrite.recipe:rewrite-spring:1.0.0")),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangePluginDependencies(
+                        "org.openrewrite.maven",
+                        "rewrite-maven-plugin",
+                        "org.openrewrite.recipe:rewrite-spring:1.0.0")),
+                pomXml(
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
@@ -99,7 +99,7 @@ class ChangePluginDependenciesTest implements RewriteTest {
                   </build>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
@@ -123,19 +123,19 @@ class ChangePluginDependenciesTest implements RewriteTest {
                   </build>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void replaceDependencies() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePluginDependencies(
-            "org.openrewrite.maven",
-            "rewrite-maven-plugin",
-            "org.openrewrite.recipe:rewrite-spring:1.0.0, org.openrewrite.recipe:rewrite-testing-frameworks:1.0.0")),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangePluginDependencies(
+                        "org.openrewrite.maven",
+                        "rewrite-maven-plugin",
+                        "org.openrewrite.recipe:rewrite-spring:1.0.0, org.openrewrite.recipe:rewrite-testing-frameworks:1.0.0")),
+                pomXml(
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
@@ -153,7 +153,7 @@ class ChangePluginDependenciesTest implements RewriteTest {
                   </build>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
@@ -182,7 +182,7 @@ class ChangePluginDependenciesTest implements RewriteTest {
                   </build>
               </project>
               """
-          )
+                )
         );
     }
 }

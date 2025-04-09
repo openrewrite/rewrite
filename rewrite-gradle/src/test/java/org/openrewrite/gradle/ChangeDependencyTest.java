@@ -33,9 +33,9 @@ class ChangeDependencyTest implements RewriteTest {
     @Test
     void relocateDependency() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null)),
+                buildGradle(
+                        """
               plugins {
                   id "java-library"
               }
@@ -49,7 +49,7 @@ class ChangeDependencyTest implements RewriteTest {
                   implementation group: "commons-lang", name: "commons-lang", version: "2.6"
               }
               """,
-            """
+                        """
               plugins {
                   id "java-library"
               }
@@ -63,16 +63,16 @@ class ChangeDependencyTest implements RewriteTest {
                   implementation group: "org.apache.commons", name: "commons-lang3", version: "3.11"
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void changeGroupIdOnly() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", null, null, null, null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", null, null, null, null)),
+                buildGradle(
+                        """
               plugins {
                   id "java-library"
               }
@@ -86,7 +86,7 @@ class ChangeDependencyTest implements RewriteTest {
                   implementation group: "commons-lang", name: "commons-lang", version: "2.6"
               }
               """,
-            """
+                        """
               plugins {
                   id "java-library"
               }
@@ -100,16 +100,16 @@ class ChangeDependencyTest implements RewriteTest {
                   implementation group: "org.apache.commons", name: "commons-lang", version: "2.6"
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void changeArtifactIdOnly() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", null, "commons-lang3", null, null, null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", null, "commons-lang3", null, null, null)),
+                buildGradle(
+                        """
               plugins {
                   id "java-library"
               }
@@ -123,7 +123,7 @@ class ChangeDependencyTest implements RewriteTest {
                   implementation group: "commons-lang", name: "commons-lang", version: "2.6"
               }
               """,
-            """
+                        """
               plugins {
                   id "java-library"
               }
@@ -137,16 +137,16 @@ class ChangeDependencyTest implements RewriteTest {
                   implementation group: "commons-lang", name: "commons-lang3", version: "2.6"
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void worksWithPlatform() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null)),
+                buildGradle(
+                        """
               plugins {
                   id "java-library"
               }
@@ -159,7 +159,7 @@ class ChangeDependencyTest implements RewriteTest {
                   implementation platform("commons-lang:commons-lang:2.6")
               }
               """,
-            """
+                        """
               plugins {
                   id "java-library"
               }
@@ -172,16 +172,16 @@ class ChangeDependencyTest implements RewriteTest {
                   implementation platform("org.apache.commons:commons-lang3:3.11")
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void worksWithGString() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null)),
+                buildGradle(
+                        """
               plugins {
                   id "java-library"
               }
@@ -195,7 +195,7 @@ class ChangeDependencyTest implements RewriteTest {
                   implementation platform("commons-lang:commons-lang:${version}")
               }
               """,
-            """
+                        """
               plugins {
                   id "java-library"
               }
@@ -209,16 +209,16 @@ class ChangeDependencyTest implements RewriteTest {
                   implementation platform("org.apache.commons:commons-lang3:3.11")
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void changeDependencyWithLowerVersionAfter() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependency("org.openrewrite", "plugin", "io.moderne", "moderne-gradle-plugin", "0.x", null, null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new ChangeDependency("org.openrewrite", "plugin", "io.moderne", "moderne-gradle-plugin", "0.x", null, null)),
+                buildGradle(
+                        """
               buildscript {
                   repositories {
                       gradlePluginPortal()
@@ -229,7 +229,7 @@ class ChangeDependencyTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               buildscript {
                   repositories {
                       gradlePluginPortal()
@@ -240,16 +240,16 @@ class ChangeDependencyTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doNotPinWhenNotVersioned() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependency("mysql", "mysql-connector-java", "com.mysql", "mysql-connector-j", "8.0.x", null, null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new ChangeDependency("mysql", "mysql-connector-java", "com.mysql", "mysql-connector-j", "8.0.x", null, null)),
+                buildGradle(
+                        """
               plugins {
                 id 'java'
                 id 'org.springframework.boot' version '2.6.1'
@@ -264,7 +264,7 @@ class ChangeDependencyTest implements RewriteTest {
                   runtimeOnly 'mysql:mysql-connector-java'
               }
               """,
-            """
+                        """
               plugins {
                 id 'java'
                 id 'org.springframework.boot' version '2.6.1'
@@ -285,9 +285,9 @@ class ChangeDependencyTest implements RewriteTest {
     @Test
     void doNotPinWhenNotVersionedOnMap() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependency("mysql", "mysql-connector-java", "com.mysql", "mysql-connector-j", "8.0.x", null, null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new ChangeDependency("mysql", "mysql-connector-java", "com.mysql", "mysql-connector-j", "8.0.x", null, null)),
+                buildGradle(
+                        """
               plugins {
                 id 'java'
                 id 'org.springframework.boot' version '2.6.1'
@@ -302,7 +302,7 @@ class ChangeDependencyTest implements RewriteTest {
                   runtimeOnly group: 'mysql', name: 'mysql-connector-java'
               }
               """,
-            """
+                        """
               plugins {
                 id 'java'
                 id 'org.springframework.boot' version '2.6.1'
@@ -323,9 +323,9 @@ class ChangeDependencyTest implements RewriteTest {
     @Test
     void pinWhenOverrideManagedVersion() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependency("mysql", "mysql-connector-java", "com.mysql", "mysql-connector-j", "8.0.x", null, true)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new ChangeDependency("mysql", "mysql-connector-java", "com.mysql", "mysql-connector-j", "8.0.x", null, true)),
+                buildGradle(
+                        """
               plugins {
                 id 'java'
                 id 'org.springframework.boot' version '2.6.1'
@@ -340,7 +340,7 @@ class ChangeDependencyTest implements RewriteTest {
                   runtimeOnly 'mysql:mysql-connector-java'
               }
               """,
-            """
+                        """
               plugins {
                 id 'java'
                 id 'org.springframework.boot' version '2.6.1'
@@ -361,9 +361,9 @@ class ChangeDependencyTest implements RewriteTest {
     @Test
     void warPluginProvidedConfigurations() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null)),
+                buildGradle(
+                        """
               plugins {
                   id "war"
               }
@@ -378,7 +378,7 @@ class ChangeDependencyTest implements RewriteTest {
                   implementation group: "commons-lang", name: "commons-lang", version: "2.6"
               }
               """,
-            """
+                        """
               plugins {
                   id "war"
               }
@@ -393,16 +393,16 @@ class ChangeDependencyTest implements RewriteTest {
                   implementation group: "org.apache.commons", name: "commons-lang3", version: "3.11"
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void relocateDependencyInJvmTestSuite() {
         rewriteRun(
-            spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null)),
-            buildGradle(
-                """
+                spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null)),
+                buildGradle(
+                        """
                   plugins {
                       id "java-library"
                       id 'jvm-test-suite'
@@ -422,7 +422,7 @@ class ChangeDependencyTest implements RewriteTest {
                       }
                   }
                   """,
-                """
+                        """
                   plugins {
                       id "java-library"
                       id 'jvm-test-suite'
@@ -442,7 +442,7 @@ class ChangeDependencyTest implements RewriteTest {
                       }
                   }
                   """
-            )
+                )
         );
     }
 }

@@ -43,67 +43,67 @@ class SpacesTest implements RewriteTest {
     @Test
     void columnarAlignment() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               resource "aws_ebs_volume" {
                 size =1
                 encrypted =true
               }
               """,
-            """
+                        """
               resource "aws_ebs_volume" {
                 size      = 1
                 encrypted = true
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void nonColumnarAlignment() {
         rewriteRun(
-          spec -> spec.parser(HclParser.builder().styles(spaces(new SpacesStyle(new SpacesStyle.BodyContent(false))))),
-          hcl(
-            """
+                spec -> spec.parser(HclParser.builder().styles(spaces(new SpacesStyle(new SpacesStyle.BodyContent(false))))),
+                hcl(
+                        """
               resource "aws_ebs_volume" {
                 size      = 1
                 encrypted = true
               }
               """,
-            """
+                        """
               resource "aws_ebs_volume" {
                 size = 1
                 encrypted = true
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void blockOpen() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               resource "aws_ebs_volume"{
                 size = 1
               }
               """,
-            """
+                        """
               resource "aws_ebs_volume" {
                 size = 1
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void attributeGroups() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               resource "custom_resource" {
                 size = 1
                 x = 1
@@ -112,7 +112,7 @@ class SpacesTest implements RewriteTest {
                 y = 2
               }
               """,
-            """
+                        """
               resource "custom_resource" {
                 size = 1
                 x    = 1
@@ -121,15 +121,15 @@ class SpacesTest implements RewriteTest {
                 y               = 2
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void attributeGroupMultilineValue() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               variable myvar {
                 description = "Sample Variable"
                 type = object({
@@ -146,7 +146,7 @@ class SpacesTest implements RewriteTest {
                 })
               }
               """,
-            """ 
+                        """ 
               variable myvar {
                 description = "Sample Variable"
                 type = object({
@@ -163,15 +163,15 @@ class SpacesTest implements RewriteTest {
                 })
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void objectAttributeGroupMultilineValue() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               locals {
                  myvar = {
                    description = "Sample Variable"
@@ -190,7 +190,7 @@ class SpacesTest implements RewriteTest {
                 }
               }
               """,
-            """ 
+                        """ 
               locals {
                  myvar = {
                    description = "Sample Variable"
@@ -209,15 +209,15 @@ class SpacesTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void noAttributeGroups() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               resource "custom_resource" {
                 size   = 1
 
@@ -228,7 +228,7 @@ class SpacesTest implements RewriteTest {
                 y = 2
               }
               """,
-            """
+                        """
               resource "custom_resource" {
                 size = 1
 
@@ -239,7 +239,7 @@ class SpacesTest implements RewriteTest {
                 y = 2
               }
               """
-          )
+                )
         );
     }
 
@@ -247,20 +247,20 @@ class SpacesTest implements RewriteTest {
     @Test
     void lineHashComment() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               # a hash comment with inline # or // is still 1 line.
               resource{}
               """,
-            """
+                        """
               # a hash comment with inline # or // is still 1 line.
               resource {}
               """,
-            spec -> spec.afterRecipe(c -> {
-              assertThat(c.getPrefix().getComments().size()).isEqualTo(1);
-              assertThat(c.getPrefix().getComments().get(0).getStyle()).isEqualTo(Comment.Style.LINE_HASH);
-            })
-          )
+                        spec -> spec.afterRecipe(c -> {
+                            assertThat(c.getPrefix().getComments().size()).isEqualTo(1);
+                            assertThat(c.getPrefix().getComments().get(0).getStyle()).isEqualTo(Comment.Style.LINE_HASH);
+                        })
+                )
         );
     }
 
@@ -268,28 +268,28 @@ class SpacesTest implements RewriteTest {
     @Test
     void lineSlashComment() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               // a slash comment with inline # or // is still 1 line.
               resource{}
               """,
-            """
+                        """
               // a slash comment with inline # or // is still 1 line.
               resource {}
               """,
-            spec -> spec.afterRecipe(c -> {
-              assertThat(c.getPrefix().getComments().size()).isEqualTo(1);
-              assertThat(c.getPrefix().getComments().get(0).getStyle()).isEqualTo(Comment.Style.LINE_SLASH);
-            })
-          )
+                        spec -> spec.afterRecipe(c -> {
+                            assertThat(c.getPrefix().getComments().size()).isEqualTo(1);
+                            assertThat(c.getPrefix().getComments().get(0).getStyle()).isEqualTo(Comment.Style.LINE_SLASH);
+                        })
+                )
         );
     }
 
     private List<NamedStyles> spaces(SpacesStyle style) {
         return List.of(
-          new NamedStyles(
-            Tree.randomId(), "test", "test", "test", emptySet(), List.of(style)
-          )
+                new NamedStyles(
+                        Tree.randomId(), "test", "test", "test", emptySet(), List.of(style)
+                )
         );
     }
 }

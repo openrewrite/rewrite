@@ -33,15 +33,15 @@ class AutoFormatTest implements RewriteTest {
     @Test
     void autoFormatAttributes() {
         rewriteRun(
-          xml(
-            """
+                xml(
+                        """
               <databaseChangeLog
                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                 xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
                 xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog">
               </databaseChangeLog>
               """
-          )
+                )
         );
     }
 
@@ -49,12 +49,12 @@ class AutoFormatTest implements RewriteTest {
     @Test
     void autoFormatXmlDecl() {
         rewriteRun(
-          xml(
-            """
+                xml(
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <tag>required tag</tag>
               """
-          )
+                )
         );
     }
 
@@ -62,8 +62,8 @@ class AutoFormatTest implements RewriteTest {
     @Test
     void autoFormatTag() {
         rewriteRun(
-          xml(
-            """
+                xml(
+                        """
               <project>
                 <dependencies>
                   <dependency>
@@ -80,7 +80,7 @@ class AutoFormatTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <dependencies>
                   <dependency>
@@ -97,7 +97,7 @@ class AutoFormatTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -105,13 +105,13 @@ class AutoFormatTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1189")
     void tagContentIndentation() {
         rewriteRun(
-          xml(
-            """
+                xml(
+                        """
               <foo>
                 bar
               </foo>
               """
-          )
+                )
         );
     }
 }

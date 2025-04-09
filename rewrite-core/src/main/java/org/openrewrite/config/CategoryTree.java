@@ -146,7 +146,7 @@ public class CategoryTree<G> {
             }
             if (categoryDescriptor == null) {
                 throw new IllegalStateException("Unable to find a descriptor for category. This represents " +
-                                                "a bug in CategoryTree, since it should never occur.");
+                        "a bug in CategoryTree, since it should never occur.");
             }
         }
 
@@ -202,7 +202,7 @@ public class CategoryTree<G> {
         CategoryTree<G> subtree = getCategory(subcategory);
         if (subtree == null) {
             throw new IllegalArgumentException("No subcategory of " +
-                                               getDescriptor().getPackageName() + " named '" + subcategory + "'");
+                    getDescriptor().getPackageName() + " named '" + subcategory + "'");
         }
         return subtree;
     }
@@ -270,7 +270,7 @@ public class CategoryTree<G> {
 
         // subcategory of this category
         if (packageName.isEmpty() || (categoryPackage.startsWith(packageName + ".") &&
-                                      categoryPackage.charAt(packageName.length()) == '.')) {
+                categoryPackage.charAt(packageName.length()) == '.')) {
             for (CategoryTree<G> subtree : subtrees) {
                 String subtreePackage = subtree.getDescriptor().getPackageName();
                 if (subtreePackage.equals(categoryPackage) || categoryPackage.startsWith(subtreePackage + ".")) {
@@ -319,10 +319,10 @@ public class CategoryTree<G> {
             return subtree;
         } else {
             throw new IllegalStateException("Attempted to add a category with package '" +
-                                            category.getPackageName() + "' as a subcategory of '" +
-                                            packageName + "'. This represents a bug in CategoryTree, as " +
-                                            "it should not be possible to add a category to a CategoryTree root " +
-                                            "that cannot be placed somewhere in the tree.");
+                    category.getPackageName() + "' as a subcategory of '" +
+                    packageName + "'. This represents a bug in CategoryTree, as " +
+                    "it should not be possible to add a category to a CategoryTree root " +
+                    "that cannot be placed somewhere in the tree.");
         }
     }
 
@@ -332,7 +332,7 @@ public class CategoryTree<G> {
         }
         if (!recipe.getName().contains(".")) {
             throw new IllegalArgumentException("Expected recipe with name '" + recipe.getName() + "' to have " +
-                                               "a package, but it did not.");
+                    "a package, but it did not.");
         }
         String category = recipe.getName().substring(0, recipe.getName().lastIndexOf('.'));
         CategoryTree<G> categoryTree = findOrAddCategory(group, new CategoryDescriptor(
@@ -391,14 +391,14 @@ public class CategoryTree<G> {
      * @return The subcategories of this category.
      */
     public Collection<CategoryTree<G>> getCategories(boolean omitCategoryRoots,
-                                                     boolean omitEmptyCategories) {
+            boolean omitEmptyCategories) {
         synchronized (lock) {
             List<CategoryTree<G>> cats = new ArrayList<>(subtrees.size());
             for (CategoryTree<G> subtree : subtrees) {
                 if (omitCategoryRoots && subtree.getDescriptor().isRoot()) {
                     cats.addAll(subtree.getCategories());
                 } else if (!omitEmptyCategories || !subtree.getRecipes().isEmpty() ||
-                           !subtree.getCategories().isEmpty()) {
+                        !subtree.getCategories().isEmpty()) {
                     cats.add(subtree);
                 }
             }
@@ -445,9 +445,9 @@ public class CategoryTree<G> {
     }
 
     void toString(StringJoiner out,
-                  int level,
-                  PrintOptions printOptions,
-                  BitSet lastCategoryMask) {
+            int level,
+            PrintOptions printOptions,
+            BitSet lastCategoryMask) {
         if (level > printOptions.getMaxDepth()) {
             return;
         }

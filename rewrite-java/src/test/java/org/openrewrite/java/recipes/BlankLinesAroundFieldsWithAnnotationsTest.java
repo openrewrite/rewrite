@@ -33,8 +33,8 @@ class BlankLinesAroundFieldsWithAnnotationsTest implements RewriteTest {
     @DocumentExample
     void spaceBetweenFields() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   @Deprecated
                   int a;
@@ -44,7 +44,7 @@ class BlankLinesAroundFieldsWithAnnotationsTest implements RewriteTest {
                   int d;
               }
               """,
-            """
+                        """
               class Test {
                   @Deprecated
                   int a;
@@ -57,7 +57,7 @@ class BlankLinesAroundFieldsWithAnnotationsTest implements RewriteTest {
                   int d;
               }
               """
-          )
+                )
         );
     }
 }

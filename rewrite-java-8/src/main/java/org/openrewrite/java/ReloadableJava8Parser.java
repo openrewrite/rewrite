@@ -72,12 +72,12 @@ class ReloadableJava8Parser implements JavaParser {
     private final Collection<NamedStyles> styles;
 
     ReloadableJava8Parser(@Nullable Collection<Path> classpath,
-                          Collection<byte[]> classBytesClasspath,
-                          @Nullable Collection<Input> dependsOn,
-                          Charset charset,
-                          boolean logCompilationWarningsAndErrors,
-                          Collection<NamedStyles> styles,
-                          JavaTypeCache typeCache) {
+            Collection<byte[]> classBytesClasspath,
+            @Nullable Collection<Input> dependsOn,
+            Charset charset,
+            boolean logCompilationWarningsAndErrors,
+            Collection<NamedStyles> styles,
+            JavaTypeCache typeCache) {
         this.classpath = classpath;
         this.dependsOn = dependsOn;
         this.styles = styles;
@@ -150,7 +150,8 @@ class ReloadableJava8Parser implements JavaParser {
             }
         }
 
-        @SuppressWarnings("ConstantConditions") LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = acceptedInputs(sourceFiles)
+        @SuppressWarnings("ConstantConditions")
+        LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = acceptedInputs(sourceFiles)
                 .collect(Collectors.toMap(
                         Function.identity(),
                         input -> {
@@ -160,8 +161,8 @@ class ReloadableJava8Parser implements JavaParser {
                                 if ("endPosTable already set".equals(e.getMessage())) {
                                     throw new IllegalStateException(
                                             "Call reset() on JavaParser before parsing another set of source files that " +
-                                            "have some of the same fully qualified names. Source file [" +
-                                            input.getPath() + "]\n[\n" + StringUtils.readFully(input.getSource(ctx), getCharset(ctx)) + "\n]", e);
+                                                    "have some of the same fully qualified names. Source file [" +
+                                                    input.getPath() + "]\n[\n" + StringUtils.readFully(input.getSource(ctx), getCharset(ctx)) + "\n]", e);
                                 }
                                 throw e;
                             }
@@ -274,10 +275,10 @@ class ReloadableJava8Parser implements JavaParser {
         public boolean isEmpty() {
             if (sample != null) {
                 sample.stop(MetricsHelper.successTags(
-                                Timer.builder("rewrite.parse")
-                                        .description("The time spent by the JDK in type attributing the source file")
-                                        .tag("file.type", "Java")
-                                        .tag("step", "(2) Type attribution"))
+                        Timer.builder("rewrite.parse")
+                                .description("The time spent by the JDK in type attributing the source file")
+                                .tag("file.type", "Java")
+                                .tag("step", "(2) Type attribution"))
                         .register(Metrics.globalRegistry));
             }
             return todo.isEmpty();
@@ -294,9 +295,9 @@ class ReloadableJava8Parser implements JavaParser {
         private final List<PackageAwareJavaFileObject> classByteClasspath;
 
         public ByteArrayCapableJavacFileManager(Context context,
-                                                boolean register,
-                                                Charset charset,
-                                                Collection<byte[]> classByteClasspath) {
+                boolean register,
+                Charset charset,
+                Collection<byte[]> classByteClasspath) {
             super(context, register, charset);
             this.classByteClasspath = classByteClasspath.stream()
                     .map(PackageAwareJavaFileObject::new)

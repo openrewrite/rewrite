@@ -34,30 +34,30 @@ class ChangeProjectVersionTest implements RewriteTest {
     @Test
     void changeProjectVersion() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <groupId>org.openrewrite</groupId>
                   <artifactId>rewrite-maven</artifactId>
                   <version>8.4.1</version>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>org.openrewrite</groupId>
                   <artifactId>rewrite-maven</artifactId>
                   <version>8.4.2</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void changeProjectVersionProperty() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <groupId>org.openrewrite</groupId>
                   <artifactId>rewrite-maven</artifactId>
@@ -68,7 +68,7 @@ class ChangeProjectVersionTest implements RewriteTest {
                   </properties>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>org.openrewrite</groupId>
                   <artifactId>rewrite-maven</artifactId>
@@ -79,15 +79,15 @@ class ChangeProjectVersionTest implements RewriteTest {
                   </properties>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void changeProjectVersionResolveProperties() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <groupId>${rewrite.groupId}</groupId>
                   <artifactId>${rewrite-maven.artifactId}</artifactId>
@@ -99,7 +99,7 @@ class ChangeProjectVersionTest implements RewriteTest {
                   </properties>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>${rewrite.groupId}</groupId>
                   <artifactId>${rewrite-maven.artifactId}</artifactId>
@@ -111,15 +111,15 @@ class ChangeProjectVersionTest implements RewriteTest {
                   </properties>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void changeProjectVersionResolvePropertiesOnParent() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <groupId>org.openrewrite</groupId>
                   <artifactId>rewrite-core</artifactId>
@@ -133,10 +133,10 @@ class ChangeProjectVersionTest implements RewriteTest {
                   <packaging>pom</packaging>
               </project>
               """
-          ),
-          mavenProject("rewrite-maven",
-            pomXml(
-              """
+                ),
+                mavenProject("rewrite-maven",
+                        pomXml(
+                                """
                 <project>
                     <parent>
                         <groupId>org.openrewrite</groupId>
@@ -149,7 +149,7 @@ class ChangeProjectVersionTest implements RewriteTest {
                     <version>8.4.1</version>
                 </project>
                 """,
-              """
+                                """
                 <project>
                     <parent>
                         <groupId>org.openrewrite</groupId>
@@ -162,72 +162,72 @@ class ChangeProjectVersionTest implements RewriteTest {
                     <version>8.4.2</version>
                 </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void doNotChangeOtherProjectVersion() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <groupId>org.openrewrite</groupId>
                   <artifactId>rewrite-gradle</artifactId>
                   <version>8.4.1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void changesMultipleMatchingProjects() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeProjectVersion("org.openrewrite", "rewrite-*", "8.4.2", null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeProjectVersion("org.openrewrite", "rewrite-*", "8.4.2", null)),
+                pomXml(
+                        """
               <project>
                   <groupId>org.openrewrite</groupId>
                   <artifactId>rewrite-maven</artifactId>
                   <version>8.4.1</version>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>org.openrewrite</groupId>
                   <artifactId>rewrite-maven</artifactId>
                   <version>8.4.2</version>
               </project>
               """,
-            spec -> spec.path("a/pom.xml")
-          ),
-          pomXml(
-            """
+                        spec -> spec.path("a/pom.xml")
+                ),
+                pomXml(
+                        """
               <project>
                   <groupId>org.openrewrite</groupId>
                   <artifactId>rewrite-gradle</artifactId>
                   <version>8.4.1</version>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>org.openrewrite</groupId>
                   <artifactId>rewrite-gradle</artifactId>
                   <version>8.4.2</version>
               </project>
               """,
-            spec -> spec.path("/pom.xml")
-          )
+                        spec -> spec.path("/pom.xml")
+                )
         );
     }
 
     @Test
     void doNotChangeProjectVersionInheritedFromParent() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <groupId>org.openrewrite</groupId>
                   <artifactId>rewrite-core</artifactId>
@@ -236,10 +236,10 @@ class ChangeProjectVersionTest implements RewriteTest {
                   <packaging>pom</packaging>
               </project>
               """
-          ),
-          mavenProject("rewrite-maven",
-            pomXml(
-              """
+                ),
+                mavenProject("rewrite-maven",
+                        pomXml(
+                                """
                 <project>
                     <parent>
                         <groupId>org.openrewrite</groupId>
@@ -251,17 +251,17 @@ class ChangeProjectVersionTest implements RewriteTest {
                     <artifactId>rewrite-maven</artifactId>
                 </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void changeProjectVersionInheritedFromParentIfOverrideParentVersion() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeProjectVersion("org.openrewrite", "rewrite-maven", "8.4.2", true)),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeProjectVersion("org.openrewrite", "rewrite-maven", "8.4.2", true)),
+                pomXml(
+                        """
               <project>
                   <groupId>org.openrewrite</groupId>
                   <artifactId>rewrite-core</artifactId>
@@ -270,10 +270,10 @@ class ChangeProjectVersionTest implements RewriteTest {
                   <packaging>pom</packaging>
               </project>
               """
-          ),
-          mavenProject("rewrite-maven",
-            pomXml(
-              """
+                ),
+                mavenProject("rewrite-maven",
+                        pomXml(
+                                """
                 <project>
                     <parent>
                         <groupId>org.openrewrite</groupId>
@@ -285,7 +285,7 @@ class ChangeProjectVersionTest implements RewriteTest {
                     <artifactId>rewrite-maven</artifactId>
                 </project>
                 """,
-              """
+                                """
                 <project>
                     <parent>
                         <groupId>org.openrewrite</groupId>
@@ -298,8 +298,8 @@ class ChangeProjectVersionTest implements RewriteTest {
                     <version>8.4.2</version>
                 </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 

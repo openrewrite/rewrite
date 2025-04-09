@@ -27,16 +27,16 @@ class RemoveDevelocityTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec
-          .beforeRecipe(withToolingApi())
-          .recipeFromResource("/META-INF/rewrite/gradle.yml", "org.openrewrite.gradle.plugins.RemoveDevelocity");
+                .beforeRecipe(withToolingApi())
+                .recipeFromResource("/META-INF/rewrite/gradle.yml", "org.openrewrite.gradle.plugins.RemoveDevelocity");
     }
 
     @Test
     @DocumentExample
     void removeGradleEnterprise() {
         rewriteRun(
-          settingsGradle(
-            """
+                settingsGradle(
+                        """
               plugins {
                   id 'com.gradle.enterprise' version '3.16'
               }
@@ -58,16 +58,16 @@ class RemoveDevelocityTest implements RewriteTest {
                   }
               }
               """,
-            ""
-          )
+                        ""
+                )
         );
     }
 
     @Test
     void removeDevelocity() {
         rewriteRun(
-          settingsGradle(
-            """
+                settingsGradle(
+                        """
               plugins {
                   id 'com.gradle.develocity' version '3.17.6'
               }
@@ -88,8 +88,8 @@ class RemoveDevelocityTest implements RewriteTest {
                   }
               }
               """,
-            ""
-          )
+                        ""
+                )
         );
     }
 }

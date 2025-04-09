@@ -27,13 +27,13 @@ class ExtTest implements RewriteTest {
     @Test
     void basicExt() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               ext {
                   foo = "bar"
               }
               """
-          )
+                )
         );
     }
 }

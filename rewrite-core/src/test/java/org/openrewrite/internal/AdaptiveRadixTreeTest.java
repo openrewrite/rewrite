@@ -292,7 +292,7 @@ public class AdaptiveRadixTreeTest {
     public void insertAndSearch_NullKey() {
         AdaptiveRadixTree<Integer> tree = new AdaptiveRadixTree<>();
         assertThatThrownBy(() -> tree.insert((String) null, 1))
-          .isInstanceOf(NullPointerException.class);
+                .isInstanceOf(NullPointerException.class);
     }
 
     @Test

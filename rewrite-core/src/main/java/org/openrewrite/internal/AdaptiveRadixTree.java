@@ -88,7 +88,7 @@ public class AdaptiveRadixTree<V> {
                     return depth == key.length ? value : null;
                 case 1:
                     return depth < key.length && key[depth] == partialKey[0] &&
-                           depth + 1 == key.length ? value : null;
+                            depth + 1 == key.length ? value : null;
             }
 
             // Standard implementation for longer keys
@@ -207,16 +207,16 @@ public class AdaptiveRadixTree<V> {
                     );
                     InternalNode<V> grown = newNode.addChild(firstByte, currentNodeCopy);
                     if (grown != null) {
-                        newNode = (Node4<V>)grown;
+                        newNode = (Node4<V>) grown;
                     }
                 } else {
                     newNode.value = this.value;
                     for (int i = 0; i < 256; i++) {
                         Node<V> child = getChild((byte) i);
                         if (child != null) {
-                            InternalNode<V> grown = newNode.addChild((byte)i, child);
+                            InternalNode<V> grown = newNode.addChild((byte) i, child);
                             if (grown != null) {
-                                newNode = (Node4<V>)grown;
+                                newNode = (Node4<V>) grown;
                             }
                         }
                     }
@@ -281,7 +281,8 @@ public class AdaptiveRadixTree<V> {
         }
 
         @Override
-        @Nullable Node<V> getChild(byte key) {
+        @Nullable
+        Node<V> getChild(byte key) {
             // Unrolled loop, testing one at a time for best branch prediction
             if (size > 0 && k0 == key) return c0;
             if (size > 1 && k1 == key) return c1;
@@ -292,12 +293,25 @@ public class AdaptiveRadixTree<V> {
 
         @SuppressWarnings("DataFlowIssue")
         @Override
-        @Nullable InternalNode<V> addChild(byte key, Node<V> child) {
+        @Nullable
+        InternalNode<V> addChild(byte key, Node<V> child) {
             // Check if we're replacing an existing child
-            if (size > 0 && k0 == key) { c0 = child; return null; }
-            if (size > 1 && k1 == key) { c1 = child; return null; }
-            if (size > 2 && k2 == key) { c2 = child; return null; }
-            if (size > 3 && k3 == key) { c3 = child; return null; }
+            if (size > 0 && k0 == key) {
+                c0 = child;
+                return null;
+            }
+            if (size > 1 && k1 == key) {
+                c1 = child;
+                return null;
+            }
+            if (size > 2 && k2 == key) {
+                c2 = child;
+                return null;
+            }
+            if (size > 3 && k3 == key) {
+                c3 = child;
+                return null;
+            }
 
             // If we're at capacity, grow to Node16
             if (size == 4) {
@@ -313,7 +327,7 @@ public class AdaptiveRadixTree<V> {
             }
 
             // Find insertion point while maintaining sorted order
-            byte keyByte = (byte)(key & 0xFF);
+            byte keyByte = (byte) (key & 0xFF);
             if (size == 0) {
                 k0 = keyByte;
                 c0 = child;
@@ -448,8 +462,7 @@ public class AdaptiveRadixTree<V> {
                 int midVal = array[mid] & 0xFF;
 
                 if (midVal < key)
-                    low = mid + 1;
-                else if (midVal > key)
+                    low = mid + 1; else if (midVal > key)
                     high = mid - 1;
                 else
                     return mid; // key found

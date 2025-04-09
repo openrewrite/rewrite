@@ -39,8 +39,8 @@ class VariableAccessTest implements RewriteTest {
     @Test
     void variableAccesses() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                  int test(int p) {
                    int a = p;
@@ -51,7 +51,7 @@ class VariableAccessTest implements RewriteTest {
                  }
               }
               """,
-            """
+                        """
               class Test {
                  int test(int p) {
                    int a = /*~~(read p)~~>*/p;
@@ -62,9 +62,9 @@ class VariableAccessTest implements RewriteTest {
                  }
               }
               """,
-            spec -> spec.afterRecipe(cu ->
-                assertThat(new VariableAccess.Matcher().lower(cu)).hasSize(6))
-          )
+                        spec -> spec.afterRecipe(cu ->
+                                assertThat(new VariableAccess.Matcher().lower(cu)).hasSize(6))
+                )
         );
     }
 
@@ -75,7 +75,7 @@ class VariableAccessTest implements RewriteTest {
                 op = "neither";
             }
             return SearchResult.found(va.getTree(),
-              op + " " + va.getTree().getSimpleName());
+                    op + " " + va.getTree().getSimpleName());
         }));
     }
 }

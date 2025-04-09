@@ -39,7 +39,7 @@ public class MavenDownloadingExceptions extends Exception {
     private final List<MavenDownloadingException> exceptions = new ArrayList<>();
 
     public static MavenDownloadingExceptions append(@Nullable MavenDownloadingExceptions current,
-                                                    MavenDownloadingException exception) {
+            MavenDownloadingException exception) {
         if (current == null) {
             current = new MavenDownloadingExceptions();
         }
@@ -49,7 +49,7 @@ public class MavenDownloadingExceptions extends Exception {
     }
 
     public static MavenDownloadingExceptions append(@Nullable MavenDownloadingExceptions current,
-                                                    MavenDownloadingExceptions exceptions) {
+            MavenDownloadingExceptions exceptions) {
         if (current == null) {
             current = new MavenDownloadingExceptions();
         }
@@ -76,8 +76,8 @@ public class MavenDownloadingExceptions extends Exception {
                 Xml.Tag t = tag;
                 for (GroupArtifact ga : byGav.keySet()) {
                     boolean hasException = (DEPENDENCY_MATCHER.matches(getCursor()) || MANAGED_DEPENDENCY_MATCHER.matches(getCursor()) || PARENT_MATCHER.matches(getCursor())) &&
-                                           tag.getChildValue("groupId").map(a -> ga.getGroupId().equals(a)).orElse(false) &&
-                                           tag.getChildValue("artifactId").map(a -> ga.getArtifactId().equals(a)).orElse(false);
+                            tag.getChildValue("groupId").map(a -> ga.getGroupId().equals(a)).orElse(false) &&
+                            tag.getChildValue("artifactId").map(a -> ga.getArtifactId().equals(a)).orElse(false);
                     if (hasException) {
                         for (MavenDownloadingException exception : byGav.get(ga)) {
                             t = Markup.warn(t, exception);

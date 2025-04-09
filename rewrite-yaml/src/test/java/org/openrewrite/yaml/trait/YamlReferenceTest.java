@@ -39,58 +39,58 @@ class YamlReferenceTest implements RewriteTest {
 
     @ParameterizedTest
     @CsvSource({
-      "application.yaml",
-      "application.yml",
-      "application-test.yaml",
-      "application-test.yml",
-      "/foo/bar/application-test.yaml",
-      "/foo/bar/application-test.yml",
+            "application.yaml",
+            "application.yml",
+            "application-test.yaml",
+            "application-test.yml",
+            "/foo/bar/application-test.yaml",
+            "/foo/bar/application-test.yml",
     })
     void findJavaReferencesInYamlProperties(String filename) {
         rewriteRun(
-          yaml(
-            YAML,
-            spec -> spec.path(filename).afterRecipe(doc -> {
-                assertThat(doc.getReferences().getReferences()).satisfiesExactlyInAnyOrder(
-                  ref -> {
-                      assertThat(ref.getKind()).isEqualTo(Reference.Kind.TYPE);
-                      assertThat(ref.getValue()).isEqualTo("java.lang.String");
-                  },
-                  ref -> {
-                      assertThat(ref.getKind()).isEqualTo(Reference.Kind.PACKAGE);
-                      assertThat(ref.getValue()).isEqualTo("java.lang");
-                  },
-                  ref -> {
-                      assertThat(ref.getKind()).isEqualTo(Reference.Kind.TYPE);
-                      assertThat(ref.getValue()).isEqualTo("org.openrewrite.java.DoSomething");
-                  },
-                  ref -> {
-                      assertThat(ref.getKind()).isEqualTo(Reference.Kind.TYPE);
-                      assertThat(ref.getValue()).isEqualTo("org.foo.Bar");
-                  });
-            }))
+                yaml(
+                        YAML,
+                        spec -> spec.path(filename).afterRecipe(doc -> {
+                            assertThat(doc.getReferences().getReferences()).satisfiesExactlyInAnyOrder(
+                                    ref -> {
+                                        assertThat(ref.getKind()).isEqualTo(Reference.Kind.TYPE);
+                                        assertThat(ref.getValue()).isEqualTo("java.lang.String");
+                                    },
+                                    ref -> {
+                                        assertThat(ref.getKind()).isEqualTo(Reference.Kind.PACKAGE);
+                                        assertThat(ref.getValue()).isEqualTo("java.lang");
+                                    },
+                                    ref -> {
+                                        assertThat(ref.getKind()).isEqualTo(Reference.Kind.TYPE);
+                                        assertThat(ref.getValue()).isEqualTo("org.openrewrite.java.DoSomething");
+                                    },
+                                    ref -> {
+                                        assertThat(ref.getKind()).isEqualTo(Reference.Kind.TYPE);
+                                        assertThat(ref.getValue()).isEqualTo("org.foo.Bar");
+                                    });
+                        }))
         );
     }
 
     @ParameterizedTest
     @CsvSource({
-      "application-.yaml",
-      "application-.yml",
-      "application.test.yaml",
-      "application.test.yml",
-      "other-application.yaml",
-      "other-application.yml",
-      "other.yaml",
-      "other.yml",
-      "/foo/bar/other.yaml",
-      "/foo/bar/other.yml"
+            "application-.yaml",
+            "application-.yml",
+            "application.test.yaml",
+            "application.test.yml",
+            "other-application.yaml",
+            "other-application.yml",
+            "other.yaml",
+            "other.yml",
+            "/foo/bar/other.yaml",
+            "/foo/bar/other.yml"
     })
     void noReferencesInMismatchedFilenames(String filename) {
         rewriteRun(
-          yaml(
-            YAML,
-            spec -> spec.path(filename).afterRecipe(doc -> assertThat(doc.getReferences().getReferences()).isEmpty())
-          )
+                yaml(
+                        YAML,
+                        spec -> spec.path(filename).afterRecipe(doc -> assertThat(doc.getReferences().getReferences()).isEmpty())
+                )
         );
     }
 }

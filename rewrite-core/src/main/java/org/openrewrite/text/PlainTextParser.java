@@ -65,7 +65,7 @@ public class PlainTextParser implements Parser {
 
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo,
-                                          ExecutionContext ctx) {
+            ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         return StreamSupport.stream(sources.spliterator(), false).map(input -> {
             Path path = input.getRelativePath(relativeTo);
@@ -139,7 +139,7 @@ public class PlainTextParser implements Parser {
                         }
                         // PathMather will not evaluate the path "README.md" to be matched by the pattern "**/README.md"
                         // This is counter-intuitive for most users and would otherwise require separate exclusions for files at the root and files in subdirectories
-                        if(!path.isAbsolute() && !path.startsWith(File.separator)) {
+                        if (!path.isAbsolute() && !path.startsWith(File.separator)) {
                             return accept(Paths.get("/" + path));
                         }
                         return false;

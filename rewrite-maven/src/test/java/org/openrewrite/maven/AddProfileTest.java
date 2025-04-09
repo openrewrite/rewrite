@@ -29,17 +29,17 @@ class AddProfileTest implements RewriteTest {
     @Test
     void addProfileToPom() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2).recipe(new AddProfile("myprofile", "<activation><foo>foo</foo></activation>",
-            "<properties><bar>bar</bar></properties>", "<build><param>value</param></build>")),
-          pomXml(
-            """
+                spec -> spec.expectedCyclesThatMakeChanges(2).recipe(new AddProfile("myprofile", "<activation><foo>foo</foo></activation>",
+                        "<properties><bar>bar</bar></properties>", "<build><param>value</param></build>")),
+                pomXml(
+                        """
               <project>
                 <groupId>group</groupId>
                 <artifactId>artifact</artifactId>
                 <version>1</version>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>group</groupId>
                 <artifactId>artifact</artifactId>
@@ -61,7 +61,7 @@ class AddProfileTest implements RewriteTest {
               </project>
               """
 
-          )
+                )
         );
     }
 
@@ -69,10 +69,10 @@ class AddProfileTest implements RewriteTest {
     @Test
     void preExistingOtherProfile() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2).recipe(new AddProfile("myprofile", "<activation><foo>foo</foo></activation>",
-            "<properties><bar>bar</bar></properties>", "<build><param>value</param></build>")),
-          pomXml(
-            """
+                spec -> spec.expectedCyclesThatMakeChanges(2).recipe(new AddProfile("myprofile", "<activation><foo>foo</foo></activation>",
+                        "<properties><bar>bar</bar></properties>", "<build><param>value</param></build>")),
+                pomXml(
+                        """
               <project>
                 <groupId>group</groupId>
                 <artifactId>artifact</artifactId>
@@ -87,7 +87,7 @@ class AddProfileTest implements RewriteTest {
                 </profiles>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>group</groupId>
                 <artifactId>artifact</artifactId>
@@ -115,17 +115,17 @@ class AddProfileTest implements RewriteTest {
               </project>
               """
 
-          )
+                )
         );
     }
 
     @Test
     void preExistingMatchingProfile() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2).recipe(new AddProfile("myprofile", "<activation><foo>foo</foo></activation>",
-            "<properties><bar>bar</bar></properties>", "<build><param>value</param></build>")),
-          pomXml(
-            """
+                spec -> spec.expectedCyclesThatMakeChanges(2).recipe(new AddProfile("myprofile", "<activation><foo>foo</foo></activation>",
+                        "<properties><bar>bar</bar></properties>", "<build><param>value</param></build>")),
+                pomXml(
+                        """
               <project>
                 <groupId>group</groupId>
                 <artifactId>artifact</artifactId>
@@ -141,7 +141,7 @@ class AddProfileTest implements RewriteTest {
                 </profiles>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>group</groupId>
                 <artifactId>artifact</artifactId>
@@ -164,7 +164,7 @@ class AddProfileTest implements RewriteTest {
               </project>
               """
 
-          )
+                )
         );
     }
 
@@ -172,16 +172,16 @@ class AddProfileTest implements RewriteTest {
     @Test
     void notAPom() {
         rewriteRun(
-          spec -> spec.recipe(new AddProfile("myprofile", "<activation></activation>",
-            "<properties></properties>", "<build></build>")),
-          xml(
-            """
+                spec -> spec.recipe(new AddProfile("myprofile", "<activation></activation>",
+                        "<properties></properties>", "<build></build>")),
+                xml(
+                        """
               <project>
               </project>
               """,
-            documentSourceSpec -> documentSourceSpec.path("my/project/beans.xml")
+                        documentSourceSpec -> documentSourceSpec.path("my/project/beans.xml")
 
-          )
+                )
         );
     }
 

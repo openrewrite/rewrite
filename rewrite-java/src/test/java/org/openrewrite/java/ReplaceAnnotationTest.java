@@ -31,9 +31,9 @@ class ReplaceAnnotationTest implements RewriteTest {
         @Test
         void matchNoPrams() {
             rewriteRun(
-              spec -> spec.recipe(new ReplaceAnnotation("@org.jetbrains.annotations.NotNull", "@lombok.NonNull", null)),
-              java(
-                """
+                    spec -> spec.recipe(new ReplaceAnnotation("@org.jetbrains.annotations.NotNull", "@lombok.NonNull", null)),
+                    java(
+                            """
                   import org.jetbrains.annotations.NotNull;
                   
                   class A {
@@ -41,7 +41,7 @@ class ReplaceAnnotationTest implements RewriteTest {
                       String testMethod() {}
                   }
                   """,
-                """
+                            """
                   import lombok.NonNull;
                   
                   class A {
@@ -49,7 +49,7 @@ class ReplaceAnnotationTest implements RewriteTest {
                       String testMethod() {}
                   }
                   """
-              )
+                    )
             );
         }
 
@@ -57,9 +57,9 @@ class ReplaceAnnotationTest implements RewriteTest {
         @DocumentExample
         void matchWithPrams() {
             rewriteRun(
-              spec -> spec.recipe(new ReplaceAnnotation("@org.jetbrains.annotations.NotNull(\"Test\")", "@lombok.NonNull", null)),
-              java(
-                """
+                    spec -> spec.recipe(new ReplaceAnnotation("@org.jetbrains.annotations.NotNull(\"Test\")", "@lombok.NonNull", null)),
+                    java(
+                            """
                   import org.jetbrains.annotations.NotNull;
                  
                   class A {
@@ -67,7 +67,7 @@ class ReplaceAnnotationTest implements RewriteTest {
                       String testMethod() {}
                   }
                   """,
-                """
+                            """
                   import lombok.NonNull;
                   
                   class A {
@@ -75,16 +75,16 @@ class ReplaceAnnotationTest implements RewriteTest {
                       String testMethod() {}
                   }
                   """
-              )
+                    )
             );
         }
 
         @Test
         void insertWithParams() {
             rewriteRun(
-              spec -> spec.recipe(new ReplaceAnnotation("@lombok.NonNull", "@org.jetbrains.annotations.NotNull(\"Test\")", null)),
-              java(
-                """
+                    spec -> spec.recipe(new ReplaceAnnotation("@lombok.NonNull", "@org.jetbrains.annotations.NotNull(\"Test\")", null)),
+                    java(
+                            """
                   import lombok.NonNull;
                   
                   class A {
@@ -92,7 +92,7 @@ class ReplaceAnnotationTest implements RewriteTest {
                       String testMethod() {}
                   }
                   """,
-                """
+                            """
                   import org.jetbrains.annotations.NotNull;
                   
                   class A {
@@ -100,7 +100,7 @@ class ReplaceAnnotationTest implements RewriteTest {
                       String testMethod() {}
                   }
                   """
-              )
+                    )
             );
         }
 
@@ -108,9 +108,9 @@ class ReplaceAnnotationTest implements RewriteTest {
         @Issue("https://github.com/openrewrite/rewrite/issues/4441")
         void methodWithAnnotatedParameter() {
             rewriteRun(
-              spec -> spec.recipe(new ReplaceAnnotation("@org.jetbrains.annotations.NotNull", "@lombok.NonNull", null)),
-              java(
-                """
+                    spec -> spec.recipe(new ReplaceAnnotation("@org.jetbrains.annotations.NotNull", "@lombok.NonNull", null)),
+                    java(
+                            """
                   import org.jetbrains.annotations.NotNull;
                   import org.jetbrains.annotations.Nullable;
                   
@@ -121,7 +121,7 @@ class ReplaceAnnotationTest implements RewriteTest {
                       }
                   }
                   """,
-                """
+                            """
                   import lombok.NonNull;
                   import org.jetbrains.annotations.Nullable;
                   
@@ -132,7 +132,7 @@ class ReplaceAnnotationTest implements RewriteTest {
                       }
                   }
                   """
-              )
+                    )
             );
         }
     }
@@ -142,9 +142,9 @@ class ReplaceAnnotationTest implements RewriteTest {
         @Test
         void noMatchOtherType() {
             rewriteRun(
-              spec -> spec.recipe(new ReplaceAnnotation("@org.jetbrains.annotations.NotNull", "@lombok.NonNull", null)),
-              java(
-                """
+                    spec -> spec.recipe(new ReplaceAnnotation("@org.jetbrains.annotations.NotNull", "@lombok.NonNull", null)),
+                    java(
+                            """
                   import org.jetbrains.annotations.Nullable;
                   
                   class A {
@@ -152,16 +152,16 @@ class ReplaceAnnotationTest implements RewriteTest {
                       String testMethod() {}
                   }
                   """
-              )
+                    )
             );
         }
 
         @Test
         void noMatchParameter() {
             rewriteRun(
-              spec -> spec.recipe(new ReplaceAnnotation("@org.jetbrains.annotations.NotNull(\"Test\")", "@lombok.NonNull", null)),
-              java(
-                """
+                    spec -> spec.recipe(new ReplaceAnnotation("@org.jetbrains.annotations.NotNull(\"Test\")", "@lombok.NonNull", null)),
+                    java(
+                            """
                   import org.jetbrains.annotations.Nullable;
                   
                   class A {
@@ -169,7 +169,7 @@ class ReplaceAnnotationTest implements RewriteTest {
                       String testMethod() {}
                   }
                   """
-              )
+                    )
             );
         }
     }

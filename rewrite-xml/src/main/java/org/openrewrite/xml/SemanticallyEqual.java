@@ -46,33 +46,33 @@ public class SemanticallyEqual {
 
         @Override
         public @Nullable Xml visitDocument(Xml.Document document, Xml other) {
-            if(document == other) {
+            if (document == other) {
                 return null;
             }
-            if(!(other instanceof Xml.Document)) {
+            if (!(other instanceof Xml.Document)) {
                 areEqual = false;
                 return null;
             }
-            Xml.Document otherDocument = (Xml.Document)other;
+            Xml.Document otherDocument = (Xml.Document) other;
             visitTag(document.getRoot(), otherDocument.getRoot());
             return null;
         }
 
         @Override
         public @Nullable Xml visitTag(Xml.Tag tag, Xml other) {
-            if(tag == other) {
+            if (tag == other) {
                 return null;
             }
-            if(!(other instanceof Xml.Tag)) {
+            if (!(other instanceof Xml.Tag)) {
                 areEqual = false;
                 return null;
             }
-            Xml.Tag otherTag = (Xml.Tag)other;
+            Xml.Tag otherTag = (Xml.Tag) other;
             if (!tag.getName().equals(otherTag.getName())) {
                 areEqual = false;
                 return null;
             }
-            if(tag.getAttributes().size() != otherTag.getAttributes().size()) {
+            if (tag.getAttributes().size() != otherTag.getAttributes().size()) {
                 areEqual = false;
                 return null;
             }
@@ -82,15 +82,15 @@ public class SemanticallyEqual {
             List<Xml.Attribute> thoseAttributes = otherTag.getAttributes().stream()
                     .sorted(comparing(Xml.Attribute::getKeyAsString))
                     .collect(toList());
-            for(int i = 0; i < theseAttributes.size(); i++) {
+            for (int i = 0; i < theseAttributes.size(); i++) {
                 visitAttribute(theseAttributes.get(i), thoseAttributes.get(i));
-                if(!areEqual) {
+                if (!areEqual) {
                     return null;
                 }
             }
-            if(bothNullOrEmpty(tag.getContent(), otherTag.getContent())) {
+            if (bothNullOrEmpty(tag.getContent(), otherTag.getContent())) {
                 return null;
-            } else if(eitherNullOrEmpty(tag.getContent(), otherTag.getContent())) {
+            } else if (eitherNullOrEmpty(tag.getContent(), otherTag.getContent())) {
                 areEqual = false;
                 return null;
             }
@@ -100,13 +100,13 @@ public class SemanticallyEqual {
             List<Content> thoseContents = otherTag.getContent().stream()
                     .filter(it -> it != null && !(it instanceof Xml.Comment))
                     .collect(toList());
-            if(theseContents.size() != thoseContents.size()) {
+            if (theseContents.size() != thoseContents.size()) {
                 areEqual = false;
                 return null;
             }
-            for(int i = 0; i < theseContents.size(); i++) {
+            for (int i = 0; i < theseContents.size(); i++) {
                 visit(theseContents.get(i), thoseContents.get(i));
-                if(!areEqual) {
+                if (!areEqual) {
                     return null;
                 }
             }
@@ -115,19 +115,19 @@ public class SemanticallyEqual {
 
         @Override
         public @Nullable Xml visitAttribute(Xml.Attribute attribute, Xml other) {
-            if(attribute == other) {
+            if (attribute == other) {
                 return null;
             }
-            if(!(other instanceof Xml.Attribute)) {
+            if (!(other instanceof Xml.Attribute)) {
                 areEqual = false;
                 return null;
             }
-            Xml.Attribute otherAttribute = (Xml.Attribute)other;
-            if(!attribute.getKeyAsString().equals(otherAttribute.getKeyAsString())) {
+            Xml.Attribute otherAttribute = (Xml.Attribute) other;
+            if (!attribute.getKeyAsString().equals(otherAttribute.getKeyAsString())) {
                 areEqual = false;
                 return null;
             }
-            if(!attribute.getValueAsString().equals(otherAttribute.getValueAsString())) {
+            if (!attribute.getValueAsString().equals(otherAttribute.getValueAsString())) {
                 areEqual = false;
                 return null;
             }
@@ -136,27 +136,30 @@ public class SemanticallyEqual {
 
         @Override
         public @Nullable Xml visitCharData(Xml.CharData charData, Xml other) {
-            if(charData == other) {
+            if (charData == other) {
                 return null;
             }
-            if(!(other instanceof Xml.CharData)) {
+            if (!(other instanceof Xml.CharData)) {
                 areEqual = false;
                 return null;
             }
-            Xml.CharData otherChar = (Xml.CharData)other;
-            if(!charData.getText().trim().equals(otherChar.getText().trim())) {
+            Xml.CharData otherChar = (Xml.CharData) other;
+            if (!charData.getText().trim().equals(otherChar.getText().trim())) {
                 areEqual = false;
                 return null;
             }
             return null;
         }
     }
+
     private static boolean isNullOrEmpty(@Nullable List<?> a) {
         return a == null || a.isEmpty();
     }
+
     private static boolean bothNullOrEmpty(@Nullable List<?> a, @Nullable List<?> b) {
         return isNullOrEmpty(a) && isNullOrEmpty(b);
     }
+
     private static boolean eitherNullOrEmpty(@Nullable List<?> a, @Nullable List<?> b) {
         return isNullOrEmpty(a) || isNullOrEmpty(b);
     }

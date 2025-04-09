@@ -27,17 +27,17 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
     @Test
     void replaceConstantInAnnotation() {
         rewriteRun(
-          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("java.io.File.pathSeparator", "com.constant.B.PATH_SEPARATOR")),
-          java(
-            """
+                spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("java.io.File.pathSeparator", "com.constant.B.PATH_SEPARATOR")),
+                java(
+                        """
               package com.constant;
               public class B {
                   public static final String PATH_SEPARATOR = ":";
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import java.io.File;
               
               @SuppressWarnings(File.pathSeparator)
@@ -48,7 +48,7 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import com.constant.B;
               
               @SuppressWarnings(B.PATH_SEPARATOR)
@@ -59,7 +59,7 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -67,10 +67,10 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/pull/3448")
     void replaceConstantInCurlyBracesInAnnotation() {
         rewriteRun(
-          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("java.io.File.pathSeparator", "java.io.File.separator"))
-            .parser(JavaParser.fromJavaVersion().classpath("guava")),
-          java(
-            """
+                spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("java.io.File.pathSeparator", "java.io.File.separator"))
+                        .parser(JavaParser.fromJavaVersion().classpath("guava")),
+                java(
+                        """
               import java.io.File;
               
               class Test {
@@ -78,7 +78,7 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
                   private String bar;
               }
               """,
-            """
+                        """
               import java.io.File;
               
               class Test {
@@ -86,7 +86,7 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
                   private String bar;
               }
               """
-          )
+                )
         );
     }
 
@@ -94,9 +94,9 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
     @Test
     void replaceConstant() {
         rewriteRun(
-          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("java.io.File.pathSeparator", "java.io.File.separator")),
-          java(
-            """
+                spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("java.io.File.pathSeparator", "java.io.File.separator")),
+                java(
+                        """
               import java.io.File;
 
               import static java.io.File.pathSeparator;
@@ -109,7 +109,7 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.io.File;
 
               import static java.io.File.separator;
@@ -122,16 +122,16 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void removeTopLevelClassImport() {
         rewriteRun(
-          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("foo.Bar.Baz.QUX", "Test.FOO")),
-          java(
-            """
+                spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("foo.Bar.Baz.QUX", "Test.FOO")),
+                java(
+                        """
               package foo;
 
               public class Bar {
@@ -140,9 +140,9 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
                   }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import foo.Bar;
 
               class Test {
@@ -150,13 +150,13 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
                   Object o = Bar.Baz.QUX;
               }
               """,
-            """
+                        """
               class Test {
                   static final String FOO = "foo";
                   Object o = Test.FOO;
               }
               """
-          )
+                )
         );
     }
 
@@ -164,9 +164,9 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3555")
     void replaceConstantForAnnotatedParameter() {
         rewriteRun(
-          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("java.io.File.pathSeparator", "java.io.File.separator")),
-          java(
-            """
+                spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("java.io.File.pathSeparator", "java.io.File.separator")),
+                java(
+                        """
               import java.io.File;
               
               class Test {
@@ -175,7 +175,7 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.io.File;
               
               class Test {
@@ -184,7 +184,7 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

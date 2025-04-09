@@ -25,14 +25,14 @@ class FieldAccessTest implements RewriteTest {
     @Test
     void fieldAccess() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class B {
                   public B field = new B();
                   B b = new B() . field . field;
               }
               """
-          )
+                )
         );
     }
 }

@@ -44,15 +44,15 @@ class GroovyTypeMappingTest implements JavaTypeMappingTest {
     public JavaType.Parameterized goatType() {
         //noinspection ConstantConditions
         return TypeUtils.asParameterized(GroovyParser.builder()
-          .logCompilationWarningsAndErrors(true)
-          .build()
-          .parse(new InMemoryExecutionContext(), goat)
-          .findFirst()
-          .map(G.CompilationUnit.class::cast)
-          .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"))
-          .getClasses()
-          .get(0)
-          .getType()
+                .logCompilationWarningsAndErrors(true)
+                .build()
+                .parse(new InMemoryExecutionContext(), goat)
+                .findFirst()
+                .map(G.CompilationUnit.class::cast)
+                .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"))
+                .getClasses()
+                .get(0)
+                .getType()
         );
     }
 
@@ -60,16 +60,16 @@ class GroovyTypeMappingTest implements JavaTypeMappingTest {
     @Test
     void noDuplicateSignatures() {
         Statement cu = GroovyParser.builder().build()
-          .parse(
-            """
+                .parse(
+                        """
               def a = "hi"
               """
-          )
-          .findFirst()
-          .map(G.CompilationUnit.class::cast)
-          .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"))
-          .getStatements()
-          .get(0);
+                )
+                .findFirst()
+                .map(G.CompilationUnit.class::cast)
+                .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"))
+                .getStatements()
+                .get(0);
 
         Set<JavaType> uniqueTypes = Collections.newSetFromMap(new IdentityHashMap<>());
         Map<String, JavaType> typeBySignatureAfterMapping = new HashMap<>();
@@ -104,7 +104,7 @@ class GroovyTypeMappingTest implements JavaTypeMappingTest {
         System.out.println("Signature collisions: ${signatureCollisions.size}");
 
         assertThat(signatureCollisions)
-          .as("More than one instance of a type collides on the same signature.")
-          .isEmpty();
+                .as("More than one instance of a type collides on the same signature.")
+                .isEmpty();
     }
 }

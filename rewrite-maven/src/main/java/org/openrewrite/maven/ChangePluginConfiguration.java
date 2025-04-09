@@ -49,8 +49,8 @@ public class ChangePluginConfiguration extends Recipe {
     @Language("xml")
     @Option(displayName = "Configuration",
             description = "Plugin configuration provided as raw XML overriding any existing configuration. " +
-                          "Configuration inside `<executions>` blocks will not be altered. " +
-                          "Supplying `null` will remove any existing configuration.",
+                    "Configuration inside `<executions>` blocks will not be altered. " +
+                    "Supplying `null` will remove any existing configuration.",
             example = "<foo>bar</foo>",
             required = false)
     @Nullable
@@ -81,8 +81,8 @@ public class ChangePluginConfiguration extends Recipe {
                     Optional<Xml.Tag> maybePlugin = plugins.getChildren().stream()
                             .filter(plugin ->
                                     "plugin".equals(plugin.getName()) &&
-                                    groupId.equals(plugin.getChildValue("groupId").orElse(null)) &&
-                                    artifactId.equals(plugin.getChildValue("artifactId").orElse(null))
+                                            groupId.equals(plugin.getChildValue("groupId").orElse(null)) &&
+                                            artifactId.equals(plugin.getChildValue("artifactId").orElse(null))
                             )
                             .findAny();
                     if (maybePlugin.isPresent()) {
@@ -90,7 +90,7 @@ public class ChangePluginConfiguration extends Recipe {
                         if (configuration == null) {
                             plugins = filterChildren(plugins, plugin,
                                     child -> !(child instanceof Xml.Tag && "configuration".equals(((Xml.Tag) child).getName())));
-                        } else  {
+                        } else {
                             plugins = addOrUpdateChild(plugins, plugin,
                                     Xml.Tag.build("<configuration>\n" + configuration + "\n</configuration>"),
                                     getCursor().getParentOrThrow());

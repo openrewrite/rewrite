@@ -26,8 +26,8 @@ class ForLoopTest implements RewriteTest {
     @Test
     void forLoopMultipleInit() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       int i;
@@ -37,15 +37,15 @@ class ForLoopTest implements RewriteTest {
                   }
                 }
               """
-          )
+                )
         );
     }
 
     @Test
     void forLoop() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       for(int i = 0; i < 10; i++) {
@@ -53,15 +53,15 @@ class ForLoopTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void infiniteLoop() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       for(;;) {
@@ -69,15 +69,15 @@ class ForLoopTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void format() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       for ( int i = 0 ; i < 10 ; i++ ) {
@@ -85,45 +85,45 @@ class ForLoopTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void formatInfiniteLoop() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       for ( ; ; ) {}
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void formatLoopNoInit() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test(int i) {
                       for ( ; i < 10 ; i++ ) {}
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void formatLoopNoCondition() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       int i = 0;
@@ -131,30 +131,30 @@ class ForLoopTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void statementTerminatorForSingleLineForLoops() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       for(;;) test();
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void initializerIsAnAssignment() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                   
@@ -164,22 +164,22 @@ class ForLoopTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void multiVariableInitialization() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       for(int i, j = 0;;) {}
                   }
               }
               """
-          )
+                )
         );
     }
 }

@@ -28,15 +28,15 @@ class RecipeEqualsAndHashCodeCallSuperTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new RecipeEqualsAndHashCodeCallSuper())
-          .parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()));
+                .parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()));
     }
 
     @DocumentExample
     @Test
     void recipeEqualsAndHashCodeCallSuper() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import org.openrewrite.Recipe;
               import lombok.EqualsAndHashCode;
               import lombok.Value;
@@ -46,7 +46,7 @@ class RecipeEqualsAndHashCodeCallSuperTest implements RewriteTest {
               class MyRecipe extends Recipe {
               }
               """,
-            """
+                        """
               import org.openrewrite.Recipe;
               import lombok.EqualsAndHashCode;
               import lombok.Value;
@@ -56,15 +56,15 @@ class RecipeEqualsAndHashCodeCallSuperTest implements RewriteTest {
               class MyRecipe extends Recipe {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void retainExclude() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import org.openrewrite.Recipe;
               import lombok.EqualsAndHashCode;
               import lombok.Value;
@@ -75,7 +75,7 @@ class RecipeEqualsAndHashCodeCallSuperTest implements RewriteTest {
                   String messages;
               }
               """,
-            """
+                        """
               import org.openrewrite.Recipe;
               import lombok.EqualsAndHashCode;
               import lombok.Value;
@@ -86,15 +86,15 @@ class RecipeEqualsAndHashCodeCallSuperTest implements RewriteTest {
                   String messages;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void skipFalse() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import org.openrewrite.Recipe;
               import lombok.EqualsAndHashCode;
               import lombok.Value;
@@ -105,7 +105,7 @@ class RecipeEqualsAndHashCodeCallSuperTest implements RewriteTest {
                   String messages;
               }
               """
-          )
+                )
         );
     }
 }

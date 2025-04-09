@@ -39,9 +39,9 @@ class EnvironmentTest implements RewriteTest {
     @Test
     void declarativeRecipesDontAddToEstimatedTimeFixed() {
         rewriteRun(
-          spec -> spec
-            .recipeFromYaml(
-              """
+                spec -> spec
+                        .recipeFromYaml(
+                                """
                 type: specs.openrewrite.org/v1beta/recipe
                 name: test.ChangeTextToHello
                 displayName: Change text to hello
@@ -50,28 +50,28 @@ class EnvironmentTest implements RewriteTest {
                     - org.openrewrite.text.ChangeText:
                         toText: Hello
                 """,
-              "test.ChangeTextToHello"
-            )
-            .afterRecipe(run -> {
-                for (Result result : run.getChangeset().getAllResults()) {
-                    assertThat(result.getTimeSavings()).isEqualTo(Duration.ofMinutes(5));
-                }
-            }),
-          text(
-            "Hi",
-            "Hello"
-          )
+                                "test.ChangeTextToHello"
+                        )
+                        .afterRecipe(run -> {
+                            for (Result result : run.getChangeset().getAllResults()) {
+                                assertThat(result.getTimeSavings()).isEqualTo(Duration.ofMinutes(5));
+                            }
+                        }),
+                text(
+                        "Hi",
+                        "Hello"
+                )
         );
     }
 
     @Test
     void listRecipes() {
         var env = Environment.builder()
-          .load(
-            new YamlResourceLoader(
-              //language=yml
-              new ByteArrayInputStream(
-                """
+                .load(
+                        new YamlResourceLoader(
+                                //language=yml
+                                new ByteArrayInputStream(
+                                        """
                   type: specs.openrewrite.org/v1beta/recipe
                   name: test.ChangeTextToHello
                   displayName: Change text to hello
@@ -80,37 +80,37 @@ class EnvironmentTest implements RewriteTest {
                       - org.openrewrite.text.ChangeText:
                           toText: Hello
                   """.getBytes()
-              ),
-              URI.create("rewrite.yml"),
-              new Properties()
-            )
-          )
-          .build();
+                                ),
+                                URI.create("rewrite.yml"),
+                                new Properties()
+                        )
+                )
+                .build();
 
         assertThat(env.listRecipes().stream()
-          .map(Recipe::getName)).containsExactly("test.ChangeTextToHello");
+                .map(Recipe::getName)).containsExactly("test.ChangeTextToHello");
 
         var recipe = env.activateRecipes("test.ChangeTextToHello");
         assertThat(recipe.validateAll()).allMatch(Validated::isValid);
 
         var changes = recipe.run(new InMemoryLargeSourceSet(List.of(
-            PlainText.builder()
-              .sourcePath(Paths.get("test.txt"))
-              .text("hello")
-              .build())), new InMemoryExecutionContext())
-          .getChangeset()
-          .getAllResults();
+                PlainText.builder()
+                        .sourcePath(Paths.get("test.txt"))
+                        .text("hello")
+                        .build())), new InMemoryExecutionContext())
+                .getChangeset()
+                .getAllResults();
         assertThat(changes).hasSize(1);
     }
 
     @Test
     void activeRecipeNotFoundSuggestions() {
         var env = Environment.builder()
-          .load(
-            new YamlResourceLoader(
-              //language=yml
-              new ByteArrayInputStream(
-                """
+                .load(
+                        new YamlResourceLoader(
+                                //language=yml
+                                new ByteArrayInputStream(
+                                        """
                   type: specs.openrewrite.org/v1beta/recipe
                   name: test.ChangeTextToHello
                   displayName: Change text to hello
@@ -127,27 +127,27 @@ class EnvironmentTest implements RewriteTest {
                     - org.openrewrite.text.ChangeText:
                         toText: Hello
                   """.getBytes()
-              ),
-              URI.create("rewrite.yml"),
-              new Properties()
-            )
-          )
-          .build();
+                                ),
+                                URI.create("rewrite.yml"),
+                                new Properties()
+                        )
+                )
+                .build();
 
         assertThatExceptionOfType(RecipeException.class)
-          .isThrownBy(() -> env.activateRecipes("foo.ChangeTextToHelloWorld"))
-          .withMessageContaining("foo.ChangeTextToHelloWorld")
-          .withMessageContaining("test.ChangeTextToHelloWorld");
+                .isThrownBy(() -> env.activateRecipes("foo.ChangeTextToHelloWorld"))
+                .withMessageContaining("foo.ChangeTextToHelloWorld")
+                .withMessageContaining("test.ChangeTextToHelloWorld");
     }
 
     @Test
     void recipeWithoutRequiredConfiguration() {
         var env = Environment.builder()
-          .load(
-            new YamlResourceLoader(
-              //language=yml
-              new ByteArrayInputStream(
-                """
+                .load(
+                        new YamlResourceLoader(
+                                //language=yml
+                                new ByteArrayInputStream(
+                                        """
                   type: specs.openrewrite.org/v1beta/recipe
                   name: test.ChangeTextToHello
                   displayName: Change text to hello
@@ -155,12 +155,12 @@ class EnvironmentTest implements RewriteTest {
                   recipeList:
                       - org.openrewrite.text.ChangeText
                   """.getBytes()
-              ),
-              URI.create("rewrite.yml"),
-              new Properties()
-            )
-          )
-          .build();
+                                ),
+                                URI.create("rewrite.yml"),
+                                new Properties()
+                        )
+                )
+                .build();
 
         var recipe = env.activateRecipes("test.ChangeTextToHello");
         assertThat(recipe.validateAll()).anyMatch(Validated::isInvalid);
@@ -169,11 +169,11 @@ class EnvironmentTest implements RewriteTest {
     @Test
     void recipeDependsOnOtherDeclarativeRecipe() {
         var env = Environment.builder()
-          .load(
-            new YamlResourceLoader(
-              //language=yml
-              new ByteArrayInputStream(
-                """
+                .load(
+                        new YamlResourceLoader(
+                                //language=yml
+                                new ByteArrayInputStream(
+                                        """
                   type: specs.openrewrite.org/v1beta/recipe
                   name: test.TextMigration
                   displayName: Text migration
@@ -189,34 +189,34 @@ class EnvironmentTest implements RewriteTest {
                       - org.openrewrite.text.ChangeText:
                           toText: Hello
                   """.getBytes()
-              ),
-              URI.create("rewrite.yml"),
-              new Properties()
-            )
-          )
-          .build();
+                                ),
+                                URI.create("rewrite.yml"),
+                                new Properties()
+                        )
+                )
+                .build();
 
         var recipe = env.activateRecipes("test.TextMigration");
         assertThat(recipe.validateAll()).allMatch(Validated::isValid);
 
         var changes = recipe.run(new InMemoryLargeSourceSet(List.of(
-            PlainText.builder()
-              .sourcePath(Paths.get("test.txt"))
-              .text("hello")
-              .build())), new InMemoryExecutionContext())
-          .getChangeset()
-          .getAllResults();
+                PlainText.builder()
+                        .sourcePath(Paths.get("test.txt"))
+                        .text("hello")
+                        .build())), new InMemoryExecutionContext())
+                .getChangeset()
+                .getAllResults();
         assertThat(changes).hasSize(1);
     }
 
     @Test
     void recipeDependsOnOtherDeclarativeRecipeSpecifiedInAnotherFile() {
         var env = Environment.builder()
-          .load(
-            new YamlResourceLoader(
-              //language=yml
-              new ByteArrayInputStream(
-                """
+                .load(
+                        new YamlResourceLoader(
+                                //language=yml
+                                new ByteArrayInputStream(
+                                        """
                   type: specs.openrewrite.org/v1beta/recipe
                   name: test.TextMigration
                   displayName: Text migration
@@ -224,14 +224,14 @@ class EnvironmentTest implements RewriteTest {
                   recipeList:
                       - test.ChangeTextToHello
                   """.getBytes()
-              ),
-              URI.create("rewrite.yml"),
-              new Properties()
-            )
-          )
-          .load(
-            new YamlResourceLoader(
-              new ByteArrayInputStream("""
+                                ),
+                                URI.create("rewrite.yml"),
+                                new Properties()
+                        )
+                )
+                .load(
+                        new YamlResourceLoader(
+                                new ByteArrayInputStream("""
                     type: specs.openrewrite.org/v1beta/recipe
                     name: test.ChangeTextToHello
                     displayName: Change text to hello
@@ -239,34 +239,34 @@ class EnvironmentTest implements RewriteTest {
                         - org.openrewrite.text.ChangeText:
                             toText: Hello
                 """.getBytes()
-              ),
-              URI.create("text.yml"),
-              new Properties()
-            )
-          )
-          .build();
+                                ),
+                                URI.create("text.yml"),
+                                new Properties()
+                        )
+                )
+                .build();
 
         var recipe = env.activateRecipes("test.TextMigration");
         assertThat(recipe.validateAll()).allMatch(Validated::isValid);
 
         var changes = recipe.run(new InMemoryLargeSourceSet(List.of(
-            PlainText.builder()
-              .sourcePath(Paths.get("test.txt"))
-              .text("hello")
-              .build())), new InMemoryExecutionContext())
-          .getChangeset()
-          .getAllResults();
+                PlainText.builder()
+                        .sourcePath(Paths.get("test.txt"))
+                        .text("hello")
+                        .build())), new InMemoryExecutionContext())
+                .getChangeset()
+                .getAllResults();
         assertThat(changes).hasSize(1);
     }
 
     @Test
     void recipeDependsOnNonExistentRecipe() {
         var env = Environment.builder()
-          .load(
-            new YamlResourceLoader(
-              //language=yml
-              new ByteArrayInputStream(
-                """
+                .load(
+                        new YamlResourceLoader(
+                                //language=yml
+                                new ByteArrayInputStream(
+                                        """
                   type: specs.openrewrite.org/v1beta/recipe
                   name: test.TextMigration
                   displayName: Text migration
@@ -274,12 +274,12 @@ class EnvironmentTest implements RewriteTest {
                   recipeList:
                       - test.DoesNotExist
                   """.getBytes()
-              ),
-              URI.create("rewrite.yml"),
-              new Properties()
-            )
-          )
-          .build();
+                                ),
+                                URI.create("rewrite.yml"),
+                                new Properties()
+                        )
+                )
+                .build();
 
         var recipe = env.activateRecipes("test.TextMigration");
         assertThat(recipe.validateAll()).anyMatch(Validated::isInvalid);
@@ -288,11 +288,11 @@ class EnvironmentTest implements RewriteTest {
     @Test
     void declarativeRecipeListClassCastException() {
         var env = Environment.builder()
-          .load(
-            new YamlResourceLoader(
-              //language=yml
-              new ByteArrayInputStream(
-                """
+                .load(
+                        new YamlResourceLoader(
+                                //language=yml
+                                new ByteArrayInputStream(
+                                        """
                   type: specs.openrewrite.org/v1beta/recipe
                   name: test.LicenseHeader
                   displayName: License header
@@ -301,11 +301,11 @@ class EnvironmentTest implements RewriteTest {
                     - org.openrewrite.java.AddLicenseHeader: |-
                         LicenseHeader
                   """.getBytes()
-              ),
-              URI.create("rewrite.yml"),
-              new Properties()
-            )
-          ).build();
+                                ),
+                                URI.create("rewrite.yml"),
+                                new Properties()
+                        )
+                ).build();
 
         var recipe = env.activateRecipes("test.LicenseHeader");
         assertThat(recipe.validateAll()).anyMatch(Validated::isInvalid);
@@ -314,11 +314,11 @@ class EnvironmentTest implements RewriteTest {
     @Test
     void declarativeRecipeWrongPackage() {
         var env = Environment.builder()
-          .load(
-            new YamlResourceLoader(
-              //language=yml
-              new ByteArrayInputStream(
-                """
+                .load(
+                        new YamlResourceLoader(
+                                //language=yml
+                                new ByteArrayInputStream(
+                                        """
                   type: specs.openrewrite.org/v1beta/recipe
                   name: test.ResultOfFileMkdirsIgnored
                   displayName: Test
@@ -327,11 +327,11 @@ class EnvironmentTest implements RewriteTest {
                     - org.openrewrite.java.ResultOfMethodCallIgnored:
                           methodPattern: 'java.io.File mkdir*()'
                   """.getBytes()
-              ),
-              URI.create("rewrite.yml"),
-              new Properties()
-            )
-          ).build();
+                                ),
+                                URI.create("rewrite.yml"),
+                                new Properties()
+                        )
+                ).build();
 
         var recipe = env.activateRecipes("test.ResultOfFileMkdirsIgnored");
         var validateAll = recipe.validateAll();
@@ -341,10 +341,10 @@ class EnvironmentTest implements RewriteTest {
     @Test
     void scanClasspath() {
         var env = Environment.builder()
-          .scanRuntimeClasspath()
-          .load(new YamlResourceLoader(new ByteArrayInputStream(
-            //language=yml
-            """
+                .scanRuntimeClasspath()
+                .load(new YamlResourceLoader(new ByteArrayInputStream(
+                        //language=yml
+                        """
               type: specs.openrewrite.org/v1beta/attribution
               recipeName: org.openrewrite.text.ChangeTextToJon
               contributors:
@@ -352,26 +352,26 @@ class EnvironmentTest implements RewriteTest {
                   email: "jon@moderne.io"
                   lineCount: 5
               """.getBytes()
-          ), URI.create("attribution/test.ChangeTextToHello.yml"), new Properties()))
-          .build();
+                ), URI.create("attribution/test.ChangeTextToHello.yml"), new Properties()))
+                .build();
 
         Collection<Recipe> recipes = env.listRecipes();
         assertThat(recipes).hasSizeGreaterThanOrEqualTo(2)
-          .extracting("name")
-          .contains("org.openrewrite.text.ChangeTextToJon", "org.openrewrite.HelloJon");
+                .extracting("name")
+                .contains("org.openrewrite.text.ChangeTextToJon", "org.openrewrite.HelloJon");
 
         assertThat(env.listStyles()).hasSizeGreaterThanOrEqualTo(1)
-          .extracting("name")
-          .contains("org.openrewrite.SampleStyle");
+                .extracting("name")
+                .contains("org.openrewrite.SampleStyle");
 
         //noinspection OptionalGetWithoutIsPresent
         Recipe cttj = recipes.stream()
-          .filter(it -> "org.openrewrite.text.ChangeTextToJon".equals(it.getName()))
-          .findAny()
-          .get();
+                .filter(it -> "org.openrewrite.text.ChangeTextToJon".equals(it.getName()))
+                .findAny()
+                .get();
 
         assertThat(cttj.getContributors())
-          .isNotEmpty();
+                .isNotEmpty();
     }
 
     @Test
@@ -380,7 +380,7 @@ class EnvironmentTest implements RewriteTest {
         var recipeDescriptors = env.listRecipeDescriptors();
         assertThat(recipeDescriptors).isNotNull().isNotEmpty();
         var changeTextDescriptor = recipeDescriptors.stream().filter(rd -> rd.getName().equals("org.openrewrite.text.ChangeText"))
-          .findAny().orElse(null);
+                .findAny().orElse(null);
         assertThat(changeTextDescriptor).isNotNull();
         assertThat(changeTextDescriptor.getOptions()).hasSize(1);
         assertThat(changeTextDescriptor.getOptions().get(0).getName()).isEqualTo("toText");
@@ -393,7 +393,7 @@ class EnvironmentTest implements RewriteTest {
         var styles = env.listStyles();
         assertThat(styles).isNotNull().isNotEmpty();
         var sampleStyle = styles.stream().filter(s -> s.getName().equals("org.openrewrite.SampleStyle"))
-          .findAny().orElse(null);
+                .findAny().orElse(null);
         assertThat(sampleStyle).isNotNull();
         assertThat(sampleStyle.getDisplayName()).isEqualTo("Sample style");
         assertThat(sampleStyle.getDescription()).isEqualTo("Sample test style.");
@@ -404,14 +404,14 @@ class EnvironmentTest implements RewriteTest {
     @Test
     void environmentActivatedRecipeUsableInTests() {
         rewriteRun(
-          spec -> spec.recipe(Environment.builder()
-            .scanRuntimeClasspath()
-            .build()
-            .activateRecipes("org.openrewrite.text.ChangeTextToJon")),
-          text(
-            "some text that isn't jon",
-            "Hello Jon!"
-          )
+                spec -> spec.recipe(Environment.builder()
+                        .scanRuntimeClasspath()
+                        .build()
+                        .activateRecipes("org.openrewrite.text.ChangeTextToJon")),
+                text(
+                        "some text that isn't jon",
+                        "Hello Jon!"
+                )
         );
     }
 
@@ -422,7 +422,7 @@ class EnvironmentTest implements RewriteTest {
         var recipeDescriptors = env.listRecipeDescriptors();
         assertThat(recipeDescriptors).isNotNull().isNotEmpty();
         var helloJon2 = recipeDescriptors.stream().filter(rd -> rd.getName().equals("org.openrewrite.HelloJon2"))
-          .findAny().orElseThrow();
+                .findAny().orElseThrow();
         assertThat(helloJon2.getRecipeList()).hasSize(1);
         assertThat(helloJon2.getRecipeList().get(0).getName()).isEqualTo("org.openrewrite.HelloJon");
     }
@@ -431,10 +431,10 @@ class EnvironmentTest implements RewriteTest {
     @Test
     void preserveRecipeListOrder() {
         var env = Environment.builder()
-          .load(new YamlResourceLoader(
-            //language=yaml
-            new ByteArrayInputStream(
-              """
+                .load(new YamlResourceLoader(
+                        //language=yaml
+                        new ByteArrayInputStream(
+                                """
                 type: specs.openrewrite.org/v1beta/recipe
                 name: test.FooOne
                 displayName: Test
@@ -444,14 +444,14 @@ class EnvironmentTest implements RewriteTest {
                         foo: "foo"
                         bar: 1
                 """.getBytes()
-            ),
-            URI.create("rewrite.yml"),
-            new Properties()
-          ))
-          .load(new YamlResourceLoader(
-            //language=yaml
-            new ByteArrayInputStream(
-              """
+                        ),
+                        URI.create("rewrite.yml"),
+                        new Properties()
+                ))
+                .load(new YamlResourceLoader(
+                        //language=yaml
+                        new ByteArrayInputStream(
+                                """
                 type: specs.openrewrite.org/v1beta/recipe
                 name: test.BarTwo
                 displayName: Test
@@ -460,14 +460,14 @@ class EnvironmentTest implements RewriteTest {
                         foo: "bar"
                         bar: 2
                 """.getBytes()
-            ),
-            URI.create("rewrite.yml"),
-            new Properties()
-          ))
-          .load(new YamlResourceLoader(
-            //language=yaml
-            new ByteArrayInputStream(
-              """
+                        ),
+                        URI.create("rewrite.yml"),
+                        new Properties()
+                ))
+                .load(new YamlResourceLoader(
+                        //language=yaml
+                        new ByteArrayInputStream(
+                                """
                 type: specs.openrewrite.org/v1beta/recipe
                 name: test.OrderPreserved
                 displayName: Test
@@ -482,11 +482,11 @@ class EnvironmentTest implements RewriteTest {
                   - test.BarTwo
                   - org.openrewrite.config.RecipeNoParameters
                 """.getBytes()
-            ),
-            URI.create("rewrite.yml"),
-            new Properties()
-          ))
-          .build();
+                        ),
+                        URI.create("rewrite.yml"),
+                        new Properties()
+                ))
+                .build();
         var recipeList = env.activateRecipes("test.OrderPreserved").getRecipeList();
         assertThat(recipeList.get(0).getName()).isEqualTo("org.openrewrite.config.RecipeNoParameters");
         assertThat(recipeList.get(1).getName()).isEqualTo("test.FooOne");
@@ -499,10 +499,10 @@ class EnvironmentTest implements RewriteTest {
     @Test
     void canCauseAnotherCycle() {
         var env = Environment.builder()
-          .load(new YamlResourceLoader(
-            //language=yaml
-            new ByteArrayInputStream(
-              """
+                .load(new YamlResourceLoader(
+                        //language=yaml
+                        new ByteArrayInputStream(
+                                """
                 type: specs.openrewrite.org/v1beta/recipe
                 name: test.Foo
                 displayName: Test
@@ -512,10 +512,10 @@ class EnvironmentTest implements RewriteTest {
                   - org.openrewrite.config.RecipeNoParameters
                 
                 """.getBytes()
-            ),
-            URI.create("rewrite.yml"),
-            new Properties()
-          )).build();
+                        ),
+                        URI.create("rewrite.yml"),
+                        new Properties()
+                )).build();
         var recipe = env.activateRecipes("test.Foo");
         assertThat(recipe.causesAnotherCycle()).isTrue();
     }
@@ -523,10 +523,10 @@ class EnvironmentTest implements RewriteTest {
     @Test
     void willBeValidIfIncludesRecipesFromDependencies() {
         var env = Environment.builder()
-          .load(new YamlResourceLoader(
-              //language=yaml
-              new ByteArrayInputStream(
-                """
+                .load(new YamlResourceLoader(
+                                //language=yaml
+                                new ByteArrayInputStream(
+                                        """
                   type: specs.openrewrite.org/v1beta/recipe
                   name: test.Foo
                   displayName: Test
@@ -534,14 +534,14 @@ class EnvironmentTest implements RewriteTest {
                   recipeList:
                     - org.openrewrite.config.RecipeNoParameters
                   """.getBytes()
-              ),
-              URI.create("rewrite.yml"),
-              new Properties()
-            ),
-            List.of(new YamlResourceLoader(
-              //language=yaml
-              new ByteArrayInputStream(
-                """
+                                ),
+                                URI.create("rewrite.yml"),
+                                new Properties()
+                        ),
+                        List.of(new YamlResourceLoader(
+                                //language=yaml
+                                new ByteArrayInputStream(
+                                        """
                   type: specs.openrewrite.org/v1beta/recipe
                   name: org.openrewrite.config.RecipeNoParameters
                   displayName: Test
@@ -549,10 +549,10 @@ class EnvironmentTest implements RewriteTest {
                   recipeList:
                     - org.openrewrite.config.RecipeSomeParameters
                   """.getBytes()
-              ),
-              URI.create("rewrite.yml"),
-              new Properties()
-            ))).build();
+                                ),
+                                URI.create("rewrite.yml"),
+                                new Properties()
+                        ))).build();
         var recipe = env.activateRecipes("test.Foo");
         assertThat(recipe.validate().isValid()).isTrue();
     }

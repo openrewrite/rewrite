@@ -27,205 +27,205 @@ class FindAndReplaceLiteralTest implements RewriteTest {
     @DocumentExample
     void defaultNonRegexReplace() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplaceLiteral("app-cluster", "new-app-cluster", null, null)),
-          //language=hcl
-          hcl(
-            """
+                spec -> spec.recipe(new FindAndReplaceLiteral("app-cluster", "new-app-cluster", null, null)),
+                //language=hcl
+                hcl(
+                        """
               config = {
                 app_deployment = {
                   cluster_name = "app-cluster"
                 }
               }
               """,
-            """
+                        """
               config = {
                 app_deployment = {
                   cluster_name = "new-app-cluster"
                 }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void removeWhenReplaceIsNullOrEmpty() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplaceLiteral("prefix-", null, null, null)),
-          //language=hcl
-          hcl(
-            """
+                spec -> spec.recipe(new FindAndReplaceLiteral("prefix-", null, null, null)),
+                //language=hcl
+                hcl(
+                        """
               config = {
                 app_deployment = {
                   cluster_name = "prefix-app-cluster"
                 }
               }
               """,
-            """
+                        """
               config = {
                 app_deployment = {
                   cluster_name = "app-cluster"
                 }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void regexReplace() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplaceLiteral(".", "a", true, null)),
-          //language=hcl
-          hcl(
-            """
+                spec -> spec.recipe(new FindAndReplaceLiteral(".", "a", true, null)),
+                //language=hcl
+                hcl(
+                        """
               config = {
                 app_deployment = {
                   cluster_name = "app-cluster"
                 }
               }
               """,
-            """
+                        """
               config = {
                 app_deployment = {
                   cluster_name = "aaaaaaaaaaa"
                 }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void captureGroupsReplace() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplaceLiteral("old-([^.]+)", "new-$1", true, null)),
-          //language=hcl
-          hcl(
-            """
+                spec -> spec.recipe(new FindAndReplaceLiteral("old-([^.]+)", "new-$1", true, null)),
+                //language=hcl
+                hcl(
+                        """
               config = {
                 app_deployment = {
                   cluster_name = "old-app-cluster"
                 }
               }
               """,
-            """
+                        """
               config = {
                 app_deployment = {
                   cluster_name = "new-app-cluster"
                 }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void noRecursiveReplace() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplaceLiteral("app", "application", null, null)),
-          //language=hcl
-          hcl(
-            """
+                spec -> spec.recipe(new FindAndReplaceLiteral("app", "application", null, null)),
+                //language=hcl
+                hcl(
+                        """
               config = {
                 app_deployment = {
                   cluster_name = "app-cluster"
                 }
               }
               """,
-            """
+                        """
               config = {
                 app_deployment = {
                   cluster_name = "application-cluster"
                 }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void compatibleWithDollarSigns() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplaceLiteral("$${app-cluster}", "$${new-app-cluster}", null, null)),
-          //language=hcl
-          hcl(
-            """
+                spec -> spec.recipe(new FindAndReplaceLiteral("$${app-cluster}", "$${new-app-cluster}", null, null)),
+                //language=hcl
+                hcl(
+                        """
               config = {
                 app_deployment = {
                   cluster_name = "$${app-cluster}"
                 }
               }
               """,
-            """
+                        """
               config = {
                 app_deployment = {
                   cluster_name = "$${new-app-cluster}"
                 }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doesNotReplaceStringTemplate() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplaceLiteral("app-name", "new-app-name", null, null)),
-          //language=hcl
-          hcl(
-            """
+                spec -> spec.recipe(new FindAndReplaceLiteral("app-name", "new-app-name", null, null)),
+                //language=hcl
+                hcl(
+                        """
               config = {
                 app_deployment = {
                   cluster_name = "old-${app-name}-cluster"
                 }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doesNothingIfLiteralNotFound() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplaceLiteral("hello", "goodbye", null, null)),
-          //language=hcl
-          hcl(
-            """
+                spec -> spec.recipe(new FindAndReplaceLiteral("hello", "goodbye", null, null)),
+                //language=hcl
+                hcl(
+                        """
               config = {
                 app_deployment = {
                   cluster_name = "app-cluster"
                 }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doesNotReplaceVariableNames() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplaceLiteral("app_deployment", "replacement_deployment_name", null, null)),
-          //language=hcl
-          hcl(
-            """
+                spec -> spec.recipe(new FindAndReplaceLiteral("app_deployment", "replacement_deployment_name", null, null)),
+                //language=hcl
+                hcl(
+                        """
               config = {
                 app_deployment = {
                   cluster_name = "app-cluster"
                 }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void replacesNumericLiterals() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplaceLiteral("2", "1", null, null)),
-          //language=hcl
-          hcl(
-            """
+                spec -> spec.recipe(new FindAndReplaceLiteral("2", "1", null, null)),
+                //language=hcl
+                hcl(
+                        """
               config = {
                 app_deployment = {
                   cluster_name = "app-cluster"
@@ -233,7 +233,7 @@ class FindAndReplaceLiteralTest implements RewriteTest {
                 }
               }
               """,
-            """
+                        """
               config = {
                 app_deployment = {
                   cluster_name = "app-cluster"
@@ -241,35 +241,35 @@ class FindAndReplaceLiteralTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void successiveReplacement() {
         rewriteRun(
-          spec -> spec.recipes(
-            new FindAndReplaceLiteral("cluster-1", "cluster-2", null, null),
-            new FindAndReplaceLiteral("cluster-2", "cluster-3", null, null),
-            new FindAndReplaceLiteral("cluster-3", "cluster-4", null, null)
-          ),
-          //language=hcl
-          hcl(
-            """
+                spec -> spec.recipes(
+                        new FindAndReplaceLiteral("cluster-1", "cluster-2", null, null),
+                        new FindAndReplaceLiteral("cluster-2", "cluster-3", null, null),
+                        new FindAndReplaceLiteral("cluster-3", "cluster-4", null, null)
+                ),
+                //language=hcl
+                hcl(
+                        """
               config = {
                 app_deployment = {
                   cluster_name = "cluster-1"
                 }
               }
               """,
-            """
+                        """
               config = {
                 app_deployment = {
                   cluster_name = "cluster-4"
                 }
               }
               """
-          )
+                )
         );
     }
 }

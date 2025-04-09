@@ -34,15 +34,15 @@ class UpgradeParentVersionTest implements RewriteTest {
     @Test
     void doesNotDowngradeVersion() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeParentVersion(
-            "org.springframework.boot",
-            "spring-boot-starter-parent",
-            "~1.5",
-            null,
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeParentVersion(
+                        "org.springframework.boot",
+                        "spring-boot-starter-parent",
+                        "~1.5",
+                        null,
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                 <parent>
                   <groupId>org.springframework.boot</groupId>
@@ -55,7 +55,7 @@ class UpgradeParentVersionTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -63,17 +63,17 @@ class UpgradeParentVersionTest implements RewriteTest {
     @Test
     void nonMavenCentralRepository() {
         rewriteRun(
-          spec -> spec
-            .recipe(new UpgradeParentVersion("org.jenkins-ci", "jenkins", "1.125", null, null))
-            .executionContext(
-              MavenExecutionContextView
-                .view(new InMemoryExecutionContext())
-                .setRepositories(List.of(
-                  MavenRepository.builder().id("jenkins").uri("https://repo.jenkins-ci.org/public/").build()
-                ))
-            ),
-          pomXml(
-            """
+                spec -> spec
+                        .recipe(new UpgradeParentVersion("org.jenkins-ci", "jenkins", "1.125", null, null))
+                        .executionContext(
+                                MavenExecutionContextView
+                                        .view(new InMemoryExecutionContext())
+                                        .setRepositories(List.of(
+                                                MavenRepository.builder().id("jenkins").uri("https://repo.jenkins-ci.org/public/").build()
+                                        ))
+                        ),
+                pomXml(
+                        """
               <project>
                   <parent>
                       <groupId>org.jenkins-ci</groupId>
@@ -84,7 +84,7 @@ class UpgradeParentVersionTest implements RewriteTest {
                   <version>1.0.0</version>
               </project>
               """,
-            """
+                        """
               <project>
                   <parent>
                       <groupId>org.jenkins-ci</groupId>
@@ -95,22 +95,22 @@ class UpgradeParentVersionTest implements RewriteTest {
                   <version>1.0.0</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void upgradeVersion() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeParentVersion(
-            "org.springframework.boot",
-            "spring-boot-starter-parent",
-            "~1.5",
-            null,
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeParentVersion(
+                        "org.springframework.boot",
+                        "spring-boot-starter-parent",
+                        "~1.5",
+                        null,
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                 <parent>
                   <groupId>org.springframework.boot</groupId>
@@ -123,7 +123,7 @@ class UpgradeParentVersionTest implements RewriteTest {
                 <version>1</version>
               </project>
               """,
-            """
+                        """
               <project>
                 <parent>
                   <groupId>org.springframework.boot</groupId>
@@ -136,7 +136,7 @@ class UpgradeParentVersionTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -144,15 +144,15 @@ class UpgradeParentVersionTest implements RewriteTest {
     @ValueSource(strings = {"<relativePath />", "<relativePath></relativePath>"})
     void onlyExternalWhenActuallyExternal(String relativePathTag) {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeParentVersion(
-            "org.springframework.boot",
-            "spring-boot-starter-parent",
-            "~1.5",
-            null,
-            true
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeParentVersion(
+                        "org.springframework.boot",
+                        "spring-boot-starter-parent",
+                        "~1.5",
+                        null,
+                        true
+                )),
+                pomXml(
+                        """
               <project>
                 <parent>
                   <groupId>org.springframework.boot</groupId>
@@ -165,7 +165,7 @@ class UpgradeParentVersionTest implements RewriteTest {
                 <version>1</version>
               </project>
               """.formatted(relativePathTag),
-            """
+                        """
               <project>
                 <parent>
                   <groupId>org.springframework.boot</groupId>
@@ -178,7 +178,7 @@ class UpgradeParentVersionTest implements RewriteTest {
                 <version>1</version>
               </project>
               """.formatted(relativePathTag)
-          )
+                )
         );
     }
 
@@ -186,15 +186,15 @@ class UpgradeParentVersionTest implements RewriteTest {
     @ValueSource(strings = {"", "<relativePath>..</relativePath>", "<relativePath>../pom.xml</relativePath>", "<relativePath>../../pom.xml</relativePath>"})
     void onlyExternalWhenNotExternal(String relativePathTag) {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeParentVersion(
-            "org.springframework.boot",
-            "spring-boot-starter-parent",
-            "~1.5",
-            null,
-            true
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeParentVersion(
+                        "org.springframework.boot",
+                        "spring-boot-starter-parent",
+                        "~1.5",
+                        null,
+                        true
+                )),
+                pomXml(
+                        """
               <project>
                 <parent>
                   <groupId>org.springframework.boot</groupId>
@@ -207,22 +207,22 @@ class UpgradeParentVersionTest implements RewriteTest {
                 <version>1</version>
               </project>
               """.formatted(relativePathTag)
-          )
+                )
         );
     }
 
     @Test
     void upgradeToExactVersion() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeParentVersion(
-            "org.springframework.boot",
-            "spring-boot-starter-parent",
-            "1.5.22.RELEASE",
-            null,
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new UpgradeParentVersion(
+                        "org.springframework.boot",
+                        "spring-boot-starter-parent",
+                        "1.5.22.RELEASE",
+                        null,
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                 <parent>
                   <groupId>org.springframework.boot</groupId>
@@ -235,7 +235,7 @@ class UpgradeParentVersionTest implements RewriteTest {
                 <version>1</version>
               </project>
               """,
-            """
+                        """
               <project>
                 <parent>
                   <groupId>org.springframework.boot</groupId>
@@ -248,7 +248,7 @@ class UpgradeParentVersionTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 }

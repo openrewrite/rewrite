@@ -46,7 +46,7 @@ class VariableNameUtilsTest implements RewriteTest {
                 J.CompilationUnit c = super.visitCompilationUnit(cu, executionContext);
                 //noinspection RedundantCast
                 assertThat(getCursor().getMessage("variables", emptySet()))
-                  .containsExactlyInAnyOrder((Object[]) expected.split(","));
+                        .containsExactlyInAnyOrder((Object[]) expected.split(","));
                 return c;
             }
 
@@ -66,17 +66,17 @@ class VariableNameUtilsTest implements RewriteTest {
     @Test
     void doNotAddPackagePrivateNameFromSuperClass() {
         rewriteRun(
-          baseTest("classBlock", "classBlock"),
-          java(
-            """
+                baseTest("classBlock", "classBlock"),
+                java(
+                        """
               package foo;
               public class Super {
                   boolean pkgPrivate;
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package bar;
                             
               import foo.Super;
@@ -85,16 +85,16 @@ class VariableNameUtilsTest implements RewriteTest {
                   boolean classBlock;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void staticImportedFieldNames() {
         rewriteRun(
-          baseTest("classBlock", "classBlock,UTF_8"),
-          java(
-            """
+                baseTest("classBlock", "classBlock,UTF_8"),
+                java(
+                        """
               import static java.nio.charset.StandardCharsets.UTF_8;
               import static java.util.Collections.emptyList;
                             
@@ -102,16 +102,16 @@ class VariableNameUtilsTest implements RewriteTest {
                   boolean classBlock;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void enumFieldNames() {
         rewriteRun(
-          baseTest("myType", "myType,TYPES"),
-          java(
-            """
+                baseTest("myType", "myType,TYPES"),
+                java(
+                        """
               class Test {
                   TYPES myType;
               }
@@ -119,16 +119,16 @@ class VariableNameUtilsTest implements RewriteTest {
                VALUE, NUMBER, TEXT
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void allClassFieldsAreFound() {
         rewriteRun(
-          baseTest("methodBlock", "methodBlock,classBlockA,classBlockB"),
-          java(
-            """
+                baseTest("methodBlock", "methodBlock,classBlockA,classBlockB"),
+                java(
+                        """
               class Test {
                   boolean classBlockA;
                   void method() {
@@ -137,34 +137,34 @@ class VariableNameUtilsTest implements RewriteTest {
                   boolean classBlockB;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void findNamesAvailableFromBlock() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
-                  J.CompilationUnit c = super.visitCompilationUnit(cu, executionContext);
-                  assertThat(getCursor().getMessage("variables", emptySet()))
-                    .containsExactlyInAnyOrder("classFieldA", "classFieldB", "methodBlockA", "methodBlockB", "methodParam", "control", "forBlock", "ifBlock");
-                  return c;
-              }
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
+                        J.CompilationUnit c = super.visitCompilationUnit(cu, executionContext);
+                        assertThat(getCursor().getMessage("variables", emptySet()))
+                                .containsExactlyInAnyOrder("classFieldA", "classFieldB", "methodBlockA", "methodBlockB", "methodParam", "control", "forBlock", "ifBlock");
+                        return c;
+                    }
 
-              @Override
-              public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext p) {
-                  if (identifier.getSimpleName().equals("methodBlockA")) {
-                      HashSet<String> variables = getCursor().getNearestMessage("variables", new HashSet<>());
-                      variables.addAll(VariableNameUtils.findNamesInScope(getCursor().dropParentUntil(J.Block.class::isInstance)));
-                      getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "variables", variables);
-                  }
-                  return identifier;
-              }
-          })),
-          java(
-            """
+                    @Override
+                    public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext p) {
+                        if (identifier.getSimpleName().equals("methodBlockA")) {
+                            HashSet<String> variables = getCursor().getNearestMessage("variables", new HashSet<>());
+                            variables.addAll(VariableNameUtils.findNamesInScope(getCursor().dropParentUntil(J.Block.class::isInstance)));
+                            getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "variables", variables);
+                        }
+                        return identifier;
+                    }
+                })),
+                java(
+                        """
               class Test {
                   boolean classFieldA;
                   void method (boolean methodParam) {
@@ -180,16 +180,16 @@ class VariableNameUtilsTest implements RewriteTest {
                   boolean classFieldB;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void detectMethodParam() {
         rewriteRun(
-          baseTest("ifBlock", "ifBlock,methodBlockA,methodParam"),
-          java(
-            """
+                baseTest("ifBlock", "ifBlock,methodBlockA,methodParam"),
+                java(
+                        """
               class Test {
                   void method(boolean methodParam) {
                       boolean methodBlockA;
@@ -200,16 +200,16 @@ class VariableNameUtilsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void detectInstanceOf() {
         rewriteRun(
-          baseTest("ifBlock", "ifBlock,pattern,methodParam"),
-          java(
-            """
+                baseTest("ifBlock", "ifBlock,pattern,methodParam"),
+                java(
+                        """
               class Test {
                   void method(Object methodParam) {
                       if (methodParam instanceof String pattern) {
@@ -218,16 +218,16 @@ class VariableNameUtilsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void innerClass() {
         rewriteRun(
-          baseTest("innerClassBlock", "classBlockA,classBlockB,innerClassBlock"),
-          java(
-            """
+                baseTest("innerClassBlock", "classBlockA,classBlockB,innerClassBlock"),
+                java(
+                        """
               class Test {
                   boolean classBlockA;
                   void method() {
@@ -239,21 +239,21 @@ class VariableNameUtilsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
 
     }
 
     @ParameterizedTest
     @CsvSource(value = {
-      "control:control,methodBlockA",
-      "forBlock:forBlock,control,methodBlockA"
+            "control:control,methodBlockA",
+            "forBlock:forBlock,control,methodBlockA"
     }, delimiter = ':')
     void forLoop(String scope, String result) {
         rewriteRun(
-          baseTest(scope, result),
-          java(
-            """
+                baseTest(scope, result),
+                java(
+                        """
               class Test {
                   void method() {
                       boolean methodBlockA;
@@ -264,21 +264,21 @@ class VariableNameUtilsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @ParameterizedTest
     @CsvSource(value = {
-      "ifScope:ifScope,methodParam,methodBlockA",
-      "elseIfScope:elseIfScope,methodParam,methodBlockA",
-      "elseScope:elseScope,methodParam,methodBlockA"
+            "ifScope:ifScope,methodParam,methodBlockA",
+            "elseIfScope:elseIfScope,methodParam,methodBlockA",
+            "elseScope:elseScope,methodParam,methodBlockA"
     }, delimiter = ':')
     void ifElse(String scope, String result) {
         rewriteRun(
-          baseTest(scope, result),
-          java(
-            """
+                baseTest(scope, result),
+                java(
+                        """
               class Test {
                   void method(short methodParam) {
                       boolean methodBlockA;
@@ -293,21 +293,21 @@ class VariableNameUtilsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @SuppressWarnings({"UnnecessaryLocalVariable", "Convert2Lambda"})
     @ParameterizedTest
     @CsvSource(value = {
-      "supplier:supplier,methodBlockA",
-      "anonMethodBlock:anonMethodBlock,methodBlockA,supplier"
+            "supplier:supplier,methodBlockA",
+            "anonMethodBlock:anonMethodBlock,methodBlockA,supplier"
     }, delimiter = ':')
     void lambda(String scope, String result) {
         rewriteRun(
-          baseTest(scope, result),
-          java(
-            """
+                baseTest(scope, result),
+                java(
+                        """
               import java.util.function.Supplier;
                             
               class Test {
@@ -324,7 +324,7 @@ class VariableNameUtilsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -332,9 +332,9 @@ class VariableNameUtilsTest implements RewriteTest {
     @Test
     void superClass() {
         rewriteRun(
-          baseTest("classBlock", "classBlock,superPublic,superProtected,superPackagePrivate,superSuperPublic,superSuperProtected,superSuperPackagePrivate"),
-          java(
-            """
+                baseTest("classBlock", "classBlock,superPublic,superProtected,superPackagePrivate,superSuperPublic,superSuperProtected,superSuperPackagePrivate"),
+                java(
+                        """
               package foo.bar;
                             
               class SuperSuper {
@@ -344,9 +344,9 @@ class VariableNameUtilsTest implements RewriteTest {
                   int superSuperPackagePrivate;
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package foo.bar;
                             
               class Super extends SuperSuper {
@@ -356,31 +356,31 @@ class VariableNameUtilsTest implements RewriteTest {
                   int superPackagePrivate;
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package foo.bar;
                             
               class Test extends Super {
                   boolean classBlock;
               }
               """
-          )
+                )
         );
     }
 
     @SuppressWarnings("DuplicateBranchesInSwitch")
     @ParameterizedTest
     @CsvSource(value = {
-      "caseA:caseA,methodParam,methodBlockA",
-      "caseB:caseB,methodParam,methodBlockA",
-      "defaultBlock:defaultBlock,methodParam,methodBlockA"
+            "caseA:caseA,methodParam,methodBlockA",
+            "caseB:caseB,methodParam,methodBlockA",
+            "defaultBlock:defaultBlock,methodParam,methodBlockA"
     }, delimiter = ':')
     void switchStatement(String scope, String result) {
         rewriteRun(
-          baseTest(scope, result),
-          java(
-            """
+                baseTest(scope, result),
+                java(
+                        """
               class Test {
                   void method(short methodParam) {
                       boolean methodBlockA;
@@ -399,23 +399,23 @@ class VariableNameUtilsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @ParameterizedTest
     @CsvSource(value = {
-      "resourceA:resourceA,methodBlockA",
-      "tryBlock:tryBlock,methodBlockA,resourceA,resourceB",
-      "catchControl:catchControl,methodBlockA,resourceA,resourceB",
-      "catchBlock:catchBlock,methodBlockA,resourceA,resourceB,catchControl",
-      "finallyBlock:finallyBlock,methodBlockA,resourceA,resourceB"
+            "resourceA:resourceA,methodBlockA",
+            "tryBlock:tryBlock,methodBlockA,resourceA,resourceB",
+            "catchControl:catchControl,methodBlockA,resourceA,resourceB",
+            "catchBlock:catchBlock,methodBlockA,resourceA,resourceB,catchControl",
+            "finallyBlock:finallyBlock,methodBlockA,resourceA,resourceB"
     }, delimiter = ':')
     void tryCatchFinally(String scope, String result) {
         rewriteRun(
-          baseTest(scope, result),
-          java(
-            """
+                baseTest(scope, result),
+                java(
+                        """
               import java.io.*;
                             
               class Test {
@@ -432,20 +432,20 @@ class VariableNameUtilsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @ParameterizedTest
     @CsvSource(value = {
-      "whileBlock:whileBlock,methodParam,methodBlockA",
-      "doWhileBlock:doWhileBlock,methodParam,methodBlockA"
+            "whileBlock:whileBlock,methodParam,methodBlockA",
+            "doWhileBlock:doWhileBlock,methodParam,methodBlockA"
     }, delimiter = ':')
     void whileLoops(String scope, String result) {
         rewriteRun(
-          baseTest(scope, result),
-          java(
-            """
+                baseTest(scope, result),
+                java(
+                        """
               import java.io.*;
                             
               class Test {
@@ -463,7 +463,7 @@ class VariableNameUtilsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -471,17 +471,17 @@ class VariableNameUtilsTest implements RewriteTest {
     @Test
     void incrementExistingNumberPostFix() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext executionContext) {
-                  if (identifier.getSimpleName().equals("name2")) {
-                      return identifier.withSimpleName(VariableNameUtils.generateVariableName("name1", getCursor(), VariableNameUtils.GenerationStrategy.INCREMENT_NUMBER));
-                  }
-                  return identifier;
-              }
-          })).typeValidationOptions(TypeValidation.builder().variableDeclarations(false).identifiers(false).build()),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext executionContext) {
+                        if (identifier.getSimpleName().equals("name2")) {
+                            return identifier.withSimpleName(VariableNameUtils.generateVariableName("name1", getCursor(), VariableNameUtils.GenerationStrategy.INCREMENT_NUMBER));
+                        }
+                        return identifier;
+                    }
+                })).typeValidationOptions(TypeValidation.builder().variableDeclarations(false).identifiers(false).build()),
+                java(
+                        """
               @SuppressWarnings("all")
               class Test {
                   int name = 0;
@@ -490,7 +490,7 @@ class VariableNameUtilsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               @SuppressWarnings("all")
               class Test {
                   int name = 0;
@@ -499,28 +499,28 @@ class VariableNameUtilsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void conflictsInModifiedContents() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext ctx) {
-                  lambda = super.visitLambda(lambda, ctx);
-                  if (((J.VariableDeclarations) lambda.getParameters().getParameters().get(0)).getVariables().get(0).getSimpleName().startsWith("i")) {
-                      J.VariableDeclarations declarations = (J.VariableDeclarations) lambda.getParameters().getParameters().get(0);
-                      J.VariableDeclarations.NamedVariable variable = declarations.getVariables().get(0);
-                      variable = variable.withName(variable.getName().withSimpleName(VariableNameUtils.generateVariableName("j", new Cursor(getCursor(), lambda), VariableNameUtils.GenerationStrategy.INCREMENT_NUMBER)));
-                      lambda = lambda.withParameters(lambda.getParameters().withParameters(List.of(declarations.withVariables(List.of(variable)))));
-                  }
-                  return lambda;
-              }
-          })).typeValidationOptions(TypeValidation.builder().variableDeclarations(false).identifiers(false).build()),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext ctx) {
+                        lambda = super.visitLambda(lambda, ctx);
+                        if (((J.VariableDeclarations) lambda.getParameters().getParameters().get(0)).getVariables().get(0).getSimpleName().startsWith("i")) {
+                            J.VariableDeclarations declarations = (J.VariableDeclarations) lambda.getParameters().getParameters().get(0);
+                            J.VariableDeclarations.NamedVariable variable = declarations.getVariables().get(0);
+                            variable = variable.withName(variable.getName().withSimpleName(VariableNameUtils.generateVariableName("j", new Cursor(getCursor(), lambda), VariableNameUtils.GenerationStrategy.INCREMENT_NUMBER)));
+                            lambda = lambda.withParameters(lambda.getParameters().withParameters(List.of(declarations.withVariables(List.of(variable)))));
+                        }
+                        return lambda;
+                    }
+                })).typeValidationOptions(TypeValidation.builder().variableDeclarations(false).identifiers(false).build()),
+                java(
+                        """
               import java.util.function.Consumer;
               
               @SuppressWarnings("all")
@@ -535,7 +535,7 @@ class VariableNameUtilsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.function.Consumer;
               
               @SuppressWarnings("all")
@@ -550,7 +550,7 @@ class VariableNameUtilsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -559,17 +559,17 @@ class VariableNameUtilsTest implements RewriteTest {
     @Test
     void generateUniqueNameWithIncrementedNumber() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext executionContext) {
-                  if (identifier.getSimpleName().equals("ex")) {
-                      return identifier.withSimpleName(VariableNameUtils.generateVariableName("ignored", getCursor(), VariableNameUtils.GenerationStrategy.INCREMENT_NUMBER));
-                  }
-                  return identifier;
-              }
-          })).typeValidationOptions(TypeValidation.builder().variableDeclarations(false).identifiers(false).build()),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext executionContext) {
+                        if (identifier.getSimpleName().equals("ex")) {
+                            return identifier.withSimpleName(VariableNameUtils.generateVariableName("ignored", getCursor(), VariableNameUtils.GenerationStrategy.INCREMENT_NUMBER));
+                        }
+                        return identifier;
+                    }
+                })).typeValidationOptions(TypeValidation.builder().variableDeclarations(false).identifiers(false).build()),
+                java(
+                        """
               @SuppressWarnings("all")
               class Test {
                   int ignored = 0;
@@ -588,7 +588,7 @@ class VariableNameUtilsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               @SuppressWarnings("all")
               class Test {
                   int ignored = 0;
@@ -607,7 +607,7 @@ class VariableNameUtilsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

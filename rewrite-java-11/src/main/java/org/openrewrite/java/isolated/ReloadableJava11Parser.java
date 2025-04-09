@@ -79,12 +79,12 @@ public class ReloadableJava11Parser implements JavaParser {
     private final Collection<NamedStyles> styles;
 
     private ReloadableJava11Parser(boolean logCompilationWarningsAndErrors,
-                                   @Nullable Collection<Path> classpath,
-                                   Collection<byte[]> classBytesClasspath,
-                                   @Nullable Collection<Input> dependsOn,
-                                   Charset charset,
-                                   Collection<NamedStyles> styles,
-                                   JavaTypeCache typeCache) {
+            @Nullable Collection<Path> classpath,
+            Collection<byte[]> classBytesClasspath,
+            @Nullable Collection<Input> dependsOn,
+            Charset charset,
+            Collection<NamedStyles> styles,
+            JavaTypeCache typeCache) {
         this.classpath = classpath;
         this.dependsOn = dependsOn;
         this.styles = styles;
@@ -199,8 +199,8 @@ public class ReloadableJava11Parser implements JavaParser {
                 if ("endPosTable already set".equals(e.getMessage())) {
                     throw new IllegalStateException(
                             "Call reset() on JavaParser before parsing another set of source files that " +
-                            "have some of the same fully qualified names. Source file [" +
-                            input1.getPath() + "]\n[\n" + StringUtils.readFully(input1.getSource(ctx), getCharset(ctx)) + "\n]", e);
+                                    "have some of the same fully qualified names. Source file [" +
+                                    input1.getPath() + "]\n[\n" + StringUtils.readFully(input1.getSource(ctx), getCharset(ctx)) + "\n]", e);
                 }
                 throw e;
             }
@@ -313,10 +313,10 @@ public class ReloadableJava11Parser implements JavaParser {
         public boolean isEmpty() {
             if (sample != null) {
                 sample.stop(MetricsHelper.successTags(
-                                Timer.builder("rewrite.parse")
-                                        .description("The time spent by the JDK in type attributing the source file")
-                                        .tag("file.type", "Java")
-                                        .tag("step", "(2) Type attribution"))
+                        Timer.builder("rewrite.parse")
+                                .description("The time spent by the JDK in type attributing the source file")
+                                .tag("file.type", "Java")
+                                .tag("step", "(2) Type attribution"))
                         .register(Metrics.globalRegistry));
             }
             return super.isEmpty();
@@ -340,9 +340,9 @@ public class ReloadableJava11Parser implements JavaParser {
         private final List<PackageAwareJavaFileObject> classByteClasspath;
 
         public ByteArrayCapableJavacFileManager(Context context,
-                                                boolean register,
-                                                Charset charset,
-                                                Collection<byte[]> classByteClasspath) {
+                boolean register,
+                Charset charset,
+                Collection<byte[]> classByteClasspath) {
             super(context, register, charset);
             this.classByteClasspath = classByteClasspath.stream()
                     .map(PackageAwareJavaFileObject::new)

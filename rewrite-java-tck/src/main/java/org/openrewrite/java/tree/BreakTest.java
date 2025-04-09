@@ -26,15 +26,15 @@ class BreakTest implements RewriteTest {
     @Test
     void breakFromWhileLoop() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       while(true) break;
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -42,8 +42,8 @@ class BreakTest implements RewriteTest {
     @Test
     void breakFromLabeledWhileLoop() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       labeled: while(true)
@@ -51,7 +51,7 @@ class BreakTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

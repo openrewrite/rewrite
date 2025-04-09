@@ -55,88 +55,88 @@ class ImplementInterfaceTest implements RewriteTest {
     @Test
     void firstImplementedInterface() {
         rewriteRun(
-          java(b, SourceSpec::skip),
-          java(
-            """
+                java(b, SourceSpec::skip),
+                java(
+                        """
               class A {
               }
               """,
-            """
+                        """
               import b.B;
                             
               class A implements B {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void addAnImplementedInterface() {
         rewriteRun(
-          java(b, SourceSpec::skip),
-          java(c, SourceSpec::skip),
-          java(
-            """
+                java(b, SourceSpec::skip),
+                java(c, SourceSpec::skip),
+                java(
+                        """
               import c.C;
                             
               class A implements C {
               }
               """,
-            """
+                        """
               import b.B;
               import c.C;
                             
               class A implements C, B {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void addAnImplementedInterfaceWithTypeParameters() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
-                  doAfterVisit(new ImplementInterface<>(
-                    classDecl,
-                    "b.B",
-                    Arrays.asList(
-                      new J.Identifier(
-                        randomId(),
-                        Space.EMPTY,
-                        Markers.EMPTY,
-                        emptyList(),
-                        "String",
-                        ShallowClass.build("java.lang.String"),
-                        null
-                      ),
-                      new J.Identifier(
-                        randomId(),
-                        Space.build(" ", emptyList()),
-                        Markers.EMPTY,
-                        emptyList(),
-                        "LocalDate",
-                        ShallowClass.build("java.time.LocalDate"),
-                        null
-                      )
-                    )
-                  ));
-                  return classDecl;
-              }
-          })),
-          java(b, SourceSpec::skip),
-          java(c, SourceSpec::skip),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                        doAfterVisit(new ImplementInterface<>(
+                                classDecl,
+                                "b.B",
+                                Arrays.asList(
+                                        new J.Identifier(
+                                                randomId(),
+                                                Space.EMPTY,
+                                                Markers.EMPTY,
+                                                emptyList(),
+                                                "String",
+                                                ShallowClass.build("java.lang.String"),
+                                                null
+                                        ),
+                                        new J.Identifier(
+                                                randomId(),
+                                                Space.build(" ", emptyList()),
+                                                Markers.EMPTY,
+                                                emptyList(),
+                                                "LocalDate",
+                                                ShallowClass.build("java.time.LocalDate"),
+                                                null
+                                        )
+                                )
+                        ));
+                        return classDecl;
+                    }
+                })),
+                java(b, SourceSpec::skip),
+                java(c, SourceSpec::skip),
+                java(
+                        """
               import c.C;
                               
               class A implements C {
               }
               """,
-            """
+                        """
               import b.B;
               import c.C;
                               
@@ -145,7 +145,7 @@ class ImplementInterfaceTest implements RewriteTest {
               class A implements C, B<String, LocalDate> {
               }
               """
-          )
+                )
         );
     }
 }

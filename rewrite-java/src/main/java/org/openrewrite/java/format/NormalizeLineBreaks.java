@@ -35,7 +35,7 @@ public class NormalizeLineBreaks extends Recipe {
     @Override
     public String getDescription() {
         return "Consistently use either Windows style (CRLF) or Linux style (LF) line breaks. " +
-               "If no `GeneralFormatStyle` is specified this will use whichever style of line endings are more common.";
+                "If no `GeneralFormatStyle` is specified this will use whichever style of line endings are more common.";
     }
 
     @Override

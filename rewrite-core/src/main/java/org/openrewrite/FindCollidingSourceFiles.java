@@ -40,8 +40,8 @@ public class FindCollidingSourceFiles extends ScanningRecipe<FindCollidingSource
     @Override
     public String getDescription() {
         return "Finds source files which share a path with another source file. " +
-               "There should always be exactly one source file per path within a repository. " +
-               "This is a diagnostic for finding problems in OpenRewrite parsers/build plugins.";
+                "There should always be exactly one source file per path within a repository. " +
+                "This is a diagnostic for finding problems in OpenRewrite parsers/build plugins.";
     }
 
     @Override

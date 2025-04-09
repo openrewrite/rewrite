@@ -27,26 +27,26 @@ class ChangeKeyTest implements RewriteTest {
     @Test
     void simpleChangeRootKey() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeKey(
-            "$.description",
-            "\"newDescription\""
-          )),
-          json(
-                """
+                spec -> spec.recipe(new ChangeKey(
+                        "$.description",
+                        "\"newDescription\""
+                )),
+                json(
+                        """
               {
                 "id": "something",
                 "description": "desc",
                 "other": "whatever"
               }
               """,
-            """
+                        """
               {
                 "id": "something",
                 "newDescription": "desc",
                 "other": "whatever"
               }
               """
-          )
+                )
         );
     }
 
@@ -54,12 +54,12 @@ class ChangeKeyTest implements RewriteTest {
     @Test
     void changeNestedKey() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeKey(
-            "$.metadata.name",
-            "\"name2\""
-          )),
-          json(
-                """
+                spec -> spec.recipe(new ChangeKey(
+                        "$.metadata.name",
+                        "\"name2\""
+                )),
+                json(
+                        """
               {
                 "apiVersion": "v1",
                 "metadata": {
@@ -68,7 +68,7 @@ class ChangeKeyTest implements RewriteTest {
                 }
               }
               """,
-            """
+                        """
               {
                 "apiVersion": "v1",
                 "metadata": {
@@ -77,19 +77,19 @@ class ChangeKeyTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void changeArrayKey() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeKey(
-            "$.subjects.kind",
-            "\"kind2\""
-          )),
-          json(
-                """
+                spec -> spec.recipe(new ChangeKey(
+                        "$.subjects.kind",
+                        "\"kind2\""
+                )),
+                json(
+                        """
               {
                 "subjects": [
                   {
@@ -99,7 +99,7 @@ class ChangeKeyTest implements RewriteTest {
                 ]
               }
               """,
-            """
+                        """
               {
                 "subjects": [
                   {
@@ -109,7 +109,7 @@ class ChangeKeyTest implements RewriteTest {
                 ]
               }
               """
-          )
+                )
         );
     }
 }

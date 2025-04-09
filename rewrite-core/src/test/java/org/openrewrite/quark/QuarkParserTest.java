@@ -42,74 +42,74 @@ class QuarkParserTest implements RewriteTest {
     @Test
     void allOthers() {
         rewriteRun(
-          spec -> spec.beforeRecipe(sources -> {
-              try {
-                  List<SourceFile> quarks = QuarkParser.parseAllOtherFiles(Paths.get("../"), sources).toList();
-                  assertThat(quarks).isNotEmpty();
-                  assertThat(quarks.stream().map(SourceFile::getSourcePath))
-                    .doesNotContain(Paths.get("build.gradle.kts"));
-              } catch (IOException e) {
-                  throw new RuntimeException(e);
-              }
+                spec -> spec.beforeRecipe(sources -> {
+                    try {
+                        List<SourceFile> quarks = QuarkParser.parseAllOtherFiles(Paths.get("../"), sources).toList();
+                        assertThat(quarks).isNotEmpty();
+                        assertThat(quarks.stream().map(SourceFile::getSourcePath))
+                                .doesNotContain(Paths.get("build.gradle.kts"));
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
 
-          }),
-          text("hi", spec -> spec.path(Paths.get("build.gradle.kts")))
+                }),
+                text("hi", spec -> spec.path(Paths.get("build.gradle.kts")))
         );
     }
 
     @Test
     void oneQuark() {
         rewriteRun(
-          spec -> spec.beforeRecipe(sources -> assertThat(sources.stream().filter(s -> s instanceof Quark)).hasSize(1)),
-          text("hi"),
-          other("jon")
+                spec -> spec.beforeRecipe(sources -> assertThat(sources.stream().filter(s -> s instanceof Quark)).hasSize(1)),
+                text("hi"),
+                other("jon")
         );
     }
 
     @Test
     void renameQuark(@TempDir Path tempDir) {
         rewriteRun(
-          spec ->
-            spec
-              .expectedCyclesThatMakeChanges(1)
-              .recipe(toRecipe(() -> new TreeVisitor<>() {
-                  @Override
-                  public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                      SourceFile sourceFile = (SourceFile) requireNonNull(tree);
-                      if (sourceFile.getSourcePath().toString().endsWith(".bak")) {
-                          return sourceFile;
-                      }
-                      return sourceFile.withSourcePath(Paths.get(sourceFile.getSourcePath() + ".bak"));
-                  }
-              }))
-              .afterRecipe(run -> {
-                  try {
-                      for (Result result : run.getChangeset().getAllResults()) {
-                          try (var git = Git.init().setDirectory(tempDir.toFile()).call()) {
-                              git.apply().setPatch(new ByteArrayInputStream(result.diff().getBytes())).call();
-                          }
-                      }
-                      assertThat(tempDir.toFile().list())
-                        .containsExactlyInAnyOrder("hi.txt.bak", "jon.bak", ".git");
-                      assertThat(Files.readString(tempDir.resolve("jon.bak")).trim()).isEqualTo("jon");
-                  } catch (IOException | GitAPIException e) {
-                      fail(e);
-                  }
-              }),
-          text(
-            "hi",
-            spec -> spec
-              .path("hi.txt")
-              .beforeRecipe(s -> Files.writeString(tempDir.resolve(s.getSourcePath()), "hi"))
-              .afterRecipe(s -> assertThat(s.getSourcePath()).isEqualTo(Paths.get("hi.txt.bak")))
-          ),
-          other(
-            "jon",
-            spec -> spec
-              .path("jon")
-              .beforeRecipe(s -> Files.writeString(tempDir.resolve(s.getSourcePath()), "jon"))
-              .afterRecipe(s -> assertThat(s.getSourcePath()).isEqualTo(Paths.get("jon.bak")))
-          )
+                spec ->
+                        spec
+                                .expectedCyclesThatMakeChanges(1)
+                                .recipe(toRecipe(() -> new TreeVisitor<>() {
+                                    @Override
+                                    public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                                        SourceFile sourceFile = (SourceFile) requireNonNull(tree);
+                                        if (sourceFile.getSourcePath().toString().endsWith(".bak")) {
+                                            return sourceFile;
+                                        }
+                                        return sourceFile.withSourcePath(Paths.get(sourceFile.getSourcePath() + ".bak"));
+                                    }
+                                }))
+                                .afterRecipe(run -> {
+                                    try {
+                                        for (Result result : run.getChangeset().getAllResults()) {
+                                            try (var git = Git.init().setDirectory(tempDir.toFile()).call()) {
+                                                git.apply().setPatch(new ByteArrayInputStream(result.diff().getBytes())).call();
+                                            }
+                                        }
+                                        assertThat(tempDir.toFile().list())
+                                                .containsExactlyInAnyOrder("hi.txt.bak", "jon.bak", ".git");
+                                        assertThat(Files.readString(tempDir.resolve("jon.bak")).trim()).isEqualTo("jon");
+                                    } catch (IOException | GitAPIException e) {
+                                        fail(e);
+                                    }
+                                }),
+                text(
+                        "hi",
+                        spec -> spec
+                                .path("hi.txt")
+                                .beforeRecipe(s -> Files.writeString(tempDir.resolve(s.getSourcePath()), "hi"))
+                                .afterRecipe(s -> assertThat(s.getSourcePath()).isEqualTo(Paths.get("hi.txt.bak")))
+                ),
+                other(
+                        "jon",
+                        spec -> spec
+                                .path("jon")
+                                .beforeRecipe(s -> Files.writeString(tempDir.resolve(s.getSourcePath()), "jon"))
+                                .afterRecipe(s -> assertThat(s.getSourcePath()).isEqualTo(Paths.get("jon.bak")))
+                )
         );
     }
 }

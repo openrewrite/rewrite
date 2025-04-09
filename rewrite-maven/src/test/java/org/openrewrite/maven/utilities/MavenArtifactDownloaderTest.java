@@ -41,18 +41,18 @@ class MavenArtifactDownloaderTest {
         ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
         MavenArtifactCache artifactCache = new LocalMavenArtifactCache(tempDir);
         MavenArtifactDownloader downloader = new MavenArtifactDownloader(
-          artifactCache, null, t -> ctx.getOnError().accept(t));
+                artifactCache, null, t -> ctx.getOnError().accept(t));
         ResolvedGroupArtifactVersion recipeGav = new ResolvedGroupArtifactVersion(
-          "https://repo1.maven.org/maven2",
-          "org.openrewrite.recipe",
-          "rewrite-testing-frameworks",
-          "1.6.0", null);
+                "https://repo1.maven.org/maven2",
+                "org.openrewrite.recipe",
+                "rewrite-testing-frameworks",
+                "1.6.0", null);
 
         MavenParser mavenParser = MavenParser.builder().build();
         SourceFile parsed = mavenParser.parse(ctx,
-          String.format(
-            //language=xml
-            """
+                String.format(
+                        //language=xml
+                        """
               <project>
                   <groupId>org.openrewrite</groupId>
                   <artifactId>maven-downloader-test</artifactId>
@@ -71,16 +71,16 @@ class MavenArtifactDownloaderTest {
         MavenResolutionResult mavenModel = parsed.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
         assertThat(mavenModel.getDependencies()).isNotEmpty();
 
-    List<ResolvedDependency> runtimeDependencies = mavenModel.getDependencies().get(Scope.Runtime);
-    for (ResolvedDependency runtimeDependency : runtimeDependencies) {
-      assertNotNull(
-          downloader.downloadArtifact(runtimeDependency),
-          String.format(
-              "%s:%s:%s:%s failed to download",
-              runtimeDependency.getGroupId(),
-              runtimeDependency.getArtifactId(),
-              runtimeDependency.getVersion(),
-              runtimeDependency.getType()));
+        List<ResolvedDependency> runtimeDependencies = mavenModel.getDependencies().get(Scope.Runtime);
+        for (ResolvedDependency runtimeDependency : runtimeDependencies) {
+            assertNotNull(
+                    downloader.downloadArtifact(runtimeDependency),
+                    String.format(
+                            "%s:%s:%s:%s failed to download",
+                            runtimeDependency.getGroupId(),
+                            runtimeDependency.getArtifactId(),
+                            runtimeDependency.getVersion(),
+                            runtimeDependency.getType()));
+        }
     }
-  }
 }

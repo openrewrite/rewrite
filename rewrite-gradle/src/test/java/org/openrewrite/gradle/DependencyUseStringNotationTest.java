@@ -28,15 +28,15 @@ class DependencyUseStringNotationTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withToolingApi())
-          .recipe(new DependencyUseStringNotation());
+                .recipe(new DependencyUseStringNotation());
     }
 
     @DocumentExample
     @Test
     void basicMap() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -50,7 +50,7 @@ class DependencyUseStringNotationTest implements RewriteTest {
                   implementation group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release'
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -64,15 +64,15 @@ class DependencyUseStringNotationTest implements RewriteTest {
                   implementation "org.openrewrite:rewrite-core:latest.release"
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void withClassifier() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -86,7 +86,7 @@ class DependencyUseStringNotationTest implements RewriteTest {
                   implementation group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'sources'
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -100,15 +100,15 @@ class DependencyUseStringNotationTest implements RewriteTest {
                   implementation "org.openrewrite:rewrite-core:latest.release:sources"
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void basicMapLiteral() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -121,7 +121,7 @@ class DependencyUseStringNotationTest implements RewriteTest {
                   api([group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release'])
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -134,15 +134,15 @@ class DependencyUseStringNotationTest implements RewriteTest {
                   api("org.openrewrite:rewrite-core:latest.release")
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void withGString() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -157,7 +157,7 @@ class DependencyUseStringNotationTest implements RewriteTest {
                   implementation group: 'org.openrewrite', name: 'rewrite-core', version: version
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -172,15 +172,15 @@ class DependencyUseStringNotationTest implements RewriteTest {
                   implementation "org.openrewrite:rewrite-core:$version"
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void withGStringLiteral() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -195,7 +195,7 @@ class DependencyUseStringNotationTest implements RewriteTest {
                   implementation group: 'org.openrewrite', name: 'rewrite-core', version: "$version"
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -210,15 +210,15 @@ class DependencyUseStringNotationTest implements RewriteTest {
                   implementation "org.openrewrite:rewrite-core:$version"
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void withoutVersion() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -233,7 +233,7 @@ class DependencyUseStringNotationTest implements RewriteTest {
                   implementation group: "org.openrewrite", name: "rewrite-core"
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -248,15 +248,15 @@ class DependencyUseStringNotationTest implements RewriteTest {
                   implementation "org.openrewrite:rewrite-core"
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void withExclusion() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -271,7 +271,7 @@ class DependencyUseStringNotationTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -286,15 +286,15 @@ class DependencyUseStringNotationTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void withGStringExclusion() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -310,7 +310,7 @@ class DependencyUseStringNotationTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -326,15 +326,15 @@ class DependencyUseStringNotationTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void worksWithDependencyDefinedInBuildScript() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               buildscript {
                   repositories {
                       gradlePluginPortal()
@@ -344,7 +344,7 @@ class DependencyUseStringNotationTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               buildscript {
                   repositories {
                       gradlePluginPortal()
@@ -354,15 +354,15 @@ class DependencyUseStringNotationTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void dependenciesBlockInFreestandingScript() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               repositories {
                   mavenLocal()
                   mavenCentral()
@@ -374,7 +374,7 @@ class DependencyUseStringNotationTest implements RewriteTest {
                   implementation(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release')
               }
               """,
-            """
+                        """
               repositories {
                   mavenLocal()
                   mavenCentral()
@@ -386,16 +386,16 @@ class DependencyUseStringNotationTest implements RewriteTest {
                   implementation("org.openrewrite:rewrite-core:latest.release")
               }
               """,
-            spec -> spec.path("dependencies.gradle")
-          ),
-          buildGradle(
-            """
+                        spec -> spec.path("dependencies.gradle")
+                ),
+                buildGradle(
+                        """
               plugins {
                   id("java")
               }
               apply from: 'dependencies.gradle'
               """
-          )
+                )
         );
     }
 }

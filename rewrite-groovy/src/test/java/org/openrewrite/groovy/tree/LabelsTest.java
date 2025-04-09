@@ -25,9 +25,9 @@ class LabelsTest implements RewriteTest {
     @Test
     void singleLabel() {
         rewriteRun(
-          //language=groovy
-          groovy(
-                """
+                //language=groovy
+                groovy(
+                        """
             given: "hello"
             """)
         );
@@ -36,9 +36,9 @@ class LabelsTest implements RewriteTest {
     @Test
     void multiLabel() {
         rewriteRun(
-          //language=groovy
-          groovy(
-                """
+                //language=groovy
+                groovy(
+                        """
             def foo() {}
             label1:
             label2:

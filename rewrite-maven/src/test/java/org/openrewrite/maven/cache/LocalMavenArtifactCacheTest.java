@@ -60,16 +60,16 @@ class LocalMavenArtifactCacheTest {
     private static ResolvedDependency findDependency() {
         ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
         ResolvedGroupArtifactVersion recipeGav = new ResolvedGroupArtifactVersion(
-          "https://repo1.maven.org/maven2",
-          "org.openrewrite.recipe",
-          "rewrite-testing-frameworks",
-          "1.6.0", null);
+                "https://repo1.maven.org/maven2",
+                "org.openrewrite.recipe",
+                "rewrite-testing-frameworks",
+                "1.6.0", null);
 
         MavenParser mavenParser = MavenParser.builder().build();
         SourceFile parsed = mavenParser.parse(ctx,
-          String.format(
-            //language=xml
-            """
+                String.format(
+                        //language=xml
+                        """
               <project>
                   <groupId>org.openrewrite</groupId>
                   <artifactId>maven-downloader-test</artifactId>

@@ -63,7 +63,7 @@ public class MavenRepositoryMirror {
     private final Set<String> includedRepos;
 
     public MavenRepositoryMirror(@Nullable String id, @Nullable String url, @Nullable String mirrorOf,
-                                 @Nullable Boolean releases, @Nullable Boolean snapshots, MavenSettings.@Nullable Servers servers) {
+            @Nullable Boolean releases, @Nullable Boolean snapshots, MavenSettings.@Nullable Servers servers) {
         this.id = id;
         this.url = url;
         this.mirrorOf = mirrorOf;
@@ -95,7 +95,7 @@ public class MavenRepositoryMirror {
                 Optional<MavenSettings.Server> maybeServer = servers.getServers().stream()
                         .filter(s -> id.equals(s.getId()) && s.getConfiguration() != null)
                         .findFirst();
-                if (maybeServer.isPresent() && maybeServer.get().getConfiguration() != null){
+                if (maybeServer.isPresent() && maybeServer.get().getConfiguration() != null) {
                     timeout = maybeServer.get().getConfiguration().getTimeout();
                 } else {
                     timeout = null;

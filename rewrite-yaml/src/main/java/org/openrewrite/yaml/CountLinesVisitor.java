@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class CountLinesVisitor extends YamlVisitor<AtomicInteger> {
     @Override
     public Yaml visitDocuments(Yaml.Documents documents, AtomicInteger count) {
-        if(documents.getPrefix().contains("\n")) {
+        if (documents.getPrefix().contains("\n")) {
             count.incrementAndGet();
         }
         return super.visitDocuments(documents, count);
@@ -31,7 +31,7 @@ public class CountLinesVisitor extends YamlVisitor<AtomicInteger> {
 
     @Override
     public Yaml visitDocument(Yaml.Document document, AtomicInteger count) {
-        if(document.getPrefix().contains("\n")) {
+        if (document.getPrefix().contains("\n")) {
             count.incrementAndGet();
         }
         return super.visitDocument(document, count);
@@ -39,7 +39,7 @@ public class CountLinesVisitor extends YamlVisitor<AtomicInteger> {
 
     @Override
     public Yaml visitMapping(Yaml.Mapping mapping, AtomicInteger count) {
-        if(mapping.getPrefix().contains("\n")) {
+        if (mapping.getPrefix().contains("\n")) {
             count.incrementAndGet();
         }
         return super.visitMapping(mapping, count);
@@ -47,7 +47,7 @@ public class CountLinesVisitor extends YamlVisitor<AtomicInteger> {
 
     @Override
     public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, AtomicInteger count) {
-        if(entry.getPrefix().contains("\n")) {
+        if (entry.getPrefix().contains("\n")) {
             count.incrementAndGet();
         }
         return super.visitMappingEntry(entry, count);
@@ -55,7 +55,7 @@ public class CountLinesVisitor extends YamlVisitor<AtomicInteger> {
 
     @Override
     public Yaml visitScalar(Yaml.Scalar scalar, AtomicInteger count) {
-        if(scalar.getPrefix().contains("\n")) {
+        if (scalar.getPrefix().contains("\n")) {
             count.incrementAndGet();
         }
         return super.visitScalar(scalar, count);
@@ -63,7 +63,7 @@ public class CountLinesVisitor extends YamlVisitor<AtomicInteger> {
 
     @Override
     public Yaml visitSequence(Yaml.Sequence sequence, AtomicInteger count) {
-        if(sequence.getPrefix().contains("\n")) {
+        if (sequence.getPrefix().contains("\n")) {
             count.incrementAndGet();
         }
         return super.visitSequence(sequence, count);
@@ -71,7 +71,7 @@ public class CountLinesVisitor extends YamlVisitor<AtomicInteger> {
 
     @Override
     public Yaml visitSequenceEntry(Yaml.Sequence.Entry entry, AtomicInteger count) {
-        if(entry.getPrefix().contains("\n")) {
+        if (entry.getPrefix().contains("\n")) {
             count.incrementAndGet();
         }
         return super.visitSequenceEntry(entry, count);
@@ -79,7 +79,7 @@ public class CountLinesVisitor extends YamlVisitor<AtomicInteger> {
 
     @Override
     public Yaml visitAnchor(Yaml.Anchor anchor, AtomicInteger count) {
-        if(anchor.getPrefix().contains("\n")) {
+        if (anchor.getPrefix().contains("\n")) {
             count.incrementAndGet();
         }
         return super.visitAnchor(anchor, count);
@@ -87,7 +87,7 @@ public class CountLinesVisitor extends YamlVisitor<AtomicInteger> {
 
     @Override
     public Yaml visitAlias(Yaml.Alias alias, AtomicInteger count) {
-        if(alias.getPrefix().contains("\n")) {
+        if (alias.getPrefix().contains("\n")) {
             count.incrementAndGet();
         }
         return super.visitAlias(alias, count);

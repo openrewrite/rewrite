@@ -60,16 +60,16 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     @Override
     public String getDescription() {
         return "Update the version of Gradle used in an existing Gradle wrapper. " +
-               "Queries services.gradle.org to determine the available releases, but prefers the artifact repository URL " +
-               "which already exists within the wrapper properties file. " +
-               "If your artifact repository does not contain the same Gradle distributions as services.gradle.org, " +
-               "then the recipe may suggest a version which is not available in your artifact repository.";
+                "Queries services.gradle.org to determine the available releases, but prefers the artifact repository URL " +
+                "which already exists within the wrapper properties file. " +
+                "If your artifact repository does not contain the same Gradle distributions as services.gradle.org, " +
+                "then the recipe may suggest a version which is not available in your artifact repository.";
     }
 
     @Getter
     @Option(displayName = "New version",
             description = "An exact version number or node-style semver selector used to select the version number. " +
-                          "Defaults to the latest release available from services.gradle.org if not specified.",
+                    "Defaults to the latest release available from services.gradle.org if not specified.",
             example = "7.x",
             required = false)
     @Nullable
@@ -78,8 +78,8 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     @Getter
     @Option(displayName = "Distribution type",
             description = "The distribution of Gradle to use. \"bin\" includes Gradle binaries. " +
-                          "\"all\" includes Gradle binaries, source code, and documentation. " +
-                          "Defaults to \"bin\".",
+                    "\"all\" includes Gradle binaries, source code, and documentation. " +
+                    "Defaults to \"bin\".",
             valid = {"bin", "all"},
             required = false
     )
@@ -97,10 +97,10 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     @Option(example = "https://services.gradle.org/distributions/gradle-${version}-${distribution}.zip",
             displayName = "Wrapper URI",
             description = "The URI of the Gradle wrapper distribution. " +
-                          "Lookup of available versions still requires access to https://services.gradle.org " +
-                          "When this is specified the exact literal values supplied for `version` and `distribution` " +
-                          "will be interpolated into this string wherever `${version}` and `${distribution}` appear respectively. " +
-                          "Defaults to https://services.gradle.org/distributions/gradle-${version}-${distribution}.zip.",
+                    "Lookup of available versions still requires access to https://services.gradle.org " +
+                    "When this is specified the exact literal values supplied for `version` and `distribution` " +
+                    "will be interpolated into this string wherever `${version}` and `${distribution}` appear respectively. " +
+                    "Defaults to https://services.gradle.org/distributions/gradle-${version}-${distribution}.zip.",
             required = false)
     @Nullable
     final String wrapperUri;
@@ -109,7 +109,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     @Option(example = "29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda",
             displayName = "SHA-256 checksum",
             description = "The SHA-256 checksum of the Gradle distribution. " +
-                          "If specified, the recipe will add the checksum along with the custom distribution URL.",
+                    "If specified, the recipe will add the checksum along with the custom distribution URL.",
             required = false)
     @Nullable
     final String distributionChecksum;
@@ -149,7 +149,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                 }
                 throw new IllegalArgumentException(
                         "Could not reach services.gradle.org. " +
-                        "To use this recipe in environments where services.gradle.org is unavailable specify a wrapperUri or exact version.", e);
+                                "To use this recipe in environments where services.gradle.org is unavailable specify a wrapperUri or exact version.", e);
             }
         }
         return gradleWrapper;
@@ -224,7 +224,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
 
                         GradleWrapper gradleWrpr = getGradleWrapper(ctx);
                         if (StringUtils.isBlank(gradleWrpr.getDistributionUrl()) && !StringUtils.isBlank(version) &&
-                            Semver.validate(version, null).getValue() instanceof ExactVersion) {
+                                Semver.validate(version, null).getValue() instanceof ExactVersion) {
                             String newDownloadUrl = currentDistributionUrl.replace("\\", "")
                                     .replaceAll("(.*gradle-)(\\d+\\.\\d+(?:\\.\\d+)?)(.*-(?:bin|all).zip)",
                                             "$1" + gradleWrapper.getVersion() + "$3");
@@ -232,7 +232,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                         }
                         String wrapperHost = currentDistributionUrl.substring(0, currentDistributionUrl.lastIndexOf("/")) + "/gradle-";
                         if (StringUtils.isBlank(wrapperUri) && !StringUtils.isBlank(gradleWrpr.getDistributionUrl()) &&
-                            !gradleWrpr.getPropertiesFormattedUrl().startsWith(wrapperHost)) {
+                                !gradleWrpr.getPropertiesFormattedUrl().startsWith(wrapperHost)) {
                             String newDownloadUrl = gradleWrpr.getDistributionUrl()
                                     .replace("\\", "")
                                     .replaceAll("(.*gradle-)(\\d+\\.\\d+(?:\\.\\d+)?)(.*-(?:bin|all).zip)",
@@ -254,7 +254,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                         }
 
                         if ((sourceFile instanceof Quark || sourceFile instanceof Remote) &&
-                            equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_JAR_LOCATION)) {
+                                equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_JAR_LOCATION)) {
                             acc.addGradleWrapperJar = false;
                             return true;
                         }
@@ -308,7 +308,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
 
             //noinspection UnusedProperty
             Properties.File gradleWrapperProperties = new PropertiesParser().parse(
-                            "distributionBase=GRADLE_USER_HOME\n" +
+                    "distributionBase=GRADLE_USER_HOME\n" +
                             "distributionPath=wrapper/dists\n" +
                             "distributionUrl=" + gradleWrapper.getPropertiesFormattedUrl() + "\n" +
                             (checksum == null ? "" : "distributionSha256Sum=" + checksum + "\n") +

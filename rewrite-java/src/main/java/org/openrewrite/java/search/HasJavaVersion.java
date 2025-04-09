@@ -37,7 +37,7 @@ public class HasJavaVersion extends Recipe {
 
     @Option(displayName = "Version check against target compatibility",
             description = "The source and target compatibility versions can be different. This option allows you to " +
-                          "check against the target compatibility version instead of the source compatibility version.",
+                    "check against the target compatibility version instead of the source compatibility version.",
             example = "17.X",
             required = false)
     @Nullable
@@ -51,7 +51,7 @@ public class HasJavaVersion extends Recipe {
     @Override
     public String getDescription() {
         return "Finds Java source files matching a particular language level. " +
-               "This is useful especially as a precondition for other recipes.";
+                "This is useful especially as a precondition for other recipes.";
     }
 
     @SuppressWarnings("ConstantConditions")

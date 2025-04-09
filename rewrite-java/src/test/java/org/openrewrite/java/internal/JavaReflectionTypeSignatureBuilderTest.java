@@ -62,7 +62,8 @@ class JavaReflectionTypeSignatureBuilderTest implements JavaTypeSignatureBuilder
 
     @Override
     public Object lastClassTypeParameter() {
-        @SuppressWarnings("rawtypes") TypeVariable<Class<JavaTypeGoat>>[] tp =
+        @SuppressWarnings("rawtypes")
+        TypeVariable<Class<JavaTypeGoat>>[] tp =
                 JavaTypeGoat.class.getTypeParameters();
         return tp[tp.length - 1];
     }

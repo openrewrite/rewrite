@@ -33,21 +33,21 @@ class CompilationUnitTest implements RewriteTest {
     @Test
     void imports() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.List;
               import java.io.*;
               public class A {}
               """
-          )
+                )
         );
     }
 
     @Test
     void packageAndComments() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /* Comment */
               package a;
               import java.util.List;
@@ -55,8 +55,8 @@ class CompilationUnitTest implements RewriteTest {
               public class A { }
               // comment
               """,
-            SourceSpec::noTrim
-          )
+                        SourceSpec::noTrim
+                )
         );
     }
 }

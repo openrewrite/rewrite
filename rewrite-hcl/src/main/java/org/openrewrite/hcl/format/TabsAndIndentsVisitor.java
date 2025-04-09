@@ -140,7 +140,7 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
         if (right.getElement() instanceof Hcl) {
             Hcl elem = (Hcl) right.getElement();
             if ((right.getAfter().getLastWhitespace().contains("\n") ||
-                 elem.getPrefix().getLastWhitespace().contains("\n"))) {
+                    elem.getPrefix().getLastWhitespace().contains("\n"))) {
                 switch (loc) {
                     case FUNCTION_CALL_ARGUMENT:
                     case PARENTHESES: {
@@ -251,10 +251,10 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
             }
         } else {
             if (!StringUtils.isNullOrEmpty(space.getWhitespace()) &&
-                // Preserve whitespace of trailing line comments.
-                (Comment.Style.INLINE.equals(space.getComments().get(0).getStyle()) ||
-                 (!Comment.Style.INLINE.equals(space.getComments().get(0).getStyle()) &&
-                  (space.getWhitespace().contains("\n") || space.getWhitespace().contains("\r"))))) {
+                    // Preserve whitespace of trailing line comments.
+                    (Comment.Style.INLINE.equals(space.getComments().get(0).getStyle()) ||
+                            (!Comment.Style.INLINE.equals(space.getComments().get(0).getStyle()) &&
+                                    (space.getWhitespace().contains("\n") || space.getWhitespace().contains("\r"))))) {
                 if (style.getUseTabCharacter()) {
                     space = space.withWhitespace(space.getWhitespace().replaceAll(" ", ""));
                 } else {

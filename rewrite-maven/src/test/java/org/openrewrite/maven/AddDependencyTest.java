@@ -36,7 +36,7 @@ class AddDependencyTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.parser(JavaParser.fromJavaVersion()
-          .classpath("junit-jupiter-api", "guava", "jackson-databind", "jackson-core"));
+                .classpath("junit-jupiter-api", "guava", "jackson-databind", "jackson-core"));
     }
 
     @Language("java")
@@ -52,21 +52,21 @@ class AddDependencyTest implements RewriteTest {
     @Test
     void dontAddDuplicateIfUpdateModelOnPriorRecipeCycleFailed() {
         rewriteRun(
-          spec -> spec
-            .recipe(addDependency("doesnotexist:doesnotexist:1", "com.google.common.math.IntMath")),
-          mavenProject("project",
-            srcMainJava(
-              java(usingGuavaIntMath)
-            ),
-            pomXml(
-              """
+                spec -> spec
+                        .recipe(addDependency("doesnotexist:doesnotexist:1", "com.google.common.math.IntMath")),
+                mavenProject("project",
+                        srcMainJava(
+                                java(usingGuavaIntMath)
+                        ),
+                        pomXml(
+                                """
                     <project>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
                         <version>1</version>
                     </project>
                 """,
-              """
+                                """
                     <project>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
@@ -81,29 +81,29 @@ class AddDependencyTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void systemScope() {
         rewriteRun(
-          spec -> spec
-            .recipe(addDependency("doesnotexist:doesnotexist:1", "com.google.common.math.IntMath", "system")),
-          mavenProject("project",
-            srcMainJava(
-              java(usingGuavaIntMath)
-            ),
-            pomXml(
-              """
+                spec -> spec
+                        .recipe(addDependency("doesnotexist:doesnotexist:1", "com.google.common.math.IntMath", "system")),
+                mavenProject("project",
+                        srcMainJava(
+                                java(usingGuavaIntMath)
+                        ),
+                        pomXml(
+                                """
                     <project>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
                         <version>1</version>
                     </project>
                 """,
-              """
+                                """
                     <project>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
@@ -118,29 +118,29 @@ class AddDependencyTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void pomType() {
         rewriteRun(
-          spec -> spec
-            .recipe(new AddDependency("com.google.guava", "guava", "29.0-jre", null, null, null, null, "pom", null, null, null, null)),
-          mavenProject("project",
-            srcMainJava(
-              java(usingGuavaIntMath)
-            ),
-            pomXml(
-              """
+                spec -> spec
+                        .recipe(new AddDependency("com.google.guava", "guava", "29.0-jre", null, null, null, null, "pom", null, null, null, null)),
+                mavenProject("project",
+                        srcMainJava(
+                                java(usingGuavaIntMath)
+                        ),
+                        pomXml(
+                                """
                 <project>
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>my-app</artifactId>
                     <version>1</version>
                 </project>
                 """,
-              """
+                                """
                 <project>
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>my-app</artifactId>
@@ -155,8 +155,8 @@ class AddDependencyTest implements RewriteTest {
                     </dependencies>
                 </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
@@ -164,21 +164,21 @@ class AddDependencyTest implements RewriteTest {
     @ValueSource(strings = {"com.google.common.math.*", "com.google.common.math.IntMath"})
     void onlyIfUsingTestScope(String onlyIfUsing) {
         rewriteRun(
-          spec -> spec.recipe(
-            addDependency("com.google.guava:guava:29.0-jre", onlyIfUsing)),
-          mavenProject("project",
-            srcTestJava(
-              java(usingGuavaIntMath)
-            ),
-            pomXml(
-              """
+                spec -> spec.recipe(
+                        addDependency("com.google.guava:guava:29.0-jre", onlyIfUsing)),
+                mavenProject("project",
+                        srcTestJava(
+                                java(usingGuavaIntMath)
+                        ),
+                        pomXml(
+                                """
                     <project>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
                         <version>1</version>
                     </project>
                 """,
-              """
+                                """
                     <project>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
@@ -193,8 +193,8 @@ class AddDependencyTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
@@ -202,20 +202,20 @@ class AddDependencyTest implements RewriteTest {
     @ValueSource(strings = {"com.google.common.math.*", "com.google.common.math.IntMath"})
     void onlyIfUsingCompileScope(String onlyIfUsing) {
         rewriteRun(
-          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", onlyIfUsing)),
-          mavenProject("project",
-            srcMainJava(
-              java(usingGuavaIntMath)
-            ),
-            pomXml(
-              """
+                spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", onlyIfUsing)),
+                mavenProject("project",
+                        srcMainJava(
+                                java(usingGuavaIntMath)
+                        ),
+                        pomXml(
+                                """
                     <project>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
                         <version>1</version>
                     </project>
                 """,
-              """
+                                """
                     <project>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
@@ -229,31 +229,31 @@ class AddDependencyTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void addDependencyWithClassifier() {
         AddDependency addDep = new AddDependency("io.netty", "netty-tcnative-boringssl-static", "2.0.54.Final", null,
-          "compile", true, "com.google.common.math.IntMath", null, "linux-x86_64", false, null, null);
+                "compile", true, "com.google.common.math.IntMath", null, "linux-x86_64", false, null, null);
         rewriteRun(
-          spec -> spec.recipe(addDep),
-          mavenProject(
-            "project",
-            srcMainJava(
-              java(usingGuavaIntMath)
-            ),
-            pomXml(
-              """
+                spec -> spec.recipe(addDep),
+                mavenProject(
+                        "project",
+                        srcMainJava(
+                                java(usingGuavaIntMath)
+                        ),
+                        pomXml(
+                                """
                     <project>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
                         <version>1</version>
                     </project>
                 """,
-              """
+                                """
                     <project>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
@@ -268,47 +268,47 @@ class AddDependencyTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void notUsingType() {
         rewriteRun(
-          spec -> spec.recipe(addDependency(
-            "com.google.guava:guava:29.0-jre",
-            "com.google.common.collect.ImmutableMap"
-          )),
-          mavenProject(
-            "project",
-            srcMainJava(
-              java(usingGuavaIntMath)
-            ),
-            pomXml(
-              """
+                spec -> spec.recipe(addDependency(
+                        "com.google.guava:guava:29.0-jre",
+                        "com.google.common.collect.ImmutableMap"
+                )),
+                mavenProject(
+                        "project",
+                        srcMainJava(
+                                java(usingGuavaIntMath)
+                        ),
+                        pomXml(
+                                """
                     <project>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
                         <version>1</version>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void addInOrder() {
         rewriteRun(
-          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
-          mavenProject(
-            "project",
-            srcMainJava(
-              java(usingGuavaIntMath)
-            ),
-            pomXml(
-              """
+                spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
+                mavenProject(
+                        "project",
+                        srcMainJava(
+                                java(usingGuavaIntMath)
+                        ),
+                        pomXml(
+                                """
                     <project>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
@@ -322,7 +322,7 @@ class AddDependencyTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """,
-              """
+                                """
                     <project>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
@@ -341,29 +341,29 @@ class AddDependencyTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void doNotAddBecauseAlreadyTransitive() {
         rewriteRun(
-          spec -> spec.recipe(addDependency("org.junit.jupiter:junit-jupiter-api:5.x", "org.junit.jupiter.api.*", true)),
-          mavenProject(
-            "project",
-            srcTestJava(
-              java(
-                """
+                spec -> spec.recipe(addDependency("org.junit.jupiter:junit-jupiter-api:5.x", "org.junit.jupiter.api.*", true)),
+                mavenProject(
+                        "project",
+                        srcTestJava(
+                                java(
+                                        """
                       class MyTest {
                           @org.junit.jupiter.api.Test
                           void test() {}
                       }
                   """
-              )
-            ),
-            pomXml(
-              """
+                                )
+                        ),
+                        pomXml(
+                                """
                     <project>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
@@ -377,29 +377,29 @@ class AddDependencyTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void doNotAddBecauseAlreadyTransitiveNoCompileScope() {
         rewriteRun(
-          spec -> spec.recipe(addDependency("org.junit.jupiter:junit-jupiter-api:5.10.3", null, true)),
-          mavenProject(
-            "project",
-            srcTestJava(
-              java(
-                """
+                spec -> spec.recipe(addDependency("org.junit.jupiter:junit-jupiter-api:5.10.3", null, true)),
+                mavenProject(
+                        "project",
+                        srcTestJava(
+                                java(
+                                        """
                   class MyTest {
                       @org.junit.jupiter.api.Test
                       void test() {}
                   }
                   """
-              )
-            ),
-            pomXml(
-              """
+                                )
+                        ),
+                        pomXml(
+                                """
                 <project>
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>my-app</artifactId>
@@ -414,39 +414,39 @@ class AddDependencyTest implements RewriteTest {
                     </dependencies>
                 </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void addDependencyAcceptsTransitiveAlreadyInTestScope() {
         rewriteRun(
-          spec -> spec.recipe(addDependency("org.junit.jupiter:junit-jupiter-api:5.10.3", "org.junit.jupiter..*", true)),
-          mavenProject(
-            "project",
-            srcMainJava(
-              java(
-                """
+                spec -> spec.recipe(addDependency("org.junit.jupiter:junit-jupiter-api:5.10.3", "org.junit.jupiter..*", true)),
+                mavenProject(
+                        "project",
+                        srcMainJava(
+                                java(
+                                        """
                   class MyMain {
                       @org.junit.jupiter.api.Test
                       void test() {}
                   }
                   """
-              )
-            ),
-            srcTestJava(
-              java(
-                """
+                                )
+                        ),
+                        srcTestJava(
+                                java(
+                                        """
                   class MyTest {
                       @org.junit.jupiter.api.Test
                       void test() {}
                   }
                   """
-              )
-            ),
-            pomXml(
-              """
+                                )
+                        ),
+                        pomXml(
+                                """
                 <project>
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>my-app</artifactId>
@@ -461,7 +461,7 @@ class AddDependencyTest implements RewriteTest {
                     </dependencies>
                 </project>
                 """,
-              """
+                                """
                 <project>
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>my-app</artifactId>
@@ -481,8 +481,8 @@ class AddDependencyTest implements RewriteTest {
                     </dependencies>
                 </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
@@ -490,22 +490,22 @@ class AddDependencyTest implements RewriteTest {
     @ValueSource(strings = {"com.google.common.math.*", "com.google.common.math.IntMath"})
     void semverSelector(String onlyIfUsing) {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency("com.google.guava", "guava", "29.x", "-jre", null, false, onlyIfUsing,
-            null, null, false, null, null)),
-          mavenProject(
-            "project",
-            srcMainJava(
-              java(usingGuavaIntMath)
-            ),
-            pomXml(
-              """
+                spec -> spec.recipe(new AddDependency("com.google.guava", "guava", "29.x", "-jre", null, false, onlyIfUsing,
+                        null, null, false, null, null)),
+                mavenProject(
+                        "project",
+                        srcMainJava(
+                                java(usingGuavaIntMath)
+                        ),
+                        pomXml(
+                                """
                     <project>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
                         <version>1</version>
                     </project>
                 """,
-              """
+                                """
                     <project>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
@@ -519,22 +519,22 @@ class AddDependencyTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void addTestDependenciesAfterCompile() {
         rewriteRun(
-          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
-          mavenProject(
-            "project",
-            srcTestJava(
-              java(usingGuavaIntMath)
-            ),
-            pomXml(
-              """
+                spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
+                mavenProject(
+                        "project",
+                        srcTestJava(
+                                java(usingGuavaIntMath)
+                        ),
+                        pomXml(
+                                """
                     <project>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
@@ -548,7 +548,7 @@ class AddDependencyTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """,
-              """
+                                """
                     <project>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
@@ -568,8 +568,8 @@ class AddDependencyTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
@@ -577,14 +577,14 @@ class AddDependencyTest implements RewriteTest {
     @Test
     void preserveNonTagContent() {
         rewriteRun(
-          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
-          mavenProject(
-            "project",
-            srcTestJava(
-              java(usingGuavaIntMath)
-            ),
-            pomXml(
-              """
+                spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
+                mavenProject(
+                        "project",
+                        srcTestJava(
+                                java(usingGuavaIntMath)
+                        ),
+                        pomXml(
+                                """
                     <project>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
@@ -604,7 +604,7 @@ class AddDependencyTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """,
-              """
+                                """
                     <project>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
@@ -630,22 +630,22 @@ class AddDependencyTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void addDependencyDoesntAddWhenExistingDependency() {
         rewriteRun(
-          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
-          mavenProject(
-            "project",
-            srcMainJava(
-              java(usingGuavaIntMath)
-            ),
-            pomXml(
-              """
+                spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
+                mavenProject(
+                        "project",
+                        srcMainJava(
+                                java(usingGuavaIntMath)
+                        ),
+                        pomXml(
+                                """
                     <project>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
@@ -659,8 +659,8 @@ class AddDependencyTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
@@ -668,14 +668,14 @@ class AddDependencyTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3458")
     void addDependencyOopsAllComments() {
         rewriteRun(
-          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
-          mavenProject(
-            "project",
-            srcMainJava(
-              java(usingGuavaIntMath)
-            ),
-            pomXml(
-              """
+                spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
+                mavenProject(
+                        "project",
+                        srcMainJava(
+                                java(usingGuavaIntMath)
+                        ),
+                        pomXml(
+                                """
                     <project>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
@@ -686,7 +686,7 @@ class AddDependencyTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """,
-              """
+                                """
                     <project>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
@@ -702,17 +702,17 @@ class AddDependencyTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void useManaged() {
         rewriteRun(
-          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
-          pomXml(
-            """
+                spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
+                pomXml(
+                        """
               <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-parent</artifactId>
@@ -728,14 +728,14 @@ class AddDependencyTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          ),
-          mavenProject(
-            "server",
-            srcMainJava(
-              java(usingGuavaIntMath)
-            ),
-            pomXml(
-              """
+                ),
+                mavenProject(
+                        "server",
+                        srcMainJava(
+                                java(usingGuavaIntMath)
+                        ),
+                        pomXml(
+                                """
                     <project>
                         <parent>
                             <groupId>com.mycompany.app</groupId>
@@ -747,7 +747,7 @@ class AddDependencyTest implements RewriteTest {
                         <version>1</version>
                     </project>
                 """,
-              """
+                                """
                     <project>
                         <parent>
                             <groupId>com.mycompany.app</groupId>
@@ -765,29 +765,29 @@ class AddDependencyTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void useRequestedVersionInUseByOtherMembersOfTheFamily() {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency("com.fasterxml.jackson.module", "jackson-module-afterburner", "2.10.5",
-            null, null, false, "com.fasterxml.jackson.databind.*", null, null, null, "com.fasterxml.*", null)),
-          mavenProject(
-            "project",
-            srcMainJava(
-              java(
-                """
+                spec -> spec.recipe(new AddDependency("com.fasterxml.jackson.module", "jackson-module-afterburner", "2.10.5",
+                        null, null, false, "com.fasterxml.jackson.databind.*", null, null, null, "com.fasterxml.*", null)),
+                mavenProject(
+                        "project",
+                        srcMainJava(
+                                java(
+                                        """
                       public class A {
                           com.fasterxml.jackson.databind.ObjectMapper mapper;
                       }
                   """
-              )
-            ),
-            pomXml(
-              """
+                                )
+                        ),
+                        pomXml(
+                                """
                     <project>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
@@ -804,7 +804,7 @@ class AddDependencyTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """,
-              """
+                                """
                     <project>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
@@ -826,8 +826,8 @@ class AddDependencyTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
@@ -835,23 +835,23 @@ class AddDependencyTest implements RewriteTest {
     @Test
     void addTransitiveDependencyAsDirect() {
         rewriteRun(
-          spec -> spec.recipe(addDependency(
-            "com.fasterxml.jackson.core:jackson-core:2.12.0",
-            "com.fasterxml.jackson.core.*"
-          )),
-          mavenProject(
-            "project",
-            srcMainJava(
-              java(
-                """
+                spec -> spec.recipe(addDependency(
+                        "com.fasterxml.jackson.core:jackson-core:2.12.0",
+                        "com.fasterxml.jackson.core.*"
+                )),
+                mavenProject(
+                        "project",
+                        srcMainJava(
+                                java(
+                                        """
                       public class A {
                           com.fasterxml.jackson.core.Versioned v;
                       }
                   """
-              )
-            ),
-            pomXml(
-              """
+                                )
+                        ),
+                        pomXml(
+                                """
                     <project>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
@@ -865,7 +865,7 @@ class AddDependencyTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """,
-              """
+                                """
                     <project>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
@@ -884,8 +884,8 @@ class AddDependencyTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
@@ -894,31 +894,31 @@ class AddDependencyTest implements RewriteTest {
     @ValueSource(strings = {"provided", "runtime", "test"})
     void addScopedDependency(String scope) {
         rewriteRun(
-          spec -> spec.recipe(addDependency(
-            "com.fasterxml.jackson.core:jackson-core:2.12.0",
-            "com.fasterxml.jackson.core.*",
-            scope
-          )),
-          mavenProject(
-            "project",
-            srcMainJava(
-              java(
-                """
+                spec -> spec.recipe(addDependency(
+                        "com.fasterxml.jackson.core:jackson-core:2.12.0",
+                        "com.fasterxml.jackson.core.*",
+                        scope
+                )),
+                mavenProject(
+                        "project",
+                        srcMainJava(
+                                java(
+                                        """
                       public class A {
                           com.fasterxml.jackson.core.Versioned v;
                       }
                   """
-              )
-            ),
-            pomXml(
-              """
+                                )
+                        ),
+                        pomXml(
+                                """
                     <project>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
                         <version>1</version>
                     </project>
                 """,
-              """
+                                """
                     <project>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
@@ -933,18 +933,18 @@ class AddDependencyTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """.formatted(scope)
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void addDependencyToProjectsThatNeedIt() {
         rewriteRun(
-          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath", "compile")),
-          mavenProject("root",
-            pomXml(
-              """
+                spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath", "compile")),
+                mavenProject("root",
+                        pomXml(
+                                """
                 <project>
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>root</artifactId>
@@ -955,14 +955,14 @@ class AddDependencyTest implements RewriteTest {
                     </modules>
                 </project>
                 """
-            )
-          ),
-          mavenProject("project1",
-            srcMainJava(
-              java(usingGuavaIntMath)
-            ),
-            pomXml(
-              """
+                        )
+                ),
+                mavenProject("project1",
+                        srcMainJava(
+                                java(usingGuavaIntMath)
+                        ),
+                        pomXml(
+                                """
                 <project>
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>project1</artifactId>
@@ -974,7 +974,7 @@ class AddDependencyTest implements RewriteTest {
                     </parent>
                 </project>
                 """,
-              """
+                                """
                 <project>
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>project1</artifactId>
@@ -993,11 +993,11 @@ class AddDependencyTest implements RewriteTest {
                     </dependencies>
                 </project>
                 """
-            )
-          ),
-          mavenProject("project2",
-            pomXml(
-              """
+                        )
+                ),
+                mavenProject("project2",
+                        pomXml(
+                                """
                 <project>
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>project2</artifactId>
@@ -1009,18 +1009,18 @@ class AddDependencyTest implements RewriteTest {
                     </parent>
                 </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void preferRootPom() {
         rewriteRun(
-          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre")),
-          mavenProject("root",
-            pomXml(
-              """
+                spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre")),
+                mavenProject("root",
+                        pomXml(
+                                """
                 <project>
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>root</artifactId>
@@ -1031,7 +1031,7 @@ class AddDependencyTest implements RewriteTest {
                     </modules>
                 </project>
                 """,
-              """
+                                """
                 <project>
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>root</artifactId>
@@ -1049,11 +1049,11 @@ class AddDependencyTest implements RewriteTest {
                     </dependencies>
                 </project>
                 """
-            )
-          ),
-          mavenProject("project1",
-            pomXml(
-              """
+                        )
+                ),
+                mavenProject("project1",
+                        pomXml(
+                                """
                 <project>
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>project1</artifactId>
@@ -1065,10 +1065,10 @@ class AddDependencyTest implements RewriteTest {
                     </parent>
                 </project>
                 """)
-          ),
-          mavenProject("project2",
-            pomXml(
-              """
+                ),
+                mavenProject("project2",
+                        pomXml(
+                                """
                 <project>
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>project2</artifactId>
@@ -1080,37 +1080,37 @@ class AddDependencyTest implements RewriteTest {
                     </parent>
                 </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void rawVisitorDoesNotDuplicate() {
         rewriteRun(
-          spec -> spec.recipe(
-            toRecipe()
-              .withDisplayName("Add dependency")
-              .withName("Uses AddDependencyVisitor directly to validate that it will not add a dependency multiple times")
-              .withGetVisitor(() -> new AddDependencyVisitor(
-                "com.google.guava",
-                "guava",
-                "29.0-jre",
-                null,
-                "test",
-                null,
-                null,
-                null,
-                null,
-                null
-              ))
-          ),
-          mavenProject("project",
-            srcTestJava(
-              java(usingGuavaIntMath)
-            ),
-            pomXml(
-              """
+                spec -> spec.recipe(
+                        toRecipe()
+                                .withDisplayName("Add dependency")
+                                .withName("Uses AddDependencyVisitor directly to validate that it will not add a dependency multiple times")
+                                .withGetVisitor(() -> new AddDependencyVisitor(
+                                        "com.google.guava",
+                                        "guava",
+                                        "29.0-jre",
+                                        null,
+                                        "test",
+                                        null,
+                                        null,
+                                        null,
+                                        null,
+                                        null
+                                ))
+                ),
+                mavenProject("project",
+                        srcTestJava(
+                                java(usingGuavaIntMath)
+                        ),
+                        pomXml(
+                                """
                     <project>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
@@ -1125,22 +1125,22 @@ class AddDependencyTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void noCompileScopeDependency() {
         rewriteRun(
-          spec -> spec.recipe(addDependency("jakarta.xml.bind:jakarta.xml.bind-api:latest.release", "com.google.common.math.IntMath", true)),
-          mavenProject(
-            "project",
-            srcMainJava(
-              java(usingGuavaIntMath)
-            ),
-            pomXml(
-              """
+                spec -> spec.recipe(addDependency("jakarta.xml.bind:jakarta.xml.bind-api:latest.release", "com.google.common.math.IntMath", true)),
+                mavenProject(
+                        "project",
+                        srcMainJava(
+                                java(usingGuavaIntMath)
+                        ),
+                        pomXml(
+                                """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>org.springframework.samples</groupId>
@@ -1177,7 +1177,7 @@ class AddDependencyTest implements RewriteTest {
                 
                 </project>
                 """,
-              """
+                                """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>org.springframework.samples</groupId>
@@ -1218,22 +1218,22 @@ class AddDependencyTest implements RewriteTest {
                 
                 </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void addDependenciesOnEmptyProjectWithMavenProject() {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency("com.google.guava", "guava", "29.0-jre", null, null, true, null, null, null, null, null, null)),
-          mavenProject("my-app", pomXml("""
+                spec -> spec.recipe(new AddDependency("com.google.guava", "guava", "29.0-jre", null, null, true, null, null, null, null, null, null)),
+                mavenProject("my-app", pomXml("""
                 <project>
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>my-app</artifactId>
                     <version>1</version>
                 </project>""",
-              """
+                        """
                 <project>
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>my-app</artifactId>
@@ -1246,22 +1246,22 @@ class AddDependencyTest implements RewriteTest {
                         </dependency>
                     </dependencies>
                 </project>"""
-            )
-          ));
+                )
+                ));
     }
 
     @DocumentExample
     @Test
     void addDependenciesOnEmptyProject() {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency("com.google.guava", "guava", "29.0-jre", null, null, true, null, null, null, null, null, null)),
-          pomXml("""
+                spec -> spec.recipe(new AddDependency("com.google.guava", "guava", "29.0-jre", null, null, true, null, null, null, null, null, null)),
+                pomXml("""
               <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
               </project>""",
-            """
+                        """
               <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
@@ -1274,31 +1274,31 @@ class AddDependencyTest implements RewriteTest {
                       </dependency>
                   </dependencies>
               </project>"""
-          )
+                )
         );
     }
 
     @Test
     void dependencyThatIsTransitivelyProvidedWithWrongScopeShouldBeAdded() {
         rewriteRun(
-          spec -> spec
-            .parser(JavaParser.fromJavaVersion()
-              .dependsOn(
-                """
+                spec -> spec
+                        .parser(JavaParser.fromJavaVersion()
+                                .dependsOn(
+                                        """
                   package main.java.checkerframework.checker.nullness.qual;
                   public @interface NonNull {}
                   """
-              )
-            )
-            .recipes(
-              new AddDependency("org.checkerframework", "checker-qual", "3.44.0",
-                null, null, null, "main.java.checkerframework..*", null, null, null, null,
-                true),
-              new ChangePackage("main.java.checkerframework", "org.checkerframework", true)
-            ),
-          mavenProject("parent",
-            pomXml(
-              """
+                                )
+                        )
+                        .recipes(
+                                new AddDependency("org.checkerframework", "checker-qual", "3.44.0",
+                                        null, null, null, "main.java.checkerframework..*", null, null, null, null,
+                                        true),
+                                new ChangePackage("main.java.checkerframework", "org.checkerframework", true)
+                        ),
+                mavenProject("parent",
+                        pomXml(
+                                """
                 <project>
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>parent</artifactId>
@@ -1316,22 +1316,22 @@ class AddDependencyTest implements RewriteTest {
                     </dependencies>
                 </project>
                 """
-            ),
-            mavenProject("child",
-              srcMainJava(
-                java(
-                  """
+                        ),
+                        mavenProject("child",
+                                srcMainJava(
+                                        java(
+                                                """
                     import main.java.checkerframework.checker.nullness.qual.NonNull;
                     class Foo {}
                     """,
-                  """
+                                                """
                     import org.checkerframework.checker.nullness.qual.NonNull;
                     class Foo {}
                     """
-                )
-              ),
-              pomXml(
-                """
+                                        )
+                                ),
+                                pomXml(
+                                        """
                   <project>
                       <parent>
                           <groupId>com.mycompany.app</groupId>
@@ -1350,7 +1350,7 @@ class AddDependencyTest implements RewriteTest {
                       </dependencies>
                   </project>
                   """,
-                """
+                                        """
                   <project>
                       <parent>
                           <groupId>com.mycompany.app</groupId>
@@ -1374,33 +1374,33 @@ class AddDependencyTest implements RewriteTest {
                       </dependencies>
                   </project>
                   """
-              )
-            )
-          )
+                                )
+                        )
+                )
         );
     }
 
     @Test
     void dependencyThatIsTransitivelyProvidedWithCorrectScopeShouldNotBeAdded() {
         rewriteRun(
-          spec -> spec
-            .parser(JavaParser.fromJavaVersion()
-              .dependsOn(
-                """
+                spec -> spec
+                        .parser(JavaParser.fromJavaVersion()
+                                .dependsOn(
+                                        """
                   package main.java.checkerframework.checker.nullness.qual;
                   public @interface NonNull {}
                   """
-              )
-            )
-            .recipes(
-              new AddDependency("org.checkerframework", "checker-qual", "3.44.0",
-                null, null, null, "main.java.checkerframework..*", null, null, null, null,
-                true),
-              new ChangePackage("main.java.checkerframework", "org.checkerframework", true)
-            ),
-          mavenProject("parent",
-            pomXml(
-              """
+                                )
+                        )
+                        .recipes(
+                                new AddDependency("org.checkerframework", "checker-qual", "3.44.0",
+                                        null, null, null, "main.java.checkerframework..*", null, null, null, null,
+                                        true),
+                                new ChangePackage("main.java.checkerframework", "org.checkerframework", true)
+                        ),
+                mavenProject("parent",
+                        pomXml(
+                                """
                 <project>
                     <groupId>com.mycompany.app</groupId>
                     <artifactId>parent</artifactId>
@@ -1418,22 +1418,22 @@ class AddDependencyTest implements RewriteTest {
                     </dependencies>
                 </project>
                 """
-            ),
-            mavenProject("child",
-              srcTestJava(
-                java(
-                  """
+                        ),
+                        mavenProject("child",
+                                srcTestJava(
+                                        java(
+                                                """
                     import main.java.checkerframework.checker.nullness.qual.NonNull;
                     class Foo {}
                     """,
-                  """
+                                                """
                     import org.checkerframework.checker.nullness.qual.NonNull;
                     class Foo {}
                     """
-                )
-              ),
-              pomXml(
-                """
+                                        )
+                                ),
+                                pomXml(
+                                        """
                   <project>
                       <parent>
                           <groupId>com.mycompany.app</groupId>
@@ -1452,31 +1452,31 @@ class AddDependencyTest implements RewriteTest {
                       </dependencies>
                   </project>
                   """
-              )
-            )
-          )
+                                )
+                        )
+                )
         );
     }
 
     @Test
     void addDependencyToParentPomWhenAggregatingPomIsNotParent() {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency(
-            "org.hamcrest",
-            "hamcrest-junit",
-            "2.0.0.0",
-            null,
-            "test",
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            true)),
-          mavenProject("my-app-aggregate",
-            pomXml(
-              """
+                spec -> spec.recipe(new AddDependency(
+                        "org.hamcrest",
+                        "hamcrest-junit",
+                        "2.0.0.0",
+                        null,
+                        "test",
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        true)),
+                mavenProject("my-app-aggregate",
+                        pomXml(
+                                """
                 <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app-aggregate</artifactId>
@@ -1487,11 +1487,11 @@ class AddDependencyTest implements RewriteTest {
                   </modules>
                 </project>
                 """
-            )
-          ),
-          mavenProject("project-parent",
-            pomXml(
-              """
+                        )
+                ),
+                mavenProject("project-parent",
+                        pomXml(
+                                """
                 <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app-parent</artifactId>
@@ -1503,7 +1503,7 @@ class AddDependencyTest implements RewriteTest {
                   </parent>
                 </project>
                 """,
-              """
+                                """
                 <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app-parent</artifactId>
@@ -1523,11 +1523,11 @@ class AddDependencyTest implements RewriteTest {
                   </dependencies>
                 </project>
                 """
-            )
-          ),
-          mavenProject("my-app-child",
-            pomXml(
-              """
+                        )
+                ),
+                mavenProject("my-app-child",
+                        pomXml(
+                                """
                 <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app-child</artifactId>
@@ -1539,30 +1539,30 @@ class AddDependencyTest implements RewriteTest {
                   </parent>
                 </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void addDependencyToAggregatingPomAndParentPomWhenAggregatingPomIsParent() {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency(
-            "org.hamcrest",
-            "hamcrest-junit",
-            "2.0.0.0",
-            null,
-            "test",
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            true)),
-          mavenProject("my-app-aggregate",
-            pomXml(
-              """
+                spec -> spec.recipe(new AddDependency(
+                        "org.hamcrest",
+                        "hamcrest-junit",
+                        "2.0.0.0",
+                        null,
+                        "test",
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        true)),
+                mavenProject("my-app-aggregate",
+                        pomXml(
+                                """
                 <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app-aggregate</artifactId>
@@ -1573,7 +1573,7 @@ class AddDependencyTest implements RewriteTest {
                   </modules>
                 </project>
                 """,
-              """
+                                """
                 <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app-aggregate</artifactId>
@@ -1592,11 +1592,11 @@ class AddDependencyTest implements RewriteTest {
                   </dependencies>
                 </project>
                 """
-            )
-          ),
-          mavenProject("project-parent",
-            pomXml(
-              """
+                        )
+                ),
+                mavenProject("project-parent",
+                        pomXml(
+                                """
                 <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app-parent</artifactId>
@@ -1608,7 +1608,7 @@ class AddDependencyTest implements RewriteTest {
                   </parent>
                 </project>
                 """,
-              """
+                                """
                 <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app-parent</artifactId>
@@ -1628,11 +1628,11 @@ class AddDependencyTest implements RewriteTest {
                   </dependencies>
                 </project>
                 """
-            )
-          ),
-          mavenProject("my-app-child",
-            pomXml(
-              """
+                        )
+                ),
+                mavenProject("my-app-child",
+                        pomXml(
+                                """
                 <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app-child</artifactId>
@@ -1644,8 +1644,8 @@ class AddDependencyTest implements RewriteTest {
                   </parent>
                 </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
@@ -1668,6 +1668,6 @@ class AddDependencyTest implements RewriteTest {
     private AddDependency addDependency(String gav, @Nullable String onlyIfUsing, @Nullable String scope, @Nullable Boolean acceptTransitive) {
         String[] gavParts = gav.split(":");
         return new AddDependency(gavParts[0], gavParts[1], gavParts[2], null, scope, true, onlyIfUsing, null, null,
-          false, null, acceptTransitive);
+                false, null, acceptTransitive);
     }
 }

@@ -30,7 +30,8 @@ class MavenMetadataTest {
 
     @Test
     void deserializeMetadata() throws IOException {
-        @Language("xml") String metadata = """
+        @Language("xml")
+        String metadata = """
           <metadata>
               <groupId>org.springframework.boot</groupId>
               <artifactId>spring-boot</artifactId>
@@ -54,7 +55,8 @@ class MavenMetadataTest {
     @SuppressWarnings("ConstantConditions")
     @Test
     void deserializeSnapshotMetadata() throws IOException {
-        @Language("xml") String metadata = """
+        @Language("xml")
+        String metadata = """
           <metadata modelVersion="1.1.0">
               <groupId>org.openrewrite.recipe</groupId>
               <artifactId>rewrite-recommendations</artifactId>

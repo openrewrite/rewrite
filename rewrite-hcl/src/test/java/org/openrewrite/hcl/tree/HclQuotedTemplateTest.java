@@ -25,22 +25,22 @@ class HclQuotedTemplateTest implements RewriteTest {
     @Test
     void quotedTemplate() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               a = "abc${1}"
               """
-          )
+                )
         );
     }
 
     @Test
     void nestedQuotedTemplate() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               a = "abc${"a${b}"}"
               """
-          )
+                )
         );
     }
 }

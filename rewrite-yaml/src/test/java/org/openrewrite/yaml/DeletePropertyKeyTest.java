@@ -35,9 +35,9 @@ class DeletePropertyKeyTest implements RewriteTest {
     @Test
     void singleEntry() {
         rewriteRun(
-          yaml("management.metrics.binders.files.enabled: true",
-            ""
-          )
+                yaml("management.metrics.binders.files.enabled: true",
+                        ""
+                )
         );
     }
 
@@ -45,25 +45,25 @@ class DeletePropertyKeyTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1841")
     void firstItem() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               management.metrics.binders.files.enabled: true
               server.port: 8080
               """,
-            """
+                        """
               server.port: 8080
               """
-          )
+                )
         );
     }
 
     @Test
     void deleteSequenceItem() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteProperty("foo.bar.sequence.propertyA",
-            null, null, null)),
-          yaml(
-            """
+                spec -> spec.recipe(new DeleteProperty("foo.bar.sequence.propertyA",
+                        null, null, null)),
+                yaml(
+                        """
                 foo:
                   bar:
                     sequence:
@@ -72,7 +72,7 @@ class DeletePropertyKeyTest implements RewriteTest {
                       - propertyB: fieldB
                     scalar: value
               """,
-            """
+                        """
                 foo:
                   bar:
                     sequence:
@@ -80,17 +80,17 @@ class DeletePropertyKeyTest implements RewriteTest {
                       - propertyB: fieldB
                     scalar: value
               """
-          )
+                )
         );
     }
 
     @Test
     void deleteEntireSequence() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteProperty("foo.bar.sequence.propertyA",
-            null, null, null)),
-          yaml(
-            """
+                spec -> spec.recipe(new DeleteProperty("foo.bar.sequence.propertyA",
+                        null, null, null)),
+                yaml(
+                        """
               foo:
                 bar:
                   sequence:
@@ -98,13 +98,13 @@ class DeletePropertyKeyTest implements RewriteTest {
                   # comments
                   scalar: value
               """,
-            """
+                        """
               foo:
                 bar:
                   # comments
                   scalar: value
               """
-          )
+                )
         );
     }
 
@@ -112,10 +112,10 @@ class DeletePropertyKeyTest implements RewriteTest {
     @Test
     void deleteFirstItemWithComments() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteProperty("foo.bar.sequence",
-            null, null, null)),
-          yaml(
-            """
+                spec -> spec.recipe(new DeleteProperty("foo.bar.sequence",
+                        null, null, null)),
+                yaml(
+                        """
               foo:
                 bar:
                   sequence:
@@ -125,64 +125,64 @@ class DeletePropertyKeyTest implements RewriteTest {
                   # Some comments
                   scalar: value
               """,
-            """
+                        """
               foo:
                 bar:
                   # Some comments
                   scalar: value
               """
-          )
+                )
         );
     }
 
     @Test
     void lastItem() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               server.port: 8080
               management.metrics.binders.files.enabled: true
               """,
-            """
+                        """
               server.port: 8080
               """
-          )
+                )
         );
     }
 
     @Test
     void middleItem() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               app.name: foo
               management.metrics.binders.files.enabled: true
               server.port: 8080
               """,
-            """
+                        """
               app.name: foo
               server.port: 8080
               """
-          )
+                )
         );
     }
 
     @Test
     void downDeeper() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               management.metrics:
                 enabled: true
                 binders.files.enabled: true
               server.port: 8080
               """,
-            """
+                        """
               management.metrics:
                 enabled: true
               server.port: 8080
               """
-          )
+                )
         );
     }
 
@@ -191,31 +191,31 @@ class DeletePropertyKeyTest implements RewriteTest {
     @Test
     void aliasAnchorPairs() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteProperty("bar.yo", null, null, null)),
-          yaml(
-            """
+                spec -> spec.recipe(new DeleteProperty("bar.yo", null, null, null)),
+                yaml(
+                        """
               bar:
                 &abc yo: friend
               baz:
                 *abc: friendly
               """
-          )
+                )
         );
     }
 
     @ParameterizedTest
     @ValueSource(strings = {
-      "acme.my-project.person.first-name",
-      "acme.myProject.person.firstName",
-      "acme.my_project.person.first_name"
+            "acme.my-project.person.first-name",
+            "acme.myProject.person.firstName",
+            "acme.my_project.person.first_name"
     })
     @Issue("https://github.com/openrewrite/rewrite/issues/1168")
     void relaxedBinding(String propertyKey) {
         rewriteRun(
-          spec -> spec.recipe(new DeleteProperty(propertyKey, false, true, null)),
-          yaml("acme.my-project.person.first-name: example",
-            ""
-          )
+                spec -> spec.recipe(new DeleteProperty(propertyKey, false, true, null)),
+                yaml("acme.my-project.person.first-name: example",
+                        ""
+                )
         );
     }
 
@@ -223,18 +223,18 @@ class DeletePropertyKeyTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1168")
     void exactMatch() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteProperty("acme.my-project.person.first-name", false, false, null)),
-          yaml(
-            """
+                spec -> spec.recipe(new DeleteProperty("acme.my-project.person.first-name", false, false, null)),
+                yaml(
+                        """
               acme.myProject.person.firstName: example
               acme.my_project.person.first_name: example
               acme.my-project.person.first-name: example
               """,
-            """
+                        """
               acme.myProject.person.firstName: example
               acme.my_project.person.first_name: example
               """
-          )
+                )
         );
     }
 
@@ -242,9 +242,9 @@ class DeletePropertyKeyTest implements RewriteTest {
     @Test
     void preservesOriginalIndentStructureOfExistingHierarchy() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteProperty("my.old.key", false, null, null)),
-          yaml(
-            """
+                spec -> spec.recipe(new DeleteProperty("my.old.key", false, null, null)),
+                yaml(
+                        """
                 my:
                   old:
                     key:
@@ -253,12 +253,12 @@ class DeletePropertyKeyTest implements RewriteTest {
                   other:
                     key: qwe
               """,
-            """
+                        """
                 my:
                   other:
                     key: qwe
               """
-          )
+                )
         );
     }
 
@@ -266,16 +266,16 @@ class DeletePropertyKeyTest implements RewriteTest {
     @Test
     void preserveEmptySequencesWithOtherKeys() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteProperty("my.key", false, null, null)),
-          yaml(
-            """
+                spec -> spec.recipe(new DeleteProperty("my.key", false, null, null)),
+                yaml(
+                        """
               my.key: qwe
               seq: []
               """,
-            """
+                        """
               seq: []
               """
-          )
+                )
         );
     }
 }

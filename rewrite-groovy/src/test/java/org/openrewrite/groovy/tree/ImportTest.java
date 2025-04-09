@@ -26,68 +26,68 @@ class ImportTest implements RewriteTest {
     @Test
     void classImport() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               import java.util.List
               """
-          )
+                )
         );
     }
 
     @Test
     void starImport() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               import java.util.*
               """
-          )
+                )
         );
     }
 
     @Test
     void staticImport() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               import static java.util.Collections.singletonList
               """
-          )
+                )
         );
     }
 
     @Test
     void staticStarImport() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               import static java.util.Collections.*
               """
-          )
+                )
         );
     }
 
     @Test
     void classImportAlias() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               import java.util.List as L
               """,
-            spec -> spec.afterRecipe(cu -> assertThat(cu.getEof()).isEqualTo(Space.EMPTY))
-          )
+                        spec -> spec.afterRecipe(cu -> assertThat(cu.getEof()).isEqualTo(Space.EMPTY))
+                )
         );
     }
 
     @Test
     void staticImportAlias() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               import static java.util.Collections.singletonList as listOf
               """,
-            spec -> spec.afterRecipe(cu -> assertThat(cu.getEof()).isEqualTo(Space.EMPTY))
-          )
+                        spec -> spec.afterRecipe(cu -> assertThat(cu.getEof()).isEqualTo(Space.EMPTY))
+                )
         );
     }
 }

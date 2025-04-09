@@ -143,10 +143,10 @@ public class MethodMatcher {
 
     private static boolean isPlainIdentifier(MethodSignatureParser.TargetTypePatternContext context) {
         return context.BANG() == null &&
-               context.AND() == null &&
-               context.OR() == null &&
-               context.classNameOrInterface().DOTDOT().isEmpty() &&
-               context.classNameOrInterface().WILDCARD().isEmpty();
+                context.AND() == null &&
+                context.OR() == null &&
+                context.classNameOrInterface().DOTDOT().isEmpty() &&
+                context.classNameOrInterface().WILDCARD().isEmpty();
     }
 
     private static boolean isPlainIdentifier(MethodSignatureParser.SimpleNamePatternContext context) {
@@ -186,7 +186,7 @@ public class MethodMatcher {
 
     private boolean matchesTargetTypeName(String fullyQualifiedTypeName) {
         return this.targetType != null && fullyQualifiedNamesAreEqual(this.targetType, fullyQualifiedTypeName) ||
-               this.targetTypePattern != null && this.targetTypePattern.matcher(fullyQualifiedTypeName).matches();
+                this.targetTypePattern != null && this.targetTypePattern.matcher(fullyQualifiedTypeName).matches();
     }
 
     boolean matchesTargetType(JavaType.@Nullable FullyQualified type) {
@@ -200,7 +200,7 @@ public class MethodMatcher {
     @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     private boolean matchesMethodName(String methodName) {
         return this.methodName != null && this.methodName.equals(methodName) ||
-               this.methodNamePattern != null && methodNamePattern.matcher(methodName).matches();
+                this.methodNamePattern != null && methodNamePattern.matcher(methodName).matches();
     }
 
     private boolean matchesParameterTypes(List<JavaType> parameterTypes) {
@@ -254,7 +254,7 @@ public class MethodMatcher {
         // aspectJUtils does not support matching classes separated by packages.
         // [^.]* is the product of a fully wild card match for a method. `* foo()`
         boolean matchesTargetType = (targetTypePattern != null && "[^.]*".equals(targetTypePattern.pattern())) ||
-                                    matchesTargetType(enclosing.getType());
+                matchesTargetType(enclosing.getType());
         if (!matchesTargetType) {
             return false;
         }
@@ -281,7 +281,7 @@ public class MethodMatcher {
         // aspectJUtils does not support matching classes separated by packages.
         // [^.]* is the product of a fully wild card match for a method. `* foo()`
         boolean matchesTargetType = (targetTypePattern != null && "[^.]*".equals(targetTypePattern.pattern())) ||
-                                    TypeUtils.isAssignableTo(targetType, enclosing.getType());
+                TypeUtils.isAssignableTo(targetType, enclosing.getType());
         if (!matchesTargetType) {
             return false;
         }
@@ -339,8 +339,8 @@ public class MethodMatcher {
         }
 
         if (method.getSelect() != null &&
-            method.getSelect() instanceof J.Identifier &&
-            !matchesSelectBySimpleNameAlone(((J.Identifier) method.getSelect()))) {
+                method.getSelect() instanceof J.Identifier &&
+                !matchesSelectBySimpleNameAlone(((J.Identifier) method.getSelect()))) {
             return false;
         }
 
@@ -361,10 +361,10 @@ public class MethodMatcher {
         }
         //noinspection DataFlowIssue
         return targetTypePattern.matcher(select.getSimpleName()).matches() ||
-               Pattern.compile(targetTypePattern.pattern()
-                               .replaceAll(".*" + Pattern.quote(ASPECTJ_DOT_PATTERN), "")
-                               .replaceAll(".*" + Pattern.quote(ASPECTJ_DOTDOT_PATTERN), ""))
-                       .matcher(select.getSimpleName()).matches();
+                Pattern.compile(targetTypePattern.pattern()
+                        .replaceAll(".*" + Pattern.quote(ASPECTJ_DOT_PATTERN), "")
+                        .replaceAll(".*" + Pattern.quote(ASPECTJ_DOTDOT_PATTERN), ""))
+                        .matcher(select.getSimpleName()).matches();
     }
 
     private String argumentsFromExpressionTypes(J.MethodInvocation method) {
@@ -398,7 +398,7 @@ public class MethodMatcher {
         Expression target = fieldAccess.getTarget();
         if (target instanceof J.Identifier) {
             return targetType != null && targetType.equals(((J.Identifier) target).getSimpleName()) ||
-                   targetTypePattern != null && targetTypePattern.matcher(((J.Identifier) target).getSimpleName()).matches();
+                    targetTypePattern != null && targetTypePattern.matcher(((J.Identifier) target).getSimpleName()).matches();
         } else if (target instanceof J.FieldAccess) {
             return ((J.FieldAccess) target).isFullyQualifiedClassReference(targetType != null ? targetType : targetTypePattern.pattern());
         }
@@ -437,16 +437,16 @@ public class MethodMatcher {
         }
 
         return typePattern(method.getDeclaringType()) + " " +
-               method.getName() + "(" + parameters + ")";
+                method.getName() + "(" + parameters + ")";
     }
 
     @Override
     public String toString() {
         //noinspection DataFlowIssue
         return (targetType != null ? targetType : targetTypePattern.pattern()) +
-               ' ' +
-               (methodName != null ? methodName : methodNamePattern.pattern()) +
-               '(' + argumentPattern.pattern() + ')';
+                ' ' +
+                (methodName != null ? methodName : methodNamePattern.pattern()) +
+                '(' + argumentPattern.pattern() + ')';
     }
 }
 

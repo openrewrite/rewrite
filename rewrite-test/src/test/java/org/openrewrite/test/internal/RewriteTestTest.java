@@ -41,10 +41,10 @@ class RewriteTestTest implements RewriteTest {
     @Test
     void rejectRecipeWithNameOption() {
         assertThrows(AssertionError.class, () -> rewriteRun(
-          spec -> spec.recipe(new RecipeWithNameOption("test")),
-          text(
-            "hello world!"
-          )
+                spec -> spec.recipe(new RecipeWithNameOption("test")),
+                text(
+                        "hello world!"
+                )
         ));
     }
 
@@ -61,8 +61,8 @@ class RewriteTestTest implements RewriteTest {
     @Test
     void rejectsRecipeWithDescriptionNotEndingWithPeriod() {
         assertThrows(
-          AssertionError.class,
-          () -> validateRecipeNameAndDescription(new RecipeWithDescriptionNotEndingWithPeriod())
+                AssertionError.class,
+                () -> validateRecipeNameAndDescription(new RecipeWithDescriptionNotEndingWithPeriod())
         );
     }
 
@@ -74,25 +74,25 @@ class RewriteTestTest implements RewriteTest {
     @Test
     void multipleFilesWithSamePath() {
         assertThrows(AssertionError.class,
-          () -> rewriteRun(
-            spec -> spec.recipe(new CreatesTwoFilesSamePath()),
-            text(null, "duplicate", spec -> spec.path("duplicate.txt"))));
+                () -> rewriteRun(
+                        spec -> spec.recipe(new CreatesTwoFilesSamePath()),
+                        text(null, "duplicate", spec -> spec.path("duplicate.txt"))));
     }
 
     @Test
     void cursorValidation() {
         assertThrows(AssertionError.class, () ->
-          rewriteRun(
-            spec -> spec.recipe(new ImproperCursorUsage()),
-            text("")
-          )
+                rewriteRun(
+                        spec -> spec.recipe(new ImproperCursorUsage()),
+                        text("")
+                )
         );
 
         rewriteRun(
-          spec -> spec.recipe(new ImproperCursorUsage()).typeValidationOptions(TypeValidation.builder()
-            .cursorAcyclic(false)
-            .build()),
-          text("")
+                spec -> spec.recipe(new ImproperCursorUsage()).typeValidationOptions(TypeValidation.builder()
+                        .cursorAcyclic(false)
+                        .build()),
+                text("")
         );
     }
 
@@ -100,8 +100,8 @@ class RewriteTestTest implements RewriteTest {
     @Test
     void rejectRecipeValidationFailure() {
         assertThrows(AssertionError.class, () ->
-          rewriteRun(
-            spec -> spec.recipeFromYaml("""
+                rewriteRun(
+                        spec -> spec.recipeFromYaml("""
               type: specs.openrewrite.org/v1beta/recipe
               name: org.openrewrite.RefersToNonExistentRecipe
               displayName: Refers to non-existent recipe
@@ -110,7 +110,7 @@ class RewriteTestTest implements RewriteTest {
                 - org.openrewrite.DoesNotExist
               
               """, "org.openrewrite.RefersToNonExistentRecipe")
-          ));
+                ));
     }
 }
 
@@ -135,7 +135,8 @@ class ImproperCursorUsage extends Recipe {
         return new TreeVisitor<>() {
             @Override
             public @Nullable Tree visit(Tree tree, ExecutionContext ctx) {
-                return new TreeVisitor<>(){}.visit(tree, ctx, new Cursor(getCursor(), tree));
+                return new TreeVisitor<>(){
+                }.visit(tree, ctx, new Cursor(getCursor(), tree));
             }
         };
     }
@@ -154,7 +155,7 @@ class CreatesTwoFilesSamePath extends ScanningRecipe<AtomicBoolean> {
     @Override
     public String getDescription() {
         return "A source file's path must be unique. " +
-               "This recipe creates two source files with the same path to show that the test framework helps protect against this mistake.";
+                "This recipe creates two source files with the same path to show that the test framework helps protect against this mistake.";
     }
 
     @Override
@@ -184,13 +185,13 @@ class CreatesTwoFilesSamePath extends ScanningRecipe<AtomicBoolean> {
         }
         Path duplicatePath = Paths.get("duplicate.txt");
         return Arrays.asList(PlainText.builder()
-            .text("duplicate")
-            .sourcePath(duplicatePath)
-            .build(),
-          PlainText.builder()
-            .text("duplicate")
-            .sourcePath(duplicatePath)
-            .build()
+                        .text("duplicate")
+                        .sourcePath(duplicatePath)
+                        .build(),
+                PlainText.builder()
+                        .text("duplicate")
+                        .sourcePath(duplicatePath)
+                        .build()
         );
     }
 }

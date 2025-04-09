@@ -36,8 +36,8 @@ public class RecipeList {
     }
 
     public RecipeList recipe(@NlsRewrite.DisplayName @Language("markdown") String displayName,
-                             @NlsRewrite.Description @Language("markdown") String description,
-                             TreeVisitor<? extends Tree, ExecutionContext> visitor) {
+            @NlsRewrite.Description @Language("markdown") String description,
+            TreeVisitor<? extends Tree, ExecutionContext> visitor) {
         return recipe(Recipe.builder(displayName, description).visitor(visitor));
     }
 

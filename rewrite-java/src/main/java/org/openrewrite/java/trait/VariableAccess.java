@@ -49,7 +49,7 @@ public class VariableAccess implements Trait<J.Identifier> {
         if (pair.getParent() instanceof J.Unary) {
             J.Unary unary = (J.Unary) pair.getParent();
             return unary.getExpression() == pair.getTree() &&
-                   unary.getOperator().isModifying();
+                    unary.getOperator().isModifying();
         }
         return false;
     }
@@ -71,7 +71,7 @@ public class VariableAccess implements Trait<J.Identifier> {
         if (pair.getParent() instanceof J.Unary) {
             J.Unary unary = (J.Unary) pair.getParent();
             return unary.getExpression() == pair.getTree() &&
-                   !unary.getOperator().isModifying();
+                    !unary.getOperator().isModifying();
         }
         return true;
     }
@@ -120,7 +120,7 @@ public class VariableAccess implements Trait<J.Identifier> {
             J.Identifier ident = cursor.getValue();
             String name = ident.getSimpleName();
             if (name.equals("this") || name.equals("super") ||
-                checkNamePart(cursor, J.VariableDeclarations.NamedVariable.class, J.VariableDeclarations.NamedVariable::getName)) {
+                    checkNamePart(cursor, J.VariableDeclarations.NamedVariable.class, J.VariableDeclarations.NamedVariable::getName)) {
                 return null;
             }
 
@@ -129,13 +129,13 @@ public class VariableAccess implements Trait<J.Identifier> {
             }
 
             if (checkNamePart(cursor, J.ClassDeclaration.class, J.ClassDeclaration::getName) ||
-                checkNamePart(cursor, J.MethodDeclaration.class, J.MethodDeclaration::getName) ||
-                checkNamePart(cursor, J.MethodInvocation.class, J.MethodInvocation::getName) ||
-                checkNamePart(cursor, J.NewClass.class, J.NewClass::getClazz) ||
-                checkNamePart(cursor, J.FieldAccess.class, J.FieldAccess::getName) ||
-                checkNamePart(cursor, J.MethodInvocation.class, J.MethodInvocation::getName) ||
-                checkNamePart(cursor, J.ParameterizedType.class, J.ParameterizedType::getClazz) ||
-                cursor.firstEnclosing(Javadoc.class) != null) {
+                    checkNamePart(cursor, J.MethodDeclaration.class, J.MethodDeclaration::getName) ||
+                    checkNamePart(cursor, J.MethodInvocation.class, J.MethodInvocation::getName) ||
+                    checkNamePart(cursor, J.NewClass.class, J.NewClass::getClazz) ||
+                    checkNamePart(cursor, J.FieldAccess.class, J.FieldAccess::getName) ||
+                    checkNamePart(cursor, J.MethodInvocation.class, J.MethodInvocation::getName) ||
+                    checkNamePart(cursor, J.ParameterizedType.class, J.ParameterizedType::getClazz) ||
+                    cursor.firstEnclosing(Javadoc.class) != null) {
                 return null;
             }
 
@@ -147,28 +147,28 @@ public class VariableAccess implements Trait<J.Identifier> {
             // Special case for annotations, where the left side of the assignment is the annotation field name,
             // and not a variable access.
             if (checkNamePart(cursor, J.Assignment.class, J.Assignment::getVariable) &&
-                checkParent(parent, J.Annotation.class, j -> j.getArguments() != null && j.getArguments().contains(ident))) {
+                    checkParent(parent, J.Annotation.class, j -> j.getArguments() != null && j.getArguments().contains(ident))) {
                 return null;
             }
 
             if (checkNamePart(cursor, J.ArrayAccess.class, J.ArrayAccess::getIndexed) ||
-                checkNamePart(cursor, J.ArrayDimension.class, J.ArrayDimension::getIndex) ||
-                checkNamePart(cursor, J.ControlParentheses.class, J.ControlParentheses::getTree) ||
-                checkNamePart(cursor, J.ForEachLoop.Control.class, J.ForEachLoop.Control::getIterable) ||
-                checkNamePart(cursor, J.ForLoop.Control.class, J.ForLoop.Control::getCondition) ||
-                checkNamePart(cursor, J.Parentheses.class, J.Parentheses::getTree) ||
-                checkNamePart(cursor, J.TypeCast.class, J.TypeCast::getExpression) ||
-                checkNamePart(cursor, J.Unary.class, J.Unary::getExpression) ||
-                checkNamePart(cursor, J.VariableDeclarations.NamedVariable.class, J.VariableDeclarations.NamedVariable::getInitializer) ||
-                checkParent(cursor, J.Assignment.class, a -> a.getVariable() == ident || a.getAssignment() == ident) ||
-                checkParent(cursor, J.Binary.class, b -> b.getLeft() == ident || b.getRight() == ident) ||
-                checkParent(cursor, J.MethodInvocation.class, m -> m.getSelect() == ident || m.getArguments().contains(ident)) ||
-                checkParent(cursor, J.NewClass.class, n -> n.getEnclosing() == ident || n.getArguments().contains(ident)) ||
-                checkParent(cursor, J.NewArray.class, n -> n.getInitializer() != null && n.getInitializer().contains(ident)) ||
-                checkParent(cursor, J.Ternary.class, t -> t.getCondition() == ident ||
-                                                          t.getTruePart() == ident ||
-                                                          t.getFalsePart() == ident) ||
-                checkParent(cursor, J.Annotation.class, parentAnnotation -> parentAnnotation.getArguments() != null && parentAnnotation.getArguments().contains(ident))) {
+                    checkNamePart(cursor, J.ArrayDimension.class, J.ArrayDimension::getIndex) ||
+                    checkNamePart(cursor, J.ControlParentheses.class, J.ControlParentheses::getTree) ||
+                    checkNamePart(cursor, J.ForEachLoop.Control.class, J.ForEachLoop.Control::getIterable) ||
+                    checkNamePart(cursor, J.ForLoop.Control.class, J.ForLoop.Control::getCondition) ||
+                    checkNamePart(cursor, J.Parentheses.class, J.Parentheses::getTree) ||
+                    checkNamePart(cursor, J.TypeCast.class, J.TypeCast::getExpression) ||
+                    checkNamePart(cursor, J.Unary.class, J.Unary::getExpression) ||
+                    checkNamePart(cursor, J.VariableDeclarations.NamedVariable.class, J.VariableDeclarations.NamedVariable::getInitializer) ||
+                    checkParent(cursor, J.Assignment.class, a -> a.getVariable() == ident || a.getAssignment() == ident) ||
+                    checkParent(cursor, J.Binary.class, b -> b.getLeft() == ident || b.getRight() == ident) ||
+                    checkParent(cursor, J.MethodInvocation.class, m -> m.getSelect() == ident || m.getArguments().contains(ident)) ||
+                    checkParent(cursor, J.NewClass.class, n -> n.getEnclosing() == ident || n.getArguments().contains(ident)) ||
+                    checkParent(cursor, J.NewArray.class, n -> n.getInitializer() != null && n.getInitializer().contains(ident)) ||
+                    checkParent(cursor, J.Ternary.class, t -> t.getCondition() == ident ||
+                            t.getTruePart() == ident ||
+                            t.getFalsePart() == ident) ||
+                    checkParent(cursor, J.Annotation.class, parentAnnotation -> parentAnnotation.getArguments() != null && parentAnnotation.getArguments().contains(ident))) {
                 return checkFilters(cursor);
             }
 

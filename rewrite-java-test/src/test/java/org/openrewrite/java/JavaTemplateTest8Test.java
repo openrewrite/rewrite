@@ -32,21 +32,21 @@ class JavaTemplateTest8Test implements RewriteTest {
     @Test
     void parameterizedMatch() {
         JavaTemplate template = JavaTemplate.builder("#{any(java.util.List<String>)}")
-          .build();
+                .build();
 
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public <N extends NameTree> N visitTypeName(N nameTree, ExecutionContext ctx) {
-                  // the cursor points at the parent when `visitTypeName()` is called
-                  if (template.matches(new Cursor(getCursor(), nameTree))) {
-                      return SearchResult.found(nameTree);
-                  }
-                  return super.visitTypeName(nameTree, ctx);
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public <N extends NameTree> N visitTypeName(N nameTree, ExecutionContext ctx) {
+                        // the cursor points at the parent when `visitTypeName()` is called
+                        if (template.matches(new Cursor(getCursor(), nameTree))) {
+                            return SearchResult.found(nameTree);
+                        }
+                        return super.visitTypeName(nameTree, ctx);
+                    }
+                })),
+                java(
+                        """
               import java.util.List;
               class Test {
                   List<Object> o;
@@ -59,7 +59,7 @@ class JavaTemplateTest8Test implements RewriteTest {
                   List<java.lang.Integer> qi;
               }
               """,
-            """
+                        """
               import java.util.List;
               class Test {
                   List<Object> o;
@@ -72,28 +72,28 @@ class JavaTemplateTest8Test implements RewriteTest {
                   List<java.lang.Integer> qi;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void parameterizedMatchWithBounds() {
         JavaTemplate template = JavaTemplate.builder("#{any(java.util.List<? extends java.lang.Number>)}")
-          .build();
+                .build();
 
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public <N extends NameTree> N visitTypeName(N nameTree, ExecutionContext ctx) {
-                  // the cursor points at the parent when `visitTypeName()` is called
-                  if (getCursor().getValue() != nameTree && template.matches(new Cursor(getCursor(), nameTree))) {
-                      return SearchResult.found(nameTree);
-                  }
-                  return super.visitTypeName(nameTree, ctx);
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public <N extends NameTree> N visitTypeName(N nameTree, ExecutionContext ctx) {
+                        // the cursor points at the parent when `visitTypeName()` is called
+                        if (getCursor().getValue() != nameTree && template.matches(new Cursor(getCursor(), nameTree))) {
+                            return SearchResult.found(nameTree);
+                        }
+                        return super.visitTypeName(nameTree, ctx);
+                    }
+                })),
+                java(
+                        """
               import java.util.List;
               class Test {
                   List<Object> o;
@@ -106,7 +106,7 @@ class JavaTemplateTest8Test implements RewriteTest {
                   List<java.lang.Integer> qi;
               }
               """,
-            """
+                        """
               import java.util.List;
               class Test {
                   List<Object> o;
@@ -119,28 +119,28 @@ class JavaTemplateTest8Test implements RewriteTest {
                   /*~~>*/List<java.lang.Integer> qi;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void parameterizedArrayMatch() {
         JavaTemplate template = JavaTemplate.builder("#{anyArray(java.util.List<String>)}")
-          .build();
+                .build();
 
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public <N extends NameTree> N visitTypeName(N nameTree, ExecutionContext ctx) {
-                  // the cursor points at the parent when `visitTypeName()` is called
-                  if (template.matches(new Cursor(getCursor(), nameTree))) {
-                      return SearchResult.found(nameTree);
-                  }
-                  return super.visitTypeName(nameTree, ctx);
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public <N extends NameTree> N visitTypeName(N nameTree, ExecutionContext ctx) {
+                        // the cursor points at the parent when `visitTypeName()` is called
+                        if (template.matches(new Cursor(getCursor(), nameTree))) {
+                            return SearchResult.found(nameTree);
+                        }
+                        return super.visitTypeName(nameTree, ctx);
+                    }
+                })),
+                java(
+                        """
               import java.util.List;
               class Test {
                   List<Object>[] o;
@@ -153,7 +153,7 @@ class JavaTemplateTest8Test implements RewriteTest {
                   List<java.lang.Integer>[] qi;
               }
               """,
-            """
+                        """
               import java.util.List;
               class Test {
                   List<Object>[] o;
@@ -166,7 +166,7 @@ class JavaTemplateTest8Test implements RewriteTest {
                   List<java.lang.Integer>[] qi;
               }
               """
-          )
+                )
         );
     }
 }

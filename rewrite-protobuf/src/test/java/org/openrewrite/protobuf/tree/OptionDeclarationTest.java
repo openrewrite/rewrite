@@ -25,60 +25,60 @@ class OptionDeclarationTest implements RewriteTest {
     @Test
     void option() {
         rewriteRun(
-          proto(
-            """
+                proto(
+                        """
               syntax = 'proto2';
               option my_option = "test";
               """
-          )
+                )
         );
     }
 
     @Test
     void optionFullIdentifier() {
         rewriteRun(
-          proto(
-            """
+                proto(
+                        """
               syntax = 'proto2';
               option my_option.key = "test";
               """
-          )
+                )
         );
     }
 
     @Test
     void optionWithReservedWord() {
         rewriteRun(
-          proto(
-            """
+                proto(
+                        """
               syntax = 'proto2';
               option my_option.option = "test";
               """
-          )
+                )
         );
     }
 
     @Test
     void extensionName() {
         rewriteRun(
-          proto(
-            """
+                proto(
+                        """
               syntax = 'proto2';
               option ( my_option ) = "test";
               """
-          )
+                )
         );
     }
 
     @Test
     void extensionNameFullIdentifier() {
         rewriteRun(
-          proto(
-            """
+                proto(
+                        """
               syntax = 'proto2';
               option ( my_option ).key = "test";
               """
-          )
+                )
         );
     }
 }

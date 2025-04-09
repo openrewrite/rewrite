@@ -107,11 +107,11 @@ public class FindAnnotations extends Recipe {
 
     public static Set<J.Annotation> find(J j, String annotationPattern, boolean matchMetaAnnotations) {
         return TreeVisitor.collect(
-                        new FindAnnotations(annotationPattern, matchMetaAnnotations).getVisitor(),
-                        j,
-                        new HashSet<>()
-                )
-                .stream()
+                new FindAnnotations(annotationPattern, matchMetaAnnotations).getVisitor(),
+                j,
+                new HashSet<>()
+        )
+        .stream()
                 .filter(a -> a instanceof J.Annotation)
                 .map(a -> (J.Annotation) a)
                 .collect(toSet());

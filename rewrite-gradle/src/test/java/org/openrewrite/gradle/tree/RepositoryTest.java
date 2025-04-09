@@ -26,14 +26,14 @@ class RepositoryTest implements RewriteTest {
     @Test
     void builtInFunctions() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               repositories {
                   mavenCentral()
                   mavenLocal()
               }
               """
-          )
+                )
         );
     }
 
@@ -41,8 +41,8 @@ class RepositoryTest implements RewriteTest {
     @Test
     void customMavenRepo() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               repositories {
                   maven {
                       url "https://repo.spring.io/release"
@@ -52,7 +52,7 @@ class RepositoryTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

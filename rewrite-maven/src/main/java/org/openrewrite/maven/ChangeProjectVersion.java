@@ -75,7 +75,7 @@ public class ChangeProjectVersion extends Recipe {
     @Override
     public String getDescription() {
         return "Change the project version of a Maven pom.xml. Identifies the project to be changed by its groupId and artifactId. " +
-               "If the version is defined as a property, this recipe will only change the property value if the property exists within the same pom.";
+                "If the version is defined as a property, this recipe will only change the property value if the property exists within the same pom.";
     }
 
     @Override
@@ -90,7 +90,7 @@ public class ChangeProjectVersion extends Recipe {
                     ResolvedPom resolvedPom = getResolutionResult().getPom();
 
                     if (matchesGlob(resolvedPom.getValue(t.getChildValue("groupId").orElse(null)), groupId) &&
-                        matchesGlob(resolvedPom.getValue(t.getChildValue("artifactId").orElse(null)), artifactId)) {
+                            matchesGlob(resolvedPom.getValue(t.getChildValue("artifactId").orElse(null)), artifactId)) {
                         Optional<Xml.Tag> versionTag = t.getChild("version");
                         if (versionTag.isPresent() && versionTag.get().getValue().isPresent()) {
                             String versionTagValue = versionTag.get().getValue().get();

@@ -26,15 +26,15 @@ class EmptyTest implements RewriteTest {
     @Test
     void empty() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       ;
                   }
               }
               """
-          )
+                )
         );
     }
 }

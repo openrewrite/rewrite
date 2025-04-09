@@ -64,9 +64,9 @@ public class ChangePlugin extends Recipe {
 
     @Option(displayName = "New plugin version",
             description = "An exact version number or node-style semver selector used to select the version number. " +
-                          "You can also use `latest.release` for the latest available version and `latest.patch` if " +
-                          "the current version is a valid semantic version. For more details, you can look at the documentation " +
-                          "page of [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors).",
+                    "You can also use `latest.release` for the latest available version and `latest.patch` if " +
+                    "the current version is a valid semantic version. For more details, you can look at the documentation " +
+                    "page of [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors).",
             example = "7.x",
             required = false)
     @Nullable
@@ -147,8 +147,8 @@ public class ChangePlugin extends Recipe {
                     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                         J.MethodInvocation m = method;
                         if (versionMatcher.matches(m) &&
-                            m.getSelect() instanceof J.MethodInvocation &&
-                            pluginMatcher.matches(m.getSelect())) {
+                                m.getSelect() instanceof J.MethodInvocation &&
+                                pluginMatcher.matches(m.getSelect())) {
                             m = maybeUpdateVersion(m, ctx);
                         } else if (pluginMatcher.matches(m)) {
                             m = maybeUpdatePluginSyntax(m);

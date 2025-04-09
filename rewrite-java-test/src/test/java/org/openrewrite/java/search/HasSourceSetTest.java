@@ -27,38 +27,38 @@ class HasSourceSetTest implements RewriteTest {
     @Test
     void main() {
         rewriteRun(
-          spec -> spec.recipe(new HasSourceSet("main")),
-          srcMainJava(
-            java(
-              """
+                spec -> spec.recipe(new HasSourceSet("main")),
+                srcMainJava(
+                        java(
+                                """
                 class Test {
                 }
                 """,
-              """
+                                """
                 /*~~>*/class Test {
                 }
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void test() {
         rewriteRun(
-          spec -> spec.recipe(new HasSourceSet("test")),
-          srcTestJava(
-            java(
-              """
+                spec -> spec.recipe(new HasSourceSet("test")),
+                srcTestJava(
+                        java(
+                                """
                 class Test {
                 }
                 """,
-              """
+                                """
                 /*~~>*/class Test {
                 }
                 """
-            )
-          )
+                        )
+                )
         );
     }
 }

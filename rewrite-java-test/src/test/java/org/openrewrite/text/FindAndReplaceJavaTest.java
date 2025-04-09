@@ -29,19 +29,19 @@ class FindAndReplaceJavaTest implements RewriteTest {
     @Test
     void findAndReplaceJava() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplace("Test", "Replaced", null, null, null, null, null, null)),
-          java(
-            "class Test {}",
-            "class Replaced {}"
-          )
+                spec -> spec.recipe(new FindAndReplace("Test", "Replaced", null, null, null, null, null, null)),
+                java(
+                        "class Test {}",
+                        "class Replaced {}"
+                )
         );
     }
 
     @Test
     void ignoresJavaFileWithPlaintextFlagEnabled() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplace("Test", "Replaced", null, null, null, null, null, true)),
-          java("class Test {}")
+                spec -> spec.recipe(new FindAndReplace("Test", "Replaced", null, null, null, null, null, true)),
+                java("class Test {}")
         );
     }
 
@@ -49,7 +49,7 @@ class FindAndReplaceJavaTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3532")
     void filePatternShouldLimitApplication() {
         rewriteRun(
-          spec -> spec.recipeFromYaml("""
+                spec -> spec.recipeFromYaml("""
               type: specs.openrewrite.org/v1beta/recipe
               name: com.yourorg.FindAndReplaceExample
               displayName: Find and replace example
@@ -60,12 +60,12 @@ class FindAndReplaceJavaTest implements RewriteTest {
                     replace: denylist
                     filePattern: '**/*.java'
               """,
-            "com.yourorg.FindAndReplaceExample"),
-          java(
-            "class blacklist {}",
-            "class denylist {}"
-          ),
-          text("See `class blacklist {}`")
+                        "com.yourorg.FindAndReplaceExample"),
+                java(
+                        "class blacklist {}",
+                        "class denylist {}"
+                ),
+                text("See `class blacklist {}`")
         );
     }
 }

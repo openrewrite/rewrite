@@ -128,15 +128,15 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
         public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
             // Only handle String literals
             if (!TypeUtils.isString(literal.getType()) ||
-                !Objects.equals(literalValue, literal.getValue())) {
+                    !Objects.equals(literalValue, literal.getValue())) {
                 return super.visitLiteral(literal, ctx);
             }
 
             // Prevent changing constant definition
             J.ClassDeclaration classDeclaration = getCursor().firstEnclosing(J.ClassDeclaration.class);
             if (classDeclaration != null &&
-                classDeclaration.getType() != null &&
-                owningType.equals(classDeclaration.getType().getFullyQualifiedName())) {
+                    classDeclaration.getType() != null &&
+                    owningType.equals(classDeclaration.getType().getFullyQualifiedName())) {
                 return super.visitLiteral(literal, ctx);
             }
 

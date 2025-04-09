@@ -27,14 +27,14 @@ class AddManagedDependencyVisitorTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(toRecipe(() -> new AddManagedDependencyVisitor("org.apache.logging.log4j", "log4j-bom", "2.17.2",
-          "import","pom",null)));
+                "import", "pom", null)));
     }
 
     @Test
     void alreadyExists() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
             <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -51,7 +51,7 @@ class AddManagedDependencyVisitorTest implements RewriteTest {
                 </dependencyManagement>
             </project>
             """
-          )
+                )
         );
     }
 
@@ -59,15 +59,15 @@ class AddManagedDependencyVisitorTest implements RewriteTest {
     @Test
     void newDependencyManagementTag() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
             <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
             </project>
             """,
-            """
+                        """
             <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -85,15 +85,15 @@ class AddManagedDependencyVisitorTest implements RewriteTest {
                 </dependencyManagement>
             </project>
             """
-          )
+                )
         );
     }
 
     @Test
     void dependencyManagementTagExists() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
             <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -101,7 +101,7 @@ class AddManagedDependencyVisitorTest implements RewriteTest {
                 <dependencyManagement/>
             </project>
             """,
-            """
+                        """
             <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -119,7 +119,7 @@ class AddManagedDependencyVisitorTest implements RewriteTest {
                 </dependencyManagement>
             </project>
             """
-          )
+                )
         );
     }
 }

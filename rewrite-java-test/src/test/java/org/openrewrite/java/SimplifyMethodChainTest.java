@@ -29,10 +29,10 @@ class SimplifyMethodChainTest implements RewriteTest {
     @DocumentExample
     void simplify() {
         rewriteRun(
-          spec -> spec.recipe(new SimplifyMethodChain(
-            Arrays.asList("A b()", "B c()"), "c2", false)),
-          java(
-            """
+                spec -> spec.recipe(new SimplifyMethodChain(
+                        Arrays.asList("A b()", "B c()"), "c2", false)),
+                java(
+                        """
               class A {
                   static B b() { return new B(); }
                   static C c2() { return new C(); }
@@ -45,19 +45,19 @@ class SimplifyMethodChainTest implements RewriteTest {
               class C {
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               class Test {
                   C c = A.b().c();
               }
               """,
-            """
+                        """
               class Test {
                   C c = A.c2();
               }
               """
-          )
+                )
         );
     }
 }

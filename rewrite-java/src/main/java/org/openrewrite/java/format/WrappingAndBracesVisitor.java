@@ -167,7 +167,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.Block visitBlock(J.Block block, P p) {
         J.Block b = super.visitBlock(block, p);
-        if(!b.getEnd().getWhitespace().contains("\n")) {
+        if (!b.getEnd().getWhitespace().contains("\n")) {
             b = b.withEnd(withNewline(b.getEnd()));
         }
         return b;
@@ -176,7 +176,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     private Space withNewline(Space space) {
         if (space.getComments().isEmpty()) {
             space = space.withWhitespace("\n" + space.getWhitespace());
-        } else if (space.getComments().get(space.getComments().size()-1).isMultiline()) {
+        } else if (space.getComments().get(space.getComments().size() - 1).isMultiline()) {
             space = space.withComments(ListUtils.mapLast(space.getComments(), c -> c.withSuffix("\n")));
         }
 

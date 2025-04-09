@@ -44,7 +44,7 @@ public class Assertions {
     }
 
     public static SourceSpecs xml(@Language("xml") @Nullable String before, @Language("xml") @Nullable String after,
-                             Consumer<SourceSpec<Xml.Document>> spec) {
+            Consumer<SourceSpec<Xml.Document>> spec) {
         SourceSpec<Xml.Document> xml = new SourceSpec<>(Xml.Document.class, null, XmlParser.builder(), before, s -> after);
         spec.accept(xml);
         return xml;

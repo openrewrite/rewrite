@@ -25,7 +25,7 @@ class SyntaxTest implements RewriteTest {
     @Test
     void syntax() {
         rewriteRun(
-          proto("syntax = 'proto2' ;")
+                proto("syntax = 'proto2' ;")
         );
     }
 }

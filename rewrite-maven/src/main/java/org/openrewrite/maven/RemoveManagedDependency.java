@@ -39,7 +39,7 @@ public class RemoveManagedDependency extends Recipe {
 
     @Option(displayName = "Scope",
             description = "Only remove managed dependencies if they are in this scope. If `runtime`, this will " +
-                          "also remove managed dependencies in the 'compile' scope because `compile` dependencies are part of the runtime dependency set.",
+                    "also remove managed dependencies in the 'compile' scope because `compile` dependencies are part of the runtime dependency set.",
             valid = {"compile", "test", "runtime", "provided"},
             example = "compile",
             required = false)

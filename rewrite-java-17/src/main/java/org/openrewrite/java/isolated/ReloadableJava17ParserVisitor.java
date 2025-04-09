@@ -106,12 +106,12 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
     public ReloadableJava17ParserVisitor(Path sourcePath,
-                                         @Nullable FileAttributes fileAttributes,
-                                         EncodingDetectingInputStream source,
-                                         Collection<NamedStyles> styles,
-                                         JavaTypeCache typeCache,
-                                         ExecutionContext ctx,
-                                         Context context) {
+            @Nullable FileAttributes fileAttributes,
+            EncodingDetectingInputStream source,
+            Collection<NamedStyles> styles,
+            JavaTypeCache typeCache,
+            ExecutionContext ctx,
+            Context context) {
         this.sourcePath = sourcePath;
         this.fileAttributes = fileAttributes;
         this.source = source.readFully();
@@ -503,12 +503,12 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             // since it will never be subject to refactoring
             if (m instanceof JCMethodDecl md && (
                     hasFlag(md.getModifiers(), Flags.GENERATEDCONSTR) ||
-                    hasFlag(md.getModifiers(), Flags.RECORD))) {
+                            hasFlag(md.getModifiers(), Flags.RECORD))) {
                 continue;
             }
             if (m instanceof JCVariableDecl vt &&
-                (hasFlag(vt.getModifiers(), Flags.ENUM) ||
-                 hasFlag(vt.getModifiers(), Flags.RECORD))) {
+                    (hasFlag(vt.getModifiers(), Flags.ENUM) ||
+                            hasFlag(vt.getModifiers(), Flags.RECORD))) {
                 continue;
             }
             membersMultiVariablesSeparated.add(m);
@@ -1712,7 +1712,8 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             // Java 21 and 23 have a different return type from getCommentTree; with reflection we can support both
             Method getCommentTreeMethod = DocCommentTable.class.getMethod("getCommentTree", JCTree.class);
             DocCommentTree commentTree = (DocCommentTree) getCommentTreeMethod.invoke(docCommentTable, t);
-            @SuppressWarnings("unchecked") J2 j = (J2) scan(t, formatWithCommentTree(prefix, (JCTree) t, commentTree));
+            @SuppressWarnings("unchecked")
+            J2 j = (J2) scan(t, formatWithCommentTree(prefix, (JCTree) t, commentTree));
             return j;
         } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException ex) {
             reportJavaParsingException(ex);
@@ -1760,7 +1761,8 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             return null;
         }
         J2 j = convert(t);
-        @SuppressWarnings("ConstantConditions") JRightPadded<J2> rightPadded = j == null ? null :
+        @SuppressWarnings("ConstantConditions")
+        JRightPadded<J2> rightPadded = j == null ? null :
                 new JRightPadded<>(j, suffix.apply(t), Markers.EMPTY);
         int idx = findFirstNonWhitespaceChar(rightPadded.getAfter().getWhitespace());
         if (idx >= 0) {
@@ -1812,8 +1814,8 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     private <J2 extends J> List<JRightPadded<J2>> convertAll(List<? extends Tree> trees,
-                                                             Function<Tree, Space> innerSuffix,
-                                                             Function<Tree, Space> suffix) {
+            Function<Tree, Space> innerSuffix,
+            Function<Tree, Space> suffix) {
         int size = trees.size();
         if (size == 0) {
             return emptyList();
@@ -1859,7 +1861,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             case EXPRESSION_STATEMENT:
                 ExpressionTree expTree = ((ExpressionStatementTree) t).getExpression();
                 if (expTree instanceof ErroneousTree) {
-                    return Space.build(source.substring(((JCTree) expTree).getEndPosition(endPosTable),((JCTree) t).getEndPosition(endPosTable)), Collections.emptyList());
+                    return Space.build(source.substring(((JCTree) expTree).getEndPosition(endPosTable), ((JCTree) t).getEndPosition(endPosTable)), Collections.emptyList());
                 } else {
                     return sourceBefore(";");
                 }
@@ -1900,7 +1902,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
     @SuppressWarnings("unchecked")
     private List<JRightPadded<Statement>> convertStatements(@Nullable List<? extends Tree> trees,
-                                                            Function<Tree, Space> suffix) {
+            Function<Tree, Space> suffix) {
         if (trees == null || trees.isEmpty()) {
             return emptyList();
         }
@@ -2123,7 +2125,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                     try {
                         // FIXME instanceof probably not right here...
                         return field.get(null) instanceof Long &&
-                               field.getName().matches("[A-Z_]+");
+                                field.getName().matches("[A-Z_]+");
                     } catch (IllegalAccessException e) {
                         throw new RuntimeException(e);
                     }

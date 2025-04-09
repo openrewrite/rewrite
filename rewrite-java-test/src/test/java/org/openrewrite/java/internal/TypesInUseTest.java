@@ -32,8 +32,8 @@ class TypesInUseTest implements RewriteTest {
     @Test
     void findAnnotationArgumentType() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package org.openrewrite.test;
               
               public @interface YesOrNo {
@@ -43,9 +43,9 @@ class TypesInUseTest implements RewriteTest {
                   }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package org.openrewrite.test;
               
               import static org.openrewrite.test.YesOrNo.Status.YES;
@@ -53,13 +53,13 @@ class TypesInUseTest implements RewriteTest {
               @YesOrNo(status = YES)
               public class Foo {}
               """,
-            spec -> spec.afterRecipe(cu -> {
-                var foundTypes = cu.getTypesInUse().getVariables().stream()
-                  .map(v -> TypeUtils.asFullyQualified(v.getType()).getFullyQualifiedName())
-                  .collect(Collectors.toList());
-                assertThat(foundTypes).containsExactlyInAnyOrder("org.openrewrite.test.YesOrNo$Status");
-            })
-          )
+                        spec -> spec.afterRecipe(cu -> {
+                            var foundTypes = cu.getTypesInUse().getVariables().stream()
+                                    .map(v -> TypeUtils.asFullyQualified(v.getType()).getFullyQualifiedName())
+                                    .collect(Collectors.toList());
+                            assertThat(foundTypes).containsExactlyInAnyOrder("org.openrewrite.test.YesOrNo$Status");
+                        })
+                )
         );
     }
 

@@ -83,12 +83,12 @@ public class GitProvenance implements Marker {
     // javadoc does not like @RequiredArgsConstructor(onConstructor_ = { @JsonCreator })
     @JsonCreator
     public GitProvenance(UUID id,
-                         @Nullable String origin,
-                         @Nullable String branch,
-                         @Nullable String change,
-                         @Nullable AutoCRLF autocrlf,
-                         @Nullable EOL eol,
-                         @Nullable List<Committer> committers) {
+            @Nullable String origin,
+            @Nullable String branch,
+            @Nullable String change,
+            @Nullable AutoCRLF autocrlf,
+            @Nullable EOL eol,
+            @Nullable List<Committer> committers) {
         this.id = id;
         this.origin = origin;
         this.branch = branch;
@@ -186,7 +186,7 @@ public class GitProvenance implements Marker {
      * @return A marker containing git provenance information.
      */
     public static @Nullable GitProvenance fromProjectDirectory(Path projectDir,
-                                                               @Nullable BuildEnvironment environment,
+            @Nullable BuildEnvironment environment,
             GitRemote.@Nullable Parser gitRemoteParser) {
         if (gitRemoteParser == null) {
             gitRemoteParser = new GitRemote.Parser();
@@ -311,7 +311,7 @@ public class GitProvenance implements Marker {
             List<RemoteConfig> remotes = git.remoteList().call();
             for (RemoteConfig remote : remotes) {
                 if (remoteBranch.startsWith(remote.getName()) &&
-                    (branch == null || branch.length() > remoteBranch.length() - remote.getName().length() - 1)) {
+                        (branch == null || branch.length() > remoteBranch.length() - remote.getName().length() - 1)) {
                     branch = remoteBranch.substring(remote.getName().length() + 1); // +1 for the forward slash
                 }
             }

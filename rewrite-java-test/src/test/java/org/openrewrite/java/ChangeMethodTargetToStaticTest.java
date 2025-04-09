@@ -27,28 +27,28 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
     @Test
     void targetToStatic() {
         rewriteRun(
-          spec -> spec.recipes(
-            new ChangeMethodTargetToStatic("a.A nonStatic()", "b.B", null, null),
-            new ChangeMethodName("b.B nonStatic()", "foo", null, null)
-          ),
-          java(
-            """
+                spec -> spec.recipes(
+                        new ChangeMethodTargetToStatic("a.A nonStatic()", "b.B", null, null),
+                        new ChangeMethodName("b.B nonStatic()", "foo", null, null)
+                ),
+                java(
+                        """
               package a;
               public class A {
                  public void nonStatic() {}
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package b;
               public class B {
                  public static void foo() {}
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import a.*;
               class C {
                  public void test() {
@@ -56,7 +56,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
                  }
               }
               """,
-            """
+                        """
               import b.B;
                             
               class C {
@@ -65,7 +65,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
                  }
               }
               """
-          )
+                )
         );
     }
 
@@ -73,25 +73,25 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
     @Test
     void staticTargetToStatic() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A foo()", "b.B", null, null)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A foo()", "b.B", null, null)),
+                java(
+                        """
               package b;
               public class B {
                  public static void foo() {}
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package a;
               public class A {
                  public static void foo() {}
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import static a.A.foo;
                             
               class C {
@@ -100,7 +100,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
                  }
               }
               """,
-            """
+                        """
               import static b.B.foo;
                             
               class C {
@@ -109,24 +109,24 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
                  }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void targetToStaticWhenMethodHasSameName() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null)),
+                java(
+                        """
               package a;
               public class A {
                  public void method() {}
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import a.A;
               class Test {
                  public void test() {
@@ -134,7 +134,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
                  }
               }
               """,
-            """
+                        """
               import a.A;
               class Test {
                  public void test() {
@@ -142,24 +142,24 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
                  }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void staticMethodCalledOnInstanceToCallOnClass() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeMethodTargetToStatic("a.A method()", "a.A", null, null)),
+                java(
+                        """
               package a;
               public class A {
                  public static void method() {}
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import a.A;
               class Test {
                  public void test() {
@@ -170,7 +170,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
                  }
               }
               """,
-            """
+                        """
               import a.A;
               class Test {
                  public void test() {
@@ -181,7 +181,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
                  }
               }
               """
-          )
+                )
         );
     }
 
@@ -191,9 +191,9 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
     @Disabled
     void keepImportComments() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodTargetToStatic("org.codehaus.plexus.util.StringUtils isBlank(String)", "org.openrewrite.internal.StringUtils", null, null)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeMethodTargetToStatic("org.codehaus.plexus.util.StringUtils isBlank(String)", "org.openrewrite.internal.StringUtils", null, null)),
+                java(
+                        """
               package org.codehaus.plexus.util;
                             
               public class StringUtils {
@@ -202,9 +202,9 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
                  }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package a;
 
               /*
@@ -220,7 +220,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
                  }
               }
               """,
-            """
+                        """
               package a;
 
               /*
@@ -236,7 +236,7 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
                  }
               }
               """
-          )
+                )
         );
     }
 }

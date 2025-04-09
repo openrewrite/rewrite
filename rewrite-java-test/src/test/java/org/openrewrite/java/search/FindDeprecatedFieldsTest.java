@@ -28,7 +28,7 @@ class FindDeprecatedFieldsTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.parser(JavaParser.fromJavaVersion().dependsOn(
-          """
+                """
             package org.old.types;
             public class D {
                 @Deprecated
@@ -41,9 +41,9 @@ class FindDeprecatedFieldsTest implements RewriteTest {
     @Test
     void ignoreDeprecationsInDeprecatedMethod() {
         rewriteRun(
-          spec -> spec.recipe(new FindDeprecatedFields("org.old.types..*", null, true)),
-          java(
-            """
+                spec -> spec.recipe(new FindDeprecatedFields("org.old.types..*", null, true)),
+                java(
+                        """
               import org.old.types.D;
               class Test {
                   @Deprecated
@@ -52,16 +52,16 @@ class FindDeprecatedFieldsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void ignoreDeprecationsInDeprecatedClass() {
         rewriteRun(
-          spec -> spec.recipe(new FindDeprecatedFields("org.old.types..*", null, true)),
-          java(
-            """
+                spec -> spec.recipe(new FindDeprecatedFields("org.old.types..*", null, true)),
+                java(
+                        """
               import org.old.types.D;
 
               @Deprecated
@@ -71,7 +71,7 @@ class FindDeprecatedFieldsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -79,9 +79,9 @@ class FindDeprecatedFieldsTest implements RewriteTest {
     @Test
     void findDeprecations() {
         rewriteRun(
-          spec -> spec.recipe(new FindDeprecatedFields("org.old.types..*", null, false)),
-          java(
-            """
+                spec -> spec.recipe(new FindDeprecatedFields("org.old.types..*", null, false)),
+                java(
+                        """
               import org.old.types.D;
               class Test {
                   void test(int n) {
@@ -89,7 +89,7 @@ class FindDeprecatedFieldsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import org.old.types.D;
               class Test {
                   void test(int n) {
@@ -97,7 +97,7 @@ class FindDeprecatedFieldsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

@@ -30,8 +30,8 @@ class WeightTest implements RewriteTest {
     @Test
     void weightIncludesJavadocsAndTypes() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.List;
               
               /**
@@ -44,13 +44,13 @@ class WeightTest implements RewriteTest {
                   }
               }
               """,
-            spec -> spec.beforeRecipe(cu -> {
-                // in performance sensitive situations, use a bloom filter or other
-                // probabilistic set membership data structure
-                Set<Object> uniqueTypes = Collections.newSetFromMap(new IdentityHashMap<>());
-                assertThat(cu.getWeight(uniqueTypes::add)).isGreaterThan(10_000);
-            })
-          )
+                        spec -> spec.beforeRecipe(cu -> {
+                            // in performance sensitive situations, use a bloom filter or other
+                            // probabilistic set membership data structure
+                            Set<Object> uniqueTypes = Collections.newSetFromMap(new IdentityHashMap<>());
+                            assertThat(cu.getWeight(uniqueTypes::add)).isGreaterThan(10_000);
+                        })
+                )
         );
     }
 }

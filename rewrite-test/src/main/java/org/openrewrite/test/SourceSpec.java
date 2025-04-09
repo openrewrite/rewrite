@@ -69,7 +69,7 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
     final ThrowingConsumer<ExecutionContext> customizeExecutionContext;
 
     public SourceSpec(Class<T> sourceFileType, @Nullable String dsl,
-                      Parser.Builder parser, @Nullable String before, @Nullable UnaryOperator<String> after) {
+            Parser.Builder parser, @Nullable String before, @Nullable UnaryOperator<String> after) {
         this.sourceFileType = sourceFileType;
         this.dsl = dsl;
         this.parser = parser;

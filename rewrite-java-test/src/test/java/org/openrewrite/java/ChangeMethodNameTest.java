@@ -48,20 +48,20 @@ class ChangeMethodNameTest implements RewriteTest {
     @Test
     void changeMethodNameForOverriddenMethod() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodName("com.abc.B singleArg(String)", "bar", true, null)),
-          java(b, SourceSpec::skip),
-          java(
-            """
+                spec -> spec.recipe(new ChangeMethodName("com.abc.B singleArg(String)", "bar", true, null)),
+                java(b, SourceSpec::skip),
+                java(
+                        """
               package com.abc;
               class C extends B {
                   @Override
                   public void singleArg(String s) {}
               }
               """,
-            SourceSpec::skip
-          ),
-          java(
-            """
+                        SourceSpec::skip
+                ),
+                java(
+                        """
               package com.abc;
               class A {
                   public void test() {
@@ -70,7 +70,7 @@ class ChangeMethodNameTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package com.abc;
               class A {
                   public void test() {
@@ -79,27 +79,27 @@ class ChangeMethodNameTest implements RewriteTest {
                   }
               }
               """,
-            spec -> spec.afterRecipe(cu -> {
-                J.MethodDeclaration testMethodDecl = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
-                List<Statement> statements = testMethodDecl.getBody().getStatements();
-                J.MethodInvocation barInvocation = (J.MethodInvocation) statements.get(0);
-                assertThat(barInvocation.getName().getSimpleName()).isEqualTo("bar");
-                assertThat(barInvocation.getMethodType().getName()).isEqualTo("bar");
-                J.MemberReference barReference = (J.MemberReference) ((J.MethodInvocation) statements.get(1)).getArguments().get(0);
-                JavaType.Method barRefType = barReference.getMethodType();
-                assertThat(barRefType.getName()).isEqualTo("bar");
-            })
-          )
+                        spec -> spec.afterRecipe(cu -> {
+                            J.MethodDeclaration testMethodDecl = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
+                            List<Statement> statements = testMethodDecl.getBody().getStatements();
+                            J.MethodInvocation barInvocation = (J.MethodInvocation) statements.get(0);
+                            assertThat(barInvocation.getName().getSimpleName()).isEqualTo("bar");
+                            assertThat(barInvocation.getMethodType().getName()).isEqualTo("bar");
+                            J.MemberReference barReference = (J.MemberReference) ((J.MethodInvocation) statements.get(1)).getArguments().get(0);
+                            JavaType.Method barRefType = barReference.getMethodType();
+                            assertThat(barRefType.getName()).isEqualTo("bar");
+                        })
+                )
         );
     }
 
     @Test
     void changeMethodNameForOverriddenMethodAnonymousClass() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodName("com.abc.B singleArg(String)", "bar", true, null)),
-          java(b, SourceSpec::skip),
-          java(
-            """
+                spec -> spec.recipe(new ChangeMethodName("com.abc.B singleArg(String)", "bar", true, null)),
+                java(b, SourceSpec::skip),
+                java(
+                        """
               package com.abc;
               class A {
                    public void test() {
@@ -110,7 +110,7 @@ class ChangeMethodNameTest implements RewriteTest {
                    }
               }
               """,
-            """
+                        """
               package com.abc;
               class A {
                    public void test() {
@@ -121,7 +121,7 @@ class ChangeMethodNameTest implements RewriteTest {
                    }
               }
               """
-          )
+                )
         );
     }
 
@@ -130,9 +130,9 @@ class ChangeMethodNameTest implements RewriteTest {
     @SuppressWarnings("MethodMayBeStatic")
     void changeMethodNameForOverriddenMethodMatchOverridesFalse() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodName("com.abc.Parent method(String)", "changed", false, null)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeMethodName("com.abc.Parent method(String)", "changed", false, null)),
+                java(
+                        """
               package com.abc;
               class Parent {
                   public void method(String s) {
@@ -144,7 +144,7 @@ class ChangeMethodNameTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package com.abc;
               class Parent {
                   public void changed(String s) {
@@ -156,7 +156,7 @@ class ChangeMethodNameTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -164,10 +164,10 @@ class ChangeMethodNameTest implements RewriteTest {
     @Test
     void changeMethodNameForMethodWithSingleArgDeclarative() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodName("com.abc.B singleArg(String)", "bar", null, null)),
-          java(b, SourceSpec::skip),
-          java(
-            """
+                spec -> spec.recipe(new ChangeMethodName("com.abc.B singleArg(String)", "bar", null, null)),
+                java(b, SourceSpec::skip),
+                java(
+                        """
               package com.abc;
               class A {
                   public void test() {
@@ -176,7 +176,7 @@ class ChangeMethodNameTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package com.abc;
               class A {
                   public void test() {
@@ -185,7 +185,7 @@ class ChangeMethodNameTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -193,10 +193,10 @@ class ChangeMethodNameTest implements RewriteTest {
     @Test
     void changeMethodNameForMethodWithSingleArg() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodName("com.abc.B singleArg(String)", "bar", null, null)),
-          java(b, SourceSpec::skip),
-          java(
-            """
+                spec -> spec.recipe(new ChangeMethodName("com.abc.B singleArg(String)", "bar", null, null)),
+                java(b, SourceSpec::skip),
+                java(
+                        """
               package com.abc;
               class A {
                  public void test() {
@@ -204,7 +204,7 @@ class ChangeMethodNameTest implements RewriteTest {
                  }
               }
               """,
-            """
+                        """
               package com.abc;
               class A {
                  public void test() {
@@ -212,17 +212,17 @@ class ChangeMethodNameTest implements RewriteTest {
                  }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void changeMethodNameForMethodWithArrayArg() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodName("com.abc.B arrArg(String[])", "bar", null, null)),
-          java(b, SourceSpec::skip),
-          java(
-            """
+                spec -> spec.recipe(new ChangeMethodName("com.abc.B arrArg(String[])", "bar", null, null)),
+                java(b, SourceSpec::skip),
+                java(
+                        """
               package com.abc;
               class A {
                  public void test() {
@@ -230,7 +230,7 @@ class ChangeMethodNameTest implements RewriteTest {
                  }
               }
               """,
-            """
+                        """
               package com.abc;
               class A {
                  public void test() {
@@ -238,17 +238,17 @@ class ChangeMethodNameTest implements RewriteTest {
                  }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void changeMethodNameForMethodWithVarargArg() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodName("com.abc.B varargArg(String...)", "bar", null, null)),
-          java(b, SourceSpec::skip),
-          java(
-            """
+                spec -> spec.recipe(new ChangeMethodName("com.abc.B varargArg(String...)", "bar", null, null)),
+                java(b, SourceSpec::skip),
+                java(
+                        """
               package com.abc;
               class A {
                  public void test() {
@@ -256,7 +256,7 @@ class ChangeMethodNameTest implements RewriteTest {
                  }
               }
               """,
-            """
+                        """
               package com.abc;
               class A {
                  public void test() {
@@ -264,26 +264,26 @@ class ChangeMethodNameTest implements RewriteTest {
                  }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void changeMethodNameWhenMatchingAgainstMethodWithNameThatIsAnAspectjToken() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodName("com.abc.B error()", "foo", null, null)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeMethodName("com.abc.B error()", "foo", null, null)),
+                java(
+                        """
               package com.abc;
               class B {
                  public void error() {}
                  public void foo() {}
               }
               """,
-            SourceSpec::skip
-          ),
-          java(
-            """
+                        SourceSpec::skip
+                ),
+                java(
+                        """
               package com.abc;
               class A {
                  public void test() {
@@ -291,7 +291,7 @@ class ChangeMethodNameTest implements RewriteTest {
                  }
               }
               """,
-            """
+                        """
               package com.abc;
               class A {
                  public void test() {
@@ -299,57 +299,57 @@ class ChangeMethodNameTest implements RewriteTest {
                  }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void changeMethodDeclarationForMethodWithSingleArg() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodName("com.abc.A foo(String)", "bar", null, null)),
-          java(b, SourceSpec::skip),
-          java(
-            """
+                spec -> spec.recipe(new ChangeMethodName("com.abc.A foo(String)", "bar", null, null)),
+                java(b, SourceSpec::skip),
+                java(
+                        """
               package com.abc;
               class A {
                  public void foo(String s) {
                  }
               }
               """,
-            """
+                        """
               package com.abc;
               class A {
                  public void bar(String s) {
                  }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doNotChangeMethodNameOnDeclaringClass() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodName("com.abc.A foo(String)", "bar", null, true)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeMethodName("com.abc.A foo(String)", "bar", null, true)),
+                java(
+                        """
               package com.abc;
               class A {
                  public void foo(String s) {
                  }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void changeStaticMethodTest() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodName("com.abc.B static1(String)", "static2", null, null)),
-          java(b, SourceSpec::skip),
-          java(
-            """
+                spec -> spec.recipe(new ChangeMethodName("com.abc.B static1(String)", "static2", null, null)),
+                java(b, SourceSpec::skip),
+                java(
+                        """
               package com.abc;
               class A {
                  public void test() {
@@ -357,7 +357,7 @@ class ChangeMethodNameTest implements RewriteTest {
                  }
               }
               """,
-            """
+                        """
               package com.abc;
               class A {
                  public void test() {
@@ -365,17 +365,17 @@ class ChangeMethodNameTest implements RewriteTest {
                  }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void changeStaticImportTest() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodName("com.abc.B static1(String)", "static2", null, null)),
-          java(b, SourceSpec::skip),
-          java(
-            """
+                spec -> spec.recipe(new ChangeMethodName("com.abc.B static1(String)", "static2", null, null)),
+                java(b, SourceSpec::skip),
+                java(
+                        """
               package com.abc;
               import static com.abc.B.static1;
               class A {
@@ -384,7 +384,7 @@ class ChangeMethodNameTest implements RewriteTest {
                  }
               }
               """,
-            """
+                        """
               package com.abc;
               import static com.abc.B.static2;
               class A {
@@ -393,17 +393,17 @@ class ChangeMethodNameTest implements RewriteTest {
                  }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void fullyQualifiedStaticMemberReference() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodName("com.abc.B static1(String)", "static2", null, null)),
-          java(b, SourceSpec::skip),
-          java(
-            """
+                spec -> spec.recipe(new ChangeMethodName("com.abc.B static1(String)", "static2", null, null)),
+                java(b, SourceSpec::skip),
+                java(
+                        """
               package com.abc;
               class A {
                  public void test() {
@@ -411,7 +411,7 @@ class ChangeMethodNameTest implements RewriteTest {
                  }
               }
               """,
-            """
+                        """
               package com.abc;
               class A {
                  public void test() {
@@ -419,7 +419,7 @@ class ChangeMethodNameTest implements RewriteTest {
                  }
               }
               """
-          )
+                )
         );
     }
 }

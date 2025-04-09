@@ -28,16 +28,16 @@ class SourceSpecTextBlockIndentationTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new SourceSpecTextBlockIndentation())
-          .parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()));
+                .parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()));
     }
 
     @DocumentExample
     @Test
     void minimalIndentation() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
-          java(
-            """
+                spec -> spec.expectedCyclesThatMakeChanges(2),
+                java(
+                        """
               import org.openrewrite.test.RewriteTest;
               import static org.openrewrite.test.SourceSpecs.text;
 
@@ -59,7 +59,7 @@ class SourceSpecTextBlockIndentationTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import org.openrewrite.test.RewriteTest;
               import static org.openrewrite.test.SourceSpecs.text;
 
@@ -81,16 +81,16 @@ class SourceSpecTextBlockIndentationTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void startsOnNewline() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
-          java(
-            """
+                spec -> spec.expectedCyclesThatMakeChanges(2),
+                java(
+                        """
               import org.openrewrite.test.RewriteTest;
               import static org.openrewrite.test.SourceSpecs.text;
 
@@ -112,7 +112,7 @@ class SourceSpecTextBlockIndentationTest implements RewriteTest {
               }
               """,
 
-            """
+                        """
               import org.openrewrite.test.RewriteTest;
               import static org.openrewrite.test.SourceSpecs.text;
 
@@ -134,7 +134,7 @@ class SourceSpecTextBlockIndentationTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

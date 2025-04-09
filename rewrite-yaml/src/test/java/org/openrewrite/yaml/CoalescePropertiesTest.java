@@ -34,8 +34,8 @@ class CoalescePropertiesTest implements RewriteTest {
     @Test
     void fold() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
                   management:
                       metrics:
                           enable.process.files: true
@@ -44,14 +44,14 @@ class CoalescePropertiesTest implements RewriteTest {
                               show-components: always
                               show-details: always
               """,
-            """
+                        """
                   management:
                       metrics.enable.process.files: true
                       endpoint.health:
                           show-components: always
                           show-details: always
               """
-          )
+                )
         );
     }
 
@@ -59,8 +59,8 @@ class CoalescePropertiesTest implements RewriteTest {
     @Test
     void foldSequenceOfObjects() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
                 foo:
                   bar:
                     sequence:
@@ -72,7 +72,7 @@ class CoalescePropertiesTest implements RewriteTest {
                         propertyB: fieldB
                     scalar: value
               """,
-            """
+                        """
                 foo.bar:
                   sequence:
                     - name: name
@@ -83,7 +83,7 @@ class CoalescePropertiesTest implements RewriteTest {
                       propertyB: fieldB
                   scalar: value
               """
-          )
+                )
         );
     }
 
@@ -91,8 +91,8 @@ class CoalescePropertiesTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1133")
     void foldSequenceOfObjectsFormattedWithDashDirectlyUnderMappingKey() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
                 matrix:
                   include:
                   # comment-a
@@ -104,7 +104,7 @@ class CoalescePropertiesTest implements RewriteTest {
                   - name: entry-1-name
                     value: entry-1-value
               """,
-            """
+                        """
                 matrix.include:
                 # comment-a
                 # comment-b
@@ -115,7 +115,7 @@ class CoalescePropertiesTest implements RewriteTest {
                 - name: entry-1-name
                   value: entry-1-value
               """
-          )
+                )
         );
     }
 
@@ -123,8 +123,8 @@ class CoalescePropertiesTest implements RewriteTest {
     @Test
     void foldSequence() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
                 foo:
                   bar:
                     buz:
@@ -133,7 +133,7 @@ class CoalescePropertiesTest implements RewriteTest {
                       - item3
                     baz: value
               """,
-            """
+                        """
                 foo.bar:
                   buz:
                     - item1
@@ -141,7 +141,7 @@ class CoalescePropertiesTest implements RewriteTest {
                     - item3
                   baz: value
               """
-          )
+                )
         );
     }
 
@@ -149,17 +149,17 @@ class CoalescePropertiesTest implements RewriteTest {
     @Disabled
     void group() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               management.metrics.enable.process.files: true
               management.metrics.enable.jvm: true
               """,
-            """
+                        """
                   management.metrics.enable:
                       process.files: true
                       jvm: true
               """
-          )
+                )
         );
     }
 
@@ -167,8 +167,8 @@ class CoalescePropertiesTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1125")
     void foldWithCommentsInPrefix() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
                   a:
                     b:
                       # d-comment
@@ -176,13 +176,13 @@ class CoalescePropertiesTest implements RewriteTest {
                         e.f: true
                       c: c-value
               """,
-            """
+                        """
                   a.b:
                     # d-comment
                     d.e.f: true
                     c: c-value
               """
-          )
+                )
         );
     }
 
@@ -190,8 +190,8 @@ class CoalescePropertiesTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1125")
     void foldWithCommentsInPrefixWhenCommentsHaveDifferentIndentThanTheirElement() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
                   a:
                     b:
                     # d-comment
@@ -201,14 +201,14 @@ class CoalescePropertiesTest implements RewriteTest {
                       c:
                         d: d-value
               """,
-            """
+                        """
                   a.b:
                   # d-comment
                     d.e.f: true
                    # c-comment
                     c.d: d-value
               """
-          )
+                )
         );
     }
 
@@ -216,8 +216,8 @@ class CoalescePropertiesTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1125")
     void doNotFoldKeysWithCommentsInPrefix() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
                   a:
                     b:
                       d: # d-comment
@@ -228,7 +228,7 @@ class CoalescePropertiesTest implements RewriteTest {
                         g:
                           h: h-value
               """,
-            """
+                        """
                   a.b:
                     d: # d-comment
                       e.f: f-value # f-comment
@@ -236,7 +236,7 @@ class CoalescePropertiesTest implements RewriteTest {
                       # g-comment
                       g.h: h-value
               """
-          )
+                )
         );
     }
 
@@ -244,8 +244,8 @@ class CoalescePropertiesTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1142")
     void doNotShiftYamlCommentsInPrefixFollowingPreviousYamlObject() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
                 a:
                   b:
                     c: c-value  # c-comment
@@ -254,7 +254,7 @@ class CoalescePropertiesTest implements RewriteTest {
                     f: f-value
                     g: g-value
               """,
-            """
+                        """
                   a.b:
                     c: c-value  # c-comment
                     d: d-value # d-comment
@@ -262,7 +262,7 @@ class CoalescePropertiesTest implements RewriteTest {
                     f: f-value
                     g: g-value
               """
-          )
+                )
         );
     }
 
@@ -270,8 +270,8 @@ class CoalescePropertiesTest implements RewriteTest {
     @Test
     void doNotCoalesceDocumentsHavingAnchorsAndAliases() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
                   management:
                       metrics:
                           &id enable.process.files: true
@@ -281,7 +281,7 @@ class CoalescePropertiesTest implements RewriteTest {
                               show-details: always
                               *id: false
               """
-          )
+                )
         );
     }
 }

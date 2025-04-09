@@ -94,8 +94,8 @@ public class MatchPatternsFileFilter implements FileFilter {
                 includes.add(processPattern("**/*"));
             }
             return new MatchPatternsFileFilter(
-                    MatchPatterns.from(includes.toArray(new String[] {})),
-                    MatchPatterns.from(excludes.toArray(new String[] {})),
+                    MatchPatterns.from(includes.toArray(new String[]{})),
+                    MatchPatterns.from(excludes.toArray(new String[]{})),
                     sourceDirectory,
                     caseSensitive);
         }

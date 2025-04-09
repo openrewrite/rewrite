@@ -141,7 +141,7 @@ public interface J extends Tree {
             List<J.Annotation> allAnnotations = annotations;
             List<J.Annotation> moreAnnotations;
             if (typeExpression instanceof FieldAccess &&
-                !(moreAnnotations = ((FieldAccess) typeExpression).getName().getAnnotations()).isEmpty()) {
+                    !(moreAnnotations = ((FieldAccess) typeExpression).getName().getAnnotations()).isEmpty()) {
                 if (allAnnotations.isEmpty()) {
                     allAnnotations = moreAnnotations;
                 } else {
@@ -1980,8 +1980,8 @@ public interface J extends Tree {
 
         public boolean isFullyQualifiedClassReference(String className) {
             if (getName().getFieldType() == null && getName().getType() instanceof JavaType.FullyQualified &&
-                !(getName().getType() instanceof JavaType.Unknown) &&
-                TypeUtils.fullyQualifiedNamesAreEqual(((JavaType.FullyQualified) getName().getType()).getFullyQualifiedName(), className)) {
+                    !(getName().getType() instanceof JavaType.Unknown) &&
+                    TypeUtils.fullyQualifiedNamesAreEqual(((JavaType.FullyQualified) getName().getType()).getFullyQualifiedName(), className)) {
                 return true;
             } else if (!className.contains(".")) {
                 return false;
@@ -2773,7 +2773,7 @@ public interface J extends Tree {
                 String name = part.getSimpleName();
                 if (part.getTarget() instanceof J.Identifier) {
                     typeName.insert(0, ((Identifier) part.getTarget()).getSimpleName() +
-                                       "." + name);
+                            "." + name);
                     break;
                 } else if (part.getTarget() instanceof J.FieldAccess) {
                     part = (FieldAccess) part.getTarget();
@@ -3718,8 +3718,8 @@ public interface J extends Tree {
         @Override
         public String toString() {
             return "MethodDeclaration{" +
-                   (getMethodType() == null ? "unknown" : getMethodType()) +
-                   "}";
+                    (getMethodType() == null ? "unknown" : getMethodType()) +
+                    "}";
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -5926,15 +5926,15 @@ public interface J extends Tree {
             public Cursor getDeclaringScope(Cursor cursor) {
                 return cursor.dropParentUntil(it ->
                         it instanceof J.Block ||
-                        it instanceof J.Lambda ||
-                        it instanceof J.MethodDeclaration ||
-                        it == Cursor.ROOT_VALUE);
+                                it instanceof J.Lambda ||
+                                it instanceof J.MethodDeclaration ||
+                                it == Cursor.ROOT_VALUE);
             }
 
             public boolean isField(Cursor cursor) {
                 Cursor declaringScope = getDeclaringScope(cursor);
                 return declaringScope.getValue() instanceof J.Block &&
-                       declaringScope.getParentTreeCursor().getValue() instanceof J.ClassDeclaration;
+                        declaringScope.getParentTreeCursor().getValue() instanceof J.ClassDeclaration;
             }
 
             public Padding getPadding() {

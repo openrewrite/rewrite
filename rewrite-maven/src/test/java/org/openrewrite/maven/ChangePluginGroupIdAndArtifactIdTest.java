@@ -27,15 +27,15 @@ class ChangePluginGroupIdAndArtifactIdTest implements RewriteTest {
     @Test
     void changePluginGroupIdAndArtifactId() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePluginGroupIdAndArtifactId(
-            "io.quarkus",
-            "quarkus-bootstrap-maven-plugin",
-            null,
-            "quarkus-extension-maven-plugin",
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangePluginGroupIdAndArtifactId(
+                        "io.quarkus",
+                        "quarkus-bootstrap-maven-plugin",
+                        null,
+                        "quarkus-extension-maven-plugin",
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -66,7 +66,7 @@ class ChangePluginGroupIdAndArtifactIdTest implements RewriteTest {
                   </profiles>
               </project>
               """,
-            """
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -97,7 +97,7 @@ class ChangePluginGroupIdAndArtifactIdTest implements RewriteTest {
                   </profiles>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -105,15 +105,15 @@ class ChangePluginGroupIdAndArtifactIdTest implements RewriteTest {
     @Test
     void changePluginGroupIdAndArtifactIdDeprecatedNewArtifact() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePluginGroupIdAndArtifactId(
-            "io.quarkus",
-            "quarkus-bootstrap-maven-plugin",
-            null,
-            null,
-            "quarkus-extension-maven-plugin"
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangePluginGroupIdAndArtifactId(
+                        "io.quarkus",
+                        "quarkus-bootstrap-maven-plugin",
+                        null,
+                        null,
+                        "quarkus-extension-maven-plugin"
+                )),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -144,7 +144,7 @@ class ChangePluginGroupIdAndArtifactIdTest implements RewriteTest {
                   </profiles>
               </project>
               """,
-            """
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -175,22 +175,22 @@ class ChangePluginGroupIdAndArtifactIdTest implements RewriteTest {
                   </profiles>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void changePluginGroupIdAndArtifactIdNoChange() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePluginGroupIdAndArtifactId(
-            "io.quarkus",
-            "quarkus-bootstrap-maven-plugin",
-            null,
-            "quarkus-extension-maven-plugin",
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangePluginGroupIdAndArtifactId(
+                        "io.quarkus",
+                        "quarkus-bootstrap-maven-plugin",
+                        null,
+                        "quarkus-extension-maven-plugin",
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -221,22 +221,22 @@ class ChangePluginGroupIdAndArtifactIdTest implements RewriteTest {
                   </profiles>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void changeManagedPluginGroupIdAndArtifactId() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePluginGroupIdAndArtifactId(
-            "io.quarkus",
-            "quarkus-bootstrap-maven-plugin",
-            null,
-            "quarkus-extension-maven-plugin",
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangePluginGroupIdAndArtifactId(
+                        "io.quarkus",
+                        "quarkus-bootstrap-maven-plugin",
+                        null,
+                        "quarkus-extension-maven-plugin",
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -284,7 +284,7 @@ class ChangePluginGroupIdAndArtifactIdTest implements RewriteTest {
                   </profiles>
               </project>
               """,
-            """
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -332,22 +332,22 @@ class ChangePluginGroupIdAndArtifactIdTest implements RewriteTest {
                   </profiles>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void changeManagedPluginGroupIdAndArtifactIdNoChange() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePluginGroupIdAndArtifactId(
-            "io.quarkus",
-            "quarkus-bootstrap-maven-plugin",
-            null,
-            "quarkus-extension-maven-plugin",
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangePluginGroupIdAndArtifactId(
+                        "io.quarkus",
+                        "quarkus-bootstrap-maven-plugin",
+                        null,
+                        "quarkus-extension-maven-plugin",
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -395,7 +395,7 @@ class ChangePluginGroupIdAndArtifactIdTest implements RewriteTest {
                   </profiles>
               </project>
               """
-          )
+                )
         );
     }
 }

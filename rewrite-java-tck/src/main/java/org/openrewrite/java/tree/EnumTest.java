@@ -30,8 +30,8 @@ class EnumTest implements RewriteTest {
     @Test
     void enumWithAnnotations() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public enum Test {
                   @Deprecated(since = "now")
                   One,
@@ -40,15 +40,15 @@ class EnumTest implements RewriteTest {
                   Two;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void anonymousClassInitializer() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public enum A {
                   A1(1) {
                       @Override
@@ -60,15 +60,15 @@ class EnumTest implements RewriteTest {
                   abstract void foo();
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void anonymousClassInitializerNoParentheses() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public enum A {
                   A2 {
                       @Override
@@ -78,15 +78,15 @@ class EnumTest implements RewriteTest {
                   abstract void foo();
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void enumConstructor() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class Outer {
                   public enum A {
                       A1(1);
@@ -101,28 +101,28 @@ class EnumTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void noArguments() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public enum A {
                   A1, A2();
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void enumWithParameters() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public enum A {
                   ONE(1),
                   TWO(2);
@@ -130,14 +130,14 @@ class EnumTest implements RewriteTest {
                   A(int n) {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void enumWithoutParameters() {
         rewriteRun(
-          java("public enum A { ONE, TWO }")
+                java("public enum A { ONE, TWO }")
         );
     }
 
@@ -145,7 +145,7 @@ class EnumTest implements RewriteTest {
     @Test
     void enumUnnecessarilyTerminatedWithSemicolon() {
         rewriteRun(
-          java("public enum A { ONE ; }")
+                java("public enum A { ONE ; }")
         );
     }
 
@@ -153,14 +153,14 @@ class EnumTest implements RewriteTest {
     @Disabled("enum A { ONE~~(non-whitespace)~~>, <~~}")
     void enumValuesTerminatedWithComma() {
         rewriteRun(
-          java("enum A { ONE, }")
+                java("enum A { ONE, }")
         );
     }
 
     @Test
     void enumWithEmptyParameters() {
         rewriteRun(
-          java("public enum A { ONE ( ), TWO ( ) }")
+                java("public enum A { ONE ( ), TWO ( ) }")
         );
     }
 }

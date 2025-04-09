@@ -90,15 +90,15 @@ public class IsOrIsNotLikelyTestTest {
 
         default SourceSpecs assertTestIsFound() {
             return dir("com/example",
-              java(TEST_INITIAL, TEST_SEARCH_RESULT),
-              java(JUNIT_TEST_INITIAL, JUNIT_TEST_SEARCH_RESULT)
+                    java(TEST_INITIAL, TEST_SEARCH_RESULT),
+                    java(JUNIT_TEST_INITIAL, JUNIT_TEST_SEARCH_RESULT)
             );
         }
 
         default SourceSpecs assertTestNoChanges() {
             return dir("com/example",
-              java(TEST_INITIAL),
-              java(JUNIT_TEST_INITIAL)
+                    java(TEST_INITIAL),
+                    java(JUNIT_TEST_INITIAL)
             );
         }
 
@@ -118,15 +118,15 @@ public class IsOrIsNotLikelyTestTest {
         @Override
         public void defaults(RecipeSpec spec) {
             spec
-              .parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api"))
-              .recipe(new IsLikelyTest());
+                    .parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api"))
+                    .recipe(new IsLikelyTest());
         }
 
         @Test
         void standardMainAndTestSourceSet() {
             rewriteRun(
-              srcMainJava(assertMainNoChanges()),
-              srcTestJava(assertTestIsFound())
+                    srcMainJava(assertMainNoChanges()),
+                    srcTestJava(assertTestIsFound())
             );
         }
 
@@ -134,16 +134,16 @@ public class IsOrIsNotLikelyTestTest {
         @SuppressWarnings("SpellCheckingInspection")
         void standardMainAndIntegTestSourceSet() {
             rewriteRun(
-              srcMainJava(assertMainNoChanges()),
-              srcIntegTestJava(assertTestIsFound())
+                    srcMainJava(assertMainNoChanges()),
+                    srcIntegTestJava(assertTestIsFound())
             );
         }
 
         @Test
         void standardMainAndCompatibilityTestSourceSet() {
             rewriteRun(
-              srcMainJava(assertMainNoChanges()),
-              srcCompatibilityTestJava(assertTestIsFound())
+                    srcMainJava(assertMainNoChanges()),
+                    srcCompatibilityTestJava(assertTestIsFound())
             );
         }
 
@@ -159,31 +159,31 @@ public class IsOrIsNotLikelyTestTest {
         @Override
         public void defaults(RecipeSpec spec) {
             spec
-              .parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api"))
-              .recipe(new IsLikelyNotTest());
+                    .parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api"))
+                    .recipe(new IsLikelyNotTest());
         }
 
         @Test
         void standardMainAndTestSourceSet() {
             rewriteRun(
-              srcMainJava(assertMainIsFound()),
-              srcTestJava(assertTestNoChanges())
+                    srcMainJava(assertMainIsFound()),
+                    srcTestJava(assertTestNoChanges())
             );
         }
 
         @Test
         void preconditionForOtherSourceType() {
             rewriteRun(
-              spec -> spec.recipe(toRecipe(() -> Preconditions.check(
-                Preconditions.or(new IsLikelyTest().getVisitor()),
-                new TreeVisitor<>() {
+                    spec -> spec.recipe(toRecipe(() -> Preconditions.check(
+                            Preconditions.or(new IsLikelyTest().getVisitor()),
+                            new TreeVisitor<>() {
 
-                    @Override
-                    public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                        return tree != null ? SearchResult.found(tree, "recipe") : null;
-                    }
-                }))),
-              text("foo")
+                                @Override
+                                public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                                    return tree != null ? SearchResult.found(tree, "recipe") : null;
+                                }
+                            }))),
+                    text("foo")
             );
         }
 
@@ -191,16 +191,16 @@ public class IsOrIsNotLikelyTestTest {
         @SuppressWarnings("SpellCheckingInspection")
         void standardMainAndIntegTestSourceSet() {
             rewriteRun(
-              srcMainJava(assertMainIsFound()),
-              srcIntegTestJava(assertTestNoChanges())
+                    srcMainJava(assertMainIsFound()),
+                    srcIntegTestJava(assertTestNoChanges())
             );
         }
 
         @Test
         void standardMainAndCompatibilityTestSourceSet() {
             rewriteRun(
-              srcMainJava(assertMainIsFound()),
-              srcCompatibilityTestJava(assertTestNoChanges())
+                    srcMainJava(assertMainIsFound()),
+                    srcCompatibilityTestJava(assertTestNoChanges())
             );
         }
 

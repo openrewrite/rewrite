@@ -32,9 +32,9 @@ class RemovePluginTest implements RewriteTest {
     @Test
     void removePluginFromBuild() {
         rewriteRun(
-          spec -> spec.recipe(new RemovePlugin("org.apache.avro", "avro-maven-plugin")),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemovePlugin("org.apache.avro", "avro-maven-plugin")),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
 
@@ -72,7 +72,7 @@ class RemovePluginTest implements RewriteTest {
                 </build>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
 
@@ -85,15 +85,15 @@ class RemovePluginTest implements RewriteTest {
                 </properties>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void removePluginFromReporting() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
 
@@ -112,7 +112,7 @@ class RemovePluginTest implements RewriteTest {
                 </reporting>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
 
@@ -121,15 +121,15 @@ class RemovePluginTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void removePluginFromBothBuildAndReporting() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
 
@@ -158,7 +158,7 @@ class RemovePluginTest implements RewriteTest {
                 </reporting>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
 
@@ -167,15 +167,15 @@ class RemovePluginTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void removePluginWhenAlongsideOtherPlugins() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
 
@@ -222,7 +222,7 @@ class RemovePluginTest implements RewriteTest {
                 </reporting>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
 
@@ -259,15 +259,15 @@ class RemovePluginTest implements RewriteTest {
                 </reporting>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void pluginToRemoveNotFound() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
 
@@ -299,7 +299,7 @@ class RemovePluginTest implements RewriteTest {
                 </reporting>
               </project>
               """
-          )
+                )
         );
     }
 }

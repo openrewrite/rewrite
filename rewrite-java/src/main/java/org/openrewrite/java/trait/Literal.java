@@ -51,7 +51,7 @@ public class Literal implements Trait<Expression> {
     public boolean isNull() {
         if (getTree() instanceof J.Literal) {
             return ((J.Literal) getTree()).getValue() == null;
-        } else if(getTree() instanceof J.NewArray) {
+        } else if (getTree() instanceof J.NewArray) {
             J.NewArray newArray = (J.NewArray) getTree();
             return newArray.getInitializer() == null;
         }
@@ -84,11 +84,12 @@ public class Literal implements Trait<Expression> {
      * @return the value of this expression as a list of strings. Works for both single string literals and array literals.
      */
     public List<String> getStrings() {
-        if(getTree() instanceof J.Literal) {
+        if (getTree() instanceof J.Literal) {
             String stringValue = getString();
             return stringValue == null ? emptyList() : singletonList(stringValue);
         }
-        List<String> result = getValue(new TypeReference<List<String>>() {});
+        List<String> result = getValue(new TypeReference<List<String>>() {
+        });
         return result == null ? Collections.emptyList() : result;
     }
 
@@ -152,7 +153,7 @@ public class Literal implements Trait<Expression> {
         protected @Nullable Literal test(Cursor cursor) {
             Object value = cursor.getValue();
             return value instanceof J.Literal ||
-                   isNewArrayWithLiteralInitializer(value) ?
+                    isNewArrayWithLiteralInitializer(value) ?
                     new Literal(cursor, mapper) :
                     null;
         }
@@ -165,7 +166,7 @@ public class Literal implements Trait<Expression> {
                 }
                 for (Expression expr : init) {
                     if (!(expr instanceof J.Literal) &&
-                        !isNewArrayWithLiteralInitializer(expr)) {
+                            !isNewArrayWithLiteralInitializer(expr)) {
                         return false;
                     }
                 }

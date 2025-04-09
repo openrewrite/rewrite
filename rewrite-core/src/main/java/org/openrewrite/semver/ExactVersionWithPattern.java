@@ -30,7 +30,7 @@ public class ExactVersionWithPattern extends LatestRelease {
     @Override
     public boolean isValid(@Nullable String currentVersion, String version) {
         return super.isValid(currentVersion, version) &&
-               super.compare(currentVersion, version, this.version) == 0;
+                super.compare(currentVersion, version, this.version) == 0;
     }
 
     public static Validated<ExactVersionWithPattern> build(String toVersion, @Nullable String metadataPattern) {

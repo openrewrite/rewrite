@@ -34,29 +34,29 @@ class ReplaceConstantTest implements RewriteTest {
     @Test
     void replaceConstant() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().classpath("guava")),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().classpath("guava")),
+                java(
+                        """
               import com.google.common.base.Charsets;
               class Test {
                   Object o = Charsets.UTF_8;
               }
               """,
-            """
+                        """
               class Test {
                   Object o = "UTF_8";
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void replaceStaticallyImportedConstant() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().classpath("guava")),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().classpath("guava")),
+                java(
+                        """
               import static com.google.common.base.Charsets.UTF_8;
               class Test {
                   Object o = UTF_8;
@@ -65,7 +65,7 @@ class ReplaceConstantTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   Object o = "UTF_8";
                   void foo() {
@@ -73,7 +73,7 @@ class ReplaceConstantTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -81,9 +81,9 @@ class ReplaceConstantTest implements RewriteTest {
     @Test
     void doesNotChangeOriginalVariableDeclaration() {
         rewriteRun(
-          spec -> spec.recipe(new ReplaceConstant("com.constant.B", "VAR", "\"newValue\"")),
-          java(
-            """
+                spec -> spec.recipe(new ReplaceConstant("com.constant.B", "VAR", "\"newValue\"")),
+                java(
+                        """
               package com.constant;
               public class B {
                   public static final String VAR = "default";
@@ -92,9 +92,9 @@ class ReplaceConstantTest implements RewriteTest {
                   }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package com.abc;
               import com.constant.B;
               class A {
@@ -104,7 +104,7 @@ class ReplaceConstantTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package com.abc;
               class A {
                   String v = "newValue";
@@ -113,7 +113,7 @@ class ReplaceConstantTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

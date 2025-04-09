@@ -85,8 +85,8 @@ class ExplicitPluginGroupIdTest implements RewriteTest {
     @Test
     void reportingPlugin() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -101,7 +101,7 @@ class ExplicitPluginGroupIdTest implements RewriteTest {
                 </reporting>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -117,7 +117,7 @@ class ExplicitPluginGroupIdTest implements RewriteTest {
                 </reporting>
               </project>
               """
-          )
+                )
         );
     }
 }

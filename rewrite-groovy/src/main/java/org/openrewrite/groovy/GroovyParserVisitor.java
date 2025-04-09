@@ -182,9 +182,9 @@ public class GroovyParserVisitor {
 
         for (ClassNode aClass : ast.getClasses()) {
             if (aClass.getSuperClass() == null ||
-                !("groovy.lang.Script".equals(aClass.getSuperClass().getName()) ||
-                  "RewriteGradleProject".equals(aClass.getSuperClass().getName()) ||
-                  "RewriteSettings".equals(aClass.getSuperClass().getName()))) {
+                    !("groovy.lang.Script".equals(aClass.getSuperClass().getName()) ||
+                            "RewriteGradleProject".equals(aClass.getSuperClass().getName()) ||
+                            "RewriteSettings".equals(aClass.getSuperClass().getName()))) {
                 sortedByPosition.computeIfAbsent(pos(aClass), i -> new ArrayList<>()).add(aClass);
             }
         }
@@ -219,8 +219,8 @@ public class GroovyParserVisitor {
                 }
                 throw new GroovyParsingException(
                         "Failed to parse " + sourcePath + " at cursor position " + cursor +
-                        ". The next 10 characters in the original source are `" +
-                        source.substring(cursor, Math.min(source.length(), cursor + 10)) + "`", t);
+                                ". The next 10 characters in the original source are `" +
+                                source.substring(cursor, Math.min(source.length(), cursor + 10)) + "`", t);
             }
         }
 
@@ -787,7 +787,7 @@ public class GroovyParserVisitor {
                 // Could iterate over those in reverse order, but feels safer to just take the count and go off source code alone
                 for (int i = 0; i < statement.getStatementLabels().size(); i++) {
                     labels.add(new J.Label(randomId(), whitespace(), Markers.EMPTY, JRightPadded.build(
-                            new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), name(), null, null)).withAfter(sourceBefore(":")),
+                                    new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), name(), null, null)).withAfter(sourceBefore(":")),
                             new J.Empty(randomId(), EMPTY, Markers.EMPTY)));
                 }
             }
@@ -822,16 +822,16 @@ public class GroovyParserVisitor {
             //     https://docs.groovy-lang.org/latest/html/documentation/#_named_parameters_2
             // When named parameters are in use they may appear before, after, or intermixed with any positional arguments
             if (unparsedArgs.size() > 1 && unparsedArgs.get(0) instanceof MapExpression &&
-                (unparsedArgs.get(0).getLastLineNumber() > unparsedArgs.get(1).getLastLineNumber() ||
-                 (unparsedArgs.get(0).getLastLineNumber() == unparsedArgs.get(1).getLastLineNumber() &&
-                  unparsedArgs.get(0).getLastColumnNumber() > unparsedArgs.get(1).getLastColumnNumber()))) {
+                    (unparsedArgs.get(0).getLastLineNumber() > unparsedArgs.get(1).getLastLineNumber() ||
+                            (unparsedArgs.get(0).getLastLineNumber() == unparsedArgs.get(1).getLastLineNumber() &&
+                                    unparsedArgs.get(0).getLastColumnNumber() > unparsedArgs.get(1).getLastColumnNumber()))) {
 
                 // Figure out the source-code ordering of the expressions
                 MapExpression namedArgExpressions = (MapExpression) unparsedArgs.get(0);
                 unparsedArgs =
                         Stream.concat(
-                                        namedArgExpressions.getMapEntryExpressions().stream(),
-                                        unparsedArgs.subList(1, unparsedArgs.size()).stream())
+                                namedArgExpressions.getMapEntryExpressions().stream(),
+                                unparsedArgs.subList(1, unparsedArgs.size()).stream())
                                 .sorted(Comparator.comparing(ASTNode::getLastLineNumber)
                                         .thenComparing(ASTNode::getLastColumnNumber))
                                 .collect(Collectors.toList());
@@ -846,8 +846,8 @@ public class GroovyParserVisitor {
                     MapExpression namedArgExpressions = (MapExpression) unparsedArgs.get(0);
                     unparsedArgs =
                             Stream.concat(
-                                            namedArgExpressions.getMapEntryExpressions().stream(),
-                                            unparsedArgs.subList(1, unparsedArgs.size()).stream())
+                                    namedArgExpressions.getMapEntryExpressions().stream(),
+                                    unparsedArgs.subList(1, unparsedArgs.size()).stream())
                                     .collect(Collectors.toList());
                 }
             }
@@ -1100,7 +1100,7 @@ public class GroovyParserVisitor {
                 J expr = visit(statement);
                 if (i == blockStatements.size() - 1 && (expr instanceof Expression)) {
                     if (parent instanceof ClosureExpression || (parent instanceof MethodNode &&
-                                                                !JavaType.Primitive.Void.equals(typeMapping.type(((MethodNode) parent).getReturnType())))) {
+                            !JavaType.Primitive.Void.equals(typeMapping.type(((MethodNode) parent).getReturnType())))) {
                         expr = new J.Return(randomId(), expr.getPrefix(), Markers.EMPTY,
                                 expr.withPrefix(EMPTY));
                         expr = expr.withMarkers(expr.getMarkers().add(new ImplicitReturn(randomId())));
@@ -1140,8 +1140,8 @@ public class GroovyParserVisitor {
             // Groovy allows catch variables to omit their type, shorthand for being of type java.lang.Exception
             // Can't use isSynthetic() here because groovy doesn't record the line number on the Parameter
             if ("java.lang.Exception".equals(param.getType().getName()) &&
-                !source.startsWith("Exception", cursor) &&
-                !source.startsWith("java.lang.Exception", cursor)) {
+                    !source.startsWith("Exception", cursor) &&
+                    !source.startsWith("java.lang.Exception", cursor)) {
                 paramType = new J.Identifier(randomId(), paramPrefix, Markers.EMPTY, emptyList(), "",
                         JavaType.ShallowClass.build("java.lang.Exception"), null);
             } else {
@@ -1190,7 +1190,7 @@ public class GroovyParserVisitor {
                     statement.getCode() instanceof EmptyStatement ?
                             JContainer.build(sourceBefore(":"), convertStatements(emptyList()), Markers.EMPTY) :
                             JContainer.build(sourceBefore(":"), convertStatements(((BlockStatement) statement.getCode()).getStatements()), Markers.EMPTY)
-                    , null)
+            , null)
             );
         }
 
@@ -1816,7 +1816,7 @@ public class GroovyParserVisitor {
                 MethodNode methodNode = (MethodNode) call.getNodeMetaData().get(StaticTypesMarker.DIRECT_METHOD_CALL_TARGET);
                 JavaType.Method methodType = null;
                 if (methodNode == null && call.getObjectExpression() instanceof VariableExpression &&
-                    ((VariableExpression) call.getObjectExpression()).getAccessedVariable() != null) {
+                        ((VariableExpression) call.getObjectExpression()).getAccessedVariable() != null) {
                     // Groovy doesn't know what kind of object this method is being invoked on
                     // But if this invocation is inside a Closure we may have already enriched its parameters with types from the static type checker
                     // Use any such type information to attempt to find a matching method
@@ -1825,12 +1825,12 @@ public class GroovyParserVisitor {
                         methodType = typeMapping.methodType(parameterType.getMethod(name.getSimpleName(), new Parameter[]{}));
                     } else if (call.getArguments() instanceof ArgumentListExpression) {
                         List<org.codehaus.groovy.ast.expr.Expression> rawArgs = ((ArgumentListExpression) call.getArguments()).getExpressions();
-                    /*
-                      Look through the methods returning the closest match on a best-effort basis
-                      Factors which can result in a less accurate match, or no match, include:
-                          * The type of each parameter may or may not be known to us
-                          * Usage of Groovy's "named parameters" syntactic sugaring throwing off argument count and order
-                    */
+                        /*
+                          Look through the methods returning the closest match on a best-effort basis
+                          Factors which can result in a less accurate match, or no match, include:
+                              * The type of each parameter may or may not be known to us
+                              * Usage of Groovy's "named parameters" syntactic sugaring throwing off argument count and order
+                        */
                         methodLoop:
                         for (MethodNode candidateMethod : parameterType.getAllDeclaredMethods()) {
                             if (!name.getSimpleName().equals(candidateMethod.getName())) {
@@ -1959,7 +1959,7 @@ public class GroovyParserVisitor {
         public void visitReturnStatement(ReturnStatement return_) {
             Space fmt = sourceBefore("return");
             if (return_.getExpression() instanceof ConstantExpression && isSynthetic(return_.getExpression()) &&
-                (((ConstantExpression) return_.getExpression()).getValue() == null)) {
+                    (((ConstantExpression) return_.getExpression()).getValue() == null)) {
                 queue.add(new J.Return(randomId(), fmt, Markers.EMPTY, null));
             } else {
                 queue.add(new J.Return(randomId(), fmt, Markers.EMPTY, visit(return_.getExpression())));
@@ -2199,8 +2199,8 @@ public class GroovyParserVisitor {
         }
 
         private <J2 extends J> List<JRightPadded<J2>> convertAll(List<? extends ASTNode> nodes,
-                                                                 Function<ASTNode, Space> innerSuffix,
-                                                                 Function<ASTNode, Space> suffix) {
+                Function<ASTNode, Space> innerSuffix,
+                Function<ASTNode, Space> suffix) {
             if (nodes.isEmpty()) {
                 return emptyList();
             }

@@ -42,7 +42,7 @@ class RecipeStack {
     int recipePosition;
 
     public <T> T reduce(LargeSourceSet sourceSet, Recipe recipe, ExecutionContext ctx,
-                        BiFunction<T, Stack<Recipe>, T> consumer, T acc) {
+            BiFunction<T, Stack<Recipe>, T> consumer, T acc) {
         init(recipe);
         AtomicInteger recipePosition = new AtomicInteger(0);
         while (!allRecipesStack.isEmpty()) {

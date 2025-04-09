@@ -27,22 +27,22 @@ class CreatePropertiesFileTest implements RewriteTest {
     @Test
     void hasCreatedPropertiesFile() {
         rewriteRun(
-          spec -> spec.recipe(new CreatePropertiesFile(
-            "test/test.properties",
-            """
+                spec -> spec.recipe(new CreatePropertiesFile(
+                        "test/test.properties",
+                        """
               # This is a comment
               x.y=z
               """,
-            null
-          )),
-          properties(
-            null,
-            """
+                        null
+                )),
+                properties(
+                        null,
+                        """
               # This is a comment
               x.y=z
               """,
-            spec -> spec.path("test/test.properties")
-          )
+                        spec -> spec.path("test/test.properties")
+                )
         );
     }
 
@@ -50,66 +50,66 @@ class CreatePropertiesFileTest implements RewriteTest {
     @Test
     void hasOverwrittenFile() {
         rewriteRun(
-          spec -> spec.recipe(new CreatePropertiesFile(
-            "test/test.properties",
-            "after=true",
-            true
-          )).cycles(1).expectedCyclesThatMakeChanges(1),
-          properties(
-            "test.property=test",
-            "after=true",
-            spec -> spec.path("test/test.properties")
-          )
+                spec -> spec.recipe(new CreatePropertiesFile(
+                        "test/test.properties",
+                        "after=true",
+                        true
+                )).cycles(1).expectedCyclesThatMakeChanges(1),
+                properties(
+                        "test.property=test",
+                        "after=true",
+                        spec -> spec.path("test/test.properties")
+                )
         );
     }
 
     @Test
     void shouldNotChangeExistingFile() {
         rewriteRun(
-          spec -> spec.recipe(new CreatePropertiesFile(
-            "test/test.properties",
-            "a.property=value",
-            false
-          )),
-          properties(
-            "test.property=test",
-            spec -> spec.path("test/test.properties")
-          )
+                spec -> spec.recipe(new CreatePropertiesFile(
+                        "test/test.properties",
+                        "a.property=value",
+                        false
+                )),
+                properties(
+                        "test.property=test",
+                        spec -> spec.path("test/test.properties")
+                )
         );
     }
 
     @Test
     void shouldNotChangeExistingFileWhenOverwriteNull() {
         rewriteRun(
-          spec -> spec.recipe(new CreatePropertiesFile(
-            "test/test.properties",
-            null,
-            null
-          )),
-          properties(
-            "test.property=test",
-            spec -> spec.path("test/test.properties")
-          )
+                spec -> spec.recipe(new CreatePropertiesFile(
+                        "test/test.properties",
+                        null,
+                        null
+                )),
+                properties(
+                        "test.property=test",
+                        spec -> spec.path("test/test.properties")
+                )
         );
     }
 
     @Test
     void shouldAddAnotherFile() {
         rewriteRun(
-          spec -> spec.recipe(new CreatePropertiesFile(
-            "test/test-file-2.properties",
-            null,
-            true
-          )),
-          properties(
-            "test.property=test",
-            spec -> spec.path("test/test-file-1.properties")
-          ),
-          properties(
-            null,
-            "",
-            spec -> spec.path("test/test-file-2.properties")
-          )
+                spec -> spec.recipe(new CreatePropertiesFile(
+                        "test/test-file-2.properties",
+                        null,
+                        true
+                )),
+                properties(
+                        "test.property=test",
+                        spec -> spec.path("test/test-file-1.properties")
+                ),
+                properties(
+                        null,
+                        "",
+                        spec -> spec.path("test/test-file-2.properties")
+                )
         );
     }
 }

@@ -119,7 +119,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                     Space removedPrefix = spaceForNextImport.get();
                     Space currentPrefix = import_.getPrefix();
                     if (removedPrefix.getLastWhitespace().isEmpty() ||
-                        (countTrailingLinebreaks(removedPrefix) > countTrailingLinebreaks(currentPrefix))) {
+                            (countTrailingLinebreaks(removedPrefix) > countTrailingLinebreaks(currentPrefix))) {
                         import_ = import_.withPrefix(currentPrefix.withWhitespace(removedPrefix.getLastWhitespace()));
                     }
                     spaceForNextImport.set(null);

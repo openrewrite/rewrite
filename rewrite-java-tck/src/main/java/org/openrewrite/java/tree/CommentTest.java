@@ -25,8 +25,8 @@ class CommentTest implements RewriteTest {
     @Test
     void backToBackMultilineComments() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   /*
                       Comment 1
@@ -35,19 +35,19 @@ class CommentTest implements RewriteTest {
                   */
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void multilineNestedInsideSingleLine() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {// /*
               }
               """
-          )
+                )
         );
     }
 }

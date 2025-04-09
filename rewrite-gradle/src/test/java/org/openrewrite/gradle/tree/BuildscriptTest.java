@@ -25,8 +25,8 @@ class BuildscriptTest implements RewriteTest {
     @Test
     void buildscriptWithDependencies() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               buildscript {
                   repositories {
                       maven {
@@ -40,7 +40,7 @@ class BuildscriptTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

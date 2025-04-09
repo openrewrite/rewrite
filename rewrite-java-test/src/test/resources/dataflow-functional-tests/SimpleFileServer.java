@@ -109,7 +109,7 @@ public class SimpleFileServer extends AbstractTestServer {
             ParseResult result = cmd.parseArgs(args);
             if (result.isVersionHelpRequested()) {
                 System.out.println("Californium (Cf) " + cmd.getCommandName() + " " + version);
-                        cmd.printVersionHelp(System.out);
+                cmd.printVersionHelp(System.out);
                 System.out.println();
             }
             if (result.isUsageHelpRequested()) {
@@ -184,7 +184,7 @@ public class SimpleFileServer extends AbstractTestServer {
      * server are initialized.
      */
     public SimpleFileServer(Configuration config, Map<Select, Configuration> protocolConfig, String coapRootPath,
-                            File filesRoot) throws SocketException {
+            File filesRoot) throws SocketException {
         super(config, protocolConfig);
         add(new FileResource(config, coapRootPath, filesRoot));
         add(new MyIpResource(MyIpResource.RESOURCE_NAME, true));

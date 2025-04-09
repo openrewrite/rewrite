@@ -25,54 +25,54 @@ class MethodDeclarationTest implements RewriteTest {
     @Test
     void defaultValue() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public @interface A {
                   String foo() default "foo";
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void constructor() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   public A() { }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void typeArguments() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   public <P, R> R foo(P p, String s, String... args) {
                       return null;
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void interfaceMethodDecl() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public interface A {
                   String getName() ;
               }
               """
-          )
+                )
         );
     }
 
@@ -80,39 +80,39 @@ class MethodDeclarationTest implements RewriteTest {
     @Test
     void methodThrows() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   public void foo()  throws Exception { }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void nativeModifier() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   public native void foo();
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void methodWithSuffixMultiComment() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   public void foo() { }/*Comments*/
               }
               """
-          )
+                )
         );
     }
 

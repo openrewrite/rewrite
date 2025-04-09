@@ -27,13 +27,13 @@ class FindPropertiesTest implements RewriteTest {
     @Test
     void findProperty() {
         rewriteRun(
-          spec -> spec.recipe(new FindProperties("guava.*", null))
-            .dataTableAsCsv("org.openrewrite.maven.table.MavenProperties", """
+                spec -> spec.recipe(new FindProperties("guava.*", null))
+                        .dataTableAsCsv("org.openrewrite.maven.table.MavenProperties", """
               property,value
               guava.version,28.2-jre
               """),
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <properties>
                   <someNullProp/>
@@ -51,7 +51,7 @@ class FindPropertiesTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <properties>
                   <someNullProp/>
@@ -69,20 +69,20 @@ class FindPropertiesTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void findPropertyValue() {
         rewriteRun(
-          spec -> spec.recipe(new FindProperties("guava.*", "28.*"))
-            .dataTableAsCsv("org.openrewrite.maven.table.MavenProperties", """
+                spec -> spec.recipe(new FindProperties("guava.*", "28.*"))
+                        .dataTableAsCsv("org.openrewrite.maven.table.MavenProperties", """
               property,value
               guava.version,28.2-jre
               """),
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <properties>
                   <someNullProp/>
@@ -93,7 +93,7 @@ class FindPropertiesTest implements RewriteTest {
                 <version>1</version>
               </project>
               """,
-            """
+                        """
               <project>
                 <properties>
                   <someNullProp/>
@@ -104,16 +104,16 @@ class FindPropertiesTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void doesNotFindPropertyValue() {
         rewriteRun(
-          spec -> spec.recipe(new FindProperties("guava.*", "30.*")),
-          pomXml(
-            """
+                spec -> spec.recipe(new FindProperties("guava.*", "30.*")),
+                pomXml(
+                        """
               <project>
                 <properties>
                   <someNullProp/>
@@ -124,16 +124,16 @@ class FindPropertiesTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void doesNotMatchOtherPropertyUsages() {
         rewriteRun(
-          spec -> spec.recipe(new FindProperties("guava.*", null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new FindProperties("guava.*", null)),
+                pomXml(
+                        """
               <project>
                 <properties>
                   <someNullProp/>
@@ -152,7 +152,7 @@ class FindPropertiesTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <properties>
                   <someNullProp/>
@@ -171,7 +171,7 @@ class FindPropertiesTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 }

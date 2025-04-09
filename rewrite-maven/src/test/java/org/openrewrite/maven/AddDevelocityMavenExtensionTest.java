@@ -32,11 +32,11 @@ class AddDevelocityMavenExtensionTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new AddDevelocityMavenExtension("1.17", "https://foo", null,
-          null, null, null));
+                null, null, null));
     }
 
     private static final SourceSpecs POM_XML_SOURCE_SPEC = pomXml(
-      """
+            """
         <project>
             <groupId>com.mycompany.app</groupId>
             <artifactId>my-app</artifactId>
@@ -49,22 +49,22 @@ class AddDevelocityMavenExtensionTest implements RewriteTest {
     @Test
     void addGradleEnterpriseMavenExtensionToExistingExtensionsXmlFile() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
               </project>
               """
-          ),
-          xml(
-            """
+                ),
+                xml(
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <extensions>
               </extensions>
               """,
-            """
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <extensions>
                 <extension>
@@ -74,29 +74,29 @@ class AddDevelocityMavenExtensionTest implements RewriteTest {
                 </extension>
               </extensions>
               """,
-            spec -> spec.path(".mvn/extensions.xml")
-          ),
-          xml(
-            null,
-            """
+                        spec -> spec.path(".mvn/extensions.xml")
+                ),
+                xml(
+                        null,
+                        """
               <gradleEnterprise>
                 <server>
                   <url>https://foo</url>
                 </server>
               </gradleEnterprise>
               """,
-            spec -> spec.path(".mvn/gradle-enterprise.xml")
-          )
+                        spec -> spec.path(".mvn/gradle-enterprise.xml")
+                )
         );
     }
 
     @Test
     void createNewExtensionsXmlFileIfNotExist() {
         rewriteRun(
-          POM_XML_SOURCE_SPEC,
-          xml(
-            null,
-            """
+                POM_XML_SOURCE_SPEC,
+                xml(
+                        null,
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <extensions>
                 <extension>
@@ -106,19 +106,19 @@ class AddDevelocityMavenExtensionTest implements RewriteTest {
                 </extension>
               </extensions>
               """,
-            spec -> spec.path(".mvn/extensions.xml")
-          ),
-          xml(
-            null,
-            """
+                        spec -> spec.path(".mvn/extensions.xml")
+                ),
+                xml(
+                        null,
+                        """
               <gradleEnterprise>
                 <server>
                   <url>https://foo</url>
                 </server>
               </gradleEnterprise>
               """,
-            spec -> spec.path(".mvn/gradle-enterprise.xml")
-          )
+                        spec -> spec.path(".mvn/gradle-enterprise.xml")
+                )
         );
     }
 
@@ -127,16 +127,16 @@ class AddDevelocityMavenExtensionTest implements RewriteTest {
     @Test
     void noVersionSpecified() {
         rewriteRun(
-          spec -> spec.recipe(new AddDevelocityMavenExtension(null, "https://foo", null, null, null, null)),
-          POM_XML_SOURCE_SPEC,
-          xml(
-            null,
-            spec -> spec.path(".mvn/extensions.xml").after(after -> {
-                Matcher versionMatcher = Pattern.compile("<version>(.*)</version>").matcher(after);
-                assertThat(versionMatcher.find()).isTrue();
-                String version = versionMatcher.group(1);
-                assertThat(version).isNotBlank();
-                return """
+                spec -> spec.recipe(new AddDevelocityMavenExtension(null, "https://foo", null, null, null, null)),
+                POM_XML_SOURCE_SPEC,
+                xml(
+                        null,
+                        spec -> spec.path(".mvn/extensions.xml").after(after -> {
+                            Matcher versionMatcher = Pattern.compile("<version>(.*)</version>").matcher(after);
+                            assertThat(versionMatcher.find()).isTrue();
+                            String version = versionMatcher.group(1);
+                            assertThat(version).isNotBlank();
+                            return """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <extensions>
                     <extension>
@@ -146,19 +146,19 @@ class AddDevelocityMavenExtensionTest implements RewriteTest {
                     </extension>
                   </extensions>
                   """.formatted(version);
-            })
-          ),
-          xml(
-            null,
-            """
+                        })
+                ),
+                xml(
+                        null,
+                        """
               <develocity>
                 <server>
                   <url>https://foo</url>
                 </server>
               </develocity>
               """,
-            spec -> spec.path(".mvn/develocity.xml")
-          )
+                        spec -> spec.path(".mvn/develocity.xml")
+                )
         );
     }
 
@@ -166,41 +166,41 @@ class AddDevelocityMavenExtensionTest implements RewriteTest {
     @Test
     void noChangeIfGradleEnterpriseXmlExists() {
         rewriteRun(
-          POM_XML_SOURCE_SPEC,
-          xml(
-            """
+                POM_XML_SOURCE_SPEC,
+                xml(
+                        """
               <?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
               <gradleEnterprise>
               </gradleEnterprise>
               """,
-            spec -> spec.path(".mvn/gradle-enterprise.xml")
-          )
+                        spec -> spec.path(".mvn/gradle-enterprise.xml")
+                )
         );
     }
 
     @Test
     void noChangeIfDevelocityXmlExists() {
         rewriteRun(
-          POM_XML_SOURCE_SPEC,
-          xml(
-            """
+                POM_XML_SOURCE_SPEC,
+                xml(
+                        """
               <?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
               <develocity>
               </develocity>
               """,
-            spec -> spec.path(".mvn/develocity.xml")
-          )
+                        spec -> spec.path(".mvn/develocity.xml")
+                )
         );
     }
 
     @Test
     void allGradleEnterpriseSettings() {
         rewriteRun(
-          spec -> spec.recipe(new AddDevelocityMavenExtension("1.17", "https://foo", true, true, false, AddDevelocityMavenExtension.PublishCriteria.Failure)),
-          POM_XML_SOURCE_SPEC,
-          xml(
-            null,
-            """
+                spec -> spec.recipe(new AddDevelocityMavenExtension("1.17", "https://foo", true, true, false, AddDevelocityMavenExtension.PublishCriteria.Failure)),
+                POM_XML_SOURCE_SPEC,
+                xml(
+                        null,
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <extensions>
                 <extension>
@@ -210,11 +210,11 @@ class AddDevelocityMavenExtensionTest implements RewriteTest {
                 </extension>
               </extensions>
               """,
-            spec -> spec.path(".mvn/extensions.xml")
-          ),
-          xml(
-            null,
-            """
+                        spec -> spec.path(".mvn/extensions.xml")
+                ),
+                xml(
+                        null,
+                        """
               <gradleEnterprise>
                 <server>
                   <url>https://foo</url>
@@ -229,19 +229,19 @@ class AddDevelocityMavenExtensionTest implements RewriteTest {
                 </buildScan>
               </gradleEnterprise>
               """,
-            spec -> spec.path(".mvn/gradle-enterprise.xml")
-          )
+                        spec -> spec.path(".mvn/gradle-enterprise.xml")
+                )
         );
     }
 
     @Test
     void allDevelocitySettings() {
         rewriteRun(
-          spec -> spec.recipe(new AddDevelocityMavenExtension("1.21", "https://foo", true, true, false, AddDevelocityMavenExtension.PublishCriteria.Failure)),
-          POM_XML_SOURCE_SPEC,
-          xml(
-            null,
-            """
+                spec -> spec.recipe(new AddDevelocityMavenExtension("1.21", "https://foo", true, true, false, AddDevelocityMavenExtension.PublishCriteria.Failure)),
+                POM_XML_SOURCE_SPEC,
+                xml(
+                        null,
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <extensions>
                 <extension>
@@ -251,11 +251,11 @@ class AddDevelocityMavenExtensionTest implements RewriteTest {
                 </extension>
               </extensions>
               """,
-            spec -> spec.path(".mvn/extensions.xml")
-          ),
-          xml(
-            null,
-            """
+                        spec -> spec.path(".mvn/extensions.xml")
+                ),
+                xml(
+                        null,
+                        """
               <develocity>
                 <server>
                   <url>https://foo</url>
@@ -272,8 +272,8 @@ class AddDevelocityMavenExtensionTest implements RewriteTest {
                 </buildScan>
               </develocity>
               """,
-            spec -> spec.path(".mvn/develocity.xml")
-          )
+                        spec -> spec.path(".mvn/develocity.xml")
+                )
         );
     }
 

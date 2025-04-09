@@ -31,16 +31,16 @@ class FindMissingTypesTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new FindMissingTypes())
-          .parser(JavaParser.fromJavaVersion())
-          .typeValidationOptions(TypeValidation.none());
+                .parser(JavaParser.fromJavaVersion())
+                .typeValidationOptions(TypeValidation.none());
     }
 
     @DocumentExample
     @Test
     void missingAnnotationType() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import org.junit.Test;
 
               class ATest {
@@ -48,7 +48,7 @@ class FindMissingTypesTest implements RewriteTest {
                   void foo() {}
               }
               """,
-            """
+                        """
               import org.junit.Test;
 
               class ATest {
@@ -56,81 +56,81 @@ class FindMissingTypesTest implements RewriteTest {
                   void foo() {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void variableDeclaration() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class A {
                   {
                       Foo f;
                   }
               }
               """,
-            """
+                        """
               class A {
                   {
                       /*~~(Identifier type is missing or malformed)~~>*/Foo f;
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void classReference() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class A {
                   {
                       Class<?> c = Unknown.class;
                   }
               }
               """,
-            """
+                        """
               class A {
                   {
                       Class<?> c = /*~~(Identifier type is missing or malformed)~~>*/Unknown.class;
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void methodReference() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.function.Consumer;
 
               class A {
                   Consumer<String> r = System.out::printlns;
               }
               """,
-            """
+                        """
               import java.util.function.Consumer;
 
               class A {
                   Consumer<String> r = /*~~(MemberReference type is missing or malformed)~~>*/System.out::printlns;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void newClass() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import some.org.Unknown;
 
               class A {
@@ -139,7 +139,7 @@ class FindMissingTypesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import some.org.Unknown;
 
               class A {
@@ -148,7 +148,7 @@ class FindMissingTypesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -156,39 +156,39 @@ class FindMissingTypesTest implements RewriteTest {
     @Test
     void missingMethodReturnTypeNoMethodArguments() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
-          java(
-            """
+                spec -> spec.typeValidationOptions(TypeValidation.none()),
+                java(
+                        """
               import java.util.GenClass1;
 
               abstract class Foo1 {
                   public abstract GenClass1 noArg();
               }
               """,
-            """
+                        """
               import java.util.GenClass1;
 
               abstract class Foo1 {
                   /*~~(MethodDeclaration type is missing or malformed)~~>*/public abstract GenClass1 noArg();
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import java.util.GenClass1;
 
               abstract class Foo2 {
                   public abstract GenClass1 withArg(String a);
               }
               """,
-            """
+                        """
               import java.util.GenClass1;
 
               abstract class Foo2 {
                   /*~~(MethodDeclaration type is missing or malformed)~~>*/public abstract GenClass1 withArg(String a);
               }
               """
-          )
+                )
         );
     }
 }

@@ -48,7 +48,7 @@ public class ChangeDependencyClassifier extends Recipe {
      */
     @Option(displayName = "New classifier",
             description = "Classifier to apply to specified Maven dependency. " +
-                          "May be omitted, which indicates that no classifier should be added and any existing scope be removed from the dependency.",
+                    "May be omitted, which indicates that no classifier should be added and any existing scope be removed from the dependency.",
             example = "jar",
             required = false)
     @Nullable

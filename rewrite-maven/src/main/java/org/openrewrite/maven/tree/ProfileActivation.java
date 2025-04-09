@@ -37,7 +37,7 @@ public class ProfileActivation {
     Property property;
 
     public static boolean isActive(@Nullable String id, Iterable<String> activeProfiles,
-                                   @Nullable ProfileActivation activation) {
+            @Nullable ProfileActivation activation) {
         if (id != null) {
             for (String activeProfile : activeProfiles) {
                 if (activeProfile.trim().equals(id)) {
@@ -46,10 +46,10 @@ public class ProfileActivation {
             }
         }
         return activation != null &&
-               (activation.isActive() ||
-                // Active by default is *only* enabled when no other profile is marked active by any other mechanism
-                // So even this check for any other explicit activation is overly broad
-                (Boolean.TRUE.equals(activation.getActiveByDefault()) && !activeProfiles.iterator().hasNext()));
+                (activation.isActive() ||
+                        // Active by default is *only* enabled when no other profile is marked active by any other mechanism
+                        // So even this check for any other explicit activation is overly broad
+                        (Boolean.TRUE.equals(activation.getActiveByDefault()) && !activeProfiles.iterator().hasNext()));
     }
 
     public boolean isActive() {

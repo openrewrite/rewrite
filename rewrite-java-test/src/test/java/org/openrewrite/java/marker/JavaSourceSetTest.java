@@ -45,8 +45,8 @@ class JavaSourceSetTest {
     void shadedJar() {
         JavaSourceSet jss = JavaSourceSet.build("test", JavaParser.dependenciesFromClasspath("hbase-shaded-client"));
         var shaded = jss.getClasspath().stream()
-          .filter(o -> o.getFullyQualifiedName().startsWith("org.apache.hadoop.hbase.CacheEvictionStats"))
-          .findAny();
+                .filter(o -> o.getFullyQualifiedName().startsWith("org.apache.hadoop.hbase.CacheEvictionStats"))
+                .findAny();
         assertThat(shaded).isPresent();
         assertThat(jss.getGavToTypes().get("org.apache.hbase:hbase-shaded-client:2.4.11")).contains(shaded.get());
     }
@@ -54,26 +54,26 @@ class JavaSourceSetTest {
     @Test
     void runtimeClasspath() {
         var jss = JavaSourceSet.build("main", JavaParser.runtimeClasspath()).getClasspath()
-          .stream().filter(it -> it.getFullyQualifiedName().contains("org.openrewrite"))
-          .toList();
+                .stream().filter(it -> it.getFullyQualifiedName().contains("org.openrewrite"))
+                .toList();
         assertThat(jss).isNotEmpty();
     }
 
     @Test
     void gavCoordinateFromGradle() {
         assertThat(gavFromPath(Paths.get("C:/Users/Sam/.gradle/caches/modules-2/files-2.1/org.openrewrite/rewrite-core/8.32.0/64ddcc371f1bf29593b4b27e907757d5554d1a83/rewrite-core-8.32.0.jar")))
-          .isEqualTo("org.openrewrite:rewrite-core:8.32.0");
+                .isEqualTo("org.openrewrite:rewrite-core:8.32.0");
     }
 
     @Test
     void gavCoordinateFromMaven() {
         assertThat(gavFromPath(Paths.get("C:/Users/Sam/.m2/repository/org/openrewrite/rewrite-core/8.32.0/rewrite-core-8.32.0.jar")))
-          .isEqualTo("org.openrewrite:rewrite-core:8.32.0");
+                .isEqualTo("org.openrewrite:rewrite-core:8.32.0");
     }
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/pull/4401")
-    void tolerateWeirdClassNames(){
+    void tolerateWeirdClassNames() {
         assertThat(JavaSourceSet.isDeclarable("fj.data.$")).isFalse();
     }
 }

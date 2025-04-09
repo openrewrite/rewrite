@@ -103,11 +103,11 @@ public class AddProfile extends Recipe {
 
                 }
                 Xml.Tag profileTag = Xml.Tag.build("<profile>\n" +
-                                                   "<id>" + id + "</id>\n" +
-                                                   (activation != null ? activation.trim() + "\n" : "") +
-                                                   (properties != null ? properties.trim() + "\n" : "") +
-                                                   (build != null ? build.trim() + "\n" : "") +
-                                                   "</profile>");
+                        "<id>" + id + "</id>\n" +
+                        (activation != null ? activation.trim() + "\n" : "") +
+                        (properties != null ? properties.trim() + "\n" : "") +
+                        (build != null ? build.trim() + "\n" : "") +
+                        "</profile>");
                 t = (Xml.Tag) new AddToTagVisitor<>(profiles, profileTag).visitNonNull(t, ctx, getCursor().getParentOrThrow());
 
             }

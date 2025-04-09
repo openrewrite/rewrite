@@ -44,13 +44,13 @@ public class ManageDependencies extends ScanningRecipe<Map<GroupArtifactVersion,
 
     @Option(displayName = "Group",
             description = "Group glob expression pattern used to match dependencies that should be managed." +
-                          "Group is the first part of a dependency coordinate `com.google.guava:guava:VERSION`.",
+                    "Group is the first part of a dependency coordinate `com.google.guava:guava:VERSION`.",
             example = "com.google.*")
     String groupPattern;
 
     @Option(displayName = "Artifact",
             description = "Artifact glob expression pattern used to match dependencies that should be managed." +
-                          "Artifact is the second part of a dependency coordinate `com.google.guava:guava:VERSION`.",
+                    "Artifact is the second part of a dependency coordinate `com.google.guava:guava:VERSION`.",
             example = "guava*",
             required = false)
     @Nullable
@@ -64,9 +64,9 @@ public class ManageDependencies extends ScanningRecipe<Map<GroupArtifactVersion,
 
     @Option(displayName = "Skip model updates",
             description = "Optionally skip updating the dependency model after managing dependencies. " +
-                          "Updating the model does not affect the source code of the POM," +
-                          "but will cause the resolved dependency model to reflect the changes made to the POM. " +
-                          "If this recipe is ran standalone, it is not necessary to update the model.",
+                    "Updating the model does not affect the source code of the POM," +
+                    "but will cause the resolved dependency model to reflect the changes made to the POM. " +
+                    "If this recipe is ran standalone, it is not necessary to update the model.",
             required = false)
     @Nullable
     Boolean skipModelUpdate;

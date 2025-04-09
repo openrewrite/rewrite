@@ -30,19 +30,19 @@ class TypeParameterTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-      "boolean",
-      "byte",
-      "char",
-      "int",
-      "long",
-      "float",
-      "double",
+            "boolean",
+            "byte",
+            "char",
+            "int",
+            "long",
+            "float",
+            "double",
 //      "void",
-      "short"
+            "short"
     })
     void primitive(String name) {
         TemplateParameterParser parser = new TemplateParameterParser(new CommonTokenStream(new TemplateParameterLexer(
-          CharStreams.fromString(name))));
+                CharStreams.fromString(name))));
         JavaType type = TypeParameter.toFullyQualifiedName(parser.type());
         assertThat(type).isSameAs(JavaType.Primitive.fromKeyword(name));
         assertThat(TypeUtils.toString(type)).isEqualTo(name);
@@ -50,12 +50,12 @@ class TypeParameterTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-      "Object",
-      "String",
+            "Object",
+            "String",
     })
     void javaLang(String name) {
         TemplateParameterParser parser = new TemplateParameterParser(new CommonTokenStream(new TemplateParameterLexer(
-          CharStreams.fromString(name))));
+                CharStreams.fromString(name))));
         JavaType type = TypeParameter.toFullyQualifiedName(parser.type());
         assertThat(type).isInstanceOf(JavaType.Class.class);
         assertThat(TypeUtils.toString(type)).isEqualTo("java.lang." + name);
@@ -63,11 +63,11 @@ class TypeParameterTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-      "java.util.List",
+            "java.util.List",
     })
     void qualified(String name) {
         TemplateParameterParser parser = new TemplateParameterParser(new CommonTokenStream(new TemplateParameterLexer(
-          CharStreams.fromString(name))));
+                CharStreams.fromString(name))));
         JavaType type = TypeParameter.toFullyQualifiedName(parser.type());
         assertThat(type).isInstanceOf(JavaType.Class.class);
         assertThat(TypeUtils.toString(type)).isEqualTo(name);
@@ -75,46 +75,46 @@ class TypeParameterTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-      "java.util.List<java.lang.String>",
-      "java.util.Map<java.lang.String, java.lang.Integer>",
-      "java.util.List<? extends java.lang.Object>",
-      "java.util.List<? super java.lang.Integer>",
-      "java.util.List<java.util.List<? super java.lang.Integer>>",
+            "java.util.List<java.lang.String>",
+            "java.util.Map<java.lang.String, java.lang.Integer>",
+            "java.util.List<? extends java.lang.Object>",
+            "java.util.List<? super java.lang.Integer>",
+            "java.util.List<java.util.List<? super java.lang.Integer>>",
     })
     void parameterized(String name) {
         TemplateParameterParser parser = new TemplateParameterParser(new CommonTokenStream(new TemplateParameterLexer(
-          CharStreams.fromString(name))));
+                CharStreams.fromString(name))));
         JavaType type = TypeParameter.toFullyQualifiedName(parser.type());
         assertThat(type).isInstanceOf(JavaType.Parameterized.class);
         assertThat(TypeUtils.toString(type)).isEqualTo(name);
     }
 
-	@ParameterizedTest
-	@ValueSource(strings = {
-	  "java.util.List<java.lang.String>",
-	  "java.util.Map<java.lang.String, java.lang.Integer>",
-	  "java.util.List<? extends java.lang.Object>",
-	  "java.util.List<? super java.lang.Integer>",
-	  "java.util.List<java.util.List<? super java.lang.Integer>>",
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "java.util.List<java.lang.String>",
+            "java.util.Map<java.lang.String, java.lang.Integer>",
+            "java.util.List<? extends java.lang.Object>",
+            "java.util.List<? super java.lang.Integer>",
+            "java.util.List<java.util.List<? super java.lang.Integer>>",
 	})
-	void parameterizedWithModifierShouldNeverHideParametrizedType(String name) {
-		TemplateParameterParser parser = new TemplateParameterParser(new CommonTokenStream(new TemplateParameterLexer(
-		  CharStreams.fromString(name))));
-		JavaType type = TypeParameter.toFullyQualifiedName(parser.type());
+    void parameterizedWithModifierShouldNeverHideParametrizedType(String name) {
+        TemplateParameterParser parser = new TemplateParameterParser(new CommonTokenStream(new TemplateParameterLexer(
+                CharStreams.fromString(name))));
+        JavaType type = TypeParameter.toFullyQualifiedName(parser.type());
 
-		JavaType.Parameterized pType = (JavaType.Parameterized) type;
-		assertThat(pType.withFullyQualifiedName("test")).isInstanceOf(JavaType.Parameterized.class);
-		assertThat(pType.withFullyQualifiedName("test")).isNotSameAs(pType);
-		assertThat(pType.withFullyQualifiedName(pType.getFullyQualifiedName())).isSameAs(pType);
-	}
+        JavaType.Parameterized pType = (JavaType.Parameterized) type;
+        assertThat(pType.withFullyQualifiedName("test")).isInstanceOf(JavaType.Parameterized.class);
+        assertThat(pType.withFullyQualifiedName("test")).isNotSameAs(pType);
+        assertThat(pType.withFullyQualifiedName(pType.getFullyQualifiedName())).isSameAs(pType);
+    }
 
     @ParameterizedTest
     @ValueSource(strings = {
-      "java.util.List<?>",
+            "java.util.List<?>",
     })
     void unbounded(String name) {
         TemplateParameterParser parser = new TemplateParameterParser(new CommonTokenStream(new TemplateParameterLexer(
-          CharStreams.fromString(name))));
+                CharStreams.fromString(name))));
         JavaType type = TypeParameter.toFullyQualifiedName(parser.type());
         assertThat(type).isInstanceOf(JavaType.Parameterized.class);
         assertThat(TypeUtils.toString(type)).isEqualTo(name);

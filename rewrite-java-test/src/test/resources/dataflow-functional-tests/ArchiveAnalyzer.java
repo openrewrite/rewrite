@@ -164,6 +164,7 @@ public class ArchiveAnalyzer extends AbstractFileTypeAnalyzer {
     public AnalysisPhase getAnalysisPhase() {
         return ANALYSIS_PHASE;
     }
+
     //</editor-fold>
 
     /**
@@ -211,7 +212,7 @@ public class ArchiveAnalyzer extends AbstractFileTypeAnalyzer {
                 final String[] l = tempFileLocation.list();
                 if (l != null && l.length > 0) {
                     LOGGER.warn("Failed to delete the Archive Analyzer's temporary files from `{}`, " +
-                                "see the log for more details", tempFileLocation.toString());
+                            "see the log for more details", tempFileLocation.toString());
                 }
             }
         }
@@ -512,13 +513,13 @@ public class ArchiveAnalyzer extends AbstractFileTypeAnalyzer {
             final byte[] b = new byte[7];
             final int read = in.read(b);
             if (read == 7 &&
-                b[0] == '#' &&
-                b[1] == '!' &&
-                b[2] == '/' &&
-                b[3] == 'b' &&
-                b[4] == 'i' &&
-                b[5] == 'n' &&
-                b[6] == '/') {
+                    b[0] == '#' &&
+                    b[1] == '!' &&
+                    b[2] == '/' &&
+                    b[3] == 'b' &&
+                    b[4] == 'i' &&
+                    b[5] == 'n' &&
+                    b[6] == '/') {
                 boolean stillLooking = true;
                 int chr;
                 int nxtChr;
@@ -647,7 +648,7 @@ public class ArchiveAnalyzer extends AbstractFileTypeAnalyzer {
         try {
             zip = new ZipFile(dependency.getActualFilePath());
             if (zip.getEntry("META-INF/MANIFEST.MF") != null ||
-                zip.getEntry("META-INF/maven") != null) {
+                    zip.getEntry("META-INF/maven") != null) {
                 final Enumeration<ZipArchiveEntry> entries = zip.getEntries();
                 while (entries.hasMoreElements()) {
                     final ZipArchiveEntry entry = entries.nextElement();

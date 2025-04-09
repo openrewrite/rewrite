@@ -27,23 +27,23 @@ class ChangeTagNameTest implements RewriteTest {
     @Test
     void renamesWhitelistToAllowlist() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeTagName("/virtual-patches/enhanced-virtual-patch/whitelist-pattern", "allowlist-pattern")),
-          xml(
-            """
+                spec -> spec.recipe(new ChangeTagName("/virtual-patches/enhanced-virtual-patch/whitelist-pattern", "allowlist-pattern")),
+                xml(
+                        """
               <virtual-patches>
                   <enhanced-virtual-patch id="evp-name" path="/[request-path]" variable="request.parameters.[paramName]" message="alphabet validation failed" enableAntisamy="false">
                       <whitelist-pattern>^[a-zA-Z]+${'$'}</whitelist-pattern>
                   </enhanced-virtual-patch>
               </virtual-patches>
               """,
-            """
+                        """
               <virtual-patches>
                   <enhanced-virtual-patch id="evp-name" path="/[request-path]" variable="request.parameters.[paramName]" message="alphabet validation failed" enableAntisamy="false">
                       <allowlist-pattern>^[a-zA-Z]+${'$'}</allowlist-pattern>
                   </enhanced-virtual-patch>
               </virtual-patches>
               """
-          )
+                )
         );
     }
 }

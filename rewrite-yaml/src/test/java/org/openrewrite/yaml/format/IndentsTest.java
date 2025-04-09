@@ -31,9 +31,9 @@ class IndentsTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(toRecipe(() -> new IndentsVisitor<>(
-            YamlDefaultStyles.indents(),
-            null
-          )
+                        YamlDefaultStyles.indents(),
+                        null
+                )
         ));
     }
 
@@ -41,14 +41,14 @@ class IndentsTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3531")
     void multilineString() {
         rewriteRun(
-          yaml("""
+                yaml("""
             foo:
               bar: >
                 A multiline string.
               baz:
                 quz: Another string.
             """
-          )
+                )
         );
     }
 
@@ -56,24 +56,24 @@ class IndentsTest implements RewriteTest {
     @Test
     void indentSequence() {
         rewriteRun(
-          yaml("""
+                yaml("""
                   root:
                       - a: 0
                         b: 0
               """,
-            """
+                        """
                   root:
                     - a: 0
                       b: 0
               """
-          )
+                )
         );
     }
 
     @Test
     void indents() {
         rewriteRun(
-          yaml("""
+                yaml("""
                   apiVersion: storage.cnrm.cloud.google.com/v1beta1
                   kind: StorageBucket
                   spec:
@@ -84,7 +84,7 @@ class IndentsTest implements RewriteTest {
                                     condition:
                                       age: 7
               """,
-            """
+                        """
                   apiVersion: storage.cnrm.cloud.google.com/v1beta1
                   kind: StorageBucket
                   spec:
@@ -95,7 +95,7 @@ class IndentsTest implements RewriteTest {
                         condition:
                           age: 7
               """
-          )
+                )
         );
     }
 
@@ -103,7 +103,7 @@ class IndentsTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1135")
     void maintainIndentSpacingOnMixedTypeSequences() {
         rewriteRun(
-          yaml("""
+                yaml("""
                 steps:
                   - checkout
                   - run:
@@ -113,14 +113,14 @@ class IndentsTest implements RewriteTest {
                       name: Run tests
                       command: npm run test:ci
             """
-          )
+                )
         );
     }
 
     @Test
     void indentSequenceComments() {
         rewriteRun(
-          yaml("""
+                yaml("""
               key:
               # a under-indented
                   # a over-indented
@@ -129,7 +129,7 @@ class IndentsTest implements RewriteTest {
                       # b over-indented
                      - b
               """,
-            """
+                        """
               key:
                 # a under-indented
                 # a over-indented
@@ -138,14 +138,14 @@ class IndentsTest implements RewriteTest {
                     # b over-indented
                     - b
               """
-          )
+                )
         );
     }
 
     @Test
     void indentMappingComments() {
         rewriteRun(
-          yaml("""
+                yaml("""
               key: # no change
               # under-indented
                   # over-indented
@@ -156,7 +156,7 @@ class IndentsTest implements RewriteTest {
                     # over-indented
                   b : c
               """,
-            """
+                        """
               key: # no change
                 # under-indented
                 # over-indented
@@ -167,14 +167,14 @@ class IndentsTest implements RewriteTest {
                   # over-indented
                   b : c
               """
-          )
+                )
         );
     }
 
     @Test
     void indentRootComments() {
         rewriteRun(
-          yaml("""
+                yaml("""
                 # over-indented 1
               ---
                 # over-indented 2
@@ -182,7 +182,7 @@ class IndentsTest implements RewriteTest {
                 # over-indented 2
               key2: value2
               """,
-            """
+                        """
               # over-indented 1
               ---
               # over-indented 2
@@ -190,7 +190,7 @@ class IndentsTest implements RewriteTest {
               # over-indented 2
               key2: value2
               """
-          )
+                )
         );
     }
 }

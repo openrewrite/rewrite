@@ -38,47 +38,47 @@ class JavaTemplateContextFreeTest implements RewriteTest {
     @Test
     void replaceMethodBody() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              @Override
-              public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                  return method.getBody() != null && JavaTemplate.matches("System.out.println(1);",
-                    new Cursor(new Cursor(getCursor(), method.getBody()), method.getBody().getStatements().get(0))) ?
-                    JavaTemplate.apply("System.out.println(2);", getCursor(), method.getCoordinates().replaceBody()) :
-                    super.visitMethodDeclaration(method, ctx);
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    @Override
+                    public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                        return method.getBody() != null && JavaTemplate.matches("System.out.println(1);",
+                                new Cursor(new Cursor(getCursor(), method.getBody()), method.getBody().getStatements().get(0))) ?
+                                JavaTemplate.apply("System.out.println(2);", getCursor(), method.getCoordinates().replaceBody()) :
+                                super.visitMethodDeclaration(method, ctx);
+                    }
+                })),
+                java(
+                        """
               class Test {
                   void m() {
                       System.out.println(1);
                   }
               }
               """,
-            """
+                        """
               class Test {
                   void m() {
                       System.out.println(2);
                   }
               }
               """
-          ));
+                ));
     }
 
     @Test
     void replaceField() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              @Override
-              public J visitVariableDeclarations(J.VariableDeclarations vd, ExecutionContext ctx) {
-                  if (vd.getVariables().size() == 1 && vd.getVariables().get(0).getSimpleName().equals("i")) {
-                      return JavaTemplate.apply("Integer i = 2;", getCursor(), vd.getCoordinates().replace());
-                  }
-                  return super.visitVariableDeclarations(vd, ctx);
-              }
-          }).withMaxCycles(1)),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    @Override
+                    public J visitVariableDeclarations(J.VariableDeclarations vd, ExecutionContext ctx) {
+                        if (vd.getVariables().size() == 1 && vd.getVariables().get(0).getSimpleName().equals("i")) {
+                            return JavaTemplate.apply("Integer i = 2;", getCursor(), vd.getCoordinates().replace());
+                        }
+                        return super.visitVariableDeclarations(vd, ctx);
+                    }
+                }).withMaxCycles(1)),
+                java(
+                        """
               class Test {
                   private Integer i = 1;
                   void m() {
@@ -89,7 +89,7 @@ class JavaTemplateContextFreeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   Integer i = 2;
                   void m() {
@@ -100,25 +100,25 @@ class JavaTemplateContextFreeTest implements RewriteTest {
                   }
               }
               """
-          ));
+                ));
     }
 
     @SuppressWarnings("UnusedAssignment")
     @Test
     void genericsAndAnyParameters() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              @Override
-              public J visitLiteral(J.Literal literal, ExecutionContext executionContext) {
-                  if (literal.getMarkers().findFirst(SearchResult.class).isEmpty() &&
-                      (Objects.equals(literal.getValue(), 1) || Objects.requireNonNull(literal.getValue()).equals("s"))) {
-                      return JavaTemplate.apply("java.util.List.of(#{any()})", getCursor(), literal.getCoordinates().replace(), SearchResult.found(literal));
-                  }
-                  return super.visitLiteral(literal, executionContext);
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    @Override
+                    public J visitLiteral(J.Literal literal, ExecutionContext executionContext) {
+                        if (literal.getMarkers().findFirst(SearchResult.class).isEmpty() &&
+                                (Objects.equals(literal.getValue(), 1) || Objects.requireNonNull(literal.getValue()).equals("s"))) {
+                            return JavaTemplate.apply("java.util.List.of(#{any()})", getCursor(), literal.getCoordinates().replace(), SearchResult.found(literal));
+                        }
+                        return super.visitLiteral(literal, executionContext);
+                    }
+                })),
+                java(
+                        """
               class Test {
                   void m() {
                       Object o;
@@ -129,7 +129,7 @@ class JavaTemplateContextFreeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   void m() {
                       Object o;
@@ -140,23 +140,23 @@ class JavaTemplateContextFreeTest implements RewriteTest {
                   }
               }
               """,
-            sourceSpecs -> sourceSpecs.afterRecipe(cu -> new JavaIsoVisitor<>() {
-                @SuppressWarnings("DataFlowIssue")
-                @Override
-                public <M extends Marker> M visitMarker(Marker marker, Object o) {
-                    if (marker instanceof SearchResult) {
-                        J.Literal literal = getCursor().getValue();
-                        Expression parent = getCursor().getParentTreeCursor().getValue();
-                        if (literal.getType() == JavaType.Primitive.Int) {
-                            assertThat(parent.getType().toString()).isEqualTo("java.util.List<java.lang.Integer>");
-                        } else if (literal.getType() == JavaType.Primitive.String) {
-                            assertThat(parent.getType().toString()).isEqualTo("java.util.List<java.lang.String>");
-                        }
-                    }
-                    return super.visitMarker(marker, o);
-                }
-            }.visit(cu, 0))
-          ));
+                        sourceSpecs -> sourceSpecs.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                            @SuppressWarnings("DataFlowIssue")
+                            @Override
+                            public <M extends Marker> M visitMarker(Marker marker, Object o) {
+                                if (marker instanceof SearchResult) {
+                                    J.Literal literal = getCursor().getValue();
+                                    Expression parent = getCursor().getParentTreeCursor().getValue();
+                                    if (literal.getType() == JavaType.Primitive.Int) {
+                                        assertThat(parent.getType().toString()).isEqualTo("java.util.List<java.lang.Integer>");
+                                    } else if (literal.getType() == JavaType.Primitive.String) {
+                                        assertThat(parent.getType().toString()).isEqualTo("java.util.List<java.lang.String>");
+                                    }
+                                }
+                                return super.visitMarker(marker, o);
+                            }
+                        }.visit(cu, 0))
+                ));
     }
 
 }

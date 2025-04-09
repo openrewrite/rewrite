@@ -73,7 +73,7 @@ public class ReflectionUtils {
                 declaredMethodsCache.put(clazz, (result.length == 0 ? EMPTY_METHOD_ARRAY : result));
             } catch (Throwable ex) {
                 throw new IllegalStateException("Failed to introspect Class [" + clazz.getName() +
-                                                "] from ClassLoader [" + clazz.getClassLoader() + "]", ex);
+                        "] from ClassLoader [" + clazz.getClassLoader() + "]", ex);
             }
         }
         return result;

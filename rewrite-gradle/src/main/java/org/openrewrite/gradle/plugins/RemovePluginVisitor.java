@@ -102,14 +102,14 @@ public class RemovePluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
                 //noinspection DataFlowIssue
                 return null;
             }
-        } else if(applyPluginMatcher.matches(m)) {
+        } else if (applyPluginMatcher.matches(m)) {
             for (Expression arg : m.getArguments()) {
-                if(arg instanceof G.MapEntry) {
+                if (arg instanceof G.MapEntry) {
                     G.MapEntry me = (G.MapEntry) arg;
-                    if(me.getKey() instanceof J.Literal && me.getValue() instanceof J.Literal) {
+                    if (me.getKey() instanceof J.Literal && me.getValue() instanceof J.Literal) {
                         J.Literal pluginLiteral = (J.Literal) me.getKey();
                         J.Literal pluginIdLiteral = (J.Literal) me.getValue();
-                        if("plugin".equals(pluginLiteral.getValue()) && pluginId.equals(pluginIdLiteral.getValue())) {
+                        if ("plugin".equals(pluginLiteral.getValue()) && pluginId.equals(pluginIdLiteral.getValue())) {
                             //noinspection DataFlowIssue
                             return null;
                         }

@@ -26,25 +26,25 @@ class FindFieldsTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new FindFields("java.nio.charset.StandardCharsets", null,"UTF_8"));
+        spec.recipe(new FindFields("java.nio.charset.StandardCharsets", null, "UTF_8"));
     }
 
     @Test
     void fieldMatch() {
         rewriteRun(
-          spec -> spec.recipe(new FindFields("java.nio..*", true, "*")),
-          java(
-            """
+                spec -> spec.recipe(new FindFields("java.nio..*", true, "*")),
+                java(
+                        """
               class Test {
                   Object o = java.nio.charset.StandardCharsets.UTF_8;
               }
               """,
-            """
+                        """
               class Test {
                   Object o = /*~~>*/java.nio.charset.StandardCharsets.UTF_8;
               }
               """
-          )
+                )
         );
     }
 
@@ -52,58 +52,58 @@ class FindFieldsTest implements RewriteTest {
     @Test
     void findFullyQualifiedFields() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   Object o = java.nio.charset.StandardCharsets.UTF_8;
               }
               """,
-            """
+                        """
               class Test {
                   Object o = /*~~>*/java.nio.charset.StandardCharsets.UTF_8;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void findImported() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.nio.charset.StandardCharsets;
               class Test {
                   Object o = StandardCharsets.UTF_8;
               }
               """,
-            """
+                        """
               import java.nio.charset.StandardCharsets;
               class Test {
                   Object o = /*~~>*/StandardCharsets.UTF_8;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void findStaticallyImported() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import static java.nio.charset.StandardCharsets.*;
               class Test {
                   Object o = UTF_8;
               }
               """,
-            """
+                        """
               import static java.nio.charset.StandardCharsets.*;
               class Test {
                   Object o = /*~~>*/UTF_8;
               }
               """
-          )
+                )
         );
     }
 }

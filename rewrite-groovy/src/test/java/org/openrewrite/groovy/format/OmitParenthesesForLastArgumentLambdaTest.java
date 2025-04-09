@@ -25,7 +25,7 @@ import static org.openrewrite.groovy.Assertions.groovy;
 
 class OmitParenthesesForLastArgumentLambdaTest implements RewriteTest {
     final SourceSpecs closureApi = groovy(
-      """
+            """
         class Test {
           static void test(Closure closure) {
           }
@@ -42,11 +42,11 @@ class OmitParenthesesForLastArgumentLambdaTest implements RewriteTest {
     @Test
     void lastClosureArgument() {
         rewriteRun(
-          closureApi,
-          groovy(
-            "Test.test({ it })",
-            "Test.test { it }"
-          )
+                closureApi,
+                groovy(
+                        "Test.test({ it })",
+                        "Test.test { it }"
+                )
         );
     }
 }

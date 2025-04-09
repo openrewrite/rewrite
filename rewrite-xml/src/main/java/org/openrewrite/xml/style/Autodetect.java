@@ -55,7 +55,7 @@ public class Autodetect extends NamedStyles {
         private final FindLineFormatJavaVisitor findLineFormatJavaVisitor = new FindLineFormatJavaVisitor();
 
         public void sample(SourceFile xml) {
-            if(xml instanceof Xml.Document) {
+            if (xml instanceof Xml.Document) {
                 findIndentXmlVisitor.visit(xml, indentStatistics);
                 findLineFormatJavaVisitor.visit(xml, generalFormatStatistics);
             }
@@ -171,11 +171,11 @@ public class Autodetect extends NamedStyles {
         private void measureFrequencies(String prefix, IndentFrequencies frequencies) {
             AtomicBoolean takeWhile = new AtomicBoolean(true);
             if (prefix.chars()
-                        .filter(c -> {
-                            takeWhile.set(takeWhile.get() && (c == '\n' || c == '\r'));
-                            return takeWhile.get();
-                        })
-                        .count() > 0) {
+                    .filter(c -> {
+                        takeWhile.set(takeWhile.get() && (c == '\n' || c == '\r'));
+                        return takeWhile.get();
+                    })
+                    .count() > 0) {
                 int tabIndent = 0;
                 int spaceIndent = 0;
                 boolean mixed = false;

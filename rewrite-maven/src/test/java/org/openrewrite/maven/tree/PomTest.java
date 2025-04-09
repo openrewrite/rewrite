@@ -24,14 +24,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class PomTest {
 
     @ParameterizedTest
-    @ValueSource(strings={"jar", "bundle"})
+    @ValueSource(strings = {"jar", "bundle"})
     void hasJarPackagingWithJarPackagingTypes(String type) {
         Pom pom = Pom.builder().packaging(type).build();
         assertThat(pom.hasJarPackaging()).isTrue();
     }
 
     @ParameterizedTest
-    @ValueSource(strings={"pom", "ejb"})
+    @ValueSource(strings = {"pom", "ejb"})
     void hasJarPackagingWithNonJarPackagingTypes(String type) {
         Pom pom = Pom.builder().packaging(type).build();
         assertThat(pom.hasJarPackaging()).isFalse();

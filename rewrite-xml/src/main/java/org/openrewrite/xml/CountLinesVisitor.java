@@ -30,7 +30,7 @@ public class CountLinesVisitor extends XmlVisitor<AtomicInteger> {
 
     @Override
     public Xml visitXmlDecl(Xml.XmlDecl xmlDecl, AtomicInteger count) {
-        if(xmlDecl.getPrefix().contains("\n")) {
+        if (xmlDecl.getPrefix().contains("\n")) {
             count.incrementAndGet();
         }
         return super.visitXmlDecl(xmlDecl, count);
@@ -38,7 +38,7 @@ public class CountLinesVisitor extends XmlVisitor<AtomicInteger> {
 
     @Override
     public Xml visitProcessingInstruction(Xml.ProcessingInstruction processingInstruction, AtomicInteger count) {
-        if(processingInstruction.getPrefix().contains("\n")) {
+        if (processingInstruction.getPrefix().contains("\n")) {
             count.incrementAndGet();
         }
         return super.visitProcessingInstruction(processingInstruction, count);
@@ -47,7 +47,7 @@ public class CountLinesVisitor extends XmlVisitor<AtomicInteger> {
 
     @Override
     public Xml visitElement(Xml.Element element, AtomicInteger count) {
-        if(element.getPrefix().contains("\n")) {
+        if (element.getPrefix().contains("\n")) {
             count.incrementAndGet();
         }
         return super.visitElement(element, count);
@@ -55,7 +55,7 @@ public class CountLinesVisitor extends XmlVisitor<AtomicInteger> {
 
     @Override
     public Xml visitAttribute(Xml.Attribute attribute, AtomicInteger count) {
-        if(attribute.getPrefix().contains("\n")) {
+        if (attribute.getPrefix().contains("\n")) {
             count.incrementAndGet();
         }
         return super.visitAttribute(attribute, count);
@@ -63,7 +63,7 @@ public class CountLinesVisitor extends XmlVisitor<AtomicInteger> {
 
     @Override
     public Xml visitTag(Xml.Tag tag, AtomicInteger count) {
-        if(tag.getPrefix().contains("\n")) {
+        if (tag.getPrefix().contains("\n")) {
             count.incrementAndGet();
         }
 
@@ -81,7 +81,7 @@ public class CountLinesVisitor extends XmlVisitor<AtomicInteger> {
 
     @Override
     public Xml visitComment(Xml.Comment comment, AtomicInteger count) {
-        if(comment.getPrefix().contains("\n")) {
+        if (comment.getPrefix().contains("\n")) {
             count.incrementAndGet();
         }
         return super.visitComment(comment, count);
@@ -89,7 +89,7 @@ public class CountLinesVisitor extends XmlVisitor<AtomicInteger> {
 
     @Override
     public Xml visitDocTypeDecl(Xml.DocTypeDecl docTypeDecl, AtomicInteger count) {
-        if(docTypeDecl.getPrefix().contains("\n")) {
+        if (docTypeDecl.getPrefix().contains("\n")) {
             count.incrementAndGet();
         }
         return super.visitDocTypeDecl(docTypeDecl, count);
@@ -97,7 +97,7 @@ public class CountLinesVisitor extends XmlVisitor<AtomicInteger> {
 
     @Override
     public Xml visitProlog(Xml.Prolog prolog, AtomicInteger count) {
-        if(prolog.getPrefix().contains("\n")) {
+        if (prolog.getPrefix().contains("\n")) {
             count.incrementAndGet();
         }
         return super.visitProlog(prolog, count);
@@ -105,7 +105,7 @@ public class CountLinesVisitor extends XmlVisitor<AtomicInteger> {
 
     @Override
     public Xml visitIdent(Xml.Ident ident, AtomicInteger count) {
-        if(ident.getPrefix().contains("\n")) {
+        if (ident.getPrefix().contains("\n")) {
             count.incrementAndGet();
         }
         return super.visitIdent(ident, count);

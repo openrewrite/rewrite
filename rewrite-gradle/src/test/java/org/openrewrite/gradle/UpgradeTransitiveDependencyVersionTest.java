@@ -31,17 +31,17 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec
-          .beforeRecipe(withToolingApi())
-          .recipe(new UpgradeTransitiveDependencyVersion(
-            "com.fasterxml*", "jackson-core", "2.12.5", null, "CVE-2024-BAD", null));
+                .beforeRecipe(withToolingApi())
+                .recipe(new UpgradeTransitiveDependencyVersion(
+                        "com.fasterxml*", "jackson-core", "2.12.5", null, "CVE-2024-BAD", null));
     }
 
     @DocumentExample
     @Test
     void addConstraint() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                 id 'java'
               }
@@ -51,7 +51,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """,
-            """
+                        """
               plugins {
                 id 'java'
               }
@@ -67,15 +67,15 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void customConfiguration() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                 id 'java'
               }
@@ -86,7 +86,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   foo 'org.openrewrite:rewrite-java:7.0.0'
               }
               """,
-            """
+                        """
               plugins {
                 id 'java'
               }
@@ -103,15 +103,15 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   foo 'org.openrewrite:rewrite-java:7.0.0'
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void customNonTransitiveConfigurationCannotAddConstraint() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                 id 'java'
               }
@@ -126,15 +126,15 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   foo 'org.openrewrite:rewrite-java:7.0.0'
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void addConstraintAddsSameArtifactsInSameConfigurationAsSingleConstraint() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                 id 'java'
               }
@@ -145,7 +145,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.8.9'
               }
               """,
-            """
+                        """
               plugins {
                 id 'java'
               }
@@ -162,15 +162,15 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.8.9'
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void addConstraintAddsSameArtifactsInDifferentConfigurationAsSingleConstraint() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                 id 'java'
               }
@@ -181,7 +181,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   runtimeOnly 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.8.9'
               }
               """,
-            """
+                        """
               plugins {
                 id 'java'
               }
@@ -198,15 +198,15 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   runtimeOnly 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.8.9'
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void addConstraintAddsUnrelatedConfigurationsForSameArtifact() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                 id 'java'
                 id 'ear'
@@ -219,7 +219,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   earlib 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.8.9'
               }
               """,
-            """
+                        """
               plugins {
                 id 'java'
                 id 'ear'
@@ -241,15 +241,15 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   earlib 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.8.9'
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void updateConstraint() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins { id 'java' }
               repositories { mavenCentral() }
               
@@ -263,7 +263,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """,
-            """
+                        """
               plugins { id 'java' }
               repositories { mavenCentral() }
               
@@ -277,15 +277,15 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void updateConstraintAddingBecause() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins { id 'java' }
               repositories { mavenCentral() }
               
@@ -299,7 +299,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """,
-            """
+                        """
               plugins { id 'java' }
               repositories { mavenCentral() }
               
@@ -315,15 +315,15 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void addConstraintToExistingConstraintsBlock() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins { id 'java' }
               repositories { mavenCentral() }
               
@@ -334,7 +334,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               plugins { id 'java' }
               repositories { mavenCentral() }
               
@@ -348,15 +348,15 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void addConstraintToConfigurationNotExtendingAnything() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins { id 'ear' }
               repositories { mavenCentral() }
               
@@ -367,7 +367,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               plugins { id 'ear' }
               repositories { mavenCentral() }
               
@@ -381,15 +381,15 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void removeOtherVersionConstraint() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins { id 'java' }
               repositories { mavenCentral() }
               
@@ -406,7 +406,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               plugins { id 'java' }
               repositories { mavenCentral() }
               
@@ -420,15 +420,15 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void addConstraintToNonTransitiveExtendingTransitiveConfiguration() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins { id 'ear' }
               repositories { mavenCentral() }
               configurations.earlib.extendsFrom configurations.deploy
@@ -439,7 +439,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               plugins { id 'ear' }
               repositories { mavenCentral() }
               configurations.earlib.extendsFrom configurations.deploy
@@ -453,14 +453,15 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
+
     @Test
     void constraintDoesNotGetAddedToNonTransitiveNonExtendingConfiguration() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins { id 'ear' }
               repositories { mavenCentral() }
               dependencies {
@@ -470,7 +471,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -478,11 +479,11 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/4228")
     void constraintDoesNotGetAddedInsideConstraint() {
         rewriteRun(
-          spec -> spec
-            .recipe(new UpgradeTransitiveDependencyVersion("com.fasterxml.jackson.core", "jackson-core","2.12.5", null, "CVE-2024-BAD", null)),
-          //language=groovy
-          buildGradle(
-            """
+                spec -> spec
+                        .recipe(new UpgradeTransitiveDependencyVersion("com.fasterxml.jackson.core", "jackson-core", "2.12.5", null, "CVE-2024-BAD", null)),
+                //language=groovy
+                buildGradle(
+                        """
               plugins {
                   id 'java'
               }
@@ -524,18 +525,18 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void includedConfigurationsReceiveOnlyConfiguredConstraints() {
         rewriteRun(
-          spec -> spec
-            .recipe(new UpgradeTransitiveDependencyVersion(
-              "org.apache.commons", "commons-lang3", "3.14.0", null, null, List.of("pitest"))),
-          buildGradle(
-            """
+                spec -> spec
+                        .recipe(new UpgradeTransitiveDependencyVersion(
+                                "org.apache.commons", "commons-lang3", "3.14.0", null, null, List.of("pitest"))),
+                buildGradle(
+                        """
               plugins {
                   id 'info.solidsoft.pitest' version '1.15.0'
                   id 'java'
@@ -558,18 +559,18 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   testImplementation 'org.apache.activemq:artemis-jakarta-server:2.28.0'
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void noIncludedConfigurationsReceiveAllConstraints() {
         rewriteRun(
-          spec -> spec
-            .recipe(new UpgradeTransitiveDependencyVersion(
-              "org.apache.commons", "commons-lang3", "3.14.0", null, null, null)),
-          buildGradle(
-            """
+                spec -> spec
+                        .recipe(new UpgradeTransitiveDependencyVersion(
+                                "org.apache.commons", "commons-lang3", "3.14.0", null, null, null)),
+                buildGradle(
+                        """
               plugins {
                   id 'info.solidsoft.pitest' version '1.15.0'
                   id 'java'
@@ -593,7 +594,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   testImplementation 'org.apache.activemq:artemis-jakarta-server:2.28.0'
               }
               """
-          )
+                )
         );
     }
 
@@ -601,11 +602,11 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     @DocumentExample
     void IncludedDefaultConfigurationsReceiveRuntimeConstraints() {
         rewriteRun(
-          spec -> spec
-            .recipe(new UpgradeTransitiveDependencyVersion(
-              "org.apache.commons", "commons-lang3", "3.14.0", null, null, List.of("implementation", "runtimeOnly"))),
-          buildGradle(
-            """
+                spec -> spec
+                        .recipe(new UpgradeTransitiveDependencyVersion(
+                                "org.apache.commons", "commons-lang3", "3.14.0", null, null, List.of("implementation", "runtimeOnly"))),
+                buildGradle(
+                        """
               plugins {
                   id 'info.solidsoft.pitest' version '1.15.0'
                   id 'java'
@@ -628,15 +629,15 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   compileOnly 'org.apache.activemq:artemis-jakarta-server:2.28.0'
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void useResolutionStrategyWhenSpringDependencyManagementPluginIsPresent() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id 'java'
                   id 'io.spring.dependency-management' version '1.1.5'
@@ -648,7 +649,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """,
-            """
+                        """
               plugins {
                   id 'java'
                   id 'io.spring.dependency-management' version '1.1.5'
@@ -668,7 +669,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """
-          )
+                )
         );
     }
 }

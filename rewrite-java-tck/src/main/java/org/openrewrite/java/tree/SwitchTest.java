@@ -27,8 +27,8 @@ class SwitchTest implements RewriteTest {
     @Test
     void singleCase() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                  void test() {
                      int n;
@@ -38,7 +38,7 @@ class SwitchTest implements RewriteTest {
                  }
               }
               """
-          )
+                )
         );
     }
 
@@ -46,8 +46,8 @@ class SwitchTest implements RewriteTest {
     @Test
     void defaultCase() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                  void test() {
                      int n;
@@ -57,15 +57,15 @@ class SwitchTest implements RewriteTest {
                  }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void noCases() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                  void test() {
                      int n;
@@ -73,7 +73,7 @@ class SwitchTest implements RewriteTest {
                  }
               }
               """
-          )
+                )
         );
     }
 
@@ -81,8 +81,8 @@ class SwitchTest implements RewriteTest {
     @Test
     void multipleCases() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                  void test() {
                      int n;
@@ -97,7 +97,7 @@ class SwitchTest implements RewriteTest {
                  }
               }
               """
-          )
+                )
         );
     }
 }

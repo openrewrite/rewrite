@@ -49,11 +49,11 @@ public class GitRemote {
         }
         GitRemote gitRemote = (GitRemote) o;
         return service == gitRemote.service &&
-               StringUtils.equalsIgnoreCase(url, gitRemote.url) &&
-               StringUtils.equalsIgnoreCase(origin, gitRemote.origin) &&
-               StringUtils.equalsIgnoreCase(path, gitRemote.path) &&
-               StringUtils.equalsIgnoreCase(organization, gitRemote.organization) &&
-               StringUtils.equalsIgnoreCase(repositoryName, gitRemote.repositoryName);
+                StringUtils.equalsIgnoreCase(url, gitRemote.url) &&
+                StringUtils.equalsIgnoreCase(origin, gitRemote.origin) &&
+                StringUtils.equalsIgnoreCase(path, gitRemote.path) &&
+                StringUtils.equalsIgnoreCase(organization, gitRemote.organization) &&
+                StringUtils.equalsIgnoreCase(repositoryName, gitRemote.repositoryName);
     }
 
     @Override
@@ -139,8 +139,8 @@ public class GitRemote {
             } else {
                 selectedBaseUrl = servers.stream()
                         .filter(server -> server.allOrigins()
-                                .stream()
-                                .anyMatch(o -> o.equalsIgnoreCase(stripProtocol(origin)))
+                                        .stream()
+                                        .anyMatch(o -> o.equalsIgnoreCase(stripProtocol(origin)))
                         )
                         .flatMap(server -> server.getUris().stream())
                         .filter(uri -> Parser.normalize(uri).getScheme().equals(protocol))
@@ -291,8 +291,8 @@ public class GitRemote {
             String contextPath = origin.getPath();
             String path = normalizedUri.getPath();
             if (!normalizedUri.getHost().equalsIgnoreCase(origin.getHost()) ||
-                normalizedUri.getPort() != origin.getPort() ||
-                !path.toLowerCase(Locale.ENGLISH).startsWith(contextPath.toLowerCase(Locale.ENGLISH))) {
+                    normalizedUri.getPort() != origin.getPort() ||
+                    !path.toLowerCase(Locale.ENGLISH).startsWith(contextPath.toLowerCase(Locale.ENGLISH))) {
                 throw new IllegalArgumentException("Origin: " + origin + " does not match the clone url: " + uri);
             }
             return path.substring(contextPath.length())
@@ -361,9 +361,9 @@ public class GitRemote {
 
         private static boolean isDefaultPort(int port, String scheme) {
             return port < 1 ||
-                   ("https".equals(scheme) && port == 443) ||
-                   ("http".equals(scheme) && port == 80) ||
-                   ("ssh".equals(scheme) && port == 22);
+                    ("https".equals(scheme) && port == 443) ||
+                    ("http".equals(scheme) && port == 80) ||
+                    ("ssh".equals(scheme) && port == 22);
         }
     }
 

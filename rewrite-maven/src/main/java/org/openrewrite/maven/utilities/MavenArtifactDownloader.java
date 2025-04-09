@@ -62,15 +62,15 @@ public class MavenArtifactDownloader {
 
 
     public MavenArtifactDownloader(MavenArtifactCache mavenArtifactCache,
-                                   @Nullable MavenSettings settings,
-                                   Consumer<Throwable> onError) {
+            @Nullable MavenSettings settings,
+            Consumer<Throwable> onError) {
         this(mavenArtifactCache, settings, new HttpUrlConnectionSender(), onError);
     }
 
     public MavenArtifactDownloader(MavenArtifactCache mavenArtifactCache,
-                                   @Nullable MavenSettings settings,
-                                   HttpSender httpSender,
-                                   Consumer<Throwable> onError) {
+            @Nullable MavenSettings settings,
+            HttpSender httpSender,
+            Consumer<Throwable> onError) {
         this.httpSender = httpSender;
         this.mavenArtifactCache = mavenArtifactCache;
         this.onError = onError;
@@ -94,11 +94,11 @@ public class MavenArtifactDownloader {
             String baseUri = requireNonNull(dependency.getRepository(),
                     String.format("Repository for dependency '%s' was null.", dependency)).getUri();
             String path = dependency.getGroupId().replace('.', '/') + '/' +
-                          dependency.getArtifactId() + '/' +
-                          dependency.getVersion() + '/' +
-                          dependency.getArtifactId() + '-' +
-                          (dependency.getDatedSnapshotVersion() == null ? dependency.getVersion() : dependency.getDatedSnapshotVersion()) +
-                          ".jar";
+                    dependency.getArtifactId() + '/' +
+                    dependency.getVersion() + '/' +
+                    dependency.getArtifactId() + '-' +
+                    (dependency.getDatedSnapshotVersion() == null ? dependency.getVersion() : dependency.getDatedSnapshotVersion()) +
+                    ".jar";
             String uri = baseUri + (baseUri.endsWith("/") ? "" : "/") + path;
 
             InputStream bodyStream;
@@ -113,7 +113,7 @@ public class MavenArtifactDownloader {
                      InputStream body = response.getBody()) {
                     if (!response.isSuccessful() || body == null) {
                         onError.accept(new MavenDownloadingException(String.format("Unable to download dependency %s:%s:%s from %s. Response was %d",
-                                dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), uri, response.getCode()), null,
+                                        dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), uri, response.getCode()), null,
                                 dependency.getRequested().getGav()));
                         return null;
                     }

@@ -42,8 +42,8 @@ public class FindImplementations extends Recipe {
     @Override
     public String getDescription() {
         return "Find class declarations which implement the specified type. " +
-               "If the specified type is a class, its subclasses will be matched. " +
-               "If the specified type is an interface, classes which implement it will be matched.";
+                "If the specified type is a class, its subclasses will be matched. " +
+                "If the specified type is an interface, classes which implement it will be matched.";
     }
 
     @Override
@@ -51,7 +51,7 @@ public class FindImplementations extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl,
-                                                            ExecutionContext ctx) {
+                    ExecutionContext ctx) {
                 J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, ctx);
                 if (TypeUtils.isAssignableTo(typeName, cd.getType()) && !TypeUtils.isOfClassType(cd.getType(), typeName)) {
                     cd = SearchResult.found(cd);

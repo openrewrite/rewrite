@@ -145,8 +145,8 @@ public class MavenDependency implements Trait<Xml.Tag> {
 
                 // `XPathMatcher` is still a bit expensive
                 if (!"dependency".equals(tag.getName()) ||
-                    (!DEPENDENCY_MATCHER.matches(cursor) &&
-                     !PROFILE_DEPENDENCY_MATCHER.matches(cursor))) {
+                        (!DEPENDENCY_MATCHER.matches(cursor) &&
+                                !PROFILE_DEPENDENCY_MATCHER.matches(cursor))) {
                     return null;
                 }
 
@@ -155,7 +155,7 @@ public class MavenDependency implements Trait<Xml.Tag> {
                     if (dependencies.containsKey(scope)) {
                         for (ResolvedDependency resolvedDependency : dependencies.get(scope)) {
                             if ((groupId == null || matchesGlob(resolvedDependency.getGroupId(), groupId)) &&
-                                (artifactId == null || matchesGlob(resolvedDependency.getArtifactId(), artifactId))) {
+                                    (artifactId == null || matchesGlob(resolvedDependency.getArtifactId(), artifactId))) {
                                 String scopeName = tag.getChildValue("scope").orElse(null);
                                 Scope tagScope = scopeName != null ? Scope.fromName(scopeName) : null;
                                 if (tagScope == null && artifactId != null) {
@@ -172,8 +172,8 @@ public class MavenDependency implements Trait<Xml.Tag> {
                                 Dependency req = resolvedDependency.getRequested();
                                 String reqGroup = req.getGroupId();
                                 if ((reqGroup == null || reqGroup.equals(tag.getChildValue("groupId").orElse(null))) &&
-                                    req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
-                                    scope == tagScope) {
+                                        req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
+                                        scope == tagScope) {
                                     return new MavenDependency(cursor, resolvedDependency);
                                 }
                             }

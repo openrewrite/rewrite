@@ -36,8 +36,8 @@ class FindRepositoryOrderTest implements RewriteTest {
     void findRepositoryOrder() {
         var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
         ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
-          //language=xml
-          """
+                //language=xml
+                """
             <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                 xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
@@ -63,16 +63,16 @@ class FindRepositoryOrderTest implements RewriteTest {
         ), ctx));
 
         rewriteRun(
-          spec -> spec
-            .recipe(new FindRepositoryOrder())
-            .executionContext(ctx)
-            .dataTable(MavenRepositoryOrder.Row.class, failures ->
-              assertThat(failures.stream().map(MavenRepositoryOrder.Row::getUri).distinct())
-                .containsExactlyInAnyOrder(
-                  "https://myrepo.maven.com/repo",
-                  "https://repo.spring.io/milestone")),
-          pomXml(
-            """
+                spec -> spec
+                        .recipe(new FindRepositoryOrder())
+                        .executionContext(ctx)
+                        .dataTable(MavenRepositoryOrder.Row.class, failures ->
+                                assertThat(failures.stream().map(MavenRepositoryOrder.Row::getUri).distinct())
+                                        .containsExactlyInAnyOrder(
+                                                "https://myrepo.maven.com/repo",
+                                                "https://repo.spring.io/milestone")),
+                pomXml(
+                        """
               <project>
                 <parent>
                   <groupId>org.springframework.boot</groupId>
@@ -91,7 +91,7 @@ class FindRepositoryOrderTest implements RewriteTest {
                 </repositories>
               </project>
               """,
-            """
+                        """
               <!--~~(https://myrepo.maven.com/repo
               https://repo.spring.io/milestone)~~>--><project>
                 <parent>
@@ -111,7 +111,7 @@ class FindRepositoryOrderTest implements RewriteTest {
                 </repositories>
               </project>
               """
-          )
+                )
         );
     }
 }

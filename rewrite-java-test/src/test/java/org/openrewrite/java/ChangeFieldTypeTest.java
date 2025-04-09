@@ -30,24 +30,24 @@ class ChangeFieldTypeTest implements RewriteTest {
     @Test
     void changeFieldTypeDeclarative() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new ChangeFieldType<>(
-            JavaType.ShallowClass.build("java.util.List"),
-            JavaType.ShallowClass.build("java.util.Collection")))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new ChangeFieldType<>(
+                        JavaType.ShallowClass.build("java.util.List"),
+                        JavaType.ShallowClass.build("java.util.Collection")))),
+                java(
+                        """
               import java.util.List;
               public class A {
                  List collection;
               }
               """,
-            """
+                        """
               import java.util.Collection;
                             
               public class A {
                  Collection collection;
               }
               """
-          )
+                )
         );
     }
 }

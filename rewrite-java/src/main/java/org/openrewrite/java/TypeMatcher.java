@@ -85,8 +85,8 @@ public class TypeMatcher implements Reference.Matcher {
 
     public boolean matchesPackage(String packageName) {
         return targetTypePattern.matcher(packageName).matches() ||
-               targetTypePattern.matcher(packageName.replaceAll("\\.\\*$",
-                       "." + signature.substring(signature.lastIndexOf('.') + 1))).matches();
+                targetTypePattern.matcher(packageName.replaceAll("\\.\\*$",
+                        "." + signature.substring(signature.lastIndexOf('.') + 1))).matches();
     }
 
     public boolean matches(@Nullable JavaType type) {
@@ -99,15 +99,15 @@ public class TypeMatcher implements Reference.Matcher {
 
     private boolean matchesTargetTypeName(String fullyQualifiedTypeName) {
         return this.targetType != null && fullyQualifiedNamesAreEqual(this.targetType, fullyQualifiedTypeName) ||
-               this.targetTypePattern.matcher(fullyQualifiedTypeName).matches();
+                this.targetTypePattern.matcher(fullyQualifiedTypeName).matches();
     }
 
     private static boolean isPlainIdentifier(MethodSignatureParser.TargetTypePatternContext context) {
         return context.BANG() == null &&
-               context.AND() == null &&
-               context.OR() == null &&
-               context.classNameOrInterface().DOTDOT().isEmpty() &&
-               context.classNameOrInterface().WILDCARD().isEmpty();
+                context.AND() == null &&
+                context.OR() == null &&
+                context.classNameOrInterface().DOTDOT().isEmpty() &&
+                context.classNameOrInterface().WILDCARD().isEmpty();
     }
 
     @Override

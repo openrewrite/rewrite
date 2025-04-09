@@ -25,25 +25,25 @@ class ChangeMethodTargetToVariableTest implements RewriteTest {
     @Test
     void explicitStaticToVariable() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodTargetToVariable("b.B foo()", "a", "a.A", null)),
-          java(
-            """ 
+                spec -> spec.recipe(new ChangeMethodTargetToVariable("b.B foo()", "a", "a.A", null)),
+                java(
+                        """ 
               package a;
               public class A {
                  public void foo() {}
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package b;
               public class B {
                  public static void foo() {}
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import a.*;
                             
               import b.B;
@@ -54,7 +54,7 @@ class ChangeMethodTargetToVariableTest implements RewriteTest {
                  }
               }
               """,
-            """
+                        """
               import a.*;
               public class C {
                  A a;
@@ -63,32 +63,32 @@ class ChangeMethodTargetToVariableTest implements RewriteTest {
                  }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void staticImportToVariable() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodTargetToVariable("b.B foo()", "a", "a.A", null)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeMethodTargetToVariable("b.B foo()", "a", "a.A", null)),
+                java(
+                        """
               package a;
               public class A {
                  public void foo() {}
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package b;
               public class B {
                  public static void foo() {}
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import a.*;
               import static b.B.*;
               public class C {
@@ -98,7 +98,7 @@ class ChangeMethodTargetToVariableTest implements RewriteTest {
                  }
               }
               """,
-            """
+                        """
               import a.*;
               public class C {
                  A a;
@@ -107,7 +107,7 @@ class ChangeMethodTargetToVariableTest implements RewriteTest {
                  }
               }
               """
-          )
+                )
         );
     }
 }

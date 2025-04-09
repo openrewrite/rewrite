@@ -34,62 +34,62 @@ class NormalizeLineBreaksTest implements RewriteTest {
 
     private static Consumer<RecipeSpec> normalizeLineBreaks(boolean useCRLF) {
         return spec -> spec.recipe(toRecipe(() -> new NormalizeLineBreaksVisitor<>(
-          new GeneralFormatStyle(useCRLF))));
+                new GeneralFormatStyle(useCRLF))));
     }
 
     @Language("java")
     String windows = "" +
-                     "class Test {\r\n" +
-                     "    // some comment\r\n" +
-                     "    public void test() {\r\n" +
-                     "        System.out.println();\r\n" +
-                     "    }\r\n" +
-                     "}";
+            "class Test {\r\n" +
+            "    // some comment\r\n" +
+            "    public void test() {\r\n" +
+            "        System.out.println();\r\n" +
+            "    }\r\n" +
+            "}";
 
     @Language("java")
     String linux = "" +
-                   "class Test {\n" +
-                   "    // some comment\n" +
-                   "    public void test() {\n" +
-                   "        System.out.println();\n" +
-                   "    }\n" +
-                   "}";
+            "class Test {\n" +
+            "    // some comment\n" +
+            "    public void test() {\n" +
+            "        System.out.println();\n" +
+            "    }\n" +
+            "}";
 
     @Language("java")
     String windowsJavadoc = "" +
-                            "/**\r\n" +
-                            " *\r\n" +
-                            " */\r\n" +
-                            "class Test {\r\n" +
-                            "}";
+            "/**\r\n" +
+            " *\r\n" +
+            " */\r\n" +
+            "class Test {\r\n" +
+            "}";
 
     @Language("java")
     String linuxJavadoc = "" +
-                          "/**\n" +
-                          " *\n" +
-                          " */\n" +
-                          "class Test {\n" +
-                          "}";
+            "/**\n" +
+            " *\n" +
+            " */\n" +
+            "class Test {\n" +
+            "}";
 
     @Test
     void trimKeepCRLF() {
         assertThat(StringUtils.trimIndent("\n  test\r\n  test".replace('\r', '⏎'))
-          .replace('⏎', '\r')).isEqualTo("test\r\ntest");
+                .replace('⏎', '\r')).isEqualTo("test\r\ntest");
     }
 
     @Test
     void windowsToLinux() {
         rewriteRun(
-          normalizeLineBreaks(false),
-          java(windows, linux)
+                normalizeLineBreaks(false),
+                java(windows, linux)
         );
     }
 
     @Test
     void linuxToWindows() {
         rewriteRun(
-          normalizeLineBreaks(true),
-          java(linux, windows)
+                normalizeLineBreaks(true),
+                java(linux, windows)
         );
     }
 
@@ -97,8 +97,8 @@ class NormalizeLineBreaksTest implements RewriteTest {
     @Test
     void doNotChangeWindowsJavadoc() {
         rewriteRun(
-          normalizeLineBreaks(true),
-          java(windowsJavadoc)
+                normalizeLineBreaks(true),
+                java(windowsJavadoc)
         );
     }
 
@@ -106,8 +106,8 @@ class NormalizeLineBreaksTest implements RewriteTest {
     @Test
     void doNotChangeLinuxJavadoc() {
         rewriteRun(
-          normalizeLineBreaks(false),
-          java(linuxJavadoc)
+                normalizeLineBreaks(false),
+                java(linuxJavadoc)
         );
     }
 
@@ -115,8 +115,8 @@ class NormalizeLineBreaksTest implements RewriteTest {
     @Test
     void windowsToLinuxJavadoc() {
         rewriteRun(
-          normalizeLineBreaks(false),
-          java(windowsJavadoc, linuxJavadoc)
+                normalizeLineBreaks(false),
+                java(windowsJavadoc, linuxJavadoc)
         );
     }
 
@@ -124,8 +124,8 @@ class NormalizeLineBreaksTest implements RewriteTest {
     @Test
     void linuxToWindowsJavadoc() {
         rewriteRun(
-          normalizeLineBreaks(true),
-          java(linuxJavadoc, windowsJavadoc)
+                normalizeLineBreaks(true),
+                java(linuxJavadoc, windowsJavadoc)
         );
     }
 
@@ -133,8 +133,8 @@ class NormalizeLineBreaksTest implements RewriteTest {
     @Test
     void preservesExistingWindowsEndingsByDefault() {
         rewriteRun(
-          normalizeLineBreaks(true),
-          java(windows)
+                normalizeLineBreaks(true),
+                java(windows)
         );
     }
 
@@ -142,8 +142,8 @@ class NormalizeLineBreaksTest implements RewriteTest {
     @Test
     void preservesExistingLinuxEndingsByDefault() {
         rewriteRun(
-          normalizeLineBreaks(false),
-          java(linux)
+                normalizeLineBreaks(false),
+                java(linux)
         );
     }
 }

@@ -41,18 +41,18 @@ public class GradleWrapperTest {
     public static void mockGradleServices(Collection<String> gradleVersions, Consumer<MockWebServer> block) {
         try (MockWebServer mockRepo = new MockWebServer()) {
             List<GradleWrapper.GradleVersion> versions = gradleVersions.stream()
-              .map(version -> {
-                  String urlPrefix = "http://%s:%d/distributions/gradle-%s".formatted(mockRepo.getHostName(), mockRepo.getPort(), version);
-                  return new GradleWrapper.GradleVersion(version,
-                    urlPrefix + "-bin.zip",
-                    urlPrefix + "-bin.zip.sha256",
-                    urlPrefix + "-wrapper.jar.sha256");
-              })
-              .toList();
+                    .map(version -> {
+                        String urlPrefix = "http://%s:%d/distributions/gradle-%s".formatted(mockRepo.getHostName(), mockRepo.getPort(), version);
+                        return new GradleWrapper.GradleVersion(version,
+                                urlPrefix + "-bin.zip",
+                                urlPrefix + "-bin.zip.sha256",
+                                urlPrefix + "-wrapper.jar.sha256");
+                    })
+                    .toList();
 
             String availableVersions = new ObjectMapper()
-              .registerModule(new ParameterNamesModule())
-              .writeValueAsString(versions);
+                    .registerModule(new ParameterNamesModule())
+                    .writeValueAsString(versions);
 
             mockRepo.setDispatcher(new Dispatcher() {
 
@@ -60,7 +60,7 @@ public class GradleWrapperTest {
                 @Override
                 public MockResponse dispatch(RecordedRequest recordedRequest) {
                     String path = recordedRequest.getPath();
-                    if(path != null) {
+                    if (path != null) {
                         if ("/versions/all".equals(path)) {
                             return new MockResponse().setResponseCode(200).setBody(availableVersions);
                         } else if (path.startsWith("/distributions/gradle-")) {
@@ -69,7 +69,7 @@ public class GradleWrapperTest {
                             String resourcePath = "gradle-%s-bin.%s".formatted(version, extension);
                             try (
                               InputStream is = getClass().getClassLoader().getResourceAsStream(resourcePath)
-                            ) {
+                                    ) {
                                 String body = StringUtils.readFully(is);
                                 return new MockResponse().setResponseCode(200).setBody(body);
                             } catch (IOException e) {
@@ -83,8 +83,8 @@ public class GradleWrapperTest {
 
             block.accept(mockRepo);
             assertThat(mockRepo.getRequestCount())
-              .as("The mock repository received no requests. The test is not using it.")
-              .isGreaterThan(0);
+                    .as("The mock repository received no requests. The test is not using it.")
+                    .isGreaterThan(0);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

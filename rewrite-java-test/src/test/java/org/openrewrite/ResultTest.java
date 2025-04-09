@@ -35,33 +35,33 @@ class ResultTest implements RewriteTest {
     @Test
     void noChangesNewList() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       System.out.println("Hello, world!");
                   }
               }
               """,
-            spec -> spec.afterRecipe(before -> {
-                J.CompilationUnit after = (J.CompilationUnit) new JavaIsoVisitor<Integer>() {
-                    @Override
-                    public J.Block visitBlock(J.Block block, Integer p) {
-                        // intentional inappropriate creation of a new list
-                        List<Statement> statements = ListUtils.concat(block.getStatements(),
-                          new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY));
-                        return block
-                          .withStatements(statements)
-                          .withStatements(ListUtils.map(statements, (n, s) -> n == 0 ? s : null));
-                    }
-                }.visitNonNull(before, 0);
+                        spec -> spec.afterRecipe(before -> {
+                            J.CompilationUnit after = (J.CompilationUnit) new JavaIsoVisitor<Integer>() {
+                                @Override
+                                public J.Block visitBlock(J.Block block, Integer p) {
+                                    // intentional inappropriate creation of a new list
+                                    List<Statement> statements = ListUtils.concat(block.getStatements(),
+                                            new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY));
+                                    return block
+                                            .withStatements(statements)
+                                            .withStatements(ListUtils.map(statements, (n, s) -> n == 0 ? s : null));
+                                }
+                            }.visitNonNull(before, 0);
 
-                assertThat(
-                  assertThrows(IllegalStateException.class, () -> new Result(before, after))
-                    .getMessage()
-                ).contains("+class Test /*~~>*/{");
-            })
-          )
+                            assertThat(
+                                    assertThrows(IllegalStateException.class, () -> new Result(before, after))
+                                            .getMessage()
+                            ).contains("+class Test /*~~>*/{");
+                        })
+                )
         );
     }
 }

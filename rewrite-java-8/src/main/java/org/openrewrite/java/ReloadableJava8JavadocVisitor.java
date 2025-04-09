@@ -541,14 +541,14 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         if (ref.qualifierExpression != null) {
             try {
                 attr.attribType(ref.qualifierExpression, symbol);
-            } catch(NullPointerException ignored) {
+            } catch (NullPointerException ignored) {
                 // best effort, can result in:
                 // java.lang.NullPointerException: Cannot read field "info" because "env" is null
                 //   at com.sun.tools.javac.comp.Attr.attribType(Attr.java:404)
             }
         }
 
-        if(ref.qualifierExpression != null) {
+        if (ref.qualifierExpression != null) {
             qualifier = (TypedTree) javaVisitor.scan(ref.qualifierExpression, Space.EMPTY);
             qualifierType = qualifier.getType();
             if (ref.memberName != null) {

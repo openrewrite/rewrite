@@ -89,7 +89,7 @@ public class ExtractInterface {
         @Override
         public  J.@Nullable MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
             if (method.hasModifier(J.Modifier.Type.Static) || !method.hasModifier(J.Modifier.Type.Public) ||
-                method.isConstructor()) {
+                    method.isConstructor()) {
                 //noinspection ConstantConditions
                 return null;
             }
@@ -97,8 +97,8 @@ public class ExtractInterface {
             return method
                     .withModifiers(ListUtils.map(method.getModifiers(), m ->
                             m.getType() == J.Modifier.Type.Public ||
-                            m.getType() == J.Modifier.Type.Final ||
-                            m.getType() == J.Modifier.Type.Native ? null : m))
+                                    m.getType() == J.Modifier.Type.Final ||
+                                    m.getType() == J.Modifier.Type.Native ? null : m))
                     .withBody(null);
         }
     }
@@ -128,8 +128,8 @@ public class ExtractInterface {
                     if (getCursor().getParentTreeCursor().getValue() == body) {
                         try {
                             if (!method.hasModifier(J.Modifier.Type.Public) ||
-                                method.hasModifier(J.Modifier.Type.Static) ||
-                                method.isConstructor()) {
+                                    method.hasModifier(J.Modifier.Type.Static) ||
+                                    method.isConstructor()) {
                                 return method;
                             }
 

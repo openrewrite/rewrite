@@ -29,14 +29,14 @@ class JsonParserTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.parser(JsonParser.builder())
-          .recipe(Recipe.noop());
+                .recipe(Recipe.noop());
     }
 
     @Test
     void parseJsonDocument() {
         rewriteRun(
-          json(
-      """
+                json(
+                        """
             {
               // comments
               unquoted: 'and you can quote me on that',
@@ -48,71 +48,71 @@ class JsonParserTest implements RewriteTest {
               "backwardsCompatible": "with JSON",
             }
             """
-          )
+                )
         );
     }
 
     @Test
     void stringLiteral() {
         rewriteRun(
-          json("'hello world'")
+                json("'hello world'")
         );
     }
 
     @Test
     void booleanLiteral() {
         rewriteRun(
-          json("true")
+                json("true")
         );
     }
 
     @Test
     void doubleLiteralExpSigned() {
         rewriteRun(
-          json("-1e3")
+                json("-1e3")
         );
     }
 
     @Test
     void doubleLiteralExpSignedUpperCase() {
         rewriteRun(
-          json("1E-3")
+                json("1E-3")
         );
     }
 
     @Test
     void bigInteger() {
         rewriteRun(
-          json("-10000000000000000999")
+                json("-10000000000000000999")
         );
     }
 
     @Test
     void array() {
         rewriteRun(
-          json("[ 1 , 2 , 3 , ]")
+                json("[ 1 , 2 , 3 , ]")
         );
     }
 
     @Test
     void object() {
         rewriteRun(
-          json(
-            """
+                json(
+                        """
             {
                 key: "value",
                 "key": 1,
             }
             """
-          )
+                )
         );
     }
 
     @Test
     void comments() {
         rewriteRun(
-          json(
-            """
+                json(
+                        """
             // test
             {
                 /* test */
@@ -121,7 +121,7 @@ class JsonParserTest implements RewriteTest {
                 "key": 1,
             }
             """
-          )
+                )
         );
     }
 
@@ -129,13 +129,13 @@ class JsonParserTest implements RewriteTest {
     @Test
     void longValue() {
         rewriteRun(
-          json(
-            """
+                json(
+                        """
             {
                 "timestamp": 1577000812973
             }
             """
-          )
+                )
         );
     }
 
@@ -143,7 +143,7 @@ class JsonParserTest implements RewriteTest {
     @Test
     void empty() {
         rewriteRun(
-          json("")
+                json("")
         );
     }
 
@@ -151,29 +151,29 @@ class JsonParserTest implements RewriteTest {
     @Test
     void multiBytesUnicode() {
         rewriteRun(
-          json(
-            """
+                json(
+                        """
               {
                 "🤖"    : "robot",
                 "robot" : "🤖",
                 "நடித்த" : 3 /* 🇩🇪 */
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unicodeEscapes() {
         rewriteRun(
-          json(
-            """
+                json(
+                        """
               {
                 "nul": "\\u0000",
                 "reverse-solidus": "\\u005c",
               }
               """
-          )
+                )
         );
     }
 }

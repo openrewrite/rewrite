@@ -44,11 +44,11 @@ import static org.openrewrite.groovy.Assertions.groovy;
 import static org.openrewrite.java.Assertions.java;
 
 @SuppressWarnings({
-  "ConstantConditions",
-  "UnusedAssignment",
-  "ReturnOfThis",
-  "InfiniteLoopStatement",
-  "StatementWithEmptyBody"
+        "ConstantConditions",
+        "UnusedAssignment",
+        "ReturnOfThis",
+        "InfiniteLoopStatement",
+        "StatementWithEmptyBody"
 })
 class NoWhitespaceBeforeTest implements RewriteTest {
     @Override
@@ -62,10 +62,10 @@ class NoWhitespaceBeforeTest implements RewriteTest {
 
     private static List<NamedStyles> noWhitespaceBeforeStyle(UnaryOperator<NoWhitespaceBeforeStyle> with) {
         return Collections.singletonList(
-          new NamedStyles(
-            Tree.randomId(), "test", "test", "test", emptySet(),
-            singletonList(with.apply(Checkstyle.noWhitespaceBeforeStyle()))
-          )
+                new NamedStyles(
+                        Tree.randomId(), "test", "test", "test", emptySet(),
+                        singletonList(with.apply(Checkstyle.noWhitespaceBeforeStyle()))
+                )
         );
     }
 
@@ -73,15 +73,15 @@ class NoWhitespaceBeforeTest implements RewriteTest {
     @DisabledOnOs(value = OS.WINDOWS, disabledReason = "java.nio.file.Path does not allow leading or trailing spaces on Windows")
     void packages() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
+                java(
+                        """
               package org .openrewrite .example . cleanup;
 
               class Test {
               }
               """
-          )
+                )
         );
     }
 
@@ -89,15 +89,15 @@ class NoWhitespaceBeforeTest implements RewriteTest {
     @DisabledOnOs(value = OS.WINDOWS, disabledReason = "java.nio.file.Path does not allow leading or trailing spaces on Windows")
     void imports() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
+                java(
+                        """
               import java . util . function.*;
 
               class Test {
               }
               """
-          )
+                )
         );
     }
 
@@ -105,10 +105,10 @@ class NoWhitespaceBeforeTest implements RewriteTest {
     @Test
     void fieldAccessDoNotAllowLineBreaks() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle(style ->
-            style.withDot(true)))),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle(style ->
+                        style.withDot(true)))),
+                java(
+                        """
               class Test {
                   int m;
 
@@ -119,7 +119,7 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   int m;
 
@@ -129,18 +129,18 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
     @Test
     void fieldAccessAllowLineBreaks() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle(style ->
-            style.withAllowLineBreaks(true).withDot(true)))),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle(style ->
+                        style.withAllowLineBreaks(true).withDot(true)))),
+                java(
+                        """
               class Test {
                   int m;
 
@@ -151,7 +151,7 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   int m;
 
@@ -162,8 +162,8 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
@@ -171,9 +171,9 @@ class NoWhitespaceBeforeTest implements RewriteTest {
     @Disabled
     void methodDeclarationParametersDoNotAllowLineBreaks() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
+                java(
+                        """
               class Test {
                   static void method0(String
                                              ...params) {
@@ -183,7 +183,7 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   static void method0(String...params) {
                   }
@@ -192,8 +192,8 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
@@ -201,10 +201,10 @@ class NoWhitespaceBeforeTest implements RewriteTest {
     @Disabled
     void methodDeclarationParametersAllowLineBreaks() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle(style ->
-            style.withAllowLineBreaks(true)))),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle(style ->
+                        style.withAllowLineBreaks(true)))),
+                java(
+                        """
               class Test {
                   static void method0(String
                                              ...params) {
@@ -214,7 +214,7 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   static void method0(String
                                              ...params) {
@@ -224,18 +224,18 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
     @Test
     void methodInvocationDoNotAllowLineBreaks() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle(style ->
-            style.withDot(true)))),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle(style ->
+                        style.withDot(true)))),
+                java(
+                        """
               class Test {
                   Test test(int... i) {
                       return this;
@@ -248,7 +248,7 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   Test test(int... i) {
                       return this;
@@ -260,18 +260,18 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
     @Test
     void methodInvocationAllowLineBreaks() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle(style ->
-            style.withAllowLineBreaks(true).withDot(true)))),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle(style ->
+                        style.withAllowLineBreaks(true).withDot(true)))),
+                java(
+                        """
               class Test {
                   Test test(int... i) {
                       return this;
@@ -284,7 +284,7 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   Test test(int... i) {
                       return this;
@@ -297,17 +297,17 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
     @Test
     void forLoop() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
+                java(
+                        """
               class Test {
                   static void method() {
                       for (int i = 0 , j = 0 ; i < 2 ; i++ , j++) {
@@ -316,7 +316,7 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   static void method() {
                       for (int i = 0, j = 0; i < 2; i++, j++) {
@@ -325,17 +325,17 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
     @Test
     void forEachLoop() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
+                java(
+                        """
               import java.util.List;
 
               class Test {
@@ -346,16 +346,16 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void whileLoop() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
+                java(
+                        """
               class Test {
                   static void method0() {
                       while (true) ;
@@ -368,32 +368,32 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doWhileLoop() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
+                java(
+                        """
               class Test {
                   static void method() {
                       do { } while (true);
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void variableDeclarationDoNotAllowLineBreaks() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
+                java(
+                        """
               class Test {
                   static void method() {
                       int n , o = 0;
@@ -402,7 +402,7 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   static void method() {
                       int n, o = 0;
@@ -410,18 +410,18 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
     @Test
     void variableDeclarationAllowLineBreaks() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle(style ->
-            style.withAllowLineBreaks(true)))),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle(style ->
+                        style.withAllowLineBreaks(true)))),
+                java(
+                        """
               class Test {
                   static void method() {
                       int n , o = 0;
@@ -430,7 +430,7 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   static void method() {
                       int n, o = 0;
@@ -439,17 +439,17 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
     @Test
     void arrayDeclarations() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
+                java(
+                        """
               class Test {
                   static void method() {
                       int[][] array = {{1, 2}
@@ -457,16 +457,16 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unaryDoNotAllowLineBreaks() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
+                java(
+                        """
               class Test {
                   static void method(int n) {
                       n ++;
@@ -476,7 +476,7 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   static void method(int n) {
                       n++;
@@ -485,18 +485,18 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
     @Test
     void unaryAllowLineBreaks() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle(style ->
-            style.withAllowLineBreaks(true)))),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle(style ->
+                        style.withAllowLineBreaks(true)))),
+                java(
+                        """
               class Test {
                   static void method(int n) {
                       n ++;
@@ -506,7 +506,7 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   static void method(int n) {
                       n++;
@@ -516,18 +516,18 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
     @Test
     void parameterizedTypeDoNotAllowLineBreaks() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle(style ->
-            style.withGenericStart(true).withGenericEnd(true)))),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle(style ->
+                        style.withGenericStart(true).withGenericEnd(true)))),
+                java(
+                        """
               import java.util.ArrayList;
               import java.util.List;
               import java.util.function.Function;
@@ -541,7 +541,7 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.ArrayList;
               import java.util.List;
               import java.util.function.Function;
@@ -554,18 +554,18 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
     @Test
     void memberReferenceDoNotAllowLineBreaks() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle(style ->
-            style.withMethodRef(true)))),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle(style ->
+                        style.withMethodRef(true)))),
+                java(
+                        """
               import java.util.function.Function;
               import java.util.function.Supplier;
 
@@ -577,7 +577,7 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.function.Function;
               import java.util.function.Supplier;
 
@@ -588,18 +588,18 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
     @Test
     void memberReferenceAllowLineBreaks() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle(style ->
-            style.withAllowLineBreaks(true).withMethodRef(true)))),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle(style ->
+                        style.withAllowLineBreaks(true).withMethodRef(true)))),
+                java(
+                        """
               import java.util.function.Function;
               import java.util.function.Supplier;
 
@@ -611,7 +611,7 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.function.Function;
               import java.util.function.Supplier;
 
@@ -623,17 +623,17 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
     @Test
     void doNotStripLastParameterSuffixInMethodDeclaration() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
+                java(
+                        """
               package a;
 
               abstract class Test {
@@ -643,16 +643,16 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   );
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doNotStripLastArgumentSuffixInMethodInvocation() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
+                java(
+                        """
               package a;
 
               class Test {
@@ -664,16 +664,16 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doNotStripStatementSuffixInTernaryConditionAndTrue() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
+                java(
+                        """
               import java.util.List;
 
               class Test {
@@ -682,16 +682,16 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doNotStripStatementSuffixPrecedingInstanceof() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
+                java(
+                        """
               import java.util.ArrayList;
               import java.util.List;
 
@@ -701,16 +701,16 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doNotStripTryWithResourcesEndParentheses() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
+                java(
+                        """
               import java.io.FileInputStream;
               import java.io.FileOutputStream;
               import java.io.InputStream;
@@ -730,17 +730,17 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doNotStripAnnotationArguments() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle()))
-            .typeValidationOptions(TypeValidation.none()),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle()))
+                        .typeValidationOptions(TypeValidation.none()),
+                java(
+                        """
               import org.graalvm.compiler.core.common.SuppressFBWarnings;
 
               class Test {
@@ -752,7 +752,7 @@ class NoWhitespaceBeforeTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -764,6 +764,6 @@ class NoWhitespaceBeforeTest implements RewriteTest {
 
     private static Consumer<SourceSpec<J.CompilationUnit>> autoFormatIsIdempotent() {
         return spec -> spec.afterRecipe(cu ->
-          Assertions.assertThat(new AutoFormatVisitor<>().visit(cu, 0)).isEqualTo(cu));
+                Assertions.assertThat(new AutoFormatVisitor<>().visit(cu, 0)).isEqualTo(cu));
     }
 }

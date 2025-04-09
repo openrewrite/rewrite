@@ -26,88 +26,88 @@ class FindAndReplaceTest implements RewriteTest {
     @Test
     void nonTxtExtension() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplace(".", "G", null, null, null, null, null, null)),
-          text(
-            """
+                spec -> spec.recipe(new FindAndReplace(".", "G", null, null, null, null, null, null)),
+                text(
+                        """
               This is text.
               """,
-            """
+                        """
               This is textG
               """,
-            spec -> spec.path("test.yml")
-          )
+                        spec -> spec.path("test.yml")
+                )
         );
     }
 
     @Test
     void removeWhenNullOrEmpty() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplace("Bar", null, null, null, null, null, null, null)),
-          text(
-            """
+                spec -> spec.recipe(new FindAndReplace("Bar", null, null, null, null, null, null, null)),
+                text(
+                        """
               Foo
               Bar
               Quz
               """,
-            """
+                        """
               Foo
 
               Quz
               """
-          )
+                )
         );
     }
 
     @Test
     void defaultNonRegex() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplace(".", "G", null, null, null, null, null, null)),
-          text(
-            """
+                spec -> spec.recipe(new FindAndReplace(".", "G", null, null, null, null, null, null)),
+                text(
+                        """
               This is text.
               """,
-            """
+                        """
               This is textG
               """
-          )
+                )
         );
     }
 
     @Test
     void regexReplace() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplace(".", "G", true, null, null, null, null, null)),
-          text(
-            """
+                spec -> spec.recipe(new FindAndReplace(".", "G", true, null, null, null, null, null)),
+                text(
+                        """
               This is text.
               """,
-            """
+                        """
               GGGGGGGGGGGGG
               """
-          )
+                )
         );
     }
 
     @Test
     void captureGroups() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplace("This is ([^.]+).", "I like $1.", true, null, null, null, null, null)),
-          text(
-            """
+                spec -> spec.recipe(new FindAndReplace("This is ([^.]+).", "I like $1.", true, null, null, null, null, null)),
+                text(
+                        """
               This is text.
               """,
-            """
+                        """
               I like text.
               """
-          )
+                )
         );
     }
 
     @Test
     void noRecursive() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplace("test", "tested", false, null, null, null, null, null)),
-          text("test", "tested")
+                spec -> spec.recipe(new FindAndReplace("test", "tested", false, null, null, null, null, null)),
+                text("test", "tested")
         );
     }
 
@@ -116,27 +116,27 @@ class FindAndReplaceTest implements RewriteTest {
         String find = "This is text ${dynamic}.";
         String replace = "This is text ${dynamic}. Stuff";
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplace(find, replace, null, null, null, null, null, null)),
-          text(find, replace)
+                spec -> spec.recipe(new FindAndReplace(find, replace, null, null, null, null, null, null)),
+                text(find, replace)
         );
     }
 
     @Test
     void successiveReplacement() {
         rewriteRun(
-          spec -> spec.recipes(
-            new FindAndReplace("one", "two", null, null, null, null, null, null),
-            new FindAndReplace("two", "three", null, null, null, null, null, null),
-            new FindAndReplace("three", "four", null, null, null, null, null, null)
-          ),
-          text(
-            """
+                spec -> spec.recipes(
+                        new FindAndReplace("one", "two", null, null, null, null, null, null),
+                        new FindAndReplace("two", "three", null, null, null, null, null, null),
+                        new FindAndReplace("three", "four", null, null, null, null, null, null)
+                ),
+                text(
+                        """
               one
               """,
-            """
+                        """
               four
               """
-          )
+                )
         );
     }
 }

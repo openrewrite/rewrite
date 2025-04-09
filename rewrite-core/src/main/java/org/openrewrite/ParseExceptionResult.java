@@ -41,8 +41,8 @@ public class ParseExceptionResult implements Marker {
     String treeType;
 
     public static ParseExceptionResult build(Class<? extends Parser> parserClass,
-                                             Throwable t,
-                                             @Nullable String message) {
+            Throwable t,
+            @Nullable String message) {
         String simpleName = t.getClass().getSimpleName();
         return new ParseExceptionResult(
                 randomId(),

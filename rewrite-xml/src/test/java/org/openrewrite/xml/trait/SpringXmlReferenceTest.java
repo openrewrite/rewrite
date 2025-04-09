@@ -28,7 +28,7 @@ class SpringXmlReferenceTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(RewriteTest.toRecipe(() -> new SpringXmlReference.Matcher()
-          .asVisitor(springJavaTypeReference -> SearchResult.found(springJavaTypeReference.getTree(), springJavaTypeReference.getValue()))));
+                .asVisitor(springJavaTypeReference -> SearchResult.found(springJavaTypeReference.getTree(), springJavaTypeReference.getValue()))));
     }
 
     @SuppressWarnings("SpringXmlModelInspection")
@@ -36,9 +36,9 @@ class SpringXmlReferenceTest implements RewriteTest {
     @DocumentExample
     void xmlConfiguration() {
         rewriteRun(
-          xml(
-            //language=xml
-            """
+                xml(
+                        //language=xml
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <beans xmlns="http://www.springframework.org/schema/beans"
                   xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
@@ -61,8 +61,8 @@ class SpringXmlReferenceTest implements RewriteTest {
                 </bean>
               </beans>
               """,
-            //language=xml
-            """
+                        //language=xml
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <beans xmlns="http://www.springframework.org/schema/beans"
                   xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
@@ -85,7 +85,7 @@ class SpringXmlReferenceTest implements RewriteTest {
                 </bean>
               </beans>
               """
-          )
+                )
         );
     }
 }

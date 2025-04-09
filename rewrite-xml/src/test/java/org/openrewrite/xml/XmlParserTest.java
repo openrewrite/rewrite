@@ -40,25 +40,25 @@ class XmlParserTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(toRecipe(
-          () -> new XmlVisitor<>() {
-              @Override
-              public Xml visitDocTypeDecl(Xml.DocTypeDecl docTypeDecl, ExecutionContext executionContext) {
-                  assertNotNull(docTypeDecl.getPrefixUnsafe(), "prefix should not be null");
-                  assertNotNull(docTypeDecl.getName(), "name should not be null");
-                  assertNotNull(docTypeDecl.getInternalSubset(), "internalSubset should not be null");
-                  assertNotNull(docTypeDecl.getBeforeTagDelimiterPrefix(), "beforeTagDelimiterPrefix should not be null");
-                  return super.visitDocTypeDecl(docTypeDecl, executionContext);
-              }
-          }
+                () -> new XmlVisitor<>() {
+                    @Override
+                    public Xml visitDocTypeDecl(Xml.DocTypeDecl docTypeDecl, ExecutionContext executionContext) {
+                        assertNotNull(docTypeDecl.getPrefixUnsafe(), "prefix should not be null");
+                        assertNotNull(docTypeDecl.getName(), "name should not be null");
+                        assertNotNull(docTypeDecl.getInternalSubset(), "internalSubset should not be null");
+                        assertNotNull(docTypeDecl.getBeforeTagDelimiterPrefix(), "beforeTagDelimiterPrefix should not be null");
+                        return super.visitDocTypeDecl(docTypeDecl, executionContext);
+                    }
+                }
         ));
     }
 
     @Test
     void jsp() {
         rewriteRun(
-          xml(
-            //language=html
-            """
+                xml(
+                        //language=html
+                        """
               <!DOCTYPE html>
               <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
               <%@ taglib prefix="s" uri="/struts-tags" %>
@@ -72,17 +72,17 @@ class XmlParserTest implements RewriteTest {
                 </body>
               </html>
               """,
-            spec -> spec.path("index.jsp")
-          )
+                        spec -> spec.path("index.jsp")
+                )
         );
     }
 
     @Test
     void lowerCaseDocType() {
         rewriteRun(
-          xml(
-            //language=html
-            """
+                xml(
+                        //language=html
+                        """
               <!doctype html>
               <html lang="en">
                 <body>
@@ -90,7 +90,7 @@ class XmlParserTest implements RewriteTest {
                 </body>
               </html>
               """
-          )
+                )
         );
     }
 
@@ -98,15 +98,15 @@ class XmlParserTest implements RewriteTest {
     @Test
     void specialCharacters() {
         rewriteRun(
-          xml("<project>Some &#39;Example&#39;</project>")
+                xml("<project>Some &#39;Example&#39;</project>")
         );
     }
 
     @Test
     void parseXmlDocument() {
         rewriteRun(
-          xml(
-            """
+                xml(
+                        """
               <?xml
                   version="1.0" encoding="UTF-8"?>
               <?xml-stylesheet href="mystyle.css" type="text/css"?>
@@ -116,15 +116,15 @@ class XmlParserTest implements RewriteTest {
                   <bean id="myBean"/>
               </beans>
               """
-          )
+                )
         );
     }
 
     @Test
     void javaReferenceDocument() {
         rewriteRun(
-          xml(
-            """
+                xml(
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <beans xmlns="http://www.springframework.org/schema/beans"
                   xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
@@ -144,12 +144,12 @@ class XmlParserTest implements RewriteTest {
                 </bean>
               </beans>
               """,
-            spec -> spec.afterRecipe(doc -> {
-                assertThat(doc.getReferences().getReferences().stream().anyMatch(typeRef -> typeRef.getValue().equals("java.lang.String"))).isTrue();
-                assertThat(doc.getReferences().getReferences().stream().anyMatch(typeRef -> typeRef.getKind().equals(Reference.Kind.TYPE))).isTrue();
-                assertThat(doc.getReferences().getReferences().stream().anyMatch(typeRef -> typeRef.getKind().equals(Reference.Kind.PACKAGE))).isTrue();
-            })
-          )
+                        spec -> spec.afterRecipe(doc -> {
+                            assertThat(doc.getReferences().getReferences().stream().anyMatch(typeRef -> typeRef.getValue().equals("java.lang.String"))).isTrue();
+                            assertThat(doc.getReferences().getReferences().stream().anyMatch(typeRef -> typeRef.getKind().equals(Reference.Kind.TYPE))).isTrue();
+                            assertThat(doc.getReferences().getReferences().stream().anyMatch(typeRef -> typeRef.getKind().equals(Reference.Kind.PACKAGE))).isTrue();
+                        })
+                )
         );
     }
 
@@ -157,8 +157,8 @@ class XmlParserTest implements RewriteTest {
     @Test
     void cdataTagWhitespace() {
         rewriteRun(
-          xml(
-            """
+                xml(
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
                   <suppress>
@@ -172,15 +172,15 @@ class XmlParserTest implements RewriteTest {
                   </suppress>
               </suppressions>
               """
-          )
+                )
         );
     }
 
     @Test
     void parsePomDocument() {
         rewriteRun(
-          xml(
-            """
+                xml(
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <!-- comment -->
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -196,7 +196,7 @@ class XmlParserTest implements RewriteTest {
                 <name>Guava: Google Core Libraries for Java</name>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -204,13 +204,13 @@ class XmlParserTest implements RewriteTest {
     @Test
     void commentBeforeContent() {
         rewriteRun(
-          xml(
-            """
+                xml(
+                        """
               <foo>
                   <a><!-- comment -->a</a>
               </foo>
               """
-          )
+                )
         );
     }
 
@@ -218,14 +218,14 @@ class XmlParserTest implements RewriteTest {
     @Test
     void singleQuestionMarkContent() {
         rewriteRun(
-          xml(
-            """
+                xml(
+                        """
               <foo>
                   <a><!-- comment -->a</a>
                   <literal>List&lt;?&gt;</literal>
               </foo>
               """
-          )
+                )
         );
     }
 
@@ -233,8 +233,8 @@ class XmlParserTest implements RewriteTest {
     @Test
     void commentBeforeContentNewline() {
         rewriteRun(
-          xml(
-            """
+                xml(
+                        """
               <foo>
                   <a>
                       <!-- comment -->
@@ -242,7 +242,7 @@ class XmlParserTest implements RewriteTest {
                   </a>
               </foo>
               """
-          )
+                )
         );
     }
 
@@ -251,13 +251,13 @@ class XmlParserTest implements RewriteTest {
     @Test
     void commentAfterContent() {
         rewriteRun(
-          xml(
-            """
+                xml(
+                        """
               <foo>
                   <a>a<!-- comment --></a>
               </foo>
               """
-          )
+                )
         );
     }
 
@@ -266,8 +266,8 @@ class XmlParserTest implements RewriteTest {
     @Test
     void commentAfterContentNewline() {
         rewriteRun(
-          xml(
-            """
+                xml(
+                        """
               <foo>
                   <a>
                       a
@@ -275,7 +275,7 @@ class XmlParserTest implements RewriteTest {
                   </a>
               </foo>
               """
-          )
+                )
         );
     }
 
@@ -283,8 +283,8 @@ class XmlParserTest implements RewriteTest {
     @Test
     void parseDocTypeWithoutExternalId() {
         rewriteRun(
-          xml(
-            """
+                xml(
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <!DOCTYPE configuration >
               
@@ -295,7 +295,7 @@ class XmlParserTest implements RewriteTest {
                   </root>
               </configuration>
               """
-          )
+                )
         );
     }
 
@@ -303,15 +303,15 @@ class XmlParserTest implements RewriteTest {
     @Test
     void dtdSubsetMarkupDecl() {
         rewriteRun(
-          xml(
-            """
+                xml(
+                        """
               <?xml version="1.0"?>
               <!DOCTYPE p [
                   <!ELEMENT p ANY>
               ]>
               <p>Hello world!</p>
               """
-          )
+                )
         );
     }
 
@@ -319,15 +319,15 @@ class XmlParserTest implements RewriteTest {
     @Test
     void dtdSubsetParamEntityRef() {
         rewriteRun(
-          xml(
-            """
+                xml(
+                        """
               <?xml version="1.0"?>
               <!DOCTYPE p [
                   %entity;
               ]>
               <p>Hello world!</p>
               """
-          )
+                )
         );
     }
 
@@ -335,15 +335,15 @@ class XmlParserTest implements RewriteTest {
     @Test
     void dtdSubsetComment() {
         rewriteRun(
-          xml(
-            """
+                xml(
+                        """
               <?xml version="1.0"?>
               <!DOCTYPE p [
                   <!-- comment -->
               ]>
               <p>Hello world!</p>
               """
-          )
+                )
         );
     }
 
@@ -351,14 +351,14 @@ class XmlParserTest implements RewriteTest {
     @Test
     void processingInstructions() {
         rewriteRun(
-          xml(
-            """
+                xml(
+                        """
               <?xml-stylesheet href="mystyle.css" type="text/css"?>
               <execution>
                   <?m2e execute onConfiguration,onIncremental?>
               </execution>
               """
-          )
+                )
         );
     }
 
@@ -366,9 +366,9 @@ class XmlParserTest implements RewriteTest {
     @Test
     void utf8BOMCharacters() {
         rewriteRun(
-          xml(
-            "ï»¿<?xml version=\"1.0\" encoding=\"UTF-8\"?><test></test>"
-          )
+                xml(
+                        "ï»¿<?xml version=\"1.0\" encoding=\"UTF-8\"?><test></test>"
+                )
         );
     }
 
@@ -376,11 +376,11 @@ class XmlParserTest implements RewriteTest {
     @Test
     void utf8BOM() {
         rewriteRun(
-          xml(
-            """
+                xml(
+                        """
               %s<?xml version="1.0" encoding="UTF-8"?><test></test>
               """.formatted("\uFEFF")
-          )
+                )
         );
     }
 
@@ -388,11 +388,11 @@ class XmlParserTest implements RewriteTest {
     @Test
     void preserveSpaceBeforeAttributeAssignment() {
         rewriteRun(
-          xml(
-            """
+                xml(
+                        """
               <?xml version = "1.0" encoding    =   "UTF-8" standalone = "no" ?><blah></blah>
               """
-          )
+                )
         );
     }
 
@@ -400,13 +400,13 @@ class XmlParserTest implements RewriteTest {
     @Test
     void linkWithQuestionMark() {
         rewriteRun(
-          xml(
-            """
+                xml(
+                        """
               <?xml version="1.0" encoding="ISO-8859-1"?>
               <?xml-stylesheet type="text/xsl" href="/name/other?link"?>
               <blah></blah>
               """
-          )
+                )
         );
     }
 
@@ -414,8 +414,8 @@ class XmlParserTest implements RewriteTest {
     @Test
     void preserveWhitespaceOnEntities() {
         rewriteRun(
-          xml(
-            """
+                xml(
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <message><text>&lt;?xml version='1.0' encoding='UTF-8'?&gt;&#13;
               &lt;note&gt;&#13;
@@ -427,17 +427,17 @@ class XmlParserTest implements RewriteTest {
               &#13;
               </text></message>
               """
-          )
+                )
         );
     }
 
     @DisabledOnOs(OS.WINDOWS)
     @ParameterizedTest
     @ValueSource(strings = {
-      "foo.xml",
-      "proj.csproj",
-      "/foo/bar/baz.jsp",
-      "packages.config"
+            "foo.xml",
+            "proj.csproj",
+            "/foo/bar/baz.jsp",
+            "packages.config"
     })
     void acceptWithValidPaths(String path) {
         assertThat(new XmlParser().accept(Paths.get(path))).isTrue();
@@ -446,10 +446,10 @@ class XmlParserTest implements RewriteTest {
     @DisabledOnOs(OS.WINDOWS)
     @ParameterizedTest
     @ValueSource(strings = {
-      ".xml",
-      "foo.xml.",
-      "file.cpp",
-      "/foo/bar/baz.xml.txt"
+            ".xml",
+            "foo.xml.",
+            "file.cpp",
+            "/foo/bar/baz.xml.txt"
     })
     void acceptWithInvalidPaths(String path) {
         assertThat(new XmlParser().accept(Paths.get(path))).isFalse();

@@ -28,12 +28,12 @@ class ManageDependenciesTest implements RewriteTest {
     @Test
     void createDependencyManagementWithDependencyWhenNoneExists() {
         rewriteRun(
-          spec -> spec.recipe(new ManageDependencies(
-            "org.junit.jupiter",
-            "*",
-            false, false)),
-          pomXml(
-            """
+                spec -> spec.recipe(new ManageDependencies(
+                        "org.junit.jupiter",
+                        "*",
+                        false, false)),
+                pomXml(
+                        """
               <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
@@ -48,7 +48,7 @@ class ManageDependenciesTest implements RewriteTest {
                   </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
@@ -71,19 +71,19 @@ class ManageDependenciesTest implements RewriteTest {
                   </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void deferToDependencyManagementWhenDependencyIsAlreadyManaged() {
         rewriteRun(
-          spec -> spec.recipe(new ManageDependencies(
-            "junit",
-            "junit",
-            false, false)),
-          pomXml(
-            """
+                spec -> spec.recipe(new ManageDependencies(
+                        "junit",
+                        "junit",
+                        false, false)),
+                pomXml(
+                        """
               <project>
               <groupId>com.othercompany.app</groupId>
               <artifactId>my-parent-app</artifactId>
@@ -99,10 +99,10 @@ class ManageDependenciesTest implements RewriteTest {
               </dependencyManagement>
               </project>
               """
-          ),
-          mavenProject("my-app",
-            pomXml(
-              """
+                ),
+                mavenProject("my-app",
+                        pomXml(
+                                """
                     <project>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
@@ -121,7 +121,7 @@ class ManageDependenciesTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """,
-              """
+                                """
                     <project>
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
@@ -139,20 +139,20 @@ class ManageDependenciesTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void manageToSpecifiedVersion() {
         rewriteRun(
-          spec -> spec.recipe(new ManageDependencies(
-            "junit",
-            "junit",
-            false, false)),
-          pomXml(
-            """
+                spec -> spec.recipe(new ManageDependencies(
+                        "junit",
+                        "junit",
+                        false, false)),
+                pomXml(
+                        """
               <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
@@ -166,7 +166,7 @@ class ManageDependenciesTest implements RewriteTest {
                   </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
@@ -188,16 +188,16 @@ class ManageDependenciesTest implements RewriteTest {
                   </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void addedToTheRootPom() {
         rewriteRun(
-          spec -> spec.recipe(new ManageDependencies("junit", "junit", true, false)),
-          pomXml(
-            """
+                spec -> spec.recipe(new ManageDependencies("junit", "junit", true, false)),
+                pomXml(
+                        """
               <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>project</artifactId>
@@ -209,7 +209,7 @@ class ManageDependenciesTest implements RewriteTest {
                   </modules>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>project</artifactId>
@@ -230,10 +230,10 @@ class ManageDependenciesTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          ),
-          mavenProject("api",
-            pomXml(
-              """
+                ),
+                mavenProject("api",
+                        pomXml(
+                                """
                     <project>
                         <parent>
                             <groupId>com.mycompany.app</groupId>
@@ -245,11 +245,11 @@ class ManageDependenciesTest implements RewriteTest {
                         <version>1</version>
                     </project>
                 """
-            )
-          ),
-          mavenProject("service",
-            pomXml(
-              """
+                        )
+                ),
+                mavenProject("service",
+                        pomXml(
+                                """
                     <project>
                         <parent>
                             <groupId>com.mycompany.app</groupId>
@@ -268,7 +268,7 @@ class ManageDependenciesTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """,
-              """
+                                """
                     <project>
                         <parent>
                             <groupId>com.mycompany.app</groupId>
@@ -286,31 +286,31 @@ class ManageDependenciesTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            ),
-            mavenProject("core",
-              pomXml(
-                """
+                        ),
+                        mavenProject("core",
+                                pomXml(
+                                        """
                       <project>
                           <groupId>com.mycompany.app</groupId>
                           <artifactId>core</artifactId>
                           <version>1</version>
                       </project>
                   """
-              )
-            )
-          )
+                                )
+                        )
+                )
         );
     }
 
     @Test
     void externalParent() {
         rewriteRun(
-          spec -> spec.recipe(new ManageDependencies(
-            "org.apache.logging.log4j",
-            "log4j-*",
-            true, false)),
-          pomXml(
-            """
+                spec -> spec.recipe(new ManageDependencies(
+                        "org.apache.logging.log4j",
+                        "log4j-*",
+                        true, false)),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.managed.test</groupId>
@@ -323,7 +323,7 @@ class ManageDependenciesTest implements RewriteTest {
                   </parent>
               </project>
               """,
-            """
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.managed.test</groupId>
@@ -345,10 +345,10 @@ class ManageDependenciesTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          ),
-          mavenProject("b",
-            pomXml(
-              """
+                ),
+                mavenProject("b",
+                        pomXml(
+                                """
                     <project>
                         <modelVersion>4.0.0</modelVersion>
                         <groupId>com.managed.test</groupId>
@@ -373,7 +373,7 @@ class ManageDependenciesTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """,
-              """
+                                """
                     <project>
                         <modelVersion>4.0.0</modelVersion>
                         <groupId>com.managed.test</groupId>
@@ -397,20 +397,20 @@ class ManageDependenciesTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void externalManagedDependencyOverride() {
         rewriteRun(
-          spec -> spec.recipe(new ManageDependencies(
-            "junit",
-            "junit",
-            true, false)),
-          pomXml(
-            """
+                spec -> spec.recipe(new ManageDependencies(
+                        "junit",
+                        "junit",
+                        true, false)),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.managed.test</groupId>
@@ -430,7 +430,7 @@ class ManageDependenciesTest implements RewriteTest {
                   </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.managed.test</groupId>
@@ -449,7 +449,7 @@ class ManageDependenciesTest implements RewriteTest {
                   </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 }

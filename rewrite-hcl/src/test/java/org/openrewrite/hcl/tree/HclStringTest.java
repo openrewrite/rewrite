@@ -27,13 +27,13 @@ class HclStringTest implements RewriteTest {
     @Test
     void quoteEscaping() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               locals {
                 quotedText = "this is a double quote: \\". Look at me"
               }
               """
-          )
+                )
         );
     }
 
@@ -43,13 +43,13 @@ class HclStringTest implements RewriteTest {
         // The interpolation and directive introductions are escaped by doubling their leading characters. The ${
         // sequence is escaped as $${ and the %{ sequence is escaped as %%{.
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               locals {
                 something = "Not a template/expression, just escaping $${somethingElse}."
               }
               """
-          )
+                )
         );
     }
 
@@ -57,13 +57,13 @@ class HclStringTest implements RewriteTest {
     @Test
     void trailingDollarSign() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               locals {
                 regexp = "^(.*?)-monitoring$"
               }
               """
-          )
+                )
         );
     }
 }

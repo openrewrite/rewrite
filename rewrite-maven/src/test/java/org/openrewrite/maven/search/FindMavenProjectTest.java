@@ -34,8 +34,8 @@ class FindMavenProjectTest implements RewriteTest {
     @Test
     void isMavenProject() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>org.openrewrite</groupId>
@@ -43,7 +43,7 @@ class FindMavenProjectTest implements RewriteTest {
                   <version>1.0.0</version>
               </project>
               """,
-            """
+                        """
               <!--~~>--><project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>org.openrewrite</groupId>
@@ -51,15 +51,15 @@ class FindMavenProjectTest implements RewriteTest {
                   <version>1.0.0</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void isNotMavenProject() {
         rewriteRun(
-          xml(
-            """
+                xml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>org.openrewrite</groupId>
@@ -67,7 +67,7 @@ class FindMavenProjectTest implements RewriteTest {
                   <version>1.0.0</version>
               </project>
               """
-          )
+                )
         );
     }
 }

@@ -25,8 +25,8 @@ class TernaryTest implements RewriteTest {
     @Test
     void ternary() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       int n;
@@ -34,7 +34,7 @@ class TernaryTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

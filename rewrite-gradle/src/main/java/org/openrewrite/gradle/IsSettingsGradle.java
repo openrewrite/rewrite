@@ -29,7 +29,7 @@ public class IsSettingsGradle<P> extends TreeVisitor<Tree, P> {
         if (tree instanceof JavaSourceFile) {
             JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
             if (cu.getSourcePath().toString().endsWith("settings.gradle") ||
-                cu.getSourcePath().toString().endsWith("settings.gradle.kts")) {
+                    cu.getSourcePath().toString().endsWith("settings.gradle.kts")) {
                 return SearchResult.found(cu);
             }
         }

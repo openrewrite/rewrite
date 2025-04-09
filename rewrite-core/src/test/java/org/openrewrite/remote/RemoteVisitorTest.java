@@ -42,16 +42,16 @@ class RemoteVisitorTest {
             }
         };
         remoteVisitor.visitRemote(new RemoteArchive(
-          Tree.randomId(),
-          Path.of("foo/bar/gradle-wrapper.jar"),
-          Markers.EMPTY,
-          new URI("https://gradle.gradle/gradle-wrapper.jar"),
-          null,
-          false,
-          null,
-          "Gradle wrapper jar",
-          Collections.emptyList(),
-          null
+                Tree.randomId(),
+                Path.of("foo/bar/gradle-wrapper.jar"),
+                Markers.EMPTY,
+                new URI("https://gradle.gradle/gradle-wrapper.jar"),
+                null,
+                false,
+                null,
+                "Gradle wrapper jar",
+                Collections.emptyList(),
+                null
         ), 0);
 
         assertThat(markersVisited.get()).isTrue();

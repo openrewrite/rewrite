@@ -27,124 +27,124 @@ class ForLoopTest implements RewriteTest {
     @Test
     void forLoopMultipleInit() {
         rewriteRun(
-          groovy(
-            // IntelliJ's Groovy support is confused by multiple assignment in a for loop,
-            // but Groovy itself does support this construct:
-            //    https://groovy-lang.org/semantics.html#_enhanced_classic_java_style_for_loop
-            """
+                groovy(
+                        // IntelliJ's Groovy support is confused by multiple assignment in a for loop,
+                        // but Groovy itself does support this construct:
+                        //    https://groovy-lang.org/semantics.html#_enhanced_classic_java_style_for_loop
+                        """
               int i
               int j
               for(i = 0, j = 0;;) {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void forLoopMultipleUpdate() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
              int i = 0
              int j = 10
              for(; i < j; i++ , j-- ) { }
               """
-          )
+                )
         );
     }
 
     @Test
     void forLoop() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               for(int i = 0; i < 10; i++) {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void infiniteLoop() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               for(;;) {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void format() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               for ( int i = 0 ; i < 10 ; i++ ) {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void formatInfiniteLoop() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               for ( ; ; ) {}
               """
-          )
+                )
         );
     }
 
     @Test
     void formatLoopNoInit() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               for ( ; i < 10 ; i++ ) {}
               """
-          )
+                )
         );
     }
 
     @Test
     void formatLoopNoCondition() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               int i = 0;
               for(; i < 10; i++) {}
               """
-          )
+                )
         );
     }
 
     @Test
     void statementTerminatorForSingleLineForLoops() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               for(;;) test()
               """
-          )
+                )
         );
     }
 
     @Test
     void initializerIsAnAssignment() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def a = [1,2]
               int i=0
               for(i=0; i<a.length; i++) {}
               """
-          )
+                )
         );
     }
 
@@ -152,68 +152,68 @@ class ForLoopTest implements RewriteTest {
     @Test
     void multiVariableInitialization() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               for(int i, j = 0;;) {}
               """
-          )
+                )
         );
     }
 
     @Test
     void forEachWithColon() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               for(int i : [1, 2, 3]) {}
               """
-          )
+                )
         );
     }
 
     @Test
     void forIn() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def dependenciesType = ['implementation', 'testImplementation']
               for (type in dependenciesType) {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void forEachWithIn() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               for(int i in [1, 2, 3]) {}
               """
-          )
+                )
         );
     }
 
     @Test
     void forWithContinue() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               for(int i in [1, 2, 3]) { continue }
               """
-          )
+                )
         );
     }
 
     @Test
     void forWithLabeledContinue() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               f: for(int i in [1, 2, 3]) { continue f }
               """
-          )
+                )
         );
     }
 }

@@ -37,7 +37,7 @@ class AutodetectTest implements RewriteTest {
     @Test
     void continuationIndent() {
         var cus = jp().parse(
-          """
+                """
             class Test {
             	boolean eq(){
             		return (1 == 1 &&
@@ -63,7 +63,7 @@ class AutodetectTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3552")
     void continuationIndentFromParameters() {
         var cus = jp().parse(
-          """
+                """
             class Test {
                void foo(String s1,
                     String s2,
@@ -85,7 +85,7 @@ class AutodetectTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3550")
     void alignParametersWhenMultiple() {
         var cus = jp().parse(
-          """
+                """
             class Test {
             	void foo(String s1,
             	         String s2,
@@ -107,7 +107,7 @@ class AutodetectTest implements RewriteTest {
     @Test
     void springDemoApp() {
         var cus = jp().parse(
-          """
+                """
             package com.kmccarpenter.demospring;
 
             import org.springframework.boot.SpringApplication;
@@ -136,7 +136,7 @@ class AutodetectTest implements RewriteTest {
     @Test
     void springCloudTabsAndIndents() {
         var cus = jp().parse(
-          """
+                """
             package org.springframework.cloud.netflix.eureka;
                         
             import static org.springframework.cloud.netflix.eureka.EurekaConstants.DEFAULT_PREFIX;
@@ -175,7 +175,7 @@ class AutodetectTest implements RewriteTest {
     @Test
     void spinnakerTabsAndIndents() {
         var cus = jp().parse(
-          """
+                """
             package com.netflix.kayenta.orca.controllers;
                         
             @SuppressWarnings("ALL")
@@ -217,7 +217,7 @@ class AutodetectTest implements RewriteTest {
     @Test
     void rewriteTabsAndIndents() {
         var cus = jp().parse(
-          """
+                """
             public class Autodetect extends NamedStyles {
                 @Override
                 public J.Identifier visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
@@ -250,7 +250,7 @@ class AutodetectTest implements RewriteTest {
     @Test
     void defaultTabIndentSizeToOne() {
         var cus = jp().parse(
-          """
+                """
             /**
              *
              */
@@ -275,7 +275,7 @@ class AutodetectTest implements RewriteTest {
     @Test
     void mixedTabAndWhiteSpacesIndentsWithTabSize4() {
         var cus = jp().parse(
-          """
+                """
             /**
              *
              */
@@ -307,7 +307,7 @@ class AutodetectTest implements RewriteTest {
     @Test
     void mixedTabAndWhiteSpacesIndentsWithTabSize3() {
         var cus = jp().parse(
-          """
+                """
             /**
              *
              */
@@ -338,7 +338,7 @@ class AutodetectTest implements RewriteTest {
     @Test
     void mixedTabAndWhiteSpacesIndentsWithTabSize4AndUseTabIsFalse() {
         var cus = jp().parse(
-          """
+                """
             /**
              *
              */
@@ -369,7 +369,7 @@ class AutodetectTest implements RewriteTest {
     @Test
     void inconsistentIndents() {
         var cus = jp().parse(
-          """
+                """
             package org.openrewrite.before;
 
             import java.util.ArrayList;
@@ -395,7 +395,7 @@ class AutodetectTest implements RewriteTest {
     @Test
     void mixedTabAndWhiteSpacesIndentsWithTabSize4WithSomeErrors() {
         var cus = jp().parse(
-          """
+                """
             /**
              *
              */
@@ -426,7 +426,7 @@ class AutodetectTest implements RewriteTest {
     @Test
     void rewriteImportLayout() {
         var cus = jp().parse(
-          """
+                """
             import com.fasterxml.jackson.annotation.JsonCreator;
             
             import org.openrewrite.internal.StringUtils;
@@ -453,33 +453,33 @@ class AutodetectTest implements RewriteTest {
         assertThat(importLayout.getLayout().get(1)).isInstanceOf(ImportLayoutStyle.Block.BlankLines.class);
 
         assertThat(importLayout.getLayout().get(2))
-          .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
-          .matches(b -> !((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
-          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("org\\.openrewrite\\.internal\\..+"));
+                .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
+                .matches(b -> !((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
+                .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("org\\.openrewrite\\.internal\\..+"));
 
         assertThat(importLayout.getLayout().get(3)).isInstanceOf(ImportLayoutStyle.Block.BlankLines.class);
 
         assertThat(importLayout.getLayout().get(4))
-          .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
-          .matches(b -> !((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
-          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("javax\\..+"));
+                .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
+                .matches(b -> !((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
+                .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("javax\\..+"));
 
         assertThat(importLayout.getLayout().get(5))
-          .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
-          .matches(b -> !((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
-          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("java\\..+"));
+                .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
+                .matches(b -> !((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
+                .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("java\\..+"));
 
         assertThat(importLayout.getLayout().get(6)).isInstanceOf(ImportLayoutStyle.Block.BlankLines.class);
 
         assertThat(importLayout.getLayout().get(7))
-          .isInstanceOf(ImportLayoutStyle.Block.AllOthers.class)
-          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).isStatic());
+                .isInstanceOf(ImportLayoutStyle.Block.AllOthers.class)
+                .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).isStatic());
     }
 
     @Test
     void staticImports() {
         var cus = jp().parse(
-          """
+                """
             package com.example;
                         
             import static com.example.Assertions.java;
@@ -490,7 +490,7 @@ class AutodetectTest implements RewriteTest {
                         
             import java.util.List;
             """,
-          """
+                """
             package com.example;
                         
             import static com.example.Assertions.java;
@@ -509,27 +509,27 @@ class AutodetectTest implements RewriteTest {
         var importLayout = NamedStyles.merge(ImportLayoutStyle.class, singletonList(styles));
 
         assertThat(importLayout.getLayout().get(0))
-          .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
-          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
-          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("com\\.example\\..+"));
+                .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
+                .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
+                .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("com\\.example\\..+"));
 
         assertThat(importLayout.getLayout().get(1)).isInstanceOf(ImportLayoutStyle.Block.BlankLines.class);
 
         assertThat(importLayout.getLayout().get(2))
-          .isInstanceOf(ImportLayoutStyle.Block.AllOthers.class)
-          .matches(b -> ((ImportLayoutStyle.Block.AllOthers) b).isStatic());
+                .isInstanceOf(ImportLayoutStyle.Block.AllOthers.class)
+                .matches(b -> ((ImportLayoutStyle.Block.AllOthers) b).isStatic());
 
         assertThat(importLayout.getLayout().get(3)).isInstanceOf(ImportLayoutStyle.Block.BlankLines.class);
 
         assertThat(importLayout.getLayout().get(4))
-          .isInstanceOf(ImportLayoutStyle.Block.AllOthers.class)
-          .matches(b -> !((ImportLayoutStyle.Block.AllOthers) b).isStatic());
+                .isInstanceOf(ImportLayoutStyle.Block.AllOthers.class)
+                .matches(b -> !((ImportLayoutStyle.Block.AllOthers) b).isStatic());
     }
 
     @Test
     void detectStarImport() {
         var cus = jp().parse(
-          """
+                """
             import java.util.*;
             
             public class Test {
@@ -554,7 +554,7 @@ class AutodetectTest implements RewriteTest {
     @Test
     void detectImportCounts() {
         var cus = jp().parse(
-          """
+                """
             import java.util.ArrayList;
             import java.util.Collections;
             import java.util.HashSet;
@@ -592,7 +592,7 @@ class AutodetectTest implements RewriteTest {
     @Test
     void detectMethodArgs() {
         var cus = jp().parse(
-          """
+                """
             class Test {
                 void i() {
                     a("a" ,"b" ,"c" ,"d");
@@ -613,7 +613,7 @@ class AutodetectTest implements RewriteTest {
     @Test
     void detectMethodArgAfterComma() {
         var cus = jp().parse(
-          """
+                """
             class Test {
                 void i() {
                     a("a", "b");
@@ -635,7 +635,7 @@ class AutodetectTest implements RewriteTest {
     @Test
     void detectColonInForEachLoop() {
         var cus = jp().parse(
-          """
+                """
             class Test {
                 void i() {
                     for (int i : new int[]{}) {}
@@ -655,7 +655,7 @@ class AutodetectTest implements RewriteTest {
     @Test
     void detectAfterTypeCast() {
         var cus = jp().parse(
-          """
+                """
             class T {
                 {
                     String s = (String) getString();
@@ -676,7 +676,7 @@ class AutodetectTest implements RewriteTest {
     @Test
     void detectBeforeForSemicolon() {
         var cus = jp().parse(
-          """
+                """
             class T {
                 void m() {
                     for (int i = 0; i < x; i++) {}
@@ -697,7 +697,7 @@ class AutodetectTest implements RewriteTest {
     @Test
     void detectMethodArgsNoArgs() {
         var cus = jp().parse(
-          """
+                """
             class Test {
                 void i() {
                     a();
@@ -718,7 +718,7 @@ class AutodetectTest implements RewriteTest {
     @Test
     void detectMethodArgsNoSpaceForComma() {
         var cus = jp().parse(
-          """
+                """
             class Test {
                 void i() {
                     a("a","b","c");
@@ -739,7 +739,7 @@ class AutodetectTest implements RewriteTest {
     @Test
     void detectMethodArgsSpaceForComma() {
         var cus = jp().parse(
-          """
+                """
             class Test {
                 void i() {
                     a("a" , "b" , "c");
@@ -760,7 +760,7 @@ class AutodetectTest implements RewriteTest {
     @Test
     void detectAfterCommaInNewArray() {
         var cus = jp().parse(
-          """
+                """
             class T {
                 static {
                     int[] i = new int[]{1, 2, 3, 4};
@@ -782,7 +782,7 @@ class AutodetectTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3172")
     void detectAfterCommaShouldIgnoreFirstElement() {
         var cus = jp().parse(
-          """
+                """
             class T {
                 static {
                     int[] i0 = new int[]{1, 2};
@@ -807,7 +807,7 @@ class AutodetectTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3172")
     void detectAfterCommaBasedOnLambdas() {
         var cus = jp().parse(
-          """
+                """
             import java.util.function.BiConsumer;
             
             class T {
@@ -836,7 +836,7 @@ class AutodetectTest implements RewriteTest {
     @Test
     void detectNoSpacesWithinMethodCall() {
         var cus = jp().parse(
-          """
+                """
             class Test {
                 void a(String a, String b, String c) {
                 }
@@ -859,7 +859,7 @@ class AutodetectTest implements RewriteTest {
     @Test
     void detectSpacesWithinMethodCall() {
         var cus = jp().parse(
-          """
+                """
             class Test {
                 void i() {
                     a( "a","b","c" );
@@ -880,7 +880,7 @@ class AutodetectTest implements RewriteTest {
     @Test
     void detectElseWithNoNewLine() {
         var cus = jp().parse(
-          """
+                """
             class Test {
                 void method(int n) {
                     if (n == 0) {
@@ -904,7 +904,7 @@ class AutodetectTest implements RewriteTest {
     @Test
     void detectElseOnNewLine() {
         var cus = jp().parse(
-          """
+                """
             class Test {
                 void method(int n) {
                     if (n == 0) {
@@ -928,13 +928,14 @@ class AutodetectTest implements RewriteTest {
 
     @Test
     void detectCrlfLineFormat() {
-        @SuppressWarnings("TextBlockMigration") var cus = jp().parse(
-          "class Test {\r\n" +
-          "    // some comment\r\n" +
-          "    public void test() {\n" +
-          "        System.out.println();\n" +
-          "    }\r\n" +
-          "}\r\n"
+        @SuppressWarnings("TextBlockMigration")
+        var cus = jp().parse(
+                "class Test {\r\n" +
+                        "    // some comment\r\n" +
+                        "    public void test() {\n" +
+                        "        System.out.println();\n" +
+                        "    }\r\n" +
+                        "}\r\n"
         );
 
         var detector = Autodetect.detector();
@@ -947,13 +948,14 @@ class AutodetectTest implements RewriteTest {
 
     @Test
     void detectLfLineFormat() {
-        @SuppressWarnings("TextBlockMigration") var cus = jp().parse(
-          "class Test {\n" +
-          "    // some comment\r\n" +
-          "    public void test() {\n" +
-          "        System.out.println();\n" +
-          "    }\n" +
-          "}\r\n"
+        @SuppressWarnings("TextBlockMigration")
+        var cus = jp().parse(
+                "class Test {\n" +
+                        "    // some comment\r\n" +
+                        "    public void test() {\n" +
+                        "        System.out.println();\n" +
+                        "    }\n" +
+                        "}\r\n"
         );
 
         var detector = Autodetect.detector();
@@ -967,7 +969,7 @@ class AutodetectTest implements RewriteTest {
     @Test
     void mostCommonIndentTakesPrecedence() {
         var cus = jp().parse(
-          """
+                """
             package com.test;
             
             public class Foo {
@@ -994,18 +996,18 @@ class AutodetectTest implements RewriteTest {
         assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
         assertThat(tabsAndIndents.getTabSize()).isEqualTo(6);
         assertThat(tabsAndIndents.getIndentSize())
-          .as("While there are outlier 3 and 9 space indents, the most prevalent indentation is 6")
-          .isEqualTo(6);
+                .as("While there are outlier 3 and 9 space indents, the most prevalent indentation is 6")
+                .isEqualTo(6);
         assertThat(tabsAndIndents.getContinuationIndent())
-          .as("With no actual continuation indents to go off of, assume IntelliJ IDEA default of 2x the normal indent")
-          .isEqualTo(12);
+                .as("With no actual continuation indents to go off of, assume IntelliJ IDEA default of 2x the normal indent")
+                .isEqualTo(12);
     }
 
     @SuppressWarnings({"ResultOfMethodCallIgnored", "RedundantStreamOptionalCall"})
     @Test
     void continuationIndents() {
         var cus = jp().parse(
-          """
+                """
             import java.util.stream.Stream;
                         
             class Continuations {
@@ -1054,7 +1056,7 @@ class AutodetectTest implements RewriteTest {
         @Issue("https://github.com/openrewrite/rewrite/issues/3568")
         void ignoreSpaceBetweenAnnotations() {
             var cus = jp().parse(
-              """
+                    """
                 class Test {
                     @SafeVarargs
                     @Deprecated
@@ -1073,14 +1075,14 @@ class AutodetectTest implements RewriteTest {
 
             assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
             assertThat(tabsAndIndents.getContinuationIndent())
-              .as("With no actual continuation indents to go off of, assume IntelliJ IDEA default of 2x the normal indent")
-              .isEqualTo(8);
+                    .as("With no actual continuation indents to go off of, assume IntelliJ IDEA default of 2x the normal indent")
+                    .isEqualTo(8);
         }
 
         @Test
         void includeAnnotationAsAnnotationArg() {
             var cus = jp().parse(
-              """
+                    """
                 @interface Foo{}
                 @interface Foos{
                     Foo[] value();
@@ -1103,13 +1105,13 @@ class AutodetectTest implements RewriteTest {
 
             assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
             assertThat(tabsAndIndents.getContinuationIndent())
-              .isEqualTo(3);
+                    .isEqualTo(3);
         }
 
         @Test
         void includeAnnotationArgArray() {
             var cus = jp().parse(
-              """
+                    """
                 @interface Foo{}
                 @interface Foos{
                     Foo[] value();
@@ -1132,14 +1134,14 @@ class AutodetectTest implements RewriteTest {
 
             assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
             assertThat(tabsAndIndents.getContinuationIndent())
-              .isEqualTo(3);
+                    .isEqualTo(3);
         }
 
         @Test
         @ExpectedToFail("existing visitor does not super-visit newArray trees")
         void includeAnnotationArgArrayElements() {
             var cus = jp().parse(
-              """
+                    """
                 @interface Foo{}
                 @interface Foos{
                     Foo[] value();
@@ -1162,7 +1164,7 @@ class AutodetectTest implements RewriteTest {
 
             assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
             assertThat(tabsAndIndents.getContinuationIndent())
-              .isEqualTo(3);
+                    .isEqualTo(3);
         }
     }
 }

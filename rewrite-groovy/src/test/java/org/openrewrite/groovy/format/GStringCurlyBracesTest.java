@@ -33,12 +33,12 @@ class GStringCurlyBracesTest implements RewriteTest {
     @Test
     void basic() {
         rewriteRun(
-          groovy(
-                """
+                groovy(
+                        """
             def name = 'world'
             "Hello $name!"
             """,
-            """
+                        """
             def name = 'world'
             "Hello ${name}!"
             """)
@@ -48,12 +48,12 @@ class GStringCurlyBracesTest implements RewriteTest {
     @Test
     void fieldAccess() {
         rewriteRun(
-          groovy(
-                """
+                groovy(
+                        """
             def to = [ you : 'world']
             "Hello $to.you!"
             """,
-            """
+                        """
             def to = [ you : 'world']
             "Hello ${to.you}!"
             """)

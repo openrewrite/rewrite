@@ -35,52 +35,52 @@ class ReservedTest implements RewriteTest {
     @Test
     void ranges() {
         rewriteRun(
-          proto(
-            """
+                proto(
+                        """
               syntax = 'proto2';
               message MyMessage {
                 reserved 1 to 10, 25, 12 to 20;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void reservedRangeValues() {
         rewriteRun(
-          proto(
-            """
+                proto(
+                        """
               syntax = 'proto2';
               message MyMessage {
                 reserved 1 to 10, 25, 12 to 20;
               }
               """,
-            spec -> spec.beforeRecipe(protoDoc -> {
-                List<String> ranges = TreeVisitor.collect(new ProtoVisitor<>() {
-                    @Override
-                    public Proto visitRange(Range range, ExecutionContext ctx) {
-                        return SearchResult.found(range);
-                    }
-                }, protoDoc, new ArrayList<>(), Range.class, r -> r.getFrom().getValue() + "->" +
-                                                                  Optional.ofNullable(r.getTo()).map(Proto.Constant::getValue).orElse("null"));
+                        spec -> spec.beforeRecipe(protoDoc -> {
+                            List<String> ranges = TreeVisitor.collect(new ProtoVisitor<>() {
+                                @Override
+                                public Proto visitRange(Range range, ExecutionContext ctx) {
+                                    return SearchResult.found(range);
+                                }
+                            }, protoDoc, new ArrayList<>(), Range.class, r -> r.getFrom().getValue() + "->" +
+                                    Optional.ofNullable(r.getTo()).map(Proto.Constant::getValue).orElse("null"));
 
-                assertThat(ranges).containsExactly("1->10", "25->null", "12->20");
-            }))
+                            assertThat(ranges).containsExactly("1->10", "25->null", "12->20");
+                        }))
         );
     }
 
     @Test
     void stringLiterals() {
         rewriteRun(
-          proto(
-            """
+                proto(
+                        """
               syntax = 'proto2';
               message MyMessage {
                 reserved "1" , '10' ;
               }
               """
-          )
+                )
         );
     }
 }

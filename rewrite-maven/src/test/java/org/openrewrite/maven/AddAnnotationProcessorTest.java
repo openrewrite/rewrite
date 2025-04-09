@@ -27,13 +27,13 @@ class AddAnnotationProcessorTest implements RewriteTest {
     @Test
     void addAnnotationProcessor() {
         rewriteRun(
-          spec -> spec.recipe(new AddAnnotationProcessor(
-            "org.projectlombok",
-            "lombok-mapstruct-binding",
-            "0.2.0"
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new AddAnnotationProcessor(
+                        "org.projectlombok",
+                        "lombok-mapstruct-binding",
+                        "0.2.0"
+                )),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -61,7 +61,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
                   </build>
               </project>
               """,
-            """
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -94,20 +94,20 @@ class AddAnnotationProcessorTest implements RewriteTest {
                   </build>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void shouldUpdateProcessorVersionAlreadyPresent() {
         rewriteRun(
-          spec -> spec.recipe(new AddAnnotationProcessor(
-            "org.projectlombok",
-            "lombok-mapstruct-binding",
-            "0.2.0"
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new AddAnnotationProcessor(
+                        "org.projectlombok",
+                        "lombok-mapstruct-binding",
+                        "0.2.0"
+                )),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -141,7 +141,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
                   </build>
               </project>
               """,
-            """
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -175,7 +175,7 @@ class AddAnnotationProcessorTest implements RewriteTest {
                   </build>
               </project>
               """
-          )
+                )
         );
     }
 }

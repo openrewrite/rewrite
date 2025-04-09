@@ -34,8 +34,8 @@ class RemoveObjectsIsNullTest implements RewriteTest {
     @Test
     void transformCallToIsNull() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.Objects;
               public class A {
                   public void test() {
@@ -46,7 +46,7 @@ class RemoveObjectsIsNullTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   public void test() {
                       Boolean a = true;
@@ -56,7 +56,7 @@ class RemoveObjectsIsNullTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -64,8 +64,8 @@ class RemoveObjectsIsNullTest implements RewriteTest {
     @Test
     void transformCallToNonNull() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import static java.util.Objects.nonNull;
               public class A {
                   public void test() {
@@ -76,7 +76,7 @@ class RemoveObjectsIsNullTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   public void test() {
                       Boolean a = true;
@@ -86,7 +86,7 @@ class RemoveObjectsIsNullTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -94,8 +94,8 @@ class RemoveObjectsIsNullTest implements RewriteTest {
     @Test
     void downcastToPrimitiveBoolean() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import static java.util.Objects.isNull;
               public class A {
                   public void test() {
@@ -106,7 +106,7 @@ class RemoveObjectsIsNullTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   public void test() {
                       Boolean a = true, b = false;
@@ -116,7 +116,7 @@ class RemoveObjectsIsNullTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -124,8 +124,8 @@ class RemoveObjectsIsNullTest implements RewriteTest {
     @Test
     void upcastToBoolean() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import static java.util.Objects.isNull;
               import static java.util.Objects.nonNull;
               public class A {
@@ -145,7 +145,7 @@ class RemoveObjectsIsNullTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   public void test(boolean a) {
                       if (false) {
@@ -163,7 +163,7 @@ class RemoveObjectsIsNullTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -171,8 +171,8 @@ class RemoveObjectsIsNullTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/4244")
     void negatedCallToIsNull() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
             package com.helloworld;
             
             import java.util.Objects;
@@ -183,8 +183,8 @@ class RemoveObjectsIsNullTest implements RewriteTest {
               }
             }
             """,
-            // "!abc == null" is not a valid expression
-            """
+                        // "!abc == null" is not a valid expression
+                        """
             package com.helloworld;
 
             class Hello {
@@ -193,7 +193,7 @@ class RemoveObjectsIsNullTest implements RewriteTest {
               }
             }
             """
-          )
+                )
         );
     }
 
@@ -201,8 +201,8 @@ class RemoveObjectsIsNullTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/4244")
     void comparisonOfCallToFalse() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
             package com.helloworld;
             
             import java.util.Objects;
@@ -215,8 +215,8 @@ class RemoveObjectsIsNullTest implements RewriteTest {
               }
             }
             """,
-            // "!abc == null" is not a valid expression
-            """
+                        // "!abc == null" is not a valid expression
+                        """
             package com.helloworld;
 
             class Hello {
@@ -227,7 +227,7 @@ class RemoveObjectsIsNullTest implements RewriteTest {
               }
             }
             """
-          )
+                )
         );
     }
 }

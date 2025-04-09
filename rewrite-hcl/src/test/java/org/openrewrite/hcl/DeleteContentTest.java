@@ -27,19 +27,19 @@ class DeleteContentTest implements RewriteTest {
     @Test
     void deleteBlock() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteContent("$.before")),
-          hcl(
-            """
+                spec -> spec.recipe(new DeleteContent("$.before")),
+                hcl(
+                        """
               after {
               }
               before {
               }
               """,
-            """
+                        """
               after {
               }
               """
-          )
+                )
         );
     }
 }

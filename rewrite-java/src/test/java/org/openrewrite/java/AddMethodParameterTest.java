@@ -27,9 +27,9 @@ class AddMethodParameterTest implements RewriteTest {
     @Test
     void primitive() {
         rewriteRun(
-          spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", "int", "i", null)),
-          java(
-            """
+                spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", "int", "i", null)),
+                java(
+                        """
               package foo;
               
               public class Foo {
@@ -37,7 +37,7 @@ class AddMethodParameterTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package foo;
               
               public class Foo {
@@ -45,16 +45,16 @@ class AddMethodParameterTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void typePattern() {
         rewriteRun(
-          spec -> spec.recipe(new AddMethodParameter("*..*#bar(..)", "int", "i", null)),
-          java(
-            """
+                spec -> spec.recipe(new AddMethodParameter("*..*#bar(..)", "int", "i", null)),
+                java(
+                        """
               package foo;
               
               public class Foo {
@@ -62,7 +62,7 @@ class AddMethodParameterTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package foo;
               
               public class Foo {
@@ -70,16 +70,16 @@ class AddMethodParameterTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void primitiveArray() {
         rewriteRun(
-          spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", "int[]", "i", null)),
-          java(
-            """
+                spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", "int[]", "i", null)),
+                java(
+                        """
               package foo;
               
               public class Foo {
@@ -87,7 +87,7 @@ class AddMethodParameterTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package foo;
               
               public class Foo {
@@ -95,16 +95,16 @@ class AddMethodParameterTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void parameterized() {
         rewriteRun(
-          spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", "java.util.List<java.util.regex.Pattern>", "i", null)),
-          java(
-            """
+                spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", "java.util.List<java.util.regex.Pattern>", "i", null)),
+                java(
+                        """
               package foo;
               
               public class Foo {
@@ -112,7 +112,7 @@ class AddMethodParameterTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package foo;
               
               import java.util.List;
@@ -123,16 +123,16 @@ class AddMethodParameterTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void wildcard() {
         rewriteRun(
-          spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", "java.util.List<?>", "i", null)),
-          java(
-            """
+                spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", "java.util.List<?>", "i", null)),
+                java(
+                        """
               package foo;
               
               public class Foo {
@@ -140,7 +140,7 @@ class AddMethodParameterTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package foo;
               
               import java.util.List;
@@ -150,16 +150,16 @@ class AddMethodParameterTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void wildcardExtends() {
         rewriteRun(
-          spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", "java.util.List<? extends Object>", "i", null)),
-          java(
-            """
+                spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", "java.util.List<? extends Object>", "i", null)),
+                java(
+                        """
               package foo;
               
               public class Foo {
@@ -167,7 +167,7 @@ class AddMethodParameterTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package foo;
               
               import java.util.List;
@@ -177,16 +177,16 @@ class AddMethodParameterTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void string() {
         rewriteRun(
-          spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", "String", "i", null)),
-          java(
-            """
+                spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", "String", "i", null)),
+                java(
+                        """
               package foo;
               
               public class Foo {
@@ -200,7 +200,7 @@ class AddMethodParameterTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package foo;
               
               public class Foo {
@@ -214,16 +214,16 @@ class AddMethodParameterTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void first() {
         rewriteRun(
-          spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", "int", "i", 0)),
-          java(
-            """
+                spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", "int", "i", 0)),
+                java(
+                        """
               package foo;
               
               public class Foo {
@@ -234,7 +234,7 @@ class AddMethodParameterTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package foo;
               
               public class Foo {
@@ -245,16 +245,16 @@ class AddMethodParameterTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void qualified() {
         rewriteRun(
-          spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", "java.util.regex.Pattern", "p", null)),
-          java(
-            """
+                spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", "java.util.regex.Pattern", "p", null)),
+                java(
+                        """
               package foo;
               
               public class Foo {
@@ -264,7 +264,7 @@ class AddMethodParameterTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package foo;
               
               import java.util.regex.Pattern;
@@ -277,16 +277,16 @@ class AddMethodParameterTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void object() {
         rewriteRun(
-          spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", "Object", "o", null)),
-          java(
-            """
+                spec -> spec.recipe(new AddMethodParameter("foo.Foo#bar(..)", "Object", "o", null)),
+                java(
+                        """
               package foo;
               
               public class Foo {
@@ -294,7 +294,7 @@ class AddMethodParameterTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package foo;
               
               public class Foo {
@@ -302,7 +302,7 @@ class AddMethodParameterTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

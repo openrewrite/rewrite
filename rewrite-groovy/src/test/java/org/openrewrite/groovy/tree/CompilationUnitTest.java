@@ -30,49 +30,49 @@ class CompilationUnitTest implements RewriteTest {
     @Test
     void packageDecl() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               package org.openrewrite
               def a = 'hello'
               """
-          )
+                )
         );
     }
 
     @Test
     void mixedImports() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def a = 'hello'
               import java.util.List
               List l = null
               """
-          )
+                )
         );
     }
 
     @Test
     void shellScript() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               #!/usr/bin/env groovy
               
               def a = 'hello'
               """
-          )
+                )
         );
     }
 
     @Test
     void trailingComment() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               // foo
               """
-          )
+                )
         );
     }
 
@@ -80,24 +80,24 @@ class CompilationUnitTest implements RewriteTest {
     @Test
     void topLevelExpression() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               5
               """
-          )
+                )
         );
     }
 
     @Test
     void scriptImportsCanBeAnywhere() {
         rewriteRun(
-          spec -> spec.parser(GroovyParser.builder().compilerCustomizers(config -> {
-              ImportCustomizer imports = new ImportCustomizer();
-              imports.addStarImports("java.nio.file");
-              config.addCompilationCustomizers(imports);
-          })),
-          groovy(
-            """
+                spec -> spec.parser(GroovyParser.builder().compilerCustomizers(config -> {
+                    ImportCustomizer imports = new ImportCustomizer();
+                    imports.addStarImports("java.nio.file");
+                    config.addCompilationCustomizers(imports);
+                })),
+                groovy(
+                        """
               def p = Paths.get("abc")
               
               import java.io.File
@@ -108,18 +108,18 @@ class CompilationUnitTest implements RewriteTest {
                 io.read()
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void shouldNotFailWhenImportCannotBeResolved() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               import com.example.MyClass
               """
-          )
+                )
         );
     }
 
@@ -127,8 +127,8 @@ class CompilationUnitTest implements RewriteTest {
     @Test
     void addingToMaps() {
         rewriteRun(
-          groovy(
-                """
+                groovy(
+                        """
             class Pair {
                 String foo
                 String bar
@@ -146,7 +146,7 @@ class CompilationUnitTest implements RewriteTest {
                 }
             }
             """
-          )
+                )
         );
     }
 }

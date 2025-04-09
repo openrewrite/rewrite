@@ -26,9 +26,9 @@ class ManagedDependencyRequiresVersionTest implements RewriteTest {
     @Test
     void dependencyManagementDependencyRequiresVersion() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyManagementDependencyRequiresVersion()),
-          pomXml(
-            """
+                spec -> spec.recipe(new DependencyManagementDependencyRequiresVersion()),
+                pomXml(
+                        """
               <project>
                 <groupId>test</groupId>
                 <artifactId>test</artifactId>
@@ -43,14 +43,14 @@ class ManagedDependencyRequiresVersionTest implements RewriteTest {
                 </dependencyManagement>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>test</groupId>
                 <artifactId>test</artifactId>
                 <version>1.0-SNAPSHOT</version>
               </project>
               """
-          )
+                )
         );
     }
 }

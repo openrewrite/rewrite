@@ -27,13 +27,13 @@ class AnnotationTest implements RewriteTest {
     @Test
     void simple() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               @Foo
               class Test {
               }
               """
-          )
+                )
         );
     }
 
@@ -41,13 +41,13 @@ class AnnotationTest implements RewriteTest {
     @Test
     void nested() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               @Foo(bar = @Bar)
               class Test {
               }
               """
-          )
+                )
         );
     }
 }

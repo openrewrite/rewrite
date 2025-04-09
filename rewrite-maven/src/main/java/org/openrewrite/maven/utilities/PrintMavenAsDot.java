@@ -107,10 +107,10 @@ public class PrintMavenAsDot extends Recipe {
             }
 
             private void dotEdges(StringBuilder dot,
-                                  ResolvedGroupArtifactVersion head,
-                                  Scope scope,
-                                  List<ResolvedDependency> resolvedDependencies,
-                                  Map<ResolvedGroupArtifactVersion, Integer> index) {
+                    ResolvedGroupArtifactVersion head,
+                    Scope scope,
+                    List<ResolvedDependency> resolvedDependencies,
+                    Map<ResolvedGroupArtifactVersion, Integer> index) {
                 int headIndex = index.get(head);
                 for (ResolvedDependency dep : resolvedDependencies) {
                     dot.append(headIndex)

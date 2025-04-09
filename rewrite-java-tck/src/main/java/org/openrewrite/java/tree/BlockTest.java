@@ -25,13 +25,13 @@ class BlockTest implements RewriteTest {
     @Test
     void method() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   public void foo() {  }
               }
               """
-          )
+                )
         );
     }
 
@@ -39,13 +39,13 @@ class BlockTest implements RewriteTest {
     @Test
     void staticInit() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   static { }
               }
               """
-          )
+                )
         );
     }
 }

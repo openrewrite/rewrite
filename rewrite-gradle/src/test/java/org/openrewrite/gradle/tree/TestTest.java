@@ -25,8 +25,8 @@ class TestTest implements RewriteTest {
     @Test
     void dsl() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -45,7 +45,7 @@ class TestTest implements RewriteTest {
                  failFast = true
               }
               """
-          )
+                )
         );
     }
 }

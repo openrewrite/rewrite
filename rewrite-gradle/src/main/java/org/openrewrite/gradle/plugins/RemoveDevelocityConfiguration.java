@@ -46,7 +46,7 @@ public class RemoveDevelocityConfiguration extends Recipe {
                     @Override
                     public J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                         if ("develocity".equals(method.getSimpleName()) ||
-                            "gradleEnterprise".equals(method.getSimpleName())) {
+                                "gradleEnterprise".equals(method.getSimpleName())) {
                             return null;
                         }
                         return super.visitMethodInvocation(method, ctx);

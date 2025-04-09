@@ -64,13 +64,15 @@ public class AddNullMethodArgument extends Recipe {
             description = "The name of the parameter that we add the argument for.",
             required = false,
             example = "name")
-    @Nullable String parameterName;
+    @Nullable
+    String parameterName;
 
     @Option(displayName = "Explicit cast",
             description = "Explicitly cast the argument to the parameter type. Useful if the method is overridden with another type.",
             required = false,
             example = "true")
-    @Nullable Boolean explicitCast;
+    @Nullable
+    Boolean explicitCast;
 
     @Override
     public String getInstanceNameSuffix() {

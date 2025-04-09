@@ -39,7 +39,7 @@ public class CommitMessage implements Marker {
     String message;
 
     public static <T extends Tree> T message(Tree t, Recipe r, @Nullable String message) {
-        if(message == null) {
+        if (message == null) {
             //noinspection unchecked
             return (T) t;
         }

@@ -26,23 +26,23 @@ class ContinueTest implements RewriteTest {
     @Test
     void continueFromWhileLoop() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       while(true) continue;
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void continueFromLabeledWhileLoop() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       labeled: while(true)
@@ -50,7 +50,7 @@ class ContinueTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

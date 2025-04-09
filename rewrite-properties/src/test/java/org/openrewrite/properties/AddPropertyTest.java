@@ -30,51 +30,51 @@ class AddPropertyTest implements RewriteTest {
     @Test
     void emptyProperty() {
         rewriteRun(
-          spec -> spec.recipe(new AddProperty(
-            "",
-            "true",
-            null,
-            null
-          )),
-          properties(
-            """
+                spec -> spec.recipe(new AddProperty(
+                        "",
+                        "true",
+                        null,
+                        null
+                )),
+                properties(
+                        """
               management.metrics.enable.process.files=true
               """
-          )
+                )
         );
     }
 
     @Test
     void emptyValue() {
         rewriteRun(
-          spec -> spec.recipe(new AddProperty(
-            "management.metrics.enable.process.files",
-            "",
-            null,
-            null
-          )),
-          properties(
-            """
+                spec -> spec.recipe(new AddProperty(
+                        "management.metrics.enable.process.files",
+                        "",
+                        null,
+                        null
+                )),
+                properties(
+                        """
               management.metrics.enable.process.files=true
               """
-          )
+                )
         );
     }
 
     @Test
     void containsProperty() {
         rewriteRun(
-          spec -> spec.recipe(new AddProperty(
-            "management.metrics.enable.process.files",
-            "true",
-            null,
-            null
-          )),
-          properties(
-            """
+                spec -> spec.recipe(new AddProperty(
+                        "management.metrics.enable.process.files",
+                        "true",
+                        null,
+                        null
+                )),
+                properties(
+                        """
               management.metrics.enable.process.files=true
               """
-          )
+                )
         );
     }
 
@@ -82,21 +82,21 @@ class AddPropertyTest implements RewriteTest {
     @Test
     void newProperty() {
         rewriteRun(
-          spec -> spec.recipe(new AddProperty(
-            "management.metrics.enable.process.files",
-            "true",
-            null,
-            null
-          )),
-          properties(
-            """
+                spec -> spec.recipe(new AddProperty(
+                        "management.metrics.enable.process.files",
+                        "true",
+                        null,
+                        null
+                )),
+                properties(
+                        """
               management=true
               """,
-            """
+                        """
               management=true
               management.metrics.enable.process.files=true
               """
-          )
+                )
         );
     }
 
@@ -104,21 +104,21 @@ class AddPropertyTest implements RewriteTest {
     @Test
     void delimitedByColon() {
         rewriteRun(
-          spec -> spec.recipe(new AddProperty(
-            "management.metrics.enable.process.files",
-            "true",
-            null,
-            ":"
-          )),
-          properties(
-            """
+                spec -> spec.recipe(new AddProperty(
+                        "management.metrics.enable.process.files",
+                        "true",
+                        null,
+                        ":"
+                )),
+                properties(
+                        """
               management=true
               """,
-            """
+                        """
               management=true
               management.metrics.enable.process.files:true
               """
-          )
+                )
         );
     }
 
@@ -126,123 +126,123 @@ class AddPropertyTest implements RewriteTest {
     @Test
     void delimitedByWhitespace() {
         rewriteRun(
-          spec -> spec.recipe(new AddProperty(
-            "management.metrics.enable.process.files",
-            "true",
-            null,
-            "    "
-          )),
-          properties(
-            """
+                spec -> spec.recipe(new AddProperty(
+                        "management.metrics.enable.process.files",
+                        "true",
+                        null,
+                        "    "
+                )),
+                properties(
+                        """
               management=true
               """,
-            """
+                        """
               management=true
               management.metrics.enable.process.files    true
               """
-          )
+                )
         );
     }
 
     @Test
     void addToEmptyFile() {
         rewriteRun(
-          spec -> spec.recipe(new AddProperty(
-            "management.metrics.enable.process.files",
-            "true",
-            null,
-            null
-          )),
-          properties(
-            "",
-            """
+                spec -> spec.recipe(new AddProperty(
+                        "management.metrics.enable.process.files",
+                        "true",
+                        null,
+                        null
+                )),
+                properties(
+                        "",
+                        """
               management.metrics.enable.process.files=true
               """
-          )
+                )
         );
     }
 
     @Test
     void addCommentedPropertyToEmptyFile() {
         rewriteRun(
-          spec -> spec.recipe(new AddProperty(
-            "management.metrics.enable.process.files",
-            "true",
-            "Management metrics",
-            null
-          )),
-          properties(
-            "",
-            """
+                spec -> spec.recipe(new AddProperty(
+                        "management.metrics.enable.process.files",
+                        "true",
+                        "Management metrics",
+                        null
+                )),
+                properties(
+                        "",
+                        """
               # Management metrics
               management.metrics.enable.process.files=true
               """
-          )
+                )
         );
     }
 
     @Test
     void addCommentedPropertyToExistingFile() {
         rewriteRun(
-          spec -> spec.recipe(new AddProperty(
-            "management.metrics.enable.process.files",
-            "true",
-            "Management metrics",
-            null
-          )),
-          properties(
-            "management=true",
-            """
+                spec -> spec.recipe(new AddProperty(
+                        "management.metrics.enable.process.files",
+                        "true",
+                        "Management metrics",
+                        null
+                )),
+                properties(
+                        "management=true",
+                        """
               management=true
               # Management metrics
               management.metrics.enable.process.files=true
               """
-          )
+                )
         );
     }
 
     @Test
     void keepPropertyValueWithLineContinuations() {
         rewriteRun(
-          spec -> spec.recipe(new AddProperty(
-            "management.metrics.enable.process.files",
-            "true",
-            null,
-            null
-          )),
-          properties(
-            """
+                spec -> spec.recipe(new AddProperty(
+                        "management.metrics.enable.process.files",
+                        "true",
+                        null,
+                        null
+                )),
+                properties(
+                        """
               management=tr\\
                 ue
               """,
-            """
+                        """
               management=tr\\
                 ue
               management.metrics.enable.process.files=true
               """,
-            spec -> spec.afterRecipe(after -> {
-                Properties.Entry entry = (Properties.Entry) after.getContent().get(0);
-                assertThat(entry.getValue().getText()).isEqualTo("true");
-                assertThat(entry.getValue().getSource()).isEqualTo("tr\\\n  ue");
-            })
-          )
+                        spec -> spec.afterRecipe(after -> {
+                            Properties.Entry entry = (Properties.Entry) after.getContent().get(0);
+                            assertThat(entry.getValue().getText()).isEqualTo("true");
+                            assertThat(entry.getValue().getSource()).isEqualTo("tr\\\n  ue");
+                        })
+                )
         );
     }
 
     @Test
     void orderedInsertionBeginning() {
         rewriteRun(
-          spec -> spec.recipe(new AddProperty(
-            "com.sam",
-            "true",
-            "sam",
-            null
-          )),
-          properties(
-            """
+                spec -> spec.recipe(new AddProperty(
+                        "com.sam",
+                        "true",
+                        "sam",
+                        null
+                )),
+                properties(
+                        """
               com.zoe=true
               """,
-            """
+                        """
               # sam
               com.sam=true
               com.zoe=true
@@ -253,14 +253,14 @@ class AddPropertyTest implements RewriteTest {
     @Test
     void orderedInsertionMiddle() {
         rewriteRun(
-          spec -> spec.recipe(new AddProperty(
-            "com.sam",
-            "true",
-            "sam",
-            null
-          )),
-          properties(
-            """
+                spec -> spec.recipe(new AddProperty(
+                        "com.sam",
+                        "true",
+                        "sam",
+                        null
+                )),
+                properties(
+                        """
               # amy
               com.amy=true
               # bea
@@ -270,7 +270,7 @@ class AddPropertyTest implements RewriteTest {
               # zoe
               com.zoe=true
               """,
-            """
+                        """
               # amy
               com.amy=true
               # bea
@@ -288,17 +288,17 @@ class AddPropertyTest implements RewriteTest {
     @Test
     void orderedInsertionEnd() {
         rewriteRun(
-          spec -> spec.recipe(new AddProperty(
-            "com.sam",
-            "true",
-            "sam",
-            null
-          )),
-          properties(
-            """
+                spec -> spec.recipe(new AddProperty(
+                        "com.sam",
+                        "true",
+                        "sam",
+                        null
+                )),
+                properties(
+                        """
               com.amy=true
               """,
-            """
+                        """
               com.amy=true
               # sam
               com.sam=true

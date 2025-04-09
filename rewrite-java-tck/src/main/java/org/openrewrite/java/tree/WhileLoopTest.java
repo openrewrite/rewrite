@@ -27,15 +27,15 @@ class WhileLoopTest implements RewriteTest {
     @Test
     void whileLoop() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       while ( true ) { }
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -43,15 +43,15 @@ class WhileLoopTest implements RewriteTest {
     @Test
     void statementTerminatorForSingleLineWhileLoops() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       while ( true ) test();
                   }
               }
               """
-          )
+                )
         );
     }
 }

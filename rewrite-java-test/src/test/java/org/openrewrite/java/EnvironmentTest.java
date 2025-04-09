@@ -44,11 +44,11 @@ class EnvironmentTest {
         var env = Environment.builder().scanRuntimeClasspath().build();
         var styles = env.listStyles();
         var intelliJStyle = styles.stream()
-          .filter(s -> s.getName().equals(IntelliJ.defaults().getName()))
-          .findAny()
-          .orElseThrow();
+                .filter(s -> s.getName().equals(IntelliJ.defaults().getName()))
+                .findAny()
+                .orElseThrow();
         assertThat(intelliJStyle)
-          .as("Environment should be able to find and activate the IntelliJ IDEA style")
-          .isNotNull();
+                .as("Environment should be able to find and activate the IntelliJ IDEA style")
+                .isNotNull();
     }
 }

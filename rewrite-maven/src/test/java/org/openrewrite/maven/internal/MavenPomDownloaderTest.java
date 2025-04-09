@@ -65,12 +65,12 @@ class MavenPomDownloaderTest {
     void ossSonatype() {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext();
         MavenRepository ossSonatype = MavenRepository.builder()
-          .id("oss")
-          .uri("https://oss.sonatype.org/content/repositories/snapshots/")
-          .snapshots(true)
-          .build();
+                .id("oss")
+                .uri("https://oss.sonatype.org/content/repositories/snapshots/")
+                .snapshots(true)
+                .build();
         MavenRepository repo = new MavenPomDownloader(ctx).normalizeRepository(ossSonatype,
-          MavenExecutionContextView.view(ctx), null);
+                MavenExecutionContextView.view(ctx), null);
         assertThat(repo).isNotNull().extracting((MavenRepository::getUri)).isEqualTo(ossSonatype.getUri());
     }
 
@@ -96,15 +96,15 @@ class MavenPomDownloaderTest {
     @Nested
     class WithNativeHttpURLConnectionAndTLS {
         private final ExecutionContext ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
-          .setHttpSender(new HttpUrlConnectionSender(Duration.ofMillis(250), Duration.ofMillis(250)));
+                .setHttpSender(new HttpUrlConnectionSender(Duration.ofMillis(250), Duration.ofMillis(250)));
 
         @Issue("https://github.com/openrewrite/rewrite/issues/3908")
         @Test
         void centralIdOverridesDefaultRepository() {
             var ctx = MavenExecutionContextView.view(this.ctx);
             ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
-              //language=xml
-              """
+                    //language=xml
+                    """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                   xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
@@ -135,9 +135,9 @@ class MavenPomDownloaderTest {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
             Collection<MavenRepository> repos = downloader.distinctNormalizedRepositories(emptyList(), null, null);
             assertThat(repos).areExactly(1, new Condition<>(repo -> "central".equals(repo.getId()),
-              "id \"central\""));
+                    "id \"central\""));
             assertThat(repos).areExactly(1, new Condition<>(repo -> "https://internalartifactrepository.yourorg.com".equals(repo.getUri()),
-              "URI https://internalartifactrepository.yourorg.com"));
+                    "URI https://internalartifactrepository.yourorg.com"));
         }
 
         @Test
@@ -165,14 +165,14 @@ class MavenPomDownloaderTest {
 
             try {
                 new MavenPomDownloader(ctx)
-                  .download(new GroupArtifactVersion("org.openrewrite", "rewrite-core", "7.0.0"), null, null, singletonList(nonexistentRepo));
+                        .download(new GroupArtifactVersion("org.openrewrite", "rewrite-core", "7.0.0"), null, null, singletonList(nonexistentRepo));
             } catch (Exception e) {
                 // not expected to succeed
             }
             assertThat(attemptedUris)
-              .containsExactly("http://internalartifactrepository.yourorg.com/org/openrewrite/rewrite-core/7.0.0/rewrite-core-7.0.0.pom");
+                    .containsExactly("http://internalartifactrepository.yourorg.com/org/openrewrite/rewrite-core/7.0.0/rewrite-core-7.0.0.pom");
             assertThat(discoveredRepositories)
-              .containsExactly(nonexistentRepo);
+                    .containsExactly(nonexistentRepo);
         }
 
         @Test
@@ -192,7 +192,7 @@ class MavenPomDownloaderTest {
 
             try {
                 new MavenPomDownloader(ctx)
-                  .download(new GroupArtifactVersion("org.openrewrite", "rewrite-core", "7.0.0"), null, null, singletonList(nonexistentRepo));
+                        .download(new GroupArtifactVersion("org.openrewrite", "rewrite-core", "7.0.0"), null, null, singletonList(nonexistentRepo));
             } catch (Exception e) {
                 // not expected to succeed
             }
@@ -205,8 +205,8 @@ class MavenPomDownloaderTest {
         void mirrorsOverrideRepositoriesInPom() {
             var ctx = MavenExecutionContextView.view(this.ctx);
             ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
-              //language=xml
-              """
+                    //language=xml
+                    """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                   xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
@@ -224,30 +224,30 @@ class MavenPomDownloaderTest {
 
             Path pomPath = Paths.get("pom.xml");
             Pom pom = Pom.builder()
-              .sourcePath(pomPath)
-              .repository(MAVEN_CENTRAL)
-              .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
-              .gav(new ResolvedGroupArtifactVersion(
-                "${REPO_URL}", "org.openrewrite", "rewrite-core", "7.0.0", null))
-              .build();
+                    .sourcePath(pomPath)
+                    .repository(MAVEN_CENTRAL)
+                    .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
+                    .gav(new ResolvedGroupArtifactVersion(
+                            "${REPO_URL}", "org.openrewrite", "rewrite-core", "7.0.0", null))
+                    .build();
             ResolvedPom resolvedPom = ResolvedPom.builder()
-              .requested(pom)
-              .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
-              .repositories(singletonList(MAVEN_CENTRAL))
-              .build();
+                    .requested(pom)
+                    .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
+                    .repositories(singletonList(MAVEN_CENTRAL))
+                    .build();
 
             Map<Path, Pom> pomsByPath = new HashMap<>();
             pomsByPath.put(pomPath, pom);
 
             MavenPomDownloader mpd = new MavenPomDownloader(pomsByPath, ctx);
             MavenRepository normalized = mpd.normalizeRepository(
-              MavenRepository.builder().id("whatever").uri("${REPO_URL}").build(),
-              ctx,
-              resolvedPom
+                    MavenRepository.builder().id("whatever").uri("${REPO_URL}").build(),
+                    ctx,
+                    resolvedPom
             );
             assertThat(normalized)
-              .extracting(MavenRepository::getUri)
-              .isEqualTo("https://artifactory.moderne.ninja/artifactory/moderne-cache/");
+                    .extracting(MavenRepository::getUri)
+                    .isEqualTo("https://artifactory.moderne.ninja/artifactory/moderne-cache/");
         }
 
         @Disabled("Flaky on CI")
@@ -255,8 +255,8 @@ class MavenPomDownloaderTest {
         void normalizeOssSnapshots() {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
             MavenRepository oss = downloader.normalizeRepository(
-              MavenRepository.builder().id("oss").uri("https://oss.sonatype.org/content/repositories/snapshots").build(),
-              MavenExecutionContextView.view(ctx), null);
+                    MavenRepository.builder().id("oss").uri("https://oss.sonatype.org/content/repositories/snapshots").build(),
+                    MavenExecutionContextView.view(ctx), null);
 
             assertThat(oss).isNotNull();
             assertThat(oss.getUri()).isEqualTo("https://oss.sonatype.org/content/repositories/snapshots/");
@@ -268,8 +268,8 @@ class MavenPomDownloaderTest {
         void skipBlockedRepository(String url) {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
             MavenRepository oss = downloader.normalizeRepository(
-              MavenRepository.builder().id("myRepo").uri(url).build(),
-              MavenExecutionContextView.view(ctx), null);
+                    MavenRepository.builder().id("myRepo").uri(url).build(),
+                    MavenExecutionContextView.view(ctx), null);
 
             assertThat(oss).isNull();
         }
@@ -291,8 +291,8 @@ class MavenPomDownloaderTest {
         void normalizeRejectConnectException() {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
             var normalizedRepository = downloader.normalizeRepository(
-              MavenRepository.builder().id("id").uri("https//localhost").build(),
-              MavenExecutionContextView.view(ctx), null);
+                    MavenRepository.builder().id("id").uri("https//localhost").build(),
+                    MavenExecutionContextView.view(ctx), null);
             assertThat(normalizedRepository).isEqualTo(null);
         }
 
@@ -302,9 +302,9 @@ class MavenPomDownloaderTest {
             try (MockWebServer mockRepo = new MockWebServer()) {
                 mockRepo.enqueue(new MockResponse().setResponseCode(200).setBody("body"));
                 var httpRepo = MavenRepository.builder()
-                  .id("id")
-                  .uri("http://%s:%d/maven/".formatted(mockRepo.getHostName(), mockRepo.getPort()))
-                  .build();
+                        .id("id")
+                        .uri("http://%s:%d/maven/".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                        .build();
 
                 var normalizedRepository = downloader.normalizeRepository(httpRepo, MavenExecutionContextView.view(ctx), null);
 
@@ -323,8 +323,8 @@ class MavenPomDownloaderTest {
                         MockResponse response = new MockResponse().setResponseCode(200);
                         if (request.getPath() != null && request.getPath().contains("maven-metadata")) {
                             response.setBody(
-                              //language=xml
-                              """
+                                    //language=xml
+                                    """
                                     <metadata modelVersion="1.1.0">
                                       <groupId>org.springframework.cloud</groupId>
                                       <artifactId>spring-cloud-dataflow-build</artifactId>
@@ -348,8 +348,8 @@ class MavenPomDownloaderTest {
                             );
                         } else if (request.getPath() != null && request.getPath().endsWith(".pom")) {
                             response.setBody(
-                              //language=xml
-                              """
+                                    //language=xml
+                                    """
                                     <project>
                                         <groupId>org.springframework.cloud</groupId>
                                         <artifactId>spring-cloud-dataflow-build</artifactId>
@@ -378,8 +378,8 @@ class MavenPomDownloaderTest {
                 snapshotRepo.start();
 
                 MavenParser.builder().build().parse(ctx,
-                  //language=xml
-                  """
+                        //language=xml
+                        """
                         <project>
                             <modelVersion>4.0.0</modelVersion>
                     
@@ -433,20 +433,21 @@ class MavenPomDownloaderTest {
             }
 
             MavenRepository repository = MavenRepository.builder()
-              .id("file-based")
-              .uri(repoPath.toUri().toString())
-              .knownToExist(true)
-              .deriveMetadataIfMissing(true)
-              .build();
+                    .id("file-based")
+                    .uri(repoPath.toUri().toString())
+                    .knownToExist(true)
+                    .deriveMetadataIfMissing(true)
+                    .build();
             MavenMetadata metaData = new MavenPomDownloader(emptyMap(), ctx)
-              .downloadMetadata(new GroupArtifact("fred", "fred"), null, List.of(repository));
+                    .downloadMetadata(new GroupArtifact("fred", "fred"), null, List.of(repository));
             assertThat(metaData.getVersioning().getVersions()).hasSize(3).containsAll(Arrays.asList("1.0.0", "1.1.0", "2.0.0"));
         }
 
         @SuppressWarnings("ConstantConditions")
         @Test
         void mergeMetadata() throws IOException {
-            @Language("xml") String metadata1 = """
+            @Language("xml")
+            String metadata1 = """
                   <metadata>
                       <groupId>org.springframework.boot</groupId>
                       <artifactId>spring-boot</artifactId>
@@ -471,7 +472,8 @@ class MavenPomDownloaderTest {
                   </metadata>
               """;
 
-            @Language("xml") String metadata2 = """
+            @Language("xml")
+            String metadata2 = """
                   <metadata modelVersion="1.1.0">
                       <groupId>org.springframework.boot</groupId>
                       <artifactId>spring-boot</artifactId>
@@ -517,8 +519,8 @@ class MavenPomDownloaderTest {
 
             Path localPom = localRepository.resolve("com/bad/bad-artifact/1/bad-artifact-1.pom");
             Files.writeString(localPom,
-              //language=xml
-              """
+                    //language=xml
+                    """
                  <project>
                    <groupId>com.bad</groupId>
                    <artifactId>bad-artifact</artifactId>
@@ -528,16 +530,16 @@ class MavenPomDownloaderTest {
             );
 
             MavenRepository mavenLocal = MavenRepository.builder()
-              .id("local")
-              .uri(localRepository.toUri().toString())
-              .snapshots(false)
-              .knownToExist(true)
-              .build();
+                    .id("local")
+                    .uri(localRepository.toUri().toString())
+                    .snapshots(false)
+                    .knownToExist(true)
+                    .build();
 
             // Does not return invalid dependency.
             assertThrows(MavenDownloadingException.class, () ->
-              new MavenPomDownloader(emptyMap(), ctx)
-                .download(new GroupArtifactVersion("com.bad", "bad-artifact", "1"), null, null, List.of(mavenLocal)));
+                    new MavenPomDownloader(emptyMap(), ctx)
+                            .download(new GroupArtifactVersion("com.bad", "bad-artifact", "1"), null, null, List.of(mavenLocal)));
         }
 
         @Test
@@ -548,8 +550,8 @@ class MavenPomDownloaderTest {
 
             Path localPom = localRepository.resolve("com/bad/bad-artifact/1/bad-artifact-1.pom");
             Files.writeString(localPom,
-              //language=xml
-              """
+                    //language=xml
+                    """
                  <project>
                    <groupId>com.bad</groupId>
                    <artifactId>bad-artifact</artifactId>
@@ -561,40 +563,40 @@ class MavenPomDownloaderTest {
             Files.writeString(localJar, "");
 
             MavenRepository mavenLocal = MavenRepository.builder()
-              .id("local")
-              .uri(localRepository.toUri().toString())
-              .snapshots(false)
-              .knownToExist(true)
-              .build();
+                    .id("local")
+                    .uri(localRepository.toUri().toString())
+                    .snapshots(false)
+                    .knownToExist(true)
+                    .build();
 
             // Does not return invalid dependency.
             assertThrows(MavenDownloadingException.class, () ->
-              new MavenPomDownloader(emptyMap(), ctx)
-                .download(new GroupArtifactVersion("com.bad", "bad-artifact", "1"), null, null, List.of(mavenLocal)));
+                    new MavenPomDownloader(emptyMap(), ctx)
+                            .download(new GroupArtifactVersion("com.bad", "bad-artifact", "1"), null, null, List.of(mavenLocal)));
         }
 
         @Test
         void dontAllowPomDowloadFailureWithoutJar(@TempDir Path localRepository) throws IOException, MavenDownloadingException {
             MavenRepository mavenLocal = MavenRepository.builder()
-              .id("local")
-              .uri(localRepository.toUri().toString())
-              .snapshots(false)
-              .knownToExist(true)
-              .build();
+                    .id("local")
+                    .uri(localRepository.toUri().toString())
+                    .snapshots(false)
+                    .knownToExist(true)
+                    .build();
 
             // Do not return invalid dependency
             assertThrows(MavenDownloadingException.class, () -> new MavenPomDownloader(emptyMap(), ctx)
-              .download(new GroupArtifactVersion("com.bad", "bad-artifact", "1"), null, null, List.of(mavenLocal)));
+                    .download(new GroupArtifactVersion("com.bad", "bad-artifact", "1"), null, null, List.of(mavenLocal)));
         }
 
         @Test
         void allowPomDowloadFailureWithJar(@TempDir Path localRepository) throws IOException, MavenDownloadingException {
             MavenRepository mavenLocal = MavenRepository.builder()
-              .id("local")
-              .uri(localRepository.toUri().toString())
-              .snapshots(false)
-              .knownToExist(true)
-              .build();
+                    .id("local")
+                    .uri(localRepository.toUri().toString())
+                    .snapshots(false)
+                    .knownToExist(true)
+                    .build();
 
             // Create a valid jar
             Path localJar = localRepository.resolve("com/some/some-artifact/1/some-artifact-1.jar");
@@ -603,7 +605,7 @@ class MavenPomDownloaderTest {
 
             // Do not throw exception since we have a jar
             var result = new MavenPomDownloader(emptyMap(), ctx)
-              .download(new GroupArtifactVersion("com.some", "some-artifact", "1"), null, null, List.of(mavenLocal));
+                    .download(new GroupArtifactVersion("com.some", "some-artifact", "1"), null, null, List.of(mavenLocal));
             assertThat(result.getGav().getGroupId()).isEqualTo("com.some");
             assertThat(result.getGav().getArtifactId()).isEqualTo("some-artifact");
             assertThat(result.getGav().getVersion()).isEqualTo("1");
@@ -627,12 +629,12 @@ class MavenPomDownloaderTest {
             var downloader = new MavenPomDownloader(ctx);
             var gav = new GroupArtifactVersion("org.openrewrite", "rewrite-core", "7.0.0");
             var repos = singletonList(MavenRepository.builder()
-              .id("non-routable").uri("http://10.0.0.0/maven").knownToExist(true).build());
+                    .id("non-routable").uri("http://10.0.0.0/maven").knownToExist(true).build());
 
             assertThatThrownBy(() -> downloader.download(gav, null, null, repos))
-              .isInstanceOf(MavenDownloadingException.class)
-              .hasMessageContaining("rewrite-core")
-              .hasMessageContaining("10.0.0.0");
+                    .isInstanceOf(MavenDownloadingException.class)
+                    .hasMessageContaining("rewrite-core")
+                    .hasMessageContaining("10.0.0.0");
         }
 
         private static GroupArtifactVersion createArtifact(Path repository) throws IOException {
@@ -644,8 +646,8 @@ class MavenPomDownloaderTest {
             Files.createFile(jar);
 
             Files.write(pom,
-              //language=xml
-              """
+                    //language=xml
+                    """
                 <project>
                     <groupId>org.openrewrite</groupId>
                     <artifactId>rewrite</artifactId>
@@ -662,40 +664,40 @@ class MavenPomDownloaderTest {
 
             Path testTest2PomXml = Paths.get("test/test2/pom.xml");
             Pom pom = Pom.builder()
-              .sourcePath(testTest2PomXml)
-              .repository(MAVEN_CENTRAL)
-              .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
-              .parent(new Parent(new GroupArtifactVersion("test", "test", "${test}"), "../pom.xml"))
-              .gav(new ResolvedGroupArtifactVersion(
-                "${REPO_URL}", "test", "test2", "7.0.0", null))
-              .build();
+                    .sourcePath(testTest2PomXml)
+                    .repository(MAVEN_CENTRAL)
+                    .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
+                    .parent(new Parent(new GroupArtifactVersion("test", "test", "${test}"), "../pom.xml"))
+                    .gav(new ResolvedGroupArtifactVersion(
+                            "${REPO_URL}", "test", "test2", "7.0.0", null))
+                    .build();
 
             ResolvedPom resolvedPom = ResolvedPom.builder()
-              .requested(pom)
-              .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
-              .repositories(singletonList(MAVEN_CENTRAL))
-              .build();
+                    .requested(pom)
+                    .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
+                    .repositories(singletonList(MAVEN_CENTRAL))
+                    .build();
 
             Path testPomXml = Paths.get("test/pom.xml");
             Pom pom2 = Pom.builder()
-              .sourcePath(testPomXml)
-              .repository(MAVEN_CENTRAL)
-              .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
-              .parent(new Parent(new GroupArtifactVersion("test", "root-test", "${test}"), "../pom.xml"))
-              .gav(new ResolvedGroupArtifactVersion(
-                "${REPO_URL}", "test", "test", "7.0.0", null))
-              .build();
+                    .sourcePath(testPomXml)
+                    .repository(MAVEN_CENTRAL)
+                    .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
+                    .parent(new Parent(new GroupArtifactVersion("test", "root-test", "${test}"), "../pom.xml"))
+                    .gav(new ResolvedGroupArtifactVersion(
+                            "${REPO_URL}", "test", "test", "7.0.0", null))
+                    .build();
 
 
             Path rootPomXml = Paths.get("pom.xml");
             Pom parentPom = Pom.builder()
-              .sourcePath(rootPomXml)
-              .repository(MAVEN_CENTRAL)
-              .properties(singletonMap("test", "7.0.0"))
-              .parent(null)
-              .gav(new ResolvedGroupArtifactVersion(
-                "${REPO_URL}", "test", "root-test", "7.0.0", null))
-              .build();
+                    .sourcePath(rootPomXml)
+                    .repository(MAVEN_CENTRAL)
+                    .properties(singletonMap("test", "7.0.0"))
+                    .parent(null)
+                    .gav(new ResolvedGroupArtifactVersion(
+                            "${REPO_URL}", "test", "root-test", "7.0.0", null))
+                    .build();
 
             Map<Path, Pom> pomsByPath = new HashMap<>();
             pomsByPath.put(rootPomXml, parentPom);
@@ -716,40 +718,40 @@ class MavenPomDownloaderTest {
 
             Path testTest2PomXml = Paths.get("test/test2/pom.xml");
             Pom pom = Pom.builder()
-              .sourcePath(testTest2PomXml)
-              .repository(MAVEN_CENTRAL)
-              .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
-              .parent(new Parent(new GroupArtifactVersion("test", "test", "${test}"), "../pom.xml"))
-              .gav(new ResolvedGroupArtifactVersion(
-                "${REPO_URL}", "test", "test2", "7.0.0", null))
-              .build();
+                    .sourcePath(testTest2PomXml)
+                    .repository(MAVEN_CENTRAL)
+                    .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
+                    .parent(new Parent(new GroupArtifactVersion("test", "test", "${test}"), "../pom.xml"))
+                    .gav(new ResolvedGroupArtifactVersion(
+                            "${REPO_URL}", "test", "test2", "7.0.0", null))
+                    .build();
 
             ResolvedPom resolvedPom = ResolvedPom.builder()
-              .requested(pom)
-              .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
-              .repositories(singletonList(MAVEN_CENTRAL))
-              .build();
+                    .requested(pom)
+                    .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
+                    .repositories(singletonList(MAVEN_CENTRAL))
+                    .build();
 
             Path testPomXml = Paths.get("test/pom.xml");
             Pom pom2 = Pom.builder()
-              .sourcePath(testPomXml)
-              .repository(MAVEN_CENTRAL)
-              .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
-              .parent(new Parent(new GroupArtifactVersion("test", "root-test", "${test}"), "../pom.xml"))
-              .gav(new ResolvedGroupArtifactVersion(
-                "${REPO_URL}", "test", "test", "7.0.0", null))
-              .build();
+                    .sourcePath(testPomXml)
+                    .repository(MAVEN_CENTRAL)
+                    .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
+                    .parent(new Parent(new GroupArtifactVersion("test", "root-test", "${test}"), "../pom.xml"))
+                    .gav(new ResolvedGroupArtifactVersion(
+                            "${REPO_URL}", "test", "test", "7.0.0", null))
+                    .build();
 
 
             Path rootPomXml = Paths.get("pom.xml");
             Pom parentPom = Pom.builder()
-              .sourcePath(rootPomXml)
-              .repository(MAVEN_CENTRAL)
-              .properties(singletonMap("tt", "7.0.0"))
-              .parent(null)
-              .gav(new ResolvedGroupArtifactVersion(
-                "${REPO_URL}", "test", "root-test", "7.0.0", null))
-              .build();
+                    .sourcePath(rootPomXml)
+                    .repository(MAVEN_CENTRAL)
+                    .properties(singletonMap("tt", "7.0.0"))
+                    .parent(null)
+                    .gav(new ResolvedGroupArtifactVersion(
+                            "${REPO_URL}", "test", "root-test", "7.0.0", null))
+                    .build();
 
             Map<Path, Pom> pomsByPath = new HashMap<>();
             pomsByPath.put(rootPomXml, parentPom);
@@ -770,19 +772,19 @@ class MavenPomDownloaderTest {
 
             Path pomPath = Paths.get("pom.xml");
             Pom pom = Pom.builder()
-              .sourcePath(pomPath)
-              .repository(MAVEN_CENTRAL)
-              .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
-              .parent(new Parent(new GroupArtifactVersion("org.springframework.boot", "spring-boot-dependencies", "2.7.0"), null))
-              .gav(new ResolvedGroupArtifactVersion(
-                "${REPO_URL}", "org.springframework.boot", "spring-boot-starter-parent", "2.7.0", null))
-              .build();
+                    .sourcePath(pomPath)
+                    .repository(MAVEN_CENTRAL)
+                    .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
+                    .parent(new Parent(new GroupArtifactVersion("org.springframework.boot", "spring-boot-dependencies", "2.7.0"), null))
+                    .gav(new ResolvedGroupArtifactVersion(
+                            "${REPO_URL}", "org.springframework.boot", "spring-boot-starter-parent", "2.7.0", null))
+                    .build();
 
             ResolvedPom resolvedPom = ResolvedPom.builder()
-              .requested(pom)
-              .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
-              .repositories(singletonList(MAVEN_CENTRAL))
-              .build();
+                    .requested(pom)
+                    .properties(singletonMap("REPO_URL", MAVEN_CENTRAL.getUri()))
+                    .repositories(singletonList(MAVEN_CENTRAL))
+                    .build();
 
             Map<Path, Pom> pomsByPath = new HashMap<>();
             pomsByPath.put(pomPath, pom);
@@ -804,22 +806,22 @@ class MavenPomDownloaderTest {
         WithOkHttpClientAndSelfSignedTLS() throws UnknownHostException {
             String localhost = InetAddress.getByName("localhost").getCanonicalHostName();
             HeldCertificate localhostCertificate = new HeldCertificate.Builder()
-              .addSubjectAlternativeName(localhost)
-              .build();
+                    .addSubjectAlternativeName(localhost)
+                    .build();
             sslSocketFactory = new HandshakeCertificates.Builder()
-              .heldCertificate(localhostCertificate)
-              .build().sslSocketFactory();
+                    .heldCertificate(localhostCertificate)
+                    .build().sslSocketFactory();
 
             HandshakeCertificates clientCertificates = new HandshakeCertificates.Builder()
-              .addTrustedCertificate(localhostCertificate.certificate())
-              .build();
+                    .addTrustedCertificate(localhostCertificate.certificate())
+                    .build();
             OkHttpClient client = new OkHttpClient.Builder()
-              .sslSocketFactory(clientCertificates.sslSocketFactory(), clientCertificates.trustManager())
-              .connectTimeout(Duration.ofMillis(250))
-              .readTimeout(Duration.ofMillis(250))
-              .build();
+                    .sslSocketFactory(clientCertificates.sslSocketFactory(), clientCertificates.trustManager())
+                    .connectTimeout(Duration.ofMillis(250))
+                    .readTimeout(Duration.ofMillis(250))
+                    .build();
             ctx = HttpSenderExecutionContextView.view(new InMemoryExecutionContext())
-              .setHttpSender(new OkHttpSender(client));
+                    .setHttpSender(new OkHttpSender(client));
         }
 
         private MockWebServer getMockServer() {
@@ -839,8 +841,8 @@ class MavenPomDownloaderTest {
                 mockRepo.start();
                 block.accept(mockRepo);
                 assertThat(mockRepo.getRequestCount())
-                  .as("The mock repository received no requests. The test is not using it.")
-                  .isGreaterThan(0);
+                        .as("The mock repository received no requests. The test is not using it.")
+                        .isGreaterThan(0);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
@@ -851,18 +853,18 @@ class MavenPomDownloaderTest {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
             mockServer(200, mockRepo -> {
                 var normalizedRepository = downloader.normalizeRepository(
-                  MavenRepository.builder()
-                    .id("id")
-                    .uri("http://%s:%d/maven/".formatted(mockRepo.getHostName(), mockRepo.getPort()))
-                    .build(),
-                  MavenExecutionContextView.view(ctx),
-                  null);
+                        MavenRepository.builder()
+                                .id("id")
+                                .uri("http://%s:%d/maven/".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                                .build(),
+                        MavenExecutionContextView.view(ctx),
+                        null);
 
                 assertThat(normalizedRepository).isEqualTo(
-                  MavenRepository.builder()
-                    .id("id")
-                    .uri("https://%s:%d/maven/".formatted(mockRepo.getHostName(), mockRepo.getPort()))
-                    .build());
+                        MavenRepository.builder()
+                                .id("id")
+                                .uri("https://%s:%d/maven/".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                                .build());
             });
         }
 
@@ -872,9 +874,9 @@ class MavenPomDownloaderTest {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
             mockServer(status, mockRepo -> {
                 var originalRepo = MavenRepository.builder()
-                  .id("id")
-                  .uri("https://%s:%d/maven/".formatted(mockRepo.getHostName(), mockRepo.getPort()))
-                  .build();
+                        .id("id")
+                        .uri("https://%s:%d/maven/".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                        .build();
                 var normalizedRepo = downloader.normalizeRepository(originalRepo, MavenExecutionContextView.view(ctx), null);
                 assertThat(normalizedRepo).isEqualTo(originalRepo);
             });
@@ -885,23 +887,23 @@ class MavenPomDownloaderTest {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
             var gav = new GroupArtifactVersion("fred", "fred", "1.0.0");
             mockServer(500,
-              repo1 -> mockServer(400, repo2 -> {
-                  var repositories = List.of(
-                    MavenRepository.builder()
-                      .id("id")
-                      .uri("http://%s:%d/maven".formatted(repo1.getHostName(), repo1.getPort()))
-                      .build(),
-                    MavenRepository.builder()
-                      .id("id2")
-                      .uri("http://%s:%d/maven".formatted(repo2.getHostName(), repo2.getPort()))
-                      .build()
-                  );
+                    repo1 -> mockServer(400, repo2 -> {
+                        var repositories = List.of(
+                                MavenRepository.builder()
+                                        .id("id")
+                                        .uri("http://%s:%d/maven".formatted(repo1.getHostName(), repo1.getPort()))
+                                        .build(),
+                                MavenRepository.builder()
+                                        .id("id2")
+                                        .uri("http://%s:%d/maven".formatted(repo2.getHostName(), repo2.getPort()))
+                                        .build()
+                        );
 
-                  assertThatThrownBy(() -> downloader.download(gav, null, null, repositories))
-                    .isInstanceOf(MavenDownloadingException.class)
-                    .hasMessageContaining("https://%s:%d/maven".formatted(repo1.getHostName(), repo1.getPort()))
-                    .hasMessageContaining("https://%s:%d/maven".formatted(repo2.getHostName(), repo2.getPort()));
-              })
+                        assertThatThrownBy(() -> downloader.download(gav, null, null, repositories))
+                                .isInstanceOf(MavenDownloadingException.class)
+                                .hasMessageContaining("https://%s:%d/maven".formatted(repo1.getHostName(), repo1.getPort()))
+                                .hasMessageContaining("https://%s:%d/maven".formatted(repo2.getHostName(), repo2.getPort()));
+                    })
             );
         }
 
@@ -916,10 +918,10 @@ class MavenPomDownloaderTest {
                     public MockResponse dispatch(RecordedRequest recordedRequest) {
                         assert recordedRequest.getPath() != null;
                         return !recordedRequest.getPath().endsWith("fred/fred/2020.0.2-SNAPSHOT/fred-2020.0.2-20210127.131051-2.pom") ?
-                          new MockResponse().setResponseCode(404).setBody("") :
-                          new MockResponse().setResponseCode(200).setBody(
-                            //language=xml
-                            """
+                                new MockResponse().setResponseCode(404).setBody("") :
+                                new MockResponse().setResponseCode(200).setBody(
+                                        //language=xml
+                                        """
                               <project>
                                   <groupId>org.springframework.cloud</groupId>
                                   <artifactId>spring-cloud-dataflow-build</artifactId>
@@ -930,11 +932,11 @@ class MavenPomDownloaderTest {
                 });
                 mockRepo.start();
                 var repositories = List.of(MavenRepository.builder()
-                  .id("id")
-                  .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
-                  .username("user")
-                  .password("pass")
-                  .build());
+                        .id("id")
+                        .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                        .username("user")
+                        .password("pass")
+                        .build());
 
                 assertDoesNotThrow(() -> downloader.download(gav, null, null, repositories));
             } catch (IOException e) {
@@ -951,10 +953,10 @@ class MavenPomDownloaderTest {
                     @Override
                     public MockResponse dispatch(RecordedRequest recordedRequest) {
                         return recordedRequest.getHeaders().get("Authorization") != null ?
-                          new MockResponse().setResponseCode(401).setBody("") :
-                          new MockResponse().setResponseCode(200).setBody(
-                            //language=xml
-                            """
+                                new MockResponse().setResponseCode(401).setBody("") :
+                                new MockResponse().setResponseCode(200).setBody(
+                                        //language=xml
+                                        """
                               <project>
                                   <groupId>org.springframework.cloud</groupId>
                                   <artifactId>spring-cloud-dataflow-build</artifactId>
@@ -965,11 +967,11 @@ class MavenPomDownloaderTest {
                 });
                 mockRepo.start();
                 var repositories = List.of(MavenRepository.builder()
-                  .id("id")
-                  .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
-                  .username("user")
-                  .password("pass")
-                  .build());
+                        .id("id")
+                        .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                        .username("user")
+                        .password("pass")
+                        .build());
 
                 assertDoesNotThrow(() -> downloader.download(gav, null, null, repositories));
             } catch (IOException e) {
@@ -990,8 +992,8 @@ class MavenPomDownloaderTest {
                             response.setResponseCode(200);
                             if (!"HEAD".equalsIgnoreCase(recordedRequest.getMethod())) {
                                 response.setBody(
-                                  //language=xml
-                                  """
+                                        //language=xml
+                                        """
                                     <project>
                                         <groupId>org.springframework.cloud</groupId>
                                         <artifactId>spring-cloud-dataflow-build</artifactId>
@@ -1007,11 +1009,11 @@ class MavenPomDownloaderTest {
                 });
                 mockRepo.start();
                 var repositories = List.of(MavenRepository.builder()
-                  .id("id")
-                  .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
-                  .username("user")
-                  .password("pass")
-                  .build());
+                        .id("id")
+                        .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                        .username("user")
+                        .password("pass")
+                        .build());
 
                 assertDoesNotThrow(() -> downloader.download(gav, null, null, repositories));
             } catch (IOException e) {
@@ -1034,8 +1036,8 @@ class MavenPomDownloaderTest {
                             response.setResponseCode(401);
                         } else if (recordedRequest.getMethod() == null || !recordedRequest.getMethod().equalsIgnoreCase("HEAD")) {
                             response.setBody(
-                              //language=xml
-                              """
+                                    //language=xml
+                                    """
                                 <project>
                                     <groupId>org.springframework.cloud</groupId>
                                     <artifactId>spring-cloud-dataflow-build</artifactId>
@@ -1048,11 +1050,11 @@ class MavenPomDownloaderTest {
                 });
                 mockRepo.start();
                 var repositories = List.of(MavenRepository.builder()
-                  .id("id")
-                  .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
-                  .username("${env.ARTIFACTORY_USERNAME}")
-                  .password("${env.ARTIFACTORY_USERNAME}")
-                  .build());
+                        .id("id")
+                        .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                        .username("${env.ARTIFACTORY_USERNAME}")
+                        .password("${env.ARTIFACTORY_USERNAME}")
+                        .build());
 
                 assertDoesNotThrow(() -> downloader.download(gav, null, null, repositories));
             } catch (IOException e) {
@@ -1074,11 +1076,11 @@ class MavenPomDownloaderTest {
                 });
                 mockRepo.start();
                 var repositories = List.of(MavenRepository.builder()
-                  .id("id")
-                  .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
-                  .username("user")
-                  .password("pass")
-                  .build());
+                        .id("id")
+                        .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                        .username("user")
+                        .password("pass")
+                        .build());
 
                 var downloader = new MavenPomDownloader(emptyMap(), ctx);
                 var gav = new GroupArtifactVersion("fred", "fred", "1");
@@ -1102,11 +1104,11 @@ class MavenPomDownloaderTest {
                 });
                 mockRepo.start();
                 var repositories = List.of(MavenRepository.builder()
-                  .id("id")
-                  .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
-                  .username("user")
-                  .password("pass")
-                  .build());
+                        .id("id")
+                        .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                        .username("user")
+                        .password("pass")
+                        .build());
 
                 var gav = new GroupArtifactVersion("fred", "fred", "1");
                 var downloader = new MavenPomDownloader(emptyMap(), ctx);

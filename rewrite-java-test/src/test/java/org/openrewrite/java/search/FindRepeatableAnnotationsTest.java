@@ -34,8 +34,8 @@ class FindRepeatableAnnotationsTest implements RewriteTest {
     @Test
     void findRepeatable() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import org.mapstruct.*;
               class Test {
                   @ValueMappings({
@@ -46,7 +46,7 @@ class FindRepeatableAnnotationsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import org.mapstruct.*;
               class Test {
                   @ValueMappings({
@@ -57,9 +57,9 @@ class FindRepeatableAnnotationsTest implements RewriteTest {
                   }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package org.mapstruct;
 
               import java.lang.annotation.ElementType;
@@ -77,10 +77,10 @@ class FindRepeatableAnnotationsTest implements RewriteTest {
                   String target();
               }
               """,
-            SourceSpec::skip
-          ),
-          java(
-            """
+                        SourceSpec::skip
+                ),
+                java(
+                        """
               package org.mapstruct;
                           
               import java.lang.annotation.ElementType;
@@ -94,18 +94,18 @@ class FindRepeatableAnnotationsTest implements RewriteTest {
                   ValueMapping[] value();
               }
               """,
-            SourceSpec::skip
-          ),
-          java(
-            """
+                        SourceSpec::skip
+                ),
+                java(
+                        """
               package org.mapstruct;
                           
               public class MappingConstants {
                   public static final String NULL = "null";
               }
               """,
-            SourceSpec::skip
-          )
+                        SourceSpec::skip
+                )
         );
     }
 }

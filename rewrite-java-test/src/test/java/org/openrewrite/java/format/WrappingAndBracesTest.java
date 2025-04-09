@@ -41,26 +41,26 @@ class WrappingAndBracesTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(toRecipe(() -> new WrappingAndBracesVisitor<>(new WrappingAndBracesStyle(
-          new WrappingAndBracesStyle.IfStatement(false)))));
+                new WrappingAndBracesStyle.IfStatement(false)))));
     }
 
     private static Consumer<RecipeSpec> wrappingAndBraces(UnaryOperator<SpacesStyle> spaces,
-                                                          UnaryOperator<WrappingAndBracesStyle> wrapping) {
+            UnaryOperator<WrappingAndBracesStyle> wrapping) {
         return spec -> spec
-          .recipes(
-            new WrappingAndBraces(),
-            new TabsAndIndents(),
-            new Spaces()
-          )
-          .parser(JavaParser.fromJavaVersion().styles(singletonList(
-            new NamedStyles(
-              Tree.randomId(), "test", "test", "test", emptySet(),
-              Arrays.asList(
-                spaces.apply(IntelliJ.spaces()),
-                wrapping.apply(IntelliJ.wrappingAndBraces())
-              )
-            )
-          )));
+                .recipes(
+                        new WrappingAndBraces(),
+                        new TabsAndIndents(),
+                        new Spaces()
+                )
+                .parser(JavaParser.fromJavaVersion().styles(singletonList(
+                        new NamedStyles(
+                                Tree.randomId(), "test", "test", "test", emptySet(),
+                                Arrays.asList(
+                                        spaces.apply(IntelliJ.spaces()),
+                                        wrapping.apply(IntelliJ.wrappingAndBraces())
+                                )
+                        )
+                )));
     }
 
     @SuppressWarnings({"StatementWithEmptyBody", "ConstantConditions"})
@@ -68,12 +68,12 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void conditionalsShouldStartOnNewLines() {
         rewriteRun(
-          spec -> spec.recipes(
-            new WrappingAndBraces(),
-            new TabsAndIndents()
-          ),
-          java(
-            """
+                spec -> spec.recipes(
+                        new WrappingAndBraces(),
+                        new TabsAndIndents()
+                ),
+                java(
+                        """
               class Test {
                   void test() {
                       if (1 == 2) {
@@ -82,7 +82,7 @@ class WrappingAndBracesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   void test() {
                       if (1 == 2) {
@@ -92,7 +92,7 @@ class WrappingAndBracesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -101,15 +101,15 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void blockLevelStatements() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class Test {
                   {        int n = 0;
                       n++;
                   }
               }
               """,
-            """
+                        """
               public class Test {
                   {
                       int n = 0;
@@ -117,39 +117,39 @@ class WrappingAndBracesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void blockEndOnOwnLine() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   int n = 0;}
               """,
-            """
+                        """
               class Test {
                   int n = 0;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void annotatedMethod() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class Test {
                   @SuppressWarnings({"ALL"}) Object method() {
                       return new Object();
                   }
               }
               """,
-            """
+                        """
               public class Test {
                   @SuppressWarnings({"ALL"})
                Object method() {
@@ -157,22 +157,22 @@ class WrappingAndBracesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void annotatedMethodWithModifier() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class Test {
                   @SuppressWarnings({"ALL"}) public Object method() {
                       return new Object();
                   }
               }
               """,
-            """
+                        """
               public class Test {
                   @SuppressWarnings({"ALL"})
                public Object method() {
@@ -180,22 +180,22 @@ class WrappingAndBracesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void annotatedMethodWithModifiers() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class Test {
                   @SuppressWarnings({"ALL"}) public final Object method() {
                       return new Object();
                   }
               }
               """,
-            """
+                        """
               public class Test {
                   @SuppressWarnings({"ALL"})
                public final Object method() {
@@ -203,22 +203,22 @@ class WrappingAndBracesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void annotatedMethodWithTypeParameter() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class Test {
                   @SuppressWarnings({"ALL"}) <T> T method() {
                       return null;
                   }
               }
               """,
-            """
+                        """
               public class Test {
                   @SuppressWarnings({"ALL"})
                <T> T method() {
@@ -226,22 +226,22 @@ class WrappingAndBracesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void multipleAnnotatedMethod() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class Test {
                   @SuppressWarnings({"ALL"}) @Deprecated Object method() {
                       return new Object();
                   }
               }
               """,
-            """
+                        """
               public class Test {
                   @SuppressWarnings({"ALL"})
                @Deprecated
@@ -250,21 +250,21 @@ class WrappingAndBracesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void annotatedConstructor() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class Test {
                   @SuppressWarnings({"ALL"}) @Deprecated Test() {
                   }
               }
               """,
-            """
+                        """
               public class Test {
                   @SuppressWarnings({"ALL"})
                @Deprecated
@@ -272,69 +272,69 @@ class WrappingAndBracesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void annotatedClassDecl() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               @SuppressWarnings({"ALL"}) class Test {
               }
               """,
-            """
+                        """
               @SuppressWarnings({"ALL"})
                class Test {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void annotatedClassDeclAlreadyCorrect() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               @SuppressWarnings({"ALL"})
               class Test {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void annotatedClassDeclWithModifiers() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               @SuppressWarnings({"ALL"}) public class Test {
               }
               """,
-            """
+                        """
               @SuppressWarnings({"ALL"})
                public class Test {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void annotatedVariableDecl() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class Test {
                   public void doSomething() {
                       @SuppressWarnings("ALL") int foo;
                   }
               }
               """,
-            """
+                        """
               public class Test {
                   public void doSomething() {
                       @SuppressWarnings("ALL")
@@ -342,15 +342,15 @@ class WrappingAndBracesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void annotatedVariableAlreadyCorrect() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class Test {
                   public void doSomething() {
                       @SuppressWarnings("ALL")
@@ -358,40 +358,40 @@ class WrappingAndBracesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void annotatedVariableDeclWithModifier() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class Test {
                   @SuppressWarnings("ALL") private int foo;
               }
               """,
-            """
+                        """
               public class Test {
                   @SuppressWarnings("ALL")
                private int foo;        
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void annotatedVariableDeclInMethodDeclaration() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class Test {
                   public void doSomething(@SuppressWarnings("ALL") int foo) {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -399,18 +399,18 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void retainTrailingComments() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class Test {
               int m; /* comment */ int n;}
               """,
-            """
+                        """
               public class Test {
               int m; /* comment */
               int n;
               }
               """
-          )
+                )
         );
     }
 
@@ -418,11 +418,11 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void elseOnNewLine() {
         rewriteRun(
-          wrappingAndBraces(
-            spaces -> spaces.withBeforeKeywords(spaces.getBeforeKeywords().withElseKeyword(true)),
-            wrap -> wrap.withIfStatement(new WrappingAndBracesStyle.IfStatement(true))),
-          java(
-            """
+                wrappingAndBraces(
+                        spaces -> spaces.withBeforeKeywords(spaces.getBeforeKeywords().withElseKeyword(true)),
+                        wrap -> wrap.withIfStatement(new WrappingAndBracesStyle.IfStatement(true))),
+                java(
+                        """
               public class Test {
                   void method(int arg0) {
                       if (arg0 == 0) {
@@ -435,7 +435,7 @@ class WrappingAndBracesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class Test {
                   void method(int arg0) {
                       if (arg0 == 0) {
@@ -450,7 +450,7 @@ class WrappingAndBracesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -458,11 +458,11 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void elseNotOnNewLine() {
         rewriteRun(
-          wrappingAndBraces(
-            spaces -> spaces.withBeforeKeywords(spaces.getBeforeKeywords().withElseKeyword(true)),
-            wrap -> wrap.withIfStatement(new WrappingAndBracesStyle.IfStatement(false))),
-          java(
-            """
+                wrappingAndBraces(
+                        spaces -> spaces.withBeforeKeywords(spaces.getBeforeKeywords().withElseKeyword(true)),
+                        wrap -> wrap.withIfStatement(new WrappingAndBracesStyle.IfStatement(false))),
+                java(
+                        """
               public class Test {
                   void method(int arg0) {
                       if (arg0 == 0) {
@@ -477,7 +477,7 @@ class WrappingAndBracesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class Test {
                   void method(int arg0) {
                       if (arg0 == 0) {
@@ -490,7 +490,7 @@ class WrappingAndBracesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -498,14 +498,14 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void emptyLineBeforeEnumConstants() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public enum Status {
                   NOT_STARTED,
                   STARTED
               }
               """
-          )
+                )
         );
     }
 }

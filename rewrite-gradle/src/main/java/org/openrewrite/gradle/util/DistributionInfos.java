@@ -34,7 +34,7 @@ public class DistributionInfos {
     Checksum wrapperJarChecksum;
 
     static DistributionInfos fetch(HttpSender httpSender, GradleWrapper.DistributionType distributionType,
-                                   GradleWrapper.GradleVersion gradleVersion) throws IOException {
+            GradleWrapper.GradleVersion gradleVersion) throws IOException {
         String downloadUrl = toDistTypeUrl(distributionType, gradleVersion.getDownloadUrl());
         Checksum checksum = fetchChecksum(httpSender, toDistTypeUrl(distributionType, gradleVersion.getChecksumUrl()));
         Checksum jarChecksum = fetchChecksum(httpSender, gradleVersion.getWrapperChecksumUrl());

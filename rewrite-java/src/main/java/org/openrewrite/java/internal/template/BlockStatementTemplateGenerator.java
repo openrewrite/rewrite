@@ -60,7 +60,7 @@ public class BlockStatementTemplateGenerator {
 
                     // for CoordinateBuilder.MethodDeclaration#replaceBody()
                     if (cursor.getValue() instanceof J.MethodDeclaration &&
-                        location.equals(Space.Location.BLOCK_PREFIX)) {
+                            location.equals(Space.Location.BLOCK_PREFIX)) {
                         J.MethodDeclaration method = cursor.getValue();
                         J.MethodDeclaration m = method.withBody(null).withLeadingAnnotations(emptyList()).withPrefix(Space.EMPTY);
                         before.insert(0, m.printTrimmed(cursor.getParentOrThrow()).trim() + '{');
@@ -74,10 +74,10 @@ public class BlockStatementTemplateGenerator {
                     }
 
                     return before.toString().trim() +
-                           "\n/*" + TEMPLATE_COMMENT + "*/" +
-                           template +
-                           "/*" + STOP_COMMENT + "*/\n" +
-                           after.toString().trim();
+                            "\n/*" + TEMPLATE_COMMENT + "*/" +
+                            template +
+                            "/*" + STOP_COMMENT + "*/\n" +
+                            after.toString().trim();
                 });
     }
 
@@ -92,7 +92,7 @@ public class BlockStatementTemplateGenerator {
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Integer integer) {
                 if (getCursor().getParentTreeCursor().getValue() instanceof SourceFile &&
-                    (classDecl.getSimpleName().equals("__P__") || classDecl.getSimpleName().equals("__M__"))) {
+                        (classDecl.getSimpleName().equals("__P__") || classDecl.getSimpleName().equals("__M__"))) {
                     // don't visit the __P__ and __M__ classes declaring stubs
                     return classDecl;
                 }
@@ -125,7 +125,7 @@ public class BlockStatementTemplateGenerator {
 
             @Override
             public <T> JLeftPadded<T> visitLeftPadded(@Nullable JLeftPadded<T> left, JLeftPadded.Location loc,
-                                                      Integer integer) {
+                    Integer integer) {
                 left = super.visitLeftPadded(left, loc, integer);
                 //noinspection ConstantValue
                 if (left != null) {
@@ -146,7 +146,8 @@ public class BlockStatementTemplateGenerator {
                 }
 
                 if (expected.isInstance(tree)) {
-                    @SuppressWarnings("unchecked") J2 t = (J2) tree;
+                    @SuppressWarnings("unchecked")
+                    J2 t = (J2) tree;
 
                     if (blockEnclosingTemplateComment != null) {
                         for (Comment comment : t.getComments()) {
@@ -180,9 +181,7 @@ public class BlockStatementTemplateGenerator {
                             return t;
                         }
                     }
-                }
-                // Catch any trees having a STOP_COMMENT that are not an instance of `expected`
-                else if (tree != null && !js.isEmpty()) {
+                } else if (tree != null && !js.isEmpty()) {
                     //noinspection unchecked
                     J2 trimmed = (J2) TemplatedTreeTrimmer.trimTree((J) tree);
                     if (trimmed != tree) {
@@ -206,11 +205,11 @@ public class BlockStatementTemplateGenerator {
         if (j instanceof J.Lambda) {
             throw new IllegalArgumentException(
                     "Templating a lambda requires a cursor so that it can be properly parsed and type-attributed. " +
-                    "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive().");
+                            "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive().");
         } else if (j instanceof J.MemberReference) {
             throw new IllegalArgumentException(
                     "Templating a method reference requires a cursor so that it can be properly parsed and type-attributed. " +
-                    "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive().");
+                            "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive().");
         } else if (j instanceof J.MethodInvocation) {
             before.insert(0, "class Template {{\n");
             JavaType.Method methodType = ((J.MethodInvocation) j).getMethodType();
@@ -223,8 +222,8 @@ public class BlockStatementTemplateGenerator {
             before.append("Object o = ");
             after.append(";\n}");
         } else if ((j instanceof J.MethodDeclaration || j instanceof J.VariableDeclarations || j instanceof J.Block || j instanceof J.ClassDeclaration) &&
-                   cursor.getValue() instanceof J.Block &&
-                   (cursor.getParent().getValue() instanceof J.ClassDeclaration || cursor.getParent().getValue() instanceof J.NewClass)) {
+                cursor.getValue() instanceof J.Block &&
+                (cursor.getParent().getValue() instanceof J.ClassDeclaration || cursor.getParent().getValue() instanceof J.NewClass)) {
             before.insert(0, "class Template {\n");
             after.append("\n}");
         } else if (j instanceof J.ClassDeclaration) {
@@ -235,7 +234,7 @@ public class BlockStatementTemplateGenerator {
             // incorrect, and it would not be obvious to the recipe author why.
             throw new IllegalArgumentException(
                     "Templating a class declaration requires context from which package declaration and imports may be reached. " +
-                    "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive().");
+                            "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive().");
         } else if (j instanceof Statement && !(j instanceof J.Import) && !(j instanceof J.Package)) {
             before.insert(0, "class Template {{\n");
             after.append("\n}}");
@@ -286,9 +285,9 @@ public class BlockStatementTemplateGenerator {
                 }
 
                 before.insert(0, m.withBody(null)
-                                         .withLeadingAnnotations(emptyList())
-                                         .withPrefix(Space.EMPTY)
-                                         .printTrimmed(cursor).trim() + '{');
+                        .withLeadingAnnotations(emptyList())
+                        .withPrefix(Space.EMPTY)
+                        .printTrimmed(cursor).trim() + '{');
             } else {
                 J.Block b = (J.Block) j;
 
@@ -466,8 +465,8 @@ public class BlockStatementTemplateGenerator {
             J firstEnclosing = cursor.getParentOrThrow().firstEnclosing(J.class);
             if (m.getArguments().stream().anyMatch(arg -> referToSameElement(prior, arg))) {
                 before.insert(0, "__M__.any(");
-                if (firstEnclosing instanceof J.Block || firstEnclosing instanceof J.Case || 
-                    firstEnclosing instanceof J.If || firstEnclosing instanceof J.If.Else) {
+                if (firstEnclosing instanceof J.Block || firstEnclosing instanceof J.Case ||
+                        firstEnclosing instanceof J.If || firstEnclosing instanceof J.If.Else) {
                     after.append(");");
                 } else {
                     after.append(")");
@@ -579,8 +578,8 @@ public class BlockStatementTemplateGenerator {
             }
             if (statement instanceof J.VariableDeclarations) {
                 before.insert(0, "\n" +
-                                 variable((J.VariableDeclarations) statement, true, cursor) +
-                                 ";\n");
+                        variable((J.VariableDeclarations) statement, true, cursor) +
+                        ";\n");
             } else if (statement instanceof J.If) {
                 J.If iff = (J.If) statement;
                 String condition = PatternVariables.simplifiedPatternVariableCondition(iff.getIfCondition().getTree(), insertionPoint);

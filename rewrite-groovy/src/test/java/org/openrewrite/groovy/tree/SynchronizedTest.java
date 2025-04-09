@@ -26,13 +26,13 @@ class SynchronizedTest implements RewriteTest {
     @Test
     void synchronizedBlock() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               Integer n = 0;
               synchronized(n) {
               }
               """
-          )
+                )
         );
     }
 }

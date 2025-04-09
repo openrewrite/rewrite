@@ -29,9 +29,9 @@ class FindPluginTest implements RewriteTest {
     @Test
     void findProperty() {
         rewriteRun(
-          spec -> spec.recipe(new FindPlugin("org.openrewrite.maven", "rewrite-maven-plugin")),
-          pomXml(
-            """
+                spec -> spec.recipe(new FindPlugin("org.openrewrite.maven", "rewrite-maven-plugin")),
+                pomXml(
+                        """
               <project>
                 <groupId>org.openrewrite.example</groupId>
                 <artifactId>my-app</artifactId>
@@ -56,7 +56,7 @@ class FindPluginTest implements RewriteTest {
                 </reporting>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>org.openrewrite.example</groupId>
                 <artifactId>my-app</artifactId>
@@ -81,14 +81,14 @@ class FindPluginTest implements RewriteTest {
                 </reporting>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void multiModulePrecondition() throws URISyntaxException {
         rewriteRun(
-          spec ->  spec.recipeFromYaml("""
+                spec -> spec.recipeFromYaml("""
             ---
             type: specs.openrewrite.org/v1beta/recipe
             name: org.openrewrite.MultiModuleTest
@@ -102,8 +102,8 @@ class FindPluginTest implements RewriteTest {
                     groupId: com.google.guava
                     artifactId: guava
             """, "org.openrewrite.MultiModuleTest"),
-          pomXml(
-            """
+                pomXml(
+                        """
                   <project>
                       <groupId>org.example</groupId>
                       <artifactId>mvn_multi_module_test</artifactId>
@@ -123,8 +123,8 @@ class FindPluginTest implements RewriteTest {
                       </build>
                   </project>
                   """, sourceSpecs -> sourceSpecs.path("pom.xml")),
-          pomXml(
-            """
+                pomXml(
+                        """
                 <project>
                     <parent>
                         <groupId>org.example</groupId>
@@ -143,7 +143,7 @@ class FindPluginTest implements RewriteTest {
                     </build>
                 </project>
                 """, sourceSpecs -> sourceSpecs.path("submodule.pom.xml")
-          )
+                )
         );
     }
 }

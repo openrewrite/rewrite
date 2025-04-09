@@ -44,16 +44,16 @@ class CreateXmlFileTest implements RewriteTest {
           </library>
           """;
         rewriteRun(
-          spec -> spec.recipe(new CreateXmlFile(
-            "test/test.xml",
-            fileContents,
-            null
-          )),
-          xml(
-            null,
-            fileContents,
-            spec -> spec.path("test/test.xml")
-          )
+                spec -> spec.recipe(new CreateXmlFile(
+                        "test/test.xml",
+                        fileContents,
+                        null
+                )),
+                xml(
+                        null,
+                        fileContents,
+                        spec -> spec.path("test/test.xml")
+                )
         );
     }
 
@@ -65,78 +65,78 @@ class CreateXmlFileTest implements RewriteTest {
           <after/>
           """;
         rewriteRun(
-          spec -> spec.recipe(new CreateXmlFile(
-            "test/test.xml",
-            fileContents,
-            true
-          )).cycles(1).expectedCyclesThatMakeChanges(1),
-          xml(
-            """
+                spec -> spec.recipe(new CreateXmlFile(
+                        "test/test.xml",
+                        fileContents,
+                        true
+                )).cycles(1).expectedCyclesThatMakeChanges(1),
+                xml(
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <before/>
               """,
-            fileContents,
-            spec -> spec.path("test/test.xml")
-          )
+                        fileContents,
+                        spec -> spec.path("test/test.xml")
+                )
         );
     }
 
     @Test
     void shouldNotChangeExistingFile() {
         rewriteRun(
-          spec -> spec.recipe(new CreateXmlFile(
-            "test/test.xml",
-            null,
-            false
-          )),
-          xml(
-            """
+                spec -> spec.recipe(new CreateXmlFile(
+                        "test/test.xml",
+                        null,
+                        false
+                )),
+                xml(
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <test/>
               """,
-            spec -> spec.path("test/test.xml")
-          )
+                        spec -> spec.path("test/test.xml")
+                )
         );
     }
 
     @Test
     void shouldNotChangeExistingFileWhenOverwriteNull() {
         rewriteRun(
-          spec -> spec.recipe(new CreateXmlFile(
-            "test/test.xml",
-            null,
-            null
-          )),
-          xml(
-            """
+                spec -> spec.recipe(new CreateXmlFile(
+                        "test/test.xml",
+                        null,
+                        null
+                )),
+                xml(
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <test/>
               """,
-            spec -> spec.path("test/test.xml")
-          )
+                        spec -> spec.path("test/test.xml")
+                )
         );
     }
 
     @Test
     void shouldAddAnotherFile() {
         rewriteRun(
-          spec -> spec.recipe(new CreateXmlFile(
-            "test/test-file-2.xml",
-            null,
-            true
-          )),
-          xml(
-            """
+                spec -> spec.recipe(new CreateXmlFile(
+                        "test/test-file-2.xml",
+                        null,
+                        true
+                )),
+                xml(
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <test/>
               """,
-            spec -> spec.path("test/test-file-1.xml")
-          ),
-          xml(
-            null,
-            "",
-            spec -> spec.path("test/test-file-2.xml")
-          )
+                        spec -> spec.path("test/test-file-1.xml")
+                ),
+                xml(
+                        null,
+                        "",
+                        spec -> spec.path("test/test-file-2.xml")
+                )
         );
     }
 }

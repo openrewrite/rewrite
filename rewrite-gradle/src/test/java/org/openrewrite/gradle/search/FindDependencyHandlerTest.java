@@ -27,9 +27,9 @@ class FindDependencyHandlerTest implements RewriteTest {
     @Test
     void findDependenciesBlock() {
         rewriteRun(
-          spec -> spec.recipe(fromRuntimeClasspath("org.openrewrite.gradle.search.FindDependencyHandler")),
-          buildGradle(
-            """
+                spec -> spec.recipe(fromRuntimeClasspath("org.openrewrite.gradle.search.FindDependencyHandler")),
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -42,7 +42,7 @@ class FindDependencyHandlerTest implements RewriteTest {
                   api 'com.google.guava:guava:23.0'
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -55,7 +55,7 @@ class FindDependencyHandlerTest implements RewriteTest {
                   api 'com.google.guava:guava:23.0'
               }
               """
-          )
+                )
         );
     }
 }

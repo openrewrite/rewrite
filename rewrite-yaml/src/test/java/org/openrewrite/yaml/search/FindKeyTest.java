@@ -28,20 +28,20 @@ class FindKeyTest implements RewriteTest {
     @Test
     void findKey() {
         rewriteRun(
-          spec -> spec.recipe(new FindKey("$.metadata.name")),
-          yaml("""
+                spec -> spec.recipe(new FindKey("$.metadata.name")),
+                yaml("""
                   apiVersion: v1
                   metadata:
                     name: monitoring-tools
                     namespace: monitoring-tools
               """,
-            """
+                        """
                   apiVersion: v1
                   metadata:
                     ~~>name: monitoring-tools
                     namespace: monitoring-tools
               """
-          )
+                )
         );
     }
 
@@ -49,18 +49,18 @@ class FindKeyTest implements RewriteTest {
     @Test
     void findKeyWithSpecificName() {
         rewriteRun(
-          spec -> spec.recipe(new FindKey("$.metadata[?(@.name == 'container')].name")),
-          yaml("""
+                spec -> spec.recipe(new FindKey("$.metadata[?(@.name == 'container')].name")),
+                yaml("""
                   metadata:
                     name: container
                     namespace: container
               """,
-            """
+                        """
                   metadata:
                     ~~>name: container
                     namespace: container
               """
-          )
+                )
         );
     }
 
@@ -68,8 +68,8 @@ class FindKeyTest implements RewriteTest {
     @Test
     void findKeyWithMultipleBinaryExpressions() {
         rewriteRun(
-          spec -> spec.recipe(new FindKey("$.foo.bar[?(@.types == 'something' && @.group == 'group' && @.category == 'match' && @.type == 'type')].pattern")),
-          yaml("""
+                spec -> spec.recipe(new FindKey("$.foo.bar[?(@.types == 'something' && @.group == 'group' && @.category == 'match' && @.type == 'type')].pattern")),
+                yaml("""
               foo:
                 bar:
                   -
@@ -85,7 +85,7 @@ class FindKeyTest implements RewriteTest {
                     types: "something"
                     pattern: "p2"
               """,
-            """
+                        """
               foo:
                 bar:
                   -
@@ -101,7 +101,7 @@ class FindKeyTest implements RewriteTest {
                     types: "something"
                     ~~>pattern: "p2"
               """
-          )
+                )
         );
     }
 }

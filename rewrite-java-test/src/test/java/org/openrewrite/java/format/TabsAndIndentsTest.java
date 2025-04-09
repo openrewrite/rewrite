@@ -36,11 +36,11 @@ import static java.util.Collections.singletonList;
 import static org.openrewrite.java.Assertions.java;
 
 @SuppressWarnings({
-  "InfiniteRecursion", "UnusedAssignment", "ConstantConditions", "StatementWithEmptyBody", "RedundantThrows",
-  "UnusedLabel", "SwitchStatementWithTooFewBranches", "InfiniteLoopStatement", "rawtypes", "ResultOfMethodCallIgnored",
-  "CodeBlock2Expr", "DuplicateThrows", "EmptyTryBlock", "CatchMayIgnoreException", "EmptyFinallyBlock",
-  "PointlessBooleanExpression", "ClassInitializerMayBeStatic", "MismatchedReadAndWriteOfArray"
-  , "TypeParameterExplicitlyExtendsObject"})
+        "InfiniteRecursion", "UnusedAssignment", "ConstantConditions", "StatementWithEmptyBody", "RedundantThrows",
+        "UnusedLabel", "SwitchStatementWithTooFewBranches", "InfiniteLoopStatement", "rawtypes", "ResultOfMethodCallIgnored",
+        "CodeBlock2Expr", "DuplicateThrows", "EmptyTryBlock", "CatchMayIgnoreException", "EmptyFinallyBlock",
+        "PointlessBooleanExpression", "ClassInitializerMayBeStatic", "MismatchedReadAndWriteOfArray"
+, "TypeParameterExplicitlyExtendsObject"})
 class TabsAndIndentsTest implements RewriteTest {
 
     @Override
@@ -50,12 +50,12 @@ class TabsAndIndentsTest implements RewriteTest {
 
     private static Consumer<RecipeSpec> tabsAndIndents(UnaryOperator<TabsAndIndentsStyle> with) {
         return spec -> spec.recipe(new TabsAndIndents())
-          .parser(JavaParser.fromJavaVersion().styles(singletonList(
-            new NamedStyles(
-              Tree.randomId(), "test", "test", "test", emptySet(),
-              singletonList(with.apply(IntelliJ.tabsAndIndents()))
-            )
-          )));
+                .parser(JavaParser.fromJavaVersion().styles(singletonList(
+                        new NamedStyles(
+                                Tree.randomId(), "test", "test", "test", emptySet(),
+                                singletonList(with.apply(IntelliJ.tabsAndIndents()))
+                        )
+                )));
     }
 
     @SuppressWarnings("SuspiciousIndentAfterControlStatement")
@@ -63,8 +63,8 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void multilineCommentStartPositionIsIndented() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class A {
                   {
                       if(true)
@@ -78,7 +78,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   static void foo() {}
               }
               """,
-            """
+                        """
               class A {
                   {
                       if(true)
@@ -92,7 +92,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   static void foo() {}
               }
               """
-          )
+                )
         );
     }
 
@@ -100,8 +100,8 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void alignMethodDeclarationParamsWhenMultiple() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   @SuppressWarnings
                   private void firstArgNoPrefix(String first,
@@ -117,7 +117,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   @SuppressWarnings
                   private void firstArgNoPrefix(String first,
@@ -133,7 +133,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -141,9 +141,9 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void alignMethodDeclarationParamsWhenContinuationIndent() {
         rewriteRun(
-          tabsAndIndents(style -> style.withMethodDeclarationParameters(new TabsAndIndentsStyle.MethodDeclarationParameters(false))),
-          java(
-            """
+                tabsAndIndents(style -> style.withMethodDeclarationParameters(new TabsAndIndentsStyle.MethodDeclarationParameters(false))),
+                java(
+                        """
               class Test {
                   private void firstArgNoPrefix(String first,
                                                 int times,
@@ -156,7 +156,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   private void firstArgNoPrefix(String first,
                           int times,
@@ -169,16 +169,16 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void alignMethodDeclarationParamsWhenContinuationIndentUsingTabs() {
         rewriteRun(
-          tabsAndIndents(style -> style.withUseTabCharacter(true)),
-          java(
-            """
+                tabsAndIndents(style -> style.withUseTabCharacter(true)),
+                java(
+                        """
             import java.util.*;
             
             class Foo {
@@ -190,7 +190,7 @@ class TabsAndIndentsTest implements RewriteTest {
             	}
             }
             """
-          )
+                )
         );
     }
 
@@ -200,8 +200,8 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void rspec3973() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {{
                   if (true == false)
                   doTheThing();
@@ -217,7 +217,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   public static void foo() {}
               }
               """,
-            """
+                        """
               class Test {{
                   if (true == false)
                       doTheThing();
@@ -233,7 +233,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   public static void foo() {}
               }
               """
-          )
+                )
         );
     }
 
@@ -241,8 +241,8 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void ifElseWithComments() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class B {
                   void foo(int input) {
                       // First case
@@ -260,15 +260,15 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void annotationArguments() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   @SuppressWarnings({
                           "unchecked",
@@ -277,16 +277,16 @@ class TabsAndIndentsTest implements RewriteTest {
                   String id;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void methodChain() {
         rewriteRun(
-          tabsAndIndents(style -> style.withContinuationIndent(2)),
-          java(
-            """
+                tabsAndIndents(style -> style.withContinuationIndent(2)),
+                java(
+                        """
               class Test {
                   void method(Test t) {
                       this
@@ -296,7 +296,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -304,8 +304,8 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void methodInvocationArgumentOnOpeningLineWithMethodSelect() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   Test withData(Object... arg0) {
                       return this;
@@ -322,7 +322,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -330,8 +330,8 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void methodInvocationArgumentOnNewLineWithMethodSelect() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   Test withData(Object... arg0) {
                       return this;
@@ -346,7 +346,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -354,8 +354,8 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void methodInvocationArgumentsWithMethodSelectsOnEachNewLine() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   Test withData(Object... arg0) {
                       return this;
@@ -376,7 +376,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -384,8 +384,8 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void methodInvocationArgumentsContinuationIndentsAssorted() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   Test withData(Object... arg0) {
                       return this;
@@ -404,7 +404,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -412,8 +412,8 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void methodInvocationLambdaBlockWithClosingBracketOnSameLineIndent() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.Collection;
               class Test {
                   Test withData(Object... arg0) {
@@ -430,7 +430,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -438,8 +438,8 @@ class TabsAndIndentsTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/660")
     void methodInvocationLambdaBlockWithClosingBracketOnNewLineIndent() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.*;
               class Test {
                   Test withData(Object... arg0) {
@@ -457,7 +457,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -465,8 +465,8 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void methodInvocationLambdaBlockOnSameLine() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.function.Predicate;
 
               class SomeUtility {
@@ -475,9 +475,9 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               class Test {
 
                   void method() {
@@ -488,7 +488,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -496,8 +496,8 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void lambdaBodyWithNestedMethodInvocationLambdaStatementBodyIndent() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.*;
               import java.util.stream.Collectors;
               class Test {
@@ -510,7 +510,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -518,8 +518,8 @@ class TabsAndIndentsTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/679")
     void lambdaBodyWithNestedMethodInvocationLambdaExpressionBodyIndent() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.*;
               import java.util.stream.Collectors;
               class Test {
@@ -532,7 +532,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -540,8 +540,8 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void methodInvocationLambdaArgumentIndent() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.function.Function;
 
               abstract class Test {
@@ -554,7 +554,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -565,12 +565,12 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void tabsAndIndents() {
         rewriteRun(
-          java("public interface I1{}"),
-          java("public interface I2{}"),
-          java("public class E1 extends Exception{}"),
-          java("public class E2 extends Exception{}"),
-          java(
-            """
+                java("public interface I1{}"),
+                java("public interface I2{}"),
+                java("public class E1 extends Exception{}"),
+                java("public class E2 extends Exception{}"),
+                java(
+                        """
               public class Test {
               public int[] X = new int[]{1, 3, 5, 7, 9, 11};
               public void doSomething(int i) {}
@@ -623,7 +623,7 @@ class TabsAndIndentsTest implements RewriteTest {
               }
               }
               """,
-            """
+                        """
               public class Test {
                   public int[] X = new int[]{1, 3, 5, 7, 9, 11};
                   public void doSomething(int i) {}
@@ -676,15 +676,15 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void tryCatchFinally() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class Test {
               public void test(boolean a, int x, int y) {
               try {
@@ -697,7 +697,7 @@ class TabsAndIndentsTest implements RewriteTest {
               }
               }
               """,
-            """
+                        """
               public class Test {
                   public void test(boolean a, int x, int y) {
                       try {
@@ -710,15 +710,15 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doWhile() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class Test {
               public void test() {
               do {
@@ -731,7 +731,7 @@ class TabsAndIndentsTest implements RewriteTest {
               }
               }
               """,
-            """
+                        """
               public class Test {
                   public void test() {
                       do {
@@ -744,15 +744,15 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void elseBody() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class Test {
               public void test(boolean a, int x, int y, int z) {
               if (x > 0) {
@@ -762,7 +762,7 @@ class TabsAndIndentsTest implements RewriteTest {
               }
               }
               """,
-            """
+                        """
               public class Test {
                   public void test(boolean a, int x, int y, int z) {
                       if (x > 0) {
@@ -772,7 +772,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -780,9 +780,9 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void forLoop() {
         rewriteRun(
-          tabsAndIndents(style -> style.withContinuationIndent(2)),
-          java(
-            """
+                tabsAndIndents(style -> style.withContinuationIndent(2)),
+                java(
+                        """
               public class Test {
                   public void test() {
                   int m = 0;
@@ -803,7 +803,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class Test {
                   public void test() {
                       int m = 0;
@@ -824,16 +824,16 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void methodDeclaration() {
         rewriteRun(
-          tabsAndIndents(style -> style.withContinuationIndent(2)),
-          java(
-            """
+                tabsAndIndents(style -> style.withContinuationIndent(2)),
+                java(
+                        """
               public class Test {
                   public void test(int a,
                                    int b) {}
@@ -843,85 +843,85 @@ class TabsAndIndentsTest implements RewriteTest {
                     int b) {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void lineComment() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                 // comment at indent 2
               public void method() {}
               }
               """,
-            """
+                        """
               public class A {
                   // comment at indent 2
                   public void method() {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void noIndexOutOfBoundsUsingSpaces() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                 // length = 1 from new line.
                     int valA = 10; // text.length = 1 + shift -2 == -1.
               }
               """,
-            """
+                        """
               public class A {
                   // length = 1 from new line.
                   int valA = 10; // text.length = 1 + shift -2 == -1.
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void noIndexOutOfBoundsUsingTabs() {
         rewriteRun(
-          tabsAndIndents(style -> style.withUseTabCharacter(true).withTabSize(1).withIndentSize(1)),
-          java(
-            """
+                tabsAndIndents(style -> style.withUseTabCharacter(true).withTabSize(1).withIndentSize(1)),
+                java(
+                        """
               class Test {
               	void test() {
               		System.out.println(); // comment
               	}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void blockComment() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
               /*a
                 b*/
               public void method() {}
               }
               """,
-            """
+                        """
               public class A {
                   /*a
                     b*/
                   public void method() {}
               }
               """
-          )
+                )
         );
     }
 
@@ -929,18 +929,18 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void blockCommentCRLF() {
         rewriteRun(
-          java(
-            "public class A {\r\n" +
-            "/*a\r\n" +
-            "  b*/\r\n" +
-            "public void method() {}\r\n" +
-            "}",
-            "public class A {\r\n" +
-            "    /*a\r\n" +
-            "      b*/\r\n" +
-            "    public void method() {}\r\n" +
-            "}"
-          )
+                java(
+                        "public class A {\r\n" +
+                                "/*a\r\n" +
+                                "  b*/\r\n" +
+                                "public void method() {}\r\n" +
+                                "}",
+                        "public class A {\r\n" +
+                                "    /*a\r\n" +
+                                "      b*/\r\n" +
+                                "    public void method() {}\r\n" +
+                                "}"
+                )
         );
     }
 
@@ -948,8 +948,8 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void initBlocks() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   static {
                       System.out.println("hi");
@@ -959,16 +959,16 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void moreAnnotations() {
         rewriteRun(
-          spec -> spec.afterTypeValidationOptions(TypeValidation.none()),
-          java(
-            """
+                spec -> spec.afterTypeValidationOptions(TypeValidation.none()),
+                java(
+                        """
               import lombok.EqualsAndHashCode;
               import java.util.UUID;
               class Test {
@@ -979,15 +979,15 @@ class TabsAndIndentsTest implements RewriteTest {
                   UUID id;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void annotations() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               @Deprecated
               @SuppressWarnings("ALL")
               public class A {
@@ -997,7 +997,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               @Deprecated
               @SuppressWarnings("ALL")
               public class A {
@@ -1007,15 +1007,15 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void javadoc() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
               /**
                       * This is a javadoc
@@ -1023,7 +1023,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   public void method() {}
               }
               """,
-            """
+                        """
               public class A {
                   /**
                    * This is a javadoc
@@ -1031,39 +1031,39 @@ class TabsAndIndentsTest implements RewriteTest {
                   public void method() {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void tabs() {
         rewriteRun(
-          // TIP: turn on "Show Whitespaces" in the IDE to see this test clearly
-          tabsAndIndents(style -> style.withUseTabCharacter(true)),
-          java(
-            """
+                // TIP: turn on "Show Whitespaces" in the IDE to see this test clearly
+                tabsAndIndents(style -> style.withUseTabCharacter(true)),
+                java(
+                        """
               public class A {
               	public void method() {
               	int n = 0;
               	}
               }
               """,
-            """
+                        """
               public class A {
               	public void method() {
               		int n = 0;
               	}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void shiftRight() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class Test {
                   public void test(boolean a, int x, int y) {
                       try {
@@ -1076,7 +1076,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class Test {
                   public void test(boolean a, int x, int y) {
                       try {
@@ -1089,16 +1089,16 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void shiftRightTabs() {
         rewriteRun(
-          tabsAndIndents(style -> style.withUseTabCharacter(true)),
-          java(
-            """
+                tabsAndIndents(style -> style.withUseTabCharacter(true)),
+                java(
+                        """
               public class Test {
               	public void test(boolean a, int x, int y) {
               		try {
@@ -1111,7 +1111,7 @@ class TabsAndIndentsTest implements RewriteTest {
               	}
               }
               """,
-            """
+                        """
               public class Test {
               	public void test(boolean a, int x, int y) {
               		try {
@@ -1124,15 +1124,15 @@ class TabsAndIndentsTest implements RewriteTest {
               	}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void shiftLeft() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class Test {
                   public void test(boolean a, int x, int y) {
                       try {
@@ -1145,7 +1145,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class Test {
                   public void test(boolean a, int x, int y) {
                       try {
@@ -1158,16 +1158,16 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void shiftLeftTabs() {
         rewriteRun(
-          tabsAndIndents(style -> style.withUseTabCharacter(true)),
-          java(
-            """
+                tabsAndIndents(style -> style.withUseTabCharacter(true)),
+                java(
+                        """
               public class Test {
               	public void test(boolean a, int x, int y) {
               		try {
@@ -1180,7 +1180,7 @@ class TabsAndIndentsTest implements RewriteTest {
               	}
               }
               """,
-            """
+                        """
               public class Test {
               	public void test(boolean a, int x, int y) {
               		try {
@@ -1193,15 +1193,15 @@ class TabsAndIndentsTest implements RewriteTest {
               	}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void nestedIfElse() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void method() {
                       if (true) { // comment
@@ -1212,30 +1212,30 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void annotationOnSameLine() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   @Deprecated int method() {
                       return 1;
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void newClassAsMethodArgument() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   Test(String s, int m) {
                   }
@@ -1247,15 +1247,15 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void methodArgumentsThatDontStartOnNewLine() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.io.File;
               class Test {
                   void method(int n, File f, int m, int l) {
@@ -1286,15 +1286,15 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void methodArgumentsThatDontStartOnNewLine2() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   int method5(int n, int m) {
                       method5(1,
@@ -1307,7 +1307,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -1315,8 +1315,8 @@ class TabsAndIndentsTest implements RewriteTest {
     void identAndFieldAccess() {
         rewriteRun(
 
-          java(
-            """
+                java(
+                        """
               import java.util.stream.Stream;
               class Test {
                   Test t = this;
@@ -1335,15 +1335,15 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void lambda() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.function.Supplier;
               public class Test {
                   public void method(int n) {
@@ -1352,7 +1352,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.function.Supplier;
               public class Test {
                   public void method(int n) {
@@ -1361,15 +1361,15 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void lambdaWithBlock() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.function.Supplier;
               class Test {
                   void method(Supplier<String> s, int n) {
@@ -1380,29 +1380,29 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void enums() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               enum Scope {
                   None, // the root of a resolution tree
                   Compile
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void twoThrows() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.io.IOException;
               class Test {
                   void method() throws IOException,
@@ -1415,60 +1415,60 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
                """
-          )
+                )
         );
     }
 
     @Test
     void twoTypeParameters() {
         rewriteRun(
-          java("interface A {}"),
-          java("interface B{}"),
-          java(
-            """
+                java("interface A {}"),
+                java("interface B{}"),
+                java(
+                        """
               class Test<A,
                       B> {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void twoImplements() {
         rewriteRun(
-          java("interface A {}"),
-          java("interface B{}"),
-          java(
-            """
+                java("interface A {}"),
+                java("interface B{}"),
+                java(
+                        """
               class Test implements A,
                       B {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void fieldsWhereClassHasAnnotation() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               @Deprecated
               class Test {
                   String groupId;
                   String artifactId;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void methodWithAnnotation() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   @Deprecated
                   @SuppressWarnings("all")
@@ -1477,7 +1477,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   @Deprecated
                   @SuppressWarnings("all")
@@ -1486,7 +1486,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -1494,8 +1494,8 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void containers() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.io.ByteArrayInputStream;
               import java.io.InputStream;
               import java.io.Serializable;
@@ -1526,7 +1526,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.io.ByteArrayInputStream;
               import java.io.InputStream;
               import java.io.Serializable;
@@ -1557,15 +1557,15 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void methodInvocations() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   Test method(int n) {
                       return method(n)
@@ -1580,15 +1580,15 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void ternaries() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class Test {
                   public Test method(int n) {
                       return n > 0 ?
@@ -1597,7 +1597,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class Test {
                   public Test method(int n) {
                       return n > 0 ?
@@ -1606,15 +1606,15 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void newClassAsArgument() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.io.File;
               class Test {
                   void method(int m, File f, File f2) {
@@ -1627,15 +1627,15 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void variableWithAnnotation() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class Test {
                   @Deprecated
                   final String scope;
@@ -1644,15 +1644,15 @@ class TabsAndIndentsTest implements RewriteTest {
                   String classifier;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void lambdaMethodParameter2() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.function.Function;
 
               abstract class Test {
@@ -1669,15 +1669,15 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void lambdaMethodParameter() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.function.Function;
               abstract class Test {
                   abstract Test a(Function<Test, Test> f);
@@ -1692,16 +1692,16 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void failure1() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
-          java(
-            """
+                spec -> spec.typeValidationOptions(TypeValidation.none()),
+                java(
+                        """
               public class Test {
                   public static DefaultRepositorySystemSession getRepositorySystemSession(RepositorySystem system, // comments here
                                                                                           @Nullable File localRepositoryDir) {
@@ -1719,7 +1719,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -1727,8 +1727,8 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void methodInvocationsNotContinuationIndentedWhenPartOfBinaryExpression() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.stream.Stream;
               public class Test {
                   boolean b;
@@ -1743,7 +1743,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -1751,9 +1751,9 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void punctuation() {
         rewriteRun(
-          tabsAndIndents(style -> style.withContinuationIndent(2)),
-          java(
-            """
+                tabsAndIndents(style -> style.withContinuationIndent(2)),
+                java(
+                        """
               import java.util.function.Function;
               public class Test {
               int X[];
@@ -1787,7 +1787,7 @@ class TabsAndIndentsTest implements RewriteTest {
               }
               }
               """,
-            """
+                        """
               import java.util.function.Function;
               public class Test {
                   int X[];
@@ -1821,15 +1821,15 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void newClass() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   Test(Test t) {}
                   Test() {}
@@ -1842,7 +1842,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   Test(Test t) {}
                   Test() {}
@@ -1855,7 +1855,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -1863,8 +1863,8 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void alignLineComments() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
                       // shift left.
               package org.openrewrite; // trailing comment.
                             
@@ -1903,7 +1903,7 @@ class TabsAndIndentsTest implements RewriteTest {
                       // shift left at end of block.
                           }
               """,
-            """
+                        """
               // shift left.
               package org.openrewrite; // trailing comment.
                             
@@ -1942,7 +1942,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   // shift left at end of block.
               }
               """
-          )
+                )
         );
     }
 
@@ -1950,22 +1950,22 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void alignMultipleBlockCommentsOnOneLine() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   public void method() {
                               /* comment 1 */ /* comment 2 */ /* comment 3 */
                   }
               }
               """,
-            """
+                        """
               public class A {
                   public void method() {
                       /* comment 1 */ /* comment 2 */ /* comment 3 */
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -1973,8 +1973,8 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void alignMultipleBlockComments() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
               /* Preserve whitespace
                  alignment */
@@ -1989,7 +1989,7 @@ class TabsAndIndentsTest implements RewriteTest {
               public void method() {}
               }
               """,
-            """
+                        """
               public class A {
                   /* Preserve whitespace
                      alignment */
@@ -2004,7 +2004,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   public void method() {}
               }
               """
-          )
+                )
         );
     }
 
@@ -2012,8 +2012,8 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void alignTryCatchFinally() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class Test {
                   public void method() {
                       // inline try, catch, finally.
@@ -2038,7 +2038,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -2046,9 +2046,9 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void alignBlockPrefixes() {
         rewriteRun(
-          spec -> spec.recipe(new AutoFormat()),
-          java(
-            """
+                spec -> spec.recipe(new AutoFormat()),
+                java(
+                        """
               public class Test {
                               
                   public void practiceA()
@@ -2088,15 +2088,15 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void alignInlineBlockComments() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class WhitespaceIsHard {
               /* align comment */ public void method() { /* tricky */
               /* align comment */ int var = 10; /* tricky */
@@ -2104,7 +2104,7 @@ class TabsAndIndentsTest implements RewriteTest {
               }
               }
               """,
-            """
+                        """
               public class WhitespaceIsHard {
                   /* align comment */ public void method() { /* tricky */
                       /* align comment */ int var = 10; /* tricky */
@@ -2112,21 +2112,21 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void trailingMultilineString() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class WhitespaceIsHard {
                   public void method() { /* tricky */
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -2134,8 +2134,8 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void javaDocsWithMultipleLeadingAsterisks() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
                   /******** Align JavaDoc with multiple leading '*' in margin left.
                    **** Align left
                    */
@@ -2147,7 +2147,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               /******** Align JavaDoc with multiple leading '*' in margin left.
                **** Align left
                */
@@ -2159,7 +2159,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -2168,47 +2168,47 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void alignJavaDocsWithCRLF() {
         rewriteRun(
-          java(
-            "        /**\r\n" +
-            "         * Align JavaDoc left that starts on 2nd line.\r\n" +
-            "         */\r\n" +
-            "public class A {\r\n" +
-            "/** Align JavaDoc right that starts on 1st line.\r\n" +
-            "  * @param value test value.\r\n" +
-            "  * @return value + 1 */\r\n" +
-            "        public int methodOne(int value) {\r\n" +
-            "            return value + 1;\r\n" +
-            "        }\r\n" +
-            "\r\n" +
-            "                /** Edge case formatting test.\r\n" +
-            "   @param value test value.\r\n" +
-            "                 @return value + 1\r\n" +
-            "                 */\r\n" +
-            "        public int methodTwo(int value) {\r\n" +
-            "            return value + 1;\r\n" +
-            "        }\r\n" +
-            "}"
-            ,
-            "/**\r\n" +
-            " * Align JavaDoc left that starts on 2nd line.\r\n" +
-            " */\r\n" +
-            "public class A {\r\n" +
-            "    /** Align JavaDoc right that starts on 1st line.\r\n" +
-            "     * @param value test value.\r\n" +
-            "     * @return value + 1 */\r\n" +
-            "    public int methodOne(int value) {\r\n" +
-            "        return value + 1;\r\n" +
-            "    }\r\n" +
-            "\r\n" +
-            "    /** Edge case formatting test.\r\n" +
-            "     @param value test value.\r\n" +
-            "     @return value + 1\r\n" +
-            "     */\r\n" +
-            "    public int methodTwo(int value) {\r\n" +
-            "        return value + 1;\r\n" +
-            "    }\r\n" +
-            "}"
-          )
+                java(
+                        "        /**\r\n" +
+                                "         * Align JavaDoc left that starts on 2nd line.\r\n" +
+                                "         */\r\n" +
+                                "public class A {\r\n" +
+                                "/** Align JavaDoc right that starts on 1st line.\r\n" +
+                                "  * @param value test value.\r\n" +
+                                "  * @return value + 1 */\r\n" +
+                                "        public int methodOne(int value) {\r\n" +
+                                "            return value + 1;\r\n" +
+                                "        }\r\n" +
+                                "\r\n" +
+                                "                /** Edge case formatting test.\r\n" +
+                                "   @param value test value.\r\n" +
+                                "                 @return value + 1\r\n" +
+                                "                 */\r\n" +
+                                "        public int methodTwo(int value) {\r\n" +
+                                "            return value + 1;\r\n" +
+                                "        }\r\n" +
+                                "}"
+                ,
+                        "/**\r\n" +
+                                " * Align JavaDoc left that starts on 2nd line.\r\n" +
+                                " */\r\n" +
+                                "public class A {\r\n" +
+                                "    /** Align JavaDoc right that starts on 1st line.\r\n" +
+                                "     * @param value test value.\r\n" +
+                                "     * @return value + 1 */\r\n" +
+                                "    public int methodOne(int value) {\r\n" +
+                                "        return value + 1;\r\n" +
+                                "    }\r\n" +
+                                "\r\n" +
+                                "    /** Edge case formatting test.\r\n" +
+                                "     @param value test value.\r\n" +
+                                "     @return value + 1\r\n" +
+                                "     */\r\n" +
+                                "    public int methodTwo(int value) {\r\n" +
+                                "        return value + 1;\r\n" +
+                                "    }\r\n" +
+                                "}"
+                )
         );
     }
 
@@ -2216,8 +2216,8 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void alignJavaDocs() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
                       /**
                        * Align JavaDoc left that starts on 2nd line.
                        */
@@ -2238,7 +2238,7 @@ class TabsAndIndentsTest implements RewriteTest {
                       }
               }
               """,
-            """
+                        """
               /**
                * Align JavaDoc left that starts on 2nd line.
                */
@@ -2259,7 +2259,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -2267,16 +2267,16 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void useContinuationIndentExtendsOnNewLine() {
         rewriteRun(
-          java("package org.a; public class A {}"),
-          java(
-            """
+                java("package org.a; public class A {}"),
+                java(
+                        """
               package org.b;
               import org.a.A;
               class B
                       extends A {
               }
               """
-          )
+                )
         );
     }
 
@@ -2284,16 +2284,16 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void alignIdentifierOnNewLine() {
         rewriteRun(
-          java("package org.a; public class A {}"),
-          java(
-            """
+                java("package org.a; public class A {}"),
+                java(
+                        """
               package org.b;
               import org.a.A;
               class B extends
                       A {
               }
               """
-          )
+                )
         );
     }
 
@@ -2301,22 +2301,22 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void doNotFormatSingleLineCommentAtCol0() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class A {
               // DO NOT shift the whitespace of `Space` and the suffix of comment 1.
               // DOES shift the suffix of comment 2.
               void shiftRight() {}
               }
               """,
-            """
+                        """
               class A {
               // DO NOT shift the whitespace of `Space` and the suffix of comment 1.
               // DOES shift the suffix of comment 2.
                   void shiftRight() {}
               }
               """
-          )
+                )
         );
     }
 
@@ -2324,15 +2324,15 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void recordComponents() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
-          java(
-            """
+                spec -> spec.typeValidationOptions(TypeValidation.none()),
+                java(
+                        """
               public record RenameRequest(
                   @NotBlank
                   @JsonProperty("name") String name) {
               }
               """
-          )
+                )
         );
     }
 
@@ -2340,22 +2340,22 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void enumConstants() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public enum WorkflowStatus {
                   @SuppressWarnings("ALL")
                   VALUE1
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void longMethodChainWithMultiLineParameters_Correct() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Foo {
                   String test() {
                       return "foobar"
@@ -2369,15 +2369,15 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void longMethodChainWithMultiLineParameters_Incorrect() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Foo {
               String test() {
               return "foobar"
@@ -2391,7 +2391,7 @@ class TabsAndIndentsTest implements RewriteTest {
               }
               }
               """,
-            """
+                        """
               class Foo {
                   String test() {
                       return "foobar"
@@ -2405,7 +2405,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

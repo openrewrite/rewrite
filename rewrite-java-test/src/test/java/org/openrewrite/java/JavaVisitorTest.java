@@ -33,33 +33,33 @@ class JavaVisitorTest implements RewriteTest {
     @Test
     void javaVisitorHandlesPaddedWithNullElem() {
         rewriteRun(
-          spec -> spec
-            .expectedCyclesThatMakeChanges(2)
-            .recipes(
-              toRecipe(() -> new JavaIsoVisitor<>() {
-                  @Override
-                  public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
-                      var mi = super.visitMethodInvocation(method, p);
-                      if ("removeMethod".equals(mi.getSimpleName())) {
-                          //noinspection ConstantConditions
-                          return null;
-                      }
-                      return mi;
-                  }
-              }),
-              toRecipe(() -> new JavaIsoVisitor<>() {
-                  @Override
-                  public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
-                      if (method.getSimpleName().equals("allTheThings")) {
-                          return JavaTemplate.builder("Exception").contextSensitive().build()
-                            .apply(getCursor(), method.getCoordinates().replaceThrows());
-                      }
-                      return method;
-                  }
-              })
-            ),
-          java(
-            """
+                spec -> spec
+                        .expectedCyclesThatMakeChanges(2)
+                        .recipes(
+                                toRecipe(() -> new JavaIsoVisitor<>() {
+                                    @Override
+                                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
+                                        var mi = super.visitMethodInvocation(method, p);
+                                        if ("removeMethod".equals(mi.getSimpleName())) {
+                                            //noinspection ConstantConditions
+                                            return null;
+                                        }
+                                        return mi;
+                                    }
+                                }),
+                                toRecipe(() -> new JavaIsoVisitor<>() {
+                                    @Override
+                                    public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+                                        if (method.getSimpleName().equals("allTheThings")) {
+                                            return JavaTemplate.builder("Exception").contextSensitive().build()
+                                                    .apply(getCursor(), method.getCoordinates().replaceThrows());
+                                        }
+                                        return method;
+                                    }
+                                })
+                        ),
+                java(
+                        """
               class A {
                   void allTheThings() {
                       doSomething();
@@ -69,7 +69,7 @@ class JavaVisitorTest implements RewriteTest {
                   void removeMethod() {}
               }
               """,
-            """
+                        """
               class A {
                   void allTheThings() throws Exception {
                       doSomething();
@@ -78,7 +78,7 @@ class JavaVisitorTest implements RewriteTest {
                   void removeMethod() {}
               }
               """
-          )
+                )
         );
     }
 
@@ -96,27 +96,27 @@ class JavaVisitorTest implements RewriteTest {
             }
         };
         rewriteRun(
-          spec -> spec.recipe(
-            toRecipe(() -> new JavaIsoVisitor<>() {
-                @Override
-                public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
-                    var md = super.visitMethodDeclaration(method, p);
-                    if ("myMethod".equals(md.getSimpleName())) {
-                        //noinspection ConstantConditions
-                        return (J.MethodDeclaration) new JavaIsoVisitor<ExecutionContext>() {
+                spec -> spec.recipe(
+                        toRecipe(() -> new JavaIsoVisitor<>() {
                             @Override
                             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
-                                doAfterVisit(afterVisitor);
-                                return super.visitMethodDeclaration(method, p);
+                                var md = super.visitMethodDeclaration(method, p);
+                                if ("myMethod".equals(md.getSimpleName())) {
+                                    //noinspection ConstantConditions
+                                    return (J.MethodDeclaration) new JavaIsoVisitor<ExecutionContext>() {
+                                        @Override
+                                        public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+                                            doAfterVisit(afterVisitor);
+                                            return super.visitMethodDeclaration(method, p);
+                                        }
+                                    }.visit(md, p, getCursor().getParent());
+                                }
+                                return md;
                             }
-                        }.visit(md, p, getCursor().getParent());
-                    }
-                    return md;
-                }
-            })
-          ),
-          java(
-                """
+                        })
+                ),
+                java(
+                        """
            class A {
              public void method1() {
              }
@@ -136,36 +136,36 @@ class JavaVisitorTest implements RewriteTest {
     @Test
     void javaVisitorHandlesErroneousNodes() {
         rewriteRun(
-          spec -> spec
-            .expectedCyclesThatMakeChanges(2)
-            .recipes(
-              toRecipe(() -> new JavaIsoVisitor<>() {
-                  @Override
-                  public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
-                      if (method.getSimpleName().equals("test")) {
-                          return JavaTemplate.builder("Exception").contextSensitive().build()
-                            .apply(getCursor(), method.getCoordinates().replaceThrows());
-                      }
-                      return method;
-                  }
-              })
-            ),
-          java(
-            """
+                spec -> spec
+                        .expectedCyclesThatMakeChanges(2)
+                        .recipes(
+                                toRecipe(() -> new JavaIsoVisitor<>() {
+                                    @Override
+                                    public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+                                        if (method.getSimpleName().equals("test")) {
+                                            return JavaTemplate.builder("Exception").contextSensitive().build()
+                                                    .apply(getCursor(), method.getCoordinates().replaceThrows());
+                                        }
+                                        return method;
+                                    }
+                                })
+                        ),
+                java(
+                        """
               class A {
                   void test() {
                       owner
                   }
               }
               """,
-            """
+                        """
               class A {
                   void test() throws Exception {
                       owner
                   }
               }
               """
-          )
+                )
         );
     }
 }

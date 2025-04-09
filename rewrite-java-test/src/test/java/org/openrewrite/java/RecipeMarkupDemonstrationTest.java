@@ -27,17 +27,17 @@ class RecipeMarkupDemonstrationTest implements RewriteTest {
     @ValueSource(strings = {"debug", "info", "warning", "error"})
     void markup(String level) {
         rewriteRun(
-          spec -> spec.recipe(new RecipeMarkupDemonstration(level)),
-          java(
-            """
+                spec -> spec.recipe(new RecipeMarkupDemonstration(level)),
+                java(
+                        """
               class Test {
               }
               """,
-            String.format("""
+                        String.format("""
               /*~~(This is a%s %s message.)~~>*/class Test {
               }
               """, level.equals("error") || level.equals("info") ? "n" : "", level)
-          )
+                )
         );
     }
 }

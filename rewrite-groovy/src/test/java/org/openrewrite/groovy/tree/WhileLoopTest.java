@@ -26,22 +26,22 @@ class WhileLoopTest implements RewriteTest {
     @Test
     void whileLoop() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               while ( true ) { }
               """
-          )
+                )
         );
     }
 
     @Test
     void statementTerminatorForSingleLineWhileLoops() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               while(true) test()
               """
-          )
+                )
         );
     }
 }

@@ -216,7 +216,7 @@ public class UpdateJavaCompatibility extends Recipe {
             }
 
             private int getMajorVersion(@Nullable String version) {
-                if(version == null) {
+                if (version == null) {
                     return -1;
                 }
                 try {

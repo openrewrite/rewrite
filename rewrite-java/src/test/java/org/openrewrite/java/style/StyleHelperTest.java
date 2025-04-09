@@ -37,18 +37,18 @@ class StyleHelperTest {
     @Test
     void mergeSpacesStyles() {
         var merged = StyleHelper.merge(
-            IntelliJ.spaces(),
-            new SpacesStyle(
-                new SpacesStyle.BeforeParentheses(true, true, false, false, false, false, false, false, false, true),
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
-            )
+                IntelliJ.spaces(),
+                new SpacesStyle(
+                        new SpacesStyle.BeforeParentheses(true, true, false, false, false, false, false, false, false, true),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null
+                )
         );
         assertThat(merged.getBeforeParentheses().getMethodDeclaration()).isTrue();
         assertThat(merged.getBeforeParentheses().getMethodCall()).isTrue();

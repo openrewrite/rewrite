@@ -49,27 +49,27 @@ public class UpgradePluginVersion extends Recipe {
 
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate 'org.openrewrite.maven:rewrite-maven-plugin:VERSION'. " +
-                          "Supports globs.",
+                    "Supports globs.",
             example = "org.openrewrite.maven")
     String groupId;
 
     @Option(displayName = "Artifact",
             description = "The second part of a dependency coordinate 'org.openrewrite.maven:rewrite-maven-plugin:VERSION'. " +
-                          "Supports globs.",
+                    "Supports globs.",
             example = "rewrite-maven-plugin")
     String artifactId;
 
     @Option(displayName = "New version",
             description = "An exact version number or node-style semver selector used to select the version number. " +
-                          "You can also use `latest.release` for the latest available version and `latest.patch` if " +
-                          "the current version is a valid semantic version. For more details, you can look at the documentation " +
-                          "page of [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors)",
+                    "You can also use `latest.release` for the latest available version and `latest.patch` if " +
+                    "the current version is a valid semantic version. For more details, you can look at the documentation " +
+                    "page of [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors)",
             example = "29.X")
     String newVersion;
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
@@ -78,7 +78,7 @@ public class UpgradePluginVersion extends Recipe {
     // needs implementation, left here as syntactic placeholder // todo
     @Option(displayName = "Trust parent POM",
             description = "Even if the parent suggests a version that is older than what we are trying to upgrade to, trust it anyway. " +
-                          "Useful when you want to wait for the parent to catch up before upgrading. The parent is not trusted by default.",
+                    "Useful when you want to wait for the parent to catch up before upgrading. The parent is not trusted by default.",
             required = false)
     @Nullable
     Boolean trustParent;
@@ -112,7 +112,7 @@ public class UpgradePluginVersion extends Recipe {
     @Override
     public String getDescription() {
         return "Upgrade the version of a plugin using Node Semver advanced range selectors, " +
-               "allowing more precise control over version updates to patch or minor releases.";
+                "allowing more precise control over version updates to patch or minor releases.";
     }
 
     @Override
@@ -154,7 +154,7 @@ public class UpgradePluginVersion extends Recipe {
             }
 
             private Optional<String> findNewerDependencyVersion(String groupId, String artifactId,
-                                                                String currentVersion, ExecutionContext ctx) throws MavenDownloadingException {
+                    String currentVersion, ExecutionContext ctx) throws MavenDownloadingException {
                 MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
                 Collection<String> availableVersions = new ArrayList<>();
                 for (String v : mavenMetadata.getVersioning().getVersions()) {

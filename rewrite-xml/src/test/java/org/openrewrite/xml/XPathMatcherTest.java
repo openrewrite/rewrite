@@ -31,7 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class XPathMatcherTest {
 
     private final SourceFile xmlDoc = new XmlParser().parse(
-      """
+            """
         <?xml version="1.0" encoding="UTF-8"?>
         <dependencies>
             <dependency>
@@ -46,7 +46,7 @@ class XPathMatcherTest {
     ).toList().get(0);
 
     private final SourceFile pomXml1 = new XmlParser().parse(
-      """
+            """
         <project>
           <groupId>com.mycompany.app</groupId>
           <artifactId>my-app</artifactId>
@@ -69,7 +69,7 @@ class XPathMatcherTest {
     ).toList().get(0);
 
     private final SourceFile pomXml2 = new XmlParser().parse(
-      """
+            """
         <project>
           <groupId>com.mycompany.app</groupId>
           <artifactId>my-app</artifactId>
@@ -94,7 +94,7 @@ class XPathMatcherTest {
     ).toList().get(0);
 
     private final SourceFile namespacedXml = new XmlParser().parse(
-      """
+            """
         <?xml version="1.0" encoding="UTF-8"?>
         <root xmlns="http://www.example.com/namespace1"
               xmlns:ns2="http://www.example.com/namespace2"
@@ -165,7 +165,7 @@ class XPathMatcherTest {
     @Test
     void matchNestedElementsWithSameName() {
         var xml = new XmlParser().parse(
-          """
+                """
             <?xml version="1.0" encoding="UTF-8"?>
             <root>
                 <element foo="bar">
@@ -210,19 +210,19 @@ class XPathMatcherTest {
     @Test
     void matchPom() {
         assertThat(match("/project/build/plugins/plugin/configuration/source",
-          pomXml1)).isTrue();
+                pomXml1)).isTrue();
         assertThat(match("/project/build/plugins/plugin[artifactId='maven-compiler-plugin']/configuration/source",
-          pomXml1)).isTrue();
+                pomXml1)).isTrue();
         assertThat(match("//plugin[artifactId='maven-compiler-plugin']/configuration/source",
-          pomXml1)).isTrue();
+                pomXml1)).isTrue();
         assertThat(match("/project/build/plugins/plugin[groupId='org.apache.maven.plugins']/configuration/source",
-          pomXml1)).isTrue();
+                pomXml1)).isTrue();
         assertThat(match("/project/build/plugins/plugin[artifactId='somethingElse']/configuration/source",
-          pomXml1)).isFalse();
+                pomXml1)).isFalse();
         assertThat(match("/project/build//plugins/plugin/configuration/source",
-          pomXml1)).isTrue();
+                pomXml1)).isTrue();
         assertThat(match("/project/build//plugins/plugin/configuration/source",
-          pomXml2)).isTrue();
+                pomXml2)).isTrue();
         // skip 2+ levels with //
         assertThat(match("/project/build//plugin/configuration/source", pomXml2)).isTrue();
         assertThat(match("/project//configuration/source", pomXml2)).isTrue();
@@ -230,7 +230,7 @@ class XPathMatcherTest {
     }
 
     private final SourceFile attributeXml = new XmlParser().parse(
-      """
+            """
         <?xml version="1.0" encoding="UTF-8"?>
         <root>
           <element1 foo="bar"><foo>baz</foo></element1>
@@ -272,7 +272,7 @@ class XPathMatcherTest {
     @Test
     void relativePathsWithConditions() {
         SourceFile xml = new XmlParser().parse(
-          """
+                """
             <?xml version="1.0" encoding="UTF-8"?>
             <root>
               <element1 foo="bar">
@@ -312,14 +312,14 @@ class XPathMatcherTest {
     void otherUncoveredXpathFunctions() {
         // Other common XPath functions
        assertThat(match("contains(/root/element1, 'content1')", namespacedXml)).isTrue();
-       assertThat(match("not(contains(/root/element1, 'content1'))", namespacedXml)).isFalse();
-       assertThat(match("string-length(/root/element1) > 2", namespacedXml)).isTrue();
-       assertThat(match("starts-with(/root/element1, 'content1')", namespacedXml)).isTrue();
-       assertThat(match("ends-with(/root/element1, 'content1')", namespacedXml)).isTrue();
-       assertThat(match("substring-before(/root/element1, '1') = 'content'", namespacedXml)).isTrue();
-       assertThat(match("substring-after(/root/element1, 'content') = '1'", namespacedXml)).isTrue();
-       assertThat(match("/root/element1/text()", namespacedXml)).isTrue();
-       assertThat(match("count(/root/*)", namespacedXml)).isTrue();
+        assertThat(match("not(contains(/root/element1, 'content1'))", namespacedXml)).isFalse();
+        assertThat(match("string-length(/root/element1) > 2", namespacedXml)).isTrue();
+        assertThat(match("starts-with(/root/element1, 'content1')", namespacedXml)).isTrue();
+        assertThat(match("ends-with(/root/element1, 'content1')", namespacedXml)).isTrue();
+        assertThat(match("substring-before(/root/element1, '1') = 'content'", namespacedXml)).isTrue();
+        assertThat(match("substring-after(/root/element1, 'content') = '1'", namespacedXml)).isTrue();
+        assertThat(match("/root/element1/text()", namespacedXml)).isTrue();
+        assertThat(match("count(/root/*)", namespacedXml)).isTrue();
     }
 
     @Test

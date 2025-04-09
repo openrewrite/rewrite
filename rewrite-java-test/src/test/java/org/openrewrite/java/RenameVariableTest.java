@@ -38,19 +38,19 @@ class RenameVariableTest implements RewriteTest {
             public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
                 if (classDecl.getSimpleName().equals("A")) {
                     List<J.VariableDeclarations> variableDecls = classDecl.getBody().getStatements().stream()
-                      .filter(J.VariableDeclarations.class::isInstance)
-                      .map(J.VariableDeclarations.class::cast)
-                      .collect(toList());
+                            .filter(J.VariableDeclarations.class::isInstance)
+                            .map(J.VariableDeclarations.class::cast)
+                            .collect(toList());
 
                     if (includeMethodParameters) {
                         variableDecls.addAll(
-                          classDecl.getBody().getStatements().stream()
-                            .filter(J.MethodDeclaration.class::isInstance)
-                            .map(J.MethodDeclaration.class::cast)
-                            .flatMap(it -> it.getParameters().stream())
-                            .filter(J.VariableDeclarations.class::isInstance)
-                            .map(J.VariableDeclarations.class::cast)
-                            .collect(toList())
+                                classDecl.getBody().getStatements().stream()
+                                        .filter(J.MethodDeclaration.class::isInstance)
+                                        .map(J.MethodDeclaration.class::cast)
+                                        .flatMap(it -> it.getParameters().stream())
+                                        .filter(J.VariableDeclarations.class::isInstance)
+                                        .map(J.VariableDeclarations.class::cast)
+                                        .collect(toList())
                         );
                     }
 
@@ -74,9 +74,9 @@ class RenameVariableTest implements RewriteTest {
     @Test
     void renameFieldWithSameNameAsParameterWithJavaDoc() {
         rewriteRun(
-          spec -> spec.recipe(renameVariableTest("name", "_name", false)),
-          java(
-            """
+                spec -> spec.recipe(renameVariableTest("name", "_name", false)),
+                java(
+                        """
               public class A {
                   private String name;
                   
@@ -90,7 +90,7 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   private String _name;
                   
@@ -104,7 +104,7 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -112,9 +112,9 @@ class RenameVariableTest implements RewriteTest {
     @Test
     void variableNameExistsMultipleScopes() {
         rewriteRun(
-          spec -> spec.recipe(renameVariableTest("v", "myVal", false)),
-          java(
-            """
+                spec -> spec.recipe(renameVariableTest("v", "myVal", false)),
+                java(
+                        """
               class A {
                   String v = "";
                   String getVal(String v) {
@@ -122,7 +122,7 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class A {
                   String myVal = "";
                   String getVal(String v) {
@@ -130,7 +130,7 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -138,9 +138,9 @@ class RenameVariableTest implements RewriteTest {
     @Test
     void staticVariableReferencedByClassName() {
         rewriteRun(
-          spec -> spec.recipe(renameVariableTest("v", "aVal", false)),
-          java(
-            """
+                spec -> spec.recipe(renameVariableTest("v", "aVal", false)),
+                java(
+                        """
               class A {
                   static String v = "";
                   String getVal(String v) {
@@ -154,7 +154,7 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class A {
                   static String aVal = "";
                   String getVal(String v) {
@@ -168,7 +168,7 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -176,9 +176,9 @@ class RenameVariableTest implements RewriteTest {
     @Test
     void isParameterizedClass() {
         rewriteRun(
-          spec -> spec.recipe(renameVariableTest("_val", "v", true)),
-          java(
-            """
+                spec -> spec.recipe(renameVariableTest("_val", "v", true)),
+                java(
+                        """
               package org.openrewrite;
                             
               public class A<T> {
@@ -191,7 +191,7 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package org.openrewrite;
                             
               public class A<T> {
@@ -204,16 +204,16 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doNotChangeToJavaKeyword() {
         rewriteRun(
-          spec -> spec.recipe(renameVariableTest("v", "int", true)),
-          java(
-            """
+                spec -> spec.recipe(renameVariableTest("v", "int", true)),
+                java(
+                        """
               package org.openrewrite;
 
               public class A {
@@ -229,7 +229,7 @@ class RenameVariableTest implements RewriteTest {
                   public int v = 1;
               }
               """
-          )
+                )
         );
     }
 
@@ -237,9 +237,9 @@ class RenameVariableTest implements RewriteTest {
     @Test
     void doNotRenameForLoopVariables() {
         rewriteRun(
-          spec -> spec.recipe(renameVariableTest("v", "VALUE", true)),
-          java(
-            """
+                spec -> spec.recipe(renameVariableTest("v", "VALUE", true)),
+                java(
+                        """
               package org.openrewrite;
 
               public class A {
@@ -255,7 +255,7 @@ class RenameVariableTest implements RewriteTest {
                   public int v = 1;
               }
               """,
-            """
+                        """
               package org.openrewrite;
 
               public class A {
@@ -271,16 +271,16 @@ class RenameVariableTest implements RewriteTest {
                   public int VALUE = 1;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void renameForLoopVariables() {
         rewriteRun(
-          spec -> spec.recipe(renameVariableTest("v", "VALUE", true)),
-          java(
-            """
+                spec -> spec.recipe(renameVariableTest("v", "VALUE", true)),
+                java(
+                        """
               package org.openrewrite;
 
               public class A {
@@ -296,7 +296,7 @@ class RenameVariableTest implements RewriteTest {
                   public int v = 1;
               }
               """,
-            """
+                        """
               package org.openrewrite;
 
               public class A {
@@ -312,16 +312,16 @@ class RenameVariableTest implements RewriteTest {
                   public int VALUE = 1;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doNotRenameInnerClassVariables() {
         rewriteRun(
-          spec -> spec.recipe(renameVariableTest("v", "VALUE", true)),
-          java(
-            """
+                spec -> spec.recipe(renameVariableTest("v", "VALUE", true)),
+                java(
+                        """
               package org.openrewrite;
 
               public class A {
@@ -333,7 +333,7 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package org.openrewrite;
 
               public class A {
@@ -345,16 +345,16 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void renameInnerClassVariables() {
         rewriteRun(
-          spec -> spec.recipe(renameVariableTest("v", "VALUE", true)),
-          java(
-            """
+                spec -> spec.recipe(renameVariableTest("v", "VALUE", true)),
+                java(
+                        """
               package org.openrewrite;
 
               public class A {
@@ -368,7 +368,7 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package org.openrewrite;
 
               public class A {
@@ -382,16 +382,16 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void renameTry() {
         rewriteRun(
-          spec -> spec.recipe(renameVariableTest("v", "VALUE", true)),
-          java(
-            """
+                spec -> spec.recipe(renameVariableTest("v", "VALUE", true)),
+                java(
+                        """
               package org.openrewrite;
 
               import java.io.FileInputStream;
@@ -411,7 +411,7 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package org.openrewrite;
 
               import java.io.FileInputStream;
@@ -431,16 +431,16 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void renameCatchWithoutResource() {
         rewriteRun(
-          spec -> spec.recipe(renameVariableTest("v", "VALUE", true)),
-          java(
-            """
+                spec -> spec.recipe(renameVariableTest("v", "VALUE", true)),
+                java(
+                        """
               package org.openrewrite;
 
               import java.io.FileDescriptor;
@@ -461,7 +461,7 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package org.openrewrite;
 
               import java.io.FileDescriptor;
@@ -482,16 +482,16 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void renameCatchWithTryResource() {
         rewriteRun(
-          spec -> spec.recipe(renameVariableTest("v", "VALUE", true)),
-          java(
-            """
+                spec -> spec.recipe(renameVariableTest("v", "VALUE", true)),
+                java(
+                        """
               package org.openrewrite;
 
               import java.io.FileDescriptor;
@@ -511,7 +511,7 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package org.openrewrite;
 
               import java.io.FileDescriptor;
@@ -531,16 +531,16 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void renameVariablesInLambda() {
         rewriteRun(
-          spec -> spec.recipe(renameVariableTest("v", "VALUE", true)),
-          java(
-            """
+                spec -> spec.recipe(renameVariableTest("v", "VALUE", true)),
+                java(
+                        """
               package org.openrewrite;
 
               import java.util.function.BiFunction;
@@ -560,7 +560,7 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package org.openrewrite;
 
               import java.util.function.BiFunction;
@@ -580,16 +580,16 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doNotRenameVariablesInLambda() {
         rewriteRun(
-          spec -> spec.recipe(renameVariableTest("v", "VALUE", true)),
-          java(
-            """
+                spec -> spec.recipe(renameVariableTest("v", "VALUE", true)),
+                java(
+                        """
               package org.openrewrite;
 
               import java.util.function.BiFunction;
@@ -606,7 +606,7 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package org.openrewrite;
 
               import java.util.function.BiFunction;
@@ -623,7 +623,7 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -631,9 +631,9 @@ class RenameVariableTest implements RewriteTest {
     @Test
     void renameSwitchCases() {
         rewriteRun(
-          spec -> spec.recipe(renameVariableTest("v", "VALUE", true)),
-          java(
-            """
+                spec -> spec.recipe(renameVariableTest("v", "VALUE", true)),
+                java(
+                        """
               package org.openrewrite;
 
               public class A {
@@ -658,7 +658,7 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package org.openrewrite;
 
               public class A {
@@ -683,16 +683,16 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void renameMethodVariables() {
         rewriteRun(
-          spec -> spec.recipe(renameVariableTest("v", "VALUE", false)),
-          java(
-            """
+                spec -> spec.recipe(renameVariableTest("v", "VALUE", false)),
+                java(
+                        """
               package org.openrewrite;
 
               public class A {
@@ -710,7 +710,7 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package org.openrewrite;
 
               public class A {
@@ -728,7 +728,7 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -736,16 +736,16 @@ class RenameVariableTest implements RewriteTest {
     @Test
     void renameFieldAccessVariables() {
         rewriteRun(
-          spec -> spec.recipe(renameVariableTest("v", "VALUE", true)),
-          java(
-            """
+                spec -> spec.recipe(renameVariableTest("v", "VALUE", true)),
+                java(
+                        """
               class ClassWithPublicField {
                   public int publicField = 10;
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               public class A {
                   public ClassWithPublicField v = new ClassWithPublicField();
 
@@ -755,7 +755,7 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   public ClassWithPublicField VALUE = new ClassWithPublicField();
 
@@ -765,7 +765,7 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -773,9 +773,9 @@ class RenameVariableTest implements RewriteTest {
     @Test
     void renameLocalFieldAccessInStaticMethod() {
         rewriteRun(
-          spec -> spec.recipe(renameVariableTest("v", "VALUE", true)),
-          java(
-            """
+                spec -> spec.recipe(renameVariableTest("v", "VALUE", true)),
+                java(
+                        """
               public class A {
                   private int v;
 
@@ -786,7 +786,7 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   private int VALUE;
 
@@ -797,7 +797,7 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -805,19 +805,19 @@ class RenameVariableTest implements RewriteTest {
     @Test
     void renameVariable() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              @Override
-              public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-                  if (getCursor().getParentTreeCursor().getValue() instanceof J.MethodDeclaration) {
-                      doAfterVisit(new RenameVariable<>(multiVariable.getVariables().get(0), "n2"));
-                  } else if (!(getCursor().getParentTreeCursor().getParentTreeCursor().getValue() instanceof J.ClassDeclaration)) {
-                      doAfterVisit(new RenameVariable<>(multiVariable.getVariables().get(0), "n1"));
-                  }
-                  return super.visitVariableDeclarations(multiVariable, ctx);
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    @Override
+                    public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                        if (getCursor().getParentTreeCursor().getValue() instanceof J.MethodDeclaration) {
+                            doAfterVisit(new RenameVariable<>(multiVariable.getVariables().get(0), "n2"));
+                        } else if (!(getCursor().getParentTreeCursor().getParentTreeCursor().getValue() instanceof J.ClassDeclaration)) {
+                            doAfterVisit(new RenameVariable<>(multiVariable.getVariables().get(0), "n1"));
+                        }
+                        return super.visitVariableDeclarations(multiVariable, ctx);
+                    }
+                })),
+                java(
+                        """
               public class B {
                   int n;
                             
@@ -835,7 +835,7 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class B {
                   int n;
                             
@@ -853,16 +853,16 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void renameMethodParam() {
         rewriteRun(
-          spec -> spec.recipe(renameVariableTest("c", "foobar", true)),
-          java(
-            """
+                spec -> spec.recipe(renameVariableTest("c", "foobar", true)),
+                java(
+                        """
               package org.openrewrite;
 
               public class A {
@@ -871,7 +871,7 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package org.openrewrite;
 
               public class A {
@@ -880,7 +880,7 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -888,9 +888,9 @@ class RenameVariableTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3051")
     void doNotRenameMethods() {
         rewriteRun(
-          spec -> spec.recipe(renameVariableTest("contains", "foobar", true)),
-          java(
-            """
+                spec -> spec.recipe(renameVariableTest("contains", "foobar", true)),
+                java(
+                        """
               package org.openrewrite;
 
               public class A {
@@ -899,7 +899,7 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package org.openrewrite;
 
               public class A {
@@ -908,51 +908,51 @@ class RenameVariableTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doNotRenameNewClass() {
         rewriteRun(
-          spec -> spec.recipe(renameVariableTest("FooBarBaz", "fooBarBaz", true)),
-          java(
-            """
+                spec -> spec.recipe(renameVariableTest("FooBarBaz", "fooBarBaz", true)),
+                java(
+                        """
               class FooBarBaz {}
               class A {
                   FooBarBaz FooBarBaz = new FooBarBaz();
               }
               """,
-            """
+                        """
               class FooBarBaz {}
               class A {
                   FooBarBaz fooBarBaz = new FooBarBaz();
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doNotRenameTypeParameter() {
         rewriteRun(
-          spec -> spec.recipe(renameVariableTest("FooBarBaz", "fooBarBaz", true)),
-          java(
-            """
+                spec -> spec.recipe(renameVariableTest("FooBarBaz", "fooBarBaz", true)),
+                java(
+                        """
               import java.util.ArrayList;
               class FooBarBaz {}
               class A {
                   ArrayList<FooBarBaz> FooBarBaz = new ArrayList<FooBarBaz>();
               }
               """,
-            """
+                        """
               import java.util.ArrayList;
               class FooBarBaz {}
               class A {
                   ArrayList<FooBarBaz> fooBarBaz = new ArrayList<FooBarBaz>();
               }
               """
-          )
+                )
         );
     }
 
@@ -960,9 +960,9 @@ class RenameVariableTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/4059")
     void renameTypeCastedField() {
         rewriteRun(
-          spec -> spec.recipe(renameVariableTest("objArray", "objects", false)),
-          java(
-            """
+                spec -> spec.recipe(renameVariableTest("objArray", "objects", false)),
+                java(
+                        """
               import java.util.Arrays;
 
               public class A {
@@ -977,7 +977,7 @@ class RenameVariableTest implements RewriteTest {
                 }
               }
               """,
-            """
+                        """
               import java.util.Arrays;
 
               public class A {
@@ -992,7 +992,7 @@ class RenameVariableTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 }

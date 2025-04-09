@@ -26,9 +26,9 @@ class RemoveEmptyXmlTagsTest implements RewriteTest {
     @Test
     void removeEmptyPluginRepositories() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveEmptyXmlTags()),
-          xml(
-            """
+                spec -> spec.recipe(new RemoveEmptyXmlTags()),
+                xml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.example</groupId>
@@ -38,7 +38,7 @@ class RemoveEmptyXmlTagsTest implements RewriteTest {
                   </pluginRepositories>
               </project>
               """,
-            """
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.example</groupId>
@@ -46,16 +46,16 @@ class RemoveEmptyXmlTagsTest implements RewriteTest {
                   <version>1.0-SNAPSHOT</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void removeNestedEmptyTags() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveEmptyXmlTags()),
-          xml(
-            """
+                spec -> spec.recipe(new RemoveEmptyXmlTags()),
+                xml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.example</groupId>
@@ -70,7 +70,7 @@ class RemoveEmptyXmlTagsTest implements RewriteTest {
                   </build>
               </project>
               """,
-            """
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.example</groupId>
@@ -78,16 +78,16 @@ class RemoveEmptyXmlTagsTest implements RewriteTest {
                   <version>1.0-SNAPSHOT</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void retainWhenThereAttributes() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveEmptyXmlTags()),
-          xml(
-            """
+                spec -> spec.recipe(new RemoveEmptyXmlTags()),
+                xml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.example</groupId>
@@ -98,7 +98,7 @@ class RemoveEmptyXmlTagsTest implements RewriteTest {
                   <dependencies attr="false" />
               </project>
               """
-          )
+                )
         );
     }
 }

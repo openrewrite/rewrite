@@ -26,8 +26,8 @@ class IfTest implements RewriteTest {
     @Test
     void ifElse() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               int n = 0
               if(n == 0) {
               }
@@ -36,34 +36,34 @@ class IfTest implements RewriteTest {
               else {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void noElse() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               int n = 0;
               if (n == 0) {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void singleLineIfElseStatements() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               int n = 0;
               if (n == 0) n++;
               else if (n == 1) n++;
               else n++;
               """
-          )
+                )
         );
     }
 
@@ -71,14 +71,14 @@ class IfTest implements RewriteTest {
     @Test
     void elseWithTrailingSpace() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               if (true) {
               }
               else{ 
               }
               """
-          )
+                )
         );
     }
 }

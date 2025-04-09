@@ -25,40 +25,40 @@ class FieldAccessTest implements RewriteTest {
     @Test
     void starAccess() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               all*.exclude group: 'com.netflix.archaius', module: 'archaius-core'
               """
-          )
+                )
         );
     }
 
     @Test
     void fieldAccess() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               class Test {
                   public Test field = new Test()
                   Test b = new Test() . field . field
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void nullSafeDereference() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               class Test {
                   Integer n
               }
               Test t = new Test()
               t?.n
               """
-          )
+                )
         );
     }
 }

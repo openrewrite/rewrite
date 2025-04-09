@@ -28,24 +28,24 @@ class RecordTest implements RewriteTest {
     @Test
     void emptyRecord() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public record JavaRecord() {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void javaRecord() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public record JavaRecord(String name, @Deprecated int age) {
               }
               """
-          )
+                )
         );
     }
 
@@ -53,15 +53,15 @@ class RecordTest implements RewriteTest {
     @Test
     void compactConstructor() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public record JavaRecord(String name, @Deprecated int age) {
                   public JavaRecord {
                       java.util.Objects.requireNonNull(name);
                   }
               }
               """
-          )
+                )
         );
     }
 }

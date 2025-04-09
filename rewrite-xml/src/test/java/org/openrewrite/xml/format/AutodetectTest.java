@@ -32,9 +32,9 @@ class AutodetectTest implements RewriteTest {
     @Test
     void autodetectSimple() {
         rewriteRun(
-          hasIndentation(2, 4),
-          xml(
-            """
+                hasIndentation(2, 4),
+                xml(
+                        """
               <project>
                 <dependencies>
                   <dependency>
@@ -49,7 +49,7 @@ class AutodetectTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -57,9 +57,9 @@ class AutodetectTest implements RewriteTest {
     @Test
     void autodetectQuarkus() {
         rewriteRun(
-          hasIndentation(4, 4),
-          xml(
-            """
+                hasIndentation(4, 4),
+                xml(
+                        """
               <project xmlns="http://maven.apache.org/POM/4.0.0"
                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -72,16 +72,16 @@ class AutodetectTest implements RewriteTest {
                   <artifactId>quarkus-bootstrap-bom</artifactId>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void continuationIndents() {
         rewriteRun(
-          hasIndentation(4, 9),
-          xml(
-            """
+                hasIndentation(4, 9),
+                xml(
+                        """
               <project
                        xmlns="http://maven.apache.org/POM/4.0.0"
                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -90,7 +90,7 @@ class AutodetectTest implements RewriteTest {
                   <artifactId>quarkus-bootstrap-bom</artifactId>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -100,8 +100,8 @@ class AutodetectTest implements RewriteTest {
             sources.forEach(detector::sample);
 
             TabsAndIndentsStyle tabsAndIndents = (TabsAndIndentsStyle) detector.build().getStyles().stream()
-              .filter(TabsAndIndentsStyle.class::isInstance)
-              .findAny().orElseThrow();
+                    .filter(TabsAndIndentsStyle.class::isInstance)
+                    .findAny().orElseThrow();
             assertThat(tabsAndIndents.getTabSize()).isEqualTo(1);
             assertThat(tabsAndIndents.getIndentSize()).isEqualTo(indentSize);
             assertThat(tabsAndIndents.getContinuationIndentSize()).isEqualTo(continuationIndentSize);

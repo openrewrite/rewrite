@@ -105,7 +105,7 @@ public class RecipeSerializer {
             Method kmbBuildMethod = kmbClass.getMethod("build");
             Module kotlinModule = (Module) kmbBuildMethod.invoke(kotlinModuleBuilder);
             mapper.registerModule(kotlinModule);
-        } catch (ClassNotFoundException | NoSuchMethodException | InvocationTargetException  | InstantiationException | IllegalAccessException e) {
+        } catch (ClassNotFoundException | NoSuchMethodException | InvocationTargetException | InstantiationException | IllegalAccessException e) {
             // KotlinModule is optional
         }
     }

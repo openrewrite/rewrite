@@ -34,27 +34,27 @@ class JavaTemplateImportTest implements RewriteTest {
     @Test
     void replaceImport() {
         rewriteRun(
-          spec -> spec
-            .recipe(toRecipe(() -> new JavaVisitor<>() {
-                  @Override
-                  public J visitImport(J.Import import_, ExecutionContext executionContext) {
-                      return JavaTemplate.apply("import #{}", getCursor(),
-                        import_.getCoordinates().replace(), "java.util.Stack");
-                  }
-              }
-            )),
-          java(
-            """
+                spec -> spec
+                        .recipe(toRecipe(() -> new JavaVisitor<>() {
+                                    @Override
+                                    public J visitImport(J.Import import_, ExecutionContext executionContext) {
+                                        return JavaTemplate.apply("import #{}", getCursor(),
+                                                import_.getCoordinates().replace(), "java.util.Stack");
+                                    }
+                                }
+                        )),
+                java(
+                        """
               import java.util.List;
               class A {
               }
                 """,
-            """
+                        """
               import java.util.Stack;
               class A {
               }
               """
-          )
+                )
         );
     }
 }

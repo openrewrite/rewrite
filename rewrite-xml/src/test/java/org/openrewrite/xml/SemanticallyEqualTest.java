@@ -31,45 +31,45 @@ class SemanticallyEqualTest implements RewriteTest {
     @Test
     void attributeOrderDoesntAffectSemanticEquality() {
         rewriteRun(
-          semanticallyEqual(true),
-          xml("<foo fizz='fizz' buzz=\"buzz\"></foo>"),
-          xml("<foo buzz=\"buzz\" fizz=\"fizz\"></foo>")
+                semanticallyEqual(true),
+                xml("<foo fizz='fizz' buzz=\"buzz\"></foo>"),
+                xml("<foo buzz=\"buzz\" fizz=\"fizz\"></foo>")
         );
     }
 
     @Test
     void tagContentsAreConsidered() {
         rewriteRun(
-          semanticallyEqual(false),
-          xml("<foo>foo</foo>"),
-          xml("<foo>bar</foo>")
+                semanticallyEqual(false),
+                xml("<foo>foo</foo>"),
+                xml("<foo>bar</foo>")
         );
     }
 
     @Test
     void attributesWithDifferentValuesAreNotEqual() {
         rewriteRun(
-          semanticallyEqual(false),
-          xml("<foo fizz='fizz' buzz=\"bang\"></foo>"),
-          xml("<foo fizz=\"fizz\" buzz=\"buzz\" ></foo>")
+                semanticallyEqual(false),
+                xml("<foo fizz='fizz' buzz=\"bang\"></foo>"),
+                xml("<foo fizz=\"fizz\" buzz=\"buzz\" ></foo>")
         );
     }
 
     @Test
     void selfClosingTagIsEquivalentToEmptyTag() {
         rewriteRun(
-          semanticallyEqual(true),
-          xml("<foo></foo>"),
-          xml("<foo/>")
+                semanticallyEqual(true),
+                xml("<foo></foo>"),
+                xml("<foo/>")
         );
     }
 
     @Test
     void nestedTagsAreConsideredForEqualityAndFormattingDoesntMatter() {
         rewriteRun(
-          semanticallyEqual(true),
-          xml(
-            """
+                semanticallyEqual(true),
+                xml(
+                        """
               <foo>
                   <bar>
                       <baz>hello</baz>
@@ -77,89 +77,89 @@ class SemanticallyEqualTest implements RewriteTest {
                   </bar>
               </foo>
               """
-          ),
-          xml(
-            """
+                ),
+                xml(
+                        """
               <foo><bar>
                       <baz>hello</baz>
                       <bing/>
                   </bar></foo>
               """
-          )
+                )
         );
     }
 
     @Test
     void commentsInOrAroundTagsDontMatter() {
         rewriteRun(
-          semanticallyEqual(true),
-          xml(
-            """
+                semanticallyEqual(true),
+                xml(
+                        """
               <foo>
                   <bar>bing</bar>
               </foo>
               """
-          ),
-          xml(
-            """
+                ),
+                xml(
+                        """
               <!-- foo -->
               <foo>
                   <!-- bar -->
                   <bar><!-- bing -->bing<!-- bing --></bar>
               </foo>
               """
-          )
+                )
         );
     }
 
     @Test
     void differentTagsSameContent() {
         rewriteRun(
-          semanticallyEqual(false),
-          xml(
-            """
+                semanticallyEqual(false),
+                xml(
+                        """
               <tasks>
                 <delete file="erewhon" />
               </tasks>
               """
-          ),
-          xml(
-            """
+                ),
+                xml(
+                        """
               <target>
                 <delete file="erewhon" />
               </target>
               """
-          )
+                )
         );
     }
 
     @Test
     void differentChildTagSameContent() {
         rewriteRun(
-          semanticallyEqual(false),
-          xml(
-            """
+                semanticallyEqual(false),
+                xml(
+                        """
               <configuration>
                 <tasks>
                   <delete file="erewhon" />
                 </tasks>
               </configuration>
               """
-          ),
-          xml(
-            """
+                ),
+                xml(
+                        """
               <configuration>
                 <target>
                   <delete file="erewhon" />
                 </target>
               </configuration>
               """
-          )
+                )
         );
     }
 
     private static Consumer<RecipeSpec> semanticallyEqual(boolean isEqual) {
         return spec -> spec.beforeRecipe(sources ->
-          assertThat(SemanticallyEqual.areEqual((Xml) sources.get(0), (Xml) sources.get(1))).isEqualTo(isEqual));
+                assertThat(SemanticallyEqual.areEqual((Xml) sources.get(0), (Xml) sources.get(1))).isEqualTo(isEqual));
     }
 }

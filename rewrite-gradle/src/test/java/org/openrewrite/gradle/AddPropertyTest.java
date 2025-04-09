@@ -33,82 +33,82 @@ class AddPropertyTest implements RewriteTest {
     @Test
     void addToExistingPropertiesFile() {
         rewriteRun(
-          buildGradle("plugins { id 'java' }"),
-          properties(
-            //language=properties
-            """
+                buildGradle("plugins { id 'java' }"),
+                properties(
+                        //language=properties
+                        """
               project.name=helloworld
               """,
-            //language=properties
-            """
+                        //language=properties
+                        """
               org.gradle.caching=true
               project.name=helloworld
               """,
-            spec -> spec.path("gradle.properties")
-          )
+                        spec -> spec.path("gradle.properties")
+                )
         );
     }
 
     @Test
     void overwriteExistingProperty() {
         rewriteRun(
-          buildGradle("plugins { id 'java' }"),
-          properties(
-            //language=properties
-            """
+                buildGradle("plugins { id 'java' }"),
+                properties(
+                        //language=properties
+                        """
               project.name=helloworld
               org.gradle.caching=false
               """,
-            //language=properties
-            """
+                        //language=properties
+                        """
               project.name=helloworld
               org.gradle.caching=true
               """,
-            spec -> spec.path("gradle.properties")
-          )
+                        spec -> spec.path("gradle.properties")
+                )
         );
     }
 
     @Test
     void addToNewPropertiesFile() {
         rewriteRun(
-          buildGradle("plugins { id 'java' }"),
-          properties(
-            null,
-            //language=properties
-            """
+                buildGradle("plugins { id 'java' }"),
+                properties(
+                        null,
+                        //language=properties
+                        """
               org.gradle.caching=true
               """,
-            spec -> spec.path("gradle.properties")
-          )
+                        spec -> spec.path("gradle.properties")
+                )
         );
     }
 
     @Test
     void addOnlyToSpecifiedFilePattern() {
         rewriteRun(
-          spec -> spec.recipe(new AddProperty("org.gradle.caching", "true", null, "gradle.properties")),
-          buildGradle("plugins { id 'java' }"),
-          properties(
-            "",
-            //language=properties
-            """
+                spec -> spec.recipe(new AddProperty("org.gradle.caching", "true", null, "gradle.properties")),
+                buildGradle("plugins { id 'java' }"),
+                properties(
+                        "",
+                        //language=properties
+                        """
               org.gradle.caching=true
               """,
-            spec -> spec.path("gradle.properties")
-          ),
-          dir("project1",
-            properties(
-              "",
-              spec -> spec.path("gradle.properties")
-            )
-          ),
-          dir("project2",
-            properties(
-              "",
-              spec -> spec.path("gradle.properties")
-            )
-          )
+                        spec -> spec.path("gradle.properties")
+                ),
+                dir("project1",
+                        properties(
+                                "",
+                                spec -> spec.path("gradle.properties")
+                        )
+                ),
+                dir("project2",
+                        properties(
+                                "",
+                                spec -> spec.path("gradle.properties")
+                        )
+                )
         );
     }
 }

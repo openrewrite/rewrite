@@ -27,14 +27,14 @@ class AddCommentToXmlTagTest implements RewriteTest {
     @Test
     void addCommentToDependencyBlock() {
         rewriteRun(
-          spec -> spec.recipe(
-            new AddCommentToXmlTag(
-              "/project/dependencies/",
-              " Comment text "
-            )
-          ),
-          pomXml(
-            """
+                spec -> spec.recipe(
+                        new AddCommentToXmlTag(
+                                "/project/dependencies/",
+                                " Comment text "
+                        )
+                ),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>com.mycompany.app</groupId>
@@ -55,7 +55,7 @@ class AddCommentToXmlTagTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>com.mycompany.app</groupId>
@@ -77,7 +77,7 @@ class AddCommentToXmlTagTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 }

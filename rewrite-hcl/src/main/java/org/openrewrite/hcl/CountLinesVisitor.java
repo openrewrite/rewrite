@@ -24,7 +24,7 @@ public class CountLinesVisitor extends HclVisitor<AtomicInteger> {
 
     @Override
     public Space visitSpace(Space space, Space.Location loc, AtomicInteger count) {
-        if(space.getWhitespace().contains("\n")) {
+        if (space.getWhitespace().contains("\n")) {
             count.incrementAndGet();
         }
         return super.visitSpace(space, loc, count);

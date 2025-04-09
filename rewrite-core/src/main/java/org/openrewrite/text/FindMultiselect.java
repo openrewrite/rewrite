@@ -48,7 +48,7 @@ public class FindMultiselect extends Recipe {
     @Override
     public String getDescription() {
         return "Search for text, treating all textual sources as plain text. " +
-               "This version of the recipe exists to experiment with multiselect recipe options.";
+                "This version of the recipe exists to experiment with multiselect recipe options.";
     }
 
     @Option(displayName = "Find",
@@ -64,9 +64,9 @@ public class FindMultiselect extends Recipe {
 
     @Option(displayName = "Regex options",
             description = "Regex processing options. Multiple options may be specified. These options do nothing if `regex` mode is not enabled.\n" +
-                          "* Case-sensitive - The search will be sensitive to letter case. " +
-                          "* Multiline - Allows `^` and `$` to match the beginning and end of lines, respectively." +
-                          "* Dot all - Allows `.` to match line terminators.",
+                    "* Case-sensitive - The search will be sensitive to letter case. " +
+                    "* Multiline - Allows `^` and `$` to match the beginning and end of lines, respectively." +
+                    "* Dot all - Allows `.` to match line terminators.",
             valid = {"Case-sensitive", "Multiline", "Dot all"},
             required = false)
     @Nullable
@@ -74,9 +74,9 @@ public class FindMultiselect extends Recipe {
 
     @Option(displayName = "File pattern",
             description = "A glob expression that can be used to constrain which directories or source files should be searched. " +
-                          "Multiple patterns may be specified, separated by a semicolon `;`. " +
-                          "If multiple patterns are supplied any of the patterns matching will be interpreted as a match. " +
-                          "When not set, all source files are searched. ",
+                    "Multiple patterns may be specified, separated by a semicolon `;`. " +
+                    "If multiple patterns are supplied any of the patterns matching will be interpreted as a match. " +
+                    "When not set, all source files are searched. ",
             example = "**/*.java")
     @Nullable
     String filePattern;

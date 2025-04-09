@@ -37,23 +37,23 @@ class RemoveTrailingWhitespaceTest implements RewriteTest {
     @Test
     void removeTrailing() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {  
               
                   public void method(Test t) {\s\s
                   }\s\s
               }\s\s
               """,
-            """
+                        """
               class Test {
               
                   public void method(Test t) {
                   }
               }
               """,
-            SourceSpec::noTrim
-          )
+                        SourceSpec::noTrim
+                )
         );
     }
 
@@ -62,8 +62,8 @@ class RemoveTrailingWhitespaceTest implements RewriteTest {
     @Test
     void doNotRemoveTrailingComma() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class Test {
                   Integer[] integerArray = new Integer[] {
                       1,
@@ -72,7 +72,7 @@ class RemoveTrailingWhitespaceTest implements RewriteTest {
                   };
               }
               """
-          )
+                )
         );
     }
 }

@@ -49,7 +49,7 @@ public class AddToTagVisitor<P> extends XmlVisitor<P> {
             assert getCursor().getParent() != null;
             if (t.getClosing() == null) {
                 t = t.withClosing(autoFormat(new Xml.Tag.Closing(Tree.randomId(), "\n",
-                                Markers.EMPTY, t.getName(), ""), null, p, getCursor()))
+                        Markers.EMPTY, t.getName(), ""), null, p, getCursor()))
                         .withBeforeTagDelimiterPrefix("");
             }
 

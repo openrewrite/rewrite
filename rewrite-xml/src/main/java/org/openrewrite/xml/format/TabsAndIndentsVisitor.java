@@ -52,10 +52,10 @@ public class TabsAndIndentsVisitor<P> extends XmlIsoVisitor<P> {
 
                 StringBuilder shiftedPrefixBuilder = new StringBuilder(prefix.substring(0, prefix.lastIndexOf('\n') + 1));
                 for (int i = 0; i < indentMultiple; i++) {
-                    if(style.getUseTabCharacter()) {
+                    if (style.getUseTabCharacter()) {
                         shiftedPrefixBuilder.append("\t");
                     } else {
-                        for(int j = 0; j < (x instanceof Xml.Attribute ? style.getContinuationIndentSize() : style.getIndentSize()); j++) {
+                        for (int j = 0; j < (x instanceof Xml.Attribute ? style.getContinuationIndentSize() : style.getIndentSize()); j++) {
                             shiftedPrefixBuilder.append(" ");
                         }
                     }

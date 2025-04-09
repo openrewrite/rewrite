@@ -60,10 +60,10 @@ public class InMemoryMavenPomCache implements MavenPomCache {
     }
 
     public InMemoryMavenPomCache(String cacheNickname,
-                                 Cache<ResolvedGroupArtifactVersion, Optional<Pom>> pomCache,
-                                 Cache<MetadataKey, Optional<MavenMetadata>> mavenMetadataCache,
-                                 Cache<MavenRepository, Optional<MavenRepository>> repositoryCache,
-                                 Cache<ResolvedGroupArtifactVersion, ResolvedPom> dependencyCache) {
+            Cache<ResolvedGroupArtifactVersion, Optional<Pom>> pomCache,
+            Cache<MetadataKey, Optional<MavenMetadata>> mavenMetadataCache,
+            Cache<MavenRepository, Optional<MavenRepository>> repositoryCache,
+            Cache<ResolvedGroupArtifactVersion, ResolvedPom> dependencyCache) {
 
         this.pomCache = CaffeineCacheMetrics.monitor(Metrics.globalRegistry, pomCache, "Maven POMs - " + cacheNickname);
         this.mavenMetadataCache = CaffeineCacheMetrics.monitor(Metrics.globalRegistry, mavenMetadataCache, "Maven metadata - " + cacheNickname);
@@ -72,9 +72,9 @@ public class InMemoryMavenPomCache implements MavenPomCache {
     }
 
     public InMemoryMavenPomCache(Cache<ResolvedGroupArtifactVersion, Optional<Pom>> pomCache,
-                                 Cache<MetadataKey, Optional<MavenMetadata>> mavenMetadataCache,
-                                 Cache<MavenRepository, Optional<MavenRepository>> repositoryCache,
-                                 Cache<ResolvedGroupArtifactVersion, ResolvedPom> dependencyCache) {
+            Cache<MetadataKey, Optional<MavenMetadata>> mavenMetadataCache,
+            Cache<MavenRepository, Optional<MavenRepository>> repositoryCache,
+            Cache<ResolvedGroupArtifactVersion, ResolvedPom> dependencyCache) {
         this("default", pomCache, mavenMetadataCache, repositoryCache, dependencyCache);
     }
 

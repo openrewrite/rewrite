@@ -27,75 +27,75 @@ class AssignmentTest implements RewriteTest {
     @Test
     void noKeyword() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               x = "s"
               """
-          )
+                )
         );
     }
 
     @Test
     void simple() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def x = "s"
               """
-          )
+                )
         );
     }
 
     @Test
     void simpleWithFinal() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               final def x = "x"
               def final y = "y"
               final z = "z"
               """
-          )
+                )
         );
     }
 
     @Test
     void concat() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               android {
                   // specify the artifactId as module-name for kotlin
                   kotlinOptions.freeCompilerArgs += ["-module-name", POM_ARTIFACT_ID]
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void assignment() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               String s;
               s = "foo";
               """
-          )
+                )
         );
     }
 
     @Test
     void unaryMinus() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def i = -1
               def l = -1L
               def f = -1.0f
               def d = -1.0d
               """
-          )
+                )
         );
     }
 
@@ -103,11 +103,11 @@ class AssignmentTest implements RewriteTest {
     @Test
     void unaryPlus() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               int k = +10
               """
-          )
+                )
         );
     }
 
@@ -115,63 +115,63 @@ class AssignmentTest implements RewriteTest {
     @Test
     void baseNConversions() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def a = 01
               def b = 001
               def c = 0001
               def d = 00001
               def e = 000001
               """
-          )
+                )
         );
     }
 
     @Test
     void multipleAssignmentsAtOneLine() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def startItem = '|  ', endItem = '  |'
               def repeatLength = startItem.length() + output.length() + endItem.length()
               println("\\n" + ("-" * repeatLength) + "\\n" + startItem + output + endItem + "\\n" + ("-" * repeatLength))
               """
-          )
+                )
         );
     }
 
     @Test
     void multipleAssignmentsAtOneLineSimple() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def a = '1', b = '2'
               """
-          )
+                )
         );
     }
 
     @Test
     void multipleAssignmentsAtMultipleLineDynamicType() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
                def a = '1'    ,  
                   b = '2'
               """
-          )
+                )
         );
     }
 
     @Test
     void multipleAssignmentsAtMultipleLineStaticType() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
                String a = '1'    ,  
                   b = '2'
               """
-          )
+                )
         );
     }
 }

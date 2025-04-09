@@ -206,6 +206,6 @@ public class JavaReflectionTypeSignatureBuilder implements JavaTypeSignatureBuil
 
     public String variableSignature(Field field) {
         return field.getDeclaringClass().getName() + "{name=" + field.getName() +
-               ",type=" + signature(field.getGenericType()) + '}';
+                ",type=" + signature(field.getGenericType()) + '}';
     }
 }

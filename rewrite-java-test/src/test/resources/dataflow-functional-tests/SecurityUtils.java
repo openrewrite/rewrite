@@ -31,18 +31,22 @@ import java.util.Set;
 public final class SecurityUtils {
     private static Logger log = LoggerFactory.getLogger(SecurityUtils.class);
 
-    private static Set<String> SCHEMES = new HashSet<>() {{
-        add("http");
-        add("https");
-        add("HTTP");
-        add("HTTPS");
-    }};
+    private static Set<String> SCHEMES = new HashSet<>() {
+        {
+            add("http");
+            add("https");
+            add("HTTP");
+            add("HTTPS");
+        }
+    };
 
-    private static Set<Integer> PORTS = new HashSet<>() {{
-        add(443);
-        add(80);
-        add(3000); // we allow port 3000 for SAM local
-    }};
+    private static Set<Integer> PORTS = new HashSet<>() {
+        {
+            add(443);
+            add(80);
+            add(3000); // we allow port 3000 for SAM local
+        }
+    };
 
     public static boolean isValidPort(String port) {
         if (port == null) {

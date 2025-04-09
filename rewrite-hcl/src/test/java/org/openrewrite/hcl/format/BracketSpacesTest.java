@@ -33,33 +33,33 @@ class BracketSpacesTest implements RewriteTest {
     @Test
     void blockBraces() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               resource "aws_ebs_volume"    {    size      = 1
               encrypted = true   }
               """,
-            """
+                        """
               resource "aws_ebs_volume" {
                 size      = 1
                 encrypted = true
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void objectValues() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               resource "aws_ebs_volume" {
               foo = { bar = "bar"
               baz = "baz"
               }
               }
               """,
-            """
+                        """
               resource "aws_ebs_volume" {
                 foo = {
                   bar = "bar"
@@ -67,7 +67,7 @@ class BracketSpacesTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 
@@ -75,14 +75,14 @@ class BracketSpacesTest implements RewriteTest {
     @Test
     void objectValueBracesMulti() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               resource "aws_ebs_volume" {
                 foo = { bar = "bar"
                       bazzz = "bazzz"}
               }
               """,
-            """
+                        """
               resource "aws_ebs_volume" {
                 foo = {
                   bar   = "bar"
@@ -90,33 +90,33 @@ class BracketSpacesTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void objectValueBracesSingle() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               resource "aws_ebs_volume" {
                 foo = {    bar = "bar"   ,     baz = "baz"     }
               }
               """,
-            """
+                        """
               resource "aws_ebs_volume" {
                 foo = { bar = "bar", baz = "baz" }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void objectValueBracesComplex() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               resource "aws_ebs_volume" {
                 multiline_var = { xxx = "xxx"
                       yyy = "yyy"
@@ -126,7 +126,7 @@ class BracketSpacesTest implements RewriteTest {
                }
               }
               """,
-            """
+                        """
               resource "aws_ebs_volume" {
                 multiline_var = {
                   xxx = "xxx"
@@ -139,7 +139,7 @@ class BracketSpacesTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 }

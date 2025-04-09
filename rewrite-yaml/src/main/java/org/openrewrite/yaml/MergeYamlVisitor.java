@@ -155,9 +155,9 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 .findAny();
 
         return nameToAdd.map(nameToAddValue -> m1.getEntries().stream()
-                        .filter(e -> objectIdentifyingProperty.equals(e.getKey().getValue()))
-                        .map(e -> ((Yaml.Scalar) e.getValue()).getValue())
-                        .anyMatch(existingName -> existingName.equals(nameToAddValue)))
+                .filter(e -> objectIdentifyingProperty.equals(e.getKey().getValue()))
+                .map(e -> ((Yaml.Scalar) e.getValue()).getValue())
+                .anyMatch(existingName -> existingName.equals(nameToAddValue)))
                 .orElse(false);
     }
 
@@ -249,7 +249,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     private void removePrefixForDirectChildren(List<Yaml.Mapping.Entry> m1Entries, List<Yaml.Mapping.Entry> mutatedEntries) {
         for (int i = 0; i < m1Entries.size() - 1; i++) {
             if (m1Entries.get(i).getValue() instanceof Yaml.Mapping && mutatedEntries.get(i).getValue() instanceof Yaml.Mapping &&
-                ((Yaml.Mapping) m1Entries.get(i).getValue()).getEntries().size() < ((Yaml.Mapping) mutatedEntries.get(i).getValue()).getEntries().size()) {
+                    ((Yaml.Mapping) m1Entries.get(i).getValue()).getEntries().size() < ((Yaml.Mapping) mutatedEntries.get(i).getValue()).getEntries().size()) {
                 mutatedEntries.set(i + 1, mutatedEntries.get(i + 1).withPrefix(
                         linebreak() + substringOfAfterFirstLineBreak(mutatedEntries.get(i + 1).getPrefix())));
             }
@@ -339,7 +339,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
     private int calculateMultilineIndent(Yaml.Mapping.Entry entry) {
         String[] lines = LINE_BREAK.split(entry.getPrefix());
-        int keyIndent  = (lines.length > 1 ? lines[lines.length - 1] : "").length();
+        int keyIndent = (lines.length > 1 ? lines[lines.length - 1] : "").length();
         int indent = StringUtils.minCommonIndentLevel(substringOfAfterFirstLineBreak(((Yaml.Scalar) entry.getValue()).getValue()));
         return Math.max(indent - keyIndent, 0);
     }

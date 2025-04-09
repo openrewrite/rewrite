@@ -25,7 +25,7 @@ class HclAttributeAccessTest implements RewriteTest {
     @Test
     void attributeAccess() {
         rewriteRun(
-          hcl("a = b . c")
+                hcl("a = b . c")
         );
     }
 }

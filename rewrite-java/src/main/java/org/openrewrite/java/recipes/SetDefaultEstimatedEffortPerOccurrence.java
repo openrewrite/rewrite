@@ -52,7 +52,7 @@ public class SetDefaultEstimatedEffortPerOccurrence extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new UsesType<>("org.openrewrite.Recipe", false), new JavaIsoVisitor<ExecutionContext>() {
             final JavaTemplate addMethod = JavaTemplate.builder(
-                            "@Override public Duration getEstimatedEffortPerOccurrence() {\n" +
+                    "@Override public Duration getEstimatedEffortPerOccurrence() {\n" +
                             "return Duration.ofMinutes(5);\n" +
                             "}")
                     .imports("java.time.Duration")

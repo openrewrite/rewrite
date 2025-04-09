@@ -32,26 +32,26 @@ class ReplaceAliasWithAnchorValueTest implements RewriteTest {
     @Test
     void simpleCase() {
         rewriteRun(
-          yaml("""
+                yaml("""
               bar:
                 &abc yo: friend
               baz:
                 *abc: friendly
               """,
-            """
+                        """
               bar:
                 &abc yo: friend
               baz:
                 yo: friendly
               """
-          )
+                )
         );
     }
 
     @Test
     void aliasRefersToLastKnownAnchorValue() {
         rewriteRun(
-          yaml("""
+                yaml("""
               definitions:
                 steps:
                   - step: &build-test
@@ -72,7 +72,7 @@ class ReplaceAliasWithAnchorValueTest implements RewriteTest {
                   qa:
                     - step: *build-test
               """,
-            """
+                        """
               definitions:
                 steps:
                   - step: &build-test
@@ -96,14 +96,14 @@ class ReplaceAliasWithAnchorValueTest implements RewriteTest {
                     - step:
                         name: ReUsed Build and Test
               """
-          )
+                )
         );
     }
 
     @Test
     void howAboutSequences() {
         rewriteRun(
-          yaml("""
+                yaml("""
               stages:
                 - id: &id ping_api_endpoint
                   name: *id
@@ -114,7 +114,7 @@ class ReplaceAliasWithAnchorValueTest implements RewriteTest {
                 - id: &id revoke_token
                   name: *id
               """,
-            """
+                        """
               stages:
                 - id: &id ping_api_endpoint
                   name: ping_api_endpoint
@@ -125,7 +125,7 @@ class ReplaceAliasWithAnchorValueTest implements RewriteTest {
                 - id: &id revoke_token
                   name: revoke_token
               """
-          )
+                )
         );
     }
 

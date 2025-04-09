@@ -49,17 +49,17 @@ class CreateYamlFileTest implements RewriteTest {
             y: z
           """;
         rewriteRun(
-          spec -> spec.recipe(new CreateYamlFile(
-            "test/test.yaml",
-            fileContents,
-            null,
-            null
-          )),
-          yaml(
-            null,
-            fileContents,
-            spec -> spec.path("test/test.yaml")
-          )
+                spec -> spec.recipe(new CreateYamlFile(
+                        "test/test.yaml",
+                        fileContents,
+                        null,
+                        null
+                )),
+                yaml(
+                        null,
+                        fileContents,
+                        spec -> spec.path("test/test.yaml")
+                )
         );
     }
 
@@ -67,72 +67,72 @@ class CreateYamlFileTest implements RewriteTest {
     @Test
     void hasOverwrittenFile() {
         rewriteRun(
-          spec -> spec.recipe(new CreateYamlFile(
-            "test/test.yaml",
-            "after: true",
-            null,
-            true
-          )),
-          yaml(
-            "before: true",
-            "after: true",
-            spec -> spec.path("test/test.yaml")
-          )
+                spec -> spec.recipe(new CreateYamlFile(
+                        "test/test.yaml",
+                        "after: true",
+                        null,
+                        true
+                )),
+                yaml(
+                        "before: true",
+                        "after: true",
+                        spec -> spec.path("test/test.yaml")
+                )
         );
     }
 
     @Test
     void shouldNotChangeExistingFile() {
         rewriteRun(
-          spec -> spec.recipe(new CreateYamlFile(
-            "test/test.yaml",
-            null,
-            null,
-            false
-          )),
-          yaml(
-            """
+                spec -> spec.recipe(new CreateYamlFile(
+                        "test/test.yaml",
+                        null,
+                        null,
+                        false
+                )),
+                yaml(
+                        """
               foo: bar
               """,
-            spec -> spec.path("test/test.yaml")
-          )
+                        spec -> spec.path("test/test.yaml")
+                )
         );
     }
 
     @Test
     void shouldNotChangeExistingFileWhenOverwriteNull() {
         rewriteRun(
-          spec -> spec.recipe(new CreateYamlFile(
-            "test/test.yaml",
-            null,
-            null,
-            null
-          )),
-          yaml(
-            "",
-            spec -> spec.path("test/test.yaml")
-          )
+                spec -> spec.recipe(new CreateYamlFile(
+                        "test/test.yaml",
+                        null,
+                        null,
+                        null
+                )),
+                yaml(
+                        "",
+                        spec -> spec.path("test/test.yaml")
+                )
         );
     }
 
     @Test
     void shouldAddAnotherFile() {
         rewriteRun(
-          spec -> spec.recipe(new CreateYamlFile(
-            "test/test-file-2.yaml",
-            "",
-            null,
-            true
-          )),
-          yaml(
-            "",
-            spec -> spec.path("test/test-file-1.yaml")
-          ),
-          yaml(
-            null,
-            "",
-            spec -> spec.path("test/test-file-2.yaml")
-          )
+                spec -> spec.recipe(new CreateYamlFile(
+                        "test/test-file-2.yaml",
+                        "",
+                        null,
+                        true
+                )),
+                yaml(
+                        "",
+                        spec -> spec.path("test/test-file-1.yaml")
+                ),
+                yaml(
+                        null,
+                        "",
+                        spec -> spec.path("test/test-file-2.yaml")
+                )
         );
     }
 
@@ -147,10 +147,10 @@ class CreateYamlFileTest implements RewriteTest {
           """;
         InMemoryExecutionContext ctx = new InMemoryExecutionContext(e -> e.printStackTrace());
         MockHttpSender httpSender = new MockHttpSender(() ->
-          new ByteArrayInputStream(yamlContent.getBytes()));
+                new ByteArrayInputStream(yamlContent.getBytes()));
         HttpSenderExecutionContextView.view(ctx)
-          .setHttpSender(httpSender)
-          .setLargeFileHttpSender(httpSender);
+                .setHttpSender(httpSender)
+                .setLargeFileHttpSender(httpSender);
         RemoteExecutionContextView.view(ctx).setArtifactCache(new RemoteArtifactCache() {
             @Override
             public @Nullable Path get(URI uri) {
@@ -169,20 +169,20 @@ class CreateYamlFileTest implements RewriteTest {
             }
         });
         rewriteRun(
-          spec -> spec
-            .executionContext(ctx)
-            .recipeExecutionContext(ctx)
-            .recipe(new CreateYamlFile(
-              "test/test.yaml",
-              null,
-              "http://fake.url/test.yaml",
-              true)
-            ),
-          yaml(
-            null,
-            yamlContent,
-            spec -> spec.path("test/test.yaml")
-          )
+                spec -> spec
+                        .executionContext(ctx)
+                        .recipeExecutionContext(ctx)
+                        .recipe(new CreateYamlFile(
+                                "test/test.yaml",
+                                null,
+                                "http://fake.url/test.yaml",
+                                true)
+                        ),
+                yaml(
+                        null,
+                        yamlContent,
+                        spec -> spec.path("test/test.yaml")
+                )
         );
     }
 
@@ -195,17 +195,17 @@ class CreateYamlFileTest implements RewriteTest {
             y: z
           """;
         rewriteRun(
-          spec -> spec.recipe(new CreateYamlFile(
-            "test/test.yaml",
-            fileContents,
-            "http://foo.bar/baz.yaml",
-            true)
-          ),
-          yaml(
-            null,
-            fileContents,
-            spec -> spec.path("test/test.yaml")
-          )
+                spec -> spec.recipe(new CreateYamlFile(
+                        "test/test.yaml",
+                        fileContents,
+                        "http://foo.bar/baz.yaml",
+                        true)
+                ),
+                yaml(
+                        null,
+                        fileContents,
+                        spec -> spec.path("test/test.yaml")
+                )
         );
     }
 
@@ -224,17 +224,17 @@ class CreateYamlFileTest implements RewriteTest {
                   fileContents: |
                     content: yes
             """, "org.openrewrite.CreateYamlPrecondition"),
-          yaml(
-                """
+                yaml(
+                        """
             foo: bar
             """, spec -> spec.path("precondition.yml")),
-          yaml(
-            null,
-            """
+                yaml(
+                        null,
+                        """
                     content: yes
                     """,
-            spec -> spec.path("created.yml")
-          )
+                        spec -> spec.path("created.yml")
+                )
         );
     }
 
@@ -256,17 +256,17 @@ class CreateYamlFileTest implements RewriteTest {
                   fileContents: |
                     content: yes
             """, "org.openrewrite.CreateYamlPrecondition"),
-          yaml(
-                """
+                yaml(
+                        """
             foo: bar
             """, spec -> spec.path("precondition.yml")),
-          yaml(
-            null,
-            """
+                yaml(
+                        null,
+                        """
                     content: yes
                     """,
-            spec -> spec.path("created.yml")
-          )
+                        spec -> spec.path("created.yml")
+                )
         );
     }
 }

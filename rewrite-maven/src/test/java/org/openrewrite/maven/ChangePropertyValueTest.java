@@ -26,9 +26,9 @@ class ChangePropertyValueTest implements RewriteTest {
     @Test
     void property() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("guava.version", "29.0-jre", false, false)),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangePropertyValue("guava.version", "29.0-jre", false, false)),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                  
@@ -41,7 +41,7 @@ class ChangePropertyValueTest implements RewriteTest {
                 <version>1</version>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                  
@@ -54,16 +54,16 @@ class ChangePropertyValueTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void addFirstProperty() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("key", "value", true, false)),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangePropertyValue("key", "value", true, false)),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -73,7 +73,7 @@ class ChangePropertyValueTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -86,16 +86,16 @@ class ChangePropertyValueTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void changeExistingProperty() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("key", "value", true, false)),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangePropertyValue("key", "value", true, false)),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -108,7 +108,7 @@ class ChangePropertyValueTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -121,16 +121,16 @@ class ChangePropertyValueTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void addPropertyInOrder() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("key", "value", true, false)),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangePropertyValue("key", "value", true, false)),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -144,7 +144,7 @@ class ChangePropertyValueTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -159,7 +159,7 @@ class ChangePropertyValueTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 }

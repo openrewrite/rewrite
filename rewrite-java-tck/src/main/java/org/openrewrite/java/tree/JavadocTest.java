@@ -31,8 +31,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void javadocs() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.List;
                             
               /**
@@ -58,19 +58,19 @@ class JavadocTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void singleLineJavadocText() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**   test */
               class Test {}
               """
-          )
+                )
         );
     }
 
@@ -78,15 +78,15 @@ class JavadocTest implements RewriteTest {
     @Test
     void javaDocWithMultipleLeadingAsterisks() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /** ** * First '*' characters are treated as a margin until a non '*' is parsed.
                ** * @throws IOException validate cursor position.
                */
               class Test {
               }
                """
-          )
+                )
         );
     }
 
@@ -94,21 +94,21 @@ class JavadocTest implements RewriteTest {
     @Test
     void allBlank() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**   */
               class Test {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void allBlankMultiline() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**
                *
                *
@@ -116,7 +116,7 @@ class JavadocTest implements RewriteTest {
               class Test {
               }
               """
-          )
+                )
         );
     }
 
@@ -124,8 +124,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void emptyJavadoc() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   /***/
                   void empty() {}
@@ -134,7 +134,7 @@ class JavadocTest implements RewriteTest {
                   void onlyNewLine() {}
               }
               """
-          )
+                )
         );
     }
 
@@ -144,8 +144,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void author() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**
                * @author name
                */
@@ -153,15 +153,15 @@ class JavadocTest implements RewriteTest {
                   void method() {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void authorPostFixedNumber() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**
                * @author FirstName LastName 42
                *
@@ -170,7 +170,7 @@ class JavadocTest implements RewriteTest {
                   void method() {}
               }
               """
-          )
+                )
         );
     }
 
@@ -178,13 +178,13 @@ class JavadocTest implements RewriteTest {
     @Test
     void code() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /** {@code int n = 1; } */
               class Test {
               }
               """
-          )
+                )
         );
     }
 
@@ -192,8 +192,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void deprecated() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**
                * @deprecated reason
                */
@@ -201,7 +201,7 @@ class JavadocTest implements RewriteTest {
                   void method() {}
               }
               """
-          )
+                )
         );
     }
 
@@ -209,13 +209,13 @@ class JavadocTest implements RewriteTest {
     @Test
     void htmlComment() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /** <!-- comment --> */
               class Test {
               }
               """
-          )
+                )
         );
     }
 
@@ -223,15 +223,15 @@ class JavadocTest implements RewriteTest {
     @Test
     void docRoot() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**
                * See the <a href="{@docRoot}/copyright.html">Copyright</a>.
                */
               class Test {
               }
               """
-          )
+                )
         );
     }
 
@@ -239,13 +239,13 @@ class JavadocTest implements RewriteTest {
     @Test
     void doctype() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /** <!doctype text > test */
               class Test {
               }
               """
-          )
+                )
         );
     }
 
@@ -253,8 +253,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void multilineAttribute() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**
                * <a href="
                * https://...html">
@@ -263,7 +263,7 @@ class JavadocTest implements RewriteTest {
               class Test {
               }
               """
-          )
+                )
         );
     }
 
@@ -272,8 +272,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void selfClosingHTMLElement() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**
                *<p/>
                * text
@@ -281,7 +281,7 @@ class JavadocTest implements RewriteTest {
               class Test {
               }
               """
-          )
+                )
         );
     }
 
@@ -289,8 +289,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void preserveWhitespaceBeforeHTMLElement() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**
                * <p>
                * <p/>
@@ -300,7 +300,7 @@ class JavadocTest implements RewriteTest {
               class Test {
               }
               """
-          )
+                )
         );
     }
 
@@ -308,8 +308,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void whitespaceBeforeSelfClosingElement() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package org.foo;
                             
               /**
@@ -324,7 +324,7 @@ class JavadocTest implements RewriteTest {
                   PICKUP
               }
               """
-          )
+                )
         );
     }
 
@@ -332,8 +332,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void multipleLineErroneous() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**
                * @see this
                * or that
@@ -341,28 +341,28 @@ class JavadocTest implements RewriteTest {
               class Test {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void erroneous() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /** {@version this is an erroneous tag } */
               class Test {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unknownTags() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**
                * See the {@unknown}.
                * @unknown uh oh
@@ -370,7 +370,7 @@ class JavadocTest implements RewriteTest {
               class Test {
               }
               """
-          )
+                )
         );
     }
 
@@ -378,13 +378,13 @@ class JavadocTest implements RewriteTest {
     @Test
     void htmlEntity() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /** &amp; &amp ; &#12; */
               class Test {
               }
               """
-          )
+                )
         );
     }
 
@@ -392,9 +392,9 @@ class JavadocTest implements RewriteTest {
     @Test
     void exception() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).build()),
-          java(
-            """
+                spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).build()),
+                java(
+                        """
               public class A {
                   /**
                    * @exception ex
@@ -402,15 +402,15 @@ class JavadocTest implements RewriteTest {
                   void method() {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void hidden() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**
                * @hidden value
                */
@@ -418,15 +418,15 @@ class JavadocTest implements RewriteTest {
                   void method() {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void indexOnly() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**
                * {@index}
                * {@index
@@ -435,7 +435,7 @@ class JavadocTest implements RewriteTest {
                   void method() {}
               }
               """
-          )
+                )
         );
     }
 
@@ -443,8 +443,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void indexNoDescription() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**
                * {@index term}
                * {@index term
@@ -452,7 +452,7 @@ class JavadocTest implements RewriteTest {
               class Test {
               }
               """
-          )
+                )
         );
     }
 
@@ -460,8 +460,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void indexTermAndDescription() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**
                * {@index term description}
                * {@index term description
@@ -469,15 +469,15 @@ class JavadocTest implements RewriteTest {
               class Test {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void inheritDoc() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   /**
                    * {@inheritDoc}
@@ -487,7 +487,7 @@ class JavadocTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -496,14 +496,14 @@ class JavadocTest implements RewriteTest {
     @Test
     void noMarginJavadocFirstLineTrailingWhitespace() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**   
                  {@link int}
               */
               class Test {}
               """
-          )
+                )
         );
     }
 
@@ -511,8 +511,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void leftMargin() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   /**   
                      {@link int}
@@ -520,33 +520,33 @@ class JavadocTest implements RewriteTest {
                   String s;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void noMarginJavadoc() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**
                  {@link int}
               */
               class Test {}
               """
-          )
+                )
         );
     }
 
     @Test
     void singleLineJavadoc() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**   {@link int} */
               class Test {}
               """
-          )
+                )
         );
     }
 
@@ -554,8 +554,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void whitespaceBeforeAndAfterDelimiter() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.Map;
                             
               /**
@@ -564,15 +564,15 @@ class JavadocTest implements RewriteTest {
               class Test {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void fullyQualifiedLink() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**
                * {@link java.util.List}
                */
@@ -580,15 +580,15 @@ class JavadocTest implements RewriteTest {
                   void method() {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void fullyQualifiedParameterizedTypeLink() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**
                * {@link java.util.List<String>}
                */
@@ -596,30 +596,30 @@ class JavadocTest implements RewriteTest {
                   void method() {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void fullyQualifiedMethodLink() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**
                * {@link java.util.List#add(Object) }
                */
               class Test {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void fieldLink() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.nio.charset.StandardCharsets;
                             
               /**
@@ -629,15 +629,15 @@ class JavadocTest implements RewriteTest {
               class Test {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void thisFieldLink() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**
                *   {@link #n }
                */
@@ -645,15 +645,15 @@ class JavadocTest implements RewriteTest {
                   int n;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void thisMethodLink() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**
                *   {@link #test() }
                */
@@ -661,15 +661,15 @@ class JavadocTest implements RewriteTest {
                   void test() {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void primitiveLink() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**
                * Line 1
                * Line 2
@@ -678,7 +678,7 @@ class JavadocTest implements RewriteTest {
                */
               class Test<T> {}
               """
-          )
+                )
         );
     }
 
@@ -686,8 +686,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void multiParameterizedType() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.Map;
                             
               /**
@@ -696,7 +696,7 @@ class JavadocTest implements RewriteTest {
               class Test {
               }
               """
-          )
+                )
         );
     }
 
@@ -704,8 +704,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void parameterizedType() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.List;
                             
               class Test {
@@ -717,7 +717,7 @@ class JavadocTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -725,9 +725,9 @@ class JavadocTest implements RewriteTest {
     @Test
     void multipleReferenceParameters() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).build()),
-          java(
-            """
+                spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).build()),
+                java(
+                        """
               class Test {
                   /**
                    * {@link ListenerUtils#getExceptionFromHeader(ConsumerRecord, String, LogAccessor)}
@@ -736,7 +736,7 @@ class JavadocTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -744,15 +744,15 @@ class JavadocTest implements RewriteTest {
     @Test
     void blankLink() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**
                * {@link}
                */
               class Test {
               }
               """
-          )
+                )
         );
     }
 
@@ -761,23 +761,23 @@ class JavadocTest implements RewriteTest {
     @Test
     void missingBracket() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**
                * {@link missing.bracket
                */
               class Test {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void methodReferenceNoParameters() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               interface Test {
                   /**
                    * {@linkplain Thread#interrupt}
@@ -785,7 +785,7 @@ class JavadocTest implements RewriteTest {
                   boolean test();
               }
               """
-          )
+                )
         );
     }
 
@@ -794,8 +794,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void multilineLink() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**
                * {@link
                * multiline}.
@@ -803,7 +803,7 @@ class JavadocTest implements RewriteTest {
               class Test {
               }
               """
-          )
+                )
         );
     }
 
@@ -811,8 +811,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void constructorLink() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   /**
                    * {@link java.util.List()}
@@ -821,7 +821,7 @@ class JavadocTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -829,8 +829,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void literal() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   /**
                    * @literal
@@ -838,7 +838,7 @@ class JavadocTest implements RewriteTest {
                   void method() {}
               }
               """
-          )
+                )
         );
     }
 
@@ -846,8 +846,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void nullLiteral() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               interface Test {
                   /**
                    * {@literal null}.
@@ -855,15 +855,15 @@ class JavadocTest implements RewriteTest {
                   boolean test();
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void emptyParam() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   /**
                    * @param
@@ -871,15 +871,15 @@ class JavadocTest implements RewriteTest {
                   void method(int val) {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void param() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   /**
                    * @param val
@@ -887,27 +887,27 @@ class JavadocTest implements RewriteTest {
                   void method(int val) {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void singleLineParam() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**   @param <T> t */
               class Test<T> {}
               """
-          )
+                )
         );
     }
 
     @Test
     void lineBreakInParam() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               interface Test {
                   /**
                    * @param <
@@ -918,7 +918,7 @@ class JavadocTest implements RewriteTest {
                   <T> boolean test(int val);
               }
               """
-          )
+                )
         );
     }
 
@@ -926,8 +926,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void paramWithMultilineHtmlAttributeNewLineBeforeEquals() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               interface Test {
                   /**
                    * @param contentType <a href
@@ -936,7 +936,7 @@ class JavadocTest implements RewriteTest {
                   boolean test(int contentType);
               }
               """
-          )
+                )
         );
     }
 
@@ -944,8 +944,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void paramWithMultilineHtmlAttribute() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               interface Test {
                   /**
                    * @param contentType <a href=
@@ -955,15 +955,15 @@ class JavadocTest implements RewriteTest {
                   boolean test(int contentType);
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void descriptionOnNewLine() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class Test {
                    /**
                     * @param name
@@ -973,7 +973,7 @@ class JavadocTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -981,8 +981,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void provide() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   /**
                    * @provides int
@@ -990,7 +990,7 @@ class JavadocTest implements RewriteTest {
                   void method(int val) {}
               }
               """
-          )
+                )
         );
     }
 
@@ -998,8 +998,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void returnTag() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   /**
                    * @return id
@@ -1007,15 +1007,15 @@ class JavadocTest implements RewriteTest {
                   int method(int val) {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void returnWithoutMargin() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class Test {
                   /** Text
                    @return No margin
@@ -1025,7 +1025,7 @@ class JavadocTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -1033,8 +1033,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void see() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**
                * @see "Create link via quotes"
                * @see java.lang.Comparable#compareTo(Object) label
@@ -1044,15 +1044,15 @@ class JavadocTest implements RewriteTest {
                   void method() {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void methodFound() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               interface Test {
                   /**
                    * @see java.io.ByteArrayOutputStream#toString(String)
@@ -1060,7 +1060,7 @@ class JavadocTest implements RewriteTest {
                   boolean test();
               }
               """
-          )
+                )
         );
     }
 
@@ -1069,9 +1069,9 @@ class JavadocTest implements RewriteTest {
     @Test
     void methodNotFound() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.builder().methodInvocations(false).build()),
-          java(
-            """
+                spec -> spec.typeValidationOptions(TypeValidation.builder().methodInvocations(false).build()),
+                java(
+                        """
               interface Test {
                   /**
                    * @see Math#cosine(double)
@@ -1079,7 +1079,7 @@ class JavadocTest implements RewriteTest {
                   boolean test();
               }
               """
-          )
+                )
         );
     }
 
@@ -1088,9 +1088,9 @@ class JavadocTest implements RewriteTest {
     @Test
     void typeNotFound() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).build()),
-          java(
-            """
+                spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).build()),
+                java(
+                        """
               interface Test {
                   /**
                    * {@link SymbolThatCannotBeFound}
@@ -1099,7 +1099,7 @@ class JavadocTest implements RewriteTest {
                   boolean test();
               }
               """
-          )
+                )
         );
     }
 
@@ -1107,8 +1107,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void seeWithMultilineAttribute() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               interface Test {
                   /**
                    * @see <a href="https://www...">
@@ -1117,15 +1117,15 @@ class JavadocTest implements RewriteTest {
                   boolean test();
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void serial() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**
                * @serial
                */
@@ -1133,15 +1133,15 @@ class JavadocTest implements RewriteTest {
                   void method() {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void serialData() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**
                * @serialData
                */
@@ -1149,56 +1149,56 @@ class JavadocTest implements RewriteTest {
                   void method() {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void since() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /** @since 1.0 */
               class Test {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void summary() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /** {@summary test description } */
               class Test {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void uses() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /** @uses Test for something */
               class Test {
                   /** @uses Test for something */
                   void method() {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void throwsException() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   /**
                    * @throws Exception
@@ -1208,7 +1208,7 @@ class JavadocTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -1216,8 +1216,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void value() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   /**
                    * The value of this constant is {@value}.
@@ -1231,7 +1231,7 @@ class JavadocTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -1239,8 +1239,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void version() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**
                * @version 1.0.0
                */
@@ -1248,7 +1248,7 @@ class JavadocTest implements RewriteTest {
                   void method() {}
               }
               """
-          )
+                )
         );
     }
 
@@ -1256,14 +1256,14 @@ class JavadocTest implements RewriteTest {
     @Test
     void starMarginWithFirstLineLeadingSpace() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**   
                 *       Line 1
                 */
               class Test<T> {}
               """
-          )
+                )
         );
     }
 
@@ -1272,8 +1272,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void javaDocEndsOnSameLine() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   /**
                    * Javadoc
@@ -1282,7 +1282,7 @@ class JavadocTest implements RewriteTest {
                   void method() {}
               }
               """
-          )
+                )
         );
     }
 
@@ -1290,8 +1290,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void trailingWhitespaceWithWhitespaceOnEmptyLine() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   /**
                    * Text with trailing whitespace.    
@@ -1302,7 +1302,7 @@ class JavadocTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -1310,8 +1310,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void trailingWhitespaceAfterText() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   /**
                    * Text with trailing whitespace.    
@@ -1321,7 +1321,7 @@ class JavadocTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -1329,8 +1329,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void trailingWhitespaceAfterAnnotation() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   /**
                    * @param arg test text.    
@@ -1340,7 +1340,7 @@ class JavadocTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -1348,8 +1348,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void commentMissingMultipleAsterisks() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   /** 
                    * JavaDoc
@@ -1361,7 +1361,7 @@ class JavadocTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -1369,8 +1369,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void textWithBlankNewLines() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   /**
                   * JavaDocs treats whitespace differently when new lines exist
@@ -1381,7 +1381,7 @@ class JavadocTest implements RewriteTest {
                   void method() {}
               }
               """
-          )
+                )
         );
     }
 
@@ -1389,8 +1389,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void tagAfterBlankNewLines() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   /**
                    * New lines with whitespace followed by a param.
@@ -1402,7 +1402,7 @@ class JavadocTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -1410,8 +1410,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void consecutiveLineBreaksWithNoMargin() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   /** 
                    * @param oboFile the file to be parsed
@@ -1422,15 +1422,15 @@ class JavadocTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void whitespaceBeforeNonLeadingText() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               interface Test {
                   /**
                    * @return <code>true</code>
@@ -1439,7 +1439,7 @@ class JavadocTest implements RewriteTest {
                   boolean test();
               }
               """
-          )
+                )
         );
     }
 
@@ -1447,8 +1447,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void multipleLinesBeforeTag() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**
                * Note
                *
@@ -1457,15 +1457,15 @@ class JavadocTest implements RewriteTest {
               public class Test {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void whitespaceOnBlankLineBetweenBodyAndTags() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               interface Test {
                   /**
                    * Returns something.
@@ -1475,7 +1475,7 @@ class JavadocTest implements RewriteTest {
                   boolean test();
               }
               """
-          )
+                )
         );
     }
 
@@ -1483,8 +1483,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void trailingWhitespaceAndMultilineMargin() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               interface Test {
                   /**
                    * Text followed by whitespace, and multiple new lines with/without whitespace.        
@@ -1494,7 +1494,7 @@ class JavadocTest implements RewriteTest {
                   void method();
               }
               """
-          )
+                )
         );
     }
 
@@ -1502,8 +1502,8 @@ class JavadocTest implements RewriteTest {
     @Test
     void seeWithMultilineMethodInvocation() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.lang.Math;
                             
               interface Test {
@@ -1521,7 +1521,7 @@ class JavadocTest implements RewriteTest {
                   boolean test();
               }
               """
-          )
+                )
         );
     }
 
@@ -1529,13 +1529,13 @@ class JavadocTest implements RewriteTest {
     @Test
     void javaDocWithCRLF() {
         rewriteRun(
-          java("" +
-                          "/**\r\n" +
-                          " * JavaDoc.\r\n" +
-                          " */\r\n" +
-                          "public class A {\r\n" +
-                          "}"
-          )
+                java("" +
+                        "/**\r\n" +
+                        " * JavaDoc.\r\n" +
+                        " */\r\n" +
+                        "public class A {\r\n" +
+                        "}"
+                )
         );
     }
 
@@ -1543,14 +1543,14 @@ class JavadocTest implements RewriteTest {
     @Test
     void noMarginWithCRLF() {
         rewriteRun(
-          java("" +
-                          "/**\r\n" +
-                          " * Line 1.\r\n" +
-                          "   Text with no margin.\r\n" +
-                          " */\r\n" +
-                          "public class A {\r\n" +
-                          "}"
-          )
+                java("" +
+                        "/**\r\n" +
+                        " * Line 1.\r\n" +
+                        "   Text with no margin.\r\n" +
+                        " */\r\n" +
+                        "public class A {\r\n" +
+                        "}"
+                )
         );
     }
 
@@ -1558,16 +1558,16 @@ class JavadocTest implements RewriteTest {
     @Test
     void emptyLinesWithCRLF() {
         rewriteRun(
-          java("" +
-                          "public class A {\r\n" +
-                          "  /** Text \r\n" +
-                          "         \r\n" +
-                          "         \r\n" +
-                          "     @param arg0 desc\r\n" +
-                          "   */\r\n" +
-                          "  void method(int arg0) {}\r\n" +
-                          "}"
-          )
+                java("" +
+                        "public class A {\r\n" +
+                        "  /** Text \r\n" +
+                        "         \r\n" +
+                        "         \r\n" +
+                        "     @param arg0 desc\r\n" +
+                        "   */\r\n" +
+                        "  void method(int arg0) {}\r\n" +
+                        "}"
+                )
         );
     }
 
@@ -1575,19 +1575,19 @@ class JavadocTest implements RewriteTest {
     @Test
     void multilineJavaDocWithCRLF() {
         rewriteRun(
-          java("" +
-                          "/**\r\n" +
-                          " * Line 1.\r\n" +
-                          " * Line 2.\r\n" +
-                          " */\r\n" +
-                          "public class A {\r\n" +
-                          "    /**\r\n" +
-                          "     * Line 1.\r\n" +
-                          "     * Line 2.\r\n" +
-                          "     */\r\n" +
-                          "    void method() {}\r\n" +
-                          "}"
-          )
+                java("" +
+                        "/**\r\n" +
+                        " * Line 1.\r\n" +
+                        " * Line 2.\r\n" +
+                        " */\r\n" +
+                        "public class A {\r\n" +
+                        "    /**\r\n" +
+                        "     * Line 1.\r\n" +
+                        "     * Line 2.\r\n" +
+                        "     */\r\n" +
+                        "    void method() {}\r\n" +
+                        "}"
+                )
         );
     }
 
@@ -1596,18 +1596,18 @@ class JavadocTest implements RewriteTest {
     @Test
     void multilineWithThrowsAndCRLF() {
         rewriteRun(
-          java("" +
-                          "import java.io.IOException;\r\n" +
-                          "\r\n" +
-                          "public class A {\r\n" +
-                          "    /**\r\n" +
-                          "     * Line 1.\r\n" +
-                          "     * Line 2.\r\n" +
-                          "     * @throws IOException text.\r\n" +
-                          "     */\r\n" +
-                          "    void method() throws IOException {}\r\n" +
-                          "}"
-          )
+                java("" +
+                        "import java.io.IOException;\r\n" +
+                        "\r\n" +
+                        "public class A {\r\n" +
+                        "    /**\r\n" +
+                        "     * Line 1.\r\n" +
+                        "     * Line 2.\r\n" +
+                        "     * @throws IOException text.\r\n" +
+                        "     */\r\n" +
+                        "    void method() throws IOException {}\r\n" +
+                        "}"
+                )
         );
     }
 
@@ -1615,16 +1615,16 @@ class JavadocTest implements RewriteTest {
     @Test
     void paramNoDescriptionWithCRLF() {
         rewriteRun(
-          java("" +
-               "import org.foo;\r\n" +
-               "\r\n" +
-               "public class A {\r\n" +
-               "    /**\r\n" +
-               "     * @param arg0\r\n" +
-               "     */\r\n" +
-               "    void method(String arg0) {}\r\n" +
-               "}"
-          )
+                java("" +
+                        "import org.foo;\r\n" +
+                        "\r\n" +
+                        "public class A {\r\n" +
+                        "    /**\r\n" +
+                        "     * @param arg0\r\n" +
+                        "     */\r\n" +
+                        "    void method(String arg0) {}\r\n" +
+                        "}"
+                )
         );
     }
 
@@ -1632,13 +1632,13 @@ class JavadocTest implements RewriteTest {
     @Test
     void trailingWhitespaceWithLF() {
         rewriteRun(
-          java("" +
-                          "/**\n" +
-                          " * Text followed by trailing whitespace with CRLF.\n" +
-                          " * \n" +
-                          " */\n" +
-                          "class A {}"
-          )
+                java("" +
+                        "/**\n" +
+                        " * Text followed by trailing whitespace with CRLF.\n" +
+                        " * \n" +
+                        " */\n" +
+                        "class A {}"
+                )
         );
     }
 
@@ -1646,12 +1646,12 @@ class JavadocTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3530")
     void arrayTypeLiterals() {
         rewriteRun(
-          java("" +
-            "/**\n" +
-            "  * Create an instance of {@link byte[]} and {@link byte[][]}\n" +
-            "  */\n" +
-            "class A {}"
-          )
+                java("" +
+                        "/**\n" +
+                        "  * Create an instance of {@link byte[]} and {@link byte[][]}\n" +
+                        "  */\n" +
+                        "class A {}"
+                )
         );
     }
 
@@ -1660,12 +1660,12 @@ class JavadocTest implements RewriteTest {
     @MinimumJava11
     void arrayTypeLiterals2() {
         rewriteRun(
-          java("" +
-            "/**\n" +
-            " * <p>Values are converted to strings using {@link java.util.Arrays#compare(Comparable[], Comparable[])}.\n" +
-            " */\n" +
-            "class A {}"
-          )
+                java("" +
+                        "/**\n" +
+                        " * <p>Values are converted to strings using {@link java.util.Arrays#compare(Comparable[], Comparable[])}.\n" +
+                        " */\n" +
+                        "class A {}"
+                )
         );
     }
 
@@ -1673,8 +1673,8 @@ class JavadocTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3575")
     void varargsMethod() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class A {
                   /**
                    * A dummy main method. This method is not actually called, but we'll use its Javadoc comment to test that
@@ -1690,7 +1690,7 @@ class JavadocTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -1698,10 +1698,10 @@ class JavadocTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3575")
     void varargsWithPrefix() {
         rewriteRun(
-          // for some reason the compiler AST's type attribution is incomplete here
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
-          java(
-            """
+                // for some reason the compiler AST's type attribution is incomplete here
+                spec -> spec.typeValidationOptions(TypeValidation.none()),
+                java(
+                        """
               class A {
                   /**
                    * A dummy main method. This method is not actually called, but we'll use its Javadoc comment to test that
@@ -1717,7 +1717,7 @@ class JavadocTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -1725,8 +1725,8 @@ class JavadocTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3575")
     void arrayMethod() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class A {
                   /**
                    * A dummy main method. This method is not actually called, but we'll use its Javadoc comment to test that
@@ -1739,15 +1739,15 @@ class JavadocTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void emptyAttributes() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**
                * DEFINE TENANCY TenantB AS <TenantB OCID>
                * ENDORSE GROUP <TenantA user group name> TO {OBJECTSTORAGE_NAMESPACE_READ} IN TENANCY TenantB
@@ -1757,30 +1757,30 @@ class JavadocTest implements RewriteTest {
                */
               class Test {}
               """
-          )
+                )
         );
     }
 
     @Test
     void trailingTab() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /**
                * See <a href="">here</a>\t
                */
               class Test {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void returnOpeningAndClosingBrace() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               interface Test {
               	/**
               	 * {@return 42}
@@ -1788,15 +1788,15 @@ class JavadocTest implements RewriteTest {
               	int foo();
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void returnOpeningBraceOnly() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               interface Test {
               	/**
               	 * {@return 42
@@ -1804,7 +1804,7 @@ class JavadocTest implements RewriteTest {
               	int foo();
               }
               """
-          )
+                )
         );
     }
 
@@ -1813,8 +1813,8 @@ class JavadocTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3650")
     void unicodeEscape() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               interface Test {
               	/**
               	 * Return the {@code \\u0000} codepoint.
@@ -1822,7 +1822,7 @@ class JavadocTest implements RewriteTest {
               	int foo();
               }
               """
-          )
+                )
         );
     }
 }

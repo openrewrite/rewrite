@@ -44,7 +44,7 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
         J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
         J.ClassDeclaration classDecl = getCursor().firstEnclosing(J.ClassDeclaration.class);
-        if(classDecl == null) {
+        if (classDecl == null) {
             return m;
         }
         if (methodMatcher.matches(method, classDecl)) {
@@ -65,18 +65,15 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
                         ListUtils.map(m.getModifiers(), mod -> mod.getType() == currentMethodAccessLevel ?
                                 mod.withType(newAccessLevel) : mod)
                 );
-            }
-
-            // If current access level is package-private (no modifier), add the new modifier
-            else if (currentMethodAccessLevel == null) {
+            } else if (currentMethodAccessLevel == null) {
                 J.Modifier mod = new J.Modifier(Tree.randomId(), Space.build(" ", emptyList()), Markers.EMPTY, null, newAccessLevel, Collections.emptyList());
                 m = m.withModifiers(ListUtils.concat(mod, m.getModifiers()));
 
-                if(method.getModifiers().isEmpty()) {
+                if (method.getModifiers().isEmpty()) {
                     J.TypeParameters typeParams = m.getPadding().getTypeParameters();
-                    if(typeParams == null) {
+                    if (typeParams == null) {
                         TypeTree returnExpr = m.getReturnTypeExpression();
-                        if(returnExpr == null) {
+                        if (returnExpr == null) {
                             m = m.withModifiers(Space.formatFirstPrefix(m.getModifiers(), m.getName().getPrefix()));
                             m = m.withName(m.getName().withPrefix(Space.format(" ")));
                         } else {
@@ -87,8 +84,7 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
                         m = m.withModifiers(Space.formatFirstPrefix(m.getModifiers(), typeParams.getPrefix()));
                         m = m.getPadding().withTypeParameters(typeParams.withPrefix(Space.format(" ")));
                     }
-                }
-                else {
+                } else {
                     m = m.withModifiers(ListUtils.map(m.getModifiers(), (i, mod2) -> {
                         if (i == 0) {
                             return mod2.withPrefix(method.getModifiers().get(0).getPrefix());
@@ -98,11 +94,7 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
                         return mod2;
                     }));
                 }
-            }
-
-            // If target access level is package-private (no modifier), remove the current access level modifier
-            // and copy any associated comments
-            else if (newAccessLevel == null) {
+            } else if (newAccessLevel == null) {
                 final List<Comment> modifierComments = new ArrayList<>();
                 List<J.Modifier> modifiers = ListUtils.map(m.getModifiers(), mod -> {
                     if (mod.getType() == currentMethodAccessLevel) {

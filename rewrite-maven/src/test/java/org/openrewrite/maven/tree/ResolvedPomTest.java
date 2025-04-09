@@ -40,8 +40,8 @@ class ResolvedPomTest implements RewriteTest {
     @Test
     void resolveDependencyWithPlaceholderClassifier() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <groupId>org.example</groupId>
                 <artifactId>foo-parent</artifactId>
@@ -62,10 +62,10 @@ class ResolvedPomTest implements RewriteTest {
                 </dependencyManagement>
               </project>
               """,
-            spec -> spec.path("pom.xml")
-          ),
-          pomXml(
-            """
+                        spec -> spec.path("pom.xml")
+                ),
+                pomXml(
+                        """
               <project>
                 <groupId>org.example</groupId>
                 <artifactId>foo</artifactId>
@@ -84,10 +84,10 @@ class ResolvedPomTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            spec -> spec.path("foo/pom.xml")
-          ),
-          pomXml(
-            """
+                        spec -> spec.path("foo/pom.xml")
+                ),
+                pomXml(
+                        """
               <project>
                 <groupId>org.example</groupId>
                 <artifactId>bar</artifactId>
@@ -101,8 +101,8 @@ class ResolvedPomTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            spec -> spec.path("bar/pom.xml")
-          )
+                        spec -> spec.path("bar/pom.xml")
+                )
         );
     }
 
@@ -222,26 +222,26 @@ class ResolvedPomTest implements RewriteTest {
           </project>
           """;
         rewriteRun(
-          pomXml(grandFather, spec -> spec.path("pom.xml")),
-          pomXml(father, spec -> spec.path("father/pom.xml")),
-          pomXml(child, spec -> spec.path("father/child/pom.xml").afterRecipe(doc -> {
-                List<Plugin> pluginManagement = doc.getMarkers().findFirst(MavenResolutionResult.class)
-                  .get().getPom().getPluginManagement();
-                assertThat(pluginManagement).hasSize(1);
-                Plugin plugin = pluginManagement.get(0);
-                assertThat(plugin).extracting(Plugin::getArtifactId).isEqualTo("maven-enforcer-plugin");
-                ObjectMapper objectMapper = new ObjectMapper();
-                assertThat(plugin.getExecutions())
-                  .hasSize(2)
-                  .containsExactlyInAnyOrder(
-                    new Plugin.Execution(
-                      "father-execution-id",
-                      List.of("enforce"),
-                      "process-sources",
-                      null,
-                      objectMapper.readTree(
-                        //language=json
-                        """
+                pomXml(grandFather, spec -> spec.path("pom.xml")),
+                pomXml(father, spec -> spec.path("father/pom.xml")),
+                pomXml(child, spec -> spec.path("father/child/pom.xml").afterRecipe(doc -> {
+                            List<Plugin> pluginManagement = doc.getMarkers().findFirst(MavenResolutionResult.class)
+                                    .get().getPom().getPluginManagement();
+                            assertThat(pluginManagement).hasSize(1);
+                            Plugin plugin = pluginManagement.get(0);
+                            assertThat(plugin).extracting(Plugin::getArtifactId).isEqualTo("maven-enforcer-plugin");
+                            ObjectMapper objectMapper = new ObjectMapper();
+                            assertThat(plugin.getExecutions())
+                                    .hasSize(2)
+                                    .containsExactlyInAnyOrder(
+                                            new Plugin.Execution(
+                                                    "father-execution-id",
+                                                    List.of("enforce"),
+                                                    "process-sources",
+                                                    null,
+                                                    objectMapper.readTree(
+                                                            //language=json
+                                                            """
                           {
                               "rules": {
                                   "RestrictImports": {
@@ -257,16 +257,16 @@ class ResolvedPomTest implements RewriteTest {
                               }
                           }
                           """
-                      )
-                    ),
-                    new Plugin.Execution(
-                      "grandfather-execution-id",
-                      List.of("enforce", "clean"),
-                      "override-by-father",
-                      null,
-                      objectMapper.readTree(
-                        //language=json
-                        """
+                                                    )
+                                            ),
+                                            new Plugin.Execution(
+                                                    "grandfather-execution-id",
+                                                    List.of("enforce", "clean"),
+                                                    "override-by-father",
+                                                    null,
+                                                    objectMapper.readTree(
+                                                            //language=json
+                                                            """
                           {
                               "rules": {
                                   "requireProperty": {
@@ -282,11 +282,11 @@ class ResolvedPomTest implements RewriteTest {
                               }
                           }
                           """
-                      )
-                    )
-                  );
-            })
-          )
+                                                    )
+                                            )
+                                    );
+                        })
+                )
         );
     }
 
@@ -335,8 +335,8 @@ class ResolvedPomTest implements RewriteTest {
                 }
             });
             rewriteRun(
-              spec -> spec.executionContext(ctx),
-              pomXml(POM_WITH_DEPENDENCY)
+                    spec -> spec.executionContext(ctx),
+                    pomXml(POM_WITH_DEPENDENCY)
             );
             assertThat(downloadErrorArgs).hasSize(1);
         }
@@ -361,8 +361,8 @@ class ResolvedPomTest implements RewriteTest {
                 }
             });
             rewriteRun(
-              spec -> spec.executionContext(ctx),
-              pomXml(POM_WITH_DEPENDENCY)
+                    spec -> spec.executionContext(ctx),
+                    pomXml(POM_WITH_DEPENDENCY)
             );
             assertThat(downloadErrorArgs).hasSize(1);
         }
@@ -375,11 +375,11 @@ class ResolvedPomTest implements RewriteTest {
 
         private static MavenRepository createMavenRepository(Path localRepository, String name) {
             return MavenRepository.builder()
-              .id(name)
-              .uri(localRepository.toUri().toString())
-              .snapshots(false)
-              .knownToExist(true)
-              .build();
+                    .id(name)
+                    .uri(localRepository.toUri().toString())
+                    .snapshots(false)
+                    .knownToExist(true)
+                    .build();
         }
     }
 }

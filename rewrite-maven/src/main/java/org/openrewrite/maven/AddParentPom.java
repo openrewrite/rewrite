@@ -63,7 +63,7 @@ public class AddParentPom extends Recipe {
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
@@ -120,12 +120,12 @@ public class AddParentPom extends Recipe {
                     if (targetVersion.isPresent()) {
                         Xml.Tag parentTag = Xml.Tag.build(
                                 "<parent>\n" +
-                                "<groupId>" + groupId + "</groupId>\n" +
-                                "<artifactId>" + artifactId + "</artifactId>\n" +
-                                "<version>" + targetVersion.get() + "</version>\n" +
-                                (relativePath == null ? "" : StringUtils.isBlank(relativePath) ?
-                                        "<relativePath/>" : "<relativePath>" + relativePath + "</relativePath>") +
-                                "</parent>");
+                                        "<groupId>" + groupId + "</groupId>\n" +
+                                        "<artifactId>" + artifactId + "</artifactId>\n" +
+                                        "<version>" + targetVersion.get() + "</version>\n" +
+                                        (relativePath == null ? "" : StringUtils.isBlank(relativePath) ?
+                                                "<relativePath/>" : "<relativePath>" + relativePath + "</relativePath>") +
+                                        "</parent>");
 
                         document = (Xml.Document) new AddToTagVisitor<>(root, parentTag, new MavenTagInsertionComparator(root.getChildren()))
                                 .visitNonNull(document, ctx, getCursor().getParentOrThrow());

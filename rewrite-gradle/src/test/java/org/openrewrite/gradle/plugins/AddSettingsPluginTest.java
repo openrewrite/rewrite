@@ -34,73 +34,73 @@ class AddSettingsPluginTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withToolingApi())
-          .recipe(new AddSettingsPlugin("com.gradle.enterprise", "3.11.x", null, null));
+                .recipe(new AddSettingsPlugin("com.gradle.enterprise", "3.11.x", null, null));
     }
 
     @Test
     void addPluginToEmptyFile() {
         rewriteRun(
-          settingsGradle(
-            "",
-            interpolateResolvedVersion(
-              """
+                settingsGradle(
+                        "",
+                        interpolateResolvedVersion(
+                                """
                 plugins {
                     id 'com.gradle.enterprise' version '%s'
                 }
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void addPluginToNewBlock() {
         rewriteRun(
-          settingsGradle(
-            """
+                settingsGradle(
+                        """
               rootProject.name = 'my-project'
               """,
-            interpolateResolvedVersion(
-              """
+                        interpolateResolvedVersion(
+                                """
                 plugins {
                     id 'com.gradle.enterprise' version '%s'
                 }
 
                 rootProject.name = 'my-project'
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void addPluginToExistingBlock() {
         rewriteRun(
-          settingsGradle(
-            """
+                settingsGradle(
+                        """
               plugins {
               }
                             
               rootProject.name = 'my-project'
               """,
-            interpolateResolvedVersion(
-              """
+                        interpolateResolvedVersion(
+                                """
                 plugins {
                     id 'com.gradle.enterprise' version '%s'
                 }
                               
                 rootProject.name = 'my-project'
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void addPluginWithPluginManagementBlock() {
         rewriteRun(
-          settingsGradle(
-            """
+                settingsGradle(
+                        """
               pluginManagement {
                   repositories {
                       gradlePluginPortal()
@@ -109,8 +109,8 @@ class AddSettingsPluginTest implements RewriteTest {
 
               rootProject.name = 'my-project'
               """,
-            interpolateResolvedVersion(
-              """
+                        interpolateResolvedVersion(
+                                """
                 pluginManagement {
                     repositories {
                         gradlePluginPortal()
@@ -123,26 +123,26 @@ class AddSettingsPluginTest implements RewriteTest {
 
                 rootProject.name = 'my-project'
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void addPluginApplyFalse() {
         rewriteRun(
-          spec -> spec.beforeRecipe(withToolingApi())
-            .recipe(new AddSettingsPlugin("com.gradle.enterprise", "3.11.x", null, false)),
-          settingsGradle(
-            "",
-            interpolateResolvedVersion(
-              """
+                spec -> spec.beforeRecipe(withToolingApi())
+                        .recipe(new AddSettingsPlugin("com.gradle.enterprise", "3.11.x", null, false)),
+                settingsGradle(
+                        "",
+                        interpolateResolvedVersion(
+                                """
                 plugins {
                     id 'com.gradle.enterprise' version '%s' apply false
                 }
                 """
-            )
-          )
+                        )
+                )
         );
     }
 

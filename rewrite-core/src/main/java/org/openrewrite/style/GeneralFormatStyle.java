@@ -18,6 +18,6 @@ package org.openrewrite.style;
 import lombok.Value;
 
 @Value
-public class GeneralFormatStyle implements Style{
+public class GeneralFormatStyle implements Style {
     boolean useCRLFNewLines;
 }

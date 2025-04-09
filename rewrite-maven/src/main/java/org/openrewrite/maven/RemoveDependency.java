@@ -40,7 +40,7 @@ public class RemoveDependency extends Recipe {
 
     @Option(displayName = "Scope",
             description = "Only remove dependencies if they are in this scope. If 'runtime', this will" +
-                          "also remove dependencies in the 'compile' scope because 'compile' dependencies are part of the runtime dependency set",
+                    "also remove dependencies in the 'compile' scope because 'compile' dependencies are part of the runtime dependency set",
             valid = {"compile", "test", "runtime", "provided"},
             example = "compile",
             required = false)

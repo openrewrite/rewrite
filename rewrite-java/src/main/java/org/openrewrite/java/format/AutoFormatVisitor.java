@@ -106,7 +106,7 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
                     .visit(t, p);
 
             t = (JavaSourceFile) new SpacesVisitor<P>(Optional.ofNullable(
-                    cu.getStyle(SpacesStyle.class)).orElse(IntelliJ.spaces()),
+                            cu.getStyle(SpacesStyle.class)).orElse(IntelliJ.spaces()),
                     cu.getStyle(EmptyForInitializerPadStyle.class),
                     cu.getStyle(EmptyForIteratorPadStyle.class),
                     stopAfter)

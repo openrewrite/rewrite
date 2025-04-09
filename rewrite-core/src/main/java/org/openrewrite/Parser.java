@@ -42,7 +42,7 @@ public interface Parser {
     @Incubating(since = "8.2.0")
     default SourceFile requirePrintEqualsInput(SourceFile sourceFile, Parser.Input input, @Nullable Path relativeTo, ExecutionContext ctx) {
         if (ctx.getMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, true) &&
-            !sourceFile.printEqualsInput(input, ctx)) {
+                !sourceFile.printEqualsInput(input, ctx)) {
             String diff = Result.diff(input.getSource(ctx).readFully(), sourceFile.printAll(), input.getPath());
             return ParseError.build(
                     this,

@@ -26,11 +26,11 @@ class RemoveExclusionTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new RemoveExclusion(
-          "com.google.guava",
-          "guava",
-          "commons-lang",
-          "commons-lang",
-          null
+                "com.google.guava",
+                "guava",
+                "commons-lang",
+                "commons-lang",
+                null
         ));
     }
 
@@ -38,8 +38,8 @@ class RemoveExclusionTest implements RewriteTest {
     @Test
     void removeUnusedExclusions() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -59,7 +59,7 @@ class RemoveExclusionTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -73,22 +73,22 @@ class RemoveExclusionTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void removeUnusedExclusionsOnlyIneffective() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveExclusion(
-            "com.google.guava",
-            "guava",
-            "commons-lang",
-            "commons-lang",
-            true
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveExclusion(
+                        "com.google.guava",
+                        "guava",
+                        "commons-lang",
+                        "commons-lang",
+                        true
+                )),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -108,7 +108,7 @@ class RemoveExclusionTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -122,22 +122,22 @@ class RemoveExclusionTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void removeAnyExclusionsOnlyIneffective() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveExclusion(
-            "*",
-            "*",
-            "*",
-            "*",
-            true
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveExclusion(
+                        "*",
+                        "*",
+                        "*",
+                        "*",
+                        true
+                )),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -161,7 +161,7 @@ class RemoveExclusionTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -181,22 +181,22 @@ class RemoveExclusionTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void removeUsedExclusions() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveExclusion(
-            "com.google.guava",
-            "guava",
-            "com.google.code.findbugs",
-            "jsr305",
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveExclusion(
+                        "com.google.guava",
+                        "guava",
+                        "com.google.code.findbugs",
+                        "jsr305",
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -216,7 +216,7 @@ class RemoveExclusionTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -230,22 +230,22 @@ class RemoveExclusionTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void removeUsedExclusionsOnlyIneffective() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveExclusion(
-            "com.google.guava",
-            "guava",
-            "com.google.code.findbugs",
-            "jsr305",
-            true
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveExclusion(
+                        "com.google.guava",
+                        "guava",
+                        "com.google.code.findbugs",
+                        "jsr305",
+                        true
+                )),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -265,15 +265,15 @@ class RemoveExclusionTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void preserveOtherExclusionsAndComments() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -298,7 +298,7 @@ class RemoveExclusionTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -319,15 +319,15 @@ class RemoveExclusionTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void removeExclusionsTagWhenOnlyCommentsAreLeft() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -348,7 +348,7 @@ class RemoveExclusionTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -362,15 +362,15 @@ class RemoveExclusionTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void removeUnusedExclusionsFromDependencyManagement() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -392,7 +392,7 @@ class RemoveExclusionTest implements RewriteTest {
                 </dependencyManagement>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -408,22 +408,22 @@ class RemoveExclusionTest implements RewriteTest {
                 </dependencyManagement>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void removeAnyExclusionsFromDependencyManagementOnlyIneffectiveUsedDependency() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveExclusion(
-            "*",
-            "*",
-            "*",
-            "*",
-            true
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveExclusion(
+                        "*",
+                        "*",
+                        "*",
+                        "*",
+                        true
+                )),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -455,7 +455,7 @@ class RemoveExclusionTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -483,22 +483,22 @@ class RemoveExclusionTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void removeAnyExclusionsFromDependencyManagementOnlyIneffectiveDoesNothingIfUnsure() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveExclusion(
-            "*",
-            "*",
-            "*",
-            "*",
-            true
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveExclusion(
+                        "*",
+                        "*",
+                        "*",
+                        "*",
+                        true
+                )),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -524,7 +524,7 @@ class RemoveExclusionTest implements RewriteTest {
                 </dependencyManagement>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -532,15 +532,15 @@ class RemoveExclusionTest implements RewriteTest {
     // https://issues.apache.org/jira/browse/MNG-5600
     void dependencyManagementImportExclusionsAreAlwaysIneffective() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveExclusion(
-            "*",
-            "*",
-            "*",
-            "*",
-            true
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveExclusion(
+                        "*",
+                        "*",
+                        "*",
+                        "*",
+                        true
+                )),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -568,7 +568,7 @@ class RemoveExclusionTest implements RewriteTest {
                 </dependencyManagement>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -586,7 +586,7 @@ class RemoveExclusionTest implements RewriteTest {
                 </dependencyManagement>
               </project>
               """
-          )
+                )
         );
     }
 }

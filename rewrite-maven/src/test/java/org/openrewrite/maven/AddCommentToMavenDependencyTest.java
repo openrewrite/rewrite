@@ -27,14 +27,14 @@ class AddCommentToMavenDependencyTest implements RewriteTest {
     @Test
     void addCommentToMavenDependency() {
         rewriteRun(
-          spec -> spec.recipe(new AddCommentToMavenDependency(
-            "/project/dependencies/dependency",
-            "com.google.guava",
-            "guava",
-            " Comment text "
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new AddCommentToMavenDependency(
+                        "/project/dependencies/dependency",
+                        "com.google.guava",
+                        "guava",
+                        " Comment text "
+                )),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 
@@ -57,7 +57,7 @@ class AddCommentToMavenDependencyTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 
@@ -81,7 +81,7 @@ class AddCommentToMavenDependencyTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 }

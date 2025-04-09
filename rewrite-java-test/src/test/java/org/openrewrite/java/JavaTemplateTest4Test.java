@@ -35,43 +35,43 @@ class JavaTemplateTest4Test implements RewriteTest {
     @Test
     void replaceMethodParameters() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("int m, java.util.List<String> n").build();
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    final JavaTemplate t = JavaTemplate.builder("int m, java.util.List<String> n").build();
 
-              @Override
-              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
-                  if (method.getSimpleName().equals("test") && method.getParameters().size() == 1) {
-                      // insert in outer method
-                      J.MethodDeclaration m = t.apply(getCursor(), method.getCoordinates().replaceParameters());
-                      J.NewClass newRunnable = (J.NewClass) method.getBody().getStatements().get(0);
+                    @Override
+                    public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+                        if (method.getSimpleName().equals("test") && method.getParameters().size() == 1) {
+                            // insert in outer method
+                            J.MethodDeclaration m = t.apply(getCursor(), method.getCoordinates().replaceParameters());
+                            J.NewClass newRunnable = (J.NewClass) method.getBody().getStatements().get(0);
 
-                      // insert in inner method
-                      J.MethodDeclaration innerMethod = (J.MethodDeclaration) newRunnable.getBody().getStatements().get(0);
-                      return t.apply(updateCursor(m), innerMethod.getCoordinates().replaceParameters());
-                  }
-                  return super.visitMethodDeclaration(method, p);
-              }
-          })).afterRecipe(run -> {
-              J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().get(0).getAfter();
-              J.MethodDeclaration m = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
-              JavaType.Method type = m.getMethodType();
-              assertThat(type.getParameterNames())
-                .as("Changing the method's parameters should have also updated its type's parameter names")
-                .containsExactly("m", "n");
-              assertThat(type.getParameterTypes().get(0))
-                .as("Changing the method's parameters should have resulted in the first parameter's type being 'int'")
-                .isEqualTo(JavaType.Primitive.Int);
-              assertThat(type.getParameterTypes().get(1))
-                .matches(jt -> jt instanceof JavaType.Parameterized &&
-                               ((JavaType.Parameterized) jt).getType().getFullyQualifiedName().equals("java.util.List") &&
-                               ((JavaType.Parameterized) jt).getTypeParameters().size() == 1 &&
-                               TypeUtils.asFullyQualified(((JavaType.Parameterized) jt).getTypeParameters().get(0)).getFullyQualifiedName().equals("java.lang.String"),
-                  "Changing the method's parameters should have resulted in the second parameter's type being 'List<String>'"
-                );
-              assertThat(m.getName().getType()).isEqualTo(type);
-          }),
-          java(
-            """
+                            // insert in inner method
+                            J.MethodDeclaration innerMethod = (J.MethodDeclaration) newRunnable.getBody().getStatements().get(0);
+                            return t.apply(updateCursor(m), innerMethod.getCoordinates().replaceParameters());
+                        }
+                        return super.visitMethodDeclaration(method, p);
+                    }
+                })).afterRecipe(run -> {
+                    J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().get(0).getAfter();
+                    J.MethodDeclaration m = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
+                    JavaType.Method type = m.getMethodType();
+                    assertThat(type.getParameterNames())
+                            .as("Changing the method's parameters should have also updated its type's parameter names")
+                            .containsExactly("m", "n");
+                    assertThat(type.getParameterTypes().get(0))
+                            .as("Changing the method's parameters should have resulted in the first parameter's type being 'int'")
+                            .isEqualTo(JavaType.Primitive.Int);
+                    assertThat(type.getParameterTypes().get(1))
+                            .matches(jt -> jt instanceof JavaType.Parameterized &&
+                                            ((JavaType.Parameterized) jt).getType().getFullyQualifiedName().equals("java.util.List") &&
+                                            ((JavaType.Parameterized) jt).getTypeParameters().size() == 1 &&
+                                            TypeUtils.asFullyQualified(((JavaType.Parameterized) jt).getTypeParameters().get(0)).getFullyQualifiedName().equals("java.lang.String"),
+                                    "Changing the method's parameters should have resulted in the second parameter's type being 'List<String>'"
+                            );
+                    assertThat(m.getName().getType()).isEqualTo(type);
+                }),
+                java(
+                        """
               class Test {
                   void test() {
                       new Runnable() {
@@ -83,7 +83,7 @@ class JavaTemplateTest4Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   void test(int m, java.util.List<String> n) {
                       new Runnable() {
@@ -95,46 +95,46 @@ class JavaTemplateTest4Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void replaceMethodParametersVariadicArray() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("Object[]... values").build();
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    final JavaTemplate t = JavaTemplate.builder("Object[]... values").build();
 
-              @Override
-              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
-                  if (method.getSimpleName().equals("test") && method.getParameters().get(0) instanceof J.Empty) {
-                      // insert in outer method
-                      J.MethodDeclaration m = t.apply(getCursor(), method.getCoordinates().replaceParameters());
-                      J.NewClass newRunnable = (J.NewClass) method.getBody().getStatements().get(0);
+                    @Override
+                    public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+                        if (method.getSimpleName().equals("test") && method.getParameters().get(0) instanceof J.Empty) {
+                            // insert in outer method
+                            J.MethodDeclaration m = t.apply(getCursor(), method.getCoordinates().replaceParameters());
+                            J.NewClass newRunnable = (J.NewClass) method.getBody().getStatements().get(0);
 
-                      // insert in inner method
-                      J.MethodDeclaration innerMethod = (J.MethodDeclaration) newRunnable.getBody().getStatements().get(0);
-                      return t.apply(updateCursor(m), innerMethod.getCoordinates().replaceParameters());
-                  }
-                  return super.visitMethodDeclaration(method, p);
-              }
-          })).afterRecipe(run -> {
-              J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().get(0).getAfter();
-              final JavaType.Method type = ((J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0))
-                .getMethodType();
+                            // insert in inner method
+                            J.MethodDeclaration innerMethod = (J.MethodDeclaration) newRunnable.getBody().getStatements().get(0);
+                            return t.apply(updateCursor(m), innerMethod.getCoordinates().replaceParameters());
+                        }
+                        return super.visitMethodDeclaration(method, p);
+                    }
+                })).afterRecipe(run -> {
+                    J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().get(0).getAfter();
+                    final JavaType.Method type = ((J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0))
+                            .getMethodType();
 
-              assertThat(type.getParameterNames())
-                .as("Changing the method's parameters should have also updated its type's parameter names")
-                .containsExactly("values");
+                    assertThat(type.getParameterNames())
+                            .as("Changing the method's parameters should have also updated its type's parameter names")
+                            .containsExactly("values");
 
-              var param = TypeUtils.asArray(type.getParameterTypes().get(0));
-              assertThat(param.getElemType())
-                .as("Changing the method's parameters should have resulted in the first parameter's type being 'Object[]'")
-                .matches(at -> TypeUtils.asFullyQualified(TypeUtils.asArray(at).getElemType()).getFullyQualifiedName()
-                  .equals("java.lang.Object"));
-          }),
-          java(
-            """
+                    var param = TypeUtils.asArray(type.getParameterTypes().get(0));
+                    assertThat(param.getElemType())
+                            .as("Changing the method's parameters should have resulted in the first parameter's type being 'Object[]'")
+                            .matches(at -> TypeUtils.asFullyQualified(TypeUtils.asArray(at).getElemType()).getFullyQualifiedName()
+                                    .equals("java.lang.Object"));
+                }),
+                java(
+                        """
               class Test {
                   void test() {
                       new Runnable() {
@@ -144,7 +144,7 @@ class JavaTemplateTest4Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   void test(Object[]... values) {
                       new Runnable() {
@@ -154,107 +154,107 @@ class JavaTemplateTest4Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void replaceAndInterpolateMethodParameters() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
-                  {
-                      if (method.getSimpleName().equals("test") && method.getParameters().size() == 1) {
-                          return JavaTemplate.builder("int n, #{}")
-                            .contextSensitive()
-                            .build()
-                            .apply(getCursor(), method.getCoordinates().replaceParameters(), method.getParameters().get(0));
-                      }
-                      return method;
-                  }
-              }
-          })).afterRecipe(run -> {
-              J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().get(0).getAfter();
-              JavaType.Method type = ((J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0)).getMethodType();
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+                        {
+                            if (method.getSimpleName().equals("test") && method.getParameters().size() == 1) {
+                                return JavaTemplate.builder("int n, #{}")
+                                        .contextSensitive()
+                                        .build()
+                                        .apply(getCursor(), method.getCoordinates().replaceParameters(), method.getParameters().get(0));
+                            }
+                            return method;
+                        }
+                    }
+                })).afterRecipe(run -> {
+                    J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().get(0).getAfter();
+                    JavaType.Method type = ((J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0)).getMethodType();
 
-              assertThat(type.getParameterNames())
-                .as("Changing the method's parameters should have also updated its type's parameter names")
-                .containsExactly("n", "s");
-              assertThat(type.getParameterTypes().get(0))
-                .as("Changing the method's parameters should have resulted in the first parameter's type being 'int'")
-                .isEqualTo(JavaType.Primitive.Int);
-              assertThat(type.getParameterTypes().get(1))
-                .as("Changing the method's parameters should have resulted in the second parameter's type being 'List<String>'")
-                .matches(jt -> TypeUtils.asFullyQualified(jt).getFullyQualifiedName().equals("java.lang.String"));
-          }),
-          java(
-            """
+                    assertThat(type.getParameterNames())
+                            .as("Changing the method's parameters should have also updated its type's parameter names")
+                            .containsExactly("n", "s");
+                    assertThat(type.getParameterTypes().get(0))
+                            .as("Changing the method's parameters should have resulted in the first parameter's type being 'int'")
+                            .isEqualTo(JavaType.Primitive.Int);
+                    assertThat(type.getParameterTypes().get(1))
+                            .as("Changing the method's parameters should have resulted in the second parameter's type being 'List<String>'")
+                            .matches(jt -> TypeUtils.asFullyQualified(jt).getFullyQualifiedName().equals("java.lang.String"));
+                }),
+                java(
+                        """
               class Test {
                   void test(String s) {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   void test(int n, String s) {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void replaceLambdaParameters() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext p) {
-                  if (lambda.getParameters().getParameters().size() == 1) {
-                      return JavaTemplate.apply("int m, int n", getCursor(), lambda.getParameters().getCoordinates().replace());
-                  }
-                  return super.visitLambda(lambda, p);
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext p) {
+                        if (lambda.getParameters().getParameters().size() == 1) {
+                            return JavaTemplate.apply("int m, int n", getCursor(), lambda.getParameters().getCoordinates().replace());
+                        }
+                        return super.visitLambda(lambda, p);
+                    }
+                })),
+                java(
+                        """
               class Test {
                   void test() {
                       Object o = () -> 1;
                   }
               }
               """,
-            """
+                        """
               class Test {
                   void test() {
                       Object o = (int m, int n) -> 1;
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void replaceSingleStatement() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              @Override
-              public J visitAssert(J.Assert assert_, ExecutionContext p) {
-                  return JavaTemplate.builder(
-                      """
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    @Override
+                    public J visitAssert(J.Assert assert_, ExecutionContext p) {
+                        return JavaTemplate.builder(
+                                """
                         if(n != 1) {
                           n++;
                         }"""
-                    )
-                    .contextSensitive()
-                    .build()
-                    .apply(getCursor(), assert_.getCoordinates().replace());
-              }
-          })),
-          java(
-            """
+                        )
+                        .contextSensitive()
+                                .build()
+                                .apply(getCursor(), assert_.getCoordinates().replace());
+                    }
+                })),
+                java(
+                        """
               class Test {
                   int n;
                   void test() {
@@ -262,7 +262,7 @@ class JavaTemplateTest4Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   int n;
                   void test() {
@@ -272,7 +272,7 @@ class JavaTemplateTest4Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -280,21 +280,21 @@ class JavaTemplateTest4Test implements RewriteTest {
     @Test
     void replaceStatementInBlock() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              @Override
-              public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
-                  var statement = method.getBody().getStatements().get(1);
-                  if (statement instanceof J.Unary) {
-                      return JavaTemplate.builder("n = 2;\nn = 3;")
-                        .contextSensitive()
-                        .build()
-                        .apply(getCursor(), statement.getCoordinates().replace());
-                  }
-                  return method;
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    @Override
+                    public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+                        var statement = method.getBody().getStatements().get(1);
+                        if (statement instanceof J.Unary) {
+                            return JavaTemplate.builder("n = 2;\nn = 3;")
+                                    .contextSensitive()
+                                    .build()
+                                    .apply(getCursor(), statement.getCoordinates().replace());
+                        }
+                        return method;
+                    }
+                })),
+                java(
+                        """
               class Test {
                   int n;
                   void test() {
@@ -303,7 +303,7 @@ class JavaTemplateTest4Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   int n;
                   void test() {
@@ -313,28 +313,28 @@ class JavaTemplateTest4Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void beforeStatementInBlock() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              @Override
-              public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
-                  var statement = method.getBody().getStatements().get(0);
-                  if (statement instanceof J.Assignment) {
-                      return JavaTemplate.builder("assert n == 0;")
-                        .contextSensitive()
-                        .build()
-                        .apply(getCursor(), statement.getCoordinates().before());
-                  }
-                  return method;
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    @Override
+                    public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+                        var statement = method.getBody().getStatements().get(0);
+                        if (statement instanceof J.Assignment) {
+                            return JavaTemplate.builder("assert n == 0;")
+                                    .contextSensitive()
+                                    .build()
+                                    .apply(getCursor(), statement.getCoordinates().before());
+                        }
+                        return method;
+                    }
+                })),
+                java(
+                        """
               class Test {
                   int n;
                   void test() {
@@ -342,7 +342,7 @@ class JavaTemplateTest4Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   int n;
                   void test() {
@@ -351,27 +351,27 @@ class JavaTemplateTest4Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void afterStatementInBlock() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              @Override
-              public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
-                  if (method.getBody().getStatements().size() == 1) {
-                      return JavaTemplate.builder("n = 1;")
-                        .contextSensitive()
-                        .build()
-                        .apply(getCursor(), method.getBody().getStatements().get(0).getCoordinates().after());
-                  }
-                  return method;
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    @Override
+                    public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+                        if (method.getBody().getStatements().size() == 1) {
+                            return JavaTemplate.builder("n = 1;")
+                                    .contextSensitive()
+                                    .build()
+                                    .apply(getCursor(), method.getBody().getStatements().get(0).getCoordinates().after());
+                        }
+                        return method;
+                    }
+                })),
+                java(
+                        """
               class Test {
                   int n;
                   void test() {
@@ -379,7 +379,7 @@ class JavaTemplateTest4Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   int n;
                   void test() {
@@ -388,7 +388,7 @@ class JavaTemplateTest4Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -396,30 +396,30 @@ class JavaTemplateTest4Test implements RewriteTest {
     @Test
     void firstStatementInClassBlock() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              @Override
-              public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext p) {
-                  if (classDecl.getBody().getStatements().size() == 1) {
-                      return JavaTemplate.apply("int m;", getCursor(), classDecl.getBody().getCoordinates().firstStatement());
-                  }
-                  return classDecl;
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    @Override
+                    public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext p) {
+                        if (classDecl.getBody().getStatements().size() == 1) {
+                            return JavaTemplate.apply("int m;", getCursor(), classDecl.getBody().getCoordinates().firstStatement());
+                        }
+                        return classDecl;
+                    }
+                })),
+                java(
+                        """
               class Test {
                   // comment
                   int n;
               }
               """,
-            """
+                        """
               class Test {
                   int m;
                   // comment
                   int n;
               }
               """
-          )
+                )
         );
     }
 
@@ -427,17 +427,17 @@ class JavaTemplateTest4Test implements RewriteTest {
     @Test
     void firstStatementInMethodBlock() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              @Override
-              public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
-                  if (method.getBody().getStatements().size() == 1) {
-                      return JavaTemplate.apply("int m = 0;", getCursor(), method.getBody().getCoordinates().firstStatement());
-                  }
-                  return method;
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    @Override
+                    public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+                        if (method.getBody().getStatements().size() == 1) {
+                            return JavaTemplate.apply("int m = 0;", getCursor(), method.getBody().getCoordinates().firstStatement());
+                        }
+                        return method;
+                    }
+                })),
+                java(
+                        """
               class Test {
                   int n;
                   void test() {
@@ -446,7 +446,7 @@ class JavaTemplateTest4Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   int n;
                   void test() {
@@ -456,7 +456,7 @@ class JavaTemplateTest4Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

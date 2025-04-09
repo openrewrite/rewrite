@@ -33,76 +33,76 @@ class FindEmptyClassesTest implements RewriteTest {
     @Test
     void classNotEmpty() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class IsNotEmpty {
                   int x = 0;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void emptyInterface() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               interface IsEmpty {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void emptyEnum() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               enum IsEmpty {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void emptyClassWithAnnotation() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               @Deprecated
               class IsEmpty {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void emptyClassWithExtends() {
         rewriteRun(
-          java("class A {}", SourceSpec::skip),
-          java(
-            """
+                java("class A {}", SourceSpec::skip),
+                java(
+                        """
               class IsEmpty extends A {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void emptyClassWithImplements() {
         rewriteRun(
-          java("interface A {}"),
-          java(
-            """
+                java("interface A {}"),
+                java(
+                        """
               class IsEmpty implements A {
               }
               """
-          )
+                )
         );
     }
 
@@ -110,16 +110,16 @@ class FindEmptyClassesTest implements RewriteTest {
     @Test
     void findEmptyClass() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class IsEmpty {
               }
               """,
-            """
+                        """
               /*~~>*/class IsEmpty {
               }
               """
-          )
+                )
         );
     }
 }

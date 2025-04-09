@@ -43,81 +43,81 @@ class RemoveImportTest implements RewriteTest {
     @Test
     void removeNamedImport() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("java.util.List")),
-          java(
-            """
+                spec -> spec.recipe(removeImport("java.util.List")),
+                java(
+                        """
               import java.util.List;
               class A {}
               """,
-            "class A {}"
-          )
+                        "class A {}"
+                )
         );
     }
 
     @Test
     void leaveImportIfRemovedTypeIsStillReferredTo() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("java.util.List")),
-          java(
-            """
+                spec -> spec.recipe(removeImport("java.util.List")),
+                java(
+                        """
               import java.util.List;
               class A {
                  List<Integer> list;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void leaveWildcardImportIfRemovedTypeIsStillReferredTo() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("java.util.*")),
-          java(
-            """
+                spec -> spec.recipe(removeImport("java.util.*")),
+                java(
+                        """
               import java.util.*;
               class A {
                  List<Integer> list;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void removeStarImportIfNoTypesReferredTo() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("java.util.List")),
-          java(
-            """
+                spec -> spec.recipe(removeImport("java.util.List")),
+                java(
+                        """
               import java.util.*;
               class A {}
               """,
-            "class A {}"
-          )
+                        "class A {}"
+                )
         );
     }
 
     @Test
     void replaceStarImportWithNamedImportIfOnlyOneReferencedTypeRemains() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("java.util.List")),
-          java(
-            """
+                spec -> spec.recipe(removeImport("java.util.List")),
+                java(
+                        """
               import java.util.*;
                             
               class A {
                  Collection<Integer> c;
               }
               """,
-            """
+                        """
               import java.util.Collection;
                             
               class A {
                  Collection<Integer> c;
               }
               """
-          )
+                )
         );
     }
 
@@ -125,9 +125,9 @@ class RemoveImportTest implements RewriteTest {
     @Test
     void leaveStarImportInPlaceIfFiveOrMoreTypesStillReferredTo() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("java.util.List")),
-          java(
-            """
+                spec -> spec.recipe(removeImport("java.util.List")),
+                java(
+                        """
               import java.util.*;
               class A {
                  Collection<Integer> c;
@@ -135,62 +135,62 @@ class RemoveImportTest implements RewriteTest {
                  Map<Integer, Integer> m = new HashMap<>();
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void removeStarStaticImport() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("java.util.Collections")),
-          java(
-            """
+                spec -> spec.recipe(removeImport("java.util.Collections")),
+                java(
+                        """
               import static java.util.Collections.*;
               class A {}
               """,
-            "class A {}"
-          )
+                        "class A {}"
+                )
         );
     }
 
     @Test
     void removeStarStaticImportWhenRemovingSpecificMethod() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("java.util.Collections.emptyList")),
-          java(
-            """
+                spec -> spec.recipe(removeImport("java.util.Collections.emptyList")),
+                java(
+                        """
               import static java.util.Collections.*;
               class A {
                   Object o = emptySet();
               }
               """,
-            """
+                        """
               import static java.util.Collections.emptySet;
               class A {
                   Object o = emptySet();
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void removeStarImportEvenIfReferredTo() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("java.util.List", true)),
-          java(
-            """
+                spec -> spec.recipe(removeImport("java.util.List", true)),
+                java(
+                        """
               import java.util.List;
               class A {
                   List<String> l;
               }
               """,
-            """
+                        """
               class A {
                   List<String> l;
               }
               """
-          )
+                )
         );
     }
 
@@ -198,30 +198,30 @@ class RemoveImportTest implements RewriteTest {
     @Test
     void leaveStarStaticImportIfReferenceStillExists() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("java.util.Collections")),
-          java(
-            """
+                spec -> spec.recipe(removeImport("java.util.Collections")),
+                java(
+                        """
               import static java.util.Collections.*;
               class A {
                  Object o = emptyList();
               }
               """,
-            """
+                        """
               import static java.util.Collections.emptyList;
               class A {
                  Object o = emptyList();
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void removeStaticImport() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("java.time.DayOfWeek.MONDAY")),
-          java(
-            """
+                spec -> spec.recipe(removeImport("java.time.DayOfWeek.MONDAY")),
+                java(
+                        """
               import java.time.DayOfWeek;
                             
               import static java.time.DayOfWeek.MONDAY;
@@ -233,7 +233,7 @@ class RemoveImportTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.time.DayOfWeek;
                             
               import static java.time.DayOfWeek.TUESDAY;
@@ -244,16 +244,16 @@ class RemoveImportTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void leaveNamedStaticImportIfReferenceStillExists() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("java.util.Collections")),
-          java(
-            """
+                spec -> spec.recipe(removeImport("java.util.Collections")),
+                java(
+                        """
               import static java.util.Collections.emptyList;
               import static java.util.Collections.emptySet;
                             
@@ -261,14 +261,14 @@ class RemoveImportTest implements RewriteTest {
                  Object o = emptyList();
               }
               """,
-            """
+                        """
               import static java.util.Collections.emptyList;
                             
               class A {
                  Object o = emptyList();
               }
               """
-          )
+                )
         );
     }
 
@@ -276,9 +276,9 @@ class RemoveImportTest implements RewriteTest {
     @Test
     void preservesWhitespaceAfterPackageDeclaration() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("java.util.List")),
-          java(
-            """
+                spec -> spec.recipe(removeImport("java.util.List")),
+                java(
+                        """
               package com.example.foo;
                             
               import java.util.List;
@@ -288,7 +288,7 @@ class RemoveImportTest implements RewriteTest {
                   ArrayList<String> foo = new ArrayList<>();
               }
               """,
-            """
+                        """
               package com.example.foo;
                             
               import java.util.ArrayList;
@@ -297,16 +297,16 @@ class RemoveImportTest implements RewriteTest {
                   ArrayList<String> foo = new ArrayList<>();
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void preservesWhitespaceAfterRemovedImport() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("java.util.List")),
-          java(
-            """
+                spec -> spec.recipe(removeImport("java.util.List")),
+                java(
+                        """
               package com.example.foo;
                             
               import java.util.Collection;
@@ -317,7 +317,7 @@ class RemoveImportTest implements RewriteTest {
               public class A {
               }
               """,
-            """
+                        """
               package com.example.foo;
                             
               import java.util.Collection;
@@ -327,114 +327,114 @@ class RemoveImportTest implements RewriteTest {
               public class A {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void preservesWhitespaceAfterRemovedImportForWindowsWhitespace() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("java.util.List")),
-          java(
-              "package com.example.foo;\r\n" +
-              "\r\n" +
-              "import java.util.Collection;\r\n" +
-              "import java.util.List;\r\n" +
-              "\r\n" +
-              "import java.util.ArrayList;\r\n" +
-              "\r\n" +
-              "public class A {\r\n" +
-              "}\r\n",
-              "package com.example.foo;\r\n" +
-              "\r\n" +
-              "import java.util.Collection;\r\n" +
-              "\r\n" +
-              "import java.util.ArrayList;\r\n" +
-              "\r\n" +
-              "public class A {\r\n" +
-              "}\r\n"
-          )
+                spec -> spec.recipe(removeImport("java.util.List")),
+                java(
+                        "package com.example.foo;\r\n" +
+                                "\r\n" +
+                                "import java.util.Collection;\r\n" +
+                                "import java.util.List;\r\n" +
+                                "\r\n" +
+                                "import java.util.ArrayList;\r\n" +
+                                "\r\n" +
+                                "public class A {\r\n" +
+                                "}\r\n",
+                        "package com.example.foo;\r\n" +
+                                "\r\n" +
+                                "import java.util.Collection;\r\n" +
+                                "\r\n" +
+                                "import java.util.ArrayList;\r\n" +
+                                "\r\n" +
+                                "public class A {\r\n" +
+                                "}\r\n"
+                )
         );
     }
 
     @Test
     void preservesWhitespaceAfterRemovedImportForMixedWhitespaceBefore() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("java.util.List")),
-          java(
-              "package com.example.foo;\n" +
-              "\n" +
-              "import java.util.Collection;\r\n" +
-              "import java.util.List;\n" +
-              "import java.util.ArrayList;\n" +
-              "\n" +
-              "public class A {\n" +
-              "}\n",
-              "package com.example.foo;\n" +
-              "\n" +
-              "import java.util.Collection;\n" +
-              "import java.util.ArrayList;\n" +
-              "\n" +
-              "public class A {\n" +
-              "}\n"
-          )
+                spec -> spec.recipe(removeImport("java.util.List")),
+                java(
+                        "package com.example.foo;\n" +
+                                "\n" +
+                                "import java.util.Collection;\r\n" +
+                                "import java.util.List;\n" +
+                                "import java.util.ArrayList;\n" +
+                                "\n" +
+                                "public class A {\n" +
+                                "}\n",
+                        "package com.example.foo;\n" +
+                                "\n" +
+                                "import java.util.Collection;\n" +
+                                "import java.util.ArrayList;\n" +
+                                "\n" +
+                                "public class A {\n" +
+                                "}\n"
+                )
         );
     }
 
     @Test
     void preservesWhitespaceAfterRemovedImportForMixedWhitespaceAfter() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("java.util.List")),
-          java(
-              "package com.example.foo;\n" +
-              "\n" +
-              "import java.util.Collection;\n" +
-              "\n" +
-              "import java.util.List;\r\n" +
-              "import java.util.ArrayList;\n" +
-              "\n" +
-              "public class A {\n" +
-              "}\n",
-              "package com.example.foo;\n" +
-              "\n" +
-              "import java.util.Collection;\n" +
-              "\n" +
-              "import java.util.ArrayList;\n" +
-              "\n" +
-              "public class A {\n" +
-              "}\n"
-          )
+                spec -> spec.recipe(removeImport("java.util.List")),
+                java(
+                        "package com.example.foo;\n" +
+                                "\n" +
+                                "import java.util.Collection;\n" +
+                                "\n" +
+                                "import java.util.List;\r\n" +
+                                "import java.util.ArrayList;\n" +
+                                "\n" +
+                                "public class A {\n" +
+                                "}\n",
+                        "package com.example.foo;\n" +
+                                "\n" +
+                                "import java.util.Collection;\n" +
+                                "\n" +
+                                "import java.util.ArrayList;\n" +
+                                "\n" +
+                                "public class A {\n" +
+                                "}\n"
+                )
         );
     }
 
     @Test
     void doNotLeaveLeaveInitialBlankLine() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("java.util.Collection")),
-          java(
-            """
+                spec -> spec.recipe(removeImport("java.util.Collection")),
+                java(
+                        """
               import static java.util.Collection.*;
               import static java.util.List.*;
                             
               public class A {
               }
               """,
-            """
+                        """
               import static java.util.List.*;
                             
               public class A {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void preservesCommentAfterRemovedImport() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("java.util.List")),
-          java(
-            """
+                spec -> spec.recipe(removeImport("java.util.List")),
+                java(
+                        """
               package com.example.foo;
                             
               import java.util.List;
@@ -444,7 +444,7 @@ class RemoveImportTest implements RewriteTest {
               public class A {
               }
               """,
-            """
+                        """
               package com.example.foo;
                             
               // import java.util.UUID
@@ -453,16 +453,16 @@ class RemoveImportTest implements RewriteTest {
               public class A {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void preservesWhitespaceAfterRemovedStaticImport() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("java.util.Collections.singletonList")),
-          java(
-            """
+                spec -> spec.recipe(removeImport("java.util.Collections.singletonList")),
+                java(
+                        """
               package com.example.foo;
 
               import static java.util.Collections.emptySet;
@@ -473,7 +473,7 @@ class RemoveImportTest implements RewriteTest {
               public class A {
               }
               """,
-            """
+                        """
               package com.example.foo;
                             
               import static java.util.Collections.emptySet;
@@ -483,7 +483,7 @@ class RemoveImportTest implements RewriteTest {
               public class A {
               }
               """
-          )
+                )
         );
     }
 
@@ -491,9 +491,9 @@ class RemoveImportTest implements RewriteTest {
     @Test
     void preservesWhitespaceAfterPackageDeclarationNoImportsRemain() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("java.util.List")),
-          java(
-            """
+                spec -> spec.recipe(removeImport("java.util.List")),
+                java(
+                        """
               package com.example.foo;
                             
               import java.util.List;
@@ -501,13 +501,13 @@ class RemoveImportTest implements RewriteTest {
               public class A {
               }
               """,
-            """
+                        """
               package com.example.foo;
                             
               public class A {
               }
               """
-          )
+                )
         );
     }
 
@@ -515,15 +515,15 @@ class RemoveImportTest implements RewriteTest {
     @Test
     void preservesWhitespaceBetweenGroupsOfImports() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("java.util.List")),
-          java(
-            """
+                spec -> spec.recipe(removeImport("java.util.List")),
+                java(
+                        """
               package com.yourorg.b;
               public class B {}
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package com.example.foo;
                             
               import com.yourorg.b.B;
@@ -535,7 +535,7 @@ class RemoveImportTest implements RewriteTest {
                   ArrayList<B> foo = new ArrayList<>();
               }
               """,
-            """
+                        """
               package com.example.foo;
                             
               import com.yourorg.b.B;
@@ -546,16 +546,16 @@ class RemoveImportTest implements RewriteTest {
                   ArrayList<B> foo = new ArrayList<>();
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doesNotAffectClassBodyFormatting() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("java.util.List")),
-          java(
-            """
+                spec -> spec.recipe(removeImport("java.util.List")),
+                java(
+                        """
               package com.example.foo;
                             
               import java.util.List;
@@ -566,7 +566,7 @@ class RemoveImportTest implements RewriteTest {
               ArrayList<String> foo = new ArrayList<>();
               }
               """,
-            """
+                        """
               package com.example.foo;
                             
               import java.util.ArrayList;
@@ -576,7 +576,7 @@ class RemoveImportTest implements RewriteTest {
               ArrayList<String> foo = new ArrayList<>();
               }
               """
-          )
+                )
         );
     }
 
@@ -584,9 +584,9 @@ class RemoveImportTest implements RewriteTest {
     @Test
     void removeFromWildcardAndDuplicateImport() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("java.util.Collection")),
-          java(
-            """
+                spec -> spec.recipe(removeImport("java.util.Collection")),
+                java(
+                        """
               package a;
 
               import java.util.*;
@@ -597,7 +597,7 @@ class RemoveImportTest implements RewriteTest {
                   List<Integer> l;
               }
               """,
-            """
+                        """
               package a;
 
               import java.util.Set;
@@ -608,7 +608,7 @@ class RemoveImportTest implements RewriteTest {
                   List<Integer> l;
               }
               """
-          )
+                )
         );
     }
 
@@ -616,12 +616,12 @@ class RemoveImportTest implements RewriteTest {
     @Test
     void generateNewUUIDPerUnfoldedImport() {
         rewriteRun(
-          spec -> spec.recipes(
-            removeImport("java.util.Collection"),
-            new ChangeType("java.util.List", "java.util.Collection", null)
-          ),
-          java(
-            """
+                spec -> spec.recipes(
+                        removeImport("java.util.Collection"),
+                        new ChangeType("java.util.List", "java.util.Collection", null)
+                ),
+                java(
+                        """
               package a;
 
               import java.util.*;
@@ -632,7 +632,7 @@ class RemoveImportTest implements RewriteTest {
                   List<Integer> l;
               }
               """,
-            """
+                        """
               package a;
 
               import java.util.Collection;
@@ -643,7 +643,7 @@ class RemoveImportTest implements RewriteTest {
                   Collection<Integer> l;
               }
               """,
-            spec -> spec.afterRecipe(cu -> assertThat(cu.getImports().get(0).getId()).isNotEqualTo(cu.getImports().get(1).getId())))
+                        spec -> spec.afterRecipe(cu -> assertThat(cu.getImports().get(0).getId()).isNotEqualTo(cu.getImports().get(1).getId())))
         );
     }
 
@@ -651,9 +651,9 @@ class RemoveImportTest implements RewriteTest {
     @Test
     void leaveAloneIfThreeOrMoreStaticsAreInUse() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("org.test.Example.VALUE_1")),
-          java(
-            """
+                spec -> spec.recipe(removeImport("org.test.Example.VALUE_1")),
+                java(
+                        """
               package org.test;
               public class Example {
                   public static final int VALUE_1 = 1;
@@ -662,9 +662,9 @@ class RemoveImportTest implements RewriteTest {
                   public static int method1() { return 1; }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package org.test.a;
                             
               import static org.test.Example.*;
@@ -677,7 +677,7 @@ class RemoveImportTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -685,9 +685,9 @@ class RemoveImportTest implements RewriteTest {
     @Test
     void unfoldStaticImportIfTwoOrLessAreUsed() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("org.test.Example.VALUE_1")),
-          java(
-            """
+                spec -> spec.recipe(removeImport("org.test.Example.VALUE_1")),
+                java(
+                        """
               package org.test;
               public class Example {
                   public static final int VALUE_1 = 1;
@@ -696,9 +696,9 @@ class RemoveImportTest implements RewriteTest {
                   public static int method1() { return 1; }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package org.test.a;
                             
               import static org.test.Example.*;
@@ -710,7 +710,7 @@ class RemoveImportTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package org.test.a;
                             
               import static org.test.Example.method1;
@@ -723,58 +723,58 @@ class RemoveImportTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doNotUnfoldPackage() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("java.util.Map")).parser(JavaParser.fromJavaVersion().styles(
-            singletonList(
-              new NamedStyles(
-                randomId(), "test", "test", "test", emptySet(), singletonList(
-                ImportLayoutStyle.builder()
-                  .packageToFold("java.util.*")
-                  .importAllOthers()
-                  .importStaticAllOthers()
-                  .build()
-              )
-              )
-            )
-          )),
-          java(
-            """
+                spec -> spec.recipe(removeImport("java.util.Map")).parser(JavaParser.fromJavaVersion().styles(
+                        singletonList(
+                                new NamedStyles(
+                                        randomId(), "test", "test", "test", emptySet(), singletonList(
+                                        ImportLayoutStyle.builder()
+                                                .packageToFold("java.util.*")
+                                                .importAllOthers()
+                                                .importStaticAllOthers()
+                                                .build()
+                                )
+                                )
+                        )
+                )),
+                java(
+                        """
               import java.util.*;
                             
               class Test {
                   List<String> l;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doNotUnfoldSubPackage() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("java.util.concurrent.ConcurrentLinkedQueue")).parser(
-            JavaParser.fromJavaVersion().styles(
-              singletonList(
-                new NamedStyles(
-                  randomId(), "test", "test", "test", emptySet(), singletonList(
-                  ImportLayoutStyle.builder()
-                    .packageToFold("java.util.*")
-                    .importAllOthers()
-                    .importStaticAllOthers()
-                    .build()
-                )
-                )
-              )
-            )
-          ),
-          java(
-            """
+                spec -> spec.recipe(removeImport("java.util.concurrent.ConcurrentLinkedQueue")).parser(
+                        JavaParser.fromJavaVersion().styles(
+                                singletonList(
+                                        new NamedStyles(
+                                                randomId(), "test", "test", "test", emptySet(), singletonList(
+                                                ImportLayoutStyle.builder()
+                                                        .packageToFold("java.util.*")
+                                                        .importAllOthers()
+                                                        .importStaticAllOthers()
+                                                        .build()
+                                        )
+                                        )
+                                )
+                        )
+                ),
+                java(
+                        """
               import java.util.*;
               import java.util.concurrent.*;
                             
@@ -782,30 +782,30 @@ class RemoveImportTest implements RewriteTest {
                   Map<Integer, Integer> m = new ConcurrentHashMap<>();
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unfoldSubpackage() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("java.util.concurrent.ConcurrentLinkedQueue")).parser(
-            JavaParser.fromJavaVersion().styles(
-              singletonList(
-                new NamedStyles(
-                  randomId(), "test", "test", "test", emptySet(), singletonList(
-                  ImportLayoutStyle.builder()
-                    .packageToFold("java.util.*", false)
-                    .importAllOthers()
-                    .importStaticAllOthers()
-                    .build()
-                )
-                )
-              )
-            )
-          ),
-          java(
-            """
+                spec -> spec.recipe(removeImport("java.util.concurrent.ConcurrentLinkedQueue")).parser(
+                        JavaParser.fromJavaVersion().styles(
+                                singletonList(
+                                        new NamedStyles(
+                                                randomId(), "test", "test", "test", emptySet(), singletonList(
+                                                ImportLayoutStyle.builder()
+                                                        .packageToFold("java.util.*", false)
+                                                        .importAllOthers()
+                                                        .importStaticAllOthers()
+                                                        .build()
+                                        )
+                                        )
+                                )
+                        )
+                ),
+                java(
+                        """
               import java.util.*;
               import java.util.concurrent.*;
                             
@@ -813,7 +813,7 @@ class RemoveImportTest implements RewriteTest {
                   Map<Integer, Integer> m = new ConcurrentHashMap<>();
               }
               """,
-            """
+                        """
               import java.util.*;
               import java.util.concurrent.ConcurrentHashMap;
                             
@@ -821,30 +821,30 @@ class RemoveImportTest implements RewriteTest {
                   Map<Integer, Integer> m = new ConcurrentHashMap<>();
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doNotUnfoldStaticPackage() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("java.util.Collections.emptyMap")).parser(
-            JavaParser.fromJavaVersion().styles(
-              singletonList(
-                new NamedStyles(
-                  randomId(), "test", "test", "test", emptySet(), singletonList(
-                  ImportLayoutStyle.builder()
-                    .staticPackageToFold("java.util.Collections.*")
-                    .importAllOthers()
-                    .importStaticAllOthers()
-                    .build()
-                )
-                )
-              )
-            )
-          ),
-          java(
-            """
+                spec -> spec.recipe(removeImport("java.util.Collections.emptyMap")).parser(
+                        JavaParser.fromJavaVersion().styles(
+                                singletonList(
+                                        new NamedStyles(
+                                                randomId(), "test", "test", "test", emptySet(), singletonList(
+                                                ImportLayoutStyle.builder()
+                                                        .staticPackageToFold("java.util.Collections.*")
+                                                        .importAllOthers()
+                                                        .importStaticAllOthers()
+                                                        .build()
+                                        )
+                                        )
+                                )
+                        )
+                ),
+                java(
+                        """
               import java.util.*;
               import static java.util.Collections.*;
                             
@@ -852,30 +852,30 @@ class RemoveImportTest implements RewriteTest {
                   List<String> l = emptyList();
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doNotUnfoldStaticSubPackage() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("java.util.Collections.emptyMap")).parser(
-            JavaParser.fromJavaVersion().styles(
-              singletonList(
-                new NamedStyles(
-                  randomId(), "test", "test", "test", emptySet(), singletonList(
-                  ImportLayoutStyle.builder()
-                    .staticPackageToFold("java.util.*")
-                    .importAllOthers()
-                    .importStaticAllOthers()
-                    .build()
-                )
-                )
-              )
-            )
-          ),
-          java(
-            """
+                spec -> spec.recipe(removeImport("java.util.Collections.emptyMap")).parser(
+                        JavaParser.fromJavaVersion().styles(
+                                singletonList(
+                                        new NamedStyles(
+                                                randomId(), "test", "test", "test", emptySet(), singletonList(
+                                                ImportLayoutStyle.builder()
+                                                        .staticPackageToFold("java.util.*")
+                                                        .importAllOthers()
+                                                        .importStaticAllOthers()
+                                                        .build()
+                                        )
+                                        )
+                                )
+                        )
+                ),
+                java(
+                        """
               import java.util.List;
               import static java.util.Collections.*;
                             
@@ -883,30 +883,30 @@ class RemoveImportTest implements RewriteTest {
                   List<Integer> l = emptyList();
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unfoldStaticSubpackage() {
         rewriteRun(
-          spec -> spec.recipe(removeImport("java.util.Collections.emptyMap")).parser(
-            JavaParser.fromJavaVersion().styles(
-              singletonList(
-                new NamedStyles(
-                  randomId(), "test", "test", "test", emptySet(), singletonList(
-                  ImportLayoutStyle.builder()
-                    .packageToFold("java.util.*", false)
-                    .importAllOthers()
-                    .importStaticAllOthers()
-                    .build()
-                )
-                )
-              )
-            )
-          ),
-          java(
-            """
+                spec -> spec.recipe(removeImport("java.util.Collections.emptyMap")).parser(
+                        JavaParser.fromJavaVersion().styles(
+                                singletonList(
+                                        new NamedStyles(
+                                                randomId(), "test", "test", "test", emptySet(), singletonList(
+                                                ImportLayoutStyle.builder()
+                                                        .packageToFold("java.util.*", false)
+                                                        .importAllOthers()
+                                                        .importStaticAllOthers()
+                                                        .build()
+                                        )
+                                        )
+                                )
+                        )
+                ),
+                java(
+                        """
               import java.util.List;
               import static java.util.Collections.*;
                             
@@ -914,7 +914,7 @@ class RemoveImportTest implements RewriteTest {
                   List<Integer> l = emptyList();
               }
               """,
-            """
+                        """
               import java.util.List;
               import static java.util.Collections.emptyList;
                             
@@ -922,7 +922,7 @@ class RemoveImportTest implements RewriteTest {
                   List<Integer> l = emptyList();
               }
               """
-          )
+                )
         );
     }
 }

@@ -26,96 +26,96 @@ class FindGradleWrapperTest implements RewriteTest {
     @Test
     void findGradleWrapperVersion() {
         rewriteRun(
-          spec -> spec.recipe(new FindGradleWrapper("[6,)", null, null)),
-          properties(
-            """
+                spec -> spec.recipe(new FindGradleWrapper("[6,)", null, null)),
+                properties(
+                        """
               distributionBase=GRADLE_USER_HOME
               distributionPath=wrapper/dists
               distributionUrl=https\\\\://services.gradle.org/distributions/gradle-7.4-all.zip
               zipStoreBase=GRADLE_USER_HOME
               zipStorePath=wrapper/dists
               """,
-            """
+                        """
               distributionBase=GRADLE_USER_HOME
               distributionPath=wrapper/dists
               ~~>distributionUrl=https\\\\://services.gradle.org/distributions/gradle-7.4-all.zip
               zipStoreBase=GRADLE_USER_HOME
               zipStorePath=wrapper/dists
               """,
-            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
-          )
+                        spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+                )
         );
     }
 
     @Test
     void findGradleWrapperDistribution() {
         rewriteRun(
-          spec -> spec.recipe(new FindGradleWrapper(null, null, "all")),
-          properties(
-            """
+                spec -> spec.recipe(new FindGradleWrapper(null, null, "all")),
+                properties(
+                        """
               distributionBase=GRADLE_USER_HOME
               distributionPath=wrapper/dists
               distributionUrl=https\\\\://services.gradle.org/distributions/gradle-7.4-all.zip
               zipStoreBase=GRADLE_USER_HOME
               zipStorePath=wrapper/dists
               """,
-            """
+                        """
               distributionBase=GRADLE_USER_HOME
               distributionPath=wrapper/dists
               ~~>distributionUrl=https\\\\://services.gradle.org/distributions/gradle-7.4-all.zip
               zipStoreBase=GRADLE_USER_HOME
               zipStorePath=wrapper/dists
               """,
-            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
-          )
+                        spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+                )
         );
     }
 
     @Test
     void findGradleWrapperVersionAndDistribution() {
         rewriteRun(
-          spec -> spec.recipe(new FindGradleWrapper("[6,)", null, "all")),
-          properties(
-            """
+                spec -> spec.recipe(new FindGradleWrapper("[6,)", null, "all")),
+                properties(
+                        """
               distributionBase=GRADLE_USER_HOME
               distributionPath=wrapper/dists
               distributionUrl=https\\\\://services.gradle.org/distributions/gradle-7.4-all.zip
               zipStoreBase=GRADLE_USER_HOME
               zipStorePath=wrapper/dists
               """,
-            """
+                        """
               distributionBase=GRADLE_USER_HOME
               distributionPath=wrapper/dists
               ~~>distributionUrl=https\\\\://services.gradle.org/distributions/gradle-7.4-all.zip
               zipStoreBase=GRADLE_USER_HOME
               zipStorePath=wrapper/dists
               """,
-            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
-          )
+                        spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+                )
         );
     }
 
     @Test
     void findWrapperDefaults() {
         rewriteRun(
-          spec -> spec.recipe(new FindGradleWrapper(null, null, null)),
-          properties(
-            """
+                spec -> spec.recipe(new FindGradleWrapper(null, null, null)),
+                properties(
+                        """
               distributionBase=GRADLE_USER_HOME
               distributionPath=wrapper/dists
               distributionUrl=https\\\\://services.gradle.org/distributions/gradle-7.4-all.zip
               zipStoreBase=GRADLE_USER_HOME
               zipStorePath=wrapper/dists
               """,
-            """
+                        """
               distributionBase=GRADLE_USER_HOME
               distributionPath=wrapper/dists
               ~~>distributionUrl=https\\\\://services.gradle.org/distributions/gradle-7.4-all.zip
               zipStoreBase=GRADLE_USER_HOME
               zipStorePath=wrapper/dists
               """,
-            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
-          )
+                        spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+                )
         );
     }
 }

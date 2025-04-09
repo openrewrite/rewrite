@@ -168,8 +168,8 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
             Map<String, GradleDependencyConfiguration> newNameToConfiguration = new HashMap<>(nameToConfiguration.size());
 
             Set<GradleDependencyConfiguration> configurationsToAdd = Stream.concat(
-                            Stream.of(configuration),
-                            gp.configurationsExtendingFrom(configuration, true).stream())
+                    Stream.of(configuration),
+                    gp.configurationsExtendingFrom(configuration, true).stream())
                     .collect(Collectors.toSet());
 
             for (GradleDependencyConfiguration gdc : nameToConfiguration.values()) {
@@ -252,12 +252,12 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
             DependencyStyle style = autodetectDependencyStyle(body.getStatements());
             if (style == DependencyStyle.String) {
                 codeTemplate = "dependencies {\n" +
-                               escapeIfNecessary(configuration) + " \"" + groupId + ":" + artifactId + (resolvedVersion == null ? "" : ":" + resolvedVersion) + (resolvedVersion == null || classifier == null ? "" : ":" + classifier) + (extension == null ? "" : "@" + extension) + "\"" +
-                               "\n}";
+                        escapeIfNecessary(configuration) + " \"" + groupId + ":" + artifactId + (resolvedVersion == null ? "" : ":" + resolvedVersion) + (resolvedVersion == null || classifier == null ? "" : ":" + classifier) + (extension == null ? "" : "@" + extension) + "\"" +
+                        "\n}";
             } else {
                 codeTemplate = "dependencies {\n" +
-                               escapeIfNecessary(configuration) + " group: \"" + groupId + "\", name: \"" + artifactId + "\"" + (resolvedVersion == null ? "" : ", version: \"" + resolvedVersion + "\"") + (classifier == null ? "" : ", classifier: \"" + classifier + "\"") + (extension == null ? "" : ", ext: \"" + extension + "\"") +
-                               "\n}";
+                        escapeIfNecessary(configuration) + " group: \"" + groupId + "\", name: \"" + artifactId + "\"" + (resolvedVersion == null ? "" : ", version: \"" + resolvedVersion + "\"") + (classifier == null ? "" : ", classifier: \"" + classifier + "\"") + (extension == null ? "" : ", ext: \"" + extension + "\"") +
+                        "\n}";
             }
 
             ExecutionContext parseCtx = new InMemoryExecutionContext();

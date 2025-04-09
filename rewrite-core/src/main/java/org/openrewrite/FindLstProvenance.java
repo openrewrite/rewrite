@@ -54,7 +54,7 @@ public class FindLstProvenance extends ScanningRecipe<FindLstProvenance.Accumula
             @Override
             public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
-                if(acc.foundLstProvenance) {
+                if (acc.foundLstProvenance) {
                     return tree;
                 }
                 LstProvenance lstProvenance = tree.getMarkers().findFirst(LstProvenance.class).orElse(null);

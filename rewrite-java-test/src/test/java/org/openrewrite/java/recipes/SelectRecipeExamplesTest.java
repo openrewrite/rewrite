@@ -28,15 +28,15 @@ class SelectRecipeExamplesTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new SelectRecipeExamples())
-          .parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()));
+                .parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()));
     }
 
     @DocumentExample
     @Test
     void selectFirstExample() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package org.openrewrite.java.cleanup;
                            
               import org.junit.jupiter.api.Test;
@@ -81,7 +81,7 @@ class SelectRecipeExamplesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package org.openrewrite.java.cleanup;
                            
               import org.junit.jupiter.api.Test;
@@ -128,15 +128,15 @@ class SelectRecipeExamplesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void skipNotChangedTest() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package org.openrewrite.java.cleanup;
                            
               import org.junit.jupiter.api.Test;
@@ -178,7 +178,7 @@ class SelectRecipeExamplesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package org.openrewrite.java.cleanup;
                            
               import org.junit.jupiter.api.Test;
@@ -222,15 +222,15 @@ class SelectRecipeExamplesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void skipIssueAnnotatedTests() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package org.openrewrite.java.cleanup;
                            
               import org.junit.jupiter.api.Test;
@@ -277,7 +277,7 @@ class SelectRecipeExamplesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package org.openrewrite.java.cleanup;
                            
               import org.junit.jupiter.api.Test;
@@ -326,7 +326,7 @@ class SelectRecipeExamplesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -334,8 +334,8 @@ class SelectRecipeExamplesTest implements RewriteTest {
     @Test
     void skipDisabledAnnotatedTests() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package org.openrewrite.java.cleanup;
                            
               import org.junit.jupiter.api.Disabled;
@@ -368,15 +368,15 @@ class SelectRecipeExamplesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void ignoreIfHasAnnotated() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package org.openrewrite.java.cleanup;
                            
               import org.junit.jupiter.api.Test;
@@ -409,15 +409,15 @@ class SelectRecipeExamplesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void skipNestedClasses() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import org.junit.jupiter.api.Nested;
               import org.junit.jupiter.api.Test;
               import org.openrewrite.test.RewriteTest;
@@ -434,7 +434,7 @@ class SelectRecipeExamplesTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 }

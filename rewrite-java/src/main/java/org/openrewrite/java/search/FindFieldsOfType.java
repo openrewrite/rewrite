@@ -71,9 +71,9 @@ public class FindFieldsOfType extends Recipe {
                     return multiVariable;
                 }
                 if (multiVariable.getTypeExpression() != null &&
-                    hasElementType(multiVariable.getTypeExpression().getType(), fullyQualifiedTypeName,
+                        hasElementType(multiVariable.getTypeExpression().getType(), fullyQualifiedTypeName,
                                 Boolean.TRUE.equals(matchInherited)) &&
-                    isField(getCursor())) {
+                        isField(getCursor())) {
                     return SearchResult.found(multiVariable);
                 }
                 return multiVariable;
@@ -89,7 +89,7 @@ public class FindFieldsOfType extends Recipe {
                     return multiVariable;
                 }
                 if (multiVariable.getTypeExpression() != null &&
-                        hasElementType(multiVariable.getTypeExpression().getType(), fullyQualifiedTypeName, true)  &&
+                        hasElementType(multiVariable.getTypeExpression().getType(), fullyQualifiedTypeName, true) &&
                         isField(getCursor())) {
                     vs.add(multiVariable);
                 }
@@ -117,7 +117,7 @@ public class FindFieldsOfType extends Recipe {
     }
 
     private static boolean hasElementType(@Nullable JavaType type, String fullyQualifiedName,
-                                          boolean matchOverrides) {
+            boolean matchOverrides) {
         if (type instanceof JavaType.Array) {
             return hasElementType(((JavaType.Array) type).getElemType(), fullyQualifiedName, matchOverrides);
         } else if (type instanceof JavaType.FullyQualified) {

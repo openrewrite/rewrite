@@ -224,18 +224,18 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
     @Override
     public Hcl visitConfigFile(HCLParser.ConfigFileContext ctx) {
         return convert(ctx, (c, prefix) -> new Hcl.ConfigFile(
-                randomId(),
-                path,
-                fileAttributes,
-                Space.format(prefix),
-                Markers.EMPTY,
-                charset.name(),
-                charsetBomMarked,
-                null,
-                c.body().bodyContent().stream()
-                        .map(bc -> (BodyContent) visit(bc))
-                        .collect(toList()),
-                Space.format(source.substring(cursor)))
+                        randomId(),
+                        path,
+                        fileAttributes,
+                        Space.format(prefix),
+                        Markers.EMPTY,
+                        charset.name(),
+                        charsetBomMarked,
+                        null,
+                        c.body().bodyContent().stream()
+                                .map(bc -> (BodyContent) visit(bc))
+                                .collect(toList()),
+                        Space.format(source.substring(cursor)))
         );
     }
 

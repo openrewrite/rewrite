@@ -184,7 +184,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     }
 
     protected void visitContainer(String before, @Nullable JContainer<? extends J> container, GContainer.Location location,
-                                  String suffixBetween, @Nullable String after, PrintOutputCapture<P> p) {
+            String suffixBetween, @Nullable String after, PrintOutputCapture<P> p) {
         if (container == null) {
             return;
         }
@@ -436,7 +436,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
                     } else {
                         p.append('(');
                     }
-                }  else if (hasParentheses && omitParensCurrElem) { // first trailing lambda, eg: `stage('Build..') {}`, should close the method
+                } else if (hasParentheses && omitParensCurrElem) { // first trailing lambda, eg: `stage('Build..') {}`, should close the method
                     if (applyTrailingLambdaParenthese) { // apply once, to support multiple closures: `foo("baz") {} {}
                         p.append(')');
                         applyTrailingLambdaParenthese = false;
@@ -459,7 +459,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         @Override
         public J visitReturn(J.Return return_, PrintOutputCapture<P> p) {
             if (return_.getMarkers().findFirst(ImplicitReturn.class).isPresent() ||
-                return_.getMarkers().findFirst(org.openrewrite.java.marker.ImplicitReturn.class).isPresent()) {
+                    return_.getMarkers().findFirst(org.openrewrite.java.marker.ImplicitReturn.class).isPresent()) {
                 visitSpace(return_.getPrefix(), Space.Location.RETURN_PREFIX, p);
                 visitMarkers(return_.getMarkers(), p);
                 visit(return_.getExpression(), p);

@@ -34,8 +34,8 @@ class PrintMavenAsDotTest implements RewriteTest {
     @Test
     void dot() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
             <project>
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
@@ -56,7 +56,7 @@ class PrintMavenAsDotTest implements RewriteTest {
               </dependencies>
             </project>
             """,
-            """
+                        """
             <!--~~(digraph main {
             0 [label="com.mycompany.app:my-app:1"];
             1 [label="org.yaml:snakeyaml:1.27"];
@@ -97,7 +97,7 @@ class PrintMavenAsDotTest implements RewriteTest {
               </dependencies>
             </project>
             """
-          )
+                )
         );
     }
 
@@ -105,8 +105,8 @@ class PrintMavenAsDotTest implements RewriteTest {
     @Disabled
     void bigDot() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
                 <project>
                     <parent>
                       <groupId>org.springframework.boot</groupId>
@@ -148,7 +148,7 @@ class PrintMavenAsDotTest implements RewriteTest {
                     </dependencyManagement>
               </project>
             """
-          )
+                )
         );
     }
 }

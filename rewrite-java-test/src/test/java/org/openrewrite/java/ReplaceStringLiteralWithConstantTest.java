@@ -34,92 +34,92 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec
-          .parser(JavaParser.fromJavaVersion()
-            .logCompilationWarningsAndErrors(true));
+                .parser(JavaParser.fromJavaVersion()
+                        .logCompilationWarningsAndErrors(true));
     }
 
     @Test
     void doNothingIfStringLiteralNotFound() {
         rewriteRun(
-          spec -> spec.recipe(new ReplaceStringLiteralWithConstant(EXAMPLE_STRING_CONSTANT, EXAMPLE_STRING_FQN)),
-          java(
-            """
+                spec -> spec.recipe(new ReplaceStringLiteralWithConstant(EXAMPLE_STRING_CONSTANT, EXAMPLE_STRING_FQN)),
+                java(
+                        """
               package org.openrewrite.java;
               
               class Test {
                   String s = "FooBar";
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doNotReplaceDefinition() {
         rewriteRun(
-          spec -> spec.recipe(new ReplaceStringLiteralWithConstant(EXAMPLE_STRING_CONSTANT, EXAMPLE_STRING_FQN)),
-          java(
-            """
+                spec -> spec.recipe(new ReplaceStringLiteralWithConstant(EXAMPLE_STRING_CONSTANT, EXAMPLE_STRING_FQN)),
+                java(
+                        """
               package org.openrewrite.java;
               
               class ReplaceStringLiteralWithConstantTest {
                   static final String EXAMPLE_STRING_CONSTANT = "Hello World!";
               }
               """
-          ));
+                ));
     }
 
     @DocumentExample
     @Test
     void shouldNotAddImportWhenUnnecessary() {
         rewriteRun(
-          spec -> spec.recipe(new ReplaceStringLiteralWithConstant(EXAMPLE_STRING_CONSTANT, EXAMPLE_STRING_FQN)),
-          java(
-            """
+                spec -> spec.recipe(new ReplaceStringLiteralWithConstant(EXAMPLE_STRING_CONSTANT, EXAMPLE_STRING_FQN)),
+                java(
+                        """
               package org.openrewrite.java;
               
               class Test {
                   Object o = "Hello World!";
               }
               """,
-            """
+                        """
               package org.openrewrite.java;
               
               class Test {
                   Object o = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void replaceStringLiteralWithConstant() {
         rewriteRun(
-          spec -> spec.recipe(new ReplaceStringLiteralWithConstant(EXAMPLE_STRING_CONSTANT, EXAMPLE_STRING_FQN)),
-          java(
-            """
+                spec -> spec.recipe(new ReplaceStringLiteralWithConstant(EXAMPLE_STRING_CONSTANT, EXAMPLE_STRING_FQN)),
+                java(
+                        """
               class Test {
                   Object o = "Hello World!";
               }
               """,
-            """
+                        """
               import org.openrewrite.java.ReplaceStringLiteralWithConstantTest;
               
               class Test {
                   Object o = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void replaceLiteralWithUserDefinedConstant() {
         rewriteRun(
-          spec -> spec.recipe(new ReplaceStringLiteralWithConstant("newValue", EXAMPLE_STRING_FQN)),
-          java(
-            """
+                spec -> spec.recipe(new ReplaceStringLiteralWithConstant("newValue", EXAMPLE_STRING_FQN)),
+                java(
+                        """
               package com.abc;
               
               class A {
@@ -129,7 +129,7 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package com.abc;
               
               import org.openrewrite.java.ReplaceStringLiteralWithConstantTest;
@@ -141,56 +141,56 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void replaceStringLiteralWithConstantValueWhenLiteralValueIsNotConfigured() {
         rewriteRun(
-          spec -> spec.recipe(new ReplaceStringLiteralWithConstant(EXAMPLE_STRING_FQN)),
-          java(
-            """ 
+                spec -> spec.recipe(new ReplaceStringLiteralWithConstant(EXAMPLE_STRING_FQN)),
+                java(
+                        """ 
               class Test {
                   Object o = "Hello World!";
               }
               """,
-            """
+                        """
               import org.openrewrite.java.ReplaceStringLiteralWithConstantTest;
               
               class Test {
                   Object o = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void replaceWhitespaceStringLiteralWhenLiteralValueIsConfiguredWhitespace() {
         rewriteRun(
-          spec -> spec.recipe(new ReplaceStringLiteralWithConstant(" ", EXAMPLE_STRING_FQN)),
-          java(
-            """
+                spec -> spec.recipe(new ReplaceStringLiteralWithConstant(" ", EXAMPLE_STRING_FQN)),
+                java(
+                        """
               class Test {
                   Object o = " ";
               }
               """,
-            """
+                        """
               import org.openrewrite.java.ReplaceStringLiteralWithConstantTest;
               
               class Test {
                   Object o = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void replaceStringLiteralWithConstantValueWhenLiteralValueIsNotConfiguredYaml() {
         rewriteRun(
-          spec -> spec.recipeFromYaml("""
+                spec -> spec.recipeFromYaml("""
               type: specs.openrewrite.org/v1beta/recipe
               name: org.openrewrite.ReplaceStringLiteralWithConstantList
               description: Replace string literals with constants.
@@ -198,28 +198,28 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
                   - org.openrewrite.java.ReplaceStringLiteralWithConstant:
                       fullyQualifiedConstantName: %s
               """.formatted(EXAMPLE_STRING_FQN),
-            "org.openrewrite.ReplaceStringLiteralWithConstantList"),
-          java(
-            """                
+                        "org.openrewrite.ReplaceStringLiteralWithConstantList"),
+                java(
+                        """                
               class Test {
                   Object o = "Hello World!";
               }
               """,
-            """
+                        """
               import org.openrewrite.java.ReplaceStringLiteralWithConstantTest;
               
               class Test {
                   Object o = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void replaceStringLiteralWithConstantValueWhenLiteralValueIsConfiguredYaml() {
         rewriteRun(
-          spec -> spec.recipeFromYaml("""
+                spec -> spec.recipeFromYaml("""
               type: specs.openrewrite.org/v1beta/recipe
               name: org.openrewrite.ReplaceStringLiteralWithConstantList
               description: Replace string literals with constants.
@@ -228,44 +228,44 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
                       literalValue: %s
                       fullyQualifiedConstantName: %s
               """.formatted("Hello Darkness!", EXAMPLE_STRING_FQN),
-            "org.openrewrite.ReplaceStringLiteralWithConstantList"),
-          java(
-            """ 
+                        "org.openrewrite.ReplaceStringLiteralWithConstantList"),
+                java(
+                        """ 
               class Test {
                   Object o = "Hello Darkness!";
               }
               """,
-            """
+                        """
               import org.openrewrite.java.ReplaceStringLiteralWithConstantTest;
               
               class Test {
                   Object o = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void missingFieldNoError() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaVisitor<>(){
-              @Override
-              public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
-                  // Circumvent validation to match use in rewrite-spring's ReplaceStringLiteralsWithMediaTypeConstants
-                  doAfterVisit(new ReplaceStringLiteralWithConstant(EXAMPLE_STRING_FQN + "_xyz").getVisitor());
-                  return super.visit(tree, ctx);
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaVisitor<>(){
+                    @Override
+                    public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                        // Circumvent validation to match use in rewrite-spring's ReplaceStringLiteralsWithMediaTypeConstants
+                        doAfterVisit(new ReplaceStringLiteralWithConstant(EXAMPLE_STRING_FQN + "_xyz").getVisitor());
+                        return super.visit(tree, ctx);
+                    }
+                })),
+                java(
+                        """
               package org.openrewrite.java;
               
               class Test {
                   Object o = "Hello World!";
               }
               """
-          )
+                )
         );
     }
 }

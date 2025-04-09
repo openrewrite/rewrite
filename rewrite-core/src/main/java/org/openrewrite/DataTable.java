@@ -53,8 +53,8 @@ public class DataTable<Row> {
     protected int maxCycle = 1;
 
     public DataTable(Recipe recipe, Class<Row> type, String name,
-                     @Language("markdown") String displayName,
-                     @Language("markdown") String description) {
+            @Language("markdown") String displayName,
+            @Language("markdown") String description) {
         this.type = type;
         this.name = name;
         this.displayName = displayName;
@@ -63,8 +63,8 @@ public class DataTable<Row> {
     }
 
     public DataTable(Recipe recipe,
-                     @Language("markdown") String displayName,
-                     @Language("markdown") String description) {
+            @Language("markdown") String displayName,
+            @Language("markdown") String description) {
         //noinspection unchecked
         this.type = (Class<Row>) ((ParameterizedType) getClass().getGenericSuperclass())
                 .getActualTypeArguments()[0];

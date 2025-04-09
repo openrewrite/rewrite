@@ -31,42 +31,42 @@ class RemoveContentTest implements RewriteTest {
     @Test
     void removeContent() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
-              @Override
-              public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
-                  doAfterVisit(new RemoveContentVisitor<>(requireNonNull(x.getRoot().getContent()).get(1), false, true));
-                  return super.visitDocument(x, ctx);
-              }
-          }).withMaxCycles(1)),
-          xml(
-            """
+                spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
+                    @Override
+                    public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
+                        doAfterVisit(new RemoveContentVisitor<>(requireNonNull(x.getRoot().getContent()).get(1), false, true));
+                        return super.visitDocument(x, ctx);
+                    }
+                }).withMaxCycles(1)),
+                xml(
+                        """
               <dependency>
                   <groupId>group</groupId>
                   <version/>
               </dependency>
               """,
-            """
+                        """
               <dependency>
                   <groupId>group</groupId>
               </dependency>
               """
-          )
+                )
         );
     }
 
     @Test
     void removeAncestorsThatBecomeEmpty() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
-              @Override
-              public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
-                  doAfterVisit(new RemoveContentVisitor<>(requireNonNull(x.getRoot().getChildren()).get(1)
-                    .getChildren().get(0).getChildren().get(0), true, true));
-                  return super.visitDocument(x, ctx);
-              }
-          }).withMaxCycles(1)),
-          xml(
-            """
+                spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
+                    @Override
+                    public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
+                        doAfterVisit(new RemoveContentVisitor<>(requireNonNull(x.getRoot().getChildren()).get(1)
+                                .getChildren().get(0).getChildren().get(0), true, true));
+                        return super.visitDocument(x, ctx);
+                    }
+                }).withMaxCycles(1)),
+                xml(
+                        """
               <project>
                   <name>my.company</name>
                   <dependencyManagement>
@@ -76,28 +76,28 @@ class RemoveContentTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """,
-            """
+                        """
               <project>
                   <name>my.company</name>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void rootChangedToEmptyTagIfLastRemainingTag() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
-              @Override
-              public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
-                  doAfterVisit(new RemoveContentVisitor<>(requireNonNull(x.getRoot().getChildren()).get(0)
-                    .getChildren().get(0).getChildren().get(0), true, true));
-                  return super.visitDocument(x, ctx);
-              }
-          }).withMaxCycles(1)),
-          xml(
-            """
+                spec -> spec.recipe(toRecipe(() -> new XmlVisitor<>() {
+                    @Override
+                    public Xml visitDocument(Xml.Document x, ExecutionContext ctx) {
+                        doAfterVisit(new RemoveContentVisitor<>(requireNonNull(x.getRoot().getChildren()).get(0)
+                                .getChildren().get(0).getChildren().get(0), true, true));
+                        return super.visitDocument(x, ctx);
+                    }
+                }).withMaxCycles(1)),
+                xml(
+                        """
               <project>
                   <dependencyManagement>
                       <dependencies>
@@ -106,10 +106,10 @@ class RemoveContentTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """,
-            """
+                        """
               <project/>
               """
-          )
+                )
         );
     }
 }

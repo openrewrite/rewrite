@@ -25,38 +25,38 @@ class RangeTest implements RewriteTest {
     @Test
     void rangeExpression() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def a = []
               println(a[0..-2])
               """
-          )
+                )
         );
     }
 
     @Test
     void parenthesized() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               ( 8..19 ).each { majorVersion ->
                 if (majorVersion == 9) return
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void parenthesizedAndInvokeMethodWithParentheses() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               (((( 8..19 ))).each { majorVersion ->
                 if (majorVersion == 9) return
               })
               """
-          )
+                )
         );
     }
 }

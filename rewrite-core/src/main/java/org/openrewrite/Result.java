@@ -79,7 +79,7 @@ public class Result {
                 .orElseThrow(() -> new IllegalStateException(
                         String.format(
                                 "Source file changed but no recipe " +
-                                "reported making a change. %s",
+                                        "reported making a change. %s",
                                 explainWhatChanged(before, after)
                         )
                 ))
@@ -106,8 +106,8 @@ public class Result {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, Integer p) {
                 if (tree != null &&
-                    beforeTrees.get(tree.getId()) != tree &&
-                    !subtreeChanged(tree, beforeTrees)) {
+                        beforeTrees.get(tree.getId()) != tree &&
+                        !subtreeChanged(tree, beforeTrees)) {
                     return SearchResult.found(tree);
                 }
                 return super.visit(tree, p);
@@ -116,9 +116,9 @@ public class Result {
 
         String diff = diff(before.printAllTrimmed(), changesMarked.printAllTrimmed(), after.getSourcePath());
         return "The following diff highlights the places where unexpected changes were made:\n" +
-               Arrays.stream(requireNonNull(diff).split("\n"))
-                       .map(l -> "  " + l)
-                       .collect(Collectors.joining("\n"));
+                Arrays.stream(requireNonNull(diff).split("\n"))
+                        .map(l -> "  " + l)
+                        .collect(Collectors.joining("\n"));
     }
 
     private static boolean subtreeChanged(Tree root, Map<UUID, Tree> beforeTrees) {

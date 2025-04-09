@@ -35,7 +35,7 @@ public class JavaFiles {
         Path dir = Files.createTempDirectory("java-files-benchmark");
 
         Path test = dir.resolve("test");
-        if(!test.toFile().mkdirs()) {
+        if (!test.toFile().mkdirs()) {
             throw new RuntimeException("Unable to create directory");
         }
 

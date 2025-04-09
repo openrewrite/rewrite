@@ -64,27 +64,27 @@ public class AddPropertyComment extends Recipe {
             @Override
             public Properties visitFile(Properties.File file, ExecutionContext ctx) {
                 Properties.File p = file.withContent(ListUtils.flatMap(file.getContent(), new Function<Properties.Content, Object>() {
-                            Properties.@Nullable Content previousContent = null;
+                    Properties.@Nullable Content previousContent = null;
 
-                            @Override
-                            public Object apply(Properties.Content c) {
-                                if (c instanceof Properties.Entry &&
-                                    ((Properties.Entry) c).getKey().equals(propertyKey) &&
-                                    !isCommentAlreadyPresent(previousContent, comment)) {
-                                    Properties.Comment commentContent = new Properties.Comment(
-                                            randomId(),
-                                            previousContent == null ? "" : "\n",
-                                            Markers.EMPTY,
-                                            Properties.Comment.Delimiter.HASH_TAG,
-                                            " " + comment.trim());
-                                    previousContent = c;
-                                    return Arrays.asList(commentContent, c.getPrefix().contains("\n") ?
-                                            c : c.withPrefix("\n" + c.getPrefix()));
-                                }
-                                previousContent = c;
-                                return c;
-                            }
+                    @Override
+                    public Object apply(Properties.Content c) {
+                        if (c instanceof Properties.Entry &&
+                                ((Properties.Entry) c).getKey().equals(propertyKey) &&
+                                !isCommentAlreadyPresent(previousContent, comment)) {
+                            Properties.Comment commentContent = new Properties.Comment(
+                                    randomId(),
+                                    previousContent == null ? "" : "\n",
+                                    Markers.EMPTY,
+                                    Properties.Comment.Delimiter.HASH_TAG,
+                                    " " + comment.trim());
+                            previousContent = c;
+                            return Arrays.asList(commentContent, c.getPrefix().contains("\n") ?
+                                    c : c.withPrefix("\n" + c.getPrefix()));
                         }
+                        previousContent = c;
+                        return c;
+                    }
+                }
                 ));
                 return super.visitFile(p, ctx);
             }
@@ -107,6 +107,6 @@ public class AddPropertyComment extends Recipe {
 
     private boolean isCommentAlreadyPresent(Properties.@Nullable Content previousContent, String comment) {
         return previousContent instanceof Properties.Comment &&
-               ((Properties.Comment) previousContent).getMessage().contains(comment.trim());
+                ((Properties.Comment) previousContent).getMessage().contains(comment.trim());
     }
 }

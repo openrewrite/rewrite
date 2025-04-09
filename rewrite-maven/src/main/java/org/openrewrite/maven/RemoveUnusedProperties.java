@@ -175,7 +175,7 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
             }
 
             private boolean parentHasProperty(MavenResolutionResult resolutionResult, String propertyName,
-                                              ExecutionContext ctx) {
+                    ExecutionContext ctx) {
                 MavenPomDownloader downloader = new MavenPomDownloader(resolutionResult.getProjectPoms(), ctx,
                         resolutionResult.getMavenSettings(), resolutionResult.getActiveProfiles());
                 try {
@@ -232,7 +232,7 @@ public class RemoveUnusedProperties extends ScanningRecipe<RemoveUnusedPropertie
             if (resourceMatcher.matches(getCursor())) {
                 String directory = tag.getChildValue("directory").orElse(null);
                 if (tag.getChildValue("filtering").map(Boolean::valueOf).orElse(false) &&
-                    directory != null) {
+                        directory != null) {
                     Path path = getCursor().firstEnclosingOrThrow(SourceFile.class).getSourcePath();
                     try {
                         acc.filteredResourcePathsToDeclaringPoms.put(path.getParent().resolve(directory), getResolutionResult());

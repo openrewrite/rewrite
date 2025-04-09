@@ -33,15 +33,15 @@ public class OpenRewriteArchitectureTest {
 
     @ArchTest
     public static final ArchRule packageInfo =
-        all(packages("org.openrewrite.java"))
-          .that(doNot(name("org.openrewrite.java.internal.grammar")))
-          .should(containAnAnnotatedPackageInfo());
+            all(packages("org.openrewrite.java"))
+                    .that(doNot(name("org.openrewrite.java.internal.grammar")))
+                    .should(containAnAnnotatedPackageInfo());
 
     @ArchTest
     public static final ArchRule nullness =
-        noCodeUnits()
-          .should().beAnnotatedWith("org.jetbrains.annotations.NotNull")
-          .orShould().beAnnotatedWith("org.jetbrains.annotations.Nullable");
+            noCodeUnits()
+                    .should().beAnnotatedWith("org.jetbrains.annotations.NotNull")
+                    .orShould().beAnnotatedWith("org.jetbrains.annotations.Nullable");
 
     private static ClassesTransformer<JavaPackage> packages(String basePackage) {
         return new AbstractClassesTransformer<>("packages") {

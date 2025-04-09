@@ -45,7 +45,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     }
 
     protected void visitContainer(String before, @Nullable JContainer<? extends J> container, JContainer.Location location,
-                                  String suffixBetween, @Nullable String after, PrintOutputCapture<P> p) {
+            String suffixBetween, @Nullable String after, PrintOutputCapture<P> p) {
         if (container == null) {
             return;
         }
@@ -398,19 +398,19 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     protected void printStatementTerminator(Statement s, PrintOutputCapture<P> p) {
         while (true) {
             if (s instanceof Assert ||
-                s instanceof Assignment ||
-                s instanceof AssignmentOperation ||
-                s instanceof Break ||
-                s instanceof Continue ||
-                s instanceof DoWhileLoop ||
-                s instanceof Empty ||
-                s instanceof MethodInvocation ||
-                s instanceof NewClass ||
-                s instanceof Return ||
-                s instanceof Throw ||
-                s instanceof Unary ||
-                s instanceof VariableDeclarations ||
-                s instanceof Yield) {
+                    s instanceof Assignment ||
+                    s instanceof AssignmentOperation ||
+                    s instanceof Break ||
+                    s instanceof Continue ||
+                    s instanceof DoWhileLoop ||
+                    s instanceof Empty ||
+                    s instanceof MethodInvocation ||
+                    s instanceof NewClass ||
+                    s instanceof Return ||
+                    s instanceof Throw ||
+                    s instanceof Unary ||
+                    s instanceof VariableDeclarations ||
+                    s instanceof Yield) {
                 p.append(';');
                 return;
             }

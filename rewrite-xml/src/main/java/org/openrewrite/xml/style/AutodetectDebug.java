@@ -40,7 +40,7 @@ public class AutodetectDebug extends ScanningRecipe<AutodetectDebug.Accumulator>
     @Override
     public String getDescription() {
         return "Runs XML Autodetect and records the results in data tables and search markers. " +
-               "A debugging tool for figuring out why XML documents get styled the way they do.";
+                "A debugging tool for figuring out why XML documents get styled the way they do.";
     }
 
     public static class Accumulator {
@@ -48,8 +48,9 @@ public class AutodetectDebug extends ScanningRecipe<AutodetectDebug.Accumulator>
 
         @Nullable
         private TabsAndIndentsStyle overallProjectStyle;
+
         TabsAndIndentsStyle overallProjectStyle() {
-            if(overallProjectStyle == null) {
+            if (overallProjectStyle == null) {
                 overallProjectStyle = requireNonNull(NamedStyles.merge(TabsAndIndentsStyle.class, Collections.singletonList(overallDetector.build())));
             }
             return overallProjectStyle;
@@ -130,6 +131,7 @@ public class AutodetectDebug extends ScanningRecipe<AutodetectDebug.Accumulator>
             }
 
             int depth = 0;
+
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 // Depth 0 the expected prefix is always "" for all styles

@@ -37,8 +37,8 @@ class RemovePropertyTest implements RewriteTest {
     @Test
     void removeProperty() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -52,7 +52,7 @@ class RemovePropertyTest implements RewriteTest {
                 </properties>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -65,22 +65,22 @@ class RemovePropertyTest implements RewriteTest {
                 </properties>
               </project>
               """,
-            sourceSpecs ->
-                sourceSpecs.afterRecipe(d -> {
-                    MavenResolutionResult resolution = d.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                    Map<String, String> properties = resolution.getPom().getRequested().getProperties();
-                    assertThat(properties.get("a.version")).isEqualTo("a");
-                    assertThat(properties.get("bla.version")).isNull();
-                })
-          )
+                        sourceSpecs ->
+                                sourceSpecs.afterRecipe(d -> {
+                                    MavenResolutionResult resolution = d.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                                    Map<String, String> properties = resolution.getPom().getRequested().getProperties();
+                                    assertThat(properties.get("a.version")).isEqualTo("a");
+                                    assertThat(properties.get("bla.version")).isNull();
+                                })
+                )
         );
     }
 
     @Test
     void removeOnlyProperty() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -93,7 +93,7 @@ class RemovePropertyTest implements RewriteTest {
                 </properties>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -102,21 +102,21 @@ class RemovePropertyTest implements RewriteTest {
                 <version>1</version>
               </project>
               """,
-            sourceSpecs ->
-                sourceSpecs.afterRecipe(d -> {
-                    MavenResolutionResult resolution = d.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                    Map<String, String> properties = resolution.getPom().getRequested().getProperties();
-                    assertThat(properties.isEmpty()).isTrue();
-                })
-          )
+                        sourceSpecs ->
+                                sourceSpecs.afterRecipe(d -> {
+                                    MavenResolutionResult resolution = d.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                                    Map<String, String> properties = resolution.getPom().getRequested().getProperties();
+                                    assertThat(properties.isEmpty()).isTrue();
+                                })
+                )
         );
     }
 
     @Test
     void removePropertyWithComment() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -131,7 +131,7 @@ class RemovePropertyTest implements RewriteTest {
                 </properties>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -144,22 +144,22 @@ class RemovePropertyTest implements RewriteTest {
                 </properties>
               </project>
               """,
-            sourceSpecs ->
-              sourceSpecs.afterRecipe(d -> {
-                  MavenResolutionResult resolution = d.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                  Map<String, String> properties = resolution.getPom().getRequested().getProperties();
-                  assertThat(properties.get("a.version")).isEqualTo("a");
-                  assertThat(properties.get("bla.version")).isNull();
-              })
-          )
+                        sourceSpecs ->
+                                sourceSpecs.afterRecipe(d -> {
+                                    MavenResolutionResult resolution = d.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                                    Map<String, String> properties = resolution.getPom().getRequested().getProperties();
+                                    assertThat(properties.get("a.version")).isEqualTo("a");
+                                    assertThat(properties.get("bla.version")).isNull();
+                                })
+                )
         );
     }
 
     @Test
     void removePropertyWithCommentAndEmptyParents() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -173,7 +173,7 @@ class RemovePropertyTest implements RewriteTest {
                 </properties>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -182,15 +182,15 @@ class RemovePropertyTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void removePropertyWithTwoComments() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -205,7 +205,7 @@ class RemovePropertyTest implements RewriteTest {
                 </properties>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -214,7 +214,7 @@ class RemovePropertyTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 }

@@ -25,42 +25,42 @@ class FieldTest implements RewriteTest {
     @Test
     void primitive() {
         rewriteRun(
-          proto(
-            """
+                proto(
+                        """
               syntax = 'proto2';
               message MyMessage {
                 optional uint32 age = 1;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void fullIdent() {
         rewriteRun(
-          proto(
-            """
+                proto(
+                        """
               syntax = 'proto2';
               message MyMessage {
                 optional MyMessage msg = 1;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void fieldOption() {
         rewriteRun(
-          proto(
-            """
+                proto(
+                        """
               syntax = 'proto2';
               message MyMessage {
                 repeated int32 samples = 4 [ packed = true ];
               }
               """
-          )
+                )
         );
     }
 }

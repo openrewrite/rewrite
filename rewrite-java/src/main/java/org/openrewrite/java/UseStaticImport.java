@@ -139,7 +139,7 @@ public class UseStaticImport extends Recipe {
             return false;
         }
 
-        if(methodNameConflicts(methodName, ct)) {
+        if (methodNameConflicts(methodName, ct)) {
             return true;
         }
 
@@ -147,7 +147,7 @@ public class UseStaticImport extends Recipe {
     }
 
     private static boolean methodNameConflicts(String methodName, JavaType.@Nullable FullyQualified ct) {
-        if(ct == null) {
+        if (ct == null) {
             return false;
         }
         for (JavaType.Method method : ct.getMethods()) {

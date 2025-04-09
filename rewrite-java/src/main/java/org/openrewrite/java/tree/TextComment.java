@@ -32,7 +32,7 @@ public class TextComment implements Comment {
     String text;
 
     public TextComment withText(String text) {
-        if(!text.equals(this.text)) {
+        if (!text.equals(this.text)) {
             return new TextComment(multiline, text, suffix, markers);
         }
         return this;
@@ -43,7 +43,7 @@ public class TextComment implements Comment {
     @Override
     @SuppressWarnings("unchecked")
     public TextComment withSuffix(String suffix) {
-        if(!suffix.equals(this.suffix)) {
+        if (!suffix.equals(this.suffix)) {
             return new TextComment(multiline, text, suffix, markers);
         }
         return this;

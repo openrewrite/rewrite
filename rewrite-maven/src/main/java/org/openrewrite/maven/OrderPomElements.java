@@ -187,7 +187,7 @@ public class OrderPomElements extends Recipe {
                     }
 
                     if ((groupPos > artifactPos ||
-                         (versionPos > -1 && (artifactPos > versionPos)))) {
+                            (versionPos > -1 && (artifactPos > versionPos)))) {
                         List<Content> orderedContents = new ArrayList<>();
                         for (String type : new String[]{"groupId", "artifactId", "version"}) {
                             List<Content> gavContents = gavGroups.get(type);

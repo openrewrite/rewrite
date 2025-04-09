@@ -146,8 +146,8 @@ public class AddRepository extends Recipe {
                     Optional<Xml.Tag> maybeRepo = repositories.getChildren().stream()
                             .filter(repo ->
                                     getType().xmlTagSingle.equals(repo.getName()) &&
-                                    (id.equals(repo.getChildValue("id").orElse(null)) || (isReleasesEqual(repo) && isSnapshotsEqual(repo))) &&
-                                    url.equals(repo.getChildValue("url").orElse(null))
+                                            (id.equals(repo.getChildValue("id").orElse(null)) || (isReleasesEqual(repo) && isSnapshotsEqual(repo))) &&
+                                            url.equals(repo.getChildValue("url").orElse(null))
                             )
                             .findAny();
 
@@ -194,13 +194,13 @@ public class AddRepository extends Recipe {
                     } else {
                         @Language("xml")
                         String sb = "<" + getType().xmlTagSingle + ">\n" +
-                                    assembleTagWithValue("id", id) +
-                                    assembleTagWithValue("url", url) +
-                                    assembleTagWithValue("name", repoName) +
-                                    assembleTagWithValue("layout", layout) +
-                                    assembleReleases() +
-                                    assembleSnapshots() +
-                                    "</" + getType().xmlTagSingle + ">\n";
+                                assembleTagWithValue("id", id) +
+                                assembleTagWithValue("url", url) +
+                                assembleTagWithValue("name", repoName) +
+                                assembleTagWithValue("layout", layout) +
+                                assembleReleases() +
+                                assembleSnapshots() +
+                                "</" + getType().xmlTagSingle + ">\n";
 
                         Xml.Tag repoTag = Xml.Tag.build(sb);
                         repositories = (Xml.Tag) new AddToTagVisitor<>(repositories, repoTag).visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
@@ -268,8 +268,8 @@ public class AddRepository extends Recipe {
             return isNoReleases();
         } else {
             return Objects.equals(releasesEnabled == null ? null : String.valueOf(releasesEnabled.booleanValue()), releases.getChildValue("enabled").orElse(null)) &&
-                   Objects.equals(releasesUpdatePolicy, releases.getChildValue("updatePolicy").orElse(null)) &&
-                   Objects.equals(releasesChecksumPolicy, releases.getChildValue("checksumPolicy").orElse(null));
+                    Objects.equals(releasesUpdatePolicy, releases.getChildValue("updatePolicy").orElse(null)) &&
+                    Objects.equals(releasesChecksumPolicy, releases.getChildValue("checksumPolicy").orElse(null));
         }
     }
 
@@ -283,8 +283,8 @@ public class AddRepository extends Recipe {
             return isNoSnapshots();
         } else {
             return Objects.equals(snapshotsEnabled == null ? null : String.valueOf(snapshotsEnabled.booleanValue()), snapshots.getChildValue("enabled").orElse(null)) &&
-                   Objects.equals(snapshotsUpdatePolicy, snapshots.getChildValue("updatePolicy").orElse(null)) &&
-                   Objects.equals(snapshotsChecksumPolicy, snapshots.getChildValue("checksumPolicy").orElse(null));
+                    Objects.equals(snapshotsUpdatePolicy, snapshots.getChildValue("updatePolicy").orElse(null)) &&
+                    Objects.equals(snapshotsChecksumPolicy, snapshots.getChildValue("checksumPolicy").orElse(null));
         }
     }
 

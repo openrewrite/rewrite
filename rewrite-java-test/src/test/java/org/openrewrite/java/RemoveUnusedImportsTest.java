@@ -39,8 +39,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void enumsFromInnerClass() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package org.openrewrite;
               public class Outer {
                   public enum E {
@@ -48,9 +48,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import static org.openrewrite.Outer.E.*;
               public class Test {
                   Object a = A;
@@ -58,23 +58,23 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   Object c = C;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void enums() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package org.openrewrite;
               public enum E {
                   A, B, C
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import org.openrewrite.E;
               import static org.openrewrite.E.A;
               import static org.openrewrite.E.B;
@@ -83,7 +83,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   E b = B;
               }
               """
-          )
+                )
         );
     }
 
@@ -91,14 +91,14 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void doNotRemoveInnerClassImport() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.Map.Entry;
 
               public abstract class MyMapEntry<K, V> implements Entry<K, V> {
               }
               """
-          )
+                )
         );
     }
 
@@ -106,8 +106,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void doNotRemoveInnerClassInSamePackage() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package java.util;
 
               import java.util.Map.Entry;
@@ -115,7 +115,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               public abstract class MyMapEntry<K, V> implements Entry<K, V> {
               }
               """
-          )
+                )
         );
     }
 
@@ -123,8 +123,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void usedInJavadocWithThrows() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.time.DateTimeException;
 
               class A {
@@ -134,15 +134,15 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   void foo() {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void usedInJavadoc() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.List;
               import java.util.Collection;
 
@@ -152,7 +152,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   void foo() {}
               }
               """
-          )
+                )
         );
     }
 
@@ -160,26 +160,26 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void removeNamedImport() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.List;
               class A {}
               """,
-            "class A {}")
+                        "class A {}")
         );
     }
 
     @Test
     void leaveImportIfRemovedTypeIsStillReferredTo() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.List;
               class A {
                  List<Integer> list;
               }
               """
-          )
+                )
         );
     }
 
@@ -187,8 +187,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void leaveImportIfAnnotationOnEnum() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package com.google.gson.annotations;
 
               import java.lang.annotation.Documented;
@@ -204,9 +204,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   String value();
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import com.google.gson.annotations.SerializedName;
 
               public enum PKIState {
@@ -214,7 +214,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   @SerializedName("dismissed") DISMISSED
               }
               """
-          )
+                )
         );
     }
 
@@ -222,8 +222,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void leaveImportForStaticImportEnumInAnnotation() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package org.openrewrite.test;
 
               public @interface YesOrNo {
@@ -233,9 +233,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package org.openrewrite.test;
 
               import static org.openrewrite.test.YesOrNo.Status.YES;
@@ -243,7 +243,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               @YesOrNo(status = YES)
               public class Foo {}
               """
-          )
+                )
         );
     }
 
@@ -251,8 +251,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void removeAllImportsInFileWithHeader() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /*
                * header
                */
@@ -260,7 +260,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               import java.util.List;
               class A {}
               """,
-            """
+                        """
               /*
                * header
                */
@@ -268,57 +268,57 @@ class RemoveUnusedImportsTest implements RewriteTest {
 
               class A {}
               """
-          )
+                )
         );
     }
 
     @Test
     void removeStarImportIfNoTypesReferredTo() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.*;
               class A {}
               """,
-            "class A {}"
-          )
+                        "class A {}"
+                )
         );
     }
 
     @Test
     void replaceStarImportWithNamedImportIfOnlyOneReferencedTypeRemains() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.*;
 
               class A {
                   Collection<Integer> c;
               }
               """,
-            """
+                        """
               import java.util.Collection;
 
               class A {
                   Collection<Integer> c;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unfoldIfLessThanStarCount() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.*;
               class A {
                  Collection<Integer> c;
                  Set<Integer> s = new HashSet<>();
               }
               """,
-            """
+                        """
               import java.util.Collection;
               import java.util.HashSet;
               import java.util.Set;
@@ -327,15 +327,15 @@ class RemoveUnusedImportsTest implements RewriteTest {
                  Set<Integer> s = new HashSet<>();
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void leaveStarImportInPlaceIfMoreThanStarCount() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.*;
               class A {
                  Collection<Integer> c;
@@ -344,20 +344,20 @@ class RemoveUnusedImportsTest implements RewriteTest {
                  List<String> l = new ArrayList<>();
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void removeStarStaticImport() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import static java.util.Collections.*;
               class A {}
               """,
-            "class A {}"
-          )
+                        "class A {}"
+                )
         );
     }
 
@@ -365,28 +365,28 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void leaveStarStaticImportIfReferenceStillExists() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import static java.util.Collections.*;
               class A {
                  Object o = emptyList();
               }
               """,
-            """
+                        """
               import static java.util.Collections.emptyList;
               class A {
                  Object o = emptyList();
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void removeStaticImportIfNotReferenced() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.time.DayOfWeek;
 
               import static java.time.DayOfWeek.MONDAY;
@@ -398,7 +398,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.time.DayOfWeek;
 
               import static java.time.DayOfWeek.TUESDAY;
@@ -409,7 +409,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -417,8 +417,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
     void leaveNamedStaticImportIfReferenceStillExists() {
         rewriteRun(
 
-          java(
-            """
+                java(
+                        """
               import static java.util.Collections.emptyList;
               import static java.util.Collections.emptySet;
 
@@ -426,39 +426,39 @@ class RemoveUnusedImportsTest implements RewriteTest {
                  Object o = emptyList();
               }
               """,
-            """
+                        """
               import static java.util.Collections.emptyList;
 
               class A {
                  Object o = emptyList();
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void leaveNamedStaticImportOnFieldIfReferenceStillExists() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package foo;
               public class B {
                   public static final String STRING = "string";
                   public static final String STRING2 = "string2";
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package foo;
               public class C {
                   public static final String ANOTHER = "string";
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import static foo.B.STRING;
               import static foo.B.STRING2;
               import static foo.C.*;
@@ -467,14 +467,14 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   String a = STRING;
               }
               """,
-            """
+                        """
               import static foo.B.STRING;
 
               public class A {
                   String a = STRING;
               }
               """
-          )
+                )
         );
     }
 
@@ -482,16 +482,16 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void removePackageInfoImports() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package foo;
               public @interface FooAnnotation {}
               public @interface Foo {}
               public @interface Bar {}
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               @Foo
               @Bar
               package foo.bar.baz;
@@ -500,7 +500,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               import foo.Foo;
               import foo.FooAnnotation;
               """,
-            """
+                        """
               @Foo
               @Bar
               package foo.bar.baz;
@@ -508,30 +508,30 @@ class RemoveUnusedImportsTest implements RewriteTest {
               import foo.Bar;
               import foo.Foo;
               """
-          )
+                )
         );
     }
 
     @Test
     void removePackageInfoStarImports() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package foo;
               public @interface FooAnnotation {}
               public @interface Foo {}
               public @interface Bar {}
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               @Foo
               @Bar
               package foo.bar.baz;
 
               import foo.*;
               """,
-            """
+                        """
               @Foo
               @Bar
               package foo.bar.baz;
@@ -539,7 +539,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               import foo.Bar;
               import foo.Foo;
               """
-          )
+                )
         );
     }
 
@@ -547,14 +547,14 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void dontRemoveStaticReferenceToPrimitiveField() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import static java.sql.ResultSet.TYPE_FORWARD_ONLY;
               public class A {
                   int t = TYPE_FORWARD_ONLY;
               }
               """
-          )
+                )
         );
     }
 
@@ -562,14 +562,14 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void resultSetType() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.sql.ResultSet;
               public class A {
                   int t = ResultSet.TYPE_FORWARD_ONLY;
               }
               """
-          )
+                )
         );
     }
 
@@ -577,20 +577,20 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void ensuresWhitespaceAfterPackageDeclarationNoImportsRemain() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package com.example.foo;
               import java.util.List;
               public class A {
               }
               """,
-            """
+                        """
               package com.example.foo;
 
               public class A {
               }
               """
-          )
+                )
         );
     }
 
@@ -598,8 +598,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
     void doesNotAffectClassBodyFormatting() {
         rewriteRun(
 
-          java(
-            """
+                java(
+                        """
               package com.example.foo;
 
               import java.util.List;
@@ -610,7 +610,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               ArrayList<String> foo = new ArrayList<>();
               }
               """,
-            """
+                        """
               package com.example.foo;
 
               import java.util.ArrayList;
@@ -620,7 +620,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               ArrayList<String> foo = new ArrayList<>();
               }
               """
-          )
+                )
         );
     }
 
@@ -628,8 +628,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void doesNotRemoveStaticReferenceToNewClass() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package org.openrewrite;
               public class Bar {
                   public static final class Buz {
@@ -637,9 +637,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package foo.test;
 
               import static org.openrewrite.Bar.Buz;
@@ -650,7 +650,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -658,8 +658,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void doNotUnfoldStaticValidWildCard() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package org.openrewrite;
               public class Foo {
                   public static final int FOO_CONSTANT = 10;
@@ -670,9 +670,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   public static void fooMethod() {}
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package foo.test;
 
               import static org.openrewrite.Foo.*;
@@ -685,7 +685,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -693,8 +693,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void unfoldStaticUses() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package org.openrewrite;
               public class Foo {
                   public static final int FOO_CONSTANT = 10;
@@ -705,9 +705,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   public static void fooMethod() {}
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package foo.test;
 
               import static org.openrewrite.Foo.*;
@@ -719,7 +719,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package foo.test;
 
               import static org.openrewrite.Foo.FOO_CONSTANT;
@@ -732,29 +732,29 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doNotUnfoldPackage() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(
-            singletonList(
-              new NamedStyles(
-                Tree.randomId(), "test", "test", "test", emptySet(), singletonList(
-                ImportLayoutStyle.builder()
-                  .packageToFold("java.util.*")
-                  .staticPackageToFold("java.util.Collections.*")
-                  .importAllOthers()
-                  .importStaticAllOthers()
-                  .build()
-              )
-              )
-            )
-          )),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(
+                        singletonList(
+                                new NamedStyles(
+                                        Tree.randomId(), "test", "test", "test", emptySet(), singletonList(
+                                        ImportLayoutStyle.builder()
+                                                .packageToFold("java.util.*")
+                                                .staticPackageToFold("java.util.Collections.*")
+                                                .importAllOthers()
+                                                .importStaticAllOthers()
+                                                .build()
+                                )
+                                )
+                        )
+                )),
+                java(
+                        """
               import java.util.*;
 
               import static java.util.Collections.*;
@@ -763,29 +763,29 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   List<String> l = emptyList();
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unfoldSubpackage() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(
-            singletonList(
-              new NamedStyles(
-                Tree.randomId(), "test", "test", "test", emptySet(), singletonList(
-                ImportLayoutStyle.builder()
-                  .packageToFold("java.util.*", false)
-                  .staticPackageToFold("java.util.*", false)
-                  .importAllOthers()
-                  .importStaticAllOthers()
-                  .build()
-              )
-              )
-            )
-          )),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(
+                        singletonList(
+                                new NamedStyles(
+                                        Tree.randomId(), "test", "test", "test", emptySet(), singletonList(
+                                        ImportLayoutStyle.builder()
+                                                .packageToFold("java.util.*", false)
+                                                .staticPackageToFold("java.util.*", false)
+                                                .importAllOthers()
+                                                .importStaticAllOthers()
+                                                .build()
+                                )
+                                )
+                        )
+                )),
+                java(
+                        """
               import java.util.concurrent.*;
 
               import static java.util.Collections.*;
@@ -795,7 +795,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   ConcurrentHashMap<String, String> m;
               }
               """,
-            """
+                        """
               import java.util.concurrent.ConcurrentHashMap;
 
               import static java.util.Collections.emptyMap;
@@ -805,29 +805,29 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   ConcurrentHashMap<String, String> m;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doNotUnfoldSubpackage() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(
-            singletonList(
-              new NamedStyles(
-                Tree.randomId(), "test", "test", "test", emptySet(), singletonList(
-                ImportLayoutStyle.builder()
-                  .packageToFold("java.util.*", true)
-                  .staticPackageToFold("java.util.*", true)
-                  .importAllOthers()
-                  .importStaticAllOthers()
-                  .build()
-              )
-              )
-            )
-          )),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(
+                        singletonList(
+                                new NamedStyles(
+                                        Tree.randomId(), "test", "test", "test", emptySet(), singletonList(
+                                        ImportLayoutStyle.builder()
+                                                .packageToFold("java.util.*", true)
+                                                .staticPackageToFold("java.util.*", true)
+                                                .importAllOthers()
+                                                .importStaticAllOthers()
+                                                .build()
+                                )
+                                )
+                        )
+                )),
+                java(
+                        """
               import java.util.concurrent.*;
 
               import static java.util.Collections.*;
@@ -836,7 +836,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   ConcurrentHashMap<String, String> m = new ConcurrentHashMap<>(emptyMap());
               }
               """
-          )
+                )
         );
     }
 
@@ -844,8 +844,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void removeImportsForSamePackage() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package com.google.gson.annotations;
 
               import java.lang.annotation.Documented;
@@ -861,9 +861,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   String value();
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package com.google.gson.annotations;
 
               import com.google.gson.annotations.SerializedName;
@@ -873,7 +873,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   @SerializedName("dismissed") DISMISSED
               }
               """,
-            """
+                        """
               package com.google.gson.annotations;
 
               public enum PKIState {
@@ -881,7 +881,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   @SerializedName("dismissed") DISMISSED
               }
               """
-          )
+                )
         );
     }
 
@@ -889,8 +889,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void correctlyRemoveImportsFromLowerCaseClassNames() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package com.source;
 
               public class a {
@@ -898,9 +898,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   public static final short SHORT2 = (short)2;
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package com.test;
 
               import static com.source.a.SHORT1;
@@ -910,7 +910,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   short uniqueCount = SHORT1;
               }
               """,
-            """
+                        """
               package com.test;
 
               import static com.source.a.SHORT1;
@@ -919,7 +919,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   short uniqueCount = SHORT1;
               }
               """
-          )
+                )
         );
     }
 
@@ -927,8 +927,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void correctlyRemoveImportsFromUpperCasedPackages() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package com.Source.$;
 
               public class A {
@@ -936,9 +936,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   public static final short SHORT2 = (short)2;
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package com.test;
 
               import static com.Source.$.A.SHORT1;
@@ -948,7 +948,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   short uniqueCount = SHORT1;
               }
               """,
-            """
+                        """
               package com.test;
 
               import static com.Source.$.A.SHORT1;
@@ -957,7 +957,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   short uniqueCount = SHORT1;
               }
               """
-          )
+                )
         );
     }
 
@@ -965,8 +965,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void correctlyRemoveImportsFromInternalClasses() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package com.Source.A;
 
               public class B {
@@ -979,9 +979,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
                 }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package com.test;
 
               import static com.Source.A.B.Enums.B1;
@@ -995,7 +995,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package com.test;
 
               import static com.Source.A.B.Enums.B1;
@@ -1008,7 +1008,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -1016,8 +1016,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void correctlyRemoveImportsFromNestedInternalClasses() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package com.Source.A;
 
               public class B {
@@ -1036,9 +1036,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
                 }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package com.test;
 
               import static com.Source.A.B.Enums.B1;
@@ -1055,7 +1055,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package com.test;
 
               import static com.Source.A.B.Enums.B1;
@@ -1070,7 +1070,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -1078,8 +1078,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void doesNotRemoveReferencedClassesBeingUsedAsParameters() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package com.Source.mine;
 
               public class A {
@@ -1090,9 +1090,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package com.test;
 
               import com.Source.mine.A;
@@ -1103,7 +1103,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -1111,8 +1111,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void doesNotRemoveReferencedClassesBeingUsedAsParametersUnusualPackageName() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package com.Source.$;
 
               public class A {
@@ -1123,9 +1123,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package com.test;
 
               import com.Source.$.A;
@@ -1136,7 +1136,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -1144,36 +1144,36 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void doesNotRemoveWildCardImport() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
-          java(
-            """
+                spec -> spec.expectedCyclesThatMakeChanges(2),
+                java(
+                        """
               package com.Source.mine;
 
               public class A {
                   public void f() {}
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package com.Source.mine;
 
               public class B {
                   public void f() {}
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package com.Source.mine;
 
               public class C {
                   public void f() {}
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package com.Source.mine;
 
               public class Record {
@@ -1182,9 +1182,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   public C theOther2() { return new C(); }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package com.test;
 
               import com.Source.mine.Record;
@@ -1198,7 +1198,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package com.test;
 
               import com.Source.mine.Record;
@@ -1214,7 +1214,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -1222,36 +1222,36 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void doesNotUnfoldWildCardImport() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveUnusedImports()),
-          java(
-            """
+                spec -> spec.recipe(new RemoveUnusedImports()),
+                java(
+                        """
               package com.Source.mine;
 
               public class A {
                   public void f() {}
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package com.Source.mine;
 
               public class B {
                   public void f() {}
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package com.Source.mine;
 
               public class C {
                   public void f() {}
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package com.Source.mine;
 
               public class Record {
@@ -1260,9 +1260,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   public C theOther2() { return new C(); }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package com.test;
 
               import com.Source.mine.Record;
@@ -1278,15 +1278,15 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void removeImportUsedAsLambdaParameter() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.HashMap;
               import java.util.function.Function;
 
@@ -1297,7 +1297,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.HashMap;
 
               public class Test {
@@ -1307,15 +1307,15 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void removeImportUsedAsMethodParameter() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.HashMap;
               import java.util.ArrayList;
               import java.util.Set;
@@ -1326,7 +1326,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.HashMap;
               import java.util.ArrayList;
 
@@ -1336,15 +1336,15 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void removeMultipleDirectImports() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.Collection;
               import java.util.Collection;
 
@@ -1355,7 +1355,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                  Collection<Integer> c = emptyList();
               }
               """,
-            """
+                        """
               import java.util.Collection;
 
               import static java.util.Collections.emptyList;
@@ -1364,7 +1364,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                  Collection<Integer> c = emptyList();
               }
               """
-          )
+                )
         );
     }
 
@@ -1374,9 +1374,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
         ExecutionContext ctx = new InMemoryExecutionContext();
         ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, false);
         rewriteRun(
-          spec -> spec.executionContext(ctx),
-          java(
-            """
+                spec -> spec.executionContext(ctx),
+                java(
+                        """
               import java.util.*;
               import java.util.*;
 
@@ -1389,7 +1389,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                  List<String> l = singletonList("a");
               }
               """,
-            """
+                        """
               import java.util.*;
 
               import static java.util.Collections.emptyList;
@@ -1401,16 +1401,16 @@ class RemoveUnusedImportsTest implements RewriteTest {
                  List<String> l = singletonList("a");
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void removeWildcardImportWithDirectImport() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
-          java(
-            """
+                spec -> spec.expectedCyclesThatMakeChanges(2),
+                java(
+                        """
               import java.util.*;
               import java.util.Collection;
 
@@ -1421,7 +1421,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                  Collection<Integer> c = emptyList();
               }
               """,
-            """
+                        """
               import java.util.Collection;
 
               import static java.util.Collections.emptyList;
@@ -1430,7 +1430,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                  Collection<Integer> c = emptyList();
               }
               """
-          )
+                )
         );
     }
 
@@ -1440,9 +1440,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
         ExecutionContext ctx = new InMemoryExecutionContext();
         ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, false);
         rewriteRun(
-          spec -> spec.executionContext(ctx),
-          java(
-            """
+                spec -> spec.executionContext(ctx),
+                java(
+                        """
               import java.util.Set;
               import java.util.*;
 
@@ -1456,7 +1456,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                  Iterator<Short> i = emptyIterator();
               }
               """,
-            """
+                        """
               import java.util.*;
 
               import static java.util.Collections.*;
@@ -1468,16 +1468,16 @@ class RemoveUnusedImportsTest implements RewriteTest {
                  Iterator<Short> i = emptyIterator();
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void removeMultipleImportsWhileUnfoldingWildcard() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
-          java(
-            """
+                spec -> spec.expectedCyclesThatMakeChanges(2),
+                java(
+                        """
               import java.util.Set;
               import java.util.*;
 
@@ -1489,7 +1489,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                  Set<Integer> s = emptySet();
               }
               """,
-            """
+                        """
               import java.util.Set;
               import java.util.Collection;
 
@@ -1501,15 +1501,15 @@ class RemoveUnusedImportsTest implements RewriteTest {
                  Set<Integer> s = emptySet();
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void keepInnerClassImports() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.*;
               import java.util.Map.Entry;
 
@@ -1523,7 +1523,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                  Entry<String, Integer> entry;
               }
               """
-          )
+                )
         );
     }
 
@@ -1532,86 +1532,86 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void multiplePackagesHaveConflictingClassNames() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package org.b;
               public class Pair<K, V> {
                   K key;
                   V value;
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package org.b;
               public class Table<T> { }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package org.c;
               public class Pair<K, V> {
                   K key;
                   V value;
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package org.c;
               public class Table<T> { }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package org.b;
               public class B1 { }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package org.b;
               public class B2 { }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package org.b;
               public class B3 { }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package org.b;
               public class B4 { }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package org.c;
               public class C1 {}
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package org.c;
               public class C2 {}
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package org.c;
               public class C3 {}
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package org.c;
               public class C4 {}
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package org.a;
 
               import org.b.*;
@@ -1634,7 +1634,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -1642,8 +1642,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3607")
     void conflictWithRecord() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().dependsOn(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().dependsOn(
+                        """
               package pzrep.p1;
 
               public class Record {
@@ -1726,9 +1726,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
                 public void f() {}
               }
               """
-          )),
-          java(
-            """
+                )),
+                java(
+                        """
               package pzrep.p2;
 
               import pzrep.p1.Record;
@@ -1757,8 +1757,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
     void importUsedOnlyInReturnType() {
         // language=java
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import javax.xml.datatype.XMLGregorianCalendar;
               import java.time.LocalDateTime;
               class LocalDateTimeUtil {
@@ -1770,7 +1770,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 
@@ -1778,25 +1778,25 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void missingTypeReturnValueOfMethodWithArguments() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
-          // method with argument should still remove unused import
-          java(
-            """
+                spec -> spec.typeValidationOptions(TypeValidation.none()),
+                // method with argument should still remove unused import
+                java(
+                        """
               import java.util.List;
 
               public abstract class Foo1 {
                   public abstract String m(String a);
               }
               """,
-            """
+                        """
               public abstract class Foo1 {
                   public abstract String m(String a);
               }
               """
-          ),
-          // case with missing type should not remove the import
-          java(
-            """
+                ),
+                // case with missing type should not remove the import
+                java(
+                        """
               import java.util.List;
               import java.util.GenClass1;
 
@@ -1804,17 +1804,17 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   public abstract GenClass1 m();
               }
               """
-          ),
-          // case with missing type and method argument should not remove the import
-          java(
-            """
+                ),
+                // case with missing type and method argument should not remove the import
+                java(
+                        """
               import java.util.GenClass1;
 
               public abstract class Foo2 {
                   public abstract GenClass1 m(String a);
               }
               """
-          )
+                )
         );
     }
 
@@ -1822,8 +1822,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
     void staticAmbiguousImport() {
         // language=java
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package org.a;
               public class Abc {
                 public static String A = "A";
@@ -1832,10 +1832,10 @@ class RemoveUnusedImportsTest implements RewriteTest {
                 public static String ALL = "%s%s%s".formatted(A, B, C);
               }
               """,
-            SourceSpec::skip
-          ),
-          java(
-            """
+                        SourceSpec::skip
+                ),
+                java(
+                        """
               package org.b;
               public class Def {
                 public static String D = "D";
@@ -1844,11 +1844,11 @@ class RemoveUnusedImportsTest implements RewriteTest {
                 public static String ALL = "%s%s%s".formatted(D, E, F);
               }
               """,
-            SourceSpec::skip
-          ),
-          // No change when removal would cause ambiguity
-          java(
-            """
+                        SourceSpec::skip
+                ),
+                // No change when removal would cause ambiguity
+                java(
+                        """
               package org.test;
 
               import static org.a.Abc.*;
@@ -1865,10 +1865,10 @@ class RemoveUnusedImportsTest implements RewriteTest {
                 private String f = F;
               }
               """
-          ),
-          // Do still remove unambiguous imports
-          java(
-            """
+                ),
+                // Do still remove unambiguous imports
+                java(
+                        """
               package org.test;
 
               import static org.a.Abc.*;
@@ -1886,7 +1886,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                 private String f = F;
               }
               """,
-            """
+                        """
               package org.test;
 
               import static org.a.Abc.*;
@@ -1903,7 +1903,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                 private String f = F;
               }
               """
-          )
+                )
         );
     }
 
@@ -1911,8 +1911,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void nestedImport() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package foo;
 
               public interface J {
@@ -1924,9 +1924,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   final class Six implements J {}
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package bar;
 
               import foo.J;
@@ -1944,7 +1944,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 
@@ -1952,8 +1952,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void nestedImportStaticInnerClass() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package com.a.b.c;
               public final class ParentBaseClass {
                 public static abstract class BaseImplClass {
@@ -1962,9 +1962,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
                 }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import com.a.b.c.ParentBaseClass.*;
               public class MyClass extends BaseImplClass {
                  @Override
@@ -1972,7 +1972,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                  }
               }
               """,
-            """
+                        """
               import com.a.b.c.ParentBaseClass.BaseImplClass;
               public class MyClass extends BaseImplClass {
                  @Override
@@ -1980,24 +1980,24 @@ class RemoveUnusedImportsTest implements RewriteTest {
                  }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void retainExplicitImportWhenConflictingClassInSamePackage() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package com.a;
 
               class ConflictingClass {
               }
               """,
-            SourceSpec::skip
-          ),
-          java(
-            """
+                        SourceSpec::skip
+                ),
+                java(
+                        """
               package com.b;
 
               public class ConflictingClass {
@@ -2005,10 +2005,10 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   }
               }
               """,
-            SourceSpec::skip
-          ),
-          java(
-            """
+                        SourceSpec::skip
+                ),
+                java(
+                        """
               package com.c;
 
               import com.b.ConflictingClass;
@@ -2019,10 +2019,10 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   }
               }
               """,
-            SourceSpec::skip
-          ),
-          java(
-            """
+                        SourceSpec::skip
+                ),
+                java(
+                        """
               package com.a;
 
               import com.b.ConflictingClass;
@@ -2032,7 +2032,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   ConflictingClass impl = ImplProvider.getImpl();
               }
               """
-          )
+                )
         );
     }
 
@@ -2040,8 +2040,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
     void staticNestedInnerClass() {
         // language=java
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package a;
               
               public class A {
@@ -2049,23 +2049,23 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   public static class C {}
               }
               """,
-            SourceSpec::skip),
-          java(
-            """
+                        SourceSpec::skip),
+                java(
+                        """
               import a.*;
               
               public class Foo {
                   A method(A.B ab, A.C ac) {}
               }
               """,
-            """
+                        """
               import a.A;
               
               public class Foo {
                   A method(A.B ab, A.C ac) {}
               }
               """
-          )
+                )
         );
     }
 }

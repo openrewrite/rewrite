@@ -25,7 +25,7 @@ class HclIndexTest implements RewriteTest {
     @Test
     void index() {
         rewriteRun(
-          hcl("a = b [ 1 ]")
+                hcl("a = b [ 1 ]")
         );
     }
 }

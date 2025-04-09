@@ -29,29 +29,29 @@ class GroovyVisitorTest implements RewriteTest {
     @Test
     void autoFormatIncludesOmitParentheses() {
         rewriteRun(
-          spec -> spec
-            .recipeExecutionContext(new InMemoryExecutionContext().addObserver(new TreeObserver.Subscription(new TreeObserver() {
-                @Override
-                public Tree treeChanged(Cursor cursor, Tree newTree) {
-                    return newTree;
-                }
-            }).subscribeToType(J.Lambda.class)))
-            .recipe(RewriteTest.toRecipe(() -> new GroovyVisitor<>() {
-                @Override
-                public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
-                    return autoFormat(super.visitCompilationUnit(cu, ctx), ctx);
-                }
-            })),
-          groovy(
-            """
+                spec -> spec
+                        .recipeExecutionContext(new InMemoryExecutionContext().addObserver(new TreeObserver.Subscription(new TreeObserver() {
+                            @Override
+                            public Tree treeChanged(Cursor cursor, Tree newTree) {
+                                return newTree;
+                            }
+                        }).subscribeToType(J.Lambda.class)))
+                        .recipe(RewriteTest.toRecipe(() -> new GroovyVisitor<>() {
+                            @Override
+                            public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
+                                return autoFormat(super.visitCompilationUnit(cu, ctx), ctx);
+                            }
+                        })),
+                groovy(
+                        """
               Test.test({ it })
               """,
-            """
+                        """
               Test.test {
                   it
               }
               """
-          )
+                )
         );
     }
 }

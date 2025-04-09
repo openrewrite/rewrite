@@ -47,15 +47,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 class MavenSettingsTest {
 
     private final MavenExecutionContextView ctx = MavenExecutionContextView.view(
-      new InMemoryExecutionContext((ThrowingConsumer<Throwable>) input -> {
-          throw input;
-      }));
+            new InMemoryExecutionContext((ThrowingConsumer<Throwable>) input -> {
+                throw input;
+            }));
 
     @Test
     void parse() {
         ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
-          //language=xml
-          """
+                //language=xml
+                """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                     xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
@@ -87,8 +87,8 @@ class MavenSettingsTest {
     @Test
     void defaultActiveWhenNoOthersAreActive() {
         ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
-          //language=xml
-          """
+                //language=xml
+                """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                     xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
@@ -127,8 +127,8 @@ class MavenSettingsTest {
     @Test
     void idCollisionLastRepositoryWins() {
         ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
-          //language=xml
-          """
+                //language=xml
+                """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                     xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
@@ -161,16 +161,16 @@ class MavenSettingsTest {
         ), ctx));
 
         assertThat(ctx.getRepositories())
-          .as("When multiple repositories have the same id in a maven settings file the last one wins. In a pom.xml an error would be thrown.")
-          .containsExactly(new MavenRepository("repo", "https://lastwins.com", null, null, null, null, null));
+                .as("When multiple repositories have the same id in a maven settings file the last one wins. In a pom.xml an error would be thrown.")
+                .containsExactly(new MavenRepository("repo", "https://lastwins.com", null, null, null, null, null));
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/131")
     @Test
     void defaultOnlyActiveIfNoOthersAreActive() {
         ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
-          //language=xml
-          """
+                //language=xml
+                """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                     xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
@@ -209,18 +209,18 @@ class MavenSettingsTest {
         ), ctx));
 
         assertThat(ctx.getActiveProfiles())
-          .containsExactly("repo");
+                .containsExactly("repo");
 
         assertThat(ctx.getRepositories().stream().map(MavenRepository::getUri))
-          .containsExactly("https://activebyactivationlist.com");
+                .containsExactly("https://activebyactivationlist.com");
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/130")
     @Test
     void mirrorReplacesRepository() {
         ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
-          //language=xml
-          """
+                //language=xml
+                """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                     xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
@@ -253,16 +253,16 @@ class MavenSettingsTest {
         ), ctx));
 
         assertThat(ctx.getRepositories().stream()
-          .map(repo -> MavenRepositoryMirror.apply(ctx.getMirrors(), repo))
-          .map(MavenRepository::getUri))
-          .containsExactly("https://internalartifactrepository.yourorg.com");
+                .map(repo -> MavenRepositoryMirror.apply(ctx.getMirrors(), repo))
+                .map(MavenRepository::getUri))
+                .containsExactly("https://internalartifactrepository.yourorg.com");
     }
 
     @Test
     void starredMirrorWithExclusion() {
         ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
-          //language=xml
-          """
+                //language=xml
+                """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                     xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
@@ -299,25 +299,25 @@ class MavenSettingsTest {
         ), ctx));
 
         assertThat(ctx.getRepositories().stream()
-          .map(repo -> MavenRepositoryMirror.apply(ctx.getMirrors(), repo)))
-          .hasSize(2)
-          .haveAtLeastOne(
-            new Condition<>(repo -> repo.getUri().equals("https://internalartifactrepository.yourorg.com"),
-              "Repository should-be-mirrored should have had its URL changed to https://internalartifactrepository.yourorg.com"
-            )
-          ).haveAtLeastOne(
-            new Condition<>(repo -> repo.getUri().equals("https://externalrepository.com") &&
-                                    "should-not-be-mirrored".equals(repo.getId()),
-              "Repository should-not-be-mirrored should have had its URL left unchanged"
-            )
-          );
+                .map(repo -> MavenRepositoryMirror.apply(ctx.getMirrors(), repo)))
+                .hasSize(2)
+                .haveAtLeastOne(
+                        new Condition<>(repo -> repo.getUri().equals("https://internalartifactrepository.yourorg.com"),
+                                "Repository should-be-mirrored should have had its URL changed to https://internalartifactrepository.yourorg.com"
+                        )
+                ).haveAtLeastOne(
+                        new Condition<>(repo -> repo.getUri().equals("https://externalrepository.com") &&
+                                        "should-not-be-mirrored".equals(repo.getId()),
+                                "Repository should-not-be-mirrored should have had its URL left unchanged"
+                        )
+                );
     }
 
     @Test
     void serverCredentials() {
         var settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
-          //language=xml
-          """
+                //language=xml
+                """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                     xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
@@ -335,9 +335,9 @@ class MavenSettingsTest {
         assertThat(settings.getServers()).isNotNull();
         assertThat(settings.getServers().getServers()).hasSize(1);
         assertThat(settings.getServers().getServers().get(0))
-          .matches(repo -> repo.getId().equals("server001"))
-          .matches(repo -> repo.getUsername().equals("my_login"))
-          .matches(repo -> repo.getPassword().equals("my_password"));
+                .matches(repo -> repo.getId().equals("server001"))
+                .matches(repo -> repo.getUsername().equals("my_login"))
+                .matches(repo -> repo.getPassword().equals("my_password"));
     }
 
     @Test
@@ -345,8 +345,8 @@ class MavenSettingsTest {
         // Deliberately supporting the simpler old configuration of a single timeout
         // https://maven.apache.org/guides/mini/guide-http-settings.html#connection-timeouts
         var settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
-          //language=xml
-          """
+                //language=xml
+                """
                 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                     xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
@@ -365,8 +365,8 @@ class MavenSettingsTest {
         assertThat(settings.getServers()).isNotNull();
         assertThat(settings.getServers().getServers()).hasSize(1);
         assertThat(settings.getServers().getServers().get(0))
-          .matches(repo -> repo.getId().equals("server001"))
-          .matches(repo -> repo.getConfiguration().getTimeout().equals(40000L));
+                .matches(repo -> repo.getId().equals("server001"))
+                .matches(repo -> repo.getConfiguration().getTimeout().equals(40000L));
     }
 
     @Nested
@@ -375,8 +375,8 @@ class MavenSettingsTest {
         @Test
         void parsesLocalRepositoryPathFromSettingsXml(@TempDir Path localRepoPath) {
             ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
-              //language=xml
-              """
+                    //language=xml
+                    """
                     <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                         xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
@@ -385,15 +385,15 @@ class MavenSettingsTest {
                 """.formatted(localRepoPath)
             ), ctx));
             assertThat(ctx.getLocalRepository().getUri())
-              .startsWith("file://")
-              .containsSubsequence(localRepoPath.toUri().toString().split("/"));
+                    .startsWith("file://")
+                    .containsSubsequence(localRepoPath.toUri().toString().split("/"));
         }
 
         @Test
         void parsesLocalRepositoryUriFromSettingsXml(@TempDir Path localRepoPath) {
             ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
-              //language=xml
-              """
+                    //language=xml
+                    """
                     <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                         xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
@@ -403,15 +403,15 @@ class MavenSettingsTest {
             ), ctx));
 
             assertThat(ctx.getLocalRepository().getUri())
-              .startsWith("file://")
-              .containsSubsequence(localRepoPath.toUri().toString().split("/"));
+                    .startsWith("file://")
+                    .containsSubsequence(localRepoPath.toUri().toString().split("/"));
         }
 
         @Test
         void defaultsToTheMavenDefault() {
             ctx.setMavenSettings(MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
-              //language=xml
-              """
+                    //language=xml
+                    """
                         <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                             xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
@@ -430,8 +430,8 @@ class MavenSettingsTest {
         void properties() {
             System.setProperty("rewrite.test.custom.location", "/tmp");
             var settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
-              //language=xml
-              """
+                    //language=xml
+                    """
                     <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                         xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
@@ -470,8 +470,8 @@ class MavenSettingsTest {
         @Test
         void unresolvedPlaceholdersRemainUnchanged() {
             var settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
-              //language=xml
-              """
+                    //language=xml
+                    """
                     <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                         xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
@@ -505,7 +505,7 @@ class MavenSettingsTest {
             ), ctx);
 
             assertThat(settings.getLocalRepository())
-              .isEqualTo("${custom.location.zz}/maven/local/repository/");
+                    .isEqualTo("${custom.location.zz}/maven/local/repository/");
             assertThat(settings.getServers().getServers().get(0).getUsername()).isEqualTo("${env.PRIVATE_REPO_USERNAME_ZZ}");
             assertThat(settings.getServers().getServers().get(0).getPassword()).isEqualTo("${env.PRIVATE_REPO_PASSWORD_ZZ}");
         }
@@ -516,8 +516,8 @@ class MavenSettingsTest {
             updateEnvMap("REWRITE_TEST_PRIVATE_REPO_USERNAME", "user");
             updateEnvMap("REWRITE_TEST_PRIVATE_REPO_PASSWORD", "pass");
             var settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
-              //language=xml
-              """
+                    //language=xml
+                    """
                     <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                         xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
@@ -622,8 +622,8 @@ class MavenSettingsTest {
             Path path = Paths.get("settings.xml");
             var baseSettings = MavenSettings.parse(Parser.Input.fromString(path, installationSettings), ctx);
             var userSettings = MavenSettings.parse(Parser.Input.fromString(path,
-              //language=xml
-              """
+                    //language=xml
+                    """
                     <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                         xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
@@ -681,8 +681,8 @@ class MavenSettingsTest {
             Path path = Paths.get("settings.xml");
             var baseSettings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"), installationSettings), ctx);
             var userSettings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
-              //language=xml
-              """
+                    //language=xml
+                    """
                     <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                         xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
@@ -724,12 +724,12 @@ class MavenSettingsTest {
             assertThat(mergedSettings.getMirrors().getMirrors()).hasSize(1);
 
             assertThat(mergedSettings.getMirrors().getMirrors().get(0).getUrl())
-              .isEqualTo("http://downloads.planetmirror.com/pub/maven3000");
+                    .isEqualTo("http://downloads.planetmirror.com/pub/maven3000");
 
             assertThat(mergedSettings.getServers().getServers()).hasSize(1);
             assertThat(mergedSettings.getServers().getServers().get(0))
-              .hasFieldOrPropertyWithValue("username", "foo")
-              .hasFieldOrPropertyWithValue("password", null);
+                    .hasFieldOrPropertyWithValue("username", "foo")
+                    .hasFieldOrPropertyWithValue("password", null);
         }
     }
 
@@ -740,8 +740,8 @@ class MavenSettingsTest {
     @Test
     void serverHttpHeaders() {
         var settings = MavenSettings.parse(Parser.Input.fromString(Paths.get("settings.xml"),
-          //language=xml
-          """
+                //language=xml
+                """
             <settings>
                 <servers>
                     <server>
@@ -805,15 +805,15 @@ class MavenSettingsTest {
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         MavenXmlMapper.writeMapper()
-          .setSerializationInclusion(JsonInclude.Include.NON_ABSENT)
-          .writerWithDefaultPrettyPrinter()
-          .writeValue(baos, settings);
+                .setSerializationInclusion(JsonInclude.Include.NON_ABSENT)
+                .writerWithDefaultPrettyPrinter()
+                .writeValue(baos, settings);
 
         assertThat(XmlParser.builder().build().parse(baos.toString()).findFirst())
-          .isPresent()
-          .get(InstanceOfAssertFactories.type(Xml.Document.class))
-          .isNotNull()
-            .satisfies(serialized -> assertThat(SemanticallyEqual.areEqual(parsed, serialized)).isTrue())
-            .satisfies(serialized -> assertThat(serialized.printAll().replace("\r", "")).isEqualTo(parsed.printAll()));
+                .isPresent()
+                .get(InstanceOfAssertFactories.type(Xml.Document.class))
+                .isNotNull()
+                .satisfies(serialized -> assertThat(SemanticallyEqual.areEqual(parsed, serialized)).isTrue())
+                .satisfies(serialized -> assertThat(serialized.printAll().replace("\r", "")).isEqualTo(parsed.printAll()));
     }
 }

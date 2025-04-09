@@ -81,7 +81,7 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select 29.0-jre",
+                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
@@ -239,8 +239,8 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
                             if (resolvedManagedDep.matches(groupId, artifactId, type, classifier)) {
                                 return resolvedManagedDep.getGav().getVersion();
                             } else if (resolvedManagedDep.getRequestedBom() != null &&
-                                       resolvedManagedDep.getRequestedBom().getGroupId().equals(groupId) &&
-                                       resolvedManagedDep.getRequestedBom().getArtifactId().equals(artifactId)) {
+                                    resolvedManagedDep.getRequestedBom().getGroupId().equals(groupId) &&
+                                    resolvedManagedDep.getRequestedBom().getArtifactId().equals(artifactId)) {
                                 return resolvedManagedDep.getRequestedBom().getVersion();
                             }
                             return null;

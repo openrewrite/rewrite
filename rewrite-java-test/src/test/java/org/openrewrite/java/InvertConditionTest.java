@@ -31,15 +31,15 @@ class InvertConditionTest implements RewriteTest {
     @Test
     void invertCondition() {
         rewriteRun(
-          spec -> spec
-            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-                @Override
-                public J.If visitIf(J.If iff, ExecutionContext ctx) {
-                    return iff.withIfCondition(InvertCondition.invert(iff.getIfCondition(), getCursor()));
-                }
-            }).withMaxCycles(1)),
-          java(
-            """
+                spec -> spec
+                        .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                            @Override
+                            public J.If visitIf(J.If iff, ExecutionContext ctx) {
+                                return iff.withIfCondition(InvertCondition.invert(iff.getIfCondition(), getCursor()));
+                            }
+                        }).withMaxCycles(1)),
+                java(
+                        """
               class Test {
                   boolean a;
                   boolean b;
@@ -56,7 +56,7 @@ class InvertConditionTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   boolean a;
                   boolean b;
@@ -73,7 +73,7 @@ class InvertConditionTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

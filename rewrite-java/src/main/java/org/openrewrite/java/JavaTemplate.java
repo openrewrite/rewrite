@@ -84,7 +84,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
     private final JavaTemplateParser templateParser;
 
     private JavaTemplate(boolean contextSensitive, JavaParser.Builder<?, ?> parser, String code, Set<String> imports,
-                         Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
+            Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
         this(code, onAfterVariableSubstitution, new JavaTemplateParser(contextSensitive, augmentClasspath(parser), onAfterVariableSubstitution, onBeforeParseTemplate, imports));
     }
 

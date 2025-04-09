@@ -118,7 +118,7 @@ public class ReloadableJava17Parser implements JavaParser {
 
         LOMBOK:
         if (System.getenv().getOrDefault("REWRITE_LOMBOK", System.getProperty("rewrite.lombok")) != null &&
-            classpath != null && classpath.stream().anyMatch(it -> it.toString().contains("lombok"))) {
+                classpath != null && classpath.stream().anyMatch(it -> it.toString().contains("lombok"))) {
             Processor lombokProcessor = null;
             try {
                 // https://projectlombok.org/contributing/lombok-execution-path
@@ -293,7 +293,7 @@ public class ReloadableJava17Parser implements JavaParser {
             if ("endPosTable already set".equals(e.getMessage())) {
                 throw new IllegalStateException(
                         "Call reset() on JavaParser before parsing another set of source files that " +
-                        "have some of the same fully qualified names.", e);
+                                "have some of the same fully qualified names.", e);
             }
             throw e;
         }
@@ -387,9 +387,9 @@ public class ReloadableJava17Parser implements JavaParser {
         private final List<PackageAwareJavaFileObject> classByteClasspath;
 
         public ByteArrayCapableJavacFileManager(Context context,
-                                                boolean register,
-                                                Charset charset,
-                                                Collection<byte[]> classByteClasspath) {
+                boolean register,
+                Charset charset,
+                Collection<byte[]> classByteClasspath) {
             super(context, register, charset);
             this.classByteClasspath = classByteClasspath.stream()
                     .map(PackageAwareJavaFileObject::new)

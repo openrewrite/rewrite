@@ -26,9 +26,9 @@ class ChangePluginConfigurationTest implements RewriteTest {
     @Test
     void removeConfiguration() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePluginConfiguration("org.openrewrite.maven", "rewrite-maven-plugin", null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangePluginConfiguration("org.openrewrite.maven", "rewrite-maven-plugin", null)),
+                pomXml(
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
@@ -50,7 +50,7 @@ class ChangePluginConfigurationTest implements RewriteTest {
                   </build>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
@@ -67,19 +67,19 @@ class ChangePluginConfigurationTest implements RewriteTest {
                   </build>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void addConfiguration() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePluginConfiguration(
-            "org.openrewrite.maven",
-            "rewrite-maven-plugin",
-            "<activeRecipes>\n<recipe>org.openrewrite.java.cleanup.UnnecessaryThrows</recipe>\n</activeRecipes>")),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangePluginConfiguration(
+                        "org.openrewrite.maven",
+                        "rewrite-maven-plugin",
+                        "<activeRecipes>\n<recipe>org.openrewrite.java.cleanup.UnnecessaryThrows</recipe>\n</activeRecipes>")),
+                pomXml(
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
@@ -96,7 +96,7 @@ class ChangePluginConfigurationTest implements RewriteTest {
                   </build>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
@@ -118,19 +118,19 @@ class ChangePluginConfigurationTest implements RewriteTest {
                   </build>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void replaceConfiguration() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePluginConfiguration(
-            "org.openrewrite.maven",
-            "rewrite-maven-plugin",
-            "<activeRecipes>\n<recipe>org.openrewrite.java.cleanup.UnnecessaryThrows</recipe>\n</activeRecipes>")),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangePluginConfiguration(
+                        "org.openrewrite.maven",
+                        "rewrite-maven-plugin",
+                        "<activeRecipes>\n<recipe>org.openrewrite.java.cleanup.UnnecessaryThrows</recipe>\n</activeRecipes>")),
+                pomXml(
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
@@ -148,7 +148,7 @@ class ChangePluginConfigurationTest implements RewriteTest {
                   </build>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
@@ -170,19 +170,19 @@ class ChangePluginConfigurationTest implements RewriteTest {
                   </build>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void transformConfigurationNoOpWhenConfigurationMissing() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePluginConfiguration(
-            "org.openrewrite.maven",
-            "rewrite-maven-plugin",
-            null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangePluginConfiguration(
+                        "org.openrewrite.maven",
+                        "rewrite-maven-plugin",
+                        null)),
+                pomXml(
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
@@ -199,7 +199,7 @@ class ChangePluginConfigurationTest implements RewriteTest {
                   </build>
               </project>
               """
-          )
+                )
         );
     }
 }

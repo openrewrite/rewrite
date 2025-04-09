@@ -26,23 +26,23 @@ class DoWhileLoopTest implements RewriteTest {
     @Test
     void doWhileLoop() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       do { } while ( true ) ;
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void nonBlockStatement() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       int i = 0;
@@ -50,7 +50,7 @@ class DoWhileLoopTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

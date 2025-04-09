@@ -61,27 +61,27 @@ public class MavenParserBenchmark {
 
         Optional<SourceFile> maven = MavenParser.builder().build().parse(ctx,
                 "" +
-                "<project>" +
-                "  <parent>" +
-                "    <groupId>org.springframework.boot</groupId>" +
-                "    <artifactId>spring-boot-starter-parent</artifactId>" +
-                "    <version>2.6.3</version>" +
-                "  </parent>" +
-                "  <groupId>com.mycompany.app</groupId>" +
-                "  <artifactId>my-app</artifactId>" +
-                "  <version>1</version>" +
-                "  <dependencies>" +
-                "    <dependency>" +
-                "      <groupId>org.springframework.boot</groupId>" +
-                "      <artifactId>spring-boot-starter-webflux</artifactId>" +
-                "    </dependency>" +
-                "    <dependency>" +
-                "      <groupId>org.springframework.cloud</groupId>" +
-                "      <artifactId>spring-cloud-dataflow-tasklauncher</artifactId>" +
-                "      <version>2.9.2</version>" +
-                "    </dependency>" +
-                "  </dependencies>" +
-                "</project>"
+                        "<project>" +
+                        "  <parent>" +
+                        "    <groupId>org.springframework.boot</groupId>" +
+                        "    <artifactId>spring-boot-starter-parent</artifactId>" +
+                        "    <version>2.6.3</version>" +
+                        "  </parent>" +
+                        "  <groupId>com.mycompany.app</groupId>" +
+                        "  <artifactId>my-app</artifactId>" +
+                        "  <version>1</version>" +
+                        "  <dependencies>" +
+                        "    <dependency>" +
+                        "      <groupId>org.springframework.boot</groupId>" +
+                        "      <artifactId>spring-boot-starter-webflux</artifactId>" +
+                        "    </dependency>" +
+                        "    <dependency>" +
+                        "      <groupId>org.springframework.cloud</groupId>" +
+                        "      <artifactId>spring-cloud-dataflow-tasklauncher</artifactId>" +
+                        "      <version>2.9.2</version>" +
+                        "    </dependency>" +
+                        "  </dependencies>" +
+                        "</project>"
         ).findFirst();
 
         blackhole.consume(maven);

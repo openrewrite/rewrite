@@ -24,7 +24,8 @@ import org.openrewrite.test.SourceSpecs;
 import java.util.function.Consumer;
 
 public class Assertions {
-    private Assertions() {}
+    private Assertions() {
+    }
 
     public static SourceSpecs properties(@Language("properties") @Nullable String before) {
         return properties(before, s -> {
@@ -43,7 +44,7 @@ public class Assertions {
     }
 
     public static SourceSpecs properties(@Language("properties") @Nullable String before, @Language("properties") @Nullable String after,
-                                   Consumer<SourceSpec<Properties.File>> spec) {
+            Consumer<SourceSpec<Properties.File>> spec) {
         SourceSpec<Properties.File> properties = new SourceSpec<>(Properties.File.class, null, PropertiesParser.builder(), before, s -> after);
         spec.accept(properties);
         return properties;

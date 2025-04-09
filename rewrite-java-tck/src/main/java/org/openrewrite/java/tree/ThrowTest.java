@@ -26,15 +26,15 @@ class ThrowTest implements RewriteTest {
     @Test
     void throwException() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   public void test() throws Exception {
                       throw new UnsupportedOperationException();
                   }
               }
               """
-          )
+                )
         );
     }
 }

@@ -28,24 +28,24 @@ class AssertTest implements RewriteTest {
     @Test
     void basic() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def x = 1
               assert x == 2
               """
-          )
+                )
         );
     }
 
     @Test
     void withMessage() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def x = 1
               assert x == 2: "foo"
               """
-          )
+                )
         );
     }
 }

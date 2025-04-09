@@ -40,7 +40,7 @@ public class IsBuildGradle<P> extends TreeVisitor<Tree, P> {
     public static boolean matches(Path sourcePath) {
         return (sourcePath.toString().endsWith(".gradle") ||
                 sourcePath.toString().endsWith(".gradle.kts")) &&
-               !(sourcePath.toString().endsWith("settings.gradle") ||
-                 sourcePath.toString().endsWith("settings.gradle.kts"));
+                !(sourcePath.toString().endsWith("settings.gradle") ||
+                        sourcePath.toString().endsWith("settings.gradle.kts"));
     }
 }

@@ -25,8 +25,8 @@ class HclForTest implements RewriteTest {
     @Test
     void forTuple() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               a = [ for v in ["a", "b"] : v ]
               b = [ for i, v in ["a", "b"] : i ]
               c = [for i, v in ["a", "b", "c"]: v if 1 && !0]
@@ -38,15 +38,15 @@ class HclForTest implements RewriteTest {
                 if 0
               ]
               """
-          )
+                )
         );
     }
 
     @Test
     void forObject() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               a = { for i, v in ["a", "b"]: v => i }
               b = { for i, v in ["a", "a", "b"]: k => v }
               c = {
@@ -57,21 +57,21 @@ class HclForTest implements RewriteTest {
                 if 0
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void forEach() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               resource "aws_iam_user" "the-accounts" {
                 for_each = toset( ["Todd", "James", "Alice", "Dottie"] )
                 name     = each.key
               }
               """
-          )
+                )
         );
     }
 }

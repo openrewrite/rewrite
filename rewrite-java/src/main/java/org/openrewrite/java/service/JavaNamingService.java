@@ -28,7 +28,7 @@ public class JavaNamingService implements NamingService {
     @Override
     public String standardizeMethodName(String oldMethodName) {
         if (!oldMethodName.startsWith("_") &&
-            !STANDARD_METHOD_NAME.matcher(oldMethodName).matches()) {
+                !STANDARD_METHOD_NAME.matcher(oldMethodName).matches()) {
             StringBuilder result = new StringBuilder();
             if (SNAKE_CASE.matcher(oldMethodName).matches()) {
                 result.append(NameCaseConvention.format(NameCaseConvention.LOWER_CAMEL, oldMethodName));

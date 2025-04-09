@@ -132,7 +132,7 @@ public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
         Javadoc.Link l = link;
         l = l.withMarkers(visitMarkers(l.getMarkers(), p));
         l = l.withSpaceBeforeTree(ListUtils.map(l.getSpaceBeforeTree(), s -> visit(s, p)));
-        l = l.withTreeReference(visitAndCast(l.getTreeReference() , p));
+        l = l.withTreeReference(visitAndCast(l.getTreeReference(), p));
         l = l.withLabel(ListUtils.map(l.getLabel(), la -> visit(la, p)));
         l = l.withEndBrace(ListUtils.map(l.getEndBrace(), s -> visit(s, p)));
         return l;
@@ -173,7 +173,7 @@ public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
         Javadoc.See s = see;
         s = s.withMarkers(visitMarkers(s.getMarkers(), p));
         s = s.withSpaceBeforeTree(ListUtils.map(s.getSpaceBeforeTree(), sb -> visit(sb, p)));
-        s = s.withTreeReference(visitAndCast(s.getTreeReference() , p));
+        s = s.withTreeReference(visitAndCast(s.getTreeReference(), p));
         s = s.withReference(ListUtils.map(s.getReference(), desc -> visit(desc, p)));
         return s;
     }

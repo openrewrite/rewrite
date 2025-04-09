@@ -26,9 +26,9 @@ class RawMavenTest {
     @Test
     void emptyContainers() {
         RawPom pom = RawPom.parse(
-          new ByteArrayInputStream(
-            //language=xml
-            """
+                new ByteArrayInputStream(
+                        //language=xml
+                        """
                   <project>
                       <dependencyManagement>
                           <!--  none, for now  -->
@@ -47,7 +47,7 @@ class RawMavenTest {
                       </profiles>
                   </project>
               """.getBytes()),
-          null
+                null
         );
 
         assertThat(pom.getDependencyManagement().getDependencies()).isNull();
@@ -60,9 +60,9 @@ class RawMavenTest {
     @Test
     void dependencyManagement() {
         RawPom pom = RawPom.parse(
-          new ByteArrayInputStream(
-            //language=xml
-            """
+                new ByteArrayInputStream(
+                        //language=xml
+                        """
                   <project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>com.mycompany.app</groupId>
@@ -79,7 +79,7 @@ class RawMavenTest {
                     </dependencyManagement>
                   </project>
               """.getBytes()),
-          null
+                null
         );
 
         assertThat(pom.getDependencyManagement().getDependencies().getDependencies()).isNotEmpty();

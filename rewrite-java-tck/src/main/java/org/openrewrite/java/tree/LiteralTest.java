@@ -26,49 +26,49 @@ class LiteralTest implements RewriteTest {
     @Test
     void intentionallyBadUnicodeCharacter() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       String[] strings = new String[] { "\\\\u{U1}", "\\\\u1234", "\\\\u{00AUF}" };
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void literalField() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   int n = 0;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void literalCharacter() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   char c = 'a';
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void literalNumerics() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   double d1 = 1.0d;
                   double d2 = 1.0;
@@ -76,7 +76,7 @@ class LiteralTest implements RewriteTest {
                   long l2 = 1;
               }
               """
-          )
+                )
         );
     }
 
@@ -84,8 +84,8 @@ class LiteralTest implements RewriteTest {
     @Test
     void literalOctal() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   long l = 01L;
                   byte b = 01;
@@ -95,15 +95,15 @@ class LiteralTest implements RewriteTest {
                   float f = 01;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void literalBinary() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   long l = 0b10L;
                   byte b = 0b10;
@@ -111,15 +111,15 @@ class LiteralTest implements RewriteTest {
                   int i = 0b10;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void literalHex() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   long l = 0xA0L;
                   byte b = 0xA0;
@@ -127,7 +127,7 @@ class LiteralTest implements RewriteTest {
                   int i = 0xA0;
               }
               """
-          )
+                )
         );
     }
 
@@ -135,14 +135,14 @@ class LiteralTest implements RewriteTest {
     @Test
     void unmatchedSurrogatePair() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   char c1 = '\uD800';
                   char c2 = '\uDfFf';
               }
               """
-          )
+                )
         );
     }
 
@@ -150,14 +150,14 @@ class LiteralTest implements RewriteTest {
     @Test
     void unmatchedSurrogatePairInString() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   String s1 = "\uD800";
                   String s2 = "\uDfFf";
               }
               """
-          )
+                )
         );
     }
 
@@ -165,54 +165,54 @@ class LiteralTest implements RewriteTest {
     @Test
     void multipleUnicodeEscapeCharactersAtValueSourceIndex() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   String s1 = "A\ud83c\udf09";
                   String s2 = "B\ud83c\udf09\ud83c\udf09";
                   String s3 = "C\uDfFf D \ud83c\udf09\ud83c\udf09";
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void transformString() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   String s = "foo ''";
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void nullLiteral() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   String s = null;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void transformLong() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   Long l = 2L;
               }
               """
-          )
+                )
         );
     }
 
@@ -220,41 +220,41 @@ class LiteralTest implements RewriteTest {
     @Test
     void variationInSuffixCasing() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   Long l = 0l;
                   Long m = 0L;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void escapedString() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   String s = "\\t	\\n";
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void escapedCharacter() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   char c = '\\'';
                   char tab = '	';
               }
               """
-          )
+                )
         );
     }
 }

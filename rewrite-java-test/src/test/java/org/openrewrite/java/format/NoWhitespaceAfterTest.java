@@ -39,12 +39,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
 @SuppressWarnings({
-  "StringConcatenationMissingWhitespace",
-  "ConstantConditions",
-  "UnusedAssignment",
-  "UnaryPlus",
-  "ReturnOfThis",
-  "SimplifiableAnnotation"
+        "StringConcatenationMissingWhitespace",
+        "ConstantConditions",
+        "UnusedAssignment",
+        "UnaryPlus",
+        "ReturnOfThis",
+        "SimplifiableAnnotation"
 })
 class NoWhitespaceAfterTest implements RewriteTest {
 
@@ -59,27 +59,27 @@ class NoWhitespaceAfterTest implements RewriteTest {
 
     private static List<NamedStyles> noWhitespaceAfterStyle(UnaryOperator<NoWhitespaceAfterStyle> with) {
         return Collections.singletonList(
-          new NamedStyles(
-            Tree.randomId(), "test", "test", "test", emptySet(),
-            singletonList(with.apply(Checkstyle.noWhitespaceAfterStyle()))
-          )
+                new NamedStyles(
+                        Tree.randomId(), "test", "test", "test", emptySet(),
+                        singletonList(with.apply(Checkstyle.noWhitespaceAfterStyle()))
+                )
         );
     }
 
     @Test
     void arrayAccess() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
+                java(
+                        """
               class Test {
                   static void method(int[] n) {
                       int m = n[0];
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
@@ -87,9 +87,9 @@ class NoWhitespaceAfterTest implements RewriteTest {
     @Test
     void variableDeclaration() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
+                java(
+                        """
               class Test {
                   static void method() {
                       int [] [] a;
@@ -98,7 +98,7 @@ class NoWhitespaceAfterTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   static void method() {
                       int[][] a;
@@ -107,17 +107,17 @@ class NoWhitespaceAfterTest implements RewriteTest {
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
     @Test
     void arrayVariableDeclaration() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
+                java(
+                        """
               class Test {
                   static void method() {
                       int[] n = { 1, 2};
@@ -125,7 +125,7 @@ class NoWhitespaceAfterTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   static void method() {
                       int[] n = {1, 2};
@@ -133,41 +133,41 @@ class NoWhitespaceAfterTest implements RewriteTest {
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
     @Test
     void assignment() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
+                java(
+                        """
               class Test {
                   static void method(int m) {
                       long o = - m;
                   }
               }
               """,
-            """
+                        """
               class Test {
                   static void method(int m) {
                       long o = -m;
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
     @Test
     void unaryOperation() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
+                java(
+                        """
               class Test {
                   static void method(int m) {
                       ++ m;
@@ -179,7 +179,7 @@ class NoWhitespaceAfterTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   static void method(int m) {
                       ++m;
@@ -191,18 +191,18 @@ class NoWhitespaceAfterTest implements RewriteTest {
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
     @Test
     void typecastOperation() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle(style ->
-            style.withTypecast(true)))),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle(style ->
+                        style.withTypecast(true)))),
+                java(
+                        """
               class Test {
                   static void method(int m) {
                       long o = - m;
@@ -210,7 +210,7 @@ class NoWhitespaceAfterTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   static void method(int m) {
                       long o = -m;
@@ -218,18 +218,18 @@ class NoWhitespaceAfterTest implements RewriteTest {
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
     @Test
     void methodReference() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle(style ->
-            style.withMethodRef(true)))),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle(style ->
+                        style.withMethodRef(true)))),
+                java(
+                        """
               import java.util.stream.Stream;
 
               class Test {
@@ -238,7 +238,7 @@ class NoWhitespaceAfterTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.stream.Stream;
 
               class Test {
@@ -247,42 +247,42 @@ class NoWhitespaceAfterTest implements RewriteTest {
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
     @Test
     void methodReturnTypeSignatureAsArray() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
+                java(
+                        """
               class Test {
                   static int [] [] methodArr() {
                       return null;
                   }
               }
               """,
-            """
+                        """
               class Test {
                   static int[][] methodArr() {
                       return null;
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
     @Test
     void fieldAccess() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle(style ->
-            style.withDot(true)))),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle(style ->
+                        style.withDot(true)))),
+                java(
+                        """
               class Test {
                   int m = 0;
 
@@ -296,7 +296,7 @@ class NoWhitespaceAfterTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   int m = 0;
 
@@ -310,17 +310,17 @@ class NoWhitespaceAfterTest implements RewriteTest {
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
     @Test
     void annotation() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
+                java(
+                        """
               class Test {
                   @ Override
                   public boolean equals(Object o) {
@@ -328,7 +328,7 @@ class NoWhitespaceAfterTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   @Override
                   public boolean equals(Object o) {
@@ -336,18 +336,18 @@ class NoWhitespaceAfterTest implements RewriteTest {
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
     @Test
     void doNotAllowLinebreak() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle(style ->
-            style.withAllowLineBreaks(false).withDot(true)))),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle(style ->
+                        style.withAllowLineBreaks(false).withDot(true)))),
+                java(
+                        """
               class Test {
                   int m;
 
@@ -366,7 +366,7 @@ class NoWhitespaceAfterTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   int m;
 
@@ -383,17 +383,17 @@ class NoWhitespaceAfterTest implements RewriteTest {
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
     @Test
     void doNotChangeAnnotationValueInNewArray() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
+                java(
+                        """
               @SuppressWarnings(value = {
                       "all",
                       "unchecked"
@@ -401,16 +401,16 @@ class NoWhitespaceAfterTest implements RewriteTest {
               class Test {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doNotChangeFirstAndLastValuesOfArrayInitializer() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
+                java(
+                        """
               class Test {
                   int[] ns = {
                           0,
@@ -418,7 +418,7 @@ class NoWhitespaceAfterTest implements RewriteTest {
                   };
               }
               """
-          )
+                )
         );
     }
 
@@ -426,9 +426,9 @@ class NoWhitespaceAfterTest implements RewriteTest {
     @Test
     void dontWronglyHandleArray() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
+                java(
+                        """
               package sample;
               
               import java.lang.annotation.ElementType;
@@ -459,13 +459,13 @@ class NoWhitespaceAfterTest implements RewriteTest {
               @Target(ElementType.TYPE_USE)
               @interface NotNull {}
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
     private static Consumer<SourceSpec<J.CompilationUnit>> autoFormatIsIdempotent() {
         return spec -> spec.afterRecipe(cu ->
-          assertThat(new AutoFormatVisitor<>().visit(cu, 0)).isEqualTo(cu));
+                assertThat(new AutoFormatVisitor<>().visit(cu, 0)).isEqualTo(cu));
     }
 }

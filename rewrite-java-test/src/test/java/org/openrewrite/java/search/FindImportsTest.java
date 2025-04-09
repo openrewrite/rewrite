@@ -43,55 +43,55 @@ class FindImportsTest implements RewriteTest {
     @Test
     void exactMatch() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.concurrent.atomic.AtomicBoolean;
               class Test {
               }
               """,
-            """
+                        """
               /*~~>*/import java.util.concurrent.atomic.AtomicBoolean;
               class Test {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void starImport() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.concurrent.atomic.*;
               class Test {
               }
               """,
-            """
+                        """
               /*~~>*/import java.util.concurrent.atomic.*;
               class Test {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void starImportMatchesExact() {
         rewriteRun(
-          spec -> spec.recipe(new FindImports("java.util.List", null)),
-          java(
-            """
+                spec -> spec.recipe(new FindImports("java.util.List", null)),
+                java(
+                        """
               import java.util.*;
               class Test {
               }
               """,
-            """
+                        """
               /*~~>*/import java.util.*;
               class Test {
               }
               """
-          )
+                )
         );
     }
 }

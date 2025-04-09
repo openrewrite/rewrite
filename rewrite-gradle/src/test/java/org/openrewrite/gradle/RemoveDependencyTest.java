@@ -36,15 +36,15 @@ class RemoveDependencyTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withToolingApi())
-          .recipe(new RemoveDependency("org.springframework.boot", "spring-boot*", null));
+                .recipe(new RemoveDependency("org.springframework.boot", "spring-boot*", null));
     }
 
     @DocumentExample
     @Test
     void removeGradleDependencyUsingStringNotation() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -58,7 +58,7 @@ class RemoveDependencyTest implements RewriteTest {
                   testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -71,33 +71,33 @@ class RemoveDependencyTest implements RewriteTest {
                   testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"
               }
               """,
-            spec -> spec.afterRecipe(cu -> {
-                Optional<GradleProject> maybeGp = cu.getMarkers().findFirst(GradleProject.class);
-                assertThat(maybeGp).isPresent();
-                GradleProject gp = maybeGp.get();
-                GradleDependencyConfiguration compileClasspath = gp.getConfiguration("compileClasspath");
-                assertThat(
-                  compileClasspath.getRequested().stream()
-                    .filter(dep -> dep.getGroupId().equals("org.springframework.boot") && dep.getArtifactId().equals("spring-boot-starter-web"))
-                    .findAny())
-                  .as("GradleProject requested dependencies should have been updated to remove `spring-boot-starter-web`")
-                  .isNotPresent();
-                assertThat(
-                  compileClasspath.getResolved().stream()
-                    .filter(dep -> dep.getGroupId().equals("org.springframework.boot") && dep.getArtifactId().equals("spring-boot-starter-web"))
-                    .findAny())
-                  .as("GradleProject resolved dependencies should have been updated to remove `spring-boot-starter-web`")
-                  .isNotPresent();
-            })
-          )
+                        spec -> spec.afterRecipe(cu -> {
+                            Optional<GradleProject> maybeGp = cu.getMarkers().findFirst(GradleProject.class);
+                            assertThat(maybeGp).isPresent();
+                            GradleProject gp = maybeGp.get();
+                            GradleDependencyConfiguration compileClasspath = gp.getConfiguration("compileClasspath");
+                            assertThat(
+                                    compileClasspath.getRequested().stream()
+                                            .filter(dep -> dep.getGroupId().equals("org.springframework.boot") && dep.getArtifactId().equals("spring-boot-starter-web"))
+                                            .findAny())
+                                    .as("GradleProject requested dependencies should have been updated to remove `spring-boot-starter-web`")
+                                    .isNotPresent();
+                            assertThat(
+                                    compileClasspath.getResolved().stream()
+                                            .filter(dep -> dep.getGroupId().equals("org.springframework.boot") && dep.getArtifactId().equals("spring-boot-starter-web"))
+                                            .findAny())
+                                    .as("GradleProject resolved dependencies should have been updated to remove `spring-boot-starter-web`")
+                                    .isNotPresent();
+                        })
+                )
         );
     }
 
     @Test
     void removeGradleDependencyUsingStringNotationWithExclusion() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -113,7 +113,7 @@ class RemoveDependencyTest implements RewriteTest {
                   testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -126,15 +126,15 @@ class RemoveDependencyTest implements RewriteTest {
                   testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void removeGradleDependencyUsingMapNotation() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -148,7 +148,7 @@ class RemoveDependencyTest implements RewriteTest {
                   testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -161,15 +161,15 @@ class RemoveDependencyTest implements RewriteTest {
                   testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void removeGradleDependencyUsingMapNotationWithExclusion() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -185,7 +185,7 @@ class RemoveDependencyTest implements RewriteTest {
                   testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -198,15 +198,15 @@ class RemoveDependencyTest implements RewriteTest {
                   testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void removeWhenUsingVariableReplacement() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -222,7 +222,7 @@ class RemoveDependencyTest implements RewriteTest {
                   testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -236,15 +236,15 @@ class RemoveDependencyTest implements RewriteTest {
                   testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void removePlatformDependency() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -258,7 +258,7 @@ class RemoveDependencyTest implements RewriteTest {
                   testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -271,16 +271,16 @@ class RemoveDependencyTest implements RewriteTest {
                   testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void onlyRemoveFromSpecifiedConfiguration() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveDependency("org.springframework.boot", "spring-boot-starter-test", "implementation")),
-          buildGradle(
-            """
+                spec -> spec.recipe(new RemoveDependency("org.springframework.boot", "spring-boot-starter-test", "implementation")),
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -294,7 +294,7 @@ class RemoveDependencyTest implements RewriteTest {
                   testImplementation "org.springframework.boot:spring-boot-starter-test:2.7.0"
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -307,16 +307,16 @@ class RemoveDependencyTest implements RewriteTest {
                   testImplementation "org.springframework.boot:spring-boot-starter-test:2.7.0"
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void removeLastDependency() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveDependency("org.junit.vintage", "junit-vintage-engine", null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new RemoveDependency("org.junit.vintage", "junit-vintage-engine", null)),
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -330,7 +330,7 @@ class RemoveDependencyTest implements RewriteTest {
                   testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -343,7 +343,7 @@ class RemoveDependencyTest implements RewriteTest {
                   implementation "org.springframework.boot:spring-boot-starter-web:2.7.0"
               }
               """
-          )
+                )
         );
     }
 
@@ -351,9 +351,9 @@ class RemoveDependencyTest implements RewriteTest {
     @Test
     void removeFromSubproject() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveDependency("org.hibernate", "hibernate-entitymanager", null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new RemoveDependency("org.hibernate", "hibernate-entitymanager", null)),
+                buildGradle(
+                        """
               plugins {
                   id 'java'
                   id "org.openrewrite.rewrite" version "6.8.2"
@@ -374,17 +374,17 @@ class RemoveDependencyTest implements RewriteTest {
                   rewrite(platform("org.openrewrite.recipe:rewrite-recipe-bom:2.6.4"))
               }
               """
-          ),
-          settingsGradle(
-            """
+                ),
+                settingsGradle(
+                        """
               rootProject.name = 'OpenRewrite-example'
               include 'example'
               """
-          ),
-          mavenProject(
-            "subproject",
-            buildGradle(
-              """
+                ),
+                mavenProject(
+                        "subproject",
+                        buildGradle(
+                                """
                 plugins {
                     id 'java'
                 }
@@ -404,7 +404,7 @@ class RemoveDependencyTest implements RewriteTest {
                     useJUnitPlatform()
                 }
                 """,
-              """
+                                """
                 plugins {
                     id 'java'
                 }
@@ -423,17 +423,17 @@ class RemoveDependencyTest implements RewriteTest {
                     useJUnitPlatform()
                 }
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void removeBuildscriptDependency() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveDependency("org.springframework.boot", "spring-boot-gradle-plugin", null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new RemoveDependency("org.springframework.boot", "spring-boot-gradle-plugin", null)),
+                buildGradle(
+                        """
               buildscript {
                   repositories {
                       mavenCentral()
@@ -443,7 +443,7 @@ class RemoveDependencyTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               buildscript {
                   repositories {
                       mavenCentral()
@@ -452,15 +452,15 @@ class RemoveDependencyTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void removeDependencyDefinedInJvmTestSuite() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id "java-library"
                   id 'jvm-test-suite'
@@ -481,7 +481,7 @@ class RemoveDependencyTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               plugins {
                   id "java-library"
                   id 'jvm-test-suite'
@@ -501,15 +501,15 @@ class RemoveDependencyTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void dependenciesBlockInFreestandingScript() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               repositories {
                   mavenLocal()
                   mavenCentral()
@@ -522,7 +522,7 @@ class RemoveDependencyTest implements RewriteTest {
                   implementation "org.junit.vintage:junit-vintage-engine:5.6.2"
               }
               """,
-            """
+                        """
               repositories {
                   mavenLocal()
                   mavenCentral()
@@ -534,16 +534,16 @@ class RemoveDependencyTest implements RewriteTest {
                   implementation "org.junit.vintage:junit-vintage-engine:5.6.2"
               }
               """,
-            spec -> spec.path("dependencies.gradle")
-          ),
-          buildGradle(
-            """
+                        spec -> spec.path("dependencies.gradle")
+                ),
+                buildGradle(
+                        """
               plugins {
                   id("java")
               }
               apply from: 'dependencies.gradle'
               """
-          )
+                )
         );
     }
 }

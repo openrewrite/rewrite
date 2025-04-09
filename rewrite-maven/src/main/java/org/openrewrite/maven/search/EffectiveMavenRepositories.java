@@ -42,8 +42,8 @@ public class EffectiveMavenRepositories extends Recipe {
     @Override
     public String getDescription() {
         return "Lists the Maven repositories that would be used for dependency resolution, in order of precedence. " +
-               "This includes Maven repositories defined in the Maven settings file (and those contributed by active profiles) as " +
-               "determined when the LST was produced.";
+                "This includes Maven repositories defined in the Maven settings file (and those contributed by active profiles) as " +
+                "determined when the LST was produced.";
     }
 
     @Option(displayName = "Use markers",

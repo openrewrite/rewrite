@@ -35,27 +35,27 @@ class FindCompileErrorsTest implements RewriteTest {
     @Test
     void javaVisitorHandlesErroneousNodes() {
         rewriteRun(
-          spec -> spec.dataTable(CompileErrors.Row.class,
-            rows -> assertThat(rows).singleElement().satisfies(row -> {
-                assertThat(row.getSourceFile()).isEqualTo("A.java");
-                assertThat(row.getCode()).isEqualTo("\n        owner");
-            })),
-          java(
-            """
+                spec -> spec.dataTable(CompileErrors.Row.class,
+                        rows -> assertThat(rows).singleElement().satisfies(row -> {
+                            assertThat(row.getSourceFile()).isEqualTo("A.java");
+                            assertThat(row.getCode()).isEqualTo("\n        owner");
+                        })),
+                java(
+                        """
               class A {
                   void test() {
                       owner
                   }
               }
               """,
-            """
+                        """
               class A {
                   void test() {
                       /*~~>*/owner
                   }
               }
               """
-          )
+                )
         );
     }
 }

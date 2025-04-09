@@ -30,8 +30,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class JsonPathMatcherTest {
 
     private final List<String> simple = List.of(
-      //language=json5
-      """
+            //language=json5
+            """
           {
             "root": {
               "literal": "$.root.literal",
@@ -50,8 +50,8 @@ class JsonPathMatcherTest {
     );
 
     private final List<String> listOfScalars = List.of(
-      //language=json5
-      """
+            //language=json5
+            """
             {
               "list": [
                 "item 1",
@@ -63,8 +63,8 @@ class JsonPathMatcherTest {
     );
 
     private final List<String> sliceList = List.of(
-      //language=json5
-      """
+            //language=json5
+            """
             {
               "list": [
                 {
@@ -85,8 +85,8 @@ class JsonPathMatcherTest {
     );
 
     private final List<String> complex = List.of(
-      //language=json5
-      """
+            //language=json5
+            """
         {
           "literal": "$.literal",
           "object": {
@@ -133,18 +133,18 @@ class JsonPathMatcherTest {
     @Test
     void doesNotMatchMissingProperty() {
         assertNotMatched(
-          "$.none",
-          simple
+                "$.none",
+                simple
         );
     }
 
     @Test
     void findScopeOfObject() {
         assertMatched(
-          "$.root.object[?(@.literal == '$.root.object.literal')]",
-          simple,
-          List.of(
-            """
+                "$.root.object[?(@.literal == '$.root.object.literal')]",
+                simple,
+                List.of(
+                        """
                   "object": {
                     "literal": "$.root.object.literal",
                     "list": [{
@@ -159,19 +159,19 @@ class JsonPathMatcherTest {
     @Test
     void findLiteralInObject() {
         assertMatched(
-          "$.root.object[?(@.literal == '$.root.object.literal')].literal",
-          simple,
-          List.of("\"literal\": \"$.root.object.literal\"")
+                "$.root.object[?(@.literal == '$.root.object.literal')].literal",
+                simple,
+                List.of("\"literal\": \"$.root.object.literal\"")
         );
     }
 
     @Test
     void wildcardAtRoot() {
         assertMatched(
-          "$.*",
-          simple,
-          List.of(
-            """
+                "$.*",
+                simple,
+                List.of(
+                        """
                   "root": {
                     "literal": "$.root.literal",
                     "object": {
@@ -185,18 +185,18 @@ class JsonPathMatcherTest {
                     }]
                   }
               """
-          )
+                )
         );
     }
 
     @Test
     void multipleWildcards() {
         assertMatched(
-          "$.*.*",
-          simple,
-          List.of(
-            "\"literal\": \"$.root.literal\"",
-            """
+                "$.*.*",
+                simple,
+                List.of(
+                        "\"literal\": \"$.root.literal\"",
+                        """
                   "object": {
                     "literal": "$.root.object.literal",
                     "list": [{
@@ -204,7 +204,7 @@ class JsonPathMatcherTest {
                     }]
                   }
               """,
-            """
+                        """
                   "list": [{
                     "literal": "$.root.list[0]"
                   }]
@@ -215,20 +215,20 @@ class JsonPathMatcherTest {
     @Test
     void allPropertiesInKeyFromRoot() {
         assertMatched(
-          // This produces two false positives from $.literal and $.list.literal.
-          "$.*.literal",
-          simple,
-          List.of("\"literal\": \"$.root.literal\"")
+                // This produces two false positives from $.literal and $.list.literal.
+                "$.*.literal",
+                simple,
+                List.of("\"literal\": \"$.root.literal\"")
         );
     }
 
     @Test
     void matchObjectAtRoot() {
         assertMatched(
-          "$.root.object",
-          simple,
-          List.of(
-            """
+                "$.root.object",
+                simple,
+                List.of(
+                        """
                   "object": {
                     "literal": "$.root.object.literal",
                     "list": [{
@@ -242,37 +242,37 @@ class JsonPathMatcherTest {
     @Test
     void matchLiteral() {
         assertMatched(
-          "$.root.literal",
-          simple,
-          List.of("\"literal\": \"$.root.literal\"")
+                "$.root.literal",
+                simple,
+                List.of("\"literal\": \"$.root.literal\"")
         );
     }
 
     @Test
     void dotOperatorIntoObject() {
         assertMatched(
-          "$.root.object.literal",
-          simple,
-          List.of("\"literal\": \"$.root.object.literal\"")
+                "$.root.object.literal",
+                simple,
+                List.of("\"literal\": \"$.root.object.literal\"")
         );
     }
 
     @Test
     void dotOperatorByBracketName() {
         assertMatched(
-          "$.['root'].['object'].['literal']",
-          simple,
-          List.of("\"literal\": \"$.root.object.literal\"")
+                "$.['root'].['object'].['literal']",
+                simple,
+                List.of("\"literal\": \"$.root.object.literal\"")
         );
     }
 
     @Test
     void bracketNameAtRoot() {
         assertMatched(
-          "['root'].['object']",
-          simple,
-          List.of(
-            """
+                "['root'].['object']",
+                simple,
+                List.of(
+                        """
                   "object": {
                     "literal": "$.root.object.literal",
                     "list": [{
@@ -286,13 +286,13 @@ class JsonPathMatcherTest {
     @Test
     void relativePath() {
         assertMatched(
-          ".literal",
-          simple,
-          List.of(
-            "\"literal\": \"$.root.literal\"",
-            "\"literal\": \"$.root.object.literal\"",
-            "\"literal\": \"$.root.object.list[0]\"",
-            "\"literal\": \"$.root.list[0]\"")
+                ".literal",
+                simple,
+                List.of(
+                        "\"literal\": \"$.root.literal\"",
+                        "\"literal\": \"$.root.object.literal\"",
+                        "\"literal\": \"$.root.object.list[0]\"",
+                        "\"literal\": \"$.root.list[0]\"")
         );
     }
 
@@ -300,15 +300,15 @@ class JsonPathMatcherTest {
     @Test
     void containsInList() {
         assertMatched(
-          "$.root.object[?(@.literal contains 'object')].list",
-          simple,
-          List.of(
-            """
+                "$.root.object[?(@.literal contains 'object')].list",
+                simple,
+                List.of(
+                        """
                   "list": [{
                     "literal": "$.root.object.list[0]"
                   }]
               """
-          )
+                )
         );
     }
 
@@ -316,15 +316,15 @@ class JsonPathMatcherTest {
     @Test
     void containsInLhsString() {
         assertMatched(
-          "$.root.object[?(@.literal contains 'literal')].list",
-          simple,
-          List.of(
-            """
+                "$.root.object[?(@.literal contains 'literal')].list",
+                simple,
+                List.of(
+                        """
                   "list": [{
                     "literal": "$.root.object.list[0]"
                   }]
               """
-          )
+                )
         );
     }
 
@@ -332,10 +332,10 @@ class JsonPathMatcherTest {
     @Test
     void containsInRhsString() {
         assertMatched(
-          "$.root.object[?('$.root.object.literal' contains @.literal)].list",
-          simple,
-          List.of(
-            """
+                "$.root.object[?('$.root.object.literal' contains @.literal)].list",
+                simple,
+                List.of(
+                        """
                   "list": [{
                     "literal": "$.root.object.list[0]"
                   }]
@@ -347,15 +347,15 @@ class JsonPathMatcherTest {
     @Test
     void returnScopeOfMemberOnBinaryEx() {
         assertMatched(
-          "$.root.object[?($.root.literal == '$.root.literal')].list",
-          simple,
-          List.of(
-            """
+                "$.root.object[?($.root.literal == '$.root.literal')].list",
+                simple,
+                List.of(
+                        """
                   "list": [{
                     "literal": "$.root.object.list[0]"
                   }]
               """
-          )
+                )
         );
     }
 
@@ -363,10 +363,10 @@ class JsonPathMatcherTest {
     @Test
     void matchByConditionAndItemInList() {
         assertMatched(
-          "$.root.object[?($.root.literal == '$.root.literal' && @.literal contains 'literal')].list",
-          simple,
-          List.of(
-            """
+                "$.root.object[?($.root.literal == '$.root.literal' && @.literal contains 'literal')].list",
+                simple,
+                List.of(
+                        """
                   "list": [{
                     "literal": "$.root.object.list[0]"
                   }]
@@ -377,39 +377,39 @@ class JsonPathMatcherTest {
     @Test
     void recurseToMatchProperties() {
         assertMatched(
-          "$..object.literal",
-          complex,
-          List.of(
-            "\"literal\": \"$.object.literal\"",
-            "\"literal\": \"$.object.object.literal\"",
-            "\"literal\": \"$.objects.object.literal\"",
-            "\"literal\": \"$.objects.object.object.literal\"",
-            "\"literal\": \"$.lists[0].list[0].object.literal\"",
-            "\"literal\": \"$.lists[0].list[0].object.object.literal\""
-          )
+                "$..object.literal",
+                complex,
+                List.of(
+                        "\"literal\": \"$.object.literal\"",
+                        "\"literal\": \"$.object.object.literal\"",
+                        "\"literal\": \"$.objects.object.literal\"",
+                        "\"literal\": \"$.objects.object.object.literal\"",
+                        "\"literal\": \"$.lists[0].list[0].object.literal\"",
+                        "\"literal\": \"$.lists[0].list[0].object.object.literal\""
+                )
         );
     }
 
     @Test
     void recurseFromScopeOfObject() {
         assertMatched(
-          "$.object..literal",
-          complex,
-          List.of(
-            "\"literal\": \"$.object.literal\"",
-            "\"literal\": \"$.object.object.literal\"",
-            "\"literal\": \"$.object.list[0].literal\"")
+                "$.object..literal",
+                complex,
+                List.of(
+                        "\"literal\": \"$.object.literal\"",
+                        "\"literal\": \"$.object.object.literal\"",
+                        "\"literal\": \"$.object.list[0].literal\"")
         );
     }
 
     @Test
     void firstNElements() {
         assertMatched(
-          "$.list[:1]",
-          sliceList,
-          List.of(
-            //language=json5
-            """
+                "$.list[:1]",
+                sliceList,
+                List.of(
+                        //language=json5
+                        """
                   {
                     "item1": "index0",
                     "property": "property"
@@ -421,11 +421,11 @@ class JsonPathMatcherTest {
     @Test
     void lastNElements() {
         assertMatched(
-          "$.list[-1:]",
-          sliceList,
-          List.of(
-            //language=json5
-            """
+                "$.list[-1:]",
+                sliceList,
+                List.of(
+                        //language=json5
+                        """
                   {
                     "item3": "index2",
                     "property": "property"
@@ -437,11 +437,11 @@ class JsonPathMatcherTest {
     @Test
     void fromStartToEndPos() {
         assertMatched(
-          "$.list[0:1]",
-          sliceList,
-          List.of(
-            //language=json5
-            """
+                "$.list[0:1]",
+                sliceList,
+                List.of(
+                        //language=json5
+                        """
                   {
                     "item1": "index0",
                     "property": "property"
@@ -458,11 +458,11 @@ class JsonPathMatcherTest {
     @Test
     void allElementsFromStartPos() {
         assertMatched(
-          "$.list[1:]",
-          sliceList,
-          List.of(
-            //language=json5
-            """
+                "$.list[1:]",
+                sliceList,
+                List.of(
+                        //language=json5
+                        """
                   {
                     "item2": "index1",
                     "property": "property"
@@ -479,11 +479,11 @@ class JsonPathMatcherTest {
     @Test
     void allElements() {
         assertMatched(
-          "$.list[*]",
-          sliceList,
-          List.of(
-            //language=json5
-            """
+                "$.list[*]",
+                sliceList,
+                List.of(
+                        //language=json5
+                        """
                   {
                     "item1": "index0",
                     "property": "property"
@@ -505,11 +505,11 @@ class JsonPathMatcherTest {
     @Test
     void bracketOperatorByNames() {
         assertMatched(
-          "$.root['literal', 'object']",
-          simple,
-          List.of(
-            "\"literal\": \"$.root.literal\"",
-            """
+                "$.root['literal', 'object']",
+                simple,
+                List.of(
+                        "\"literal\": \"$.root.literal\"",
+                        """
                   "object": {
                     "literal": "$.root.object.literal",
                     "list": [{
@@ -523,19 +523,19 @@ class JsonPathMatcherTest {
     @Test
     void doesNotMatchIndex() {
         assertNotMatched(
-          "$.list[4]",
-          sliceList
+                "$.list[4]",
+                sliceList
         );
     }
 
     @Test
     void bracketOperatorByIndexes() {
         assertMatched(
-          "$.list[0, 1]",
-          sliceList,
-          List.of(
-            //language=json5
-            """
+                "$.list[0, 1]",
+                sliceList,
+                List.of(
+                        //language=json5
+                        """
                   {
                     "item1": "index0",
                     "property": "property"
@@ -553,8 +553,8 @@ class JsonPathMatcherTest {
     @Test
     void doesNotMatchWrongValue() {
         assertNotMatched(
-          "$..list[?(@.literal == 'no-match')].literal",
-          complex
+                "$..list[?(@.literal == 'no-match')].literal",
+                complex
         );
     }
 
@@ -562,9 +562,9 @@ class JsonPathMatcherTest {
     @Test
     void filterOnPropertyWithEquality() {
         assertMatched(
-          "$..list[?(@.literal == '$.lists[0].list[0].object.list[0].literal')].literal",
-          complex,
-          List.of("\"literal\": \"$.lists[0].list[0].object.list[0].literal\"")
+                "$..list[?(@.literal == '$.lists[0].list[0].object.list[0].literal')].literal",
+                complex,
+                List.of("\"literal\": \"$.lists[0].list[0].object.list[0].literal\"")
         );
     }
 
@@ -572,8 +572,8 @@ class JsonPathMatcherTest {
     @Test
     void doesNotMatchWrongAnd() {
         assertNotMatched(
-          "$..list[?(@.literal == 'no-match' && @.literal == '$.lists[0].list[0].object.list[0].literal')].literal",
-          complex
+                "$..list[?(@.literal == 'no-match' && @.literal == '$.lists[0].list[0].object.list[0].literal')].literal",
+                complex
         );
     }
 
@@ -581,9 +581,9 @@ class JsonPathMatcherTest {
     @Test
     void filterOnPropertyWithAnd() {
         assertMatched(
-          "$..list[?($.literal == '$.literal' && @.literal == '$.lists[0].list[0].object.list[0].literal')].literal",
-          complex,
-          List.of("\"literal\": \"$.lists[0].list[0].object.list[0].literal\"")
+                "$..list[?($.literal == '$.literal' && @.literal == '$.lists[0].list[0].object.list[0].literal')].literal",
+                complex,
+                List.of("\"literal\": \"$.lists[0].list[0].object.list[0].literal\"")
         );
     }
 
@@ -591,8 +591,8 @@ class JsonPathMatcherTest {
     @Test
     void doesNotMatchWrongOr() {
         assertNotMatched(
-          "$..list[?(@.literal == 'no-match-1' || @.literal == 'no-match-2')].literal",
-          complex
+                "$..list[?(@.literal == 'no-match-1' || @.literal == 'no-match-2')].literal",
+                complex
         );
     }
 
@@ -600,18 +600,18 @@ class JsonPathMatcherTest {
     @Test
     void filterOnPropertyWithOr() {
         assertMatched(
-          "$..list[?(@.literal == 'no-match' || @.literal == '$.lists[0].list[0].object.list[0].literal')].literal",
-          complex,
-          List.of("\"literal\": \"$.lists[0].list[0].object.list[0].literal\"")
+                "$..list[?(@.literal == 'no-match' || @.literal == '$.lists[0].list[0].object.list[0].literal')].literal",
+                complex,
+                List.of("\"literal\": \"$.lists[0].list[0].object.list[0].literal\"")
         );
     }
 
     @Test
     void unaryExpressionByAt() {
         assertMatched(
-          "$.list[?(@ == 'item 1')]",
-          listOfScalars,
-          List.of("\"item 1\"")
+                "$.list[?(@ == 'item 1')]",
+                listOfScalars,
+                List.of("\"item 1\"")
         );
     }
 
@@ -619,46 +619,46 @@ class JsonPathMatcherTest {
     @Test
     void unaryExpressionByBracketOperator() {
         assertMatched(
-          "$.list[?(@.['item1'])]",
-          sliceList,
-          List.of(
-            //language=json5
-            """
+                "$.list[?(@.['item1'])]",
+                sliceList,
+                List.of(
+                        //language=json5
+                        """
                   {
                     "item1": "index0",
                     "property": "property"
                   }
               """
-          )
+                )
         );
     }
 
     @Test
     void unaryExpressionByScope() {
         assertMatched(
-          "$.list[?(@.property)]",
-          sliceList,
-          //language=json5
-          List.of(
-            """
+                "$.list[?(@.property)]",
+                sliceList,
+                //language=json5
+                List.of(
+                        """
                   {
                     "item1": "index0",
                     "property": "property"
                   }
               """,
-            """
+                        """
                   {
                     "item2": "index1",
                     "property": "property"
                   }
               """,
-            """
+                        """
                   {
                     "item3": "index2",
                     "property": "property"
                   }
               """
-          )
+                )
         );
     }
 
@@ -666,29 +666,29 @@ class JsonPathMatcherTest {
     @Test
     void unaryExpressionByValue() {
         assertMatched(
-          "$.list[?(@.property == 'property')]",
-          sliceList,
-          List.of(
-            //language=json5
-            """
+                "$.list[?(@.property == 'property')]",
+                sliceList,
+                List.of(
+                        //language=json5
+                        """
                   {
                     "item1": "index0",
                     "property": "property"
                   }
               """,
-            """
+                        """
                   {
                     "item2": "index1",
                     "property": "property"
                   }
               """,
-            """
+                        """
                   {
                     "item3": "index2",
                     "property": "property"
                   }
               """
-          )
+                )
         );
     }
 
@@ -696,9 +696,9 @@ class JsonPathMatcherTest {
     @Test
     void filterOnPropertyWithMatches() {
         assertMatched(
-          "$..list[?(@.literal =~ '.*objects.*')].literal",
-          complex,
-          List.of("\"literal\": \"$.objects.object.list[0].literal\"")
+                "$..list[?(@.literal =~ '.*objects.*')].literal",
+                complex,
+                List.of("\"literal\": \"$.objects.object.list[0].literal\"")
         );
     }
 
@@ -706,9 +706,9 @@ class JsonPathMatcherTest {
     @Test
     void recursiveDecentToFilter() {
         assertMatched(
-          "$..[?(@.literal =~ '.*objects.object.literal.*')].literal",
-          complex,
-          List.of("\"literal\": \"$.objects.object.literal\"")
+                "$..[?(@.literal =~ '.*objects.object.literal.*')].literal",
+                complex,
+                List.of("\"literal\": \"$.objects.object.literal\"")
         );
     }
 
@@ -716,9 +716,9 @@ class JsonPathMatcherTest {
     @Test
     void nestedSequences() {
         assertMatched(
-          "$..list[*].[?(@.literal == '$.lists[0].list[0].object.list[0].literal')].literal",
-          complex,
-          List.of("\"literal\": \"$.lists[0].list[0].object.list[0].literal\"")
+                "$..list[*].[?(@.literal == '$.lists[0].list[0].object.list[0].literal')].literal",
+                complex,
+                List.of("\"literal\": \"$.lists[0].list[0].object.list[0].literal\"")
         );
     }
 
@@ -726,9 +726,9 @@ class JsonPathMatcherTest {
     @Test
     void matchesLiteralInListByFilterCondition() {
         assertMatched(
-          "$.list.*[?(@.item1 == 'index0')].item1",
-          sliceList,
-          List.of("\"item1\": \"index0\"")
+                "$.list.*[?(@.item1 == 'index0')].item1",
+                sliceList,
+                List.of("\"item1\": \"index0\"")
         );
     }
 
@@ -736,17 +736,17 @@ class JsonPathMatcherTest {
     @Test
     void matchesListWithByFilterConditionInList() {
         assertMatched(
-          "$.list.*[?(@.item3 == 'index2')]",
-          sliceList,
-          List.of(
-            //language=json5
-            """
+                "$.list.*[?(@.item3 == 'index2')]",
+                sliceList,
+                List.of(
+                        //language=json5
+                        """
                   {
                     "item3": "index2",
                     "property": "property"
                   }
               """
-          )
+                )
         );
     }
 
@@ -754,9 +754,9 @@ class JsonPathMatcherTest {
     @Test
     void multipleBinaryExpressions() {
         assertMatched(
-          "$.foo.bar[?(@.types == 'something' && @.group == 'group' && @.category == 'match' && @.type == 'type')].pattern",
-          List.of(
-            """
+                "$.foo.bar[?(@.types == 'something' && @.group == 'group' && @.category == 'match' && @.type == 'type')].pattern",
+                List.of(
+                        """
               {
                 "foo": {
                   "bar": [
@@ -778,8 +778,8 @@ class JsonPathMatcherTest {
                 }
               }
               """),
-          List.of("\"pattern\": \"p2\""
-          )
+                List.of("\"pattern\": \"p2\""
+                )
         );
     }
 
@@ -787,9 +787,9 @@ class JsonPathMatcherTest {
     @Test
     void noMatchWithBinaryExpressions() {
         assertMatched(
-          "$.foo.bar[?(@.types == 'something' && @.group == 'group' && @.category == 'nomatch' && @.type == 'type')].pattern",
-          List.of(
-            """
+                "$.foo.bar[?(@.types == 'something' && @.group == 'group' && @.category == 'nomatch' && @.type == 'type')].pattern",
+                List.of(
+                        """
               {
                 "foo": {
                   "bar": [
@@ -811,7 +811,7 @@ class JsonPathMatcherTest {
                 }
               }
               """),
-          Collections.emptyList()
+                Collections.emptyList()
         );
     }
 
@@ -827,16 +827,16 @@ class JsonPathMatcherTest {
                 return super.visitDocument(document, p);
             }
         }
-          .reduce(JsonParser.builder().build()
-            .parse(simple.toArray(new String[0]))
-            .findFirst()
-            .orElseThrow(() -> new IllegalArgumentException("Could not parse as JSON")), new ArrayList<>()))
-          .hasSize(1);
+                .reduce(JsonParser.builder().build()
+                        .parse(simple.toArray(new String[0]))
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalArgumentException("Could not parse as JSON")), new ArrayList<>()))
+                .hasSize(1);
     }
 
     private void assertNotMatched(String jsonPath, List<String> before) {
         var results = visit(before,
-          jsonPath, false);
+                jsonPath, false);
         assertThat(results).hasSize(0);
     }
 
@@ -845,12 +845,12 @@ class JsonPathMatcherTest {
     }
 
     private void assertMatched(List<String> before, List<String> after, String jsonPath,
-                               @SuppressWarnings("SameParameterValue") boolean printMatches) {
+            @SuppressWarnings("SameParameterValue") boolean printMatches) {
         var results = visit(before, jsonPath, printMatches);
         assertThat(results).hasSize(after.size());
         for (int i = 0; i < results.size(); i++) {
             assertThat(StringUtils.trimIndent(results.get(i)))
-              .isEqualTo(StringUtils.trimIndent(after.get(i)));
+                    .isEqualTo(StringUtils.trimIndent(after.get(i)));
         }
     }
 
@@ -919,8 +919,8 @@ class JsonPathMatcherTest {
                 return e;
             }
         }
-          .reduce(new JsonParser().parse(before.toArray(new String[0]))
-            .findFirst()
-            .orElseThrow(() -> new IllegalArgumentException("Could not parse as XML")), new ArrayList<>());
+                .reduce(new JsonParser().parse(before.toArray(new String[0]))
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalArgumentException("Could not parse as XML")), new ArrayList<>());
     }
 }

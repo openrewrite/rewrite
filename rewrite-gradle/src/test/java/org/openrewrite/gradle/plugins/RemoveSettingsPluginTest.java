@@ -26,15 +26,15 @@ class RemoveSettingsPluginTest implements RewriteTest {
     @Test
     void removePlugin() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveSettingsPlugin("com.gradle.enterprise")),
-          settingsGradle(
-            """
+                spec -> spec.recipe(new RemoveSettingsPlugin("com.gradle.enterprise")),
+                settingsGradle(
+                        """
               plugins {
                   id "com.gradle.enterprise" version "3.12.0"
               }
               """,
-            ""
-          )
+                        ""
+                )
         );
     }
 }

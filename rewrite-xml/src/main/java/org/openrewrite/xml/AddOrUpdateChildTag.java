@@ -52,8 +52,8 @@ public class AddOrUpdateChildTag extends Recipe {
     @Override
     public String getDescription() {
         return "Adds or updates a child element below the parent(s) matching the provided `parentXPath` expression. " +
-               "If a child with the same name already exists, it will be replaced by default. Otherwise, a new child will be added. " +
-               "This ensures idempotent behaviour.";
+                "If a child with the same name already exists, it will be replaced by default. Otherwise, a new child will be added. " +
+                "This ensures idempotent behaviour.";
     }
 
     @Override

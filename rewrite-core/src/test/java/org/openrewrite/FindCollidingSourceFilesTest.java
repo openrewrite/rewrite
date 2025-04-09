@@ -32,9 +32,9 @@ class FindCollidingSourceFilesTest implements RewriteTest {
     @Test
     void findsCollision() {
         rewriteRun(
-          text("", "~~(Duplicate source file foo.txt)~~>", spec -> spec.path("foo.txt")),
-          text("", "~~(Duplicate source file foo.txt)~~>", spec -> spec.path("foo.txt")),
-          text("", spec -> spec.path("bar.txt"))
+                text("", "~~(Duplicate source file foo.txt)~~>", spec -> spec.path("foo.txt")),
+                text("", "~~(Duplicate source file foo.txt)~~>", spec -> spec.path("foo.txt")),
+                text("", spec -> spec.path("bar.txt"))
         );
     }
 }

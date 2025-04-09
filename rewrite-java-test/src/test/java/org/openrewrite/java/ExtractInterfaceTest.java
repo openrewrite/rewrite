@@ -61,7 +61,7 @@ class ExtractInterfaceTest implements RewriteTest {
         @Override
         public Collection<? extends SourceFile> generate(AtomicReference<J.CompilationUnit> acc, ExecutionContext ctx) {
             return List.of((SourceFile) new ExtractInterface.CreateInterface("org.openrewrite.interfaces.ITest")
-              .visitNonNull(acc.get(), ctx));
+                    .visitNonNull(acc.get(), ctx));
         }
 
         @Override
@@ -74,9 +74,9 @@ class ExtractInterfaceTest implements RewriteTest {
     @Test
     void extractInterface() {
         rewriteRun(
-          spec -> spec.recipe(new ExtractTestInterface()).cycles(1).expectedCyclesThatMakeChanges(1),
-          java(
-            """
+                spec -> spec.recipe(new ExtractTestInterface()).cycles(1).expectedCyclesThatMakeChanges(1),
+                java(
+                        """
               package org.openrewrite;
 
               class Test {
@@ -96,7 +96,7 @@ class ExtractInterfaceTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package org.openrewrite;
                             
               import org.openrewrite.interfaces.ITest;
@@ -119,10 +119,10 @@ class ExtractInterfaceTest implements RewriteTest {
                   }
               }
               """
-          ),
-          java(
-            null,
-            """
+                ),
+                java(
+                        null,
+                        """
               package org.openrewrite.interfaces;
                             
               interface ITest {
@@ -130,8 +130,8 @@ class ExtractInterfaceTest implements RewriteTest {
                   int test();
               }
               """,
-            spec -> spec.path("org/openrewrite/interfaces/ITest.java")
-          )
+                        spec -> spec.path("org/openrewrite/interfaces/ITest.java")
+                )
         );
     }
 }

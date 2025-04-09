@@ -36,9 +36,9 @@ class ChangeDependencyExtensionTest implements RewriteTest {
     @Test
     void worksWithEmptyStringConfig() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyExtension("org.openrewrite", "*", "war", "")),
-          buildGradle(
-            """
+                spec -> spec.recipe(new ChangeDependencyExtension("org.openrewrite", "*", "war", "")),
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -51,7 +51,7 @@ class ChangeDependencyExtensionTest implements RewriteTest {
                   api 'org.openrewrite:rewrite-gradle:latest.integration@jar'
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -64,7 +64,7 @@ class ChangeDependencyExtensionTest implements RewriteTest {
                   api 'org.openrewrite:rewrite-gradle:latest.integration@war'
               }
               """
-          )
+                )
         );
     }
 
@@ -72,9 +72,9 @@ class ChangeDependencyExtensionTest implements RewriteTest {
     @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
     void findDependency(String group, String artifact) {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyExtension(group, artifact, "war", null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new ChangeDependencyExtension(group, artifact, "war", null)),
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -88,7 +88,7 @@ class ChangeDependencyExtensionTest implements RewriteTest {
                   api "org.openrewrite:rewrite-core:latest.release@jar"
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -102,7 +102,7 @@ class ChangeDependencyExtensionTest implements RewriteTest {
                   api "org.openrewrite:rewrite-core:latest.release@war"
               }
               """
-          )
+                )
         );
     }
 
@@ -110,9 +110,9 @@ class ChangeDependencyExtensionTest implements RewriteTest {
     @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
     void findMapStyleDependency(String group, String artifact) {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyExtension(group, artifact, "war", null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new ChangeDependencyExtension(group, artifact, "war", null)),
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -126,7 +126,7 @@ class ChangeDependencyExtensionTest implements RewriteTest {
                   api group: "org.openrewrite", name: "rewrite-core", version: "latest.release", ext: "jar"
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -140,7 +140,7 @@ class ChangeDependencyExtensionTest implements RewriteTest {
                   api group: "org.openrewrite", name: "rewrite-core", version: "latest.release", ext: "war"
               }
               """
-          )
+                )
         );
     }
 
@@ -148,9 +148,9 @@ class ChangeDependencyExtensionTest implements RewriteTest {
     @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
     void worksWithoutVersion(String group, String artifact) {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyExtension(group, artifact, "war", null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new ChangeDependencyExtension(group, artifact, "war", null)),
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -165,7 +165,7 @@ class ChangeDependencyExtensionTest implements RewriteTest {
                   api group: "org.openrewrite", name: "rewrite-core", ext: "jar"
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -180,7 +180,7 @@ class ChangeDependencyExtensionTest implements RewriteTest {
                   api group: "org.openrewrite", name: "rewrite-core", ext: "war"
               }
               """
-          )
+                )
         );
     }
 
@@ -188,9 +188,9 @@ class ChangeDependencyExtensionTest implements RewriteTest {
     @CsvSource(value = {"org.eclipse.jetty:jetty-servlet", "*:*"}, delimiterString = ":")
     void worksWithClassifier(String group, String artifact) {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyExtension(group, artifact, "war", null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new ChangeDependencyExtension(group, artifact, "war", null)),
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -206,7 +206,7 @@ class ChangeDependencyExtensionTest implements RewriteTest {
                   api group: "org.eclipse.jetty", name: "jetty-servlet", version: "9.4.50.v20221201", classifier: "tests", ext: "jar"
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -222,16 +222,16 @@ class ChangeDependencyExtensionTest implements RewriteTest {
                   api group: "org.eclipse.jetty", name: "jetty-servlet", version: "9.4.50.v20221201", classifier: "tests", ext: "war"
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void worksWithDependencyDefinedInJvmTestSuite() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyExtension("org.openrewrite", "*", "war", "")),
-          buildGradle(
-            """
+                spec -> spec.recipe(new ChangeDependencyExtension("org.openrewrite", "*", "war", "")),
+                buildGradle(
+                        """
               plugins {
                   id "java-library"
                   id 'jvm-test-suite'
@@ -251,7 +251,7 @@ class ChangeDependencyExtensionTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               plugins {
                   id "java-library"
                   id 'jvm-test-suite'
@@ -271,16 +271,16 @@ class ChangeDependencyExtensionTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void worksWithDependencyDefinedInBuildScript() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyExtension("org.openrewrite", "*", "war", "")),
-          buildGradle(
-            """
+                spec -> spec.recipe(new ChangeDependencyExtension("org.openrewrite", "*", "war", "")),
+                buildGradle(
+                        """
               buildscript {
                   repositories {
                       gradlePluginPortal()
@@ -290,7 +290,7 @@ class ChangeDependencyExtensionTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               buildscript {
                   repositories {
                       gradlePluginPortal()
@@ -300,16 +300,16 @@ class ChangeDependencyExtensionTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void dependenciesBlockInFreestandingScript() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyExtension("org.openrewrite", "*", "war", "")),
-          buildGradle(
-            """
+                spec -> spec.recipe(new ChangeDependencyExtension("org.openrewrite", "*", "war", "")),
+                buildGradle(
+                        """
               repositories {
                   mavenLocal()
                   mavenCentral()
@@ -321,7 +321,7 @@ class ChangeDependencyExtensionTest implements RewriteTest {
                   implementation("org.openrewrite:rewrite-gradle:latest.integration@jar")
               }
               """,
-            """
+                        """
               repositories {
                   mavenLocal()
                   mavenCentral()
@@ -333,16 +333,16 @@ class ChangeDependencyExtensionTest implements RewriteTest {
                   implementation("org.openrewrite:rewrite-gradle:latest.integration@war")
               }
               """,
-            spec -> spec.path("dependencies.gradle")
-          ),
-          buildGradle(
-            """
+                        spec -> spec.path("dependencies.gradle")
+                ),
+                buildGradle(
+                        """
               plugins {
                   id("java")
               }
               apply from: 'dependencies.gradle'
               """
-          )
+                )
         );
     }
 }

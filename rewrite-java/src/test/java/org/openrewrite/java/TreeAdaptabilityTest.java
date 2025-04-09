@@ -30,8 +30,11 @@ class TreeAdaptabilityTest implements RewriteTest {
     @Test
     void adaptParameterizedPlainTextTreeVisitor() {
         //noinspection rawtypes
-        assertThat(new PlainTextVisitor() {}.isAdaptableTo(JavaVisitor.class)).isFalse();
-        assertThat(new TreeVisitor<PlainText,Integer > () {}.isAdaptableTo(JavaVisitor.class)).isFalse();
-        assertThat(new TreeVisitor<Tree, Integer>() {}.isAdaptableTo(PlainTextVisitor.class)).isTrue();
+        assertThat(new PlainTextVisitor() {
+        }.isAdaptableTo(JavaVisitor.class)).isFalse();
+        assertThat(new TreeVisitor<PlainText, Integer>() {
+        }.isAdaptableTo(JavaVisitor.class)).isFalse();
+        assertThat(new TreeVisitor<Tree, Integer>() {
+        }.isAdaptableTo(PlainTextVisitor.class)).isTrue();
     }
 }

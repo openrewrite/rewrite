@@ -32,8 +32,8 @@ class VariableDeclarationsTest implements RewriteTest {
     @Test
     void generic() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.Collections;
               import java.util.ArrayList;
               
@@ -44,20 +44,20 @@ class VariableDeclarationsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void fieldDefinition() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   public String a = "";
               }
               """
-          )
+                )
         );
     }
 
@@ -65,41 +65,41 @@ class VariableDeclarationsTest implements RewriteTest {
     @MinimumJava11
     void finalVar() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       final var a = "";
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void localVariableDefinition() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   String a = "";
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void fieldWithNoInitializer() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   public String a;
               }
               """
-          )
+                )
         );
     }
 
@@ -107,8 +107,8 @@ class VariableDeclarationsTest implements RewriteTest {
     @Test
     void arrayVariables() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
                class Test {
                   int n [ ];
                   String s [ ] [ ];
@@ -116,22 +116,22 @@ class VariableDeclarationsTest implements RewriteTest {
                   String [ ] [ ] s2;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void multipleDeclarationOneAssignment() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       int i , j = 0;
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -139,15 +139,15 @@ class VariableDeclarationsTest implements RewriteTest {
     @Test
     void multipleDeclaration() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       Integer[] m = { 0 }, n[] = { { 0 } };
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -157,40 +157,40 @@ class VariableDeclarationsTest implements RewriteTest {
     @Test
     void modifierOrdering() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   public /* static */ final static Integer n = 0;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void primitiveClassType() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   public String fred;
                   public Class<?> a = boolean.class;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void voidClassType() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               @interface Test {
                   Class<?> interfaceClass() default void.class;
               }
               """
-          )
+                )
         );
     }
 
@@ -198,8 +198,8 @@ class VariableDeclarationsTest implements RewriteTest {
     @Test
     void implicitlyDeclaredLocalVariable() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       var a = "";
@@ -210,7 +210,7 @@ class VariableDeclarationsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -218,23 +218,23 @@ class VariableDeclarationsTest implements RewriteTest {
     @Test
     void string() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class Test {
                   static {
                       var a = "";
                   }
               }
               """,
-            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
-                @Override
-                public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, Object o) {
-                    assertThat(requireNonNull(multiVariable.getTypeAsFullyQualified()).getFullyQualifiedName())
-                      .isEqualTo("java.lang.String");
-                    return multiVariable;
-                }
-            })
-          )
+                        spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                            @Override
+                            public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, Object o) {
+                                assertThat(requireNonNull(multiVariable.getTypeAsFullyQualified()).getFullyQualifiedName())
+                                        .isEqualTo("java.lang.String");
+                                return multiVariable;
+                            }
+                        })
+                )
         );
     }
 
@@ -242,8 +242,8 @@ class VariableDeclarationsTest implements RewriteTest {
     @Test
     void typeOnVarKeyword() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.Date;
               public class Test {
                   static {
@@ -251,18 +251,18 @@ class VariableDeclarationsTest implements RewriteTest {
                   }
               }
               """,
-            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
-                @Override
-                public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, Object o) {
-                    assertThat(multiVariable.getMarkers().findFirst(JavaVarKeyword.class)).isPresent();
-                    TypeTree typeExpression = multiVariable.getTypeExpression();
-                    assertThat(typeExpression).isNotNull();
-                    assertThat(requireNonNull(TypeUtils.asFullyQualified(typeExpression.getType()))
-                      .getFullyQualifiedName()).isEqualTo("java.util.Date");
-                    return multiVariable;
-                }
-            })
-          )
+                        spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                            @Override
+                            public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, Object o) {
+                                assertThat(multiVariable.getMarkers().findFirst(JavaVarKeyword.class)).isPresent();
+                                TypeTree typeExpression = multiVariable.getTypeExpression();
+                                assertThat(typeExpression).isNotNull();
+                                assertThat(requireNonNull(TypeUtils.asFullyQualified(typeExpression.getType()))
+                                        .getFullyQualifiedName()).isEqualTo("java.util.Date");
+                                return multiVariable;
+                            }
+                        })
+                )
         );
     }
 
@@ -270,16 +270,16 @@ class VariableDeclarationsTest implements RewriteTest {
     @MinimumJava11
     void unknownVar() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
-          java(
-            """
+                spec -> spec.typeValidationOptions(TypeValidation.none()),
+                java(
+                        """
               class Test {
                   void test(Unknown b) {
                       final var a = b;
                   }
               }
               """
-          )
+                )
         );
     }
 }

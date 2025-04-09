@@ -25,12 +25,12 @@ class HclVariableExpressionTest implements RewriteTest {
     @Test
     void variableExpression() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               a = true
               b = a
               """
-          )
+                )
         );
     }
 }

@@ -49,7 +49,7 @@ public class FindComments extends Recipe {
     @Override
     public String getDescription() {
         return "Find regular expression matches within comments and literals. \"Literals\" includes string literals, " +
-               "character literals, and numeric literals.";
+                "character literals, and numeric literals.";
     }
 
     @Override

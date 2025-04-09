@@ -49,9 +49,9 @@ class ChangeLiteralTest implements RewriteTest {
     @Test
     void changeStringLiteralArgument() {
         rewriteRun(
-          java(b),
-          java(
-            """
+                java(b),
+                java(
+                        """
               import b.*;
               class A {
                  public void test() {
@@ -60,7 +60,7 @@ class ChangeLiteralTest implements RewriteTest {
                  }
               }
               """,
-            """
+                        """
               import b.*;
               class A {
                  public void test() {
@@ -69,16 +69,16 @@ class ChangeLiteralTest implements RewriteTest {
                  }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void changeStringLiteralArgumentWithEscapableCharacters() {
         rewriteRun(
-          java(b),
-          java(
-            """
+                java(b),
+                java(
+                        """
               import b.*;
               public class A {
                   B b;
@@ -87,7 +87,7 @@ class ChangeLiteralTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import b.*;
               public class A {
                   B b;
@@ -96,7 +96,7 @@ class ChangeLiteralTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

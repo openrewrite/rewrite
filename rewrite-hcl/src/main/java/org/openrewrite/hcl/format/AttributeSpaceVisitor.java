@@ -85,7 +85,7 @@ public class AttributeSpaceVisitor<P> extends HclIsoVisitor<P> {
                     allAttributes.add((Hcl.Attribute) bc);
                 }
             }
-        }else {
+        } else {
             for (final Expression expr : ((Hcl.ObjectValue) parent).getAttributes()) {
                 if (expr instanceof Hcl.Attribute) {
                     allAttributes.add((Hcl.Attribute) expr);
@@ -98,7 +98,7 @@ public class AttributeSpaceVisitor<P> extends HclIsoVisitor<P> {
     // find group of attributes (attributes with no extra newlines) containing given attribute
     private List<Hcl.Attribute> attributesInGroup(List<Hcl.Attribute> siblings, Hcl.Attribute attribute) {
         boolean isAttributeMultiline = attribute.getValue().print(getCursor()).split("\r\n|\r|\n").length > 2;
-       if (isAttributeMultiline) {
+        if (isAttributeMultiline) {
             return Collections.singletonList(attribute);
         }
 
@@ -110,7 +110,7 @@ public class AttributeSpaceVisitor<P> extends HclIsoVisitor<P> {
                 boolean siblingPrefixHasNewLines = sibling.getPrefix().getWhitespace().split("\r\n|\r|\n").length > 2;
                 boolean siblingIsMultiline = sibling.getValue().print(getCursor()).split("\r\n|\r|\n").length > 2;
                 boolean previousSiblingIsMultiline = perviousSibling != null && perviousSibling.getValue().print(getCursor()).split("\r\n|\r|\n").length > 2;
-                boolean newGroup  = siblingPrefixHasNewLines || previousSiblingIsMultiline || siblingIsMultiline;
+                boolean newGroup = siblingPrefixHasNewLines || previousSiblingIsMultiline || siblingIsMultiline;
                 if (newGroup) {
                     if (groupFound) {
                         break;

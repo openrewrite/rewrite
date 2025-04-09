@@ -84,7 +84,7 @@ public class AddCommentToMethod extends Recipe {
 
                     boolean isMultiline = Boolean.TRUE.equals(AddCommentToMethod.this.isMultiline);
                     Matcher matcher = NEWLINE.matcher(comment);
-                    String newCommentText = matcher.find() ? matcher.replaceAll(isMultiline ? methodPrefixWhitespace: " ") : comment;
+                    String newCommentText = matcher.find() ? matcher.replaceAll(isMultiline ? methodPrefixWhitespace : " ") : comment;
 
                     if (doesNotHaveComment(newCommentText, md.getComments())) {
                         TextComment textComment = new TextComment(isMultiline, newCommentText, methodPrefixWhitespace, Markers.EMPTY);
@@ -97,7 +97,7 @@ public class AddCommentToMethod extends Recipe {
             private boolean doesNotHaveComment(String lookFor, List<Comment> comments) {
                 for (Comment c : comments) {
                     if (c instanceof TextComment &&
-                        lookFor.equals(((TextComment) c).getText())) {
+                            lookFor.equals(((TextComment) c).getText())) {
                         return false;
                     }
                 }

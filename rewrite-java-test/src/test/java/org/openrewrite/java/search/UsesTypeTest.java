@@ -28,19 +28,19 @@ class UsesTypeTest implements RewriteTest {
     @Test
     void primitiveTypes() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("double", false))),
-          java(
-            """
+                spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("double", false))),
+                java(
+                        """
               class Test {
                   double d = 1d;
               }
               """,
-            """
+                        """
               /*~~>*/class Test {
                   double d = 1d;
               }
               """
-          )
+                )
         );
     }
 
@@ -48,9 +48,9 @@ class UsesTypeTest implements RewriteTest {
     @Test
     void emptyConstructor() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.ArrayList", false))),
-          java(
-            """
+                spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.ArrayList", false))),
+                java(
+                        """
               import java.util.ArrayList;
               import java.util.List;
                             
@@ -58,7 +58,7 @@ class UsesTypeTest implements RewriteTest {
                   List<String> l = new ArrayList<>();
               }
               """,
-            """
+                        """
               /*~~>*/import java.util.ArrayList;
               import java.util.List;
                             
@@ -66,7 +66,7 @@ class UsesTypeTest implements RewriteTest {
                   List<String> l = new ArrayList<>();
               }
               """
-          )
+                )
         );
     }
 
@@ -74,23 +74,23 @@ class UsesTypeTest implements RewriteTest {
     @Test
     void usesTypeFindsImports() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.Collections", false))),
-          java(
-            """
+                spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.Collections", false))),
+                java(
+                        """
               import java.io.File;
               import java.util.Collections;
                             
               class Test {
               }
               """,
-            """
+                        """
               /*~~>*/import java.io.File;
               import java.util.Collections;
                             
               class Test {
               }
               """
-          )
+                )
         );
     }
 
@@ -100,24 +100,24 @@ class UsesTypeTest implements RewriteTest {
     @Test
     void usesTypeWildcardFindsImports() {
         rewriteRun(
-          spec ->
-            spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.*", false))),
-          java(
-            """
+                spec ->
+                        spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.*", false))),
+                java(
+                        """
               import java.io.File;
               import static java.util.Collections.singleton;
                             
               class Test {
               }
               """,
-            """
+                        """
               /*~~>*/import java.io.File;
               import static java.util.Collections.singleton;
                             
               class Test {
               }
               """
-          )
+                )
         );
     }
 
@@ -127,34 +127,34 @@ class UsesTypeTest implements RewriteTest {
     @Test
     void usesRecursiveTypeWildcard() {
         rewriteRun(
-          spec ->
-            spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java..*", false))),
-          java(
-            """
+                spec ->
+                        spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java..*", false))),
+                java(
+                        """
               import java.io.File;
               import static java.util.Collections.singleton;
                             
               class Test {
               }
               """,
-            """
+                        """
               /*~~>*/import java.io.File;
               import static java.util.Collections.singleton;
                             
               class Test {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void usesFullyQualifiedReference() {
         rewriteRun(
-          spec ->
-            spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.*", false))),
-          java(
-            """
+                spec ->
+                        spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.*", false))),
+                java(
+                        """
               import java.util.Set;
               class Test {
                   void test() {
@@ -162,7 +162,7 @@ class UsesTypeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               /*~~>*/import java.util.Set;
               class Test {
                   void test() {
@@ -170,28 +170,28 @@ class UsesTypeTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void usesTypeFindsInheritedTypes() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.Collection", false))),
-          java(
-            """
+                spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.Collection", false))),
+                java(
+                        """
               import java.util.List;
               
               class Test {
               }
               """,
-            """
+                        """
               /*~~>*/import java.util.List;
               
               class Test {
               }
               """
-          )
+                )
         );
     }
 
@@ -199,23 +199,23 @@ class UsesTypeTest implements RewriteTest {
     @Test
     void findImplicitTypes() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.List", true))),
-          java(
-            """
+                spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.List", true))),
+                java(
+                        """
               import java.util.Collections;
               
               class Test {
                   int zero = Collections.emptyList().size();
               }
               """,
-            """
+                        """
               /*~~>*/import java.util.Collections;
               
               class Test {
                   int zero = Collections.emptyList().size();
               }
               """
-          )
+                )
         );
     }
 
@@ -223,16 +223,16 @@ class UsesTypeTest implements RewriteTest {
     @Test
     void findImplicitTypesFalse() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.List", false))),
-          java(
-            """
+                spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.List", false))),
+                java(
+                        """
               import java.util.Collections;
               
               class Test {
                   int zero = Collections.emptyList().size();
               }
               """
-          )
+                )
         );
     }
 
@@ -240,9 +240,9 @@ class UsesTypeTest implements RewriteTest {
     @Test
     void findImplicitTypesParams() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.List", true))),
-          java(
-            """
+                spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.List", true))),
+                java(
+                        """
               import java.util.Collections;
               
               class Test {
@@ -251,7 +251,7 @@ class UsesTypeTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               /*~~>*/import java.util.Collections;
               
               class Test {
@@ -260,7 +260,7 @@ class UsesTypeTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -268,9 +268,9 @@ class UsesTypeTest implements RewriteTest {
     @Test
     void findImplicitTypesParamsFalse() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.List", false))),
-          java(
-            """
+                spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.List", false))),
+                java(
+                        """
               import java.util.Collections;
               
               class Test {
@@ -279,28 +279,28 @@ class UsesTypeTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void findNestedType() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.Map.Entry", false))),
-          java(
-            """
+                spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.Map.Entry", false))),
+                java(
+                        """
               import java.util.Map.Entry;
               
               class Test {
               }
               """,
-            """
+                        """
               /*~~>*/import java.util.Map.Entry;
               
               class Test {
               }
               """
-          )
+                )
         );
     }
 }

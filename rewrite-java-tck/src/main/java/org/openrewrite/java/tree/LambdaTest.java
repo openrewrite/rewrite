@@ -26,8 +26,8 @@ class LambdaTest implements RewriteTest {
     @Test
     void lambda() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.function.Function;
               class Test {
                   void test() {
@@ -35,15 +35,15 @@ class LambdaTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void untypedLambdaParameter() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.*;
               class Test {
                   void test() {
@@ -52,15 +52,15 @@ class LambdaTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void optionalSingleParameterParentheses() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.*;
               class Test {
                   void test() {
@@ -69,15 +69,15 @@ class LambdaTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void rightSideBlock() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   Action a = ( ) -> { };
               }
@@ -86,15 +86,15 @@ class LambdaTest implements RewriteTest {
                   void call();
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void multipleParameters() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.function.BiConsumer;
               class Test {
                   void test() {
@@ -102,7 +102,7 @@ class LambdaTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

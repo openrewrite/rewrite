@@ -192,9 +192,9 @@ public interface Properties extends Tree {
 
             public static Delimiter getDelimiter(String value) {
                 return "=".equals(value.trim()) ? Delimiter.EQUALS :
-                            ":".equals(value.trim()) ? Delimiter.COLON :
-                            "".equals(value.trim()) ? Delimiter.NONE :
-                                    Delimiter.EQUALS;
+                        ":".equals(value.trim()) ? Delimiter.COLON :
+                                "".equals(value.trim()) ? Delimiter.NONE :
+                                        Delimiter.EQUALS;
             }
         }
     }
@@ -262,6 +262,7 @@ public interface Properties extends Tree {
 
     class Continuation {
         private static final Pattern LINE_CONTINUATION_PATTERN = Pattern.compile("\\\\\\R\\s*");
+
         static String getValue(String input) {
             return LINE_CONTINUATION_PATTERN.matcher(input).replaceAll("");
         }

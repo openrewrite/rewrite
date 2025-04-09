@@ -73,7 +73,7 @@ public class EmptyNewlineAtEndOfFile extends Recipe {
 
                     Space eof = cu.getEof();
                     if (StringUtils.isBlank(eof.getLastWhitespace()) &&
-                        eof.getLastWhitespace().chars().filter(c -> c == '\n').count() != 1) {
+                            eof.getLastWhitespace().chars().filter(c -> c == '\n').count() != 1) {
                         if (eof.getComments().isEmpty()) {
                             return cu.withEof(Space.format(lineEnding));
                         } else {

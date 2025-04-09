@@ -27,9 +27,9 @@ class RemovePluginDependencyTest implements RewriteTest {
     @Test
     void removeDependency() {
         rewriteRun(
-          spec -> spec.recipe(new RemovePluginDependency("org.apache.maven.plugins", "maven-surefire-plugin", "org.apache.maven.surefire", "surefire-junit*")),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemovePluginDependency("org.apache.maven.plugins", "maven-surefire-plugin", "org.apache.maven.surefire", "surefire-junit*")),
+                pomXml(
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <modelVersion>4.0.0</modelVersion>
@@ -60,7 +60,7 @@ class RemovePluginDependencyTest implements RewriteTest {
                 </build>
               </project>
               """,
-              """
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <modelVersion>4.0.0</modelVersion>
@@ -86,16 +86,16 @@ class RemovePluginDependencyTest implements RewriteTest {
                 </build>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void removeLastDependency() {
         rewriteRun(
-          spec -> spec.recipe(new RemovePluginDependency("org.apache.maven.plugins", "maven-surefire-plugin", "org.apache.maven.surefire", "surefire-junit*")),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemovePluginDependency("org.apache.maven.plugins", "maven-surefire-plugin", "org.apache.maven.surefire", "surefire-junit*")),
+                pomXml(
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <modelVersion>4.0.0</modelVersion>
@@ -121,7 +121,7 @@ class RemovePluginDependencyTest implements RewriteTest {
                 </build>
               </project>
               """,
-              """
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <modelVersion>4.0.0</modelVersion>
@@ -140,16 +140,16 @@ class RemovePluginDependencyTest implements RewriteTest {
                 </build>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void wrongPlugin() {
         rewriteRun(
-          spec -> spec.recipe(new RemovePluginDependency("org.foo", "foo", "org.apache.maven.surefire", "surefire-junit*")),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemovePluginDependency("org.foo", "foo", "org.apache.maven.surefire", "surefire-junit*")),
+                pomXml(
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <modelVersion>4.0.0</modelVersion>
@@ -175,7 +175,7 @@ class RemovePluginDependencyTest implements RewriteTest {
                 </build>
               </project>
               """
-          )
+                )
         );
     }
 }

@@ -26,94 +26,94 @@ class ChangeAnnotationAttributeNameTest implements RewriteTest {
     @Test
     void renameAttributeName() {
         rewriteRun(
-            spec -> spec.recipe(new ChangeAnnotationAttributeName("java.lang.Deprecated", "since", "asOf")),
-            //language=java
-            java(
-                """
+                spec -> spec.recipe(new ChangeAnnotationAttributeName("java.lang.Deprecated", "since", "asOf")),
+                //language=java
+                java(
+                        """
                 @Deprecated(since = "1.0")
                 class A {}
                 """,
-                """
+                        """
                 @Deprecated(asOf = "1.0")
                 class A {}
                 """
-            )
+                )
         );
     }
 
     @Test
     void doNotChangeIdenticalAssignment() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeAnnotationAttributeName("java.lang.SuppressWarnings", "value", "value")),
-          java(
-            """
+                spec -> spec.recipe(new ChangeAnnotationAttributeName("java.lang.SuppressWarnings", "value", "value")),
+                java(
+                        """
               @SuppressWarnings(value = {"foo", "bar"})
               class A {}
               """
-          )
+                )
         );
     }
 
     @Test
     void renameValueAttribute() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeAnnotationAttributeName("org.example.Foo", "value", "bar")),
-          java(
-            """
+                spec -> spec.recipe(new ChangeAnnotationAttributeName("org.example.Foo", "value", "bar")),
+                java(
+                        """
               package org.example;
               public @interface Foo {
                   String value() default "";
                   String bar() default "";
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import org.example.Foo;
                             
               @Foo(/* some comment */ "1.0")
               class A {}
               """,
-            """
+                        """
               import org.example.Foo;
                             
               @Foo(/* some comment */ bar = "1.0")
               class A {}
               """
-          )
+                )
         );
     }
 
     @Test
     void expandImplicitValueAttribute() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeAnnotationAttributeName("java.lang.SuppressWarnings", "value", "value")),
-          java(
-            """
+                spec -> spec.recipe(new ChangeAnnotationAttributeName("java.lang.SuppressWarnings", "value", "value")),
+                java(
+                        """
               @SuppressWarnings({"foo", "bar"})
               class A {}
               """,
-            """
+                        """
               @SuppressWarnings(value = {"foo", "bar"})
               class A {}
               """
-          )
+                )
         );
     }
 
     @Test
     void rewriteEnumValue() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeAnnotationAttributeName("org.example.Foo", "value", "bar")),
-          java(
-            """
+                spec -> spec.recipe(new ChangeAnnotationAttributeName("org.example.Foo", "value", "bar")),
+                java(
+                        """
               package org.example;
                             
               public enum E { A, B }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package org.example;
 
               public @interface Foo {
@@ -121,23 +121,23 @@ class ChangeAnnotationAttributeNameTest implements RewriteTest {
                   E bar() default E.A;
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import org.example.E;
               import org.example.Foo;
                             
               @Foo(E.B)
               class A {}
               """,
-            """
+                        """
               import org.example.E;
               import org.example.Foo;
                             
               @Foo(bar = E.B)
               class A {}
               """
-          )
+                )
         );
     }
 }

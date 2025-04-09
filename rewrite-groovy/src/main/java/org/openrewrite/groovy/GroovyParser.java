@@ -77,7 +77,7 @@ public class GroovyParser implements Parser {
                             String pkg = packageMatcher.find() ? packageMatcher.group(1).replace('.', '/') + "/" : "";
 
                             String className = Optional.ofNullable(simpleName.apply(sourceFile))
-                                                       .orElse(Long.toString(System.nanoTime())) + ".java";
+                                    .orElse(Long.toString(System.nanoTime())) + ".java";
 
                             Path path = Paths.get(pkg + className);
                             return Input.fromString(path, sourceFile);
@@ -174,7 +174,7 @@ public class GroovyParser implements Parser {
     @Override
     public boolean accept(Path path) {
         return path.toString().endsWith(".groovy") ||
-               path.toFile().getName().startsWith("Jenkinsfile");
+                path.toFile().getName().startsWith("Jenkinsfile");
     }
 
     @Override

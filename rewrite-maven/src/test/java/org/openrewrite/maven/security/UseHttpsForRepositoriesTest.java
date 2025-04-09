@@ -33,8 +33,8 @@ class UseHttpsForRepositoriesTest implements RewriteTest {
     @Test
     void replaceHttpInRepositoryBlock() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <groupId>org.openrewrite.example</groupId>
                 <artifactId>my-app</artifactId>
@@ -47,7 +47,7 @@ class UseHttpsForRepositoriesTest implements RewriteTest {
                 </repositories>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>org.openrewrite.example</groupId>
                 <artifactId>my-app</artifactId>
@@ -60,15 +60,15 @@ class UseHttpsForRepositoriesTest implements RewriteTest {
                 </repositories>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void replaceHttpInDistributionManagementBlock() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
 
@@ -88,7 +88,7 @@ class UseHttpsForRepositoriesTest implements RewriteTest {
                 </distributionManagement>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
 
@@ -108,15 +108,15 @@ class UseHttpsForRepositoriesTest implements RewriteTest {
                 </distributionManagement>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void replaceHttpInPluginRepositoriesBlock() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
 
@@ -132,7 +132,7 @@ class UseHttpsForRepositoriesTest implements RewriteTest {
                 </pluginRepositories>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
 
@@ -148,15 +148,15 @@ class UseHttpsForRepositoriesTest implements RewriteTest {
                 </pluginRepositories>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void replaceHttpInRepositoryBlockFromProperties() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>org.openrewrite.example</groupId>
@@ -173,7 +173,7 @@ class UseHttpsForRepositoriesTest implements RewriteTest {
                 </repositories>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>org.openrewrite.example</groupId>
@@ -190,7 +190,7 @@ class UseHttpsForRepositoriesTest implements RewriteTest {
                 </repositories>
               </project>
               """
-          )
+                )
         );
     }
 }

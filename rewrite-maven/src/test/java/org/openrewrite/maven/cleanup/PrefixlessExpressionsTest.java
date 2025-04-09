@@ -33,8 +33,8 @@ class PrefixlessExpressionsTest implements RewriteTest {
     @Test
     void renamePrefixlessExpressions() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>com.mycompany.app</groupId>
@@ -67,7 +67,7 @@ class PrefixlessExpressionsTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>com.mycompany.app</groupId>
@@ -100,7 +100,7 @@ class PrefixlessExpressionsTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 }

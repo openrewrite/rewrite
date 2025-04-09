@@ -83,7 +83,7 @@ public class EffectiveDependencies extends Recipe {
     }
 
     private void emitDependency(ResolvedGroupArtifactVersion gav, List<ResolvedDependency> dependencies,
-                                ExecutionContext ctx, String javaProject, String javaSourceSet) {
+            ExecutionContext ctx, String javaProject, String javaSourceSet) {
         for (ResolvedDependency d : dependencies) {
             dependencyGraph.insertRow(ctx, new DependencyGraph.Row(
                     javaProject,

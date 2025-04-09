@@ -123,10 +123,10 @@ public class AddLiteralMethodArgument extends Recipe {
                 if (StringUtils.isBlank(primitiveType) || "string".equalsIgnoreCase(primitiveType)) {
                     primitive = Primitive.String;
                     valueSource = String.format("\"%s\"", getLiteral());
-                } else if(primitiveType.equalsIgnoreCase("char")){
+                } else if (primitiveType.equalsIgnoreCase("char")) {
                     primitive = Primitive.Char;
                     valueSource = String.format("'%s'", getLiteral());
-                }else {
+                } else {
                     primitive = Primitive.fromKeyword(primitiveType.toLowerCase());
                     valueSource = String.valueOf(getLiteral());
                 }

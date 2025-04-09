@@ -56,9 +56,9 @@ class PadEmptyForLoopComponentsTest implements RewriteTest {
     @Test
     void addSpaceToEmptyInitializer() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(namedStyles(singletonList(new EmptyForInitializerPadStyle(true))))),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(namedStyles(singletonList(new EmptyForInitializerPadStyle(true))))),
+                java(
+                        """
               public class A {
                   {
                       int i = 0;
@@ -67,7 +67,7 @@ class PadEmptyForLoopComponentsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   {
                       int i = 0;
@@ -76,17 +76,17 @@ class PadEmptyForLoopComponentsTest implements RewriteTest {
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
     @Test
     void removeSpaceFromEmptyInitializer() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(namedStyles(singletonList(new EmptyForInitializerPadStyle(false))))),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(namedStyles(singletonList(new EmptyForInitializerPadStyle(false))))),
+                java(
+                        """
               public class A {
                   {
                       int i = 0;
@@ -95,7 +95,7 @@ class PadEmptyForLoopComponentsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   {
                       int i = 0;
@@ -104,17 +104,17 @@ class PadEmptyForLoopComponentsTest implements RewriteTest {
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
     @Test
     void addSpaceToEmptyIterator() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(namedStyles(singletonList(new EmptyForInitializerPadStyle(true))))),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(namedStyles(singletonList(new EmptyForInitializerPadStyle(true))))),
+                java(
+                        """
               public class A {
                   {
                       int i = 0;
@@ -122,17 +122,17 @@ class PadEmptyForLoopComponentsTest implements RewriteTest {
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
     @Test
     void removeSpaceFromEmptyIterator() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(namedStyles(singletonList(new EmptyForInitializerPadStyle(false))))),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(namedStyles(singletonList(new EmptyForInitializerPadStyle(false))))),
+                java(
+                        """
               public class A {
                   {
                       int i = 0;
@@ -140,14 +140,14 @@ class PadEmptyForLoopComponentsTest implements RewriteTest {
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
     private static Consumer<SourceSpec<J.CompilationUnit>> autoFormatIsIdempotent() {
         return spec -> spec.afterRecipe(cu ->
-          org.assertj.core.api.Assertions.assertThat(new SpacesVisitor<>(IntelliJ.spaces(), null,
-            new EmptyForIteratorPadStyle(false)).visit(cu, 0)).isEqualTo(cu));
+                org.assertj.core.api.Assertions.assertThat(new SpacesVisitor<>(IntelliJ.spaces(), null,
+                        new EmptyForIteratorPadStyle(false)).visit(cu, 0)).isEqualTo(cu));
     }
 }

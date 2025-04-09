@@ -25,12 +25,12 @@ class HclUnaryTest implements RewriteTest {
     @Test
     void unary() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               a = !true
               b = -1
               """
-          )
+                )
         );
     }
 }

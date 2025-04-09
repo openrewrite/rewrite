@@ -28,52 +28,52 @@ class BinaryTest implements RewriteTest {
     @Test
     void insideParentheses() {
         rewriteRun(
-          groovy("(1 + 1)"),
-          groovy("((1 + 1))"),
+                groovy("(1 + 1)"),
+                groovy("((1 + 1))"),
 
-          // NOT inside parentheses, but verifies the parser's
-          // test for "inside parentheses" condition
-          groovy("( 1 ) + 1"),
-          groovy("(1) + 1"),
-          // And combine the two cases
-          groovy("((1) + 1)")
+                // NOT inside parentheses, but verifies the parser's
+                // test for "inside parentheses" condition
+                groovy("( 1 ) + 1"),
+                groovy("(1) + 1"),
+                // And combine the two cases
+                groovy("((1) + 1)")
         );
     }
 
     @Test
     void equals() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               int n = 0;
               boolean b = n == 0;
               """
-          )
+                )
         );
     }
 
     @Test
     void in() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def a = []
               boolean b = 42 in a;
               """
-          )
+                )
         );
     }
 
     @Test
     void withVariable() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def foo(int a) {
                   60 + a
               }
               """
-          )
+                )
         );
     }
 
@@ -81,13 +81,13 @@ class BinaryTest implements RewriteTest {
     @Test
     void regexFindOperator() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def REGEX = /\\d+/
               def text = "123"
               def result = text =~ REGEX
               """
-          )
+                )
         );
     }
 
@@ -95,13 +95,13 @@ class BinaryTest implements RewriteTest {
     @Test
     void regexMatchOperator() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def REGEX = /\\d+/
               def text = "123"
               def result = text ==~ REGEX
               """
-          )
+                )
         );
     }
 
@@ -109,12 +109,12 @@ class BinaryTest implements RewriteTest {
     @Test
     void minusEquals() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def a = 5
               a -= 5
               """
-          )
+                )
         );
     }
 
@@ -122,12 +122,12 @@ class BinaryTest implements RewriteTest {
     @Test
     void divisionEquals() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def a = 5
               a /= 5
               """
-          )
+                )
         );
     }
 
@@ -135,12 +135,12 @@ class BinaryTest implements RewriteTest {
     @Test
     void bitwiseAnd() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def a = 4
               a &= 1
               """
-          )
+                )
         );
     }
 
@@ -148,12 +148,12 @@ class BinaryTest implements RewriteTest {
     @Test
     void bitwiseOr() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def a = 4
               a |= 1
               """
-          )
+                )
         );
     }
 
@@ -161,20 +161,20 @@ class BinaryTest implements RewriteTest {
     @Test
     void bitwiseXOr() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def a = 4
               a ^= 1
               """
-          )
+                )
         );
     }
 
     @Test
     void instanceOf() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def isString = "" instanceof java.lang.String
               """)
         );
@@ -183,9 +183,9 @@ class BinaryTest implements RewriteTest {
     @Test
     void spreadOperator() {
         rewriteRun(
-          groovy("[ ] *. toString()"),
-          groovy(
-            """
+                groovy("[ ] *. toString()"),
+                groovy(
+                        """
               class A {
                   def value = 1
               }
@@ -197,22 +197,22 @@ class BinaryTest implements RewriteTest {
     @Test
     void stringMultiplied() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def foo = "-" * 4
               """
-          )
+                )
         );
     }
 
     @Test
     void stringMultipliedInParentheses() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def foo = ("-" * 4)
               """
-          )
+                )
         );
     }
 
@@ -220,13 +220,13 @@ class BinaryTest implements RewriteTest {
     @Test
     void cxds() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def differenceInDays(int time) {
                   return (int) ((time)/(1000*60*60*24))
               }
               """
-          )
+                )
         );
     }
 
@@ -234,14 +234,14 @@ class BinaryTest implements RewriteTest {
     @Test
     void extraParensAroundInfixOxxxperator() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def timestamp(int hours, int minutes, int seconds) {
                   30 * (hours)
                   (((((hours))))) * 30
               }
               """
-          )
+                )
         );
     }
 
@@ -249,8 +249,8 @@ class BinaryTest implements RewriteTest {
     @Test
     void extraParensAroundInfixOperator() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def timestamp(int hours, int minutes, int seconds) {
                   (hours) * 60 * 60 + (minutes * 60) + seconds
               }
@@ -258,7 +258,7 @@ class BinaryTest implements RewriteTest {
                   return (int) ((time)/(1000*60*60*24))
               }
               """
-          )
+                )
         );
     }
 }

@@ -90,10 +90,10 @@ public class ParseError implements SourceFile {
     }
 
     public static ParseError build(Parser parser,
-                                   Parser.Input input,
-                                   @Nullable Path relativeTo,
-                                   ExecutionContext ctx,
-                                   Throwable t) {
+            Parser.Input input,
+            @Nullable Path relativeTo,
+            ExecutionContext ctx,
+            Throwable t) {
         EncodingDetectingInputStream is = input.getSource(ctx);
         return new ParseError(
                 Tree.randomId(),

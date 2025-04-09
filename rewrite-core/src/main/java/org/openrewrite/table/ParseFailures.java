@@ -43,9 +43,9 @@ public class ParseFailures extends DataTable<ParseFailures.Row> {
         String exceptionType;
 
         @Column(displayName = "Tree type", description = "The type of the tree element that was being parsed " +
-                                                         "when the failure occurred. This can refer either to the intended " +
-                                                         "target OpenRewrite Tree type or a parser or compiler internal tree " +
-                                                         "type that we couldn't determine how to map.")
+                "when the failure occurred. This can refer either to the intended " +
+                "target OpenRewrite Tree type or a parser or compiler internal tree " +
+                "type that we couldn't determine how to map.")
         @Nullable
         String treeType;
 

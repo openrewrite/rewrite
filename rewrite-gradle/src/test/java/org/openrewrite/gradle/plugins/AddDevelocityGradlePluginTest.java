@@ -43,7 +43,7 @@ class AddDevelocityGradlePluginTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withToolingApi())
-          .recipe(new AddDevelocityGradlePlugin("3.x", null, null, null, null, null));
+                .recipe(new AddDevelocityGradlePlugin("3.x", null, null, null, null, null));
     }
 
     private static Consumer<SourceSpec<CompilationUnit>> interpolateResolvedVersion(@Language("groovy") String after) {
@@ -58,119 +58,119 @@ class AddDevelocityGradlePluginTest implements RewriteTest {
     @Test
     void onlyChangeRootBuildGradle() {
         rewriteRun(
-          spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "5.6.1"))),
-          buildGradle(
-            "",
-            interpolateResolvedVersion("""
+                spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "5.6.1"))),
+                buildGradle(
+                        "",
+                        interpolateResolvedVersion("""
               plugins {
                   id 'com.gradle.build-scan' version '%s'
               }
               """
-            )
-          ),
-          dir("subproject", buildGradle("")),
-          settingsGradle(
-            """
+                        )
+                ),
+                dir("subproject", buildGradle("")),
+                settingsGradle(
+                        """
               rootProject.name = 'my-project'
               include("subproject")
               """
-          )
+                )
         );
     }
 
     @Test
     void addNewBuildPluginsBlock() {
         rewriteRun(
-          spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "5.6.1"))),
-          buildGradle(
-            "",
-            interpolateResolvedVersion("""
+                spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "5.6.1"))),
+                buildGradle(
+                        "",
+                        interpolateResolvedVersion("""
               plugins {
                   id 'com.gradle.build-scan' version '%s'
               }
               """
-            )
-          ),
-          settingsGradle(
-            """
+                        )
+                ),
+                settingsGradle(
+                        """
               rootProject.name = 'my-project'
               """
-          )
+                )
         );
     }
 
     @Test
     void addExistingBuildPluginsBlock() {
         rewriteRun(
-          spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "5.6.1"))),
-          buildGradle(
-            """
+                spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "5.6.1"))),
+                buildGradle(
+                        """
               plugins {
                   id "java"
               }
               """,
-            interpolateResolvedVersion("""
+                        interpolateResolvedVersion("""
               plugins {
                   id "java"
                   id "com.gradle.build-scan" version "%s"
               }
               """
-            )
-          ),
-          settingsGradle(
-            """
+                        )
+                ),
+                settingsGradle(
+                        """
               rootProject.name = 'my-project'
               """
-          )
+                )
         );
     }
 
     @Test
     void addNewSettingsPluginsBlock() {
         rewriteRun(
-          spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1"))),
-          buildGradle(
-            ""
-          ),
-          settingsGradle(
-            """
+                spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1"))),
+                buildGradle(
+                        ""
+                ),
+                settingsGradle(
+                        """
               rootProject.name = 'my-project'
               """,
-            interpolateResolvedVersion("""
+                        interpolateResolvedVersion("""
               plugins {
                   id 'com.gradle.develocity' version '%s'
               }
                             
               rootProject.name = 'my-project'
               """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void addExistingSettingsPluginsBlock() {
         rewriteRun(
-          spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1"))),
-          buildGradle(
-            ""
-          ),
-          settingsGradle(
-            """
+                spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1"))),
+                buildGradle(
+                        ""
+                ),
+                settingsGradle(
+                        """
               plugins {
               }
                             
               rootProject.name = 'my-project'
               """,
-            interpolateResolvedVersion("""
+                        interpolateResolvedVersion("""
               plugins {
                   id 'com.gradle.develocity' version '%s'
               }
                             
               rootProject.name = 'my-project'
               """
-            )
-          )
+                        )
+                )
         );
     }
 
@@ -178,14 +178,14 @@ class AddDevelocityGradlePluginTest implements RewriteTest {
     @Test
     void withGradleEnterpriseConfigurationInSettings() {
         rewriteRun(
-          spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")))
-            .recipe(new AddDevelocityGradlePlugin("3.16.x", "https://ge.sam.com/", true, true, true, AddDevelocityGradlePlugin.PublishCriteria.Always)),
-          buildGradle(
-            ""
-          ),
-          settingsGradle(
-            "",
-            interpolateResolvedVersion("""
+                spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")))
+                        .recipe(new AddDevelocityGradlePlugin("3.16.x", "https://ge.sam.com/", true, true, true, AddDevelocityGradlePlugin.PublishCriteria.Always)),
+                buildGradle(
+                        ""
+                ),
+                settingsGradle(
+                        "",
+                        interpolateResolvedVersion("""
               plugins {
                   id 'com.gradle.enterprise' version '%s'
               }
@@ -201,22 +201,22 @@ class AddDevelocityGradlePluginTest implements RewriteTest {
                   }
               }
               """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void withDevelocityConfigurationInSettings() {
         rewriteRun(
-          spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")))
-            .recipe(new AddDevelocityGradlePlugin("3.x", "https://ge.sam.com/", true, true, true, AddDevelocityGradlePlugin.PublishCriteria.Always)),
-          buildGradle(
-            ""
-          ),
-          settingsGradle(
-            "",
-            interpolateResolvedVersion("""
+                spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")))
+                        .recipe(new AddDevelocityGradlePlugin("3.x", "https://ge.sam.com/", true, true, true, AddDevelocityGradlePlugin.PublishCriteria.Always)),
+                buildGradle(
+                        ""
+                ),
+                settingsGradle(
+                        "",
+                        interpolateResolvedVersion("""
               plugins {
                   id 'com.gradle.develocity' version '%s'
               }
@@ -232,8 +232,8 @@ class AddDevelocityGradlePluginTest implements RewriteTest {
                   }
               }
               """
-            )
-          )
+                        )
+                )
         );
     }
 
@@ -241,14 +241,14 @@ class AddDevelocityGradlePluginTest implements RewriteTest {
     @Test
     void withConfigurationOldInputCapture() {
         rewriteRun(
-          spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")))
-            .recipe(new AddDevelocityGradlePlugin("3.6", null, null, true, null, null)),
-          buildGradle(
-            ""
-          ),
-          settingsGradle(
-            "",
-            """
+                spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")))
+                        .recipe(new AddDevelocityGradlePlugin("3.6", null, null, true, null, null)),
+                buildGradle(
+                        ""
+                ),
+                settingsGradle(
+                        "",
+                        """
               plugins {
                   id 'com.gradle.enterprise' version '3.6'
               }
@@ -258,53 +258,53 @@ class AddDevelocityGradlePluginTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void defaultsToLatestRelease() {
         rewriteRun(
-          spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")))
-            .recipe(new AddDevelocityGradlePlugin(null, null, null, null, null, null)),
-          buildGradle(
-            ""
-          ),
-          settingsGradle(
-            "",
-            spec -> spec.after(after -> {
-                Matcher versionMatcher = Pattern.compile("id 'com\\.gradle\\.develocity' version '(.*?)'").matcher(after);
-                assertThat(versionMatcher.find()).isTrue();
-                String version = versionMatcher.group(1);
-                VersionComparator versionComparator = requireNonNull(Semver.validate("[3.14,)", null).getValue());
-                assertThat(versionComparator.compare(null, "3.14", version)).isLessThanOrEqualTo(0);
+                spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")))
+                        .recipe(new AddDevelocityGradlePlugin(null, null, null, null, null, null)),
+                buildGradle(
+                        ""
+                ),
+                settingsGradle(
+                        "",
+                        spec -> spec.after(after -> {
+                            Matcher versionMatcher = Pattern.compile("id 'com\\.gradle\\.develocity' version '(.*?)'").matcher(after);
+                            assertThat(versionMatcher.find()).isTrue();
+                            String version = versionMatcher.group(1);
+                            VersionComparator versionComparator = requireNonNull(Semver.validate("[3.14,)", null).getValue());
+                            assertThat(versionComparator.compare(null, "3.14", version)).isLessThanOrEqualTo(0);
 
-                return """
+                            return """
                   plugins {
                       id 'com.gradle.develocity' version '%s'
                   }
                   """.formatted(version);
-            })
-          )
+                        })
+                )
         );
     }
 
     @Test
     void addNewSettingsPluginsBlockWithLicenseHeader() {
         rewriteRun(
-          spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1"))),
-          buildGradle(
-            ""
-          ),
-          settingsGradle(
-            """
+                spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1"))),
+                buildGradle(
+                        ""
+                ),
+                settingsGradle(
+                        """
               /*
                * Licensed to...
                */
                
               rootProject.name = 'my-project'
               """,
-            interpolateResolvedVersion("""
+                        interpolateResolvedVersion("""
               /*
                * Licensed to...
                */
@@ -315,8 +315,8 @@ class AddDevelocityGradlePluginTest implements RewriteTest {
                             
               rootProject.name = 'my-project'
               """
-            )
-          )
+                        )
+                )
         );
     }
 }

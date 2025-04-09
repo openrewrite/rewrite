@@ -25,13 +25,13 @@ class ParenthesesTest implements RewriteTest {
     @Test
     void parentheses() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   int n = (0);
               }
               """
-          )
+                )
         );
     }
 }

@@ -33,10 +33,10 @@ import static org.openrewrite.scheduling.WorkingDirectoryExecutionContextView.WO
 public class RecipeScheduler {
 
     public RecipeRun scheduleRun(Recipe recipe,
-                                 LargeSourceSet sourceSet,
-                                 ExecutionContext ctx,
-                                 int maxCycles,
-                                 int minCycles) {
+            LargeSourceSet sourceSet,
+            ExecutionContext ctx,
+            int maxCycles,
+            int minCycles) {
         try {
             LargeSourceSet after = runRecipeCycles(recipe, sourceSet, ctx, maxCycles, minCycles);
             return new RecipeRun(
@@ -94,7 +94,7 @@ public class RecipeScheduler {
                     }
 
                     if (i >= minCycles &&
-                        (cycle.getMadeChangesInThisCycle().isEmpty() || !anyRecipeCausingAnotherCycle)) {
+                            (cycle.getMadeChangesInThisCycle().isEmpty() || !anyRecipeCausingAnotherCycle)) {
                         after.afterCycle(true);
                         break;
                     }

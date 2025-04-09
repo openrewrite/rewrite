@@ -49,12 +49,12 @@ class JavaParserTest implements RewriteTest {
     @Test
     void incompleteAssignment() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               @Deprecated(since=)
               public class A {}
               """
-          )
+                )
         );
     }
 
@@ -63,16 +63,16 @@ class JavaParserTest implements RewriteTest {
     @Test
     void annotationCommentWithNoSpaceParsesCorrectly() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               @SuppressWarnings("serial")// fred
               @Deprecated
               public class PersistenceManagerImpl {
               }
               """,
-            spec -> spec.afterRecipe(cu ->
-              assertThat(cu.getClasses().get(0).getLeadingAnnotations()).hasSize(2))
-          )
+                        spec -> spec.afterRecipe(cu ->
+                                assertThat(cu.getClasses().get(0).getLeadingAnnotations()).hasSize(2))
+                )
         );
     }
 
@@ -80,16 +80,16 @@ class JavaParserTest implements RewriteTest {
     @Test
     void annotationCommentWithSpaceParsesCorrectly() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               @SuppressWarnings("ALL") // fred
               @Deprecated
               public class PersistenceManagerImpl {
               }
               """,
-            spec -> spec.afterRecipe(cu ->
-              assertThat(cu.getClasses().get(0).getLeadingAnnotations()).hasSize(2))
-          )
+                        spec -> spec.afterRecipe(cu ->
+                                assertThat(cu.getClasses().get(0).getLeadingAnnotations()).hasSize(2))
+                )
         );
     }
 
@@ -101,11 +101,11 @@ class JavaParserTest implements RewriteTest {
         Files.write(temp.resolve("guava-30.0-jre.jar"), "decoy for test purposes; not a real jar".getBytes());
         List<Path> classpath = JavaParser.dependenciesFromResources(ctx, "guava");
         assertThat(classpath)
-          .singleElement()
-          .matches(Files::exists, "File extracted from classpath resources exists on disk")
-          .matches(path -> path.endsWith("guava-31.0-jre.jar"),
-            "classpathFromResources should return guava-31.0-jre.jar from resources, even when the target " +
-            "directory contains guava-30.0-jre.jar which has the same prefix");
+                .singleElement()
+                .matches(Files::exists, "File extracted from classpath resources exists on disk")
+                .matches(path -> path.endsWith("guava-31.0-jre.jar"),
+                        "classpathFromResources should return guava-31.0-jre.jar from resources, even when the target " +
+                                "directory contains guava-30.0-jre.jar which has the same prefix");
     }
 
     @Test
@@ -123,18 +123,18 @@ class JavaParserTest implements RewriteTest {
     void parseFromByteArray() {
         try (ScanResult scan = new ClassGraph().scan()) {
             byte[][] classes = scan.getResourcesMatchingWildcard("javaparser-byte-array-tests/**.class").stream()
-              .map(it -> {
-                  try {
-                      return it.read().array();
-                  } catch (IOException e) {
-                      throw new RuntimeException(e);
-                  }
-              })
-              .toArray(byte[][]::new);
+                    .map(it -> {
+                        try {
+                            return it.read().array();
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    })
+                    .toArray(byte[][]::new);
 
             JavaParser parser = JavaParser.fromJavaVersion()
-              .classpath(classes)
-              .build();
+                    .classpath(classes)
+                    .build();
 
             @Language("java")
             String source = """
@@ -149,26 +149,26 @@ class JavaParserTest implements RewriteTest {
               """;
             Stream<SourceFile> compilationUnits = parser.parse(new InMemoryExecutionContext(Throwable::printStackTrace), source);
             assertThat(compilationUnits.map(J.CompilationUnit.class::cast)).singleElement()
-              .satisfies(cu -> assertThat(cu.getClasses()).singleElement()
-                .satisfies(cd -> assertThat(cd.getImplements()).satisfiesExactly(
-                  i -> assertThat(i.getType()).hasToString("example.InterfaceA"),
-                  i -> assertThat(i.getType()).hasToString("InterfaceB")
-                )));
+                    .satisfies(cu -> assertThat(cu.getClasses()).singleElement()
+                            .satisfies(cd -> assertThat(cd.getImplements()).satisfiesExactly(
+                                    i -> assertThat(i.getType()).hasToString("example.InterfaceA"),
+                                    i -> assertThat(i.getType()).hasToString("InterfaceB")
+                            )));
         }
     }
 
     @ParameterizedTest
     // language=java
     @ValueSource(strings = {
-      "package my.example; class PrivateClass { void foo() {} } public class PublicClass { void bar() {} }",
-      "package my.example; public class PublicClass { void bar() {} } class PrivateClass { void foo() {} }"
+            "package my.example; class PrivateClass { void foo() {} } public class PublicClass { void bar() {} }",
+            "package my.example; public class PublicClass { void bar() {} } class PrivateClass { void foo() {} }"
     })
     void shouldResolvePathUsingPublicClasses(@Language("java") String source) {
         rewriteRun(
-          java(
-            source,
-            spec -> spec.afterRecipe(cu -> assertThat(cu.getSourcePath()).isEqualTo(Path.of("my", "example", "PublicClass.java")))
-          )
+                java(
+                        source,
+                        spec -> spec.afterRecipe(cu -> assertThat(cu.getSourcePath()).isEqualTo(Path.of("my", "example", "PublicClass.java")))
+                )
         );
     }
 
@@ -182,7 +182,7 @@ class JavaParserTest implements RewriteTest {
     @ParameterizedTest
     //language=java
     @ValueSource(strings = {
-      """
+            """
         package com.example.demo;
         class FooBar {
             public void test() {
@@ -190,7 +190,7 @@ class JavaParserTest implements RewriteTest {
             }
         }
         """,
-      """
+            """
         package com.example.demo;
         class FooBar {
             public void test(int num string msg) {
@@ -199,7 +199,7 @@ class JavaParserTest implements RewriteTest {
             }
         }
         """,
-      """
+            """
         package com.example.demo;
         class FooBar {
             public void test(int num string s, int b) {
@@ -208,7 +208,7 @@ class JavaParserTest implements RewriteTest {
             }
         }
         """,
-      """
+            """
         package com.example.demo;
         class FooBar {
             public void test(int num) {
@@ -217,7 +217,7 @@ class JavaParserTest implements RewriteTest {
             }
         }
         """,
-      """
+            """
         package com.example.demo;
         class FooBar {
             public void test(int num) {
@@ -226,7 +226,7 @@ class JavaParserTest implements RewriteTest {
             }
         }
         """,
-      """
+            """
         package com.example.demo;
         class FooBar {
             public void test(int param ) {
@@ -238,16 +238,16 @@ class JavaParserTest implements RewriteTest {
     })
     void erroneousExpressionStatements(@Language("java") String source) {
         rewriteRun(
-          java(source)
+                java(source)
         );
     }
 
     @Test
     void erroneousVariableDeclarations() {
         rewriteRun(
-          spec -> spec.recipe(new FindCompileErrors()),
-          java(
-            """
+                spec -> spec.recipe(new FindCompileErrors()),
+                java(
+                        """
               package com.example.demo;
               class Foo {
                   /pet
@@ -255,7 +255,7 @@ class JavaParserTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package com.example.demo;
               class Foo {
                   /*~~>*///*~~>*/pet
@@ -263,9 +263,9 @@ class JavaParserTest implements RewriteTest {
                   }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package com.example.demo;
               class Bar {
                   pet
@@ -273,7 +273,7 @@ class JavaParserTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package com.example.demo;
               class Bar {
                   /*~~>*/pet
@@ -281,9 +281,9 @@ class JavaParserTest implements RewriteTest {
                   }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package com.example.demo;
               class Baz {
                   -pet
@@ -291,7 +291,7 @@ class JavaParserTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package com.example.demo;
               class Baz {
                   /*~~>*/-/*~~>*/pet
@@ -299,7 +299,7 @@ class JavaParserTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -307,8 +307,8 @@ class JavaParserTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/pull/4624")
     void shouldParseComments() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class A {
                   /*
                    * public Some getOther() { return other; }
@@ -324,16 +324,16 @@ class JavaParserTest implements RewriteTest {
                    */
               }
               """,
-            spec -> spec.afterRecipe(cu -> assertThat(cu.getClasses().get(0).getBody().getEnd().getComments())
-              .extracting("text")
-              .containsExactly(
-                """
+                        spec -> spec.afterRecipe(cu -> assertThat(cu.getClasses().get(0).getBody().getEnd().getComments())
+                                .extracting("text")
+                                .containsExactly(
+                                        """
                   
                        * public Some getOther() { return other; }
                        *
                        \
                   """,
-                """
+                                        """
                   *
                        * Sets the value of the other property.
                        *
@@ -341,32 +341,32 @@ class JavaParserTest implements RewriteTest {
                        *
                        \
                   """,
-                """
+                                        """
                   
                        * public void setOther(Some value) { this.other =
                        * value; }
                        \
                   """
-              ))
-          )
+                                ))
+                )
         );
     }
 
     @Test
     void filterArtifacts() {
         List<URI> classpath = List.of(
-          URI.create("file:/.m2/repository/com/google/guava/guava-24.1.1/com_google_guava_guava-24.1.1.jar"),
-          URI.create("file:/.m2/repository/org/threeten/threeten-extra-1.5.0/org_threeten_threeten_extra-1.5.0.jar"),
-          URI.create("file:/.m2/repository/com/amazonaws/aws-java-sdk-s3-1.11.546/com_amazonaws_aws_java_sdk_s3-1.11.546.jar"),
-          URI.create("file:/.m2/repository/org/openrewrite/rewrite-java/8.41.1/rewrite-java-8.41.1.jar")
+                URI.create("file:/.m2/repository/com/google/guava/guava-24.1.1/com_google_guava_guava-24.1.1.jar"),
+                URI.create("file:/.m2/repository/org/threeten/threeten-extra-1.5.0/org_threeten_threeten_extra-1.5.0.jar"),
+                URI.create("file:/.m2/repository/com/amazonaws/aws-java-sdk-s3-1.11.546/com_amazonaws_aws_java_sdk_s3-1.11.546.jar"),
+                URI.create("file:/.m2/repository/org/openrewrite/rewrite-java/8.41.1/rewrite-java-8.41.1.jar")
         );
         assertThat(JavaParser.filterArtifacts("threeten-extra", classpath))
-          .containsOnly(Paths.get("/.m2/repository/org/threeten/threeten-extra-1.5.0/org_threeten_threeten_extra-1.5.0.jar"));
+                .containsOnly(Paths.get("/.m2/repository/org/threeten/threeten-extra-1.5.0/org_threeten_threeten_extra-1.5.0.jar"));
         assertThat(JavaParser.filterArtifacts("guava", classpath))
-          .containsOnly(Paths.get("/.m2/repository/com/google/guava/guava-24.1.1/com_google_guava_guava-24.1.1.jar"));
+                .containsOnly(Paths.get("/.m2/repository/com/google/guava/guava-24.1.1/com_google_guava_guava-24.1.1.jar"));
         assertThat(JavaParser.filterArtifacts("aws-java-sdk-s3", classpath))
-          .containsOnly(Paths.get("/.m2/repository/com/amazonaws/aws-java-sdk-s3-1.11.546/com_amazonaws_aws_java_sdk_s3-1.11.546.jar"));
+                .containsOnly(Paths.get("/.m2/repository/com/amazonaws/aws-java-sdk-s3-1.11.546/com_amazonaws_aws_java_sdk_s3-1.11.546.jar"));
         assertThat(JavaParser.filterArtifacts("rewrite-java", classpath))
-          .containsOnly(Paths.get("/.m2/repository/org/openrewrite/rewrite-java/8.41.1/rewrite-java-8.41.1.jar"));
+                .containsOnly(Paths.get("/.m2/repository/org/openrewrite/rewrite-java/8.41.1/rewrite-java-8.41.1.jar"));
     }
 }

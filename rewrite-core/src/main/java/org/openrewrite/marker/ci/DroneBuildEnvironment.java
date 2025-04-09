@@ -63,8 +63,8 @@ public class DroneBuildEnvironment implements BuildEnvironment {
     @Override
     public GitProvenance buildGitProvenance() throws IncompleteGitConfigException {
         if (StringUtils.isBlank(remoteURL) ||
-            (StringUtils.isBlank(branch) && StringUtils.isBlank(tag)) ||
-            StringUtils.isBlank(commitSha)) {
+                (StringUtils.isBlank(branch) && StringUtils.isBlank(tag)) ||
+                StringUtils.isBlank(commitSha)) {
             throw new IncompleteGitConfigException();
         }
         return new GitProvenance(UUID.randomUUID(), remoteURL,

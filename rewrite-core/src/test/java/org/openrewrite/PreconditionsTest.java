@@ -38,16 +38,16 @@ class PreconditionsTest implements RewriteTest {
     @Test
     void not() {
         rewriteRun(
-          spec -> spec.recipe(recipe(Preconditions.not(contains("z")))),
-          text("hello", "goodbye")
+                spec -> spec.recipe(recipe(Preconditions.not(contains("z")))),
+                text("hello", "goodbye")
         );
     }
 
     @Test
     void notNot() {
         rewriteRun(
-          spec -> spec.recipe(recipe(Preconditions.not(contains("h")))),
-          text("hello")
+                spec -> spec.recipe(recipe(Preconditions.not(contains("h")))),
+                text("hello")
         );
     }
 
@@ -55,109 +55,109 @@ class PreconditionsTest implements RewriteTest {
     @Test
     void or() {
         rewriteRun(
-          spec -> spec.recipe(recipe(Preconditions.or(contains("h"), contains("z")))),
-          text("hello", "goodbye")
+                spec -> spec.recipe(recipe(Preconditions.or(contains("h"), contains("z")))),
+                text("hello", "goodbye")
         );
     }
 
     @Test
     void notOr() {
         rewriteRun(
-          spec -> spec.recipe(recipe(Preconditions.or(contains("x"), contains("z")))),
-          text("hello")
+                spec -> spec.recipe(recipe(Preconditions.or(contains("x"), contains("z")))),
+                text("hello")
         );
     }
 
     @Test
     void and() {
         rewriteRun(
-          spec -> spec.recipe(recipe(Preconditions.and(contains("h"), contains("ello")))),
-          text("hello", "goodbye")
+                spec -> spec.recipe(recipe(Preconditions.and(contains("h"), contains("ello")))),
+                text("hello", "goodbye")
         );
     }
 
     @Test
     void notAnd() {
         rewriteRun(
-          spec -> spec.recipe(recipe(Preconditions.and(contains("h"), contains("z")))),
-          text("hello")
+                spec -> spec.recipe(recipe(Preconditions.and(contains("h"), contains("z")))),
+                text("hello")
         );
     }
 
     @Test
     void checkApplicabilityAgainstOtherSourceTypes() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> Preconditions.check(
-            new PlainTextVisitor<>(),
-            new PlainTextVisitor<>()
-          ))),
-          other("hello")
+                spec -> spec.recipe(toRecipe(() -> Preconditions.check(
+                        new PlainTextVisitor<>(),
+                        new PlainTextVisitor<>()
+                ))),
+                other("hello")
         );
     }
 
     @Test
     void orOtherSourceType() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> Preconditions.check(Preconditions.or(
-              new PlainTextVisitor<>() {
+                spec -> spec.recipe(toRecipe(() -> Preconditions.check(Preconditions.or(
+                                        new PlainTextVisitor<>() {
 
-                  @Override
-                  public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                      return tree != null && ((PlainText) tree).getText().contains("foo") ? SearchResult.found(tree) : tree;
-                  }
-              }),
-            new TreeVisitor<>() {
-                @Override
-                public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                    return SearchResult.found(tree, "recipe");
-                }
-            })
-          )),
-          other("hello")
+                                            @Override
+                                            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                                                return tree != null && ((PlainText) tree).getText().contains("foo") ? SearchResult.found(tree) : tree;
+                                            }
+                                        }),
+                                new TreeVisitor<>() {
+                                    @Override
+                                    public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                                        return SearchResult.found(tree, "recipe");
+                                    }
+                                })
+                )),
+                other("hello")
         );
     }
 
     @Test
     void andOtherSourceType() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> Preconditions.check(Preconditions.and(
-              new PlainTextVisitor<>() {
+                spec -> spec.recipe(toRecipe(() -> Preconditions.check(Preconditions.and(
+                                        new PlainTextVisitor<>() {
 
-                  @Override
-                  public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                      return tree != null && ((PlainText) tree).getText().contains("foo") ? SearchResult.found(tree) : tree;
-                  }
-              }),
-            new TreeVisitor<>() {
-                @Override
-                public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                    return SearchResult.found(tree, "recipe");
-                }
-            })
-          )),
-          other("hello")
+                                            @Override
+                                            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                                                return tree != null && ((PlainText) tree).getText().contains("foo") ? SearchResult.found(tree) : tree;
+                                            }
+                                        }),
+                                new TreeVisitor<>() {
+                                    @Override
+                                    public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                                        return SearchResult.found(tree, "recipe");
+                                    }
+                                })
+                )),
+                other("hello")
         );
     }
 
     @Test
     void notOtherSourceType() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> Preconditions.check(Preconditions.not(
-              new PlainTextVisitor<>() {
+                spec -> spec.recipe(toRecipe(() -> Preconditions.check(Preconditions.not(
+                                        new PlainTextVisitor<>() {
 
-                  @Override
-                  public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                      return tree != null && ((PlainText) tree).getText().contains("foo") ? SearchResult.found(tree) : tree;
-                  }
-              }),
-            new TreeVisitor<>() {
-                @Override
-                public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                    return SearchResult.found(tree, "recipe");
-                }
-            })
-          )),
-          other("hello", "~~(recipe)~~>⚛⚛⚛ The contents of this file are not visible. ⚛⚛⚛")
+                                            @Override
+                                            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                                                return tree != null && ((PlainText) tree).getText().contains("foo") ? SearchResult.found(tree) : tree;
+                                            }
+                                        }),
+                                new TreeVisitor<>() {
+                                    @Override
+                                    public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                                        return SearchResult.found(tree, "recipe");
+                                    }
+                                })
+                )),
+                other("hello", "~~(recipe)~~>⚛⚛⚛ The contents of this file are not visible. ⚛⚛⚛")
         );
     }
 

@@ -28,11 +28,11 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new ChangeStaticFieldToMethod(
-            "java.util.Collections",
-            "EMPTY_LIST",
-            "com.acme.Lists",
-            null,
-            "of"
+                "java.util.Collections",
+                "EMPTY_LIST",
+                "com.acme.Lists",
+                null,
+                "of"
         ));
     }
 
@@ -63,9 +63,9 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
     @SuppressWarnings("unchecked")
     void migratesQualifiedField() {
         rewriteRun(
-          java(acmeLists),
-          java(
-            """
+                java(acmeLists),
+                java(
+                        """
               import java.util.Collections;
               import java.util.List;
 
@@ -75,7 +75,7 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import com.acme.Lists;
 
               import java.util.List;
@@ -86,16 +86,16 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void migratesStaticImportedField() {
         rewriteRun(
-          java(acmeLists),
-          java(
-            """
+                java(acmeLists),
+                java(
+                        """
               import static java.util.Collections.EMPTY_LIST;
 
               class A {
@@ -104,7 +104,7 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import com.acme.Lists;
 
               class A {
@@ -113,23 +113,23 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void migratesFullyQualifiedField() {
         rewriteRun(
-          java(acmeLists),
-          java(
-            """
+                java(acmeLists),
+                java(
+                        """
               class A {
                   static Object empty() {
                       return java.util.Collections.EMPTY_LIST;
                   }
               }
               """,
-            """
+                        """
               import com.acme.Lists;
 
               class A {
@@ -138,30 +138,30 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void migratesFieldInitializer() {
         rewriteRun(
-          java(acmeLists),
-          java(
-            """
+                java(acmeLists),
+                java(
+                        """
               import java.util.Collections;
 
               class A {
                   private final Object collection = Collections.EMPTY_LIST;
               }
               """,
-            """
+                        """
               import com.acme.Lists;
 
               class A {
                   private final Object collection = Lists.of();
               }
               """
-          )
+                )
         );
     }
 
@@ -169,9 +169,9 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/4382")
     void migratesNestedFieldInitializer() {
         rewriteRun(
-          java(acmeLists),
-          java(
-            """
+                java(acmeLists),
+                java(
+                        """
               import java.util.Collections;
 
               class Foo {
@@ -180,7 +180,7 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import com.acme.Lists;
 
               class Foo {
@@ -189,15 +189,15 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void ignoresUnrelatedFields() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.Collections;
 
               class A {
@@ -212,7 +212,7 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -220,16 +220,16 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1156")
     void migratesToJavaLangClass() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeStaticFieldToMethod(
-            "com.acme.Example",
-            "EXAMPLE",
-            "java.lang.System",
-            null,
-            "lineSeparator"
-          )),
-          java(staticStringClass),
-          java(
-            """
+                spec -> spec.recipe(new ChangeStaticFieldToMethod(
+                        "com.acme.Example",
+                        "EXAMPLE",
+                        "java.lang.System",
+                        null,
+                        "lineSeparator"
+                )),
+                java(staticStringClass),
+                java(
+                        """
               package example;
 
               import com.acme.Example;
@@ -240,7 +240,7 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package example;
 
               class A {
@@ -249,28 +249,28 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void leavesOwnerAlone() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeStaticFieldToMethod(
-            "com.example.Test",
-            "EXAMPLE",
-            "com.doesntmatter.Foo",
-            null,
-            "BAR")),
-          java(
-            """
+                spec -> spec.recipe(new ChangeStaticFieldToMethod(
+                        "com.example.Test",
+                        "EXAMPLE",
+                        "com.doesntmatter.Foo",
+                        null,
+                        "BAR")),
+                java(
+                        """
               package com.example;
 
               class Test {
                   public static Object EXAMPLE = null;
               }
               """
-          )
+                )
         );
     }
 
@@ -278,23 +278,23 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1626")
     void constantToMethodOnStaticTarget() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeStaticFieldToMethod(
-            "constants.Constants",
-            "SUCCESS_CODE",
-            "io.netty.handler.codec.http.HttpResponseStatus",
-            "OK",
-            "codeAsText")),
-          java(
-            """
+                spec -> spec.recipe(new ChangeStaticFieldToMethod(
+                        "constants.Constants",
+                        "SUCCESS_CODE",
+                        "io.netty.handler.codec.http.HttpResponseStatus",
+                        "OK",
+                        "codeAsText")),
+                java(
+                        """
               package constants;
 
               public class Constants {
                   public static final String SUCCESS_CODE = "200";
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package io.netty.handler.codec.http;
 
               public class HttpResponseStatus {
@@ -310,9 +310,9 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
                   }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package com.example;
               
               import constants.Constants;
@@ -323,7 +323,7 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package com.example;
               
               import io.netty.handler.codec.http.HttpResponseStatus;
@@ -334,7 +334,7 @@ class ChangeStaticFieldToMethodTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

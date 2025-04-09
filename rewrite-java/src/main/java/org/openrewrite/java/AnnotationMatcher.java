@@ -76,8 +76,8 @@ public class AnnotationMatcher {
 
     public boolean matches(J.Annotation annotation) {
         return matchesAnnotationName(annotation) &&
-               matchesSingleParameter(annotation) &&
-               matchesNamedParameters(annotation);
+                matchesSingleParameter(annotation) &&
+                matchesNamedParameters(annotation);
     }
 
     private boolean matchesAnnotationName(J.Annotation annotation) {
@@ -89,7 +89,7 @@ public class AnnotationMatcher {
     }
 
     private boolean matchesAnnotationOrMetaAnnotation(JavaType.@Nullable FullyQualified fqn,
-                                                      @Nullable Set<String> seenAnnotations) {
+            @Nullable Set<String> seenAnnotations) {
         if (fqn != null) {
             if (matcher.matcher(fqn.getFullyQualifiedName()).matches()) {
                 return true;
@@ -99,7 +99,7 @@ public class AnnotationMatcher {
                         seenAnnotations = new HashSet<>();
                     }
                     if (seenAnnotations.add(annotation.getFullyQualifiedName()) &&
-                        matchesAnnotationOrMetaAnnotation(annotation, seenAnnotations)) {
+                            matchesAnnotationOrMetaAnnotation(annotation, seenAnnotations)) {
                         return true;
                     }
                 }

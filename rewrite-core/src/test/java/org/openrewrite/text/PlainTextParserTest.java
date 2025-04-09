@@ -29,16 +29,16 @@ class PlainTextParserTest {
     @Test
     void plainTextMask() {
         PlainTextParser parser = PlainTextParser.builder()
-          .plainTextMasks(Paths.get("."), List.of("**/*.png"))
-          .build();
+                .plainTextMasks(Paths.get("."), List.of("**/*.png"))
+                .build();
 
         List<Parser.Input> inputs = List.of(Parser.Input.fromString(Paths.get("test.png"), "test"));
         assertThat(inputs)
-          .allMatch(input -> parser.accept(input.getPath()));
+                .allMatch(input -> parser.accept(input.getPath()));
 
         assertThat(parser
-          .parseInputs(inputs, null, new InMemoryExecutionContext())
-          .findFirst()
+                .parseInputs(inputs, null, new InMemoryExecutionContext())
+                .findFirst()
         ).containsInstanceOf(PlainText.class);
     }
 }

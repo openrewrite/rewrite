@@ -30,10 +30,10 @@ class HasNamespaceUriTest implements RewriteTest {
     @Test
     void rootElement() {
         rewriteRun(
-          spec -> spec.recipe(new HasNamespaceUri("http://www.w3.org/2001/XMLSchema-instance", null)),
-          xml(
-            source,
-            """
+                spec -> spec.recipe(new HasNamespaceUri("http://www.w3.org/2001/XMLSchema-instance", null)),
+                xml(
+                        source,
+                        """
               <!--~~>--><beans xmlns="http://www.springframework.org/schema/beans"
                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                   xsi:schemaLocation="
@@ -47,17 +47,17 @@ class HasNamespaceUriTest implements RewriteTest {
                   </jaxws:client>
               </beans>
               """
-          )
+                )
         );
     }
 
     @Test
     void nestedElement() {
         rewriteRun(
-          spec -> spec.recipe(new HasNamespaceUri("http://cxf.apache.org/jaxws", null)),
-          xml(
-            source,
-            """
+                spec -> spec.recipe(new HasNamespaceUri("http://cxf.apache.org/jaxws", null)),
+                xml(
+                        source,
+                        """
               <beans xmlns="http://www.springframework.org/schema/beans"
                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                   xsi:schemaLocation="
@@ -71,37 +71,37 @@ class HasNamespaceUriTest implements RewriteTest {
                   </jaxws:client>
               </beans>
               """
-          )
+                )
         );
     }
 
     @Test
     void noMatchOnNamespaceUri() {
         rewriteRun(
-          spec -> spec.recipe(new HasNamespaceUri("foo", null)),
-          xml(source)
+                spec -> spec.recipe(new HasNamespaceUri("foo", null)),
+                xml(source)
         );
     }
 
     @Test
     void noMatchOnXPath() {
         rewriteRun(
-          spec -> spec.recipe(new HasNamespaceUri("xsi", "/jaxws:client")),
-          xml(source)
+                spec -> spec.recipe(new HasNamespaceUri("xsi", "/jaxws:client")),
+                xml(source)
         );
     }
 
     @Test
     void staticFind() {
         rewriteRun(
-          xml(
-            source,
-            spec -> spec.beforeRecipe(xml -> assertThat(HasNamespaceUri.find(xml, "http://www.w3.org/2001/XMLSchema-instance", null))
-              .isNotEmpty()
-              .hasSize(1)
-              .hasOnlyElementsOfType(Xml.Tag.class)
-            )
-          )
+                xml(
+                        source,
+                        spec -> spec.beforeRecipe(xml -> assertThat(HasNamespaceUri.find(xml, "http://www.w3.org/2001/XMLSchema-instance", null))
+                                        .isNotEmpty()
+                                        .hasSize(1)
+                                        .hasOnlyElementsOfType(Xml.Tag.class)
+                        )
+                )
         );
     }
 

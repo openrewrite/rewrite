@@ -29,15 +29,15 @@ class MavenDependencyTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(RewriteTest.toRecipe(() -> mavenDependency().asVisitor(dep ->
-          SearchResult.found(dep.getTree(), dep.getResolvedDependency().getGav().toString()))));
+                SearchResult.found(dep.getTree(), dep.getResolvedDependency().getGav().toString()))));
     }
 
     @Test
     @DocumentExample
     void dependency() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -51,7 +51,7 @@ class MavenDependencyTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -65,7 +65,7 @@ class MavenDependencyTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 }

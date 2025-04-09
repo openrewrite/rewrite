@@ -26,35 +26,35 @@ class UnaryTest implements RewriteTest {
     @Test
     void format() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               int i = 0;
               int j = ++i;
               int k = i ++;
               """
-          )
+                )
         );
     }
 
     @Test
     void postfix() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               int k = i ++;
               """
-          )
+                )
         );
     }
 
     @Test
     void prefix() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               int k = ++i;
               """
-          )
+                )
         );
     }
 
@@ -63,11 +63,11 @@ class UnaryTest implements RewriteTest {
     @Test
     void negation() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def a = !true
               """
-          )
+                )
         );
     }
 }

@@ -31,17 +31,17 @@ class QuarkTest implements RewriteTest {
     @Test
     void renderMarkersOnQuarks() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
-              @Override
-              public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                  SourceFile sourceFile = (SourceFile) requireNonNull(tree);
-                  return SearchResult.found(sourceFile);
-              }
-          })),
-          other(
-            "this text will not be read because this is a quark",
-            "~~>⚛⚛⚛ The contents of this file are not visible. ⚛⚛⚛"
-          )
+                spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
+                    @Override
+                    public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                        SourceFile sourceFile = (SourceFile) requireNonNull(tree);
+                        return SearchResult.found(sourceFile);
+                    }
+                })),
+                other(
+                        "this text will not be read because this is a quark",
+                        "~~>⚛⚛⚛ The contents of this file are not visible. ⚛⚛⚛"
+                )
         );
     }
 }

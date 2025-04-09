@@ -37,43 +37,43 @@ class ChangePluginTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withToolingApi())
-          .recipe(new ChangePlugin("org.openrewrite.rewrite", "io.moderne.rewrite", "0.x"));
+                .recipe(new ChangePlugin("org.openrewrite.rewrite", "io.moderne.rewrite", "0.x"));
     }
 
     @DocumentExample
     @Test
     void changePlugin() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id "org.openrewrite.rewrite" version "6.0.0"
               }
               """,
-            """
+                        """
               plugins {
                   id "io.moderne.rewrite" version "0.39.0"
               }
               """,
-            spec -> spec.afterRecipe(g -> {
-                Optional<GradleProject> maybeGp = g.getMarkers().findFirst(GradleProject.class);
-                assertThat(maybeGp).isPresent()
-                  .hasValueSatisfying(gp -> assertThat(gp.getPlugins()).filteredOn(plugin -> "org.openrewrite.rewrite".equals(plugin.getId())).isEmpty())
-                  .hasValueSatisfying(gp -> assertThat(gp.getPlugins()).filteredOn(plugin -> "io.moderne.rewrite".equals(plugin.getId())).hasSize(1));
-            })
-          )
+                        spec -> spec.afterRecipe(g -> {
+                            Optional<GradleProject> maybeGp = g.getMarkers().findFirst(GradleProject.class);
+                            assertThat(maybeGp).isPresent()
+                                    .hasValueSatisfying(gp -> assertThat(gp.getPlugins()).filteredOn(plugin -> "org.openrewrite.rewrite".equals(plugin.getId())).isEmpty())
+                                    .hasValueSatisfying(gp -> assertThat(gp.getPlugins()).filteredOn(plugin -> "io.moderne.rewrite".equals(plugin.getId())).hasSize(1));
+                        })
+                )
         );
     }
 
     @Test
     void changeApplyPluginSyntax() {
         rewriteRun(
-          spec -> spec.recipes(
-            new ChangeDependency("org.openrewrite", "plugin", "io.moderne", "moderne-gradle-plugin", "0.x", null, null),
-            new ChangePlugin("org.openrewrite.rewrite", "io.moderne.rewrite", null)
-          ),
-          buildGradle(
-            """
+                spec -> spec.recipes(
+                        new ChangeDependency("org.openrewrite", "plugin", "io.moderne", "moderne-gradle-plugin", "0.x", null, null),
+                        new ChangePlugin("org.openrewrite.rewrite", "io.moderne.rewrite", null)
+                ),
+                buildGradle(
+                        """
               buildscript {
                   repositories {
                       gradlePluginPortal()
@@ -84,7 +84,7 @@ class ChangePluginTest implements RewriteTest {
               }
               apply plugin: "org.openrewrite.rewrite"
               """,
-            """
+                        """
               buildscript {
                   repositories {
                       gradlePluginPortal()
@@ -95,48 +95,48 @@ class ChangePluginTest implements RewriteTest {
               }
               apply plugin: "io.moderne.rewrite"
               """
-          )
+                )
         );
     }
 
     @Test
     void defaultsToLatestRelease() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePlugin("org.openrewrite.rewrite", "io.moderne.rewrite", null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new ChangePlugin("org.openrewrite.rewrite", "io.moderne.rewrite", null)),
+                buildGradle(
+                        """
               plugins {
                   id 'org.openrewrite.rewrite' version '6.0.0'
               }
               """,
-            spec -> spec.after(after -> {
-                Matcher versionMatcher = Pattern.compile("id 'io\\.moderne\\.rewrite' version '(.*?)'").matcher(after);
-                assertThat(versionMatcher.find()).isTrue();
-                String version = versionMatcher.group(1);
-                VersionComparator versionComparator = requireNonNull(Semver.validate("[1.0.34,)", null).getValue());
-                assertThat(versionComparator.compare(null, "1.0.34", version)).isLessThanOrEqualTo(0);
+                        spec -> spec.after(after -> {
+                            Matcher versionMatcher = Pattern.compile("id 'io\\.moderne\\.rewrite' version '(.*?)'").matcher(after);
+                            assertThat(versionMatcher.find()).isTrue();
+                            String version = versionMatcher.group(1);
+                            VersionComparator versionComparator = requireNonNull(Semver.validate("[1.0.34,)", null).getValue());
+                            assertThat(versionComparator.compare(null, "1.0.34", version)).isLessThanOrEqualTo(0);
 
-                //language=gradle
-                return """
+                            //language=gradle
+                            return """
                   plugins {
                       id 'io.moderne.rewrite' version '%s'
                   }
                   """.formatted(version);
-            })
-          )
+                        })
+                )
         );
     }
 
     @Test
     void dontChangeExisting() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id 'io.moderne.rewrite' version '1.0.34'
               }
               """
-          )
+                )
         );
     }
 }

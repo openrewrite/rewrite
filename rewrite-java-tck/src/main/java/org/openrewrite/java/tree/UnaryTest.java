@@ -26,13 +26,13 @@ class UnaryTest implements RewriteTest {
     @Test
     void negation() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   boolean b = !(1 == 2);
               }
               """
-          )
+                )
         );
     }
 
@@ -40,8 +40,8 @@ class UnaryTest implements RewriteTest {
     @Test
     void format() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       int i = 0;
@@ -50,7 +50,7 @@ class UnaryTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

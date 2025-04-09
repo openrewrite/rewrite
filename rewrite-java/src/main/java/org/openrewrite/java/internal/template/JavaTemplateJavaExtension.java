@@ -46,7 +46,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             emptyList(), Space.format(" "));
 
     public JavaTemplateJavaExtension(JavaTemplateParser templateParser, Substitutions substitutions,
-                                     String substitutedTemplate, JavaCoordinates coordinates) {
+            String substitutedTemplate, JavaCoordinates coordinates) {
         super(templateParser, substitutions, substitutedTemplate, coordinates);
     }
 
@@ -56,16 +56,16 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             @Override
             public J visitAnnotation(J.Annotation annotation, Integer integer) {
                 if (loc.equals(ANNOTATION_PREFIX) && mode.equals(JavaCoordinates.Mode.REPLACEMENT) &&
-                    annotation.isScope(insertionPoint)) {
+                        annotation.isScope(insertionPoint)) {
                     List<J.Annotation> gen = substitutions.unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate));
                     if (gen.isEmpty()) {
                         throw new IllegalStateException("Unable to parse annotation from template: \n" +
-                                                        substitutedTemplate +
-                                                        "\nUse JavaTemplate.Builder.doBeforeParseTemplate() to see what stub is being generated and include it in any bug report.");
+                                substitutedTemplate +
+                                "\nUse JavaTemplate.Builder.doBeforeParseTemplate() to see what stub is being generated and include it in any bug report.");
                     }
                     return gen.get(0).withPrefix(annotation.getPrefix());
                 } else if (loc.equals(ANNOTATION_ARGUMENTS) && mode.equals(JavaCoordinates.Mode.REPLACEMENT) &&
-                           annotation.isScope(insertionPoint)) {
+                        annotation.isScope(insertionPoint)) {
                     List<J.Annotation> gen = substitutions.unsubstitute(templateParser.parseAnnotations(getCursor(), "@Example(" + substitutedTemplate + ")"));
                     return annotation.withArguments(gen.get(0).getArguments());
                 }
@@ -203,12 +203,12 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             @Override
             public J visitExpression(Expression expression, Integer p) {
                 if ((loc.equals(EXPRESSION_PREFIX) ||
-                     loc.equals(STATEMENT_PREFIX) && expression instanceof Statement) &&
-                    expression.isScope(insertionPoint)) {
+                        loc.equals(STATEMENT_PREFIX) && expression instanceof Statement) &&
+                        expression.isScope(insertionPoint)) {
                     return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(
-                                    getCursor(),
-                                    substitutedTemplate,
-                                    loc))
+                            getCursor(),
+                            substitutedTemplate,
+                            loc))
                             .withPrefix(expression.getPrefix()), p);
                 }
                 return expression;
@@ -218,16 +218,16 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             public J visitFieldAccess(J.FieldAccess fa, Integer p) {
                 if (loc.equals(FIELD_ACCESS_PREFIX) && fa.isScope(insertionPoint)) {
                     return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(
-                                    getCursor(),
-                                    substitutedTemplate,
-                                    loc))
+                            getCursor(),
+                            substitutedTemplate,
+                            loc))
                             .withPrefix(fa.getPrefix()), p);
                 } else if (loc.equals(STATEMENT_PREFIX) && fa.isScope(insertionPoint)) {
                     // NOTE: while `J.FieldAccess` inherits from `Statement` they can only ever be used as expressions
                     return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(
-                                    getCursor(),
-                                    substitutedTemplate,
-                                    loc))
+                            getCursor(),
+                            substitutedTemplate,
+                            loc))
                             .withPrefix(fa.getPrefix()), p);
                 }
                 return super.visitFieldAccess(fa, p);
@@ -238,9 +238,9 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                 // ONLY for backwards compatibility, otherwise the same as expression replacement
                 if (loc.equals(IDENTIFIER_PREFIX) && ident.isScope(insertionPoint)) {
                     return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(
-                                    getCursor(),
-                                    substitutedTemplate,
-                                    loc))
+                            getCursor(),
+                            substitutedTemplate,
+                            loc))
                             .withPrefix(ident.getPrefix()), p);
                 }
                 return super.visitIdentifier(ident, p);
@@ -302,13 +302,13 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                     if (!(parameter instanceof J.VariableDeclarations)) {
                                         throw new IllegalArgumentException(
                                                 "Only variable declarations may be part of a method declaration's parameter " +
-                                                "list:" + parameter.print(getCursor()));
+                                                        "list:" + parameter.print(getCursor()));
                                     }
                                     J.VariableDeclarations decl = (J.VariableDeclarations) parameter;
                                     if (decl.getVariables().size() != 1) {
                                         throw new IllegalArgumentException(
                                                 "Multi-variable declarations may not be used in a method declaration's " +
-                                                "parameter list: " + parameter.print(getCursor()));
+                                                        "parameter list: " + parameter.print(getCursor()));
                                     }
                                     J.VariableDeclarations.NamedVariable namedVariable = decl.getVariables().get(0);
                                     paramNames.add(namedVariable.getSimpleName());
@@ -462,9 +462,9 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                 }
                             }
                             throw new IllegalArgumentException("Expected a template that would generate exactly one " +
-                                                               "statement to replace one statement, but generated " + gen.size() +
-                                                               ". Template:\n" + substitutedTemplate + "\nSubstitutions:\n" + substitutions +
-                                                               "\nStatement:\n" + statement);
+                                    "statement to replace one statement, but generated " + gen.size() +
+                                    ". Template:\n" + substitutedTemplate + "\nSubstitutions:\n" + substitutions +
+                                    "\nStatement:\n" + statement);
                         }
 
                         return autoFormat(gen.get(0).withPrefix(statement.getPrefix()), p);

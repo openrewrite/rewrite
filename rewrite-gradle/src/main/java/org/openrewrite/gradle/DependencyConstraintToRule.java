@@ -52,10 +52,10 @@ public class DependencyConstraintToRule extends Recipe {
     @Override
     public String getDescription() {
         return "Gradle [dependency constraints](https://docs.gradle.org/current/userguide/dependency_constraints.html#dependency-constraints) " +
-               "are useful for managing the versions of transitive dependencies. " +
-               "Some plugins, such as the Spring Dependency Management plugin, do not respect these constraints. " +
-               "This recipe converts constraints into [resolution rules](https://docs.gradle.org/current/userguide/resolution_rules.html), " +
-               "which can achieve similar effects to constraints but are harder for plugins to ignore.";
+                "are useful for managing the versions of transitive dependencies. " +
+                "Some plugins, such as the Spring Dependency Management plugin, do not respect these constraints. " +
+                "This recipe converts constraints into [resolution rules](https://docs.gradle.org/current/userguide/resolution_rules.html), " +
+                "which can achieve similar effects to constraints but are harder for plugins to ignore.";
     }
 
     @Override
@@ -127,7 +127,7 @@ public class DependencyConstraintToRule extends Recipe {
                         @Override
                         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer integer) {
                             J.MethodInvocation m1 = super.visitMethodInvocation(method, integer);
-                            if("because".equals(m1.getSimpleName()) && m1.getArguments().get(0) instanceof J.Literal) {
+                            if ("because".equals(m1.getSimpleName()) && m1.getArguments().get(0) instanceof J.Literal) {
                                 because.set(((J.Literal) m1.getArguments().get(0)).getValue().toString());
                             }
                             return m1;
@@ -138,7 +138,7 @@ public class DependencyConstraintToRule extends Recipe {
                     return null;
                 });
                 // If nothing remains in the constraints{} it can be removed entirely
-                if(withoutConvertableConstraints.isEmpty()) {
+                if (withoutConvertableConstraints.isEmpty()) {
                     return null;
                 } else {
                     return m.withArguments(singletonList(closure.withBody(((J.Block) closure.getBody()).withStatements(withoutConvertableConstraints))));
@@ -188,10 +188,11 @@ public class DependencyConstraintToRule extends Recipe {
                 return m;
             }
             String p = ((J.VariableDeclarations) rawParam).getVariables().get(0).getSimpleName();
-            @SuppressWarnings("GroovyEmptyStatementBody") @Language("groovy")
+            @SuppressWarnings("GroovyEmptyStatementBody")
+            @Language("groovy")
             String snippet = "Object " + p + " = null\n" +
-                             "if (" + p + ".requested.group == '" + groupArtifactVersion.getGroupId() + "' && " +
-                             p + ".requested.name == '" + groupArtifactVersion.getArtifactId() + "') {\n}";
+                    "if (" + p + ".requested.group == '" + groupArtifactVersion.getGroupId() + "' && " +
+                    p + ".requested.name == '" + groupArtifactVersion.getArtifactId() + "') {\n}";
             J.If newIf = GroovyParser.builder().build()
                     .parse(snippet)
                     .map(G.CompilationUnit.class::cast)
@@ -258,7 +259,7 @@ public class DependencyConstraintToRule extends Recipe {
                     public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer integer) {
                         // Comparison will involve "<variable name>.requested.group"
                         J.FieldAccess field = super.visitFieldAccess(fieldAccess, integer);
-                        if(field.getTarget() instanceof J.Identifier) {
+                        if (field.getTarget() instanceof J.Identifier) {
                             variableName.set(((J.Identifier) field.getTarget()).getSimpleName());
                         }
                         return fieldAccess;
@@ -266,7 +267,7 @@ public class DependencyConstraintToRule extends Recipe {
                 }.visit(anIf.getIfCondition(), 0);
                 @Language("groovy")
                 String snippet = variableName + ".useVersion('" + groupArtifactVersionBecause.getVersion() + "')\n";
-                if(groupArtifactVersionBecause.getBecause() != null) {
+                if (groupArtifactVersionBecause.getBecause() != null) {
                     snippet += variableName + ".because('" + groupArtifactVersionBecause.getBecause() + "')\n";
                 }
                 List<Statement> newStatements = GroovyParser.builder()
@@ -306,10 +307,10 @@ public class DependencyConstraintToRule extends Recipe {
             J.MethodInvocation m = GradleParser.builder()
                     .build()
                     .parse("\n" +
-                           "configurations.all {\n" +
-                           "    resolutionStrategy.eachDependency { details ->\n" +
-                           "    }\n" +
-                           "}")
+                            "configurations.all {\n" +
+                            "    resolutionStrategy.eachDependency { details ->\n" +
+                            "    }\n" +
+                            "}")
                     .map(G.CompilationUnit.class::cast)
                     .map(G.CompilationUnit::getStatements)
                     .map(it -> it.get(0))
@@ -342,14 +343,14 @@ public class DependencyConstraintToRule extends Recipe {
     private static boolean isInDependenciesBlock(Cursor cursor) {
         Cursor c = cursor.dropParentUntil(value ->
                 value == Cursor.ROOT_VALUE ||
-                (value instanceof J.MethodInvocation && DEPENDENCIES_DSL_MATCHER.matches((J.MethodInvocation) value)));
+                        (value instanceof J.MethodInvocation && DEPENDENCIES_DSL_MATCHER.matches((J.MethodInvocation) value)));
         return c.getValue() instanceof J.MethodInvocation;
     }
 
     private static boolean isEachDependency(J.MethodInvocation m) {
         return "eachDependency".equals(m.getSimpleName()) &&
-               (m.getSelect() instanceof J.Identifier &&
-                   "resolutionStrategy".equals(((J.Identifier) m.getSelect()).getSimpleName()));
+                (m.getSelect() instanceof J.Identifier &&
+                        "resolutionStrategy".equals(((J.Identifier) m.getSelect()).getSimpleName()));
     }
 
     private static boolean predicateRelatesToGav(J.If iff, GroupArtifactVersionBecause groupArtifactVersion) {

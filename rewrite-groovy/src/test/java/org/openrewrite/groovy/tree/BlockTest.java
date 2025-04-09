@@ -26,13 +26,13 @@ class BlockTest implements RewriteTest {
     @Test
     void block() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               implementation ('org.thymeleaf:thymeleaf-spring4:3.0.6.RELEASE') {
                   force = true;
               }
               """
-          )
+                )
         );
     }
 }

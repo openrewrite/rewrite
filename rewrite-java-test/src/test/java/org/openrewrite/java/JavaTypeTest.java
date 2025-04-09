@@ -33,33 +33,33 @@ class JavaTypeTest implements RewriteTest {
     @Test
     void methodOverridesOfGenericParameters() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test(java.util.List<Integer> l) {
                       l.add(0);
                   }
               }
               """,
-            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
-                @Override
-                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer integer) {
-                    MethodMatcher matcher = new MethodMatcher("java.util.List add(..)");
-                    JavaType.Method methodType = method.getMethodType();
-                    assertThat(matcher.matches(methodType)).isTrue();
-                    assertThat(methodType.getOverride()).isNotNull();
-                    return method;
-                }
-            }.visit(cu, 0))
-          )
+                        spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<Integer>() {
+                            @Override
+                            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer integer) {
+                                MethodMatcher matcher = new MethodMatcher("java.util.List add(..)");
+                                JavaType.Method methodType = method.getMethodType();
+                                assertThat(matcher.matches(methodType)).isTrue();
+                                assertThat(methodType.getOverride()).isNotNull();
+                                return method;
+                            }
+                        }.visit(cu, 0))
+                )
         );
     }
 
     @Test
     void resolvedSignatureOfGenericMethodDeclarations() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.ListIterator;
               import static java.util.Collections.singletonList;
 
@@ -71,22 +71,22 @@ class JavaTypeTest implements RewriteTest {
                   ListIterator<Integer> s = singletonList(1).listIterator();
               }
               """,
-            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
-                @Override
-                public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Object o) {
-                    assertThat(method.getMethodType().getReturnType()).isInstanceOf(JavaType.Parameterized.class);
-                    return method;
-                }
+                        spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                            @Override
+                            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Object o) {
+                                assertThat(method.getMethodType().getReturnType()).isInstanceOf(JavaType.Parameterized.class);
+                                return method;
+                            }
 
-                @Override
-                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Object o) {
-                    JavaType returnType = ((J.MethodInvocation) variable.getInitializer()).getMethodType().getReturnType();
-                    assertThat(TypeUtils.asFullyQualified(TypeUtils.asParameterized(returnType).getTypeParameters().get(0))
-                      .getFullyQualifiedName()).isEqualTo("java.lang.Integer");
-                    return variable;
-                }
-            })
-          )
+                            @Override
+                            public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Object o) {
+                                JavaType returnType = ((J.MethodInvocation) variable.getInitializer()).getMethodType().getReturnType();
+                                assertThat(TypeUtils.asFullyQualified(TypeUtils.asParameterized(returnType).getTypeParameters().get(0))
+                                        .getFullyQualifiedName()).isEqualTo("java.lang.Integer");
+                                return variable;
+                            }
+                        })
+                )
         );
     }
 
@@ -94,23 +94,23 @@ class JavaTypeTest implements RewriteTest {
     @Test
     void annotationsOnTypeAttribution() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.function.Consumer;
               class Test {
                   Consumer<String> c;
               }
               """,
-            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
-                @Override
-                public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, Object o) {
-                    List<JavaType.FullyQualified> annotations = multiVariable.getTypeAsFullyQualified().getAnnotations();
-                    assertThat(annotations).hasSize(1);
-                    assertThat(annotations.get(0).getFullyQualifiedName()).isEqualTo("java.lang.FunctionalInterface");
-                    return multiVariable;
-                }
-            })
-          )
+                        spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                            @Override
+                            public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, Object o) {
+                                List<JavaType.FullyQualified> annotations = multiVariable.getTypeAsFullyQualified().getAnnotations();
+                                assertThat(annotations).hasSize(1);
+                                assertThat(annotations.get(0).getFullyQualifiedName()).isEqualTo("java.lang.FunctionalInterface");
+                                return multiVariable;
+                            }
+                        })
+                )
         );
     }
 
@@ -118,28 +118,28 @@ class JavaTypeTest implements RewriteTest {
     @Test
     void noStackOverflow() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.HashMap;
               import java.util.Map;
               class A {
                   Map<String, Map<String, Map<Integer, String>>> overflowMap = new HashMap<>();
               }
               """,
-            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
-                @Override
-                public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, Object o) {
-                    assertThat(cu.getTypesInUse().getTypesInUse()).isNotEmpty();
-                    return super.visitCompilationUnit(cu, o);
-                }
+                        spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                            @Override
+                            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, Object o) {
+                                assertThat(cu.getTypesInUse().getTypesInUse()).isNotEmpty();
+                                return super.visitCompilationUnit(cu, o);
+                            }
 
-                @Override
-                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Object o) {
-                    assertThat(classDecl.getSimpleName()).isEqualTo("A");
-                    return classDecl;
-                }
-            })
-          )
+                            @Override
+                            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Object o) {
+                                assertThat(classDecl.getSimpleName()).isEqualTo("A");
+                                return classDecl;
+                            }
+                        })
+                )
         );
     }
 
@@ -147,14 +147,14 @@ class JavaTypeTest implements RewriteTest {
     @Test
     void noNewMethodType() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class Test {
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               public class A {
                   void method() {
                       Test a = test(null);
@@ -165,18 +165,18 @@ class JavaTypeTest implements RewriteTest {
                   }
               }
               """,
-            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
-                @Override
-                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Object o) {
-                    J.MethodInvocation m = super.visitMethodInvocation(method, o);
-                    if (m.getName().getPrefix().getWhitespace().isEmpty()) {
-                        m = m.withName(m.getName().withPrefix(m.getName().getPrefix().withWhitespace("  ")));
-                    }
-                    assertThat(m.getName().getType()).isSameAs(m.getMethodType());
-                    return m;
-                }
-            })
-          )
+                        spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                            @Override
+                            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Object o) {
+                                J.MethodInvocation m = super.visitMethodInvocation(method, o);
+                                if (m.getName().getPrefix().getWhitespace().isEmpty()) {
+                                    m = m.withName(m.getName().withPrefix(m.getName().getPrefix().withWhitespace("  ")));
+                                }
+                                assertThat(m.getName().getType()).isSameAs(m.getMethodType());
+                                return m;
+                            }
+                        })
+                )
         );
     }
 }

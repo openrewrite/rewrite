@@ -39,10 +39,10 @@ public class BlankLinesAroundFieldsWithAnnotations extends Recipe {
     @Override
     public String getDescription() {
         return "Fields with annotations should have a blank line " +
-               "before them to clearly separate them from the field above. " +
-               "If another field follows, it should also have a blank line after " +
-               "so that the field with the annotation has space on either side of it, " +
-               "visually distinguishing it from its neighbors.";
+                "before them to clearly separate them from the field above. " +
+                "If another field follows, it should also have a blank line after " +
+                "so that the field with the annotation has space on either side of it, " +
+                "visually distinguishing it from its neighbors.";
     }
 
     @Override

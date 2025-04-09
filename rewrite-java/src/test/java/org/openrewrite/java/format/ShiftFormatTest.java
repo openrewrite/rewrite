@@ -25,30 +25,30 @@ class ShiftFormatTest {
     @Test
     void shiftLeft() {
         assertThat(ShiftFormat.shiftLeft(IntelliJ.tabsAndIndents(), "        ", 1))
-            .isEqualTo("    ");
+                .isEqualTo("    ");
     }
 
     @Test
     void shiftLeftTab() {
         assertThat(ShiftFormat.shiftLeft(IntelliJ.tabsAndIndents(), "\t\t", 1))
-            .isEqualTo("	");
+                .isEqualTo("	");
     }
 
     @Test
     void shiftLeftTabWithRemainder() {
         assertThat(ShiftFormat.shiftLeft(IntelliJ.tabsAndIndents(), "\t\t ", 1))
-            .isEqualTo("\t ");
+                .isEqualTo("\t ");
     }
 
     @Test
     void shiftRight() {
         assertThat(ShiftFormat.shiftRight(IntelliJ.tabsAndIndents(), "    ", 1))
-            .isEqualTo("        ");
+                .isEqualTo("        ");
     }
 
     @Test
     void shiftRightTab() {
         assertThat(ShiftFormat.shiftRight(IntelliJ.tabsAndIndents().withUseTabCharacter(true), "\t", 1))
-            .isEqualTo("\t\t");
+                .isEqualTo("\t\t");
     }
 }

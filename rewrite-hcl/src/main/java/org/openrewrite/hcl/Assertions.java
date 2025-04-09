@@ -24,7 +24,8 @@ import org.openrewrite.test.SourceSpecs;
 import java.util.function.Consumer;
 
 public class Assertions {
-    private Assertions() {}
+    private Assertions() {
+    }
 
     public static SourceSpecs hcl(@Nullable @Language("hcl") String before) {
         return hcl(before, s -> {
@@ -43,7 +44,7 @@ public class Assertions {
     }
 
     public static SourceSpecs hcl(@Nullable @Language("hcl") String before, @Nullable @Language("hcl") String after, Consumer<SourceSpec<Hcl.ConfigFile>> spec) {
-        SourceSpec<Hcl.ConfigFile> hcl = new SourceSpec<>(Hcl.ConfigFile.class, null, HclParser.builder(),  before, s -> after);
+        SourceSpec<Hcl.ConfigFile> hcl = new SourceSpec<>(Hcl.ConfigFile.class, null, HclParser.builder(), before, s -> after);
         spec.accept(hcl);
         return hcl;
     }

@@ -131,7 +131,7 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
         }
         if (!((Tree) old).getId().equals(requireNonNull(currentValue).getId())) {
             throw new IllegalArgumentException("Updating the cursor in place is only supported for mutations on a Tree instance " +
-                                               "that maintain the same ID after the mutation.");
+                    "that maintain the same ID after the mutation.");
         }
         cursor = new Cursor(cursor.getParentOrThrow(), currentValue);
         return cursor;
@@ -147,12 +147,12 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
 
     public @Nullable T visit(@Nullable Tree tree, P p, Cursor parent) {
         assert !(parent.getValue() instanceof Tree) ||
-               !((Tree) parent.getValue()).isScope(tree) ||
-               !(p instanceof ExecutionContext) ||
-               !CursorValidatingExecutionContextView.view((ExecutionContext) p).getValidateCursorAcyclic() :
+                !((Tree) parent.getValue()).isScope(tree) ||
+                !(p instanceof ExecutionContext) ||
+                !CursorValidatingExecutionContextView.view((ExecutionContext) p).getValidateCursorAcyclic() :
                 "The `parent` cursor must not point to the same `tree` as the tree to be visited. " +
-                "This usually indicates that you have used getCursor() where getCursor().getParent() is appropriate. " +
-                "This is a test-only validation which can be opted out of by configuring your test's type validation options with `cursorAcyclic(false)`.";
+                        "This usually indicates that you have used getCursor() where getCursor().getParent() is appropriate. " +
+                        "This is a test-only validation which can be opted out of by configuring your test's type validation options with `cursorAcyclic(false)`.";
         this.cursor = parent;
         return visit(tree, p);
     }
@@ -180,15 +180,15 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
 
     @Incubating(since = "7.31.0")
     public static <R extends Tree, C extends Collection<R>> C collect(TreeVisitor<?, ExecutionContext> visitor,
-                                                                      Tree tree, C initial) {
+            Tree tree, C initial) {
         //noinspection unchecked
         return collect(visitor, tree, initial, Tree.class, t -> (R) t);
     }
 
     @Incubating(since = "7.31.0")
     public static <U extends Tree, R, C extends Collection<R>> C collect(TreeVisitor<?, ExecutionContext> visitor,
-                                                                         Tree tree, C initial, Class<U> matchOn,
-                                                                         Function<U, R> map) {
+            Tree tree, C initial, Class<U> matchOn,
+            Function<U, R> map) {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext();
         ctx.addObserver(new TreeObserver.Subscription(new TreeObserver() {
             @Override
@@ -271,7 +271,7 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
 
                 if (t != null && afterVisit != null) {
                     for (TreeVisitor<?, P> v : afterVisit) {
-                         v.setCursor(getCursor());
+                        v.setCursor(getCursor());
                         //noinspection unchecked
                         t = (T) v.visit(t, p);
                     }
@@ -370,7 +370,7 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
             }
         }
         throw new IllegalArgumentException("Expected to find a tree type somewhere in the type parameters of the " +
-                                           "type hierarchy of visitor " + getClass().getName());
+                "type hierarchy of visitor " + getClass().getName());
     }
 
     public <R extends Tree, V extends TreeVisitor<R, P>> V adapt(Class<? extends V> adaptTo) {

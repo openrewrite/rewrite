@@ -27,19 +27,19 @@ class FindLiteralsTest implements RewriteTest {
     @Test
     void findLiterals() {
         rewriteRun(
-          spec -> spec.recipe(new FindLiterals("Hello.*")),
-          java(
-            """
+                spec -> spec.recipe(new FindLiterals("Hello.*")),
+                java(
+                        """
               class Test {
                   String s = "Hello Jonathan";
               }
               """,
-            """
+                        """
               class Test {
                   String s = /*~~>*/"Hello Jonathan";
               }
               """
-          )
+                )
         );
     }
 }

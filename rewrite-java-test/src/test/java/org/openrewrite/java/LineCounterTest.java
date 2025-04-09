@@ -33,39 +33,39 @@ class LineCounterTest implements RewriteTest {
     @Test
     void countLines() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final LineCounter lineCount = new LineCounter();
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    final LineCounter lineCount = new LineCounter();
 
-              @Override
-              public Space visitSpace(Space space, Space.Location loc, ExecutionContext p) {
-                  lineCount.count(space);
-                  return super.visitSpace(space, loc, p);
-              }
+                    @Override
+                    public Space visitSpace(Space space, Space.Location loc, ExecutionContext p) {
+                        lineCount.count(space);
+                        return super.visitSpace(space, loc, p);
+                    }
 
-              @Override
-              public J preVisit(J tree, ExecutionContext p) {
-                  if (lineCount.getLine() == 3) {
-                      return SearchResult.found(tree);
-                  }
-                  return super.preVisit(tree, p);
-              }
-          })),
-          java(
-            """
+                    @Override
+                    public J preVisit(J tree, ExecutionContext p) {
+                        if (lineCount.getLine() == 3) {
+                            return SearchResult.found(tree);
+                        }
+                        return super.preVisit(tree, p);
+                    }
+                })),
+                java(
+                        """
               class Test {
                   void test() {
                       int n = 0;
                   }
               }
               """,
-            """
+                        """
               class Test {
                   void test() {
                       /*~~>*/int /*~~>*//*~~>*/n = /*~~>*/0;
                   }
               }
               """
-          )
+                )
         );
     }
 }

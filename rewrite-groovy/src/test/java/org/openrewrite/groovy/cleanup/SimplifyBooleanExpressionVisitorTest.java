@@ -39,8 +39,8 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     @Test
     void simplifyEqualsLiteralTrueIf() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               class A {
                   boolean a
                   def m() {
@@ -49,7 +49,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class A {
                   boolean a
                   def m() {
@@ -58,15 +58,15 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void simplifyBooleanExpressionComprehensive() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               class A {
                   def m() {
                       boolean a = !false
@@ -81,7 +81,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class A {
                   def m() {
                       boolean a = true
@@ -96,15 +96,15 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void simplifyInvertedBooleanLiteral() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               class A {
                   def m() {
                       boolean a = !false
@@ -112,7 +112,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class A {
                   def m() {
                       boolean a = true
@@ -120,15 +120,15 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doubleNegationWithParentheses() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               class A {
                   def m() {
                       boolean a = !!(!(!true))
@@ -136,7 +136,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class A {
                   def m() {
                       boolean a = true
@@ -144,15 +144,15 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doubleNegatedBinaryWithParentheses() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               class A {
                   def m() {
                       boolean a1 = !(1 == 1)
@@ -164,7 +164,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class A {
                   def m() {
                       boolean a1 = 1 != 1
@@ -176,15 +176,15 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void simplifyEqualsLiteralTrue() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               class A {
                   def m() {
                       boolean a = true
@@ -192,7 +192,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class A {
                   def m() {
                       boolean a = true
@@ -200,15 +200,15 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void simplifyOrLiteralTrue() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               class A {
                   def m() {
                       boolean b = true
@@ -216,7 +216,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class A {
                   def m() {
                       boolean b = true
@@ -224,15 +224,15 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void simplifyOrAlwaysTrue() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               class A {
                   def m() {
                       boolean c = true
@@ -240,7 +240,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class A {
                   def m() {
                       boolean c = true
@@ -248,15 +248,15 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void simplifyAndAlwaysTrue() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               class A {
                   def m() {
                       boolean d = true
@@ -264,7 +264,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class A {
                   def m() {
                       boolean d = true
@@ -272,15 +272,15 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void simplifyEqualsLiteralTrueAlwaysTrue() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               class A {
                   def m() {
                       boolean e = true
@@ -288,7 +288,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class A {
                   def m() {
                       boolean e = true
@@ -296,15 +296,15 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void simplifyLiteralFalseAlwaysFalse() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               class A {
                   def m() {
                       boolean f = true
@@ -312,7 +312,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class A {
                   def m() {
                       boolean f = true
@@ -320,30 +320,30 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void simplifyDoubleNegation() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               class A {
                   def doubleNegation(boolean g) {
                       boolean h = g
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void simplifyNotEqualsFalse() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               class A {
                   def m() {
                       boolean a = true
@@ -351,7 +351,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class A {
                   def m() {
                       boolean a = true
@@ -359,7 +359,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -367,8 +367,8 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     @Test
     void autoFormatIsConditionallyApplied() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               class A {
                   def m() {
                       boolean a=true
@@ -376,7 +376,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class A {
                   def m() {
                       boolean a=true
@@ -384,15 +384,15 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void binaryOrBothFalse() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               class A {
                   def m() {
                       if (!true || !true) {
@@ -401,7 +401,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class A {
                   def m() {
                       if (false) {
@@ -410,15 +410,15 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void mapFields() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               class A {
                   def foo(boolean a, Map m) {
                       if (a || m.foo || m.bar) {
@@ -427,7 +427,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 

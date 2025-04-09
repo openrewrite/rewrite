@@ -85,8 +85,8 @@ public interface JavaParser extends Parser {
         if (!missingArtifactNames.isEmpty()) {
             throw new IllegalArgumentException(
                     "Unable to find runtime dependencies beginning with: " +
-                    missingArtifactNames.stream().map(a -> "'" + a + "'").sorted().collect(joining(", ")) +
-                    ", classpath: " + runtimeClasspath);
+                            missingArtifactNames.stream().map(a -> "'" + a + "'").sorted().collect(joining(", ")) +
+                            ", classpath: " + runtimeClasspath);
         }
 
         return artifacts;
@@ -115,7 +115,7 @@ public interface JavaParser extends Parser {
             String cpEntryString = cpEntry.toString();
             Path path = Paths.get(cpEntry);
             if (jarPattern.matcher(cpEntryString).find() ||
-                explodedPattern.matcher(cpEntryString).find() && path.toFile().isDirectory()) {
+                    explodedPattern.matcher(cpEntryString).find() && path.toFile().isDirectory()) {
                 artifacts.add(path);
                 // Do not break because jarPattern matches "foo-bar-1.0.jar" and "foo-1.0.jar" to "foo"
             }
@@ -159,7 +159,7 @@ public interface JavaParser extends Parser {
                         @Override
                         public boolean test(Class<?> c1) {
                             if (c1.getName().equals(JavaParser.class.getName()) ||
-                                c1.getName().equals(Builder.class.getName())) {
+                                    c1.getName().equals(Builder.class.getName())) {
                                 parserOrBuilderFound = true;
                                 return false;
                             }
@@ -169,7 +169,7 @@ public interface JavaParser extends Parser {
                     .findFirst()
                     .orElseThrow(() -> new IllegalStateException("Unable to find caller of JavaParser.dependenciesFromResources(..)")));
         } catch (ClassNotFoundException | NoSuchFieldException | IllegalAccessException |
-                 NoSuchMethodException | InvocationTargetException e) {
+                NoSuchMethodException | InvocationTargetException e) {
             caller = JavaParser.class;
         }
 
@@ -207,10 +207,10 @@ public interface JavaParser extends Parser {
             if (!missingArtifactNames.isEmpty()) {
                 throw new IllegalArgumentException(
                         "Unable to find classpath resource dependencies beginning with: " +
-                        missingArtifactNames.stream().map(a -> "'" + a + "'").sorted().collect(joining(", ", "", ".\n")) +
-                        "The caller is of type " + caller.getName() + ".\n" +
-                        "The resources resolvable from the caller's classpath are: " +
-                        resources.stream().map(Resource::getPath).sorted().collect(joining(", "))
+                                missingArtifactNames.stream().map(a -> "'" + a + "'").sorted().collect(joining(", ", "", ".\n")) +
+                                "The caller is of type " + caller.getName() + ".\n" +
+                                "The resources resolvable from the caller's classpath are: " +
+                                resources.stream().map(Resource::getPath).sorted().collect(joining(", "))
                 );
             }
         }
@@ -277,7 +277,7 @@ public interface JavaParser extends Parser {
 
         throw new IllegalStateException(
                 "Unable to create a Java parser instance. " +
-                "`rewrite-java-8`, `rewrite-java-11`, `rewrite-java-17`, or `rewrite-java-21` must be on the classpath.");
+                        "`rewrite-java-8`, `rewrite-java-11`, `rewrite-java-17`, or `rewrite-java-21` must be on the classpath.");
     }
 
     @Override
@@ -459,7 +459,7 @@ public interface JavaParser extends Parser {
         String pkg = packageMatcher.find() ? packageMatcher.group(1).replace('.', '/') + "/" : "";
 
         String className = Optional.ofNullable(simpleName.apply(sourceCode))
-                                   .orElse(Long.toString(System.nanoTime())) + ".java";
+                .orElse(Long.toString(System.nanoTime())) + ".java";
 
         return prefix.resolve(Paths.get(pkg + className));
     }

@@ -56,7 +56,7 @@ public class SelectRecipeExamples extends Recipe {
     @Override
     public String getDescription() {
         return "Add `@DocumentExample` to the first non-issue and not a disabled unit test of a recipe as an example," +
-               " if there are not any examples yet.";
+                " if there are not any examples yet.";
     }
 
     @Override
@@ -66,7 +66,7 @@ public class SelectRecipeExamples extends Recipe {
 
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl,
-                                                            ExecutionContext ctx) {
+                    ExecutionContext ctx) {
                 if (classDecl.getImplements() != null && !classDecl.getImplements().isEmpty()) {
                     if (!TypeUtils.isOfClassType(classDecl.getImplements().get(0).getType(), REWRITE_TEST_FQN)) {
                         return classDecl;
@@ -78,7 +78,7 @@ public class SelectRecipeExamples extends Recipe {
 
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method,
-                                                              ExecutionContext ctx) {
+                    ExecutionContext ctx) {
                 if (selectedCount > 0) {
                     return method;
                 }
@@ -92,8 +92,8 @@ public class SelectRecipeExamples extends Recipe {
 
                 boolean hasIssueOrDisabledAnnotation =
                         annotations.stream().anyMatch(a -> ISSUE_ANNOTATION_MATCHER.matches(a) ||
-                                                           DISABLED_ANNOTATION_MATCHER.matches(a) ||
-                                                           DOCUMENT_EXAMPLE_ANNOTATION_MATCHER.matches(a)
+                                DISABLED_ANNOTATION_MATCHER.matches(a) ||
+                                DOCUMENT_EXAMPLE_ANNOTATION_MATCHER.matches(a)
                         );
 
                 if (hasIssueOrDisabledAnnotation) {
@@ -110,7 +110,7 @@ public class SelectRecipeExamples extends Recipe {
                 boolean isAGoodExample = new JavaIsoVisitor<AtomicBoolean>() {
                     @Override
                     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method,
-                                                                    AtomicBoolean isGood) {
+                            AtomicBoolean isGood) {
                         if (REWRITE_RUN_METHOD_MATCHER_ALL.matches(method)) {
                             int argIndex = 0;
                             if (REWRITE_RUN_METHOD_MATCHER_WITH_SPEC.matches(method)) {

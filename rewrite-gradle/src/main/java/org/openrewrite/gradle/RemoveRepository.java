@@ -48,7 +48,7 @@ public class RemoveRepository extends Recipe {
 
             @Override
             public @Nullable J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                if(repositories.matches(method)) {
+                if (repositories.matches(method)) {
                     //noinspection ConstantConditions
                     return null;
                 }

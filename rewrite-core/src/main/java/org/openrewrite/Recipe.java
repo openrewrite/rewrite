@@ -146,8 +146,8 @@ public abstract class Recipe implements Cloneable {
                 optionField.setAccessible(true);
                 Object optionValue = optionField.get(this);
                 if (optionValue != null &&
-                    !Iterable.class.isAssignableFrom(optionValue.getClass()) &&
-                    !optionValue.getClass().isArray()) {
+                        !Iterable.class.isAssignableFrom(optionValue.getClass()) &&
+                        !optionValue.getClass().isArray()) {
                     return String.format("%s `%s`", getDisplayName(), optionValue);
                 }
             } catch (NoSuchFieldException | IllegalAccessException ignore) {
@@ -463,7 +463,7 @@ public abstract class Recipe implements Cloneable {
      */
     @Incubating(since = "8.31.0")
     public static Builder builder(@NlsRewrite.DisplayName @Language("markdown") String displayName,
-                                  @NlsRewrite.Description @Language("markdown") String description) {
+            @NlsRewrite.Description @Language("markdown") String description) {
         return new Builder(displayName, description);
     }
 

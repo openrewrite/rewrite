@@ -27,13 +27,13 @@ class RemoveManagedDependencyTest implements RewriteTest {
     @Test
     void removeManagedDependency() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveManagedDependency(
-            "javax.activation",
-            "javax.activation-api",
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveManagedDependency(
+                        "javax.activation",
+                        "javax.activation-api",
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -55,7 +55,7 @@ class RemoveManagedDependencyTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """,
-            """
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -72,20 +72,20 @@ class RemoveManagedDependencyTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void removeManagedDependencyWithScopeNone() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveManagedDependency(
-            "javax.activation",
-            "javax.activation-api",
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveManagedDependency(
+                        "javax.activation",
+                        "javax.activation-api",
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -108,7 +108,7 @@ class RemoveManagedDependencyTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """,
-            """
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -125,20 +125,20 @@ class RemoveManagedDependencyTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void removeManagedDependencyWithScopeMatching() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveManagedDependency(
-            "javax.activation",
-            "javax.activation-api",
-            "test"
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveManagedDependency(
+                        "javax.activation",
+                        "javax.activation-api",
+                        "test"
+                )),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -161,7 +161,7 @@ class RemoveManagedDependencyTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """,
-            """
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -178,20 +178,20 @@ class RemoveManagedDependencyTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void removeManagedDependencyWithScopeNonMatching() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveManagedDependency(
-            "javax.activation",
-            "javax.activation-api",
-            "compile"
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveManagedDependency(
+                        "javax.activation",
+                        "javax.activation-api",
+                        "compile"
+                )),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -214,20 +214,20 @@ class RemoveManagedDependencyTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void removeBomImport() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveManagedDependency(
-            "io.micrometer",
-            "micrometer-bom",
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveManagedDependency(
+                        "io.micrometer",
+                        "micrometer-bom",
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -246,7 +246,7 @@ class RemoveManagedDependencyTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """,
-            """
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -254,7 +254,7 @@ class RemoveManagedDependencyTest implements RewriteTest {
                   <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 }

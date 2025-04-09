@@ -29,15 +29,15 @@ class MissingOptionExampleTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new MissingOptionExample())
-          .parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()));
+                .parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()));
     }
 
     @DocumentExample
     @Test
     void lacksExample() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import org.openrewrite.Option;
               import org.openrewrite.Recipe;
               
@@ -55,7 +55,7 @@ class MissingOptionExampleTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import org.openrewrite.Option;
               import org.openrewrite.Recipe;
 
@@ -73,15 +73,15 @@ class MissingOptionExampleTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void hasExampleAlready() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import org.openrewrite.Option;
               import org.openrewrite.Recipe;
               
@@ -99,23 +99,23 @@ class MissingOptionExampleTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @ParameterizedTest
     @ValueSource(strings = {
-      "boolean",
-      "Boolean",
-      "int",
-      "Integer",
-      "long",
-      "Long"
+            "boolean",
+            "Boolean",
+            "int",
+            "Integer",
+            "long",
+            "Long"
     })
     void skipBoolean(String type) {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import org.openrewrite.Option;
               import org.openrewrite.Recipe;
               
@@ -133,15 +133,15 @@ class MissingOptionExampleTest implements RewriteTest {
                   }
               }
               """.formatted(type)
-          )
+                )
         );
     }
 
     @Test
     void skipValidOptions() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import org.openrewrite.Option;
               import org.openrewrite.Recipe;
               
@@ -159,7 +159,7 @@ class MissingOptionExampleTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

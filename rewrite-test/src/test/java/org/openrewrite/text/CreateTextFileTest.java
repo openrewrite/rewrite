@@ -29,24 +29,24 @@ class CreateTextFileTest implements RewriteTest {
     @Test
     void hasCreatedFile() {
         rewriteRun(
-          spec -> spec.recipe(new CreateTextFile("foo", ".github/CODEOWNERS", false)),
-          text(
-            null,
-            "foo",
-            spec -> spec.path(".github/CODEOWNERS")
-          )
+                spec -> spec.recipe(new CreateTextFile("foo", ".github/CODEOWNERS", false)),
+                text(
+                        null,
+                        "foo",
+                        spec -> spec.path(".github/CODEOWNERS")
+                )
         );
     }
 
     @Test
     void hasCreatedFileWithTrailingNewline() {
         rewriteRun(
-          spec -> spec.recipe(new CreateTextFile("foo\n", ".github/CODEOWNERS", false)),
-          text(
-            null,
-            "foo\n",
-            spec -> spec.path(".github/CODEOWNERS").noTrim()
-          )
+                spec -> spec.recipe(new CreateTextFile("foo\n", ".github/CODEOWNERS", false)),
+                text(
+                        null,
+                        "foo\n",
+                        spec -> spec.path(".github/CODEOWNERS").noTrim()
+                )
         );
     }
 
@@ -54,50 +54,50 @@ class CreateTextFileTest implements RewriteTest {
     @Test
     void hasOverwrittenFile() {
         rewriteRun(
-          spec -> spec.recipe(new CreateTextFile("foo", ".github/CODEOWNERS", true)),
-          text(
-            "hello",
-            "foo",
-            spec -> spec.path(".github/CODEOWNERS")
-          )
+                spec -> spec.recipe(new CreateTextFile("foo", ".github/CODEOWNERS", true)),
+                text(
+                        "hello",
+                        "foo",
+                        spec -> spec.path(".github/CODEOWNERS")
+                )
         );
     }
 
     @Test
     void shouldNotChangeExistingFile() {
         rewriteRun(
-          spec -> spec.recipe(new CreateTextFile("foo", ".github/CODEOWNERS", false)),
-          text(
-            "hello",
-            spec -> spec.path(".github/CODEOWNERS")
-          )
+                spec -> spec.recipe(new CreateTextFile("foo", ".github/CODEOWNERS", false)),
+                text(
+                        "hello",
+                        spec -> spec.path(".github/CODEOWNERS")
+                )
         );
     }
 
     @Test
     void shouldNotChangeExistingFileWhenOverwriteNull() {
         rewriteRun(
-          spec -> spec.recipe(new CreateTextFile("foo", ".github/CODEOWNERS", null)),
-          text(
-            "hello",
-            spec -> spec.path(".github/CODEOWNERS")
-          )
+                spec -> spec.recipe(new CreateTextFile("foo", ".github/CODEOWNERS", null)),
+                text(
+                        "hello",
+                        spec -> spec.path(".github/CODEOWNERS")
+                )
         );
     }
 
     @Test
     void shouldAddAnotherFile() {
         rewriteRun(
-          spec -> spec.recipe(new CreateTextFile("foo", ".github/CODEOWNERS", null)),
-          text(
-            "hello",
-            spec -> spec.path(".github/CODEOWNERSZ")
-          ),
-          text(
-            null,
-            "foo",
-            spec -> spec.path(".github/CODEOWNERS")
-          )
+                spec -> spec.recipe(new CreateTextFile("foo", ".github/CODEOWNERS", null)),
+                text(
+                        "hello",
+                        spec -> spec.path(".github/CODEOWNERSZ")
+                ),
+                text(
+                        null,
+                        "foo",
+                        spec -> spec.path(".github/CODEOWNERS")
+                )
         );
     }
 
@@ -117,15 +117,15 @@ class CreateTextFileTest implements RewriteTest {
               [platform: 'windows', jdk: 17],
           ])""";
         rewriteRun(
-          spec -> spec.recipe(new CreateTextFile(after, "Jenkinsfile", true)),
-          groovy(
-            """
+                spec -> spec.recipe(new CreateTextFile(after, "Jenkinsfile", true)),
+                groovy(
+                        """
               #!groovy
               buildPlugin()
               """,
-            after,
-            spec -> spec.path("Jenkinsfile")
-          )
+                        after,
+                        spec -> spec.path("Jenkinsfile")
+                )
         );
     }
 }

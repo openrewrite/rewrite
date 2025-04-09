@@ -68,7 +68,7 @@ public class TypeUtils {
 
     public static boolean isObject(@Nullable JavaType type) {
         return type instanceof JavaType.FullyQualified &&
-               "java.lang.Object".equals(((JavaType.FullyQualified) type).getFullyQualifiedName());
+                "java.lang.Object".equals(((JavaType.FullyQualified) type).getFullyQualifiedName());
     }
 
     public static @Nullable String findQualifiedJavaLangTypeName(String name) {
@@ -77,9 +77,9 @@ public class TypeUtils {
 
     public static boolean isString(@Nullable JavaType type) {
         return type == JavaType.Primitive.String ||
-               (type instanceof JavaType.Class &&
-                "java.lang.String".equals(((JavaType.Class) type).getFullyQualifiedName())
-               );
+                (type instanceof JavaType.Class &&
+                        "java.lang.String".equals(((JavaType.Class) type).getFullyQualifiedName())
+                );
     }
 
     public static String toFullyQualifiedName(String fqn) {
@@ -89,7 +89,7 @@ public class TypeUtils {
     public static boolean fullyQualifiedNamesAreEqual(@Nullable String fqn1, @Nullable String fqn2) {
         if (fqn1 != null && fqn2 != null) {
             return fqn1.equals(fqn2) || fqn1.length() == fqn2.length() &&
-                                        toFullyQualifiedName(fqn1).equals(toFullyQualifiedName(fqn2));
+                    toFullyQualifiedName(fqn1).equals(toFullyQualifiedName(fqn2));
         }
         return fqn1 == null && fqn2 == null;
     }
@@ -139,13 +139,13 @@ public class TypeUtils {
             JavaType.Method method1 = (JavaType.Method) type1;
             JavaType.Method method2 = (JavaType.Method) type2;
             if (!method1.getName().equals(method2.getName()) ||
-                method1.getFlags().size() != method2.getFlags().size() ||
-                !method1.getFlags().containsAll(method2.getFlags()) ||
-                !TypeUtils.isOfType(method1.getDeclaringType(), method2.getDeclaringType()) ||
-                !TypeUtils.isOfType(method1.getReturnType(), method2.getReturnType()) ||
-                method1.getAnnotations().size() != method2.getAnnotations().size() ||
-                method1.getThrownExceptions().size() != method2.getThrownExceptions().size() ||
-                method1.getParameterTypes().size() != method2.getParameterTypes().size()) {
+                    method1.getFlags().size() != method2.getFlags().size() ||
+                    !method1.getFlags().containsAll(method2.getFlags()) ||
+                    !TypeUtils.isOfType(method1.getDeclaringType(), method2.getDeclaringType()) ||
+                    !TypeUtils.isOfType(method1.getReturnType(), method2.getReturnType()) ||
+                    method1.getAnnotations().size() != method2.getAnnotations().size() ||
+                    method1.getThrownExceptions().size() != method2.getThrownExceptions().size() ||
+                    method1.getParameterTypes().size() != method2.getParameterTypes().size()) {
                 return false;
             }
 
@@ -206,7 +206,7 @@ public class TypeUtils {
         }
         if (matchOverride) {
             if (!"java.lang.Object".equals(type.getFullyQualifiedName()) &&
-                isOfTypeWithName(TYPE_OBJECT, true, matcher)) {
+                    isOfTypeWithName(TYPE_OBJECT, true, matcher)) {
                 return true;
             }
 
@@ -263,7 +263,7 @@ public class TypeUtils {
 
                 // First check if the raw types are assignable
                 if (toParameters.size() != fromParameters.size() ||
-                    !isAssignableTo(toParameterized.getType(), fromParameterized.getType(), position)) {
+                        !isAssignableTo(toParameterized.getType(), fromParameterized.getType(), position)) {
                     return false;
                 }
 
@@ -279,11 +279,11 @@ public class TypeUtils {
                         if (toGeneric.getName().equals("?")) {
                             // If both are wildcards, check their compatibility
                             if (fromParam instanceof JavaType.GenericTypeVariable &&
-                                ((JavaType.GenericTypeVariable) fromParam).getName().equals("?")) {
+                                    ((JavaType.GenericTypeVariable) fromParam).getName().equals("?")) {
 
                                 // If both are unbounded wildcards, they're compatible
                                 if (toGeneric.getBounds().isEmpty() &&
-                                    ((JavaType.GenericTypeVariable) fromParam).getBounds().isEmpty()) {
+                                        ((JavaType.GenericTypeVariable) fromParam).getBounds().isEmpty()) {
                                     continue;  // Skip to next parameter, these wildcards match
                                 }
 
@@ -314,10 +314,7 @@ public class TypeUtils {
                     }
                 }
                 return true;
-            }
-
-            // Handle generic type variables (e.g., T extends Collection<String>)
-            else if (to instanceof JavaType.GenericTypeVariable) {
+            } else if (to instanceof JavaType.GenericTypeVariable) {
                 JavaType.GenericTypeVariable toGeneric = (JavaType.GenericTypeVariable) to;
 
                 switch (position) {
@@ -347,10 +344,7 @@ public class TypeUtils {
                         }
                         return false;
                 }
-            }
-
-            // Handle fully qualified types (e.g., java.util.List)
-            else if (to instanceof JavaType.FullyQualified) {
+            } else if (to instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified toFq = (JavaType.FullyQualified) to;
                 if (from instanceof JavaType.Primitive) {
                     JavaType.Primitive toPrimitive = JavaType.Primitive.fromClassName(toFq.getFullyQualifiedName());
@@ -368,10 +362,7 @@ public class TypeUtils {
                     return false;
                 }
                 return !(from instanceof JavaType.GenericTypeVariable) && isAssignableTo(toFq.getFullyQualifiedName(), from);
-            }
-
-            // Rest of the existing cases, passing through the position parameter
-            else if (to instanceof JavaType.Variable) {
+            } else if (to instanceof JavaType.Variable) {
                 return isAssignableTo(((JavaType.Variable) to).getType(), from, position);
             } else if (to instanceof JavaType.Method) {
                 return isAssignableTo(((JavaType.Method) to).getReturnType(), from, position);
@@ -383,10 +374,7 @@ public class TypeUtils {
                 }
                 // Arrays are invariant in Java
                 return isAssignableTo(toArray.getElemType(), fromArray.getElemType(), TypePosition.Invariant);
-            }
-
-            // Handle primitives with their existing logic
-            else if (to instanceof JavaType.Primitive) {
+            } else if (to instanceof JavaType.Primitive) {
                 // Primitive handling remains unchanged as they don't involve variance
                 return handlePrimitiveAssignability((JavaType.Primitive) to, from);
             }
@@ -512,7 +500,7 @@ public class TypeUtils {
                 }
                 JavaType.FullyQualified classFrom = (JavaType.FullyQualified) from;
                 if (fullyQualifiedNamesAreEqual(to, classFrom.getFullyQualifiedName()) ||
-                    isAssignableTo(to, classFrom.getSupertype())) {
+                        isAssignableTo(to, classFrom.getSupertype())) {
                     return true;
                 }
                 for (JavaType.FullyQualified i : classFrom.getInterfaces()) {
@@ -749,7 +737,7 @@ public class TypeUtils {
         if (type instanceof JavaType.Parameterized) {
             JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
             return isWellFormedType(parameterized.getType(), seen) &&
-                   parameterized.getTypeParameters().stream().allMatch(it -> isWellFormedType(it, seen));
+                    parameterized.getTypeParameters().stream().allMatch(it -> isWellFormedType(it, seen));
         } else if (type instanceof JavaType.Array) {
             JavaType.Array arr = (JavaType.Array) type;
             return isWellFormedType(arr.getElemType(), seen);
@@ -765,8 +753,8 @@ public class TypeUtils {
         } else if (type instanceof JavaType.Method) {
             JavaType.Method m = (JavaType.Method) type;
             return isWellFormedType(m.getReturnType(), seen) &&
-                   isWellFormedType(m.getDeclaringType(), seen) &&
-                   m.getParameterTypes().stream().allMatch(it -> isWellFormedType(it, seen));
+                    isWellFormedType(m.getDeclaringType(), seen) &&
+                    m.getParameterTypes().stream().allMatch(it -> isWellFormedType(it, seen));
         }
         return true;
     }

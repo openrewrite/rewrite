@@ -35,51 +35,51 @@ class NormalizeLineBreaksTest implements RewriteTest {
 
     @Language("groovy")
     String windows = "" +
-                     "class Test {\r\n" +
-                     "    // some comment\r\n" +
-                     "    def test() {\r\n" +
-                     "        System.out.println()\r\n" +
-                     "    }\r\n" +
-                     "}";
+            "class Test {\r\n" +
+            "    // some comment\r\n" +
+            "    def test() {\r\n" +
+            "        System.out.println()\r\n" +
+            "    }\r\n" +
+            "}";
 
     @Language("groovy")
     String linux = "" +
-                   "class Test {\n" +
-                   "    // some comment\n" +
-                   "    def test() {\n" +
-                   "        System.out.println()\n" +
-                   "    }\n" +
-                   "}";
+            "class Test {\n" +
+            "    // some comment\n" +
+            "    def test() {\n" +
+            "        System.out.println()\n" +
+            "    }\n" +
+            "}";
 
     @Language("groovy")
     String windowsJavadoc = "" +
-                            "/**\r\n" +
-                            " *\r\n" +
-                            " */\r\n" +
-                            "class Test {\r\n" +
-                            "}";
+            "/**\r\n" +
+            " *\r\n" +
+            " */\r\n" +
+            "class Test {\r\n" +
+            "}";
 
     @Language("groovy")
     String linuxJavadoc = "" +
-                          "/**\n" +
-                          " *\n" +
-                          " */\n" +
-                          "class Test {\n" +
-                          "}";
+            "/**\n" +
+            " *\n" +
+            " */\n" +
+            "class Test {\n" +
+            "}";
 
     @Test
     void windowsToLinux() {
         rewriteRun(
-          normalizeLineBreaks(false),
-          groovy(windows, linux)
+                normalizeLineBreaks(false),
+                groovy(windows, linux)
         );
     }
 
     @Test
     void linuxToWindows() {
         rewriteRun(
-          normalizeLineBreaks(true),
-          groovy(linux, windows)
+                normalizeLineBreaks(true),
+                groovy(linux, windows)
         );
     }
 
@@ -87,8 +87,8 @@ class NormalizeLineBreaksTest implements RewriteTest {
     @Test
     void doNotChangeWindowsJavadoc() {
         rewriteRun(
-          normalizeLineBreaks(true),
-          groovy(windowsJavadoc)
+                normalizeLineBreaks(true),
+                groovy(windowsJavadoc)
         );
     }
 
@@ -96,8 +96,8 @@ class NormalizeLineBreaksTest implements RewriteTest {
     @Test
     void doNotChangeLinuxJavadoc() {
         rewriteRun(
-          normalizeLineBreaks(false),
-          groovy(linuxJavadoc)
+                normalizeLineBreaks(false),
+                groovy(linuxJavadoc)
         );
     }
 
@@ -105,8 +105,8 @@ class NormalizeLineBreaksTest implements RewriteTest {
     @Test
     void windowsToLinuxJavadoc() {
         rewriteRun(
-          normalizeLineBreaks(false),
-          groovy(windowsJavadoc, linuxJavadoc)
+                normalizeLineBreaks(false),
+                groovy(windowsJavadoc, linuxJavadoc)
         );
     }
 
@@ -114,8 +114,8 @@ class NormalizeLineBreaksTest implements RewriteTest {
     @Test
     void linuxToWindowsJavadoc() {
         rewriteRun(
-          normalizeLineBreaks(true),
-          groovy(linuxJavadoc, windowsJavadoc)
+                normalizeLineBreaks(true),
+                groovy(linuxJavadoc, windowsJavadoc)
         );
     }
 
@@ -123,8 +123,8 @@ class NormalizeLineBreaksTest implements RewriteTest {
     @Test
     void preservesExistingWindowsEndingsByDefault() {
         rewriteRun(
-          normalizeLineBreaks(true),
-          groovy(windows)
+                normalizeLineBreaks(true),
+                groovy(windows)
         );
     }
 
@@ -132,8 +132,8 @@ class NormalizeLineBreaksTest implements RewriteTest {
     @Test
     void preservesExistingLinuxEndingsByDefault() {
         rewriteRun(
-          normalizeLineBreaks(false),
-          groovy(linux)
+                normalizeLineBreaks(false),
+                groovy(linux)
         );
     }
 }

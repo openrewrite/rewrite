@@ -123,18 +123,19 @@ public class ChangeStaticFieldToMethod extends Recipe {
 
                 String methodInvocationTemplate = simpleClassName + (newTarget != null ? "." + newTarget + "." : ".") + newMethodName + "()";
 
-                @Language("java") String methodStub;
+                @Language("java")
+                String methodStub;
                 if (newTarget == null) {
                     methodStub = "package " + packageName + ";" +
-                                 " public class " + simpleClassName + " {" +
-                                 " public static void " + newMethodName + "() { return null; }" +
-                                 " }";
+                            " public class " + simpleClassName + " {" +
+                            " public static void " + newMethodName + "() { return null; }" +
+                            " }";
                 } else {
                     methodStub = "package " + packageName + ";" +
-                                 " public class Target {" +
-                                 " public static void " + newMethodName + "() { return null; }" +
-                                 " }" +
-                                 " public class " + simpleClassName + " {public static Target " + newTarget + ";}";
+                            " public class Target {" +
+                            " public static void " + newMethodName + "() { return null; }" +
+                            " }" +
+                            " public class " + simpleClassName + " {public static Target " + newTarget + ";}";
                 }
                 return JavaTemplate
                         .builder(methodInvocationTemplate)

@@ -25,8 +25,8 @@ class OneOfTest implements RewriteTest {
     @Test
     void oneOf() {
         rewriteRun(
-          proto(
-            """
+                proto(
+                        """
               syntax = 'proto2';
               message MyMessage {
                 oneof qux {
@@ -35,7 +35,7 @@ class OneOfTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 }

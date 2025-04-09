@@ -38,7 +38,7 @@ public class MapTagChildrenVisitor<T> extends XmlVisitor<T> {
         Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
         if (scope.isScope(t)) {
             //noinspection unchecked
-            t = t.withContent(ListUtils.map((List<Content>)t.getContent(), map));
+            t = t.withContent(ListUtils.map((List<Content>) t.getContent(), map));
         }
         return t;
     }
@@ -74,7 +74,7 @@ public class MapTagChildrenVisitor<T> extends XmlVisitor<T> {
 
     public static Xml.Tag mapTagChildren(Xml.Tag parentScope, Xml.Tag parent, UnaryOperator<Xml.Tag> map) {
         return mapChildren(parentScope, parent, content -> {
-            if(content instanceof Xml.Tag) {
+            if (content instanceof Xml.Tag) {
                 return map.apply((Xml.Tag) content);
             }
             return content;

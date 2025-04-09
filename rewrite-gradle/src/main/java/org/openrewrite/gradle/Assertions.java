@@ -48,7 +48,7 @@ public class Assertions {
     @Deprecated
     public static UncheckedConsumer<List<SourceFile>> withToolingApi(@Nullable String version, @Nullable String distribution) {
         throw new UnsupportedOperationException("This method has moved to org.openrewrite.gradle.toolingapi.Assertions. " +
-                                                "Add a dependency on org.openrewrite.gradle.tooling:model to continue using it.");
+                "Add a dependency on org.openrewrite.gradle.tooling:model to continue using it.");
     }
 
     /**
@@ -61,7 +61,7 @@ public class Assertions {
     @Deprecated
     public static UncheckedConsumer<List<SourceFile>> withToolingApi(String version) {
         throw new UnsupportedOperationException("This method has moved to org.openrewrite.gradle.toolingapi.Assertions. " +
-                                                "Add a dependency on org.openrewrite.gradle.tooling:model to continue using it.");
+                "Add a dependency on org.openrewrite.gradle.tooling:model to continue using it.");
     }
 
     /**
@@ -73,7 +73,7 @@ public class Assertions {
     @Deprecated
     public static UncheckedConsumer<List<SourceFile>> withToolingApi() {
         throw new UnsupportedOperationException("This method has moved to org.openrewrite.gradle.toolingapi.Assertions. " +
-                                                "Add a dependency on org.openrewrite.gradle.tooling:model to continue using it.");
+                "Add a dependency on org.openrewrite.gradle.tooling:model to continue using it.");
     }
 
     public static SourceSpecs buildGradle(@Language("groovy") @Nullable String before) {
@@ -94,7 +94,7 @@ public class Assertions {
     }
 
     public static SourceSpecs buildGradle(@Language("groovy") @Nullable String before, @Language("groovy") @Nullable String after,
-                                          Consumer<SourceSpec<G.CompilationUnit>> spec) {
+            Consumer<SourceSpec<G.CompilationUnit>> spec) {
         SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", gradleParser, before, s -> after);
         gradle.path("build.gradle");
         spec.accept(gradle);
@@ -119,7 +119,7 @@ public class Assertions {
     }
 
     public static SourceSpecs settingsGradle(@Language("groovy") @Nullable String before, @Language("groovy") @Nullable String after,
-                                             Consumer<SourceSpec<G.CompilationUnit>> spec) {
+            Consumer<SourceSpec<G.CompilationUnit>> spec) {
         SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", gradleParser, before, s -> after);
         gradle.path("settings.gradle");
         spec.accept(gradle);

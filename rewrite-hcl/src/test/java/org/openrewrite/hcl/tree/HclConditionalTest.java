@@ -25,7 +25,7 @@ class HclConditionalTest implements RewriteTest {
     @Test
     void conditional() {
         rewriteRun(
-          hcl("a = isTrue() ? 1 : 2")
+                hcl("a = isTrue() ? 1 : 2")
         );
     }
 }

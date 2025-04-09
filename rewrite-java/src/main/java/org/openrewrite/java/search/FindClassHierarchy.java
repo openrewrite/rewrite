@@ -41,7 +41,7 @@ public class FindClassHierarchy extends Recipe {
     @Override
     public String getDescription() {
         return "Discovers all class declarations within a project, recording which files they appear in, their superclasses, and interfaces. " +
-               "That information is then recorded in a data table.";
+                "That information is then recorded in a data table.";
     }
 
 
@@ -52,7 +52,7 @@ public class FindClassHierarchy extends Recipe {
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
                 J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, ctx);
                 JavaType.FullyQualified type = cd.getType();
-                if(type == null) {
+                if (type == null) {
                     return cd;
                 }
                 classHierarchy.insertRow(ctx, new ClassHierarchy.Row(

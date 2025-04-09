@@ -38,7 +38,7 @@ class JavaTemplateTest2Test implements RewriteTest {
             J mi = super.visitMethodInvocation(method, ctx);
             if (mi instanceof J.MethodInvocation && toString.matches((J.MethodInvocation) mi)) {
                 return JavaTemplate.apply("#{any(java.lang.String)}", getCursor(), ((J.MethodInvocation) mi).getCoordinates().replace(),
-                  ((J.MethodInvocation) mi).getSelect());
+                        ((J.MethodInvocation) mi).getSelect());
             }
             return mi;
         }
@@ -49,9 +49,9 @@ class JavaTemplateTest2Test implements RewriteTest {
     @Test
     void chainedMethodInvocationsAsNewClassArgument() {
         rewriteRun(
-          spec -> spec.recipe(replaceToStringWithLiteralRecipe),
-          java(
-            """
+                spec -> spec.recipe(replaceToStringWithLiteralRecipe),
+                java(
+                        """
               import java.util.ArrayList;
               import java.util.Collections;
               public class T {
@@ -63,7 +63,7 @@ class JavaTemplateTest2Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.ArrayList;
               import java.util.Collections;
               public class T {
@@ -75,7 +75,7 @@ class JavaTemplateTest2Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -83,9 +83,9 @@ class JavaTemplateTest2Test implements RewriteTest {
     @Test
     void chainedMethodInvocationsAsNewClassArgument2() {
         rewriteRun(
-          spec -> spec.recipe(replaceToStringWithLiteralRecipe),
-          java(
-            """
+                spec -> spec.recipe(replaceToStringWithLiteralRecipe),
+                java(
+                        """
               class T {
                   void m(String jsonPayload) {
                       HttpEntity entity = new HttpEntity(jsonPayload.toString(), 0);
@@ -95,7 +95,7 @@ class JavaTemplateTest2Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class T {
                   void m(String jsonPayload) {
                       HttpEntity entity = new HttpEntity(jsonPayload, 0);
@@ -105,16 +105,16 @@ class JavaTemplateTest2Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void methodArgumentStopCommentsOnlyTerminateEnumInitializers() {
         rewriteRun(
-          spec -> spec.recipe(replaceToStringWithLiteralRecipe),
-          java(
-            """
+                spec -> spec.recipe(replaceToStringWithLiteralRecipe),
+                java(
+                        """
               import java.io.File;
               import java.io.IOException;
               import java.util.List;
@@ -127,7 +127,7 @@ class JavaTemplateTest2Test implements RewriteTest {
                   void assertEquals(File f1, File f2) {}
               }
               """,
-            """
+                        """
               import java.io.File;
               import java.io.IOException;
               import java.util.List;
@@ -140,7 +140,7 @@ class JavaTemplateTest2Test implements RewriteTest {
                   void assertEquals(File f1, File f2) {}
               }
               """
-          )
+                )
         );
     }
 
@@ -149,9 +149,9 @@ class JavaTemplateTest2Test implements RewriteTest {
     @Test
     void enumWithinEnum() {
         rewriteRun(
-          spec -> spec.recipe(replaceToStringWithLiteralRecipe),
-          java(
-            """
+                spec -> spec.recipe(replaceToStringWithLiteralRecipe),
+                java(
+                        """
               public enum Test {
                   INSTANCE;
                   public enum MatchMode { DEFAULT }
@@ -160,7 +160,7 @@ class JavaTemplateTest2Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public enum Test {
                   INSTANCE;
                   public enum MatchMode { DEFAULT }
@@ -169,7 +169,7 @@ class JavaTemplateTest2Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -177,26 +177,26 @@ class JavaTemplateTest2Test implements RewriteTest {
     @Test
     void templateStatementIsWithinTryWithResourcesBlock() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              @Override
-              public J visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
-                  var md = getCursor().firstEnclosing(J.MethodDeclaration.class);
-                  if (md != null && md.getSimpleName().equals("createBis")) {
-                      return newClass;
-                  }
-                  if (newClass.getType() != null &&
-                      TypeUtils.asFullyQualified(newClass.getType()).getFullyQualifiedName().equals("java.io.ByteArrayInputStream") &&
-                      !newClass.getArguments().isEmpty()) {
-                      return JavaTemplate.builder("createBis(#{anyArray()})")
-                        .contextSensitive()
-                        .build()
-                        .apply(getCursor(), newClass.getCoordinates().replace(), newClass.getArguments().get(0));
-                  }
-                  return newClass;
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    @Override
+                    public J visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
+                        var md = getCursor().firstEnclosing(J.MethodDeclaration.class);
+                        if (md != null && md.getSimpleName().equals("createBis")) {
+                            return newClass;
+                        }
+                        if (newClass.getType() != null &&
+                                TypeUtils.asFullyQualified(newClass.getType()).getFullyQualifiedName().equals("java.io.ByteArrayInputStream") &&
+                                !newClass.getArguments().isEmpty()) {
+                            return JavaTemplate.builder("createBis(#{anyArray()})")
+                                    .contextSensitive()
+                                    .build()
+                                    .apply(getCursor(), newClass.getCoordinates().replace(), newClass.getArguments().get(0));
+                        }
+                        return newClass;
+                    }
+                })),
+                java(
+                        """
               import java.io.*;
               import java.nio.charset.StandardCharsets;
                             
@@ -215,7 +215,7 @@ class JavaTemplateTest2Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.io.*;
               import java.nio.charset.StandardCharsets;
                             
@@ -234,7 +234,7 @@ class JavaTemplateTest2Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -242,23 +242,23 @@ class JavaTemplateTest2Test implements RewriteTest {
     @Test
     void replaceIdentifierWithMethodInvocation() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              @Override
-              public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                  return method.withBody((J.Block) visit(method.getBody(), ctx));
-              }
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    @Override
+                    public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                        return method.withBody((J.Block) visit(method.getBody(), ctx));
+                    }
 
-              @Override
-              public J visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
-                  if (identifier.getSimpleName().equals("f")) {
-                      return JavaTemplate.apply("#{any(java.io.File)}.getCanonicalFile().toPath()",
-                        getCursor(), identifier.getCoordinates().replace(), identifier);
-                  }
-                  return identifier;
-              }
-          }).withMaxCycles(1)),
-          java(
-            """
+                    @Override
+                    public J visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
+                        if (identifier.getSimpleName().equals("f")) {
+                            return JavaTemplate.apply("#{any(java.io.File)}.getCanonicalFile().toPath()",
+                                    getCursor(), identifier.getCoordinates().replace(), identifier);
+                        }
+                        return identifier;
+                    }
+                }).withMaxCycles(1)),
+                java(
+                        """
               import java.io.File;
               class Test {
                   void test(File f) {
@@ -266,7 +266,7 @@ class JavaTemplateTest2Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.io.File;
               class Test {
                   void test(File f) {
@@ -274,16 +274,16 @@ class JavaTemplateTest2Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void enumClassWithAnonymousInnerClassConstructor() {
         rewriteRun(
-          spec -> spec.recipe(replaceToStringWithLiteralRecipe),
-          java(
-            """
+                spec -> spec.recipe(replaceToStringWithLiteralRecipe),
+                java(
+                        """
               enum MyEnum {
                   THING_ONE(new MyEnumThing() {
                       @Override
@@ -300,7 +300,7 @@ class JavaTemplateTest2Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               enum MyEnum {
                   THING_ONE(new MyEnumThing() {
                       @Override
@@ -317,16 +317,16 @@ class JavaTemplateTest2Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void replacingMethodInvocationWithinEnum() {
         rewriteRun(
-          spec -> spec.recipe(replaceToStringWithLiteralRecipe),
-          java(
-            """
+                spec -> spec.recipe(replaceToStringWithLiteralRecipe),
+                java(
+                        """
               public enum Options {
 
                   JAR("instance.jar.file"),
@@ -348,7 +348,7 @@ class JavaTemplateTest2Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public enum Options {
 
                   JAR("instance.jar.file"),
@@ -370,16 +370,16 @@ class JavaTemplateTest2Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void replacingMethodInvocationWithinInnerEnum() {
         rewriteRun(
-          spec -> spec.recipe(replaceToStringWithLiteralRecipe),
-          java(
-            """
+                spec -> spec.recipe(replaceToStringWithLiteralRecipe),
+                java(
+                        """
               public class Test {
                   void doSomething(Options options) {
                       switch (options) {
@@ -411,7 +411,7 @@ class JavaTemplateTest2Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class Test {
                   void doSomething(Options options) {
                       switch (options) {
@@ -443,7 +443,7 @@ class JavaTemplateTest2Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

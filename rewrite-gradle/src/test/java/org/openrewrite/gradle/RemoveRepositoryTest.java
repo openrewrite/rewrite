@@ -27,19 +27,19 @@ class RemoveRepositoryTest implements RewriteTest {
     @Test
     void removeJcenter() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRepository("jcenter")),
-          buildGradle(
-            """
+                spec -> spec.recipe(new RemoveRepository("jcenter")),
+                buildGradle(
+                        """
               repositories {
                   jcenter()
               }
               """,
-            """
+                        """
               repositories {
                  \s
               }
               """
-          )
+                )
         );
     }
 }

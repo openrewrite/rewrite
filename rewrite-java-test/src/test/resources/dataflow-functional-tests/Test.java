@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+
+
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -24,9 +26,11 @@ import java.util.function.Supplier;
 abstract class Test<P extends Collection> implements Supplier<P> {
     Object field;
     Object ternaryStrangeness = conditional() ? get() : get().stream();
+
     static Boolean conditional() {
         return null;
     }
+
     static {
         Supplier s = new Test<Collection>() {
             @Override
@@ -35,6 +39,7 @@ abstract class Test<P extends Collection> implements Supplier<P> {
             }
         };
     }
+
     Test() {
         Collection c = new ArrayList();
         c.add(1);

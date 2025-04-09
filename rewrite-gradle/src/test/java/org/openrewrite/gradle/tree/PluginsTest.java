@@ -25,14 +25,14 @@ class PluginsTest implements RewriteTest {
     @Test
     void applySomePlugins() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id 'me.champeau.gradle.jmh' version '0.5.2'
                   id "com.github.spotbugs" version "4.6.0" apply false
               }
               """
-          )
+                )
         );
     }
 }

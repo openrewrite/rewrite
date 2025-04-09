@@ -26,8 +26,8 @@ class AssignmentTest implements RewriteTest {
     @Test
     void assignment() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       String s;
@@ -35,7 +35,7 @@ class AssignmentTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

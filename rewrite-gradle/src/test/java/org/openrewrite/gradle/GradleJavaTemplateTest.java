@@ -37,27 +37,27 @@ class GradleJavaTemplateTest implements RewriteTest {
             public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
                 if (block.getStatements().isEmpty()) {
                     return JavaTemplate.builder("implementation(\"com.google.guava:guava:latest.release\")")
-                      .contextSensitive()
-                      .build()
-                      .apply(getCursor(), block.getCoordinates().replace());
+                            .contextSensitive()
+                            .build()
+                            .apply(getCursor(), block.getCoordinates().replace());
                 }
                 return super.visitBlock(block, ctx);
             }
         });
 
         rewriteRun(
-          spec -> spec.recipe(addDependency),
-          buildGradle(
-            """
+                spec -> spec.recipe(addDependency),
+                buildGradle(
+                        """
               dependencies {
               }
               """,
-            """
+                        """
               dependencies {
                   implementation("com.google.guava:guava:latest.release")
               }
               """
-          )
+                )
         );
     }
 }

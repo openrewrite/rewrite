@@ -35,9 +35,9 @@ class ParentPomInsightTest implements RewriteTest {
     @Test
     void noParent() {
         rewriteRun(
-          pomXml(
-            //language=xml
-            """
+                pomXml(
+                        //language=xml
+                        """
               <project>
               <modelVersion>4.0.0</modelVersion>
               
@@ -46,7 +46,7 @@ class ParentPomInsightTest implements RewriteTest {
               <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -54,20 +54,20 @@ class ParentPomInsightTest implements RewriteTest {
     @Test
     void findParent() {
         rewriteRun(
-          spec -> spec.dataTable(ParentPomsInUse.Row.class, rows -> assertThat(rows)
-            .singleElement()
-            .satisfies(row -> {
-                  assertThat(row.getProjectArtifactId()).isEqualTo("demo");
-                  assertThat(row.getGroupId()).isEqualTo("org.springframework.boot");
-                  assertThat(row.getArtifactId()).isEqualTo("spring-boot-starter-parent");
-                  assertThat(row.getVersion()).isEqualTo("3.1.4");
-                  assertThat(row.getRelativePath()).isNull();
-              }
-            )
-          ),
-          mavenProject("demo",
-            pomXml(
-              """
+                spec -> spec.dataTable(ParentPomsInUse.Row.class, rows -> assertThat(rows)
+                                .singleElement()
+                                .satisfies(row -> {
+                                            assertThat(row.getProjectArtifactId()).isEqualTo("demo");
+                                            assertThat(row.getGroupId()).isEqualTo("org.springframework.boot");
+                                            assertThat(row.getArtifactId()).isEqualTo("spring-boot-starter-parent");
+                                            assertThat(row.getVersion()).isEqualTo("3.1.4");
+                                            assertThat(row.getRelativePath()).isNull();
+                                        }
+                                )
+                ),
+                mavenProject("demo",
+                        pomXml(
+                                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -83,7 +83,7 @@ class ParentPomInsightTest implements RewriteTest {
                 	<version>0.0.1-SNAPSHOT</version>
                 </project>
                 """,
-              """
+                                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -99,25 +99,25 @@ class ParentPomInsightTest implements RewriteTest {
                 	<version>0.0.1-SNAPSHOT</version>
                 </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void multiModuleOnlyRoot() {
         rewriteRun(
-          spec -> spec
-            .recipe(new ParentPomInsight("*", "*", null, null))
-            .dataTableAsCsv(ParentPomsInUse.class.getName(), """
+                spec -> spec
+                        .recipe(new ParentPomInsight("*", "*", null, null))
+                        .dataTableAsCsv(ParentPomsInUse.class.getName(), """
               projectArtifactId,groupId,artifactId,version,relativePath
               sample,org.springframework.boot,"spring-boot-starter-parent",2.5.0,
               module1,org.sample,sample,1.0.0,../
               module2,org.sample,sample,1.0.0,../
               """),
-          mavenProject("sample",
-            pomXml(
-              """
+                mavenProject("sample",
+                        pomXml(
+                                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
@@ -137,7 +137,7 @@ class ParentPomInsightTest implements RewriteTest {
                   </modules>
                 </project>
                 """,
-              """
+                                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
@@ -157,10 +157,10 @@ class ParentPomInsightTest implements RewriteTest {
                   </modules>
                 </project>
                 """
-            ),
-            mavenProject("module1",
-              pomXml(
-                """
+                        ),
+                        mavenProject("module1",
+                                pomXml(
+                                        """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -173,7 +173,7 @@ class ParentPomInsightTest implements RewriteTest {
                     <artifactId>module1</artifactId>
                   </project>
                   """,
-                """
+                                        """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -186,11 +186,11 @@ class ParentPomInsightTest implements RewriteTest {
                     <artifactId>module1</artifactId>
                   </project>
                   """,
-                spec -> spec.path("module1/pom.xml")
-              )),
-            mavenProject("module2",
-              pomXml(
-                """
+                                        spec -> spec.path("module1/pom.xml")
+                                )),
+                        mavenProject("module2",
+                                pomXml(
+                                        """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -203,7 +203,7 @@ class ParentPomInsightTest implements RewriteTest {
                     <artifactId>module2</artifactId>
                   </project>
                   """,
-                """
+                                        """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -216,27 +216,27 @@ class ParentPomInsightTest implements RewriteTest {
                     <artifactId>module2</artifactId>
                   </project>
                   """,
-                spec -> spec.path("module2/pom.xml")
-              )
-            )
-          )
+                                        spec -> spec.path("module2/pom.xml")
+                                )
+                        )
+                )
         );
     }
 
     @Test
     void ancestorMatchesVersion() {
         rewriteRun(
-          spec -> spec
-            .recipe(new ParentPomInsight("*", "*", "2.5.0", null))
-            .dataTableAsCsv(ParentPomsInUse.class.getName(), """
+                spec -> spec
+                        .recipe(new ParentPomInsight("*", "*", "2.5.0", null))
+                        .dataTableAsCsv(ParentPomsInUse.class.getName(), """
               projectArtifactId,groupId,artifactId,version,relativePath
               sample,org.springframework.boot,"spring-boot-starter-parent",2.5.0,
               module1,org.springframework.boot,"spring-boot-starter-parent",2.5.0,
               module2,org.springframework.boot,"spring-boot-starter-parent",2.5.0,
               """),
-          mavenProject("sample",
-            pomXml(
-              """
+                mavenProject("sample",
+                        pomXml(
+                                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
@@ -256,7 +256,7 @@ class ParentPomInsightTest implements RewriteTest {
                   </modules>
                 </project>
                 """,
-              """
+                                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
@@ -276,10 +276,10 @@ class ParentPomInsightTest implements RewriteTest {
                   </modules>
                 </project>
                 """
-            ),
-            mavenProject("module1",
-              pomXml(
-                """
+                        ),
+                        mavenProject("module1",
+                                pomXml(
+                                        """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -292,7 +292,7 @@ class ParentPomInsightTest implements RewriteTest {
                     <artifactId>module1</artifactId>
                   </project>
                   """,
-                """
+                                        """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -305,11 +305,11 @@ class ParentPomInsightTest implements RewriteTest {
                     <artifactId>module1</artifactId>
                   </project>
                   """,
-                spec -> spec.path("module1/pom.xml")
-              )),
-            mavenProject("module2",
-              pomXml(
-                """
+                                        spec -> spec.path("module1/pom.xml")
+                                )),
+                        mavenProject("module2",
+                                pomXml(
+                                        """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -322,7 +322,7 @@ class ParentPomInsightTest implements RewriteTest {
                     <artifactId>module2</artifactId>
                   </project>
                   """,
-                """
+                                        """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -335,25 +335,25 @@ class ParentPomInsightTest implements RewriteTest {
                     <artifactId>module2</artifactId>
                   </project>
                   """,
-                spec -> spec.path("module2/pom.xml")
-              )
-            )
-          )
+                                        spec -> spec.path("module2/pom.xml")
+                                )
+                        )
+                )
         );
     }
 
     @Test
     void matchNonSnapshot() {
         rewriteRun(
-          spec -> spec
-            .recipe(new ParentPomInsight("*", "*", "~2", false))
-            .dataTableAsCsv(ParentPomsInUse.class.getName(), """
+                spec -> spec
+                        .recipe(new ParentPomInsight("*", "*", "~2", false))
+                        .dataTableAsCsv(ParentPomsInUse.class.getName(), """
               projectArtifactId,groupId,artifactId,version,relativePath
               sample,org.springframework.boot,"spring-boot-starter-parent",2.5.0,
               """),
-          mavenProject("sample",
-            pomXml(
-              """
+                mavenProject("sample",
+                        pomXml(
+                                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
@@ -373,7 +373,7 @@ class ParentPomInsightTest implements RewriteTest {
                   </modules>
                 </project>
                 """,
-              """
+                                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
@@ -393,10 +393,10 @@ class ParentPomInsightTest implements RewriteTest {
                   </modules>
                 </project>
                 """
-            ),
-            mavenProject("module1",
-              pomXml(
-                """
+                        ),
+                        mavenProject("module1",
+                                pomXml(
+                                        """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -409,11 +409,11 @@ class ParentPomInsightTest implements RewriteTest {
                     <artifactId>module1</artifactId>
                   </project>
                   """,
-                spec -> spec.path("module1/pom.xml")
-              )),
-            mavenProject("module2",
-              pomXml(
-                """
+                                        spec -> spec.path("module1/pom.xml")
+                                )),
+                        mavenProject("module2",
+                                pomXml(
+                                        """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -426,32 +426,32 @@ class ParentPomInsightTest implements RewriteTest {
                     <artifactId>module2</artifactId>
                   </project>
                   """,
-                spec -> spec.path("module2/pom.xml")
-              )
-            )
-          )
+                                        spec -> spec.path("module2/pom.xml")
+                                )
+                        )
+                )
         );
     }
 
     @Test
     void directParentMatchesFullGAV() {
         rewriteRun(
-          spec -> {
-              spec.recipe(new ParentPomInsight("org.springframework.boot", "spring-boot-starter-parent", "3.3.3", null));
-              spec.dataTable(ParentPomsInUse.Row.class, rows -> assertThat(rows)
-                .singleElement()
-                .satisfies(row -> {
-                      assertThat(row.getProjectArtifactId()).isEqualTo("my-app");
-                      assertThat(row.getGroupId()).isEqualTo("org.springframework.boot");
-                      assertThat(row.getArtifactId()).isEqualTo("spring-boot-starter-parent");
-                      assertThat(row.getVersion()).isEqualTo("3.3.3");
-                      assertThat(row.getRelativePath()).isNull();
-                  }
-                ));
-          },
-          pomXml(
-            //language=xml
-            """
+                spec -> {
+                    spec.recipe(new ParentPomInsight("org.springframework.boot", "spring-boot-starter-parent", "3.3.3", null));
+                    spec.dataTable(ParentPomsInUse.Row.class, rows -> assertThat(rows)
+                            .singleElement()
+                            .satisfies(row -> {
+                                        assertThat(row.getProjectArtifactId()).isEqualTo("my-app");
+                                        assertThat(row.getGroupId()).isEqualTo("org.springframework.boot");
+                                        assertThat(row.getArtifactId()).isEqualTo("spring-boot-starter-parent");
+                                        assertThat(row.getVersion()).isEqualTo("3.3.3");
+                                        assertThat(row.getRelativePath()).isNull();
+                                    }
+                            ));
+                },
+                pomXml(
+                        //language=xml
+                        """
               <project>
               <modelVersion>4.0.0</modelVersion>
               
@@ -466,8 +466,8 @@ class ParentPomInsightTest implements RewriteTest {
               <version>1</version>
               </project>
               """,
-            //language=xml
-            """
+                        //language=xml
+                        """
               <project>
               <modelVersion>4.0.0</modelVersion>
               
@@ -482,29 +482,29 @@ class ParentPomInsightTest implements RewriteTest {
               <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void directParentMatchesGAVMinorVersion() {
         rewriteRun(
-          spec -> {
-              spec.recipe(new ParentPomInsight("org.springframework.boot", "spring-boot-starter-parent", "3.3.x", null));
-              spec.dataTable(ParentPomsInUse.Row.class, rows -> assertThat(rows)
-                .singleElement()
-                .satisfies(row -> {
-                      assertThat(row.getProjectArtifactId()).isEqualTo("my-app");
-                      assertThat(row.getGroupId()).isEqualTo("org.springframework.boot");
-                      assertThat(row.getArtifactId()).isEqualTo("spring-boot-starter-parent");
-                      assertThat(row.getVersion()).isEqualTo("3.3.3");
-                      assertThat(row.getRelativePath()).isNull();
-                  }
-                ));
-          },
-          pomXml(
-            //language=xml
-            """
+                spec -> {
+                    spec.recipe(new ParentPomInsight("org.springframework.boot", "spring-boot-starter-parent", "3.3.x", null));
+                    spec.dataTable(ParentPomsInUse.Row.class, rows -> assertThat(rows)
+                            .singleElement()
+                            .satisfies(row -> {
+                                        assertThat(row.getProjectArtifactId()).isEqualTo("my-app");
+                                        assertThat(row.getGroupId()).isEqualTo("org.springframework.boot");
+                                        assertThat(row.getArtifactId()).isEqualTo("spring-boot-starter-parent");
+                                        assertThat(row.getVersion()).isEqualTo("3.3.3");
+                                        assertThat(row.getRelativePath()).isNull();
+                                    }
+                            ));
+                },
+                pomXml(
+                        //language=xml
+                        """
               <project>
               <modelVersion>4.0.0</modelVersion>
               
@@ -519,8 +519,8 @@ class ParentPomInsightTest implements RewriteTest {
               <version>1</version>
               </project>
               """,
-            //language=xml
-            """
+                        //language=xml
+                        """
               <project>
               <modelVersion>4.0.0</modelVersion>
               
@@ -535,29 +535,29 @@ class ParentPomInsightTest implements RewriteTest {
               <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void directParentMatchesGroupIdGlob() {
         rewriteRun(
-          spec -> {
-              spec.recipe(new ParentPomInsight("org.springframework.*", "spring-boot-starter-parent", null, null));
-              spec.dataTable(ParentPomsInUse.Row.class, rows -> assertThat(rows)
-                .singleElement()
-                .satisfies(row -> {
-                      assertThat(row.getProjectArtifactId()).isEqualTo("my-app");
-                      assertThat(row.getGroupId()).isEqualTo("org.springframework.boot");
-                      assertThat(row.getArtifactId()).isEqualTo("spring-boot-starter-parent");
-                      assertThat(row.getVersion()).isEqualTo("3.3.3");
-                      assertThat(row.getRelativePath()).isNull();
-                  }
-                ));
-          },
-          pomXml(
-            //language=xml
-            """
+                spec -> {
+                    spec.recipe(new ParentPomInsight("org.springframework.*", "spring-boot-starter-parent", null, null));
+                    spec.dataTable(ParentPomsInUse.Row.class, rows -> assertThat(rows)
+                            .singleElement()
+                            .satisfies(row -> {
+                                        assertThat(row.getProjectArtifactId()).isEqualTo("my-app");
+                                        assertThat(row.getGroupId()).isEqualTo("org.springframework.boot");
+                                        assertThat(row.getArtifactId()).isEqualTo("spring-boot-starter-parent");
+                                        assertThat(row.getVersion()).isEqualTo("3.3.3");
+                                        assertThat(row.getRelativePath()).isNull();
+                                    }
+                            ));
+                },
+                pomXml(
+                        //language=xml
+                        """
               <project>
               <modelVersion>4.0.0</modelVersion>
               
@@ -572,8 +572,8 @@ class ParentPomInsightTest implements RewriteTest {
               <version>1</version>
               </project>
               """,
-            //language=xml
-            """
+                        //language=xml
+                        """
               <project>
               <modelVersion>4.0.0</modelVersion>
               
@@ -588,29 +588,29 @@ class ParentPomInsightTest implements RewriteTest {
               <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void directParentMatchesArtifactIdGlob() {
         rewriteRun(
-          spec -> {
-              spec.recipe(new ParentPomInsight("org.springframework.boot", "spring-*-parent", null, null));
-              spec.dataTable(ParentPomsInUse.Row.class, rows -> assertThat(rows)
-                .singleElement()
-                .satisfies(row -> {
-                      assertThat(row.getProjectArtifactId()).isEqualTo("my-app");
-                      assertThat(row.getGroupId()).isEqualTo("org.springframework.boot");
-                      assertThat(row.getArtifactId()).isEqualTo("spring-boot-starter-parent");
-                      assertThat(row.getVersion()).isEqualTo("3.3.3");
-                      assertThat(row.getRelativePath()).isNull();
-                  }
-                ));
-          },
-          pomXml(
-            //language=xml
-            """
+                spec -> {
+                    spec.recipe(new ParentPomInsight("org.springframework.boot", "spring-*-parent", null, null));
+                    spec.dataTable(ParentPomsInUse.Row.class, rows -> assertThat(rows)
+                            .singleElement()
+                            .satisfies(row -> {
+                                        assertThat(row.getProjectArtifactId()).isEqualTo("my-app");
+                                        assertThat(row.getGroupId()).isEqualTo("org.springframework.boot");
+                                        assertThat(row.getArtifactId()).isEqualTo("spring-boot-starter-parent");
+                                        assertThat(row.getVersion()).isEqualTo("3.3.3");
+                                        assertThat(row.getRelativePath()).isNull();
+                                    }
+                            ));
+                },
+                pomXml(
+                        //language=xml
+                        """
               <project>
               <modelVersion>4.0.0</modelVersion>
               
@@ -625,8 +625,8 @@ class ParentPomInsightTest implements RewriteTest {
               <version>1</version>
               </project>
               """,
-            //language=xml
-            """
+                        //language=xml
+                        """
               <project>
               <modelVersion>4.0.0</modelVersion>
               
@@ -641,29 +641,29 @@ class ParentPomInsightTest implements RewriteTest {
               <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void indirectParentMatches() {
         rewriteRun(
-          spec -> {
-              spec.recipe(new ParentPomInsight("org.springframework.boot", "spring-boot-dependencies", null, null));
-              spec.dataTable(ParentPomsInUse.Row.class, rows -> assertThat(rows)
-                .singleElement()
-                .satisfies(row -> {
-                      assertThat(row.getProjectArtifactId()).isEqualTo("my-app");
-                      assertThat(row.getGroupId()).isEqualTo("org.springframework.boot");
-                      assertThat(row.getArtifactId()).isEqualTo("spring-boot-dependencies");
-                      assertThat(row.getVersion()).isEqualTo("3.3.3");
-                      assertThat(row.getRelativePath()).isNull();
-                  }
-                ));
-          },
-          pomXml(
-            //language=xml
-            """
+                spec -> {
+                    spec.recipe(new ParentPomInsight("org.springframework.boot", "spring-boot-dependencies", null, null));
+                    spec.dataTable(ParentPomsInUse.Row.class, rows -> assertThat(rows)
+                            .singleElement()
+                            .satisfies(row -> {
+                                        assertThat(row.getProjectArtifactId()).isEqualTo("my-app");
+                                        assertThat(row.getGroupId()).isEqualTo("org.springframework.boot");
+                                        assertThat(row.getArtifactId()).isEqualTo("spring-boot-dependencies");
+                                        assertThat(row.getVersion()).isEqualTo("3.3.3");
+                                        assertThat(row.getRelativePath()).isNull();
+                                    }
+                            ));
+                },
+                pomXml(
+                        //language=xml
+                        """
               <project>
               <modelVersion>4.0.0</modelVersion>
               
@@ -678,8 +678,8 @@ class ParentPomInsightTest implements RewriteTest {
               <version>1</version>
               </project>
               """,
-            //language=xml
-            """
+                        //language=xml
+                        """
               <project>
               <modelVersion>4.0.0</modelVersion>
               
@@ -694,17 +694,17 @@ class ParentPomInsightTest implements RewriteTest {
               <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void indirectParentMatchesNonRecursive() {
         rewriteRun(
-          spec -> spec.recipe(new ParentPomInsight("org.springframework.boot", "spring-boot-dependencies", null, false)),
-          pomXml(
-            //language=xml
-            """
+                spec -> spec.recipe(new ParentPomInsight("org.springframework.boot", "spring-boot-dependencies", null, false)),
+                pomXml(
+                        //language=xml
+                        """
               <project>
               <modelVersion>4.0.0</modelVersion>
               
@@ -719,29 +719,29 @@ class ParentPomInsightTest implements RewriteTest {
               <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void indirectParentMatchesGAVPattern() {
         rewriteRun(
-          spec -> {
-              spec.recipe(new ParentPomInsight("*.springframework.*", "spring-*-dependencies", "3.x", null));
-              spec.dataTable(ParentPomsInUse.Row.class, rows -> assertThat(rows)
-                .singleElement()
-                .satisfies(row -> {
-                      assertThat(row.getProjectArtifactId()).isEqualTo("my-app");
-                      assertThat(row.getGroupId()).isEqualTo("org.springframework.boot");
-                      assertThat(row.getArtifactId()).isEqualTo("spring-boot-dependencies");
-                      assertThat(row.getVersion()).isEqualTo("3.3.3");
-                      assertThat(row.getRelativePath()).isNull();
-                  }
-                ));
-          },
-          pomXml(
-            //language=xml
-            """
+                spec -> {
+                    spec.recipe(new ParentPomInsight("*.springframework.*", "spring-*-dependencies", "3.x", null));
+                    spec.dataTable(ParentPomsInUse.Row.class, rows -> assertThat(rows)
+                            .singleElement()
+                            .satisfies(row -> {
+                                        assertThat(row.getProjectArtifactId()).isEqualTo("my-app");
+                                        assertThat(row.getGroupId()).isEqualTo("org.springframework.boot");
+                                        assertThat(row.getArtifactId()).isEqualTo("spring-boot-dependencies");
+                                        assertThat(row.getVersion()).isEqualTo("3.3.3");
+                                        assertThat(row.getRelativePath()).isNull();
+                                    }
+                            ));
+                },
+                pomXml(
+                        //language=xml
+                        """
               <project>
               <modelVersion>4.0.0</modelVersion>
               
@@ -756,8 +756,8 @@ class ParentPomInsightTest implements RewriteTest {
               <version>1</version>
               </project>
               """,
-            //language=xml
-            """
+                        //language=xml
+                        """
               <project>
               <modelVersion>4.0.0</modelVersion>
               
@@ -772,26 +772,26 @@ class ParentPomInsightTest implements RewriteTest {
               <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void multiModuleParentMatches() {
         rewriteRun(
-          spec -> spec.dataTable(ParentPomsInUse.Row.class, rows -> assertThat(rows)
-            .singleElement()
-            .satisfies(row -> {
-                  assertThat(row.getProjectArtifactId()).isEqualTo("child");
-                  assertThat(row.getGroupId()).isEqualTo("org.springframework.boot");
-                  assertThat(row.getArtifactId()).isEqualTo("spring-boot-starter-parent");
-                  assertThat(row.getVersion()).isEqualTo("3.3.3");
-                  assertThat(row.getRelativePath()).isNull();
-              }
-            )),
-          pomXml(
-            //language=xml
-            """
+                spec -> spec.dataTable(ParentPomsInUse.Row.class, rows -> assertThat(rows)
+                        .singleElement()
+                        .satisfies(row -> {
+                                    assertThat(row.getProjectArtifactId()).isEqualTo("child");
+                                    assertThat(row.getGroupId()).isEqualTo("org.springframework.boot");
+                                    assertThat(row.getArtifactId()).isEqualTo("spring-boot-starter-parent");
+                                    assertThat(row.getVersion()).isEqualTo("3.3.3");
+                                    assertThat(row.getRelativePath()).isNull();
+                                }
+                        )),
+                pomXml(
+                        //language=xml
+                        """
               <project>
               <modelVersion>4.0.0</modelVersion>
               
@@ -809,12 +809,12 @@ class ParentPomInsightTest implements RewriteTest {
               <version>1</version>
               </project>
               """,
-            SourceSpec::skip
-          ),
-          mavenProject("child",
-            pomXml(
-              //language=xml
-              """
+                        SourceSpec::skip
+                ),
+                mavenProject("child",
+                        pomXml(
+                                //language=xml
+                                """
                 <project>
                 <modelVersion>4.0.0</modelVersion>
                 
@@ -828,8 +828,8 @@ class ParentPomInsightTest implements RewriteTest {
                 <artifactId>child</artifactId>
                 </project>
                 """,
-              //language=xml
-              """
+                                //language=xml
+                                """
                 <project>
                 <modelVersion>4.0.0</modelVersion>
                 
@@ -843,18 +843,18 @@ class ParentPomInsightTest implements RewriteTest {
                 <artifactId>child</artifactId>
                 </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void groupIdDoesNotMatch() {
         rewriteRun(
-          spec -> spec.recipe(new ParentPomInsight("org.springframework.invalid", "spring-boot-starter-parent", null, null)),
-          pomXml(
-            //language=xml
-            """
+                spec -> spec.recipe(new ParentPomInsight("org.springframework.invalid", "spring-boot-starter-parent", null, null)),
+                pomXml(
+                        //language=xml
+                        """
               <project>
               <modelVersion>4.0.0</modelVersion>
               
@@ -869,17 +869,17 @@ class ParentPomInsightTest implements RewriteTest {
               <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void artifactIdDoesNotMatch() {
         rewriteRun(
-          spec -> spec.recipe(new ParentPomInsight("org.springframework.boot", "spring-boot-starter-web", null, null)),
-          pomXml(
-            //language=xml
-            """
+                spec -> spec.recipe(new ParentPomInsight("org.springframework.boot", "spring-boot-starter-web", null, null)),
+                pomXml(
+                        //language=xml
+                        """
               <project>
               <modelVersion>4.0.0</modelVersion>
               
@@ -894,17 +894,17 @@ class ParentPomInsightTest implements RewriteTest {
               <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void versionDoesNotMatch() {
         rewriteRun(
-          spec -> spec.recipe(new ParentPomInsight("org.springframework.boot", "spring-boot-starter-parent", "3.3.4", null)),
-          pomXml(
-            //language=xml
-            """
+                spec -> spec.recipe(new ParentPomInsight("org.springframework.boot", "spring-boot-starter-parent", "3.3.4", null)),
+                pomXml(
+                        //language=xml
+                        """
               <project>
               <modelVersion>4.0.0</modelVersion>
               
@@ -919,17 +919,17 @@ class ParentPomInsightTest implements RewriteTest {
               <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void minorVersionDoesNotMatch() {
         rewriteRun(
-          spec -> spec.recipe(new ParentPomInsight("org.springframework.boot", "spring-boot-starter-parent", "3.3.x", null)),
-          pomXml(
-            //language=xml
-            """
+                spec -> spec.recipe(new ParentPomInsight("org.springframework.boot", "spring-boot-starter-parent", "3.3.x", null)),
+                pomXml(
+                        //language=xml
+                        """
               <project>
               <modelVersion>4.0.0</modelVersion>
               
@@ -944,17 +944,17 @@ class ParentPomInsightTest implements RewriteTest {
               <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void doesNotMatchGroupIdGlob() {
         rewriteRun(
-          spec -> spec.recipe(new ParentPomInsight("org.invalid.*", "spring-boot-starter-parent", null, null)),
-          pomXml(
-            //language=xml
-            """
+                spec -> spec.recipe(new ParentPomInsight("org.invalid.*", "spring-boot-starter-parent", null, null)),
+                pomXml(
+                        //language=xml
+                        """
               <project>
               <modelVersion>4.0.0</modelVersion>
               
@@ -969,17 +969,17 @@ class ParentPomInsightTest implements RewriteTest {
               <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void doesNotMatchArtifactIdGlob() {
         rewriteRun(
-          spec -> spec.recipe(new ParentPomInsight("org.springframework.boot", "spring-boot-*-web", null, null)),
-          pomXml(
-            //language=xml
-            """
+                spec -> spec.recipe(new ParentPomInsight("org.springframework.boot", "spring-boot-*-web", null, null)),
+                pomXml(
+                        //language=xml
+                        """
               <project>
               <modelVersion>4.0.0</modelVersion>
               
@@ -994,7 +994,7 @@ class ParentPomInsightTest implements RewriteTest {
               <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 }

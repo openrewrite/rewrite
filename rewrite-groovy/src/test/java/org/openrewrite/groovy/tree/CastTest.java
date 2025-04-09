@@ -27,37 +27,37 @@ class CastTest implements RewriteTest {
     @Test
     void cast() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               String foo = ( String ) "hallo"
               String bar = "hallo" as String
               """
-          )
+                )
         );
     }
 
     @Test
     void javaStyleCast() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               String foo = ( String ) null
               Integer i = (/**/java.lang.Integer/*
               */)1;
               """
-          )
+                )
         );
     }
 
     @Test
     void groovyStyleCast() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               String foo = null as String
               String bar = foo
               """
-          )
+                )
         );
     }
 
@@ -66,8 +66,8 @@ class CastTest implements RewriteTest {
     @Test
     void arrayCast() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def foo(String[][] a) {
               }
               def r = [["foo"], ["bar"]] as String  [/**/][
@@ -76,51 +76,51 @@ class CastTest implements RewriteTest {
               foo(r)
               foo((String [ ] [ ] )r)
               """
-          )
+                )
         );
     }
 
     @Test
     void groovyCastAndInvokeMethod() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               ( "x" as String      ).toString()
               """
-          )
+                )
         );
     }
 
     @Test
     void groovyCastAndInvokeMethodWithParentheses() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               (((((( "" as String ))))).toString())
               """
-          )
+                )
         );
     }
 
     @Test
     void javaCastAndInvokeMethod() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               ( (String) "" ).toString()
               """
-          )
+                )
         );
     }
 
     @Test
     void javaCastAndInvokeMethodWithParentheses() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               (((((( (String) "" )).toString()))))
               """
-          )
+                )
         );
     }
 }

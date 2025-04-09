@@ -54,30 +54,30 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
     public void defaults(RecipeSpec spec) {
         //noinspection DataFlowIssue
         spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              @Override
-              public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
-                  return literal.getValue() == Integer.valueOf(42) ?
-                    JavaTemplate.builder("s.length()")
-                      .contextSensitive()
-                      .build()
-                      .apply(
-                        getCursor(),
-                        literal.getCoordinates().replace()
-                      ) :
-                    super.visitLiteral(literal, ctx);
-              }
-          }))
-          // custom missing type validation
-          .afterTypeValidationOptions(TypeValidation.none())
-          .afterRecipe(run -> run.getChangeset().getAllResults().forEach(r -> assertTypeAttribution((J) r.getAfter())));
+            @Override
+            public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
+                return literal.getValue() == Integer.valueOf(42) ?
+                        JavaTemplate.builder("s.length()")
+                                .contextSensitive()
+                                .build()
+                                .apply(
+                                        getCursor(),
+                                        literal.getCoordinates().replace()
+                                ) :
+                        super.visitLiteral(literal, ctx);
+            }
+        }))
+                // custom missing type validation
+                .afterTypeValidationOptions(TypeValidation.none())
+                .afterRecipe(run -> run.getChangeset().getAllResults().forEach(r -> assertTypeAttribution((J) r.getAfter())));
     }
 
     @SuppressWarnings({"PointlessBooleanExpression", "IfStatementWithIdenticalBranches", "ConstantValue"})
     @Test
     void replaceExpressionInNestedIfCondition() {
         rewriteRun(
-          templatedJava17(
-            """
+                templatedJava17(
+                        """
               class T {
                   Object m(Object o) {
                       if (true || (o instanceof String s && 42 != 1)) {
@@ -87,7 +87,7 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -97,8 +97,8 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
     @SuppressWarnings({"ConstantValue", "IfStatementWithIdenticalBranches"})
     void referenceFromWithinLambdaInIfCondition() {
         rewriteRun(
-          templatedJava17(
-            """
+                templatedJava17(
+                        """
               import java.util.stream.Stream;
               class T {
                   Object m(Object o) {
@@ -109,7 +109,7 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -117,8 +117,8 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
     @Test
     void elseWithEmptyTryAndReturnFromFinally() {
         rewriteRun(
-          templatedJava17(
-            """
+                templatedJava17(
+                        """
               class T {
                   Object m(Object o) {
                       if (!(o instanceof String s)) {
@@ -133,7 +133,7 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -141,8 +141,8 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
     @Test
     void normallyCompletingLabeledBreak() {
         rewriteRun(
-          templatedJava17(
-            """
+                templatedJava17(
+                        """
               class T {
                   Object m(Object o) {
                       if (!(o instanceof String s)) {
@@ -156,15 +156,15 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void abnormallyCompletingLabeledBreak() {
         rewriteRun(
-          templatedJava17(
-            """
+                templatedJava17(
+                        """
               class T {
                   Object m(Object o) {
                       A: {
@@ -180,15 +180,15 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void replaceInThenWithReturn() {
         rewriteRun(
-          templatedJava17(
-            """
+                templatedJava17(
+                        """
               class T {
                   Object m(Object o) {
                       if (o instanceof String s) {
@@ -200,15 +200,15 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void replaceInUnbracedBlocks() {
         rewriteRun(
-          templatedJava17(
-            """
+                templatedJava17(
+                        """
               class T {
                   Object m(Object o) {
                       if (o instanceof String s)
@@ -219,15 +219,15 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void replaceInThenWithoutReturn() {
         rewriteRun(
-          templatedJava17(
-            """
+                templatedJava17(
+                        """
               class T {
                   Object m(Object o) {
                       if (o instanceof String s) {
@@ -239,15 +239,15 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void replaceInThenWithReturnInElse() {
         rewriteRun(
-          templatedJava17(
-            """
+                templatedJava17(
+                        """
               class T {
                   Object m(Object o) {
                       if (o instanceof String s) {
@@ -259,15 +259,15 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void replaceInElse() {
         rewriteRun(
-          templatedJava17(
-            """
+                templatedJava17(
+                        """
               class T {
                   Object m(Object o) {
                       if (!(o instanceof String s)) {
@@ -279,7 +279,7 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -287,8 +287,8 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
     @Test
     void replaceInElseWithAnonymousClass() {
         rewriteRun(
-          templatedJava17(
-            """
+                templatedJava17(
+                        """
               class T {
                   Object m(Object o) {
                       if (!(o instanceof String s)) {
@@ -305,7 +305,7 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -313,8 +313,8 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
     @Test
     void replaceInElseWithLambda() {
         rewriteRun(
-          templatedJava17(
-            """
+                templatedJava17(
+                        """
               class T {
                   Object m(Object o) {
                       if (!(o instanceof String s)) {
@@ -329,15 +329,15 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void replaceAfterIf() {
         rewriteRun(
-          templatedJava17(
-            """
+                templatedJava17(
+                        """
               class T {
                   Object m(Object o) {
                       if (!(o instanceof String s)) {
@@ -349,7 +349,7 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -357,8 +357,8 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
     @Test
     void incompleteSwitch() {
         rewriteRun(
-          templatedJava17(
-            """
+                templatedJava17(
+                        """
               class T {
                   Object m(Object o) {
                       if (!(o instanceof String s)) {
@@ -373,7 +373,7 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -381,8 +381,8 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
     @Test
     void completeSwitch() {
         rewriteRun(
-          templatedJava17(
-            """
+                templatedJava17(
+                        """
               class T {
                   Object m(Object o) {
                       if (!(o instanceof String s)) {
@@ -398,15 +398,15 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void tryCatchWithoutRethrow() {
         rewriteRun(
-          templatedJava17(
-            """
+                templatedJava17(
+                        """
               class T {
                   Object m(Object o) {
                       if (!(o instanceof String s)) {
@@ -421,7 +421,7 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -429,8 +429,8 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
     @Test
     void tryCatchWithRethrow() {
         rewriteRun(
-          templatedJava17(
-            """
+                templatedJava17(
+                        """
               class T {
                   Object m(Object o) {
                       if (!(o instanceof String s)) {
@@ -446,7 +446,7 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -454,15 +454,15 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
     @Test
     void replaceTernaryCondition() {
         rewriteRun(
-          templatedJava17(
-            """
+                templatedJava17(
+                        """
               class T {
                   Object m(Object o) {
                       return o instanceof String s && 42 > 0 ? 42 : /*invalid*/ 42;
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -470,33 +470,33 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
     @Test
     void replaceNestedMethodInvocationInTernaryTrue() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-                @Override
-                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                    J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                    if (!new MethodMatcher("java.lang.String format(String, Object[])").matches(mi)) {
-                        return mi;
-                    }
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                            @Override
+                            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                                J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+                                if (!new MethodMatcher("java.lang.String format(String, Object[])").matches(mi)) {
+                                    return mi;
+                                }
 
-                    List<Expression> arguments = mi.getArguments();
-                    mi = JavaTemplate.builder("#{any(java.lang.String)}.formatted(#{any()})")
-                      .contextSensitive()
-                      .build()
-                      .apply(
-                        updateCursor(mi),
-                        mi.getCoordinates().replace(),
-                        arguments.toArray()
-                      );
+                                List<Expression> arguments = mi.getArguments();
+                                mi = JavaTemplate.builder("#{any(java.lang.String)}.formatted(#{any()})")
+                                        .contextSensitive()
+                                        .build()
+                                        .apply(
+                                                updateCursor(mi),
+                                                mi.getCoordinates().replace(),
+                                                arguments.toArray()
+                                        );
 
-                    mi = maybeAutoFormat(mi, mi.withArguments(
-                      ListUtils.map(arguments.subList(1, arguments.size()), (a, b) -> b.withPrefix(arguments.get(a + 1).getPrefix()))), ctx);
-                    return mi;
-                }
-            }
-          )),
-          version(
-            java(
-              """
+                                mi = maybeAutoFormat(mi, mi.withArguments(
+                                        ListUtils.map(arguments.subList(1, arguments.size()), (a, b) -> b.withPrefix(arguments.get(a + 1).getPrefix()))), ctx);
+                                return mi;
+                            }
+                        }
+                )),
+                version(
+                        java(
+                                """
                 class A {
                     String foo(String s) { return s; }
                     void bar(Object o) {
@@ -506,7 +506,7 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                     }
                 }
                 """,
-              """
+                                """
                 class A {
                     String foo(String s) { return s; }
                     void bar(Object o) {
@@ -516,16 +516,16 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                     }
                 }
                 """
-            ),
-            17
-          )
+                        ),
+                        17
+                )
         );
     }
 
     private SourceSpecs templatedJava17(@Language("java") String before) {
         return version(java(
-          before,
-          before.replaceAll("\\b42\\b", "s.length()")
+                before,
+                before.replaceAll("\\b42\\b", "s.length()")
         ), 17);
     }
 
@@ -565,19 +565,19 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
         }
         if (!expectedMissing.isEmpty()) {
             fail("Expected missing types not found:\n" + expectedMissing.entrySet().stream()
-              .map(e -> {
-                  String path = e.getValue().getPathAsStream().filter(J.class::isInstance).map(t -> t.getClass().getSimpleName()).collect(Collectors.joining("->"));
-                  return path + ": " + e.getKey().printTrimmed(new InMemoryExecutionContext(), e.getValue().getParentOrThrow());
-              })
-              .collect(Collectors.joining("\n")));
+                    .map(e -> {
+                        String path = e.getValue().getPathAsStream().filter(J.class::isInstance).map(t -> t.getClass().getSimpleName()).collect(Collectors.joining("->"));
+                        return path + ": " + e.getKey().printTrimmed(new InMemoryExecutionContext(), e.getValue().getParentOrThrow());
+                    })
+                    .collect(Collectors.joining("\n")));
         }
         if (!actualMissing.isEmpty()) {
             fail("Unexpected missing types found:\n" + actualMissing.entrySet().stream()
-              .map(e -> {
-                  String path = e.getValue().getPathAsStream().filter(J.class::isInstance).map(t -> t.getClass().getSimpleName()).collect(Collectors.joining("->"));
-                  return path + ": " + e.getKey().printTrimmed(new InMemoryExecutionContext(), e.getValue().getParentOrThrow());
-              })
-              .collect(Collectors.joining("\n")));
+                    .map(e -> {
+                        String path = e.getValue().getPathAsStream().filter(J.class::isInstance).map(t -> t.getClass().getSimpleName()).collect(Collectors.joining("->"));
+                        return path + ": " + e.getKey().printTrimmed(new InMemoryExecutionContext(), e.getValue().getParentOrThrow());
+                    })
+                    .collect(Collectors.joining("\n")));
         }
 
     }

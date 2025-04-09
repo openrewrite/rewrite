@@ -32,9 +32,9 @@ class FindCommentsTest implements RewriteTest {
     @Test
     void findText() {
         rewriteRun(
-          spec -> spec.recipe(new FindComments(Arrays.asList("test", "12.*"))),
-          java(
-            """
+                spec -> spec.recipe(new FindComments(Arrays.asList("test", "12.*"))),
+                java(
+                        """
               // not this one
               // test
               // not this one, either
@@ -45,7 +45,7 @@ class FindCommentsTest implements RewriteTest {
                   String s = "mytest";
               }
               """,
-            """
+                        """
               // not this one
               /*~~>*/// test
               // not this one, either
@@ -56,92 +56,92 @@ class FindCommentsTest implements RewriteTest {
                   String s = /*~~>*/"mytest";
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void findInJavadoc() {
         rewriteRun(
-          spec -> spec.recipe(new FindComments(List.of("foo"))),
-          java(
-            """
+                spec -> spec.recipe(new FindComments(List.of("foo"))),
+                java(
+                        """
               /** Example with a {@code foo} in Javadoc.
               *   Here another foo.
               */
               class Test {
               }
               """,
-            """
+                        """
               /** Example with a {@code ~~>foo} in Javadoc.
               *~~>   Here another foo.
               */
               class Test {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void findSecrets() {
         rewriteRun(
-          spec -> spec.recipe(Environment.builder()
-            .scanRuntimeClasspath()
-            .build()
-            .activateRecipes("org.openrewrite.java.search.FindSecrets")),
-          java(
-            """
+                spec -> spec.recipe(Environment.builder()
+                        .scanRuntimeClasspath()
+                        .build()
+                        .activateRecipes("org.openrewrite.java.search.FindSecrets")),
+                java(
+                        """
               class Test {
                   String uhOh = "-----BEGIN RSA PRIVATE KEY-----";
               }
               """,
-            """
+                        """
               class Test {
                   String uhOh = /*~~>*/"-----BEGIN RSA PRIVATE KEY-----";
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void findInLiteralSource() {
         rewriteRun(
-          spec -> spec.recipe(new FindComments(Arrays.asList("0xff", "254"))),
-          java(
-            """
+                spec -> spec.recipe(new FindComments(Arrays.asList("0xff", "254"))),
+                java(
+                        """
               class Test {
                   int i1 = 0xff;
                   int i2 = 0xfe;
               }
               """,
-            """
+                        """
               class Test {
                   int i1 = /*~~>*/0xff;
                   int i2 = /*~~>*/0xfe;
               }
               """
-          )
+                )
         );
     }
 
     @Test
-    void findInComment(){
+    void findInComment() {
         rewriteRun(
-          spec -> spec.recipe(new FindComments(List.of("foo"))),
-          java(
-                """
+                spec -> spec.recipe(new FindComments(List.of("foo"))),
+                java(
+                        """
               // Example comment with foo
               class Test {
               }
               """
-            , """
+                , """
               /*~~>*/// Example comment with foo
               class Test {
               }
               """
-          )
+                )
         );
     }
 }

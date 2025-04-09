@@ -29,9 +29,11 @@ import static java.util.Objects.requireNonNull;
 @EqualsAndHashCode(callSuper = false)
 public class CreateFileVisitor extends TreeVisitor<Tree, ExecutionContext> {
 
-    @NonNull Path relativeFileName;
+    @NonNull
+    Path relativeFileName;
 
-    @NonNull AtomicBoolean shouldCreate;
+    @NonNull
+    AtomicBoolean shouldCreate;
 
     @Override
     public Tree visit(@Nullable Tree tree, @NonNull ExecutionContext ctx) {

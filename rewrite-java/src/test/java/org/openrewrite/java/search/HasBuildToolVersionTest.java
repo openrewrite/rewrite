@@ -35,35 +35,36 @@ class HasBuildToolVersionTest implements RewriteTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-      "3.6.0",
-      "3.6.1",
-      "3.8.0"
+            "3.6.0",
+            "3.6.1",
+            "3.8.0"
     })
     @DocumentExample
     void detectMavenVersionWithinRange(String version) {
         rewriteRun(
-          java("class A {}", "/*~~>*/class A {}",
-            spec -> spec.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Maven, version)))
+                java("class A {}", "/*~~>*/class A {}",
+                        spec -> spec.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Maven, version)))
         );
     }
 
     @ParameterizedTest
     @ValueSource(strings = {
-      "3.5.4",
-      "3.8.1",
-      "4.0.0"
-    })    void doNotDetectVersionsOutsideRange() {
+            "3.5.4",
+            "3.8.1",
+            "4.0.0"
+    })
+    void doNotDetectVersionsOutsideRange() {
         rewriteRun(
-          java("class A {}",
-            spec -> spec.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Maven, "3.5.4")))
+                java("class A {}",
+                        spec -> spec.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Maven, "3.5.4")))
         );
     }
 
     @Test
     void doNotDetectGradleVersion() {
         rewriteRun(
-          java("class A {}",
-            spec -> spec.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "4.10.0")))
+                java("class A {}",
+                        spec -> spec.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "4.10.0")))
         );
     }
 }

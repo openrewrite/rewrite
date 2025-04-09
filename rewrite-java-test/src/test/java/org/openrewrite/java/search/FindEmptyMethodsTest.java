@@ -32,52 +32,52 @@ class FindEmptyMethodsTest implements RewriteTest {
     @Test
     void methodNotEmpty() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void method() {
                       int x = 0;
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void abstractClass() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               abstract class Test {
                   void method() {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void containsComment() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void method() {
                       // comment
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doNotMatchOverride() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.Collection;
               
               class Test implements Collection<String> {
@@ -86,7 +86,7 @@ class FindEmptyMethodsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -94,9 +94,9 @@ class FindEmptyMethodsTest implements RewriteTest {
     @Test
     void matchOverride() {
         rewriteRun(
-          spec -> spec.recipe(new FindEmptyMethods(true)),
-          java(
-            """
+                spec -> spec.recipe(new FindEmptyMethods(true)),
+                java(
+                        """
               import java.util.Collection;
               
               class Test implements Collection<String> {
@@ -105,7 +105,7 @@ class FindEmptyMethodsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.Collection;
               
               class Test implements Collection<String> {
@@ -114,55 +114,55 @@ class FindEmptyMethodsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void singleNoArgConstructor() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   public Test() {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   /*~~>*/public Test() {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void emptyMethod() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void method() {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   /*~~>*/void method() {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void interfaceMethods() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               interface MyInterface {
                   void doSomething();
                   default Integer doSomethingElse(Integer i) {}
@@ -171,7 +171,7 @@ class FindEmptyMethodsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               interface MyInterface {
                   void doSomething();
                   /*~~>*/default Integer doSomethingElse(Integer i) {}
@@ -180,7 +180,7 @@ class FindEmptyMethodsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

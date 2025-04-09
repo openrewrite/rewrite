@@ -46,8 +46,8 @@ class JRightPaddedTest {
         var t = new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY);
         var t2 = new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY);
         var trees = List.of(
-            new JRightPadded<>(t, Space.EMPTY, Markers.EMPTY),
-            new JRightPadded<>(t2, Space.EMPTY, Markers.EMPTY)
+                new JRightPadded<>(t, Space.EMPTY, Markers.EMPTY),
+                new JRightPadded<>(t2, Space.EMPTY, Markers.EMPTY)
         );
         assertThat(JRightPadded.withElements(trees, List.of(t2, t))).isNotSameAs(trees);
     }
@@ -64,6 +64,6 @@ class JRightPaddedTest {
         var t = new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY);
         var trees = List.of(new JRightPadded<>(t, Space.EMPTY, Markers.EMPTY));
         assertThat(JRightPadded.withElements(trees, List.of(t.withPrefix(Space.format(" ")))))
-            .isNotSameAs(trees);
+                .isNotSameAs(trees);
     }
 }

@@ -30,6 +30,7 @@ public class ParseWarningCollector extends ErrorCollector {
 
     private final List<ParseWarning> warningMarkers = new ArrayList<>();
     private final GroovyParser parser;
+
     public ParseWarningCollector(CompilerConfiguration configuration, GroovyParser parser) {
         super(configuration);
         this.parser = parser;

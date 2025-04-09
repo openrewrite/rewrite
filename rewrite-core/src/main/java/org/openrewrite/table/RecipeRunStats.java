@@ -44,9 +44,9 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
     }
 
     public void recordSourceFileChanged(@Nullable SourceFile before, @Nullable SourceFile after) {
-        if(after != null) {
+        if (after != null) {
             sourceFileChanged.add(after.getSourcePath());
-        } else if(before != null) {
+        } else if (before != null) {
             sourceFileChanged.add(before.getSourcePath());
         }
     }

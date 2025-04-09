@@ -92,12 +92,12 @@ public class TreeVisitingPrinter extends TreeVisitor<Tree, ExecutionContext> {
 
     private static Optional<Tree> findRootOfJType(Cursor cursor) {
         List<Object> cursorStack =
-            stream(Spliterators.spliteratorUnknownSize(cursor.getPath(), 0), false)
-                .collect(Collectors.toList());
+                stream(Spliterators.spliteratorUnknownSize(cursor.getPath(), 0), false)
+                        .collect(Collectors.toList());
         Collections.reverse(cursorStack);
         return cursorStack.stream().filter(Tree.class::isInstance)
-            .map(Tree.class::cast)
-            .findFirst();
+                .map(Tree.class::cast)
+                .findFirst();
     }
 
     private String print() {
@@ -194,10 +194,10 @@ public class TreeVisitingPrinter extends TreeVisitor<Tree, ExecutionContext> {
     private static String printSpace(Space space) {
         StringBuilder sb = new StringBuilder();
         sb.append(" whitespace=\"")
-            .append(space.getWhitespace()).append("\"");
+                .append(space.getWhitespace()).append("\"");
         sb.append(" comments=\"")
-            .append(printComments(space.getComments()))
-            .append("\"");
+                .append(printComments(space.getComments()))
+                .append("\"");
         return sb.toString().replace("\n", "\\s\n");
     }
 
@@ -247,9 +247,9 @@ public class TreeVisitingPrinter extends TreeVisitor<Tree, ExecutionContext> {
                     // print each unvisited element to a line
                     connectToLatestSibling(i);
                     StringBuilder newLine = new StringBuilder()
-                        .append(leftPadding(i))
-                        .append(UNVISITED_PREFIX)
-                        .append(element instanceof String ? element : element.getClass().getSimpleName());
+                            .append(leftPadding(i))
+                            .append(UNVISITED_PREFIX)
+                            .append(element instanceof String ? element : element.getClass().getSimpleName());
 
                     if (element instanceof JRightPadded) {
                         JRightPadded rp = (JRightPadded) element;
@@ -270,8 +270,8 @@ public class TreeVisitingPrinter extends TreeVisitor<Tree, ExecutionContext> {
 
         // print current visiting element
         String typeName = tree instanceof J ?
-            tree.getClass().getCanonicalName().substring(tree.getClass().getPackage().getName().length() + 1) :
-            tree.getClass().getCanonicalName();
+                tree.getClass().getCanonicalName().substring(tree.getClass().getPackage().getName().length() + 1) :
+                tree.getClass().getCanonicalName();
 
         if (skipUnvisitedElement) {
             boolean leftPadded = diffPos >= 0;

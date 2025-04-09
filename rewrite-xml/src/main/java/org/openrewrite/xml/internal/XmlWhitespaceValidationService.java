@@ -109,7 +109,7 @@ public class XmlWhitespaceValidationService implements WhitespaceValidationServi
     }
 
     private static String withNonWhitespaceWarning(String s) {
-        if(StringUtils.isBlank(s)) {
+        if (StringUtils.isBlank(s)) {
             return s;
         }
         return "~~(non-whitespace)~~>" + s + "<~~";

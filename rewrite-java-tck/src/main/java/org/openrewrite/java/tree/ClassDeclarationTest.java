@@ -35,28 +35,28 @@ class ClassDeclarationTest implements RewriteTest {
     @Test
     void sealedClasses() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public sealed class Shape
                   permits Square, Rectangle {
               }
               """,
-            spec -> spec.afterRecipe(cu -> assertThat(cu.getClasses().get(0).getPermits()).hasSize(2))
-          ),
-          java(
-            """
+                        spec -> spec.afterRecipe(cu -> assertThat(cu.getClasses().get(0).getPermits()).hasSize(2))
+                ),
+                java(
+                        """
               public non-sealed class Square extends Shape {
                  public double side;
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               public sealed class Rectangle extends Shape {
                   public double length, width;
               }
               """
-          )
+                )
         );
     }
 
@@ -65,34 +65,34 @@ class ClassDeclarationTest implements RewriteTest {
     @Test
     void sealedInterfaces() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public sealed interface Shape { }
               """,
-            spec -> spec.afterRecipe(cu -> assertThat(cu.getClasses().get(0).getPermits()).isNull())
-          ),
-          java(
-            """
+                        spec -> spec.afterRecipe(cu -> assertThat(cu.getClasses().get(0).getPermits()).isNull())
+                ),
+                java(
+                        """
               public sealed interface HasFourCorners extends Shape
                   permits Square, Rectangle {
               }
               """,
-            spec -> spec.afterRecipe(cu -> assertThat(cu.getClasses().get(0).getPermits()).hasSize(2))
-          ),
-          java(
-            """
+                        spec -> spec.afterRecipe(cu -> assertThat(cu.getClasses().get(0).getPermits()).hasSize(2))
+                ),
+                java(
+                        """
               public non-sealed class Square extends HasFourCorners {
                  public double side;
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               public sealed class Rectangle extends HasFourCorners {
                   public double length, width;
               }
               """
-          )
+                )
         );
     }
 
@@ -100,13 +100,13 @@ class ClassDeclarationTest implements RewriteTest {
     @Test
     void singleLineCommentBeforeModifier() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               @Deprecated
               // Some comment
               public final class A {}
               """
-          )
+                )
         );
     }
 
@@ -114,59 +114,59 @@ class ClassDeclarationTest implements RewriteTest {
     @Disabled("class A {}~~(non-whitespace)~~>;<~~")
     void trailingSemicolon() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class A {};
               """
-          )
+                )
         );
     }
 
     @Test
     void multipleClassDeclarationsInOneCompilationUnit() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {}
               class B {}
               """
-          )
+                )
         );
     }
 
     @Test
     void implementsInterface() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public interface B {}
               class A implements B {}
               """
-          )
+                )
         );
     }
 
     @Test
     void extendsClass() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public interface B {}
               class A extends B {}
               """
-          )
+                )
         );
     }
 
     @Test
     void typeArgumentsAndAnnotation() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class B<T> {}
               @Deprecated public class A < T > extends B < T > {}
               """
-          )
+                )
         );
     }
 
@@ -176,19 +176,19 @@ class ClassDeclarationTest implements RewriteTest {
     @Test
     void modifierOrdering() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public /* abstract */ final abstract class A {}
               """
-          )
+                )
         );
     }
 
     @Test
     void innerClass() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   public enum B {
                       ONE,
@@ -198,7 +198,7 @@ class ClassDeclarationTest implements RewriteTest {
                   private B b;
               }
               """
-          )
+                )
         );
     }
 
@@ -206,11 +206,11 @@ class ClassDeclarationTest implements RewriteTest {
     @Test
     void strictfpModifier() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public strictfp class A {}
               """
-          )
+                )
         );
     }
 
@@ -218,20 +218,20 @@ class ClassDeclarationTest implements RewriteTest {
     @Test
     void hasModifier() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public strictfp class A {}
               """,
-            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
-                @Override
-                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Object o) {
-                    assertThat(classDecl.getModifiers()).hasSize(2);
-                    assertThat(classDecl.hasModifier(J.Modifier.Type.Public)).isTrue();
-                    assertThat(classDecl.hasModifier(J.Modifier.Type.Strictfp)).isTrue();
-                    return classDecl;
-                }
-            }.visit(cu, 0))
-          )
+                        spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                            @Override
+                            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Object o) {
+                                assertThat(classDecl.getModifiers()).hasSize(2);
+                                assertThat(classDecl.hasModifier(J.Modifier.Type.Public)).isTrue();
+                                assertThat(classDecl.hasModifier(J.Modifier.Type.Strictfp)).isTrue();
+                                return classDecl;
+                            }
+                        }.visit(cu, 0))
+                )
         );
     }
 }

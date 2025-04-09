@@ -28,10 +28,10 @@ class SourceFileResultsTest implements RewriteTest {
     @Test
     void hierarchical() {
         rewriteRun(
-          spec -> spec
-            .recipeFromYaml(
-                //language=yml
-                """
+                spec -> spec
+                        .recipeFromYaml(
+                                //language=yml
+                                """
                   type: specs.openrewrite.org/v1beta/recipe
                   name: test.ChangeTextToHello
                   displayName: Change text to hello
@@ -40,18 +40,18 @@ class SourceFileResultsTest implements RewriteTest {
                     - org.openrewrite.text.ChangeText:
                         toText: Hello!
                   """,
-              "test.ChangeTextToHello"
-            ).dataTable(SourcesFileResults.Row.class, rows -> {
-                assertThat(rows).hasSize(1);
-                assertThat(rows.stream().map(SourcesFileResults.Row::getParentRecipe))
-                  .containsExactly("test.ChangeTextToHello");
-                assertThat(rows.stream().map(SourcesFileResults.Row::getRecipe))
-                  .containsExactly("org.openrewrite.text.ChangeText");
-            }),
-          text(
-            "Hi",
-            "Hello!"
-          )
+                                "test.ChangeTextToHello"
+                        ).dataTable(SourcesFileResults.Row.class, rows -> {
+                            assertThat(rows).hasSize(1);
+                            assertThat(rows.stream().map(SourcesFileResults.Row::getParentRecipe))
+                                    .containsExactly("test.ChangeTextToHello");
+                            assertThat(rows.stream().map(SourcesFileResults.Row::getRecipe))
+                                    .containsExactly("org.openrewrite.text.ChangeText");
+                        }),
+                text(
+                        "Hi",
+                        "Hello!"
+                )
         );
     }
 }

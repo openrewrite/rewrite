@@ -255,8 +255,7 @@ public class PropertiesParser implements Parser {
                     if (Character.isWhitespace(c)) {
                         valuePrefix.append(c);
                         break;
-                    }
-                    else {
+                    } else {
                         value.append(c);
                         state = State.VALUE;
                         break;

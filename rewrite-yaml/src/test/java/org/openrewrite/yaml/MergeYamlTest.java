@@ -29,23 +29,23 @@ class MergeYamlTest implements RewriteTest {
     @Test
     void scalarList() {
         rewriteRun(
-          spec -> spec.recipe(new MergeYaml(
-            "$.on",
-            //language=yaml
-            """
+                spec -> spec.recipe(new MergeYaml(
+                        "$.on",
+                        //language=yaml
+                        """
               schedule:
                   - cron: "0 18 * * *"
               """,
-            true,
-            null,
-            null
-          )),
-          yaml(
-            """
+                        true,
+                        null,
+                        null
+                )),
+                yaml(
+                        """
               name: GitHub Actions workflow
               on: [workflow_dispatch]
               """
-          )
+                )
         );
     }
 
@@ -53,28 +53,28 @@ class MergeYamlTest implements RewriteTest {
     @Test
     void emptyDocument() {
         rewriteRun(
-          spec -> spec.recipe(new MergeYaml(
-            "$",
-            //language=yaml
-            """
+                spec -> spec.recipe(new MergeYaml(
+                        "$",
+                        //language=yaml
+                        """
               spring:
                 application:
                   name: update
                   description: a description
               """,
-            false,
-            null,
-            null
-          )),
-          yaml(
-            "",
-            """
+                        false,
+                        null,
+                        null
+                )),
+                yaml(
+                        "",
+                        """
               spring:
                 application:
                   name: update
                   description: a description
               """
-          )
+                )
         );
     }
 
@@ -82,32 +82,32 @@ class MergeYamlTest implements RewriteTest {
     @Test
     void existingMultipleEntryBlock() {
         rewriteRun(
-          spec -> spec.recipe(new MergeYaml(
-            "$",
-            //language=yaml
-            """
+                spec -> spec.recipe(new MergeYaml(
+                        "$",
+                        //language=yaml
+                        """
               spring:
                 application:
                   name: update
                   description: a description
               """,
-            false,
-            null,
-            null
-          )),
-          yaml(
-            """
+                        false,
+                        null,
+                        null
+                )),
+                yaml(
+                        """
               spring:
                 application:
                   name: main
               """,
-            """
+                        """
               spring:
                 application:
                   name: update
                   description: a description
               """
-          )
+                )
         );
     }
 
@@ -115,28 +115,28 @@ class MergeYamlTest implements RewriteTest {
     @Test
     void nonExistentBlock() {
         rewriteRun(
-          spec -> spec.recipe(new MergeYaml(
-            "$.spec",
-            //language=yaml
-            """
+                spec -> spec.recipe(new MergeYaml(
+                        "$.spec",
+                        //language=yaml
+                        """
               lifecycleRule:
                   - action:
                         type: Delete
                     condition:
                         age: 7
               """,
-            false,
-            null,
-            null
-          )),
-          yaml(
-            """
+                        false,
+                        null,
+                        null
+                )),
+                yaml(
+                        """
               apiVersion: storage.cnrm.cloud.google.com/v1beta1
               kind: StorageBucket
               spec:
                   bucketPolicyOnly: true
               """,
-            """
+                        """
               apiVersion: storage.cnrm.cloud.google.com/v1beta1
               kind: StorageBucket
               spec:
@@ -147,7 +147,7 @@ class MergeYamlTest implements RewriteTest {
                         condition:
                             age: 7
               """
-          )
+                )
         );
     }
 
@@ -155,31 +155,31 @@ class MergeYamlTest implements RewriteTest {
     @Test
     void mergeList() {
         rewriteRun(spec ->
-            spec.recipe(new MergeYaml(
-              "$",
-              //language=yaml
-              """
+                        spec.recipe(new MergeYaml(
+                                "$",
+                                //language=yaml
+                                """
                 widget:
                   list:
                     - item 2
                 """,
-              false,
-              null,
-              null
-            )),
-          yaml(
-            """
+                                false,
+                                null,
+                                null
+                        )),
+                yaml(
+                        """
               widget:
                 list:
                   - item 1
               """,
-            """
+                        """
               widget:
                 list:
                   - item 1
                   - item 2
               """
-          )
+                )
         );
     }
 
@@ -187,55 +187,55 @@ class MergeYamlTest implements RewriteTest {
     @Test
     void mergeListAcceptTheirs() {
         rewriteRun(
-          spec -> spec.recipe(new
-              MergeYaml(
-              "$",
-              //language=yaml
-              """
+                spec -> spec.recipe(new
+                        MergeYaml(
+                        "$",
+                        //language=yaml
+                        """
                 widget:
                   list:
                     - item 2
                 """,
-              true, null, null
-            )
-          ),
-          yaml(
-            """
+                        true, null, null
+                )
+                ),
+                yaml(
+                        """
               widget:
                 list:
                   - item 1
               """
-          )
+                )
         );
     }
 
     @Test
     void scalar() {
         rewriteRun(
-          spec -> spec.recipe(new MergeYaml(
-            "$.spec",
-            //language=yaml
-            """
+                spec -> spec.recipe(new MergeYaml(
+                        "$.spec",
+                        //language=yaml
+                        """
               bucketPolicyOnly: true
               """,
-            false,
-            null,
-            null
-          )),
-          yaml(
-            """
+                        false,
+                        null,
+                        null
+                )),
+                yaml(
+                        """
               apiVersion: storage.cnrm.cloud.google.com/v1beta1
               kind: StorageBucket
               spec:
                   bucketPolicyOnly: false
               """,
-            """
+                        """
               apiVersion: storage.cnrm.cloud.google.com/v1beta1
               kind: StorageBucket
               spec:
                   bucketPolicyOnly: true
               """
-          )
+                )
         );
     }
 
@@ -243,30 +243,30 @@ class MergeYamlTest implements RewriteTest {
     @Test
     void insertYaml() {
         rewriteRun(
-          spec -> spec
-            .cycles(2)
-            .recipe(new MergeYaml(
-              "$.spec",
-              //language=yaml
-              """
+                spec -> spec
+                        .cycles(2)
+                        .recipe(new MergeYaml(
+                                "$.spec",
+                                //language=yaml
+                                """
                 lifecycleRule:
                     - action:
                           type: Delete
                       condition:
                           age: 7
                 """,
-              false,
-              null,
-              null
-            )),
-          yaml(
-            """
+                                false,
+                                null,
+                                null
+                        )),
+                yaml(
+                        """
               apiVersion: storage.cnrm.cloud.google.com/v1beta1
               kind: StorageBucket
               spec:
                   bucketPolicyOnly: true
               """,
-            """
+                        """
               apiVersion: storage.cnrm.cloud.google.com/v1beta1
               kind: StorageBucket
               spec:
@@ -277,181 +277,181 @@ class MergeYamlTest implements RewriteTest {
                         condition:
                             age: 7
               """
-          )
+                )
         );
     }
 
     @Test
     void insertAtRoot() {
         rewriteRun(
-          spec -> spec.recipe(new MergeYaml(
-            "$",
-            //language=yaml
-            "spec: 0",
-            true,
-            null,
-            null
-          )),
-          yaml(
-            """
+                spec -> spec.recipe(new MergeYaml(
+                        "$",
+                        //language=yaml
+                        "spec: 0",
+                        true,
+                        null,
+                        null
+                )),
+                yaml(
+                        """
               apiVersion: policy/v1beta1
               kind: PodSecurityPolicy
               """,
-            """
+                        """
               apiVersion: policy/v1beta1
               kind: PodSecurityPolicy
               spec: 0
               """
-          )
+                )
         );
     }
 
     @Test
     void insertInSequenceEntries() {
         rewriteRun(
-          spec -> spec.recipe(new MergeYaml(
-            "$.spec.containers",
-            "imagePullPolicy: Always",
-            true,
-            null,
-            null
-          )),
-          yaml(
-            """
+                spec -> spec.recipe(new MergeYaml(
+                        "$.spec.containers",
+                        "imagePullPolicy: Always",
+                        true,
+                        null,
+                        null
+                )),
+                yaml(
+                        """
               kind: Pod
               spec:
                 containers:
                   - name: <container name>
               """,
-            """
+                        """
               kind: Pod
               spec:
                 containers:
                   - name: <container name>
                     imagePullPolicy: Always
               """
-          )
+                )
         );
     }
 
     @Test
     void insertInSequenceEntriesWithWildcard() {
         rewriteRun(
-          spec -> spec.recipe(new MergeYaml(
-            "$.*.containers",
-            "imagePullPolicy: Always",
-            true,
-            null,
-            null
-          )),
-          yaml(
-            """
+                spec -> spec.recipe(new MergeYaml(
+                        "$.*.containers",
+                        "imagePullPolicy: Always",
+                        true,
+                        null,
+                        null
+                )),
+                yaml(
+                        """
               kind: Pod
               spec:
                 containers:
                   - name: <container name>
               """,
-            """
+                        """
               kind: Pod
               spec:
                 containers:
                   - name: <container name>
                     imagePullPolicy: Always
               """
-          )
+                )
         );
     }
 
     @Test
     void noInsertInSequenceEntriesWithWildcard() {
         rewriteRun(
-          spec -> spec.recipe(new MergeYaml(
-            "$.*.unknown",
-            "imagePullPolicy: Always",
-            true,
-            null,
-            null
-          )),
-          yaml(
-            """
+                spec -> spec.recipe(new MergeYaml(
+                        "$.*.unknown",
+                        "imagePullPolicy: Always",
+                        true,
+                        null,
+                        null
+                )),
+                yaml(
+                        """
               kind: Pod
               spec:
                 containers:
                   - name: <container name>
               """
-          )
+                )
         );
     }
 
     @Test
     void insertInSequenceEntriesWithDeepSearch() {
         rewriteRun(
-          spec -> spec.recipe(new MergeYaml(
-            "$..containers",
-            "imagePullPolicy: Always",
-            true,
-            null,
-            null
-          )),
-          yaml(
-            """
+                spec -> spec.recipe(new MergeYaml(
+                        "$..containers",
+                        "imagePullPolicy: Always",
+                        true,
+                        null,
+                        null
+                )),
+                yaml(
+                        """
               kind: Pod
               spec:
                 containers:
                   - name: <container name>
               """,
-            """
+                        """
               kind: Pod
               spec:
                 containers:
                   - name: <container name>
                     imagePullPolicy: Always
               """
-          )
+                )
         );
     }
 
     @Test
     void noInsertInSequenceEntriesWithDeepSearch() {
         rewriteRun(
-          spec -> spec.recipe(new MergeYaml(
-            "$..unknown",
-            "imagePullPolicy: Always",
-            true,
-            null,
-            null
-          )),
-          yaml(
-            """
+                spec -> spec.recipe(new MergeYaml(
+                        "$..unknown",
+                        "imagePullPolicy: Always",
+                        true,
+                        null,
+                        null
+                )),
+                yaml(
+                        """
               kind: Pod
               spec:
                 containers:
                   - name: <container name>
               """
-          )
+                )
         );
     }
 
     @Test
     void insertInSequenceEntriesMatchingPredicate() {
         rewriteRun(
-          spec -> spec.recipe(new MergeYaml(
-            "$.spec.containers[?(@.name == 'pod-0')]",
-            //language=yaml
-            "imagePullPolicy: Always",
-            true,
-            null,
-            null
-          )),
-          yaml(
-            """
+                spec -> spec.recipe(new MergeYaml(
+                        "$.spec.containers[?(@.name == 'pod-0')]",
+                        //language=yaml
+                        "imagePullPolicy: Always",
+                        true,
+                        null,
+                        null
+                )),
+                yaml(
+                        """
               kind: Pod
               spec:
                 containers:
                   - name: pod-0
                   - name: pod-1
               """,
-            """
+                        """
               kind: Pod
               spec:
                 containers:
@@ -459,49 +459,49 @@ class MergeYamlTest implements RewriteTest {
                     imagePullPolicy: Always
                   - name: pod-1
               """
-          )
+                )
         );
     }
 
     @Test
     void noChangeInSequenceEntriesNotMatchingPredicate() {
         rewriteRun(
-          spec -> spec.recipe(new MergeYaml(
-            "$.spec.containers[?(@.name == 'pod-x')]",
-            //language=yaml
-            "imagePullPolicy: Always",
-            true,
-            null,
-            null
-          )),
-          yaml(
-            """
+                spec -> spec.recipe(new MergeYaml(
+                        "$.spec.containers[?(@.name == 'pod-x')]",
+                        //language=yaml
+                        "imagePullPolicy: Always",
+                        true,
+                        null,
+                        null
+                )),
+                yaml(
+                        """
               kind: Pod
               spec:
                 containers:
                   - name: pod-0
                   - name: pod-1
               """
-          )
+                )
         );
     }
 
     @Test
     void insertBlockInSequenceEntriesWithExistingBlock() {
         rewriteRun(
-          spec -> spec.recipe(new MergeYaml(
-            "$.spec.containers",
-            //language=yaml
-            """
+                spec -> spec.recipe(new MergeYaml(
+                        "$.spec.containers",
+                        //language=yaml
+                        """
               securityContext:
                 privileged: false
               """,
-            true,
-            null,
-            null
-          )),
-          yaml(
-            """
+                        true,
+                        null,
+                        null
+                )),
+                yaml(
+                        """
               kind: Pod
               spec:
                 containers:
@@ -509,7 +509,7 @@ class MergeYamlTest implements RewriteTest {
                     securityContext:
                       foo: bar
               """,
-            """
+                        """
               kind: Pod
               spec:
                 containers:
@@ -518,32 +518,32 @@ class MergeYamlTest implements RewriteTest {
                       foo: bar
                       privileged: false
               """
-          )
+                )
         );
     }
 
     @Test
     void insertNestedBlockInSequenceEntries() {
         rewriteRun(
-          spec -> spec.recipe(new MergeYaml(
-            "$.spec.containers",
-            //language=yaml
-            """
+                spec -> spec.recipe(new MergeYaml(
+                        "$.spec.containers",
+                        //language=yaml
+                        """
               securityContext:
                 privileged: false
               """,
-            true,
-            null,
-            null
-          )),
-          yaml(
-            """
+                        true,
+                        null,
+                        null
+                )),
+                yaml(
+                        """
               kind: Pod
               spec:
                 containers:
                   - name: pod-0
               """,
-            """
+                        """
               kind: Pod
               spec:
                 containers:
@@ -551,38 +551,38 @@ class MergeYamlTest implements RewriteTest {
                     securityContext:
                       privileged: false
               """
-          )
+                )
         );
     }
 
     @Test
     void mergeMappingEntry() {
         rewriteRun(
-          spec -> spec.recipe(new MergeYaml(
-            "$.steps[?(@.uses == 'actions/setup-java')]",
-            //language=yaml
-            """
+                spec -> spec.recipe(new MergeYaml(
+                        "$.steps[?(@.uses == 'actions/setup-java')]",
+                        //language=yaml
+                        """
               with:
                 cache: 'gradle'
               """,
-            false,
-            null,
-            null
-          )),
-          yaml(
-            """
+                        false,
+                        null,
+                        null
+                )),
+                yaml(
+                        """
               steps:
                 - uses: actions/checkout
                 - uses: actions/setup-java
               """,
-            """
+                        """
               steps:
                 - uses: actions/checkout
                 - uses: actions/setup-java
                   with:
                     cache: 'gradle'
               """
-          )
+                )
         );
     }
 
@@ -590,10 +590,10 @@ class MergeYamlTest implements RewriteTest {
     @Test
     void maintainCorrectSequenceIndent() {
         rewriteRun(
-          spec -> spec.recipe(new MergeYaml(
-            "$",
-            //language=yaml
-            """
+                spec -> spec.recipe(new MergeYaml(
+                        "$",
+                        //language=yaml
+                        """
               darwin:
                 logging:
                   - 1
@@ -607,16 +607,16 @@ class MergeYamlTest implements RewriteTest {
                       - Woodpecker
                       - Mangrove
               """,
-            true,
-            null,
-            null
-          )),
-          yaml(
-            """
+                        true,
+                        null,
+                        null
+                )),
+                yaml(
+                        """
               com:
                 key1: value1
               """,
-            """
+                        """
               com:
                 key1: value1
               darwin:
@@ -632,7 +632,7 @@ class MergeYamlTest implements RewriteTest {
                       - Woodpecker
                       - Mangrove
               """
-          )
+                )
         );
     }
 
@@ -640,26 +640,26 @@ class MergeYamlTest implements RewriteTest {
     @Test
     void mergeSequenceWithinMap() {
         rewriteRun(
-          spec -> spec.recipe(new MergeYaml(
-            "$",
-            //language=yaml
-            """
+                spec -> spec.recipe(new MergeYaml(
+                        "$",
+                        //language=yaml
+                        """
               core:
                 - map2:
                     value:
                       - 1
                       - 2
               """,
-            true,
-            null,
-            null
-          )),
-          yaml(
-            """
+                        true,
+                        null,
+                        null
+                )),
+                yaml(
+                        """
               noncore:
                 key1: value01
               """,
-            """
+                        """
               noncore:
                 key1: value01
               core:
@@ -668,7 +668,7 @@ class MergeYamlTest implements RewriteTest {
                       - 1
                       - 2
               """
-          )
+                )
         );
     }
 
@@ -676,10 +676,10 @@ class MergeYamlTest implements RewriteTest {
     @Test
     void mergeSequenceMapWithInMap() {
         rewriteRun(
-          spec -> spec.recipe(new MergeYaml(
-            "$",
-            //language=yaml
-            """
+                spec -> spec.recipe(new MergeYaml(
+                        "$",
+                        //language=yaml
+                        """
               testing:
                 mmap4:
                   - mmmap1: v111
@@ -687,12 +687,12 @@ class MergeYamlTest implements RewriteTest {
                   - nnmap1: v111
                     nnmap2: v222
               """,
-            true,
-            null,
-            null
-          )),
-          yaml(
-            """
+                        true,
+                        null,
+                        null
+                )),
+                yaml(
+                        """
               com:
                 key1: value1
                 key3: value3
@@ -700,7 +700,7 @@ class MergeYamlTest implements RewriteTest {
                 core:
                   key1: value01
               """,
-            """
+                        """
               com:
                 key1: value1
                 key3: value3
@@ -713,7 +713,7 @@ class MergeYamlTest implements RewriteTest {
                   - nnmap1: v111
                     nnmap2: v222
               """
-          )
+                )
         );
     }
 
@@ -721,27 +721,27 @@ class MergeYamlTest implements RewriteTest {
     @Test
     void mergeSequenceMapAddAdditionalObject() {
         rewriteRun(
-          spec -> spec
-            .recipe(new MergeYaml(
-              "$.testing",
-              //language=yaml
-              """
+                spec -> spec
+                        .recipe(new MergeYaml(
+                                "$.testing",
+                                //language=yaml
+                                """
                 table:
                   - name: jdk_version
                     value: 18
                 """,
-              false,
-              "name",
-              null
-            )),
-          yaml(
-            """
+                                false,
+                                "name",
+                                null
+                        )),
+                yaml(
+                        """
               testing:
                 table:
                   - name: build_tool
                     row2key2: maven
               """,
-            """
+                        """
               testing:
                 table:
                   - name: build_tool
@@ -749,7 +749,7 @@ class MergeYamlTest implements RewriteTest {
                   - name: jdk_version
                     value: 18
               """
-          )
+                )
         );
     }
 
@@ -757,32 +757,32 @@ class MergeYamlTest implements RewriteTest {
     @Test
     void mergeSequenceMapAddObject() {
         rewriteRun(
-          spec -> spec
-            .recipe(new MergeYaml(
-              "$.testing",
-              //language=yaml
-              """
+                spec -> spec
+                        .recipe(new MergeYaml(
+                                "$.testing",
+                                //language=yaml
+                                """
                 table:
                   - name: jdk_version
                     value: 18
                 """,
-              false,
-              "name",
-              null
-            )),
-          yaml(
-            """
+                                false,
+                                "name",
+                                null
+                        )),
+                yaml(
+                        """
               testing:
                 another: value
               """,
-            """
+                        """
               testing:
                 another: value
                 table:
                   - name: jdk_version
                     value: 18
               """
-          )
+                )
         );
     }
 
@@ -790,29 +790,29 @@ class MergeYamlTest implements RewriteTest {
     @Test
     void mergeSequenceMapAddObjectFromRoot() {
         rewriteRun(
-          spec -> spec.recipe(new MergeYaml(
-            "$",
-            //language=yaml
-            """
+                spec -> spec.recipe(new MergeYaml(
+                        "$",
+                        //language=yaml
+                        """
               testing:
                 table:
                   - name: jdk_version
                     value: 18
               """,
-            false,
-            null,
-            null
-          )),
-          yaml(
-            """
+                        false,
+                        null,
+                        null
+                )),
+                yaml(
+                        """
               """,
-            """
+                        """
               testing:
                 table:
                   - name: jdk_version
                     value: 18
               """
-          )
+                )
         );
     }
 
@@ -820,29 +820,29 @@ class MergeYamlTest implements RewriteTest {
     @Test
     void mergeSequenceMapWhenOneIdenticalObjectExistsTheSecondIsAdded() {
         rewriteRun(
-          spec -> spec
-            .recipe(new MergeYaml(
-              "$.testing",
-              //language=yaml
-              """
+                spec -> spec
+                        .recipe(new MergeYaml(
+                                "$.testing",
+                                //language=yaml
+                                """
                 table:
                   - name: jdk_version
                     value: 18
                   - name: build_tool
                     row2key2: maven
                 """,
-              false,
-              "name",
-              null
-            )),
-          yaml(
-            """
+                                false,
+                                "name",
+                                null
+                        )),
+                yaml(
+                        """
               testing:
                 table:
                   - name: jdk_version
                     value: 18
               """,
-            """
+                        """
               testing:
                 table:
                   - name: jdk_version
@@ -850,7 +850,7 @@ class MergeYamlTest implements RewriteTest {
                   - name: build_tool
                     row2key2: maven
               """
-          )
+                )
         );
     }
 
@@ -858,64 +858,64 @@ class MergeYamlTest implements RewriteTest {
     @Test
     void mergeSequenceMapWhenOneDifferentObjectExistsValuesAreChanged() {
         rewriteRun(
-          spec -> spec
-            .recipe(new MergeYaml(
-              "$.testing",
-              //language=yaml
-              """
+                spec -> spec
+                        .recipe(new MergeYaml(
+                                "$.testing",
+                                //language=yaml
+                                """
                 table:
                   - name: jdk_version
                     value: 17
                 """,
-              false,
-              "name",
-              null
-            )),
-          yaml(
-            """
+                                false,
+                                "name",
+                                null
+                        )),
+                yaml(
+                        """
               testing:
                 table:
                   - name: jdk_version
                     value: 18
               """,
-            """
+                        """
               testing:
                 table:
                   - name: jdk_version
                     value: 17
               """
-          )
+                )
         );
     }
 
     @Test
     void mergeMappingIntoNewMapping() {
         rewriteRun(
-          spec -> spec
-            .recipe(new MergeYaml(
-              "$.testing",
-              //language=yaml
-              """
+                spec -> spec
+                        .recipe(new MergeYaml(
+                                "$.testing",
+                                //language=yaml
+                                """
                 table:
                   - name: jdk_version
                     value: 17
                 """,
-              false,
-              "name",
-              null
-            )),
-          yaml(
-            """
+                                false,
+                                "name",
+                                null
+                        )),
+                yaml(
+                        """
               foo: bar
               """,
-            """
+                        """
               foo: bar
               testing:
                 table:
                   - name: jdk_version
                     value: 17
               """
-          )
+                )
         );
     }
 
@@ -923,11 +923,11 @@ class MergeYamlTest implements RewriteTest {
     @Test
     void mergeSequenceMapAddComplexMapping() {
         rewriteRun(
-          spec -> spec
-            .recipe(new MergeYaml(
-              "$.spec",
-              //language=yaml
-              """
+                spec -> spec
+                        .recipe(new MergeYaml(
+                                "$.spec",
+                                //language=yaml
+                                """
                 serviceClaims:
                   - name: db02
                     ref:
@@ -935,12 +935,12 @@ class MergeYamlTest implements RewriteTest {
                       kind: Postgres
                       name: customer-profile-database-02
                 """,
-              false,
-              "name",
-              null
-            )),
-          yaml(
-            """
+                                false,
+                                "name",
+                                null
+                        )),
+                yaml(
+                        """
               spec:
                 serviceClaims:
                   - name: db
@@ -949,7 +949,7 @@ class MergeYamlTest implements RewriteTest {
                       kind: Postgres
                       name: customer-profile-database
               """,
-            """
+                        """
               spec:
                 serviceClaims:
                   - name: db
@@ -963,7 +963,7 @@ class MergeYamlTest implements RewriteTest {
                       kind: Postgres
                       name: customer-profile-database-02
               """
-          )
+                )
         );
     }
 
@@ -971,11 +971,11 @@ class MergeYamlTest implements RewriteTest {
     @Test
     void mergeSequenceMapChangeComplexMapping() {
         rewriteRun(
-          spec -> spec
-            .recipe(new MergeYaml(
-              "$.spec",
-              //language=yaml
-              """
+                spec -> spec
+                        .recipe(new MergeYaml(
+                                "$.spec",
+                                //language=yaml
+                                """
                 serviceClaims:
                   - name: db
                     ref:
@@ -983,12 +983,12 @@ class MergeYamlTest implements RewriteTest {
                       kind: MySQL
                       name: relation-profile-database
                 """,
-              false,
-              "name",
-              null
-            )),
-          yaml(
-            """
+                                false,
+                                "name",
+                                null
+                        )),
+                yaml(
+                        """
               spec:
                 serviceClaims:
                   - name: db
@@ -997,7 +997,7 @@ class MergeYamlTest implements RewriteTest {
                       kind: Postgres
                       name: customer-profile-database
               """,
-            """
+                        """
               spec:
                 serviceClaims:
                   - name: db
@@ -1006,7 +1006,7 @@ class MergeYamlTest implements RewriteTest {
                       kind: MySQL
                       name: relation-profile-database
               """
-          )
+                )
         );
     }
 
@@ -1014,10 +1014,10 @@ class MergeYamlTest implements RewriteTest {
     @Test
     void existingEntryBlockWithCommentAtFirstLine() {
         rewriteRun(
-          spec -> spec.recipe(new MergeYaml(
-            "$",
-            //language=yaml
-            """
+                spec -> spec.recipe(new MergeYaml(
+                        "$",
+                        //language=yaml
+                        """
               A:
                 B:
                   C:
@@ -1030,12 +1030,12 @@ class MergeYamlTest implements RewriteTest {
                       3: more new text
                   E: description
               """,
-            false,
-            null,
-            null
-          )),
-          yaml(
-            """
+                        false,
+                        null,
+                        null
+                )),
+                yaml(
+                        """
               A: # Comment untouched
                 B:
                   C:
@@ -1048,7 +1048,7 @@ class MergeYamlTest implements RewriteTest {
                     D3:
                       1: old text
               """,
-            """
+                        """
               A: # Comment untouched
                 B:
                   C:
@@ -1066,7 +1066,7 @@ class MergeYamlTest implements RewriteTest {
                       3: more new text
                   E: description
               """
-          )
+                )
         );
     }
 
@@ -1074,31 +1074,31 @@ class MergeYamlTest implements RewriteTest {
     @Test
     void existingEntryBlockWithCommentAtLastLine() {
         rewriteRun(
-          spec -> spec.recipe(new MergeYaml(
-            "$",
-            //language=yaml
-            """
+                spec -> spec.recipe(new MergeYaml(
+                        "$",
+                        //language=yaml
+                        """
               spring:
                 application:
                   description: a description
               """,
-            false,
-            null,
-            null
-          )),
-          yaml(
-            """
+                        false,
+                        null,
+                        null
+                )),
+                yaml(
+                        """
               spring:
                 application:
                   name: main # Comment moved from root to previous element
               """,
-            """
+                        """
               spring:
                 application:
                   name: main # Comment moved from root to previous element
                   description: a description
               """
-          )
+                )
         );
     }
 
@@ -1106,10 +1106,10 @@ class MergeYamlTest implements RewriteTest {
     @Test
     void existingEntryBlockWithCommentsAllOverThePlace() {
         rewriteRun(
-          spec -> spec.recipe(new MergeYaml(
-            "$",
-            //language=yaml
-            """
+                spec -> spec.recipe(new MergeYaml(
+                        "$",
+                        //language=yaml
+                        """
               A:
                 B:
                   C:
@@ -1122,12 +1122,12 @@ class MergeYamlTest implements RewriteTest {
                     D4:
                       2: new text
               """,
-            false,
-            null,
-            null
-          )),
-          yaml(
-            """
+                        false,
+                        null,
+                        null
+                )),
+                yaml(
+                        """
               A: # Comment untouched 1
                 B: # Comment untouched 2
                   C: # Comment untouched 3
@@ -1147,7 +1147,7 @@ class MergeYamlTest implements RewriteTest {
                     D4: # Comment untouched 7
                       1: old text # Comment moved from end document to prefix D4->2
               """,
-            """
+                        """
               A: # Comment untouched 1
                 B: # Comment untouched 2
                   C: # Comment untouched 3
@@ -1171,7 +1171,7 @@ class MergeYamlTest implements RewriteTest {
                       1: old text # Comment moved from end document to prefix D4->2
                       2: new text
               """
-          )
+                )
         );
     }
 
@@ -1179,100 +1179,100 @@ class MergeYamlTest implements RewriteTest {
     @Test
     void existingEntryBlockWithCommentNotAtLastLine() {
         rewriteRun(
-          spec -> spec.recipe(new MergeYaml(
-            "$",
-            //language=yaml
-            """
+                spec -> spec.recipe(new MergeYaml(
+                        "$",
+                        //language=yaml
+                        """
               spring:
                 application:
                   description: a description
               """,
-            false,
-            null,
-            null
-          )),
-          yaml(
-            """
+                        false,
+                        null,
+                        null
+                )),
+                yaml(
+                        """
               spring:
                 application:
                   name: main # Some comment
                   name2: main
               """,
-            """
+                        """
               spring:
                 application:
                   name: main # Some comment
                   name2: main
                   description: a description
               """
-          )
+                )
         );
     }
 
     @Test
     void mergeScalar() {
         rewriteRun(
-          spec -> spec
-            .recipe(new MergeYaml(
-              "$.name",
-              //language=yaml
-              """
+                spec -> spec
+                        .recipe(new MergeYaml(
+                                "$.name",
+                                //language=yaml
+                                """
                 sam
                 """,
-              false,
-              null,
-              null
-            )),
-          yaml(
-            """
+                                false,
+                                null,
+                                null
+                        )),
+                yaml(
+                        """
               name: jon
               """,
-            """
+                        """
               name: sam
               """
-          )
+                )
         );
     }
 
     @Test
     void insertScalar() {
         rewriteRun(
-          spec -> spec
-            .recipe(new MergeYaml(
-              "$.name",
-              //language=yaml
-              """
+                spec -> spec
+                        .recipe(new MergeYaml(
+                                "$.name",
+                                //language=yaml
+                                """
                 sam
                 """,
-              false,
-              null,
-              null
-            )),
-          yaml(
-            """
+                                false,
+                                null,
+                                null
+                        )),
+                yaml(
+                        """
               """,
-            """
+                        """
               name: sam
               """
-          )
+                )
         );
     }
 
     @Test
     void addNewEntryToSequence() {
         rewriteRun(
-          spec -> spec
-            .recipe(new MergeYaml("$.groups",
-              // language=yaml
-              """
+                spec -> spec
+                        .recipe(new MergeYaml("$.groups",
+                                // language=yaml
+                                """
                 - name: newName
                   jobs:
                     - newJob
                 """,
-              false, "name",
-              null)),
-          yaml(
-            """
+                                false, "name",
+                                null)),
+                yaml(
+                        """
               groups:
                 - name: analysis
                   jobs:
@@ -1281,7 +1281,7 @@ class MergeYamlTest implements RewriteTest {
                   jobs:
                     - update
               """,
-            """
+                        """
               groups:
                 - name: analysis
                   jobs:
@@ -1300,29 +1300,29 @@ class MergeYamlTest implements RewriteTest {
     // Mimics `org.openrewrite.java.micronaut.UpdateSecurityYamlIfNeeded`
     void mergeEmptyStructureFollowedByCopyValue() {
         rewriteRun(
-          spec -> spec.recipes(
-              new MergeYaml(
-                "$.spec",
-                //language=yaml
-                """
+                spec -> spec.recipes(
+                        new MergeYaml(
+                                "$.spec",
+                                //language=yaml
+                                """
                   empty:
                     initially:
                   """,
-                false,
-                null,
-                null
-              ),
-              new CopyValue("$.spec.level1.level2", null, "$.spec.empty.initially", null))
-            .expectedCyclesThatMakeChanges(2),
-          yaml(
-            """
+                                false,
+                                null,
+                                null
+                        ),
+                        new CopyValue("$.spec.level1.level2", null, "$.spec.empty.initially", null))
+                        .expectedCyclesThatMakeChanges(2),
+                yaml(
+                        """
               apiVersion: storage.cnrm.cloud.google.com/v1beta1
               kind: StorageBucket
               spec:
                 level1:
                   level2: true
               """,
-            """
+                        """
               apiVersion: storage.cnrm.cloud.google.com/v1beta1
               kind: StorageBucket
               spec:
@@ -1331,51 +1331,51 @@ class MergeYamlTest implements RewriteTest {
                 empty:
                   initially: true
               """
-          )
+                )
         );
     }
 
     @Test
     void comment() {
         rewriteRun(
-          spec -> spec.recipe(
-            new MergeYaml(
-              "$",
-              //language=yaml
-              """
+                spec -> spec.recipe(
+                        new MergeYaml(
+                                "$",
+                                //language=yaml
+                                """
                 
                   # new stuff
                 new-property: value
                 """,
-              false,
-              null,
-              null
-            )),
-          yaml(
-            """
+                                false,
+                                null,
+                                null
+                        )),
+                yaml(
+                        """
               # config
               activate-auto: true
               activate-mep: true
               """,
-            """
+                        """
               # config
               activate-auto: true
               activate-mep: true
               # new stuff
               new-property: value
               """
-          )
+                )
         );
     }
 
     @Test
     void commentInList() {
         rewriteRun(
-          spec -> spec.recipe(
-            new MergeYaml(
-              "$.groups",
-              //language=yaml
-              """
+                spec -> spec.recipe(
+                        new MergeYaml(
+                                "$.groups",
+                                //language=yaml
+                                """
                 
                 # comment
                 - id: 3
@@ -1383,17 +1383,17 @@ class MergeYamlTest implements RewriteTest {
                   # foo bar
                   foo: bar
                 """,
-              false,
-              "id",
-              null
-            )),
-          yaml(
-            """
+                                false,
+                                "id",
+                                null
+                        )),
+                yaml(
+                        """
               groups:
                 - id: 1
                 - id: 2
               """,
-            """
+                        """
               groups:
                 - id: 1
                 - id: 2
@@ -1403,7 +1403,7 @@ class MergeYamlTest implements RewriteTest {
                   # foo bar
                   foo: bar
               """
-          )
+                )
         );
     }
 
@@ -1411,57 +1411,57 @@ class MergeYamlTest implements RewriteTest {
     // Mimics `org.openrewrite.quarkus.AddQuarkusProperty`
     void addPropertyWitCommentAboveLastLine() {
         rewriteRun(
-          spec -> spec.recipe(
-            new MergeYaml(
-              "$",
-              //language=yaml
-              """
+                spec -> spec.recipe(
+                        new MergeYaml(
+                                "$",
+                                //language=yaml
+                                """
                 quarkus:
                   http:
                     # This property was added
                     root-path: /api
                 """,
-              true,
-              null,
-              null
-            )),
-          yaml(
-            """
+                                true,
+                                null,
+                                null
+                        )),
+                yaml(
+                        """
               quarkus:
                 http:
                   port: 9090
               """,
-            """
+                        """
               quarkus:
                 http:
                   port: 9090
                   # This property was added
                   root-path: /api
               """
-          )
+                )
         );
     }
 
     @Test
     void addLiteralStyleBlockAtRoot() {
         rewriteRun(
-          spec -> spec
-            .recipe(new MergeYaml("$.",
-              // language=yaml
-              """
+                spec -> spec
+                        .recipe(new MergeYaml("$.",
+                                // language=yaml
+                                """
                 script: |
                   #!/bin/bash
                   echo "hello"
                 """,
-              false, "name",
-              null)),
-          yaml(
-            """
+                                false, "name",
+                                null)),
+                yaml(
+                        """
               some:
                 object:
                   with: An existing value
               """,
-            """
+                        """
               some:
                 object:
                   with: An existing value
@@ -1475,19 +1475,19 @@ class MergeYamlTest implements RewriteTest {
     @Test
     void addLiteralStyleBlockWhichDoesAlreadyExist() {
         rewriteRun(
-          spec -> spec
-            .recipe(new MergeYaml("$.some.object",
-              // language=yaml
-              """
+                spec -> spec
+                        .recipe(new MergeYaml("$.some.object",
+                                // language=yaml
+                                """
                 script: |
                   #!/bin/bash
                   echo "hellow"
                 something: else
                 """,
-              false, null,
-              null)),
-          yaml(
-            """
+                                false, null,
+                                null)),
+                yaml(
+                        """
               some:
                 object:
                   with: An existing value
@@ -1495,7 +1495,7 @@ class MergeYamlTest implements RewriteTest {
                     #!/bin/bash
                     echo "hello"
               """,
-            """
+                        """
               some:
                 object:
                   with: An existing value
@@ -1510,10 +1510,10 @@ class MergeYamlTest implements RewriteTest {
     @Test
     void addLiteralStyleBlock() {
         rewriteRun(
-          spec -> spec
-            .recipe(new MergeYaml("$.some.very",
-              // language=yaml
-              """
+                spec -> spec
+                        .recipe(new MergeYaml("$.some.very",
+                                // language=yaml
+                                """
                 deep:
                   object:
                 
@@ -1522,17 +1522,17 @@ class MergeYamlTest implements RewriteTest {
                         echo "hello"
                            echo "hello"
                 """,
-              false, "name",
-              null)),
-          yaml(
-            """
+                                false, "name",
+                                null)),
+                yaml(
+                        """
               some:
                 very:
                   deep:
                     object:
                       with: An existing value
               """,
-            """
+                        """
               some:
                 very:
                   deep:
@@ -1551,10 +1551,10 @@ class MergeYamlTest implements RewriteTest {
     // Mimics `org.openrewrite.github.UpgradeSlackNotificationVersion2Test`
     void upgradeSlackNotificationVersion2() {
         rewriteRun(
-          spec -> spec
-            .recipe(new MergeYaml("$..steps[?(@.uses =~ 'slackapi/slack-github-action@v1.*')]",
-              // language=yaml
-              """
+                spec -> spec
+                        .recipe(new MergeYaml("$..steps[?(@.uses =~ 'slackapi/slack-github-action@v1.*')]",
+                                // language=yaml
+                                """
                 with:
                   method: chat.postMessage
                   token: ${{ secrets.SLACK_MORTY_BOT_TOKEN }}
@@ -1562,10 +1562,10 @@ class MergeYamlTest implements RewriteTest {
                     channel: "##foo-alerts"
                     text: ":boom: Unable run dependency check on: <${{ steps.get_failed_check_link.outputs.failed-check-link }}|${{ inputs.organization }}/${{ inputs.repository }}>"
                 """,
-              false, "name",
-              null)),
-          yaml(
-            """
+                                false, "name",
+                                null)),
+                yaml(
+                        """
               jobs:
                 build:
                   steps:
@@ -1578,7 +1578,7 @@ class MergeYamlTest implements RewriteTest {
                       env:
                         SLACK_BOT_TOKEN: ${{ secrets.SLACK_MORTY_BOT_TOKEN }}
               """,
-            """
+                        """
               jobs:
                 build:
                   steps:
@@ -1602,23 +1602,23 @@ class MergeYamlTest implements RewriteTest {
     @Test
     void addLiteralStyleMinusBlock() {
         rewriteRun(
-          spec -> spec
-            .recipe(new MergeYaml("$.some.object",
-              // language=yaml
-              """
+                spec -> spec
+                        .recipe(new MergeYaml("$.some.object",
+                                // language=yaml
+                                """
                 script: |-
                   #!/bin/bash
                   echo "hello"
                 """,
-              false, "name",
-              null)),
-          yaml(
-            """
+                                false, "name",
+                                null)),
+                yaml(
+                        """
               some:
                 object:
                   with: An existing value
               """,
-            """
+                        """
               some:
                 object:
                   with: An existing value
@@ -1632,23 +1632,23 @@ class MergeYamlTest implements RewriteTest {
     @Test
     void addFoldedStyleBlock() {
         rewriteRun(
-          spec -> spec
-            .recipe(new MergeYaml("$.some.object",
-              // language=yaml
-              """
+                spec -> spec
+                        .recipe(new MergeYaml("$.some.object",
+                                // language=yaml
+                                """
                 script: >
                   #!/bin/bash
                   echo "hello"
                 """,
-              false, "name",
-              null)),
-          yaml(
-            """
+                                false, "name",
+                                null)),
+                yaml(
+                        """
               some:
                 object:
                   with: An existing value
               """,
-            """
+                        """
               some:
                 object:
                   with: An existing value
@@ -1662,23 +1662,23 @@ class MergeYamlTest implements RewriteTest {
     @Test
     void addFoldedStyleMinusBlock() {
         rewriteRun(
-          spec -> spec
-            .recipe(new MergeYaml("$.some.object",
-              // language=yaml
-              """
+                spec -> spec
+                        .recipe(new MergeYaml("$.some.object",
+                                // language=yaml
+                                """
                 script: >-
                   #!/bin/bash
                   echo "hello"
                 """,
-              false, "name",
-              null)),
-          yaml(
-            """
+                                false, "name",
+                                null)),
+                yaml(
+                        """
               some:
                 object:
                   with: An existing value
               """,
-            """
+                        """
               some:
                 object:
                   with: An existing value

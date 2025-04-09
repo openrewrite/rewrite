@@ -328,7 +328,7 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
     }
 
     protected void visitContainer(String before, @Nullable ProtoContainer<? extends Proto> container,
-                                  @Nullable String after, PrintOutputCapture<P> p) {
+            @Nullable String after, PrintOutputCapture<P> p) {
         if (container == null) {
             return;
         }
@@ -365,15 +365,15 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
 
         Proto s = paddedStat.getElement();
         if (s instanceof Proto.Empty ||
-            s instanceof Proto.Field ||
-            s instanceof Proto.Import ||
-            s instanceof Proto.MapField ||
-            s instanceof Proto.EnumField ||
-            s instanceof Proto.OptionDeclaration ||
-            s instanceof Proto.Package ||
-            s instanceof Proto.Reserved ||
-            (s instanceof Proto.Rpc && ((Proto.Rpc) s).getBody() == null) ||
-            s instanceof Proto.Syntax) {
+                s instanceof Proto.Field ||
+                s instanceof Proto.Import ||
+                s instanceof Proto.MapField ||
+                s instanceof Proto.EnumField ||
+                s instanceof Proto.OptionDeclaration ||
+                s instanceof Proto.Package ||
+                s instanceof Proto.Reserved ||
+                (s instanceof Proto.Rpc && ((Proto.Rpc) s).getBody() == null) ||
+                s instanceof Proto.Syntax) {
             p.append(';');
         }
     }

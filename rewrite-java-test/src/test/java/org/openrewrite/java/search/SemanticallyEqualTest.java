@@ -38,7 +38,7 @@ class SemanticallyEqualTest {
     @Test
     void abstractMethods() {
         assertEqualToSelf(
-          """
+                """
             abstract class A {
                 abstract void m();
             }
@@ -49,11 +49,11 @@ class SemanticallyEqualTest {
     @Test
     void classModifierLists() {
         assertEqual(
-          """
+                """
             public abstract class A {
             }
             """,
-          """
+                """
             abstract public class A {
             }
             """
@@ -63,7 +63,7 @@ class SemanticallyEqualTest {
     @Test
     void staticMethods() {
         assertEqual(
-          """
+                """
             import static java.lang.String.valueOf;
             
             class T {
@@ -72,7 +72,7 @@ class SemanticallyEqualTest {
                 Object o3 = String.valueOf("1");
             }
             """,
-          """
+                """
             import static java.lang.String.valueOf;
             
             class T {
@@ -87,12 +87,12 @@ class SemanticallyEqualTest {
     @Test
     void literals() {
         assertEqual(
-          """
+                """
             class A {
                 int n = 1;
             }
             """,
-          """
+                """
             class A {
                 int n = 1;
             }
@@ -103,7 +103,7 @@ class SemanticallyEqualTest {
     @Test
     void classLiterals() {
         assertExpressionsEqual(
-          """
+                """
             import java.util.UUID;
             class T {
                 Class<?> a = java.util.UUID.class;
@@ -112,7 +112,7 @@ class SemanticallyEqualTest {
             """
         );
         assertExpressionsNotEqual(
-          """
+                """
             import java.util.UUID;
             class T {
                 Class<UUID> u = UUID.class;
@@ -126,7 +126,7 @@ class SemanticallyEqualTest {
     @CartesianTest
     void methodInvocationsWithDifferentSelect() {
         assertExpressionsNotEqual(
-          """
+                """
             class T {
                 static T other = new T();
                 String a = toString();
@@ -135,7 +135,7 @@ class SemanticallyEqualTest {
             """
         );
         assertExpressionsNotEqual(
-          """
+                """
             class T {
                 static T other = new T();
                 String a = this.toString();
@@ -147,51 +147,51 @@ class SemanticallyEqualTest {
 
     @CartesianTest
     void staticFieldAccesses(@CartesianTest.Values(strings = {
-      "java.util.regex.Pattern.CASE_INSENSITIVE",
-      "Pattern.CASE_INSENSITIVE",
-      "CASE_INSENSITIVE",
+            "java.util.regex.Pattern.CASE_INSENSITIVE",
+            "Pattern.CASE_INSENSITIVE",
+            "CASE_INSENSITIVE",
     }) String a, @CartesianTest.Values(strings = {
-      "java.util.regex.Pattern.CASE_INSENSITIVE",
-      "Pattern.CASE_INSENSITIVE",
-      "CASE_INSENSITIVE",
+            "java.util.regex.Pattern.CASE_INSENSITIVE",
+            "Pattern.CASE_INSENSITIVE",
+            "CASE_INSENSITIVE",
     }) String b) {
         assertExpressionsEqual(
-          "import java.util.regex.Pattern; import static java.util.regex.Pattern.CASE_INSENSITIVE; class T { int a = " + a + "; int b = " + b + "; }"
+                "import java.util.regex.Pattern; import static java.util.regex.Pattern.CASE_INSENSITIVE; class T { int a = " + a + "; int b = " + b + "; }"
         );
     }
 
     @CartesianTest
     void staticMethodAccesses(@CartesianTest.Values(strings = {
-      "java.util.regex.Pattern.compile",
-      "Pattern.compile",
-      "compile",
+            "java.util.regex.Pattern.compile",
+            "Pattern.compile",
+            "compile",
     }) String a, @CartesianTest.Values(strings = {
-      "java.util.regex.Pattern.compile",
-      "Pattern.compile",
-      "compile",
+            "java.util.regex.Pattern.compile",
+            "Pattern.compile",
+            "compile",
     }) String b) {
         assertExpressionsEqual(
-          "import java.util.regex.Pattern; import static java.util.regex.Pattern.compile; class T { Pattern a = " + a + "(\"\"); Pattern b = " + b + "(\"\"); }"
+                "import java.util.regex.Pattern; import static java.util.regex.Pattern.compile; class T { Pattern a = " + a + "(\"\"); Pattern b = " + b + "(\"\"); }"
         );
     }
 
     @CartesianTest
     void methodReferences(@CartesianTest.Values(strings = {
-      "java.lang.Object::toString",
-      "Object::toString",
+            "java.lang.Object::toString",
+            "Object::toString",
     }) String a, @CartesianTest.Values(strings = {
-      "java.lang.Object::toString",
-      "Object::toString",
+            "java.lang.Object::toString",
+            "Object::toString",
     }) String b) {
         assertExpressionsEqual(
-          "import java.util.function.Function; class T { Function<Object, String> a = " + a + "; Function<Object, String> b = " + b + "; }"
+                "import java.util.function.Function; class T { Function<Object, String> a = " + a + "; Function<Object, String> b = " + b + "; }"
         );
     }
 
     @Test
     void typeCasts() {
         assertExpressionsEqual(
-          """
+                """
             class T {
                 Number a = (java.lang.Number) null;
                 Number b = (java.lang.Number) null;
@@ -199,7 +199,7 @@ class SemanticallyEqualTest {
             """
         );
         assertExpressionsEqual(
-          """
+                """
             class T {
                 Number a = (java.lang.Number) null;
                 Number b = (Number) null;
@@ -207,7 +207,7 @@ class SemanticallyEqualTest {
             """
         );
         assertExpressionsEqual(
-          """
+                """
             import java.util.List;
             import java.util.UUID;
             class T {
@@ -217,7 +217,7 @@ class SemanticallyEqualTest {
             """
         );
         assertExpressionsEqual(
-          """
+                """
             import java.util.List;
             import java.util.UUID;
             class T {
@@ -231,7 +231,7 @@ class SemanticallyEqualTest {
     @Test
     void fieldAccesses() {
         assertExpressionsEqual(
-          """
+                """
             class T {
                 int n = 1;
                 int a = T.this.n;
@@ -240,7 +240,7 @@ class SemanticallyEqualTest {
             """
         );
         assertExpressionsNotEqual(
-          """
+                """
             class T {
                 int n = 1;
                 void m(int n) {
@@ -251,7 +251,7 @@ class SemanticallyEqualTest {
             """
         );
         assertExpressionsNotEqual(
-          """
+                """
             class T {
                 static T t1 = new T();
                 int n = 1;
@@ -266,7 +266,7 @@ class SemanticallyEqualTest {
     @Test
     void fieldAccessesWithQualifiedThisReference() {
         assertExpressionsEqual(
-          """
+                """
             class T {
                 int n = 1;
                 int a = T.this.n;
@@ -275,7 +275,7 @@ class SemanticallyEqualTest {
             """
         );
         assertExpressionsEqual(
-          """
+                """
             class T {
                 int n = 1;
                 int a = T.this.n;
@@ -288,7 +288,7 @@ class SemanticallyEqualTest {
     @Test
     void identifiers() {
         assertExpressionsNotEqual(
-          """
+                """
             class T {
                 static T t1 = new T();
                 int n = 1;
@@ -302,7 +302,7 @@ class SemanticallyEqualTest {
     @Test
     void lambdaParameterNames() {
         assertExpressionsEqual(
-          """
+                """
             import java.util.Comparator;
             class T {
                 Comparator<Integer> a = (x1, y1) -> x1 - y1;
@@ -311,7 +311,7 @@ class SemanticallyEqualTest {
             """
         );
         assertExpressionsNotEqual(
-          """
+                """
             import java.util.Comparator;
             class T {
                 Comparator<Integer> a = (x1, y1) -> x1 - y1;
@@ -326,7 +326,7 @@ class SemanticallyEqualTest {
         @Test
         void noneEmpty() {
             assertExpressionsEqual(
-              """
+                    """
                 import java.util.List;
                 class T {
                     List<String> a = new java.util.ArrayList<String>();
@@ -339,7 +339,7 @@ class SemanticallyEqualTest {
         @Test
         void firstEmpty() {
             assertExpressionsEqual(
-              """
+                    """
                 import java.util.List;
                 class T {
                     List<String> a = new java.util.ArrayList<String>();
@@ -352,7 +352,7 @@ class SemanticallyEqualTest {
         @Test
         void secondEmpty() {
             assertExpressionsEqual(
-              """
+                    """
                 import java.util.List;
                 class T {
                     List<String> a = new java.util.ArrayList<>();
@@ -365,7 +365,7 @@ class SemanticallyEqualTest {
         @Test
         void bothEmpty() {
             assertExpressionsEqual(
-              """
+                    """
                 import java.util.List;
                 class T {
                     List<String> a = new java.util.ArrayList<>();
@@ -378,7 +378,7 @@ class SemanticallyEqualTest {
         @Test
         void bothEmptyButDifferent() {
             assertExpressionsNotEqual(
-              """
+                    """
                 import java.util.List;
                 class T {
                     List<String> a = new java.util.ArrayList<>();
@@ -417,8 +417,8 @@ class SemanticallyEqualTest {
 
         Map<String, J.VariableDeclarations.NamedVariable> result = visitor.reduce(cu, new HashMap<>());
         assertThat(SemanticallyEqual.areEqual(
-          Objects.requireNonNull(result.get("a").getInitializer()),
-          Objects.requireNonNull(result.get("b").getInitializer()))
+                Objects.requireNonNull(result.get("a").getInitializer()),
+                Objects.requireNonNull(result.get("b").getInitializer()))
         ).isTrue();
     }
 
@@ -437,8 +437,8 @@ class SemanticallyEqualTest {
 
         Map<String, J.VariableDeclarations.NamedVariable> result = visitor.reduce(cu, new HashMap<>());
         assertThat(SemanticallyEqual.areEqual(
-          Objects.requireNonNull(result.get("a").getInitializer()),
-          Objects.requireNonNull(result.get("b").getInitializer()))
+                Objects.requireNonNull(result.get("a").getInitializer()),
+                Objects.requireNonNull(result.get("b").getInitializer()))
         ).isFalse();
     }
 

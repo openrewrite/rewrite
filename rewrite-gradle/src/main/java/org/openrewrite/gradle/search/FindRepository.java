@@ -76,7 +76,7 @@ public class FindRepository extends Recipe {
                 } else {
                     boolean isPluginBlock = pluginManagementMatcher.matches(method) || buildscriptMatcher.matches(method);
                     if ((purpose == Purpose.Project && !isPluginBlock) ||
-                        (purpose == Purpose.Plugin && isPluginBlock)) {
+                            (purpose == Purpose.Plugin && isPluginBlock)) {
                         return new RepositoryVisitor().visitMethodInvocation(method, ctx);
                     }
                 }
@@ -125,14 +125,14 @@ public class FindRepository extends Recipe {
                 if (statement instanceof J.Assignment || (statement instanceof J.Return && ((J.Return) statement).getExpression() instanceof J.Assignment)) {
                     J.Assignment assignment = (J.Assignment) (statement instanceof J.Return ? ((J.Return) statement).getExpression() : statement);
                     if (assignment.getVariable() instanceof J.Identifier &&
-                        "url".equals(((J.Identifier) assignment.getVariable()).getSimpleName())) {
+                            "url".equals(((J.Identifier) assignment.getVariable()).getSimpleName())) {
                         if (assignment.getAssignment() instanceof J.Literal &&
-                            url.equals(((J.Literal) assignment.getAssignment()).getValue())) {
+                                url.equals(((J.Literal) assignment.getAssignment()).getValue())) {
                             return true;
                         } else if (assignment.getAssignment() instanceof J.MethodInvocation &&
-                                   ((J.MethodInvocation) assignment.getAssignment()).getSimpleName().equals("uri") &&
-                                   ((J.MethodInvocation) assignment.getAssignment()).getArguments().get(0) instanceof J.Literal &&
-                                   url.equals(((J.Literal) ((J.MethodInvocation) assignment.getAssignment()).getArguments().get(0)).getValue())) {
+                                ((J.MethodInvocation) assignment.getAssignment()).getSimpleName().equals("uri") &&
+                                ((J.MethodInvocation) assignment.getAssignment()).getArguments().get(0) instanceof J.Literal &&
+                                url.equals(((J.Literal) ((J.MethodInvocation) assignment.getAssignment()).getArguments().get(0)).getValue())) {
                             return true;
                         } else if (assignment.getAssignment() instanceof G.GString) {
                             String valueSource = assignment.getAssignment().withPrefix(Space.EMPTY).printTrimmed(new GroovyPrinter<>());
@@ -144,12 +144,12 @@ public class FindRepository extends Recipe {
                     J.MethodInvocation m1 = (J.MethodInvocation) (statement instanceof J.Return ? ((J.Return) statement).getExpression() : statement);
                     if (m1.getSimpleName().equals("setUrl") || m1.getSimpleName().equals("url")) {
                         if (m1.getArguments().get(0) instanceof J.Literal &&
-                            url.equals(((J.Literal) m1.getArguments().get(0)).getValue())) {
+                                url.equals(((J.Literal) m1.getArguments().get(0)).getValue())) {
                             return true;
                         } else if (m1.getArguments().get(0) instanceof J.MethodInvocation &&
-                                   ((J.MethodInvocation) m1.getArguments().get(0)).getSimpleName().equals("uri") &&
-                                   ((J.MethodInvocation) m1.getArguments().get(0)).getArguments().get(0) instanceof J.Literal &&
-                                   url.equals(((J.Literal) ((J.MethodInvocation) m1.getArguments().get(0)).getArguments().get(0)).getValue())) {
+                                ((J.MethodInvocation) m1.getArguments().get(0)).getSimpleName().equals("uri") &&
+                                ((J.MethodInvocation) m1.getArguments().get(0)).getArguments().get(0) instanceof J.Literal &&
+                                url.equals(((J.Literal) ((J.MethodInvocation) m1.getArguments().get(0)).getArguments().get(0)).getValue())) {
                             return true;
                         } else if (m1.getArguments().get(0) instanceof G.GString) {
                             G.GString value = (G.GString) m1.getArguments().get(0);

@@ -25,33 +25,33 @@ class HclCollectionValueTest implements RewriteTest {
     @Test
     void tupleValue() {
         rewriteRun(
-          hcl("a = [ 1, 2 ]")
+                hcl("a = [ 1, 2 ]")
         );
     }
 
     @Test
     void tupleValueNewline() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               a = [
               1]
               """
-          )
+                )
         );
     }
 
     @Test
     void objectValue() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               a = { k1 = 1, k2 = 2 }
               b = { k1 = 1, k2 = 2, }
               c = { k1: 1, k2: 2 }
               d = { k1: 1, k2: 2, }
               """
-          )
+                )
         );
     }
 }

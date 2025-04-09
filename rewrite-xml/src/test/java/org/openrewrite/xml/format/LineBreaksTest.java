@@ -33,14 +33,14 @@ class LineBreaksTest implements RewriteTest {
     @Test
     void tags() {
         rewriteRun(
-          xml(
-            """
+                xml(
+                        """
               <project>
                 <dependencies><dependency></dependency><dependency/>
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <dependencies>
               <dependency></dependency>
@@ -48,7 +48,7 @@ class LineBreaksTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -56,21 +56,21 @@ class LineBreaksTest implements RewriteTest {
     @Test
     void comments() {
         rewriteRun(
-          xml(
-            """
+                xml(
+                        """
               <project>
                 <dependencies><!--comment-->
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <dependencies>
               <!--comment-->
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -78,16 +78,16 @@ class LineBreaksTest implements RewriteTest {
     @Test
     void docTypeDecl() {
         rewriteRun(
-          xml(
-            """
+                xml(
+                        """
               <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE beans PUBLIC "-//SPRING//DTD BEAN 2.0//EN" "https://www.springframework.org/dtd/spring-beans-2.0.dtd"><beans/>
               """,
-            """
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <!DOCTYPE beans PUBLIC "-//SPRING//DTD BEAN 2.0//EN" "https://www.springframework.org/dtd/spring-beans-2.0.dtd">
               <beans/>
               """
-          )
+                )
         );
     }
 
@@ -95,16 +95,16 @@ class LineBreaksTest implements RewriteTest {
     @Test
     void prolog() {
         rewriteRun(
-          xml(
-            """
+                xml(
+                        """
               <?xml version="1.0" encoding="UTF-8"?><?xml-stylesheet href="mystyle.css" type="text/css"?><beans/>
               """,
-            """
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <?xml-stylesheet href="mystyle.css" type="text/css"?>
               <beans/>
               """
-          )
+                )
         );
     }
 }

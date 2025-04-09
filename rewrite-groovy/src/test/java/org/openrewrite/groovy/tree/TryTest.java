@@ -28,8 +28,8 @@ class TryTest implements RewriteTest {
     @Test
     void severalCatchBlocks() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               try {
                
               } catch (RuntimeException e) {
@@ -38,45 +38,45 @@ class TryTest implements RewriteTest {
                            
               }
                """
-          )
+                )
         );
     }
 
     @Test
     void catchOmittingType() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               try {
               
               } catch (all) {
               
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void tryFinally() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               try {
               
               } finally {
                   // some comment
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void tryCatchFinally() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
              try {
              
              } catch (Exception e) {
@@ -85,7 +85,7 @@ class TryTest implements RewriteTest {
                  def a = ""
              }
               """
-          )
+                )
         );
     }
 
@@ -94,14 +94,14 @@ class TryTest implements RewriteTest {
     @Test
     void multiCatch() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               try {
               } catch (IOException | UncheckedIOException e) {
               
               }
               """
-          )
+                )
         );
     }
 
@@ -110,15 +110,15 @@ class TryTest implements RewriteTest {
     @Test
     void tryWithResource() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               try(ByteArrayInputStream a = new ByteArrayInputStream("".getBytes())) {
               
               } catch (Exception e) {
               
               }
               """
-          )
+                )
         );
     }
 
@@ -127,15 +127,15 @@ class TryTest implements RewriteTest {
     @Test
     void tryWithResources() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               try(ByteArrayInputStream a = new ByteArrayInputStream("".getBytes()); ByteArrayInputStream b = new ByteArrayInputStream("".getBytes())) {
               
               } catch (Exception e) {
               
               }
               """
-          )
+                )
         );
     }
 }

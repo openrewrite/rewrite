@@ -28,7 +28,7 @@ class MigrateGradleEnterpriseToDevelocityTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new MigrateGradleEnterpriseToDevelocity("3.17.x"))
-          .beforeRecipe(withToolingApi());
+                .beforeRecipe(withToolingApi());
     }
 
     @Test
@@ -36,8 +36,8 @@ class MigrateGradleEnterpriseToDevelocityTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/4135")
     void migrate() {
         rewriteRun(
-          settingsGradle(
-            """
+                settingsGradle(
+                        """
               plugins {
                   id 'com.gradle.enterprise' version '3.16'
               }
@@ -59,7 +59,7 @@ class MigrateGradleEnterpriseToDevelocityTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               plugins {
                   id 'com.gradle.develocity' version '3.17.6'
               }
@@ -80,15 +80,15 @@ class MigrateGradleEnterpriseToDevelocityTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void publishAlwaysIf() {
         rewriteRun(
-          settingsGradle(
-            """
+                settingsGradle(
+                        """
               plugins {
                   id 'com.gradle.enterprise' version '3.16'
               }
@@ -99,7 +99,7 @@ class MigrateGradleEnterpriseToDevelocityTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               plugins {
                   id 'com.gradle.develocity' version '3.17.6'
               }
@@ -110,15 +110,15 @@ class MigrateGradleEnterpriseToDevelocityTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void publishOnFailure() {
         rewriteRun(
-          settingsGradle(
-            """
+                settingsGradle(
+                        """
               plugins {
                   id 'com.gradle.enterprise' version '3.16'
               }
@@ -129,7 +129,7 @@ class MigrateGradleEnterpriseToDevelocityTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               plugins {
                   id 'com.gradle.develocity' version '3.17.6'
               }
@@ -140,15 +140,15 @@ class MigrateGradleEnterpriseToDevelocityTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void publishOnFailureIf() {
         rewriteRun(
-          settingsGradle(
-            """
+                settingsGradle(
+                        """
               plugins {
                   id 'com.gradle.enterprise' version '3.16'
               }
@@ -159,7 +159,7 @@ class MigrateGradleEnterpriseToDevelocityTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               plugins {
                   id 'com.gradle.develocity' version '3.17.6'
               }
@@ -170,16 +170,16 @@ class MigrateGradleEnterpriseToDevelocityTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doNothingForTooOldVersions() {
         rewriteRun(
-          spec -> spec.recipe(new MigrateGradleEnterpriseToDevelocity("3.16.x")),
-          settingsGradle(
-            """
+                spec -> spec.recipe(new MigrateGradleEnterpriseToDevelocity("3.16.x")),
+                settingsGradle(
+                        """
               plugins {
                   id 'com.gradle.enterprise' version '3.16'
               }
@@ -195,7 +195,7 @@ class MigrateGradleEnterpriseToDevelocityTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

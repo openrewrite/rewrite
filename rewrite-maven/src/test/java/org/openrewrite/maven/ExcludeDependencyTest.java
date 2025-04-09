@@ -33,8 +33,8 @@ class ExcludeDependencyTest implements RewriteTest {
     @Test
     void excludeJUnitVintageEngineSpringBoot2_3() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 <parent>
@@ -59,7 +59,7 @@ class ExcludeDependencyTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 <parent>
@@ -90,15 +90,15 @@ class ExcludeDependencyTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void jUnitVintageEngineDoesntNeedExclusionFromSpringBoot2_4() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <parent>
                   <groupId>org.springframework.boot</groupId>
@@ -117,7 +117,7 @@ class ExcludeDependencyTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -125,9 +125,9 @@ class ExcludeDependencyTest implements RewriteTest {
     @Test
     void dontExcludeADependencyFromItself() {
         rewriteRun(
-          spec -> spec.recipe(new ExcludeDependency("junit", "junit", "compile")),
-          pomXml(
-            """
+                spec -> spec.recipe(new ExcludeDependency("junit", "junit", "compile")),
+                pomXml(
+                        """
               <project>
                   <groupId>com.example</groupId>
                   <artifactId>demo</artifactId>
@@ -141,16 +141,16 @@ class ExcludeDependencyTest implements RewriteTest {
                   </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void excludeJUnitInCompileScope() {
         rewriteRun(
-          spec -> spec.recipe(new ExcludeDependency("junit", "junit", "compile")),
-          pomXml(
-            """
+                spec -> spec.recipe(new ExcludeDependency("junit", "junit", "compile")),
+                pomXml(
+                        """
               <project>
                   <groupId>com.example</groupId>
                   <artifactId>demo</artifactId>
@@ -164,7 +164,7 @@ class ExcludeDependencyTest implements RewriteTest {
                   </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>com.example</groupId>
                   <artifactId>demo</artifactId>
@@ -184,16 +184,16 @@ class ExcludeDependencyTest implements RewriteTest {
                   </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void dontExcludeJUnitWhenItIsTransitiveTestDependency() {
         rewriteRun(
-          spec -> spec.recipe(new ExcludeDependency("junit", "junit", null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new ExcludeDependency("junit", "junit", null)),
+                pomXml(
+                        """
               <project>
                   <groupId>com.example</groupId>
                   <artifactId>demo</artifactId>
@@ -205,7 +205,7 @@ class ExcludeDependencyTest implements RewriteTest {
                   </dependency>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -213,9 +213,9 @@ class ExcludeDependencyTest implements RewriteTest {
     @Test
     void respectTransitiveDependencyOriginalScopeWhenDeterminingIfExclusionIsNecessary() {
         rewriteRun(
-          spec -> spec.recipe(new ExcludeDependency("junit", "junit", null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new ExcludeDependency("junit", "junit", null)),
+                pomXml(
+                        """
               <project>
                 <parent>
                   <groupId>org.springframework.boot</groupId>
@@ -232,17 +232,17 @@ class ExcludeDependencyTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void excludeAlsoWhereConflictOmitted() {
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2)
-            .recipe(new ExcludeDependency("org.apache.logging.log4j", "log4j-api", null)),
-          pomXml(
-            """
+                spec -> spec.expectedCyclesThatMakeChanges(2)
+                        .recipe(new ExcludeDependency("org.apache.logging.log4j", "log4j-api", null)),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>com.example</groupId>
@@ -263,7 +263,7 @@ class ExcludeDependencyTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>com.example</groupId>
@@ -296,7 +296,7 @@ class ExcludeDependencyTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 }

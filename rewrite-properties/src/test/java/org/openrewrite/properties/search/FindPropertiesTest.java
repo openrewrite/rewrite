@@ -31,36 +31,36 @@ class FindPropertiesTest implements RewriteTest {
     @Test
     void findProperty() {
         rewriteRun(
-          spec -> spec.recipe(new FindProperties("management.metrics.binders.files.enabled", null)),
-          properties(
-            "management.metrics.binders.files.enabled=true",
-            "management.metrics.binders.files.enabled=~~>true"
-          )
+                spec -> spec.recipe(new FindProperties("management.metrics.binders.files.enabled", null)),
+                properties(
+                        "management.metrics.binders.files.enabled=true",
+                        "management.metrics.binders.files.enabled=~~>true"
+                )
         );
     }
 
     @ParameterizedTest
     @ValueSource(strings = {
-      "acme.my-project.person.first-name",
-      "acme.myProject.person.firstName",
-      "acme.my_project.person.first_name",
+            "acme.my-project.person.first-name",
+            "acme.myProject.person.firstName",
+            "acme.my_project.person.first_name",
     })
     @Issue("https://github.com/openrewrite/rewrite/issues/1168")
     void relaxedBinding(String propertyKey) {
         rewriteRun(
-          spec -> spec.recipe(new FindProperties(propertyKey, true)),
-          properties(
-            """
+                spec -> spec.recipe(new FindProperties(propertyKey, true)),
+                properties(
+                        """
               acme.my-project.person.first-name=example
               acme.myProject.person.firstName=example
               acme.my_project.person.first_name=example
               """,
-            """
+                        """
               acme.my-project.person.first-name=~~>example
               acme.myProject.person.firstName=~~>example
               acme.my_project.person.first_name=~~>example
               """
-          )
+                )
         );
     }
 
@@ -68,19 +68,19 @@ class FindPropertiesTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1168")
     void exactMatch() {
         rewriteRun(
-          spec -> spec.recipe(new FindProperties("acme.my-project.person.first-name", false)),
-          properties(
-            """
+                spec -> spec.recipe(new FindProperties("acme.my-project.person.first-name", false)),
+                properties(
+                        """
               acme.my-project.person.first-name=example
               acme.myProject.person.firstName=example
               acme.my_project.person.first_name=example
               """,
-            """
+                        """
               acme.my-project.person.first-name=~~>example
               acme.myProject.person.firstName=example
               acme.my_project.person.first_name=example
               """
-          )
+                )
         );
     }
 
@@ -88,36 +88,36 @@ class FindPropertiesTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1168")
     void globMatch() {
         rewriteRun(
-          spec -> spec.recipe(new FindProperties("acme.my-project.*", false)),
-          properties(
-            """
+                spec -> spec.recipe(new FindProperties("acme.my-project.*", false)),
+                properties(
+                        """
               acme.my-project.person.first-name=example
               acme.myProject.person.firstName=example
               acme.my_project.person.first_name=example
               """,
-            """
+                        """
               acme.my-project.person.first-name=~~>example
               acme.myProject.person.firstName=example
               acme.my_project.person.first_name=example
               """
-          )
+                )
         );
     }
 
     @Test
     void valueWithLineContinuation() {
         rewriteRun(
-          spec -> spec.recipe(new FindProperties("foo", null)),
-          properties(
-            """
+                spec -> spec.recipe(new FindProperties("foo", null)),
+                properties(
+                        """
               foo=tr\\
                 ue
               """,
-            """
+                        """
               foo=~~>tr\\
                 ue
               """
-          )
+                )
         );
     }
 }

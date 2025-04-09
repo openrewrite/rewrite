@@ -25,8 +25,8 @@ class HclBinaryTest implements RewriteTest {
     @Test
     void binary() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               foo {
                   a = 1 + 2
                   b = 1 <= 2
@@ -35,7 +35,7 @@ class HclBinaryTest implements RewriteTest {
                   e = !true && (!false || !true)
               }
               """
-          )
+                )
         );
     }
 }

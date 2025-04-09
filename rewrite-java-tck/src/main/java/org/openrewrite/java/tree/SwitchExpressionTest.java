@@ -31,15 +31,15 @@ class SwitchExpressionTest implements RewriteTest {
     @Test
     void switchExpressionsReturningEnums() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               enum Answer {
                   YES, MAYBE, NO
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               class Test {
                   private Answer run(String test) {
                       return switch (test) {
@@ -50,7 +50,7 @@ class SwitchExpressionTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -58,8 +58,8 @@ class SwitchExpressionTest implements RewriteTest {
     @Test
     void basicSyntax() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                 int test(int i) {
                     return switch (i) {
@@ -70,7 +70,7 @@ class SwitchExpressionTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 
@@ -78,8 +78,8 @@ class SwitchExpressionTest implements RewriteTest {
     @Test
     void multipleExpressions() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                 int test(int i) {
                     return switch (i) {
@@ -89,7 +89,7 @@ class SwitchExpressionTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 
@@ -97,8 +97,8 @@ class SwitchExpressionTest implements RewriteTest {
     @Test
     void yieldFromStatement() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                 int test(int i) {
                     return switch (i) {
@@ -110,7 +110,7 @@ class SwitchExpressionTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 
@@ -119,8 +119,8 @@ class SwitchExpressionTest implements RewriteTest {
     @Test
     void yieldFromRule() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                 int test(int i) {
                     return switch (i) {
@@ -130,7 +130,7 @@ class SwitchExpressionTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 
@@ -138,9 +138,9 @@ class SwitchExpressionTest implements RewriteTest {
     @Test
     void visitSwitchExpressionAndGetType() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(JavaIsoVisitor::new)),
-          java(
-            """
+                spec -> spec.recipe(RewriteTest.toRecipe(JavaIsoVisitor::new)),
+                java(
+                        """
               class Test {
                 int test(int i) {
                     return switch (i) {
@@ -151,18 +151,18 @@ class SwitchExpressionTest implements RewriteTest {
                 }
               }
               """,
-              spec -> spec.afterRecipe(cu -> {
-                  J.MethodDeclaration md = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
-                  assert md.getBody() != null;
+                        spec -> spec.afterRecipe(cu -> {
+                                    J.MethodDeclaration md = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
+                                    assert md.getBody() != null;
 
-                  J.SwitchExpression s = ((J.SwitchExpression) ((J.Return) md.getBody().getStatements().get(0)).getExpression());
-                  assert s != null;
+                                    J.SwitchExpression s = ((J.SwitchExpression) ((J.Return) md.getBody().getStatements().get(0)).getExpression());
+                                    assert s != null;
 
-                  JavaType type = s.getType();
-                  assertThat(type).isEqualTo(JavaType.Primitive.Int);
-              }
-            )
-          )
+                                    JavaType type = s.getType();
+                                    assertThat(type).isEqualTo(JavaType.Primitive.Int);
+                                }
+                        )
+                )
         );
     }
 }

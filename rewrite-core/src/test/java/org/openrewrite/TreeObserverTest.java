@@ -34,26 +34,26 @@ class TreeObserverTest implements RewriteTest {
         var observed = new AtomicInteger(0);
 
         rewriteRun(
-          spec -> spec
-            .recipe(toRecipe(() -> new PlainTextVisitor<>() {
-                @Override
-                public PlainText visitText(PlainText text, ExecutionContext executionContext) {
-                    return text.withText("hello jonathan");
-                }
-            }))
-            .executionContext(new InMemoryExecutionContext().addObserver(new TreeObserver.Subscription(new TreeObserver() {
-                @Override
-                public Tree propertyChanged(String property, Cursor cursor, Tree newTree, Object oldValue, Object newValue) {
-                    if (property.equals("text")) {
-                        observed.incrementAndGet();
-                    }
-                    return newTree;
-                }
-            }, true).subscribeToType(PlainText.class))),
-          text(
-            "hello jon",
-            "hello jonathan"
-          )
+                spec -> spec
+                        .recipe(toRecipe(() -> new PlainTextVisitor<>() {
+                            @Override
+                            public PlainText visitText(PlainText text, ExecutionContext executionContext) {
+                                return text.withText("hello jonathan");
+                            }
+                        }))
+                        .executionContext(new InMemoryExecutionContext().addObserver(new TreeObserver.Subscription(new TreeObserver() {
+                            @Override
+                            public Tree propertyChanged(String property, Cursor cursor, Tree newTree, Object oldValue, Object newValue) {
+                                if (property.equals("text")) {
+                                    observed.incrementAndGet();
+                                }
+                                return newTree;
+                            }
+                        }, true).subscribeToType(PlainText.class))),
+                text(
+                        "hello jon",
+                        "hello jonathan"
+                )
         );
 
         assertThat(observed.get()).isEqualTo(1);

@@ -27,58 +27,58 @@ class RemoveImplementsTest implements RewriteTest {
     @Test
     void removeBasic() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveImplements("java.io.Serializable", null)),
-          java(
-            """
+                spec -> spec.recipe(new RemoveImplements("java.io.Serializable", null)),
+                java(
+                        """
               import java.io.Serializable;
               
               class A implements Serializable {
               }
               """,
-            """
+                        """
               class A {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void preservesOtherInterfaces() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveImplements("java.io.Serializable", "")),
-          java(
-            """
+                spec -> spec.recipe(new RemoveImplements("java.io.Serializable", "")),
+                java(
+                        """
               import java.io.Closeable;
               import java.io.Serializable;
               
               class A implements Serializable, Closeable {
               }
               """,
-            """
+                        """
               import java.io.Closeable;
               
               class A implements Closeable {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void removeFullyQualifiedInterface() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveImplements("java.io.Serializable", null)),
-          java(
-            """
+                spec -> spec.recipe(new RemoveImplements("java.io.Serializable", null)),
+                java(
+                        """
               class A implements java.io.Serializable {
               }
               """,
-            """
+                        """
               class A {
               }
               """
-          )
+                )
         );
     }
 
@@ -86,9 +86,9 @@ class RemoveImplementsTest implements RewriteTest {
     @Test
     void innerClassOnly() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveImplements("java.io.Serializable", "com.yourorg.Outer$Inner")),
-          java(
-            """
+                spec -> spec.recipe(new RemoveImplements("java.io.Serializable", "com.yourorg.Outer$Inner")),
+                java(
+                        """
               package com.yourorg;
               
               import java.io.Serializable;
@@ -98,7 +98,7 @@ class RemoveImplementsTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package com.yourorg;
               
               import java.io.Serializable;
@@ -108,7 +108,7 @@ class RemoveImplementsTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -116,9 +116,9 @@ class RemoveImplementsTest implements RewriteTest {
     @Test
     void removeOverrideFromMethods() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveImplements("java.io.Closeable", null)),
-          java(
-            """
+                spec -> spec.recipe(new RemoveImplements("java.io.Closeable", null)),
+                java(
+                        """
               import java.io.Closeable;
               import java.io.IOException;
               
@@ -127,14 +127,14 @@ class RemoveImplementsTest implements RewriteTest {
                   public void close() throws IOException {}
               }
               """,
-            """
+                        """
               import java.io.IOException;
               
               class A {
                   public void close() throws IOException {}
               }
               """
-          )
+                )
         );
     }
 }

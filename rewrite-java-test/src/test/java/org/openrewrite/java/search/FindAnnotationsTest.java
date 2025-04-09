@@ -41,22 +41,22 @@ class FindAnnotationsTest implements RewriteTest {
     @Test
     void matchMetaAnnotation() {
         rewriteRun(
-          spec -> spec.recipe(new FindAnnotations("@org.jspecify.annotations.Nullable", true))
-            .parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath())),
-          java(
-            """
+                spec -> spec.recipe(new FindAnnotations("@org.jspecify.annotations.Nullable", true))
+                        .parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath())),
+                java(
+                        """
               import org.openrewrite.internal.lang.Nullable;
               public class Test {
                   @Nullable String name;
               }
               """,
-            """
+                        """
               import org.openrewrite.internal.lang.Nullable;
               public class Test {
                   /*~~>*/@Nullable String name;
               }
               """
-          )
+                )
         );
     }
 
@@ -65,10 +65,10 @@ class FindAnnotationsTest implements RewriteTest {
     @Test
     void matchesClassArgument() {
         rewriteRun(
-          spec -> spec.recipe(new FindAnnotations("@org.junit.jupiter.api.extension.ExtendWith(org.openrewrite.MyExtension.class)", null))
-            .parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api")),
-          java(
-            """
+                spec -> spec.recipe(new FindAnnotations("@org.junit.jupiter.api.extension.ExtendWith(org.openrewrite.MyExtension.class)", null))
+                        .parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api")),
+                java(
+                        """
               import org.junit.jupiter.api.extension.ExtendWith;
               import org.openrewrite.MyExtension;
               @ExtendWith(MyExtension.class) public class A {}
@@ -76,7 +76,7 @@ class FindAnnotationsTest implements RewriteTest {
               @ExtendWith(value = MyExtension.class) class C {}
               @ExtendWith(value = {MyExtension.class}) class D {}
               """,
-            """
+                        """
               import org.junit.jupiter.api.extension.ExtendWith;
               import org.openrewrite.MyExtension;
               /*~~>*/@ExtendWith(MyExtension.class) public class A {}
@@ -84,14 +84,14 @@ class FindAnnotationsTest implements RewriteTest {
               /*~~>*/@ExtendWith(value = MyExtension.class) class C {}
               /*~~>*/@ExtendWith(value = {MyExtension.class}) class D {}
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package org.openrewrite;
               import org.junit.jupiter.api.extension.Extension;
               public class MyExtension implements Extension {}
               """
-          )
+                )
         );
     }
 
@@ -99,155 +99,155 @@ class FindAnnotationsTest implements RewriteTest {
     @ValueSource(strings = {"@java.lang.Deprecated", "java.lang.Deprecated"})
     void matchesSimpleFullyQualifiedAnnotation(String annotationPattern) {
         rewriteRun(
-          spec -> spec.recipe(new FindAnnotations(annotationPattern, null)),
-          java(
-            "@Deprecated public class A {}",
-            "/*~~>*/@Deprecated public class A {}"
-          )
+                spec -> spec.recipe(new FindAnnotations(annotationPattern, null)),
+                java(
+                        "@Deprecated public class A {}",
+                        "/*~~>*/@Deprecated public class A {}"
+                )
         );
     }
 
     @Test
     void matchesWildcard() {
         rewriteRun(
-          spec -> spec.recipe(new FindAnnotations("@java.lang.*", null)),
-          java(
-            "@Deprecated public class A {}",
-            "/*~~>*/@Deprecated public class A {}"
-          )
+                spec -> spec.recipe(new FindAnnotations("@java.lang.*", null)),
+                java(
+                        "@Deprecated public class A {}",
+                        "/*~~>*/@Deprecated public class A {}"
+                )
         );
     }
 
     @Test
     void matchesSubpackageWildcard() {
         rewriteRun(
-          spec -> spec.recipe(new FindAnnotations("@java..*", null)),
-          java(
-            "@Deprecated public class A {}",
-            "/*~~>*/@Deprecated public class A {}"
-          )
+                spec -> spec.recipe(new FindAnnotations("@java..*", null)),
+                java(
+                        "@Deprecated public class A {}",
+                        "/*~~>*/@Deprecated public class A {}"
+                )
         );
     }
 
     @Test
     void matchesAnnotationOnMethod() {
         rewriteRun(
-          spec -> spec.recipe(new FindAnnotations("@java.lang.Deprecated", null)),
-          java(
-            """
+                spec -> spec.recipe(new FindAnnotations("@java.lang.Deprecated", null)),
+                java(
+                        """
               public class A {
                   @Deprecated
                   public void foo() {}
               }
               """,
-            """
+                        """
               public class A {
                   /*~~>*/@Deprecated
                   public void foo() {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void matchesAnnotationOnField() {
         rewriteRun(
-          spec -> spec.recipe(new FindAnnotations("@java.lang.Deprecated", null)),
-          java(
-            """
+                spec -> spec.recipe(new FindAnnotations("@java.lang.Deprecated", null)),
+                java(
+                        """
               public class A {
                   @Deprecated String s;
               }
               """,
-            """
+                        """
               public class A {
                   /*~~>*/@Deprecated String s;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doesNotMatchNotFullyQualifiedAnnotations() {
         rewriteRun(
-          spec -> spec.recipe(new FindAnnotations("@Deprecated", null)),
-          java("@Deprecated public class A {}")
+                spec -> spec.recipe(new FindAnnotations("@Deprecated", null)),
+                java("@Deprecated public class A {}")
         );
     }
 
     @Test
     void matchesSingleAnnotationParameter() {
         rewriteRun(
-          spec -> spec.recipe(new FindAnnotations("@java.lang.SuppressWarnings(\"deprecation\")", null)),
-          java(
-            "@SuppressWarnings(\"deprecation\") public class A {}",
-            "/*~~>*/@SuppressWarnings(\"deprecation\") public class A {}"
-          )
+                spec -> spec.recipe(new FindAnnotations("@java.lang.SuppressWarnings(\"deprecation\")", null)),
+                java(
+                        "@SuppressWarnings(\"deprecation\") public class A {}",
+                        "/*~~>*/@SuppressWarnings(\"deprecation\") public class A {}"
+                )
         );
     }
 
     @Test
     void doesNotMatchDifferentSingleAnnotationParameter() {
         rewriteRun(
-          spec -> spec.recipe(new FindAnnotations("@java.lang.SuppressWarnings(\"foo\")", null)),
-          java("@SuppressWarnings(\"deprecation\") public class A {}")
+                spec -> spec.recipe(new FindAnnotations("@java.lang.SuppressWarnings(\"foo\")", null)),
+                java("@SuppressWarnings(\"deprecation\") public class A {}")
         );
     }
 
     @Test
     void matchesNamedParameters() {
         rewriteRun(
-          spec -> spec.recipe(new FindAnnotations("@com.netflix.foo.Foo(bar=\"quux\",baz=\"bar\")", null)),
-          java(
-            """
+                spec -> spec.recipe(new FindAnnotations("@com.netflix.foo.Foo(bar=\"quux\",baz=\"bar\")", null)),
+                java(
+                        """
               import com.netflix.foo.Foo;
               @Foo(bar="quux", baz="bar")
               public class A {}
               """,
-            """
+                        """
               import com.netflix.foo.Foo;
               /*~~>*/@Foo(bar="quux", baz="bar")
               public class A {}
               """
-          ),
-          java(foo)
+                ),
+                java(foo)
         );
     }
 
     @Test
     void doesNotMatchDifferentNamedParameters() {
         rewriteRun(
-          spec -> spec.recipe(new FindAnnotations("@com.netflix.foo.Foo(bar=\"qux\",baz=\"baz\")", null)),
-          java(
-            """
+                spec -> spec.recipe(new FindAnnotations("@com.netflix.foo.Foo(bar=\"qux\",baz=\"baz\")", null)),
+                java(
+                        """
               import com.netflix.foo.Foo;
               @Foo(bar="quux", baz="bar")
               public class A {}
               """
-          ),
-          java(foo)
+                ),
+                java(foo)
         );
     }
 
     @Test
     void matchesPartialNamedParameters() {
         rewriteRun(
-          spec -> spec.recipe(new FindAnnotations("@com.netflix.foo.Foo(baz=\"bar\")", null)),
-          java(
-            """
+                spec -> spec.recipe(new FindAnnotations("@com.netflix.foo.Foo(baz=\"bar\")", null)),
+                java(
+                        """
               import com.netflix.foo.Foo;
               @Foo(bar="quux", baz="bar")
               public class A {}
               """,
-            """
+                        """
               import com.netflix.foo.Foo;
               /*~~>*/@Foo(bar="quux", baz="bar")
               public class A {}
               """
-          ),
-          java(foo)
+                ),
+                java(foo)
         );
     }
 
@@ -255,20 +255,20 @@ class FindAnnotationsTest implements RewriteTest {
     @Test
     void matchesNamedParametersRegardlessOfOrder() {
         rewriteRun(
-          spec -> spec.recipe(new FindAnnotations("@com.netflix.foo.Foo(baz=\"bar\",bar=\"quux\")", null)),
-          java(
-            """
+                spec -> spec.recipe(new FindAnnotations("@com.netflix.foo.Foo(baz=\"bar\",bar=\"quux\")", null)),
+                java(
+                        """
               import com.netflix.foo.Foo;
               @Foo(bar="quux", baz="bar")
               public class A {}
               """,
-            """
+                        """
               import com.netflix.foo.Foo;
               /*~~>*/@Foo(bar="quux", baz="bar")
               public class A {}
               """
-          ),
-          java(foo)
+                ),
+                java(foo)
         );
     }
 
@@ -276,8 +276,8 @@ class FindAnnotationsTest implements RewriteTest {
     @Test
     void findAnnotationWithClassTypeArgument() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package com.foo;
                           
               import java.lang.annotation.ElementType;
@@ -293,27 +293,27 @@ class FindAnnotationsTest implements RewriteTest {
                   Class<?> value();
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package com.foo;
                             
               @Example(Foo.class)
               public class Foo {}
               """,
-            spec -> spec.afterRecipe(cu ->
-              assertThat(FindAnnotations.find(cu, "@com.foo.Example(com.foo.Foo.class)")).hasSize(1))
-          )
+                        spec -> spec.afterRecipe(cu ->
+                                assertThat(FindAnnotations.find(cu, "@com.foo.Example(com.foo.Foo.class)")).hasSize(1))
+                )
         );
     }
 
     @Test
     void enumArgument() {
         rewriteRun(
-          spec -> spec.recipe(new FindAnnotations("@com.fasterxml.jackson.annotation.JsonTypeInfo(use=com.fasterxml.jackson.annotation.JsonTypeInfo$Id.CLASS)", null))
-            .parser(JavaParser.fromJavaVersion().classpath("jackson-annotations")),
-          java(
-            """
+                spec -> spec.recipe(new FindAnnotations("@com.fasterxml.jackson.annotation.JsonTypeInfo(use=com.fasterxml.jackson.annotation.JsonTypeInfo$Id.CLASS)", null))
+                        .parser(JavaParser.fromJavaVersion().classpath("jackson-annotations")),
+                java(
+                        """
               import com.fasterxml.jackson.annotation.JsonTypeInfo;
               import com.fasterxml.jackson.annotation.JsonTypeInfo.Id;
                             
@@ -322,7 +322,7 @@ class FindAnnotationsTest implements RewriteTest {
                   Object name;
               }
               """,
-            """
+                        """
               import com.fasterxml.jackson.annotation.JsonTypeInfo;
               import com.fasterxml.jackson.annotation.JsonTypeInfo.Id;
                             
@@ -331,7 +331,7 @@ class FindAnnotationsTest implements RewriteTest {
                   Object name;
               }
               """
-          )
+                )
         );
     }
 }

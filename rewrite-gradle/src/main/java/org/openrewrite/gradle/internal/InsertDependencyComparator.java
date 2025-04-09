@@ -133,11 +133,11 @@ public class InsertDependencyComparator implements Comparator<Statement> {
     private static Optional<String> getEntry(String entry, J.MethodInvocation invocation) {
         if (invocation.getArguments().get(0) instanceof J.Literal) {
             Object value = ((J.Literal) invocation.getArguments().get(0)).getValue();
-            if(value == null) {
+            if (value == null) {
                 return Optional.empty();
             }
             Dependency dependency = DependencyStringNotationConverter.parse((String) value);
-            if(dependency == null) {
+            if (dependency == null) {
                 return Optional.empty();
             }
             switch (entry) {

@@ -36,9 +36,9 @@ import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings({
-  "UnnecessaryLocalVariable", "ConstantConditions", "UnusedAssignment", "PointlessBooleanExpression",
-  "MismatchedStringCase", "SillyAssignment"
-  , "ParameterCanBeLocal"})
+        "UnnecessaryLocalVariable", "ConstantConditions", "UnusedAssignment", "PointlessBooleanExpression",
+        "MismatchedStringCase", "SillyAssignment"
+, "ParameterCanBeLocal"})
 class UnnecessaryParenthesesTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
@@ -47,12 +47,12 @@ class UnnecessaryParenthesesTest implements RewriteTest {
 
     private static Consumer<RecipeSpec> unnecessaryParentheses(UnaryOperator<UnnecessaryParenthesesStyle> with) {
         return spec -> spec.parser(JavaParser.fromJavaVersion().styles(
-          singletonList(
-            new NamedStyles(
-              Tree.randomId(), "test", "test", "test", emptySet(),
-              singletonList(with.apply(new UnnecessaryParenthesesStyle(false, false, false, false, false,
-                false, false, false, false, false, false, false, false, false,
-                false, false, false, false, false, false, false, false, false))))))
+                singletonList(
+                        new NamedStyles(
+                                Tree.randomId(), "test", "test", "test", emptySet(),
+                                singletonList(with.apply(new UnnecessaryParenthesesStyle(false, false, false, false, false,
+                                        false, false, false, false, false, false, false, false, false,
+                                        false, false, false, false, false, false, false, false, false))))))
         );
     }
 
@@ -60,8 +60,8 @@ class UnnecessaryParenthesesTest implements RewriteTest {
     @Test
     void minimumSpaceThrow() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   int test() {
                       try {
@@ -71,7 +71,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   int test() {
                       try {
@@ -81,7 +81,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -89,22 +89,22 @@ class UnnecessaryParenthesesTest implements RewriteTest {
     @Test
     void minimumSpace() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   int test() {
                       return (1);
                   }
               }
               """,
-            """
+                        """
               class Test {
                   int test() {
                       return 1;
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -112,8 +112,8 @@ class UnnecessaryParenthesesTest implements RewriteTest {
     @Test
     void fullUnwrappingDefault() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.*;
 
               class Test {
@@ -135,7 +135,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.*;
 
               class Test {
@@ -157,7 +157,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -166,9 +166,9 @@ class UnnecessaryParenthesesTest implements RewriteTest {
     @Test
     void unwrapExpr() {
         rewriteRun(
-          unnecessaryParentheses(style -> style.withExpr(true)),
-          java(
-            """
+                unnecessaryParentheses(style -> style.withExpr(true)),
+                java(
+                        """
               class Test {
                   void method(int x, int y, boolean a) {
                       if (a && ((x + y > 0))) {
@@ -178,7 +178,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   void method(int x, int y, boolean a) {
                       if (a && (x + y > 0)) {
@@ -188,16 +188,16 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unwrapIdent() {
         rewriteRun(
-          unnecessaryParentheses(style -> style.withIdent(true)),
-          java(
-            """
+                unnecessaryParentheses(style -> style.withIdent(true)),
+                java(
+                        """
               class Test {
                   double doNothing() {
                       double num = (10.0);
@@ -205,7 +205,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   double doNothing() {
                       double num = (10.0);
@@ -213,17 +213,17 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unwrapNum() {
         rewriteRun(
-          unnecessaryParentheses(style -> style.withNumDouble(true).withNumFloat(true)
-            .withNumInt(true).withNumLong(true)),
-          java(
-            """
+                unnecessaryParentheses(style -> style.withNumDouble(true).withNumFloat(true)
+                        .withNumInt(true).withNumLong(true)),
+                java(
+                        """
               class Test {
                   void doNothing() {
                       double a = (1000.0);
@@ -236,7 +236,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   void doNothing() {
                       double a = 1000.0;
@@ -249,17 +249,17 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unwrapLiteral() {
         rewriteRun(
-          unnecessaryParentheses(style -> style.withLiteralFalse(true).withLiteralTrue(true)
-            .withLiteralNull(true).withStringLiteral(true)),
-          java(
-            """
+                unnecessaryParentheses(style -> style.withLiteralFalse(true).withLiteralTrue(true)
+                        .withLiteralNull(true).withStringLiteral(true)),
+                java(
+                        """
               class Test {
                   void doNothing() {
                       boolean a = (true);
@@ -280,7 +280,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   void doNothing() {
                       boolean a = true;
@@ -301,16 +301,16 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unwrapAssignment() {
         rewriteRun(
-          unnecessaryParentheses(style -> style.withAssign(true)),
-          java(
-            """
+                unnecessaryParentheses(style -> style.withAssign(true)),
+                java(
+                        """
               class Test {
                   void doNothing() {
                       double a = (10.0);
@@ -330,7 +330,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   void doNothing() {
                       double a = 10.0;
@@ -350,16 +350,16 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unwrapBandAssign() {
         rewriteRun(
-          unnecessaryParentheses(style -> style.withBitAndAssign(true)),
-          java(
-            """
+                unnecessaryParentheses(style -> style.withBitAndAssign(true)),
+                java(
+                        """
               class Test {
                   int a = 5;
                   int b = 7;
@@ -370,7 +370,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   int a = 5;
                   int b = 7;
@@ -381,16 +381,16 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unwrapBorAssign() {
         rewriteRun(
-          unnecessaryParentheses(style -> style.withBitOrAssign(true)),
-          java(
-            """
+                unnecessaryParentheses(style -> style.withBitOrAssign(true)),
+                java(
+                        """
               class Test {
                   int a = 5;
                   int b = 7;
@@ -401,7 +401,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   int a = 5;
                   int b = 7;
@@ -412,16 +412,16 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unwrapBsrAssign() {
         rewriteRun(
-          unnecessaryParentheses(style -> style.withBitShiftRightAssign(true)),
-          java(
-            """
+                unnecessaryParentheses(style -> style.withBitShiftRightAssign(true)),
+                java(
+                        """
               class Test {
                   int a = -1;
 
@@ -431,7 +431,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   int a = -1;
 
@@ -441,16 +441,16 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unwrapBxorAssign() {
         rewriteRun(
-          unnecessaryParentheses(style -> style.withBitXorAssign(true)),
-          java(
-            """
+                unnecessaryParentheses(style -> style.withBitXorAssign(true)),
+                java(
+                        """
               class Test {
                   boolean a = true;
                   boolean b = false;
@@ -461,7 +461,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   boolean a = true;
                   boolean b = false;
@@ -472,16 +472,16 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unwrapDivAssign() {
         rewriteRun(
-          unnecessaryParentheses(style -> style.withDivAssign(true)),
-          java(
-            """
+                unnecessaryParentheses(style -> style.withDivAssign(true)),
+                java(
+                        """
               class Test {
                   int a = 10;
                   int b = 5;
@@ -492,7 +492,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   int a = 10;
                   int b = 5;
@@ -503,16 +503,16 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unwrapMinusAssign() {
         rewriteRun(
-          unnecessaryParentheses(style -> style.withMinusAssign(true)),
-          java(
-            """
+                unnecessaryParentheses(style -> style.withMinusAssign(true)),
+                java(
+                        """
               class Test {
                   int a = 10;
                   int b = 5;
@@ -523,7 +523,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   int a = 10;
                   int b = 5;
@@ -534,7 +534,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -542,32 +542,32 @@ class UnnecessaryParenthesesTest implements RewriteTest {
     @Test
     void unwrapMinusReturnExpression() {
         rewriteRun(
-          unnecessaryParentheses(style -> style.withExpr(true)),
-          java(
-            """
+                unnecessaryParentheses(style -> style.withExpr(true)),
+                java(
+                        """
               class T {
                   int getInt() {
                       return (4 - 5);
                   }
               }
               """,
-            """
+                        """
               class T {
                   int getInt() {
                       return 4 - 5;
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unwrapModAssign() {
         rewriteRun(
-          unnecessaryParentheses(style -> style.withModAssign(true)),
-          java(
-            """
+                unnecessaryParentheses(style -> style.withModAssign(true)),
+                java(
+                        """
               class Test {
                   int a = 5;
                   int b = 3;
@@ -578,7 +578,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   int a = 5;
                   int b = 3;
@@ -589,16 +589,16 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unwrapPlusAssign() {
         rewriteRun(
-          unnecessaryParentheses(style -> style.withPlusAssign(true)),
-          java(
-            """
+                unnecessaryParentheses(style -> style.withPlusAssign(true)),
+                java(
+                        """
               class Test {
                   int a = 1;
                   int b = 1;
@@ -609,7 +609,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   int a = 1;
                   int b = 1;
@@ -620,16 +620,16 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unwrapSlAssign() {
         rewriteRun(
-          unnecessaryParentheses(style -> style.withShiftLeftAssign(true)),
-          java(
-            """
+                unnecessaryParentheses(style -> style.withShiftLeftAssign(true)),
+                java(
+                        """
               class Test {
                   int a = 1;
                   int b = 1;
@@ -640,7 +640,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   int a = 1;
                   int b = 1;
@@ -651,16 +651,16 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unwrapSrAssign() {
         rewriteRun(
-          unnecessaryParentheses(style -> style.withShiftRightAssign(true)),
-          java(
-            """
+                unnecessaryParentheses(style -> style.withShiftRightAssign(true)),
+                java(
+                        """
               class Test {
                   int a = 1;
                   int b = 1;
@@ -671,7 +671,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   int a = 1;
                   int b = 1;
@@ -682,16 +682,16 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unwrapStarAssign() {
         rewriteRun(
-          unnecessaryParentheses(style -> style.withStarAssign(true)),
-          java(
-            """
+                unnecessaryParentheses(style -> style.withStarAssign(true)),
+                java(
+                        """
               class Test {
                   int a = 1;
                   int b = 1;
@@ -702,7 +702,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   int a = 1;
                   int b = 1;
@@ -713,16 +713,16 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unwrapLambda() {
         rewriteRun(
-          unnecessaryParentheses(style -> style.withLambda(true)),
-          java(
-            """
+                unnecessaryParentheses(style -> style.withLambda(true)),
+                java(
+                        """
               import java.util.*;
 
               class Test {
@@ -734,7 +734,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.*;
 
               class Test {
@@ -746,7 +746,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -754,30 +754,30 @@ class UnnecessaryParenthesesTest implements RewriteTest {
     @Test
     void unwrapDoubleParens() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       int sum = 1 + ((2 + 3));
                   }
               }
               """,
-            """
+                        """
               class Test {
                   void test() {
                       int sum = 1 + (2 + 3);
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unwrapIfParens() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test(String s) {
                       if ((s == null || s.isEmpty())) {
@@ -786,7 +786,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   void test(String s) {
                       if (s == null || s.isEmpty()) {
@@ -795,7 +795,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -803,8 +803,8 @@ class UnnecessaryParenthesesTest implements RewriteTest {
     @Test
     void unwrapWhileParens() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test(String s) {
                       while ((s == null || s.isEmpty())) {
@@ -813,7 +813,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   void test(String s) {
                       while (s == null || s.isEmpty()) {
@@ -822,15 +822,15 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unwrapDoWhileParens() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test(String s) {
                        do {
@@ -839,7 +839,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   void test(String s) {
                        do {
@@ -848,15 +848,15 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unwrapForControlParens() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test(String s) {
                       for (int i = 0; (i < 10); i++) {
@@ -865,7 +865,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   void test(String s) {
                       for (int i = 0; i < 10; i++) {
@@ -874,7 +874,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -882,22 +882,22 @@ class UnnecessaryParenthesesTest implements RewriteTest {
     @SuppressWarnings("SimplifiableConditionalExpression")
     void ternaryCondition() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   boolean test(String s) {
                       return (s == null) ? true : false;
                   }
               }
               """,
-            """
+                        """
               class Test {
                   boolean test(String s) {
                       return s == null ? true : false;
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -905,9 +905,9 @@ class UnnecessaryParenthesesTest implements RewriteTest {
     @Test
     void unwrapNotMethodInvocation() {
         rewriteRun(
-          unnecessaryParentheses(style -> style),
-          java(
-            """
+                unnecessaryParentheses(style -> style),
+                java(
+                        """
               class Test {
                   boolean trueMethod() {
                       return !(falseMethod());
@@ -917,7 +917,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   boolean trueMethod() {
                       return !falseMethod();
@@ -927,7 +927,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -937,8 +937,8 @@ class UnnecessaryParenthesesTest implements RewriteTest {
         @Issue("https://github.com/openrewrite/rewrite/issues/3913")
         void negatedAssignment() {
             rewriteRun(
-              java(
-                """
+                    java(
+                            """
                   class Test {
                       void test(char ch) {
                           boolean sign;
@@ -948,15 +948,15 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                       }
                   }
                   """
-              )
+                    )
             );
         }
 
         @Test
         void doNotUnwrapIfNoParens() {
             rewriteRun(
-              java(
-                """
+                    java(
+                            """
                   class Test {
                       void test(String s) {
                           if (s == null || s.isEmpty()) {
@@ -965,15 +965,15 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                       }
                   }
                   """
-              )
+                    )
             );
         }
 
         @Test
         void doNotUnwrapNegatedIfParens() {
             rewriteRun(
-              java(
-                """
+                    java(
+                            """
                   class Test {
                       void test(String s) {
                           if (!(s == null || s.isEmpty())) {
@@ -982,15 +982,15 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                       }
                   }
                   """
-              )
+                    )
             );
         }
 
         @Test
         void doNotUnwrapIfParens() {
             rewriteRun(
-              java(
-                """
+                    java(
+                            """
                   class Test {
                       void test(String s) {
                           if ((s == null || s.isEmpty()) || false) {
@@ -999,37 +999,37 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                       }
                   }
                   """
-              )
+                    )
             );
         }
 
         @Test
         void requiredCast() {
             rewriteRun(
-              java(
-                """
+                    java(
+                            """
                   class Test {
                       int test(Object o) {
                           return ((int[]) o).length;
                       }
                   }
                   """
-              )
+                    )
             );
         }
 
         @Test
         void negatedTernaryNotUnwrapped() {
             rewriteRun(
-              java(
-                """
+                    java(
+                            """
                   public class A {
                       void foo(String s, String other) {
                           boolean a = !(s == null ? other == null : s.equalsIgnoreCase(other));
                       }
                   }
                   """
-              )
+                    )
             );
         }
 
@@ -1037,16 +1037,16 @@ class UnnecessaryParenthesesTest implements RewriteTest {
         @Test
         void negatedInstanceOf() {
             rewriteRun(
-              unnecessaryParentheses(style -> style),
-              java(
-                """
+                    unnecessaryParentheses(style -> style),
+                    java(
+                            """
                   class Test {
                       boolean isNotString(Object o) {
                           return !(o instanceof String);
                       }
                   }
                   """
-              )
+                    )
             );
         }
 

@@ -28,9 +28,9 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
     @Test
     void publicToPrivate() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A aMethod(..)", "private", null)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A aMethod(..)", "private", null)),
+                java(
+                        """
               package com.abc;
                       
               class A {
@@ -51,7 +51,7 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package com.abc;
                             
               class A {
@@ -72,16 +72,16 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void packagePrivateToProtected() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A aMethod(..)", "protected", null)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A aMethod(..)", "protected", null)),
+                java(
+                        """
               package com.abc;
                       
               class A {
@@ -102,7 +102,7 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package com.abc;
                     
               class A {
@@ -123,16 +123,16 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void publicToPackagePrivate() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A aMethod(..)", "package", null)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A aMethod(..)", "package", null)),
+                java(
+                        """
               package com.abc;
                       
               class A {
@@ -153,7 +153,7 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package com.abc;
                     
               class A {
@@ -175,16 +175,16 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void publicToPackagePrivateWildcard() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A *(..)", "package", null)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A *(..)", "package", null)),
+                java(
+                        """
               package com.abc;
                       
               class A {
@@ -205,7 +205,7 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package com.abc;
                     
               class A {
@@ -228,16 +228,16 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doNotChangeExistingAccessLevel() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A aMethod(String)", "public", null)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A aMethod(String)", "public", null)),
+                java(
+                        """
               package com.abc;
 
               class A {
@@ -246,16 +246,16 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void packagePrivateToProtectedWithOtherModifier() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A aMethod(..)", "protected", null)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A aMethod(..)", "protected", null)),
+                java(
+                        """
               package com.abc;
 
               class A {
@@ -265,7 +265,7 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package com.abc;
 
               class A {
@@ -275,16 +275,16 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void packagePrivateToProtectedWithConstructor() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A <constructor>(..)", "protected", null)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A <constructor>(..)", "protected", null)),
+                java(
+                        """
               package com.abc;
 
               class A {
@@ -296,7 +296,7 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package com.abc;
 
               class A {
@@ -308,7 +308,7 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -317,9 +317,9 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
     @SuppressWarnings("MethodMayBeStatic")
     void methodPatternExactMatch() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A aMethod(..)", "protected", null)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A aMethod(..)", "protected", null)),
+                java(
+                        """
               package com.abc;
 
               class A {
@@ -335,7 +335,7 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package com.abc;
 
               class A {
@@ -351,7 +351,7 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -360,9 +360,9 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
     @SuppressWarnings("MethodMayBeStatic")
     void matchOverrides() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A aMethod(..)", "protected", true)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A aMethod(..)", "protected", true)),
+                java(
+                        """
               package com.abc;
 
               class A {
@@ -378,7 +378,7 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package com.abc;
 
               class A {
@@ -394,16 +394,16 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void dontAutoFormatBody() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A aMethod(..)", "package", null)),
-          java(
-            """
+                spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A aMethod(..)", "package", null)),
+                java(
+                        """
               package com.abc;
 
               class A {
@@ -413,7 +413,7 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package com.abc;
 
               class A {
@@ -424,7 +424,7 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

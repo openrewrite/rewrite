@@ -30,7 +30,7 @@ class AddLicenseHeaderTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new AddLicenseHeader(
-          """
+                """
             Copyright ${CURRENT_YEAR} the original author or authors.
             <p>
             Licensed under the Apache License, Version 2.0 (the "License");
@@ -43,13 +43,13 @@ class AddLicenseHeaderTest implements RewriteTest {
     @Test
     void addLicenseHeader() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package com.sample;
               class Test {
               }
               """,
-            """
+                        """
               /*
                * Copyright %s the original author or authors.
                * <p>
@@ -61,15 +61,15 @@ class AddLicenseHeaderTest implements RewriteTest {
               class Test {
               }
               """.formatted(getInstance().get(YEAR))
-          )
+                )
         );
     }
 
     @Test
     void dontChangeExistingHeader() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /*
                * My license header
                */
@@ -77,7 +77,7 @@ class AddLicenseHeaderTest implements RewriteTest {
               class Test {
               }
               """
-          )
+                )
         );
     }
 
@@ -85,8 +85,8 @@ class AddLicenseHeaderTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3198")
     void dontChangeJavadoc() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /*
                * My license header
                */
@@ -97,7 +97,7 @@ class AddLicenseHeaderTest implements RewriteTest {
               class Test {
               }
               """
-          )
+                )
         );
     }
 
@@ -106,8 +106,8 @@ class AddLicenseHeaderTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3198")
     void dontChangeInvalidJavadoc() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               /*
                * My license header
                */
@@ -118,7 +118,7 @@ class AddLicenseHeaderTest implements RewriteTest {
               class Test {
               }
               """
-          )
+                )
         );
     }
 }

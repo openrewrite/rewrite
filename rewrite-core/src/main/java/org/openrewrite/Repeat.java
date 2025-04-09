@@ -47,8 +47,8 @@ public class Repeat {
                     throw new IllegalArgumentException(
                             String.format(
                                     "Repeat visitor called on a non-source file tree without a cursor pointing to the root of the tree. " +
-                                    "Passed tree type: `%s`. " +
-                                    "This is likely a bug in the calling code. Use a `visit` method that accepts a cursor instead.",
+                                            "Passed tree type: `%s`. " +
+                                            "This is likely a bug in the calling code. Use a `visit` method that accepts a cursor instead.",
                                     tree.getClass().getName()
                             ));
                 }

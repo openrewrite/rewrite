@@ -27,15 +27,15 @@ class AssertTest implements RewriteTest {
     @Test
     void assertStatement() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                     assert 1 == 1;
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -44,8 +44,8 @@ class AssertTest implements RewriteTest {
     @Test
     void assertDetail() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   boolean test() {
                       assert this.test() == false :
@@ -54,7 +54,7 @@ class AssertTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

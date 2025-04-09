@@ -25,13 +25,13 @@ class ThrowTest implements RewriteTest {
     @Test
     void throwException() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               static def test(int a) {
                   throw new UnsupportedOperationException()
               }
               """
-          )
+                )
         );
     }
 }

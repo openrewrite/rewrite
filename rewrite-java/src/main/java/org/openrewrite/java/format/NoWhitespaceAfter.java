@@ -34,7 +34,7 @@ public class NoWhitespaceAfter extends Recipe {
     @Override
     public String getDescription() {
         return "Removes unnecessary whitespace appearing after a token. " +
-               "A linebreak after a token is allowed unless `allowLineBreaks` is set to `false`, in which case it will be removed.";
+                "A linebreak after a token is allowed unless `allowLineBreaks` is set to `false`, in which case it will be removed.";
     }
 
     @Override
@@ -151,11 +151,11 @@ public class NoWhitespaceAfter extends Recipe {
             J.Unary u = super.visitUnary(unary, ctx);
             J.Unary.Type op = u.getOperator();
             if ((Boolean.TRUE.equals(noWhitespaceAfterStyle.getInc()) && op == J.Unary.Type.PreIncrement) ||
-                (Boolean.TRUE.equals(noWhitespaceAfterStyle.getDec()) && op == J.Unary.Type.PreDecrement) ||
-                (Boolean.TRUE.equals(noWhitespaceAfterStyle.getBnoc()) && op == J.Unary.Type.Complement) ||
-                (Boolean.TRUE.equals(noWhitespaceAfterStyle.getLnot()) && op == J.Unary.Type.Not) ||
-                (Boolean.TRUE.equals(noWhitespaceAfterStyle.getUnaryPlus()) && op == J.Unary.Type.Positive) ||
-                (Boolean.TRUE.equals(noWhitespaceAfterStyle.getUnaryMinus()) && op == J.Unary.Type.Negative)
+                    (Boolean.TRUE.equals(noWhitespaceAfterStyle.getDec()) && op == J.Unary.Type.PreDecrement) ||
+                    (Boolean.TRUE.equals(noWhitespaceAfterStyle.getBnoc()) && op == J.Unary.Type.Complement) ||
+                    (Boolean.TRUE.equals(noWhitespaceAfterStyle.getLnot()) && op == J.Unary.Type.Not) ||
+                    (Boolean.TRUE.equals(noWhitespaceAfterStyle.getUnaryPlus()) && op == J.Unary.Type.Positive) ||
+                    (Boolean.TRUE.equals(noWhitespaceAfterStyle.getUnaryMinus()) && op == J.Unary.Type.Negative)
             ) {
                 u = (J.Unary) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle).visitNonNull(u, ctx);
             }

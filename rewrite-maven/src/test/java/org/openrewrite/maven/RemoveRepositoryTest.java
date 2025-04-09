@@ -30,9 +30,9 @@ class RemoveRepositoryTest implements RewriteTest {
     void removesRepoAndIdCombination() {
 
         rewriteRun(
-          spec -> spec.recipe(new RemoveRepository("myRepo", "https://myrepo.maven.com/repo")),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveRepository("myRepo", "https://myrepo.maven.com/repo")),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -59,7 +59,7 @@ class RemoveRepositoryTest implements RewriteTest {
                 </pluginRepositories>
               </project>
               """,
-            """
+                        """
             <project>
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
@@ -82,7 +82,7 @@ class RemoveRepositoryTest implements RewriteTest {
               </pluginRepositories>
             </project>
             """
-          )
+                )
         );
     }
 
@@ -91,9 +91,9 @@ class RemoveRepositoryTest implements RewriteTest {
     void removeSimpleRepoWithUrlOnly() {
 
         rewriteRun(
-          spec -> spec.recipe(new RemoveRepository(null, "https://myrepo.maven.com/repo")),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveRepository(null, "https://myrepo.maven.com/repo")),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -120,7 +120,7 @@ class RemoveRepositoryTest implements RewriteTest {
                 </pluginRepositories>
               </project>
               """,
-            """
+                        """
             <project>
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
@@ -135,7 +135,7 @@ class RemoveRepositoryTest implements RewriteTest {
               </pluginRepositories>
             </project>
             """
-        ));
+                ));
     }
 
 }

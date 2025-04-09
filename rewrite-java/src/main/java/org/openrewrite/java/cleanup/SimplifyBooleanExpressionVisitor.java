@@ -42,7 +42,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
             } else if (isLiteralTrue(asBinary.getRight())) {
                 j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(""));
             } else if (!(asBinary.getLeft() instanceof MethodCall) &&
-                       SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
+                    SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
                 j = asBinary.getLeft();
             }
         } else if (asBinary.getOperator() == J.Binary.Type.Or) {
@@ -55,7 +55,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
             } else if (isLiteralFalse(asBinary.getRight())) {
                 j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(""));
             } else if (!(asBinary.getLeft() instanceof MethodCall) &&
-                       SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
+                    SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
                 j = asBinary.getLeft();
             }
         } else if (asBinary.getOperator() == J.Binary.Type.Equal) {
@@ -248,8 +248,8 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         J.MethodInvocation asMethod = (J.MethodInvocation) j;
         Expression select = asMethod.getSelect();
         if (isEmpty.matches(asMethod) &&
-            select instanceof J.Literal &&
-            select.getType() == JavaType.Primitive.String) {
+                select instanceof J.Literal &&
+                select.getType() == JavaType.Primitive.String) {
             return booleanLiteral(method, J.Literal.isLiteralValue(select, ""));
         } else if (equals.matches(asMethod)) {
             Expression arg = asMethod.getArguments().get(0);
@@ -257,7 +257,8 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                 return booleanLiteral(method, ((J.Literal) select).getValue().equals(((J.Literal) arg).getValue()));
             } else if (arg instanceof J.Identifier && select instanceof J.Identifier) {
                 return booleanLiteral(method, SemanticallyEqual.areEqual(select, arg));
-            } if (arg instanceof J.FieldAccess && select instanceof J.FieldAccess) {
+            }
+            if (arg instanceof J.FieldAccess && select instanceof J.FieldAccess) {
                 return booleanLiteral(method, SemanticallyEqual.areEqual(select, arg));
             }
         }
@@ -310,11 +311,11 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
 
     private static J.Unary not(Expression sideRetained) {
         if (!(sideRetained instanceof J.FieldAccess) &&
-            !(sideRetained instanceof J.Identifier) &&
-            !(sideRetained instanceof J.Literal) &&
-            !(sideRetained instanceof J.MethodInvocation) &&
-            !(sideRetained instanceof J.Parentheses) &&
-            !(sideRetained instanceof J.Unary)) {
+                !(sideRetained instanceof J.Identifier) &&
+                !(sideRetained instanceof J.Literal) &&
+                !(sideRetained instanceof J.MethodInvocation) &&
+                !(sideRetained instanceof J.Parentheses) &&
+                !(sideRetained instanceof J.Unary)) {
             sideRetained = new J.Parentheses<>(Tree.randomId(),
                     Space.EMPTY,
                     Markers.EMPTY,

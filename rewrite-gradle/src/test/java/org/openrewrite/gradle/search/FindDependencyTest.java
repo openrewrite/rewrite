@@ -27,9 +27,9 @@ class FindDependencyTest implements RewriteTest {
     @Test
     void findDependency() {
         rewriteRun(
-          spec -> spec.recipe(new FindDependency("org.openrewrite", "rewrite-core", "api")),
-          buildGradle(
-            """
+                spec -> spec.recipe(new FindDependency("org.openrewrite", "rewrite-core", "api")),
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -42,7 +42,7 @@ class FindDependencyTest implements RewriteTest {
                   api 'org.openrewrite:rewrite-core:latest.release'
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -55,16 +55,16 @@ class FindDependencyTest implements RewriteTest {
                   /*~~>*/api 'org.openrewrite:rewrite-core:latest.release'
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void findDependencyByGlob() {
         rewriteRun(
-          spec -> spec.recipe(new FindDependency("org.*", "*", "")),
-          buildGradle(
-            """
+                spec -> spec.recipe(new FindDependency("org.*", "*", "")),
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -77,7 +77,7 @@ class FindDependencyTest implements RewriteTest {
                   api 'org.openrewrite:rewrite-core:latest.release'
               }
               """,
-            """
+                        """
               plugins {
                   id 'java-library'
               }
@@ -90,7 +90,7 @@ class FindDependencyTest implements RewriteTest {
                   /*~~>*/api 'org.openrewrite:rewrite-core:latest.release'
               }
               """
-          )
+                )
         );
     }
 }

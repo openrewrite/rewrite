@@ -43,21 +43,21 @@ class ChangeFieldNameTest implements RewriteTest {
     @Test
     void changeFieldName() {
         rewriteRun(
-          spec -> spec.recipe(changeFieldName("Test", "collection", "list")),
-          java(
-            """
+                spec -> spec.recipe(changeFieldName("Test", "collection", "list")),
+                java(
+                        """
               import java.util.List;
               class Test {
                  List collection = null;
               }
               """,
-            """
+                        """
               import java.util.List;
               class Test {
                  List list = null;
               }
               """
-          )
+                )
         );
     }
 
@@ -65,9 +65,9 @@ class ChangeFieldNameTest implements RewriteTest {
     @Test
     void changeFieldNameReferences() {
         rewriteRun(
-          spec -> spec.recipe(changeFieldName("Test", "n", "n1")),
-          java(
-            """
+                spec -> spec.recipe(changeFieldName("Test", "n", "n1")),
+                java(
+                        """
               class Test {
                  int n;
                  
@@ -83,7 +83,7 @@ class ChangeFieldNameTest implements RewriteTest {
                  }
               }
               """,
-            """
+                        """
               class Test {
                  int n1;
                  
@@ -99,16 +99,16 @@ class ChangeFieldNameTest implements RewriteTest {
                  }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void changeFieldNameReferencesInOtherClass() {
         rewriteRun(
-          spec -> spec.recipe(changeFieldName("Test", "n", "n1")),
-          java(
-            """
+                spec -> spec.recipe(changeFieldName("Test", "n", "n1")),
+                java(
+                        """
               class Caller {
                   Test t = new Test();
                   {
@@ -116,7 +116,7 @@ class ChangeFieldNameTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Caller {
                   Test t = new Test();
                   {
@@ -124,15 +124,15 @@ class ChangeFieldNameTest implements RewriteTest {
                   }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               class Test {
                  int n;
               }
               """,
-            SourceSpec::skip
-          )
+                        SourceSpec::skip
+                )
         );
     }
 
@@ -140,19 +140,19 @@ class ChangeFieldNameTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/632")
     void changeFieldNameReferencesInOtherClassUsingStaticImport() {
         rewriteRun(
-          spec -> spec.recipe(changeFieldName("com.example.Test", "IMPORT_ME_STATICALLY", "IMPORT_ME_STATICALLY_1")),
-          java(
-            """
+                spec -> spec.recipe(changeFieldName("com.example.Test", "IMPORT_ME_STATICALLY", "IMPORT_ME_STATICALLY_1")),
+                java(
+                        """
               package com.example;
 
               public class Test {
                   public static final int IMPORT_ME_STATICALLY = 0;
               }
               """,
-            SourceSpec::skip
-          ),
-          java(
-            """
+                        SourceSpec::skip
+                ),
+                java(
+                        """
               package org.openrewrite.test;
 
               import static com.example.Test.IMPORT_ME_STATICALLY;
@@ -161,7 +161,7 @@ class ChangeFieldNameTest implements RewriteTest {
                   int e = IMPORT_ME_STATICALLY;
               }
               """,
-            """
+                        """
               package org.openrewrite.test;
 
               import static com.example.Test.IMPORT_ME_STATICALLY_1;
@@ -170,7 +170,7 @@ class ChangeFieldNameTest implements RewriteTest {
                   int e = IMPORT_ME_STATICALLY_1;
               }
               """
-          )
+                )
         );
     }
 
@@ -178,10 +178,10 @@ class ChangeFieldNameTest implements RewriteTest {
     @Test
     void dontChangeNestedFieldsWithSameName() {
         rewriteRun(
-          spec -> spec.recipe(changeFieldName("Test", "collection", "list")),
-          java("class A { Object collection; }"),
-          java(
-            """
+                spec -> spec.recipe(changeFieldName("Test", "collection", "list")),
+                java("class A { Object collection; }"),
+                java(
+                        """
               import java.util.List;
               class Test {
                   List collection = null;
@@ -191,7 +191,7 @@ class ChangeFieldNameTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.List;
               class Test {
                   List list = null;
@@ -201,16 +201,16 @@ class ChangeFieldNameTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void dontChangeFieldsInConstructor() {
         rewriteRun(
-          spec -> spec.recipe(changeFieldName("Test", "a", "b")),
-          java(
-            """
+                spec -> spec.recipe(changeFieldName("Test", "a", "b")),
+                java(
+                        """
               class Test {
                   String a;
                   public Test(String a) {
@@ -218,7 +218,7 @@ class ChangeFieldNameTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   String b;
                   public Test(String a) {
@@ -226,7 +226,7 @@ class ChangeFieldNameTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

@@ -33,41 +33,41 @@ class EndOfLineAtEndOfFileTest implements RewriteTest {
     @Test
     void nonTxtExtension() {
         rewriteRun(
-          text(
-            """
+                text(
+                        """
               This is text.
               """,
-            """
+                        """
               This is text.
               
               """,
-            spec -> spec.path("test.yml")
-          )
+                        spec -> spec.path("test.yml")
+                )
         );
     }
 
     @Test
     void defaultText() {
         rewriteRun(
-          text(
-            """
+                text(
+                        """
               This is text.
               """,
-            """
+                        """
               This is text.
               
               """
-          )
+                )
         );
     }
 
     @Test
     void fileContainingCRLFWillEndWithCRLF() {
         rewriteRun(
-          text(
-            "Test\r\nLine",
-            "Test\r\nLine\r\n\n" // The last newline gets removed by the test framework
-            )
+                text(
+                        "Test\r\nLine",
+                        "Test\r\nLine\r\n\n" // The last newline gets removed by the test framework
+                )
         );
     }
 }

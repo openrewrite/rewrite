@@ -27,28 +27,28 @@ class MoveContentToFileTest implements RewriteTest {
     @Test
     void newFile() {
         rewriteRun(
-          spec -> spec.recipe(new MoveContentToFile("$.before", "from.tf", "to.tf")),
-          hcl(
-            """
+                spec -> spec.recipe(new MoveContentToFile("$.before", "from.tf", "to.tf")),
+                hcl(
+                        """
               after {
               }
               before {
               }
               """,
-            """
+                        """
               after {
               }
               """,
-            spec -> spec.path("from.tf")
-          ),
-          hcl(
-            doesNotExist(),
-            """
+                        spec -> spec.path("from.tf")
+                ),
+                hcl(
+                        doesNotExist(),
+                        """
               before {
               }
               """,
-            spec -> spec.path("to.tf")
-          )
+                        spec -> spec.path("to.tf")
+                )
         );
     }
 }

@@ -25,14 +25,14 @@ class ArrayAccessTest implements RewriteTest {
     @Test
     void arrayAccess() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   int[] n = new int[] { 0 };
                   int m = n [ 0 ];
               }
               """
-          )
+                )
         );
     }
 }

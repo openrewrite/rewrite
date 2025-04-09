@@ -89,16 +89,16 @@ public class FindEmptyMethods extends Recipe {
 
             private boolean isEmptyMethod(J.MethodDeclaration method) {
                 return !method.isConstructor() && !isInterfaceMethod(method) &&
-                       (matchOverrides == null || !matchOverrides && !TypeUtils.isOverride(method.getMethodType()) || matchOverrides) &&
-                       (method.getBody() == null || method.getBody().getStatements().isEmpty() && method.getBody().getEnd().getComments().isEmpty());
+                        (matchOverrides == null || !matchOverrides && !TypeUtils.isOverride(method.getMethodType()) || matchOverrides) &&
+                        (method.getBody() == null || method.getBody().getStatements().isEmpty() && method.getBody().getEnd().getComments().isEmpty());
             }
 
             private boolean isInterfaceMethod(J.MethodDeclaration method) {
                 //noinspection ConstantConditions
                 return method.getMethodType() != null &&
-                       method.getMethodType().getDeclaringType() != null &&
-                       method.getMethodType().getDeclaringType().getKind() == JavaType.FullyQualified.Kind.Interface &&
-                       !method.hasModifier(J.Modifier.Type.Default);
+                        method.getMethodType().getDeclaringType() != null &&
+                        method.getMethodType().getDeclaringType().getKind() == JavaType.FullyQualified.Kind.Interface &&
+                        !method.hasModifier(J.Modifier.Type.Default);
             }
 
             private boolean hasSinglePublicNoArgsConstructor(List<Statement> classStatements) {
@@ -108,9 +108,9 @@ public class FindEmptyMethods extends Recipe {
                         .filter(J.MethodDeclaration::isConstructor)
                         .collect(Collectors.toList());
                 return constructors.size() == 1 &&
-                       constructors.get(0).hasModifier(J.Modifier.Type.Public) &&
-                       constructors.get(0).getParameters().size() == 1 &&
-                       constructors.get(0).getParameters().get(0) instanceof J.Empty;
+                        constructors.get(0).hasModifier(J.Modifier.Type.Public) &&
+                        constructors.get(0).getParameters().size() == 1 &&
+                        constructors.get(0).getParameters().get(0) instanceof J.Empty;
             }
         };
     }

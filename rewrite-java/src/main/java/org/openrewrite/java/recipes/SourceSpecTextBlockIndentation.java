@@ -52,7 +52,7 @@ public class SourceSpecTextBlockIndentation extends Recipe {
                         if (TypeUtils.isString(argument.getType()) && argument instanceof J.Literal) {
                             J.Literal source = (J.Literal) argument;
                             if (source.getValueSource() != null && source.getValueSource().startsWith("\"\"\"") &&
-                                endTextBlockOnOwnLine.matcher(source.getValueSource()).find()) {
+                                    endTextBlockOnOwnLine.matcher(source.getValueSource()).find()) {
 
                                 String[] lines = source.getValueSource().split("\n");
                                 int[] indentations = new int[lines.length - 1];
@@ -75,10 +75,10 @@ public class SourceSpecTextBlockIndentation extends Recipe {
 
                                 int expectedIndent = indentations[indentations.length - 1];
                                 if (indentations.length >= 2 &&
-                                    nonSpaceCharacter[0] &&
-                                    nonSpaceCharacter[indentations.length - 2] &&
-                                    indentations[0] == indentations[indentations.length - 2] &&
-                                    indentations[0] >= expectedIndent) {
+                                        nonSpaceCharacter[0] &&
+                                        nonSpaceCharacter[indentations.length - 2] &&
+                                        indentations[0] == indentations[indentations.length - 2] &&
+                                        indentations[0] >= expectedIndent) {
 
                                     for (int i = 0; i < indentations.length - 1; i++) {
                                         if (nonSpaceCharacter[i] && indentations[i] < indentations[0]) {
@@ -101,7 +101,7 @@ public class SourceSpecTextBlockIndentation extends Recipe {
 
                                     J.Literal withFixedSource = source.withValueSource(fixedSource.toString());
                                     if (withFixedSource.getPrefix().getComments().isEmpty() &&
-                                        withFixedSource.getPrefix().getWhitespace().isEmpty()) {
+                                            withFixedSource.getPrefix().getWhitespace().isEmpty()) {
                                         return maybeAutoFormat(withFixedSource, withFixedSource.withPrefix(Space.format("\n")), ctx);
                                     }
                                     return withFixedSource;

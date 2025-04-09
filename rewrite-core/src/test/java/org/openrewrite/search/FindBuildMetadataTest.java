@@ -31,13 +31,13 @@ class FindBuildMetadataTest implements RewriteTest {
     @Test
     void findBuildMetadata() {
         rewriteRun(
-          spec -> spec.recipe(new FindBuildMetadata("lstFormatVersion", "2")),
-          text(
-            "hello world",
-            "~~(Found build metadata)~~>hello world",
-            spec -> spec.mapBeforeRecipe(pt -> pt.withMarkers(pt.getMarkers().add(new BuildMetadata(randomId(),
-              Map.of("lstFormatVersion", "2")))))
-          )
+                spec -> spec.recipe(new FindBuildMetadata("lstFormatVersion", "2")),
+                text(
+                        "hello world",
+                        "~~(Found build metadata)~~>hello world",
+                        spec -> spec.mapBeforeRecipe(pt -> pt.withMarkers(pt.getMarkers().add(new BuildMetadata(randomId(),
+                                Map.of("lstFormatVersion", "2")))))
+                )
         );
     }
 }

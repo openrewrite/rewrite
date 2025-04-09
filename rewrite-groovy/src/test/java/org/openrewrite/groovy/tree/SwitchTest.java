@@ -28,54 +28,54 @@ class SwitchTest implements RewriteTest {
     @Test
     void basicSwitch() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               switch ("foo") {
                   case "foo"  :
                       return true
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void singleCase() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               int n;
               switch(n) {
                  case 0: break ;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void defaultSwitch() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               switch(0) {
                   default: System.out.println("default!") ;
               }
               """,
-            spec -> spec.afterRecipe(cu -> {
-                assertThat(cu.getStatements()).hasSize(1);
-                assertThat(cu.getStatements().get(0)).isInstanceOf(J.Switch.class);
-                assertThat(((J.Switch) cu.getStatements().get(0)).getCases().getStatements()).hasSize(1);
-            })
-          )
+                        spec -> spec.afterRecipe(cu -> {
+                            assertThat(cu.getStatements()).hasSize(1);
+                            assertThat(cu.getStatements().get(0)).isInstanceOf(J.Switch.class);
+                            assertThat(((J.Switch) cu.getStatements().get(0)).getCases().getStatements()).hasSize(1);
+                        })
+                )
         );
     }
 
     @Test
     void multipleCases() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               switch("foo") {
                   case "foo": {
                      break
@@ -85,15 +85,15 @@ class SwitchTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void multipleCasesWithDefault() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               switch("foo") {
                   case "foo":
                       break
@@ -103,12 +103,12 @@ class SwitchTest implements RewriteTest {
                       break
               }
               """,
-            spec -> spec.afterRecipe(cu -> {
-                assertThat(cu.getStatements()).hasSize(1);
-                assertThat(cu.getStatements().get(0)).isInstanceOf(J.Switch.class);
-                assertThat(((J.Switch) cu.getStatements().get(0)).getCases().getStatements()).hasSize(3);
-            })
-          )
+                        spec -> spec.afterRecipe(cu -> {
+                            assertThat(cu.getStatements()).hasSize(1);
+                            assertThat(cu.getStatements().get(0)).isInstanceOf(J.Switch.class);
+                            assertThat(((J.Switch) cu.getStatements().get(0)).getCases().getStatements()).hasSize(3);
+                        })
+                )
         );
     }
 
@@ -116,8 +116,8 @@ class SwitchTest implements RewriteTest {
     @Test
     void switchWithCommas() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               switch (0) {
                 case 0:
                   return [
@@ -136,15 +136,15 @@ class SwitchTest implements RewriteTest {
                   ].join(",")
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void fallthroughCase() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               switch("foo") {
                   case "foo":
                   case "bar":
@@ -154,7 +154,7 @@ class SwitchTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

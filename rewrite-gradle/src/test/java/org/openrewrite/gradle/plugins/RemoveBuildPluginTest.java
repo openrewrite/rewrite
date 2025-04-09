@@ -27,62 +27,62 @@ class RemoveBuildPluginTest implements RewriteTest {
     @Test
     void removePlugin() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveBuildPlugin("com.jfrog.bintray")),
-          buildGradle(
-            """
+                spec -> spec.recipe(new RemoveBuildPlugin("com.jfrog.bintray")),
+                buildGradle(
+                        """
               plugins {
                   id "com.jfrog.bintray" version "1.0"
               }
               """,
-            ""
-          )
+                        ""
+                )
         );
     }
 
     @Test
     void removePluginWithoutVersion() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveBuildPlugin("java")),
-          buildGradle(
-            """
+                spec -> spec.recipe(new RemoveBuildPlugin("java")),
+                buildGradle(
+                        """
               plugins {
                   id "java"
               }
               """,
-            ""
-          )
+                        ""
+                )
         );
     }
 
     @Test
     void removeUnappliedPlugin() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveBuildPlugin("com.jfrog.bintray")),
-          buildGradle(
-            """
+                spec -> spec.recipe(new RemoveBuildPlugin("com.jfrog.bintray")),
+                buildGradle(
+                        """
               plugins {
                   id "com.jfrog.bintray" version "1.0" apply false
               }
               """,
-            ""
-          )
+                        ""
+                )
         );
     }
 
     @Test
     void removeUnappliedPluginWithoutVersion() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveBuildPlugin("com.jfrog.bintray")),
-          buildGradle(
-            """
+                spec -> spec.recipe(new RemoveBuildPlugin("com.jfrog.bintray")),
+                buildGradle(
+                        """
               plugins {
                   id "com.jfrog.bintray" apply false
               }
               """,
-            ""
-          ),
-          settingsGradle(
-            """
+                        ""
+                ),
+                settingsGradle(
+                        """
               pluginManagement {
                   plugins {
                       id "com.jfrog.bintray" version "1.0"
@@ -91,16 +91,16 @@ class RemoveBuildPluginTest implements RewriteTest {
                             
               rootProject.name = "example"
               """
-          )
+                )
         );
     }
 
     @Test
     void applySyntax() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveBuildPlugin("org.openrewrite.rewrite")),
-          buildGradle(
-                """
+                spec -> spec.recipe(new RemoveBuildPlugin("org.openrewrite.rewrite")),
+                buildGradle(
+                        """
               buildscript {
                 repositories {
                   maven {
@@ -114,7 +114,7 @@ class RemoveBuildPluginTest implements RewriteTest {
                               
               apply plugin: "org.openrewrite.rewrite"
               """,
-            """
+                        """
               buildscript {
                 repositories {
                   maven {

@@ -33,8 +33,8 @@ class QualifyThisVisitorTest implements RewriteTest {
     @Test
     void qualifyThis() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class Foo {
                   private String str = "str";
                   public String getStr() {
@@ -42,7 +42,7 @@ class QualifyThisVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class Foo {
                   private String str = "str";
                   public String getStr() {
@@ -50,15 +50,15 @@ class QualifyThisVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void alreadyQualifiedNoop() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class Foo {
                   private String str = "str";
                   public String getStr() {
@@ -66,15 +66,15 @@ class QualifyThisVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void qualifyThisMethodInvocation() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class Foo {
                   private String str = "str";
                   public int getLength() {
@@ -82,7 +82,7 @@ class QualifyThisVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class Foo {
                   private String str = "str";
                   public int getLength() {
@@ -90,7 +90,7 @@ class QualifyThisVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

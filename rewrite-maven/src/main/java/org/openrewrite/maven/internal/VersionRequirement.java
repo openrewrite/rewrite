@@ -261,7 +261,7 @@ public class VersionRequirement {
             Version version = new Version(availableVersion);
 
             if ((hardRequirement instanceof DynamicVersion && ((DynamicVersion) hardRequirement).matches(version)) ||
-                (hardRequirement instanceof RangeSet && ((RangeSet) hardRequirement).matches(version))) {
+                    (hardRequirement instanceof RangeSet && ((RangeSet) hardRequirement).matches(version))) {
 
                 if (latest == null || version.compareTo(latest) > 0) {
                     latest = version;
@@ -287,7 +287,7 @@ public class VersionRequirement {
     private static class PrintingErrorListener extends BaseErrorListener {
         @Override
         public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol,
-                                int line, int charPositionInLine, String msg, RecognitionException e) {
+                int line, int charPositionInLine, String msg, RecognitionException e) {
             System.out.printf("Syntax error at line %d:%d %s%n", line, charPositionInLine, msg);
         }
     }

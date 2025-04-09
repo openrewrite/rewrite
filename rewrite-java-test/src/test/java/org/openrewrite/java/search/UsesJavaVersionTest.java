@@ -40,7 +40,7 @@ class UsesJavaVersionTest implements RewriteTest {
       """)
     void mavenCompilerSources(String version, int major) {
         assertThat(new JavaVersion(randomId(), "", "", version, version).getMajorVersion())
-          .isEqualTo(major);
+                .isEqualTo(major);
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2035")
@@ -52,15 +52,15 @@ class UsesJavaVersionTest implements RewriteTest {
       """)
     void javaRuntimeVersions(String version, int major) {
         assertThat(new JavaVersion(randomId(), "", "", version, version).getMajorVersion())
-          .isEqualTo(major);
+                .isEqualTo(major);
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/983")
     @Test
     void invalidJavaVersion() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new UsesJavaVersion<>(-1, Integer.MAX_VALUE))),
-          java("class Test {}")
+                spec -> spec.recipe(toRecipe(() -> new UsesJavaVersion<>(-1, Integer.MAX_VALUE))),
+                java("class Test {}")
         );
     }
 
@@ -68,14 +68,14 @@ class UsesJavaVersionTest implements RewriteTest {
     @Test
     void findJavaVersion() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new UsesJavaVersion<>(8, Integer.MAX_VALUE))),
-          version(
-            java(
-              "class Test {}",
-              "/*~~>*/class Test {}"
-            ),
-            8
-          )
+                spec -> spec.recipe(toRecipe(() -> new UsesJavaVersion<>(8, Integer.MAX_VALUE))),
+                version(
+                        java(
+                                "class Test {}",
+                                "/*~~>*/class Test {}"
+                        ),
+                        8
+                )
         );
     }
 

@@ -25,24 +25,24 @@ class ClassExpressionTest implements RewriteTest {
     @Test
     void classExpressions() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               maven( List , List ) {
                   from(components.java)
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void innerClassExpression() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               ProcessBuilder.Redirect.to(new File("wat"))
               """
-          )
+                )
         );
 
     }
@@ -50,12 +50,12 @@ class ClassExpressionTest implements RewriteTest {
     @Test
     void innerClassViaImport() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               import java.lang.ProcessBuilder.Redirect
               Redirect.to(new File("wat"))
               """
-          )
+                )
         );
 
     }

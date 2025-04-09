@@ -134,7 +134,7 @@ public class Substitutions {
                 type = TypeParameter.toFullyQualifiedName(param);
             } else {
                 if (parameter instanceof J.NewClass && ((J.NewClass) parameter).getBody() != null &&
-                    ((J.NewClass) parameter).getClazz() != null) {
+                        ((J.NewClass) parameter).getClazz() != null) {
                     // for anonymous classes get the type from the supertype
                     type = ((J.NewClass) parameter).getClazz().getType();
                 } else if (parameter instanceof TypedTree) {
@@ -203,7 +203,7 @@ public class Substitutions {
                 return ((J) parameter).printTrimmed();
             } else {
                 throw new IllegalArgumentException("Template parameter " + index + " cannot be used in an untyped template substitution. " +
-                                                   "Instead of \"#{}\", indicate the template parameter's type with \"#{any(" + typeHintFor(parameter) + ")}\".");
+                        "Instead of \"#{}\", indicate the template parameter's type with \"#{any(" + typeHintFor(parameter) + ")}\".");
             }
         } else if (parameter instanceof JRightPadded) {
             return substituteUntyped(((JRightPadded<?>) parameter).getElement(), index);
@@ -315,7 +315,7 @@ public class Substitutions {
     private static class ThrowingErrorListener extends BaseErrorListener {
         @Override
         public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol,
-                                int line, int charPositionInLine, String msg, RecognitionException e) {
+                int line, int charPositionInLine, String msg, RecognitionException e) {
             throw new IllegalArgumentException(
                     String.format("Syntax error at line %d:%d %s.", line, charPositionInLine, msg), e);
         }

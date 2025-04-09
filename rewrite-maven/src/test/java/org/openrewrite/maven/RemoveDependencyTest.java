@@ -31,9 +31,9 @@ class RemoveDependencyTest implements RewriteTest {
     @Test
     void removeDependency() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveDependency("junit", "junit", null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveDependency("junit", "junit", null)),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 
@@ -56,7 +56,7 @@ class RemoveDependencyTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 
@@ -73,16 +73,16 @@ class RemoveDependencyTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void noDependencyToRemove() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveDependency("junit", "junit", null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveDependency("junit", "junit", null)),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 
@@ -99,16 +99,16 @@ class RemoveDependencyTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void shouldRemoveScopedDependency() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveDependency("org.junit.jupiter", "junit-jupiter", "compile")),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveDependency("org.junit.jupiter", "junit-jupiter", "compile")),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -142,7 +142,7 @@ class RemoveDependencyTest implements RewriteTest {
                   </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -172,7 +172,7 @@ class RemoveDependencyTest implements RewriteTest {
                   </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -180,9 +180,9 @@ class RemoveDependencyTest implements RewriteTest {
     @Test
     void removeDependencyByEffectiveScope() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveDependency("junit", "junit", "runtime")),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveDependency("junit", "junit", "runtime")),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 
@@ -204,7 +204,7 @@ class RemoveDependencyTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 
@@ -221,16 +221,16 @@ class RemoveDependencyTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void updateModelWhenAllDependenciesRemoved() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveDependency("com.google.guava", "guava", null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveDependency("com.google.guava", "guava", null)),
+                pomXml(
+                        """
                   <project>
                      <modelVersion>4.0.0</modelVersion>
                      <groupId>foo</groupId>
@@ -246,7 +246,7 @@ class RemoveDependencyTest implements RewriteTest {
                      </dependencies>
                  </project>
               """,
-            """
+                        """
                   <project>
                      <modelVersion>4.0.0</modelVersion>
                      <groupId>foo</groupId>
@@ -254,12 +254,12 @@ class RemoveDependencyTest implements RewriteTest {
                      <version>0.0.1-SNAPSHOT</version>
                  </project>
               """,
-            spec -> spec.afterRecipe(doc -> {
-                MavenResolutionResult mavenModel = doc.getMarkers().findFirst(MavenResolutionResult.class)
-                  .orElseThrow(() -> new IllegalStateException("The maven must should exist on the document."));
-                assertThat(mavenModel.getDependencies().get(Scope.Compile)).isEmpty();
-            })
-          )
+                        spec -> spec.afterRecipe(doc -> {
+                            MavenResolutionResult mavenModel = doc.getMarkers().findFirst(MavenResolutionResult.class)
+                                    .orElseThrow(() -> new IllegalStateException("The maven must should exist on the document."));
+                            assertThat(mavenModel.getDependencies().get(Scope.Compile)).isEmpty();
+                        })
+                )
         );
     }
 }

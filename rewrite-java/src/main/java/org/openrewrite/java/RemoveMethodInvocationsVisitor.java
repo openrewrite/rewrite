@@ -42,8 +42,8 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
 
     public RemoveMethodInvocationsVisitor(List<String> methodSignatures) {
         this(methodSignatures.stream().collect(Collectors.toMap(
-            MethodMatcher::new,
-            signature -> args -> true
+                MethodMatcher::new,
+                signature -> args -> true
         )));
     }
 
@@ -129,11 +129,11 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
 
     private boolean isStatement() {
         return getCursor().dropParentUntil(p -> p instanceof J.Block ||
-                                                p instanceof J.Assignment ||
-                                                p instanceof J.VariableDeclarations.NamedVariable ||
-                                                p instanceof J.Return ||
-                                                p instanceof JContainer ||
-                                                p == Cursor.ROOT_VALUE
+                p instanceof J.Assignment ||
+                p instanceof J.VariableDeclarations.NamedVariable ||
+                p instanceof J.Return ||
+                p instanceof JContainer ||
+                p == Cursor.ROOT_VALUE
         ).getValue() instanceof J.Block;
     }
 
@@ -243,9 +243,9 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
         if (statements.stream().anyMatch(ToBeRemoved::hasMarker)) {
             //noinspection DataFlowIssue
             return block.withStatements(statements.stream()
-                .filter(s -> !ToBeRemoved.hasMarker(s) || s instanceof J.MethodInvocation && ((J.MethodInvocation) s).getSelect() instanceof J.MethodInvocation)
-                .map(s -> s instanceof J.MethodInvocation && ToBeRemoved.hasMarker(s) ? ((J.MethodInvocation) s).getSelect().withPrefix(s.getPrefix()) : s)
-                .collect(Collectors.toList()));
+                    .filter(s -> !ToBeRemoved.hasMarker(s) || s instanceof J.MethodInvocation && ((J.MethodInvocation) s).getSelect() instanceof J.MethodInvocation)
+                    .map(s -> s instanceof J.MethodInvocation && ToBeRemoved.hasMarker(s) ? ((J.MethodInvocation) s).getSelect().withPrefix(s.getPrefix()) : s)
+                    .collect(Collectors.toList()));
         }
         return block;
     }
@@ -254,12 +254,15 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
     @With
     private static class ToBeRemoved implements Marker {
         UUID id;
+
         static <J2 extends J> J2 withMarker(J2 j) {
             return j.withMarkers(j.getMarkers().addIfAbsent(new ToBeRemoved(randomId())));
         }
+
         static <J2 extends J> J2 removeMarker(J2 j) {
             return j.withMarkers(j.getMarkers().removeByType(ToBeRemoved.class));
         }
+
         static boolean hasMarker(J j) {
             return j.getMarkers().findFirst(ToBeRemoved.class).isPresent();
         }

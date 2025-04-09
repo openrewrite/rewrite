@@ -58,15 +58,15 @@ import java.util.List;
  */
 public final class GitCommandLineUtils
 {
-    private static final Logger LOGGER = LoggerFactory.getLogger( GitCommandLineUtils.class );
+    private static final Logger LOGGER = LoggerFactory.getLogger(GitCommandLineUtils.class);
 
     private GitCommandLineUtils()
     {
     }
 
-    public static void addTarget( Commandline cl, List<File> files )
+    public static void addTarget(Commandline cl, List<File> files)
     {
-        if ( files == null || files.isEmpty() )
+        if (files == null || files.isEmpty())
         {
             return;
         }
@@ -74,30 +74,30 @@ public final class GitCommandLineUtils
         try
         {
             final String canonicalWorkingDirectory = workingDirectory.getCanonicalPath();
-            for ( File file : files )
+            for (File file : files)
             {
                 String relativeFile = file.getPath();
 
                 final String canonicalFile = file.getCanonicalPath();
-                if ( canonicalFile.startsWith( canonicalWorkingDirectory ) )
+                if (canonicalFile.startsWith(canonicalWorkingDirectory))
                 {
                     // so we can omit the starting characters
-                    relativeFile = canonicalFile.substring( canonicalWorkingDirectory.length() );
+                    relativeFile = canonicalFile.substring(canonicalWorkingDirectory.length());
 
-                    if ( relativeFile.startsWith( File.separator ) )
+                    if (relativeFile.startsWith(File.separator))
                     {
-                        relativeFile = relativeFile.substring( File.separator.length() );
+                        relativeFile = relativeFile.substring(File.separator.length());
                     }
                 }
 
                 // no setFile() since this screws up the working directory!
-                cl.createArg().setValue( FilenameUtils.separatorsToUnix( relativeFile ) );
+                cl.createArg().setValue(FilenameUtils.separatorsToUnix(relativeFile));
             }
         }
-        catch ( IOException ex )
+        catch (IOException ex)
         {
             throw new IllegalArgumentException( "Could not get canonical paths for workingDirectory = " +
-                                                workingDirectory + " or files=" + files, ex );
+                    workingDirectory + " or files=" + files, ex );
         }
     }
 
@@ -107,9 +107,9 @@ public final class GitCommandLineUtils
      * @param command
      * @return TODO
      */
-    public static Commandline getBaseGitCommandLine( File workingDirectory, String command )
+    public static Commandline getBaseGitCommandLine(File workingDirectory, String command)
     {
-        return getAnonymousBaseGitCommandLine( workingDirectory, command );
+        return getAnonymousBaseGitCommandLine(workingDirectory, command);
     }
 
     /**
@@ -120,35 +120,35 @@ public final class GitCommandLineUtils
      * @param command
      * @return CommandLine with anonymous output.
      */
-    private static Commandline getAnonymousBaseGitCommandLine( File workingDirectory, String command )
+    private static Commandline getAnonymousBaseGitCommandLine(File workingDirectory, String command)
     {
-        if ( command == null || command.length() == 0 )
+        if (command == null || command.length() == 0)
         {
             return null;
         }
 
         Commandline cl = new AnonymousCommandLine();
 
-        composeCommand( workingDirectory, command, cl );
+        composeCommand(workingDirectory, command, cl);
 
         return cl;
     }
 
-    private static void composeCommand( File workingDirectory, String command, Commandline cl )
+    private static void composeCommand(File workingDirectory, String command, Commandline cl)
     {
         Settings settings = GitUtil.getSettings();
 
-        cl.setExecutable( settings.getGitCommand() );
+        cl.setExecutable(settings.getGitCommand());
 
-        cl.createArg().setValue( command );
+        cl.createArg().setValue(command);
 
-        if ( workingDirectory != null )
+        if (workingDirectory != null)
         {
-            cl.setWorkingDirectory( workingDirectory.getAbsolutePath() );
+            cl.setWorkingDirectory(workingDirectory.getAbsolutePath());
         }
     }
 
-    public static int execute( Commandline cl, StreamConsumer consumer, CommandLineUtils.StringStreamConsumer stderr )
+    public static int execute(Commandline cl, StreamConsumer consumer, CommandLineUtils.StringStreamConsumer stderr)
             throws ScmException
     {
 //                        if ( LOGGER.isInfoEnabled() )
@@ -160,9 +160,9 @@ public final class GitCommandLineUtils
         int exitCode;
         try
         {
-            exitCode = CommandLineUtils.executeCommandLine( cl, consumer, stderr );
+            exitCode = CommandLineUtils.executeCommandLine(cl, consumer, stderr);
         }
-        catch ( CommandLineException ex )
+        catch (CommandLineException ex)
         {
             throw new ScmException( "Error while executing command.", ex );
         }
@@ -170,8 +170,8 @@ public final class GitCommandLineUtils
         return exitCode;
     }
 
-    public static int execute( Commandline cl, CommandLineUtils.StringStreamConsumer stdout,
-                               CommandLineUtils.StringStreamConsumer stderr )
+    public static int execute(Commandline cl, CommandLineUtils.StringStreamConsumer stdout,
+            CommandLineUtils.StringStreamConsumer stderr)
             throws ScmException
     {
 //                        if ( LOGGER.isInfoEnabled() )
@@ -183,9 +183,9 @@ public final class GitCommandLineUtils
         int exitCode;
         try
         {
-            exitCode = CommandLineUtils.executeCommandLine( cl, stdout, stderr );
+            exitCode = CommandLineUtils.executeCommandLine(cl, stdout, stderr);
         }
-        catch ( CommandLineException ex )
+        catch (CommandLineException ex)
         {
             throw new ScmException( "Error while executing command.", ex );
         }

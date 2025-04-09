@@ -27,17 +27,17 @@ import static org.openrewrite.maven.Assertions.pomXml;
 class AddManagedDependencyTest implements RewriteTest {
 
     @Test
-    void validation()  {
+    void validation() {
         AddManagedDependency recipe = new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "latest.release", "import",
-          "pom", null, null, null, "org.apache.logging:*", true);
+                "pom", null, null, null, "org.apache.logging:*", true);
         Validated<Object> validated = recipe.validate();
         assertThat(validated).allMatch(Validated::isValid);
     }
 
     @Test
-    void validationAllowsDashesInOnlyIfUsing()  {
+    void validationAllowsDashesInOnlyIfUsing() {
         AddManagedDependency recipe = new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "latest.release", "import",
-          "pom", null, null, null, "something-with:dashes-is-ok*", true);
+                "pom", null, null, null, "something-with:dashes-is-ok*", true);
         Validated<Object> validated = recipe.validate();
         assertThat(validated).allMatch(Validated::isValid);
     }
@@ -45,7 +45,7 @@ class AddManagedDependencyTest implements RewriteTest {
     @Test
     void badCharactersInOnlyIfUsingAreInvalid() {
         AddManagedDependency recipe = new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "latest.release", "import",
-          "pom", null, null, null, "spaced group:*", true);
+                "pom", null, null, null, "spaced group:*", true);
         Validated<Object> validated = recipe.validate();
         assertThat(validated.isValid()).isFalse();
         assertThat(validated.failures()).anyMatch(v -> "onlyIfUsing".equals(v.getProperty()));
@@ -54,17 +54,17 @@ class AddManagedDependencyTest implements RewriteTest {
     @Test
     void doNotAddIfTypeNotUsed() {
         rewriteRun(
-          spec -> spec.recipe(new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "2.17.2", "import",
-            "pom", null,null, null, "org.apache.logging.log4j:*", false)),
-          pomXml(
-            """
+                spec -> spec.recipe(new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "2.17.2", "import",
+                        "pom", null, null, null, "org.apache.logging.log4j:*", false)),
+                pomXml(
+                        """
             <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
             </project>
             """
-          )
+                )
         );
     }
 
@@ -72,10 +72,10 @@ class AddManagedDependencyTest implements RewriteTest {
     @Test
     void onlyAddedWhenUsing() {
         rewriteRun(
-          spec -> spec.recipe(new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "2.17.2", "import",
-            "pom", null,null, null, "org.apache.logging.log4j:*", false)),
-          pomXml(
-            """
+                spec -> spec.recipe(new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "2.17.2", "import",
+                        "pom", null, null, null, "org.apache.logging.log4j:*", false)),
+                pomXml(
+                        """
             <project>
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
@@ -89,7 +89,7 @@ class AddManagedDependencyTest implements RewriteTest {
               </dependencies>
             </project>
             """,
-            """
+                        """
             <project>
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
@@ -114,17 +114,17 @@ class AddManagedDependencyTest implements RewriteTest {
               </dependencies>
             </project>
             """
-          )
+                )
         );
     }
 
     @Test
     void addedToRootPom() {
         rewriteRun(
-          spec -> spec.recipe(new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "2.17.2", "import",
-            "pom", null,null, null, null, true)),
-          pomXml(
-            """
+                spec -> spec.recipe(new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "2.17.2", "import",
+                        "pom", null, null, null, null, true)),
+                pomXml(
+                        """
             <project>
               <groupId>com.mycompany.app</groupId>
               <artifactId>project</artifactId>
@@ -135,7 +135,7 @@ class AddManagedDependencyTest implements RewriteTest {
               </modules>
             </project>
             """,
-            """
+                        """
             <project>
               <groupId>com.mycompany.app</groupId>
               <artifactId>project</artifactId>
@@ -157,10 +157,10 @@ class AddManagedDependencyTest implements RewriteTest {
               </dependencyManagement>
             </project>
             """
-          ),
-          mavenProject("service",
-            pomXml(
-              """
+                ),
+                mavenProject("service",
+                        pomXml(
+                                """
                 <project>
                   <parent>
                     <groupId>com.mycompany.app</groupId>
@@ -172,18 +172,18 @@ class AddManagedDependencyTest implements RewriteTest {
                   <version>1</version>
                 </project>
               """
-            )
-          ),
-          mavenProject("core",
-            pomXml(
-              """
+                        )
+                ),
+                mavenProject("core",
+                        pomXml(
+                                """
                 <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>core</artifactId>
                   <version>1</version>
                 </project>
               """,
-              """
+                                """
                 <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>core</artifactId>
@@ -201,8 +201,8 @@ class AddManagedDependencyTest implements RewriteTest {
                   </dependencyManagement>
                 </project>
               """
-            )
-          )
+                        )
+                )
         );
     }
 
@@ -210,10 +210,10 @@ class AddManagedDependencyTest implements RewriteTest {
     @Test
     void propertiesAsGAVCoordinates() {
         rewriteRun(
-          spec -> spec.recipe(new AddManagedDependency("${quarkus.platform.group-id}", "${quarkus.platform.artifact-id}",
-            "${quarkus.platform.version}", "import", "pom", null,null, null, null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new AddManagedDependency("${quarkus.platform.group-id}", "${quarkus.platform.artifact-id}",
+                        "${quarkus.platform.version}", "import", "pom", null, null, null, null, null)),
+                pomXml(
+                        """
             <project>
               <groupId>com.mycompany.app</groupId>
               <artifactId>core</artifactId>
@@ -225,7 +225,7 @@ class AddManagedDependencyTest implements RewriteTest {
               </properties>
             </project>
             """,
-            """
+                        """
             <project>
               <groupId>com.mycompany.app</groupId>
               <artifactId>core</artifactId>
@@ -248,18 +248,18 @@ class AddManagedDependencyTest implements RewriteTest {
               </dependencyManagement>
             </project>
             """
-          )
+                )
         );
     }
 
     @Test
     void versionSelectionTakesExistingIntoAccount() {
         rewriteRun(
-          spec -> spec.recipes(new AddManagedDependency("com.fasterxml.jackson.core", "jackson-databind", "latest.patch", null,
-            null, null, null, null, null, true)),
-          //language=xml
-          pomXml(
-            """
+                spec -> spec.recipes(new AddManagedDependency("com.fasterxml.jackson.core", "jackson-databind", "latest.patch", null,
+                        null, null, null, null, null, true)),
+                //language=xml
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -273,7 +273,7 @@ class AddManagedDependencyTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -296,7 +296,7 @@ class AddManagedDependencyTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 }

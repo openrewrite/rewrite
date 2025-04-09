@@ -34,84 +34,84 @@ class LiteralTest implements RewriteTest {
     @Test
     void insideParentheses() {
         rewriteRun(
-          groovy("(1)"),
-          groovy("((1))")
+                groovy("(1)"),
+                groovy("((1))")
         );
     }
 
     @Test
     void string() {
         rewriteRun(
-          groovy("'hello'")
+                groovy("'hello'")
         );
     }
 
     @Test
     void nullValue() {
         rewriteRun(
-          groovy("null")
+                groovy("null")
         );
     }
 
     @Test
     void boxedInt() {
         rewriteRun(
-          groovy("Integer a = 1")
+                groovy("Integer a = 1")
         );
     }
 
     @Test
     void tripleQuotedString() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               \"""
                   " Hi "
               \"""
               """
-          )
+                )
         );
     }
 
     @Test
     void slashString() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               /.*"foo".*/
               """
-          )
+                )
         );
     }
 
     @Test
     void gString() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               " uid: ${ UUID.randomUUID() } "
               """
-          )
+                )
         );
     }
 
     @Test
     void gStringNoCurlyBraces() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def foo = 1
               def s = "foo: $foo"
               """
-          )
+                )
         );
     }
 
     @Test
     void gStringMultiPropertyAccess() {
         rewriteRun(
-          groovy(
-                """
+                groovy(
+                        """
             "$System.env.BAR_BAZ"
             """)
         );
@@ -120,8 +120,8 @@ class LiteralTest implements RewriteTest {
     @Test
     void emptyGString() {
         rewriteRun(
-          groovy(
-                """
+                groovy(
+                        """
             "${}"
             """)
         );
@@ -130,8 +130,8 @@ class LiteralTest implements RewriteTest {
     @Test
     void nestedGString() {
         rewriteRun(
-          groovy(
-                """
+                groovy(
+                        """
             " ${ " ${ " " } " } "
             """)
         );
@@ -140,8 +140,8 @@ class LiteralTest implements RewriteTest {
     @Test
     void gStringInterpolateString() {
         rewriteRun(
-          groovy(
-                """
+                groovy(
+                        """
             " ${""}\\n${" "} "
             """)
         );
@@ -150,148 +150,148 @@ class LiteralTest implements RewriteTest {
     @Test
     void gStringInterpolationFollowedByForwardSlash() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               String s = "${ARTIFACTORY_URL}/plugins-release"
               """
-          )
+                )
         );
     }
 
     @Test
     void gStringWithSpace() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               String s = "${ ARTIFACTORY_URL }"
               """
-          )
+                )
         );
     }
 
     @Test
     void mapLiteral() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def person = [ name: 'sam' , age: 9000 ]
               """
-          )
+                )
         );
     }
 
     @Test
     void numericLiterals() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               float a = 0.1
               def b = 0.1f
               double c = 1.0d
               long d = 1L
               """
-          )
+                )
         );
     }
 
     @Test
     void literalValueAndTypeAgree() {
         rewriteRun(groovy(
-            """
+                """
               def a = 1.8
               """,
-            spec -> spec.beforeRecipe(cu -> {
-                // Groovy AST represents 1.8 as a BigDecimal
-                // Java AST would represent it as Double
-                // Our AST could reasonably make either choice
-                var initializer = requireNonNull((J.Literal) ((J.VariableDeclarations) cu.getStatements().get(0))
-                  .getVariables().get(0).getInitializer());
-                if (initializer.getType() == JavaType.Primitive.Double) {
-                    assertThat(initializer.getValue()).isEqualTo(1.8);
-                } else if (TypeUtils.isOfClassType(initializer.getType(), "java.math.BigDecimal")) {
-                    assertThat(initializer.getValue()).isInstanceOf(BigDecimal.class);
-                }
-            })
-          )
+                spec -> spec.beforeRecipe(cu -> {
+                    // Groovy AST represents 1.8 as a BigDecimal
+                    // Java AST would represent it as Double
+                    // Our AST could reasonably make either choice
+                    var initializer = requireNonNull((J.Literal) ((J.VariableDeclarations) cu.getStatements().get(0))
+                            .getVariables().get(0).getInitializer());
+                    if (initializer.getType() == JavaType.Primitive.Double) {
+                        assertThat(initializer.getValue()).isEqualTo(1.8);
+                    } else if (TypeUtils.isOfClassType(initializer.getType(), "java.math.BigDecimal")) {
+                        assertThat(initializer.getValue()).isInstanceOf(BigDecimal.class);
+                    }
+                })
+        )
         );
     }
 
     @Test
     void multilineStringWithApostrophes() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def s = '''
                 multiline
                 string
                 with apostrophes
               '''
               """
-          )
+                )
         );
     }
 
     @Test
     void mapLiteralTrailingComma() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def a = [ foo : "bar" , ]
               """
-          )
+                )
         );
     }
 
     @Test
     void gStringThatHasEmptyValueExpressionForUnknownReason() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def a = "${foo.bar}"
               def b = "${foo.bar}baz"
               """
-          )
+                )
         );
     }
 
     @Test
     void escapeCharacters() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
             "\\\\n\\t"
             '\\\\n\\t'
             ///\\\\n\\t///
             """
-          )
+                )
         );
     }
 
     @Test
     void differentiateEscapeFromLiteral() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
             '\t'
             '	'
             """
-          )
+                )
         );
     }
 
     @Test
     void stringLiteralInParentheses() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def a = ("-")
               """
-          ),
-          groovy(
-            """
+                ),
+                groovy(
+                        """
               def a = (("-"))
               """
-          )
+                )
         );
     }
 }

@@ -42,67 +42,67 @@ class NormalizeTabsOrSpacesTest implements RewriteTest {
 
     private static Consumer<RecipeSpec> tabsAndIndents(UnaryOperator<TabsAndIndentsStyle> with) {
         return spec -> spec.recipe(toRecipe(() -> new NormalizeTabsOrSpacesVisitor<>(with.apply(IntelliJ.tabsAndIndents()))))
-          .parser(GroovyParser.builder().styles(singletonList(
-            new NamedStyles(
-              Tree.randomId(), "test", "test", "test", emptySet(),
-              singletonList(with.apply(IntelliJ.tabsAndIndents()))
-            )
-          )));
+                .parser(GroovyParser.builder().styles(singletonList(
+                        new NamedStyles(
+                                Tree.randomId(), "test", "test", "test", emptySet(),
+                                singletonList(with.apply(IntelliJ.tabsAndIndents()))
+                        )
+                )));
     }
 
     @DocumentExample
     @Test
     void mixedToTabs() {
         rewriteRun(
-          tabsAndIndents(style -> style.withUseTabCharacter(true)),
-          groovy(
-            """
+                tabsAndIndents(style -> style.withUseTabCharacter(true)),
+                groovy(
+                        """
               class Test {
                   def test() {
                       var n = 1
                   }
               }
               """,
-            """
+                        """
               class Test {
               	def test() {
               		var n = 1
               	}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void mixedToSpaces() {
         rewriteRun(
-          tabsAndIndents(),
-          groovy(
-            """
+                tabsAndIndents(),
+                groovy(
+                        """
               class Test {
                   def test() {
               		val n = 1
                   }
               }
               """,
-            """
+                        """
               class Test {
                   def test() {
                       val n = 1
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void tabsReplacedWithSpaces() {
         rewriteRun(
-          tabsAndIndents(),
-          groovy(
-            """
+                tabsAndIndents(),
+                groovy(
+                        """
               class Test {
               	var a = 1
               	var b = 2
@@ -126,7 +126,7 @@ class NormalizeTabsOrSpacesTest implements RewriteTest {
               	}
               }
               """,
-            """
+                        """
               class Test {
                   var a = 1
                   var b = 2
@@ -150,7 +150,7 @@ class NormalizeTabsOrSpacesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -158,9 +158,9 @@ class NormalizeTabsOrSpacesTest implements RewriteTest {
     @Test
     void doNotReplaceSpacesBeforeAsterisks() {
         rewriteRun(
-          tabsAndIndents(style -> style.withUseTabCharacter(true)),
-          groovy(
-            """
+                tabsAndIndents(style -> style.withUseTabCharacter(true)),
+                groovy(
+                        """
               /**
                *
                */
@@ -173,7 +173,7 @@ class NormalizeTabsOrSpacesTest implements RewriteTest {
               	}
               }
               """
-          )
+                )
         );
     }
 
@@ -181,9 +181,9 @@ class NormalizeTabsOrSpacesTest implements RewriteTest {
     @Test
     void normalizeJavaDocSuffix() {
         rewriteRun(
-          tabsAndIndents(),
-          groovy(
-            """
+                tabsAndIndents(),
+                groovy(
+                        """
               class Test {
               	/** Test
               	 */
@@ -191,7 +191,7 @@ class NormalizeTabsOrSpacesTest implements RewriteTest {
               	}
               }
               """,
-            """
+                        """
               class Test {
                   /** Test
                    */
@@ -199,7 +199,7 @@ class NormalizeTabsOrSpacesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -207,23 +207,23 @@ class NormalizeTabsOrSpacesTest implements RewriteTest {
     @Test
     void normalizeLastWhitespace() {
         rewriteRun(
-          tabsAndIndents(style -> style.withUseTabCharacter(true)),
-          groovy(
-            """
+                tabsAndIndents(style -> style.withUseTabCharacter(true)),
+                groovy(
+                        """
               class Test {
               	def test() {
               		var n = 1
                }
               }
               """,
-            """
+                        """
               class Test {
               	def test() {
               		var n = 1
               	}
               }
               """
-          )
+                )
         );
     }
 }

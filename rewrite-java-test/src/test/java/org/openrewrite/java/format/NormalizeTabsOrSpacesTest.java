@@ -41,67 +41,67 @@ class NormalizeTabsOrSpacesTest implements RewriteTest {
 
     private static Consumer<RecipeSpec> tabsAndIndents(UnaryOperator<TabsAndIndentsStyle> with) {
         return spec -> spec.recipe(new NormalizeTabsOrSpaces())
-          .parser(JavaParser.fromJavaVersion().styles(singletonList(
-            new NamedStyles(
-              randomId(), "test", "test", "test", emptySet(),
-              singletonList(with.apply(IntelliJ.tabsAndIndents()))
-            )
-          )));
+                .parser(JavaParser.fromJavaVersion().styles(singletonList(
+                        new NamedStyles(
+                                randomId(), "test", "test", "test", emptySet(),
+                                singletonList(with.apply(IntelliJ.tabsAndIndents()))
+                        )
+                )));
     }
 
     @DocumentExample
     @Test
     void mixedToTabs() {
         rewriteRun(
-          tabsAndIndents(style -> style.withUseTabCharacter(true)),
-          java(
-            """
+                tabsAndIndents(style -> style.withUseTabCharacter(true)),
+                java(
+                        """
               public class Test {
                   public void test() {
                       int n = 1;
                   }
               }
               """,
-            """
+                        """
               public class Test {
               	public void test() {
               		int n = 1;
               	}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void mixedToSpaces() {
         rewriteRun(
-          tabsAndIndents(),
-          java(
-            """
+                tabsAndIndents(),
+                java(
+                        """
               public class Test {
                   public void test() {
               		int n = 1;
                   }
               }
               """,
-            """
+                        """
               public class Test {
                   public void test() {
                       int n = 1;
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void tabsReplacedWithSpaces() {
         rewriteRun(
-          tabsAndIndents(),
-          java(
-            """
+                tabsAndIndents(),
+                java(
+                        """
               public class Test {
               	int a;
               	int b;
@@ -125,7 +125,7 @@ class NormalizeTabsOrSpacesTest implements RewriteTest {
               	}
               }
               """,
-            """
+                        """
               public class Test {
                   int a;
                   int b;
@@ -149,7 +149,7 @@ class NormalizeTabsOrSpacesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -157,9 +157,9 @@ class NormalizeTabsOrSpacesTest implements RewriteTest {
     @Test
     void doNotReplaceSpacesBeforeAsterisks() {
         rewriteRun(
-          tabsAndIndents(style -> style.withUseTabCharacter(true)),
-          java(
-            """
+                tabsAndIndents(style -> style.withUseTabCharacter(true)),
+                java(
+                        """
               /**
                *
                */
@@ -172,7 +172,7 @@ class NormalizeTabsOrSpacesTest implements RewriteTest {
               	}
               }
               """
-          )
+                )
         );
     }
 
@@ -180,9 +180,9 @@ class NormalizeTabsOrSpacesTest implements RewriteTest {
     @Test
     void normalizeJavaDocSuffix() {
         rewriteRun(
-          tabsAndIndents(),
-          java(
-            """
+                tabsAndIndents(),
+                java(
+                        """
               public class Test {
               	/** Test
               	 */
@@ -190,7 +190,7 @@ class NormalizeTabsOrSpacesTest implements RewriteTest {
               	}
               }
               """,
-            """
+                        """
               public class Test {
                   /** Test
                    */
@@ -198,7 +198,7 @@ class NormalizeTabsOrSpacesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -206,23 +206,23 @@ class NormalizeTabsOrSpacesTest implements RewriteTest {
     @Test
     void normalizeLastWhitespace() {
         rewriteRun(
-          tabsAndIndents(style -> style.withUseTabCharacter(true)),
-          java(
-            """
+                tabsAndIndents(style -> style.withUseTabCharacter(true)),
+                java(
+                        """
               public class Test {
               	public void test() {
               		int n = 1;
                }
               }
               """,
-            """
+                        """
               public class Test {
               	public void test() {
               		int n = 1;
               	}
               }
               """
-          )
+                )
         );
     }
 }

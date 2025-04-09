@@ -44,21 +44,21 @@ class BlankLinesTest implements RewriteTest {
 
     private static Consumer<RecipeSpec> blankLines(UnaryOperator<BlankLinesStyle> with) {
         return spec -> spec.recipe(new BlankLines())
-          .parser(JavaParser.fromJavaVersion().styles(singletonList(
-            new NamedStyles(
-              randomId(), "test", "test", "test", emptySet(),
-              singletonList(with.apply(IntelliJ.blankLines()))
-            )
-          )));
+                .parser(JavaParser.fromJavaVersion().styles(singletonList(
+                        new NamedStyles(
+                                randomId(), "test", "test", "test", emptySet(),
+                                singletonList(with.apply(IntelliJ.blankLines()))
+                        )
+                )));
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/621")
     @Test
     void leaveTrailingComments() {
         rewriteRun(
-          blankLines(),
-          java(
-            """
+                blankLines(),
+                java(
+                        """
               public class A {
                   private Long id; // this comment will move to wrong place
                             
@@ -67,7 +67,7 @@ class BlankLinesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -75,15 +75,15 @@ class BlankLinesTest implements RewriteTest {
     @Test
     void noBlankLineForFirstEnum() {
         rewriteRun(
-          blankLines(),
-          java(
-            """
+                blankLines(),
+                java(
+                        """
               public enum TheEnum {
                   FIRST,
                   SECOND
               }
               """
-          )
+                )
         );
     }
 
@@ -91,16 +91,16 @@ class BlankLinesTest implements RewriteTest {
     @Test
     void eachMethodOnItsOwnLine() {
         rewriteRun(
-          blankLines(),
-          java(
-            """
+                blankLines(),
+                java(
+                        """
               public class Test {
                   void a() {
                   }    void b() {
                   }
               }
               """,
-            """
+                        """
               public class Test {
                   void a() {
                   }
@@ -109,16 +109,16 @@ class BlankLinesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void keepMaximumInDeclarations() {
         rewriteRun(
-          blankLines(style -> style.withKeepMaximum(style.getKeepMaximum().withInDeclarations(0))),
-          java(
-            """
+                blankLines(style -> style.withKeepMaximum(style.getKeepMaximum().withInDeclarations(0))),
+                java(
+                        """
               import java.util.List;
                             
                             
@@ -149,7 +149,7 @@ class BlankLinesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.List;
                             
               public class Test {
@@ -176,16 +176,16 @@ class BlankLinesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void keepMaximumInCode() {
         rewriteRun(
-          blankLines(style -> style.withKeepMaximum(style.getKeepMaximum().withInCode(0))),
-          java(
-            """
+                blankLines(style -> style.withKeepMaximum(style.getKeepMaximum().withInCode(0))),
+                java(
+                        """
               public class Test {
                   private int field1;
                             
@@ -196,7 +196,7 @@ class BlankLinesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class Test {
                   private int field1;
                             
@@ -205,16 +205,16 @@ class BlankLinesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void keepMaximumBeforeEndOfBlock() {
         rewriteRun(
-          blankLines(style -> style.withKeepMaximum(style.getKeepMaximum().withBeforeEndOfBlock(0))),
-          java(
-            """
+                blankLines(style -> style.withKeepMaximum(style.getKeepMaximum().withBeforeEndOfBlock(0))),
+                java(
+                        """
               public class Test {
                   private int field1;
                             
@@ -231,7 +231,7 @@ class BlankLinesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class Test {
                   private int field1;
                             
@@ -245,16 +245,16 @@ class BlankLinesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void keepMaximumBetweenHeaderAndPackage() {
         rewriteRun(
-          blankLines(style -> style.withKeepMaximum(style.getKeepMaximum().withBetweenHeaderAndPackage(0))),
-          java(
-            """
+                blankLines(style -> style.withKeepMaximum(style.getKeepMaximum().withBetweenHeaderAndPackage(0))),
+                java(
+                        """
               /*
                * This is a sample file.
                */
@@ -264,7 +264,7 @@ class BlankLinesTest implements RewriteTest {
               public class Test {
               }
               """,
-            """
+                        """
               /*
                * This is a sample file.
                */
@@ -273,18 +273,18 @@ class BlankLinesTest implements RewriteTest {
               public class Test {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void minimumPackageWithComment() {
         rewriteRun(
-          blankLines(style -> style
-            .withKeepMaximum(style.getKeepMaximum().withBeforeEndOfBlock(0))
-            .withMinimum(style.getMinimum().withBeforePackage(1))),
-          java(
-            """
+                blankLines(style -> style
+                        .withKeepMaximum(style.getKeepMaximum().withBeforeEndOfBlock(0))
+                        .withMinimum(style.getMinimum().withBeforePackage(1))),
+                java(
+                        """
               /*
                * This is a sample file.
                */
@@ -293,7 +293,7 @@ class BlankLinesTest implements RewriteTest {
               public class Test {
               }
               """,
-            """
+                        """
               /*
                * This is a sample file.
                */
@@ -303,48 +303,48 @@ class BlankLinesTest implements RewriteTest {
               public class Test {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void minimumBeforePackage() {
         rewriteRun(
-          blankLines(style -> style.withMinimum(style.getMinimum().withBeforePackage(1))),
-          java(
-            """
+                blankLines(style -> style.withMinimum(style.getMinimum().withBeforePackage(1))),
+                java(
+                        """
               
               package com.intellij.samples;
               
               public class Test {
               }
               """,
-            """
+                        """
               package com.intellij.samples;
               
               public class Test {
               }
               """,
-            SourceSpec::noTrim
-          )
+                        SourceSpec::noTrim
+                )
         );
     }
 
     @Test
     void minimumBeforePackageWithComment() {
         rewriteRun(
-          blankLines(style -> style
-            .withKeepMaximum(style.getKeepMaximum().withBetweenHeaderAndPackage(0))
-            .withMinimum(style.getMinimum().withBeforePackage(1))), // this takes precedence over the "keep max"
-          java(
-            """
+                blankLines(style -> style
+                        .withKeepMaximum(style.getKeepMaximum().withBetweenHeaderAndPackage(0))
+                        .withMinimum(style.getMinimum().withBeforePackage(1))), // this takes precedence over the "keep max"
+                java(
+                        """
               /* Comment */
               package com.intellij.samples;
               
               public class Test {
               }
               """,
-            """
+                        """
               /* Comment */
               
               package com.intellij.samples;
@@ -352,24 +352,24 @@ class BlankLinesTest implements RewriteTest {
               public class Test {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void minimumBeforeImportsWithPackage() {
         rewriteRun(
-          // no blank lines if nothing preceding package
-          blankLines(style -> style.withMinimum(style.getMinimum().withBeforeImports(1))),
-          java(
-            """
+                // no blank lines if nothing preceding package
+                blankLines(style -> style.withMinimum(style.getMinimum().withBeforeImports(1))),
+                java(
+                        """
               package com.intellij.samples;
               import java.util.Vector;
               
               public class Test {
               }
               """,
-            """
+                        """
               package com.intellij.samples;
               
               import java.util.Vector;
@@ -377,41 +377,41 @@ class BlankLinesTest implements RewriteTest {
               public class Test {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void minimumBeforeImports() {
         rewriteRun(
-          // no blank lines if nothing preceding package
-          blankLines(style -> style.withMinimum(style.getMinimum().withBeforeImports(1))),
-          java(
-            """
+                // no blank lines if nothing preceding package
+                blankLines(style -> style.withMinimum(style.getMinimum().withBeforeImports(1))),
+                java(
+                        """
               
               import java.util.Vector;
               
               public class Test {
               }
               """,
-            """
+                        """
               import java.util.Vector;
               
               public class Test {
               }
               """,
-            SourceSpec::noTrim
-          )
+                        SourceSpec::noTrim
+                )
         );
     }
 
     @Test
     void minimumBeforeImportsWithComment() {
         rewriteRun(
-          // no blank lines if nothing preceding package
-          blankLines(style -> style.withMinimum(style.getMinimum().withBeforeImports(1))),
-          java(
-            """
+                // no blank lines if nothing preceding package
+                blankLines(style -> style.withMinimum(style.getMinimum().withBeforeImports(1))),
+                java(
+                        """
               /*
                * This is a sample file.
                */
@@ -420,7 +420,7 @@ class BlankLinesTest implements RewriteTest {
               public class Test {
               }
               """,
-            """
+                        """
               /*
                * This is a sample file.
                */
@@ -430,25 +430,25 @@ class BlankLinesTest implements RewriteTest {
               public class Test {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void minimumAfterPackageWithImport() {
         rewriteRun(
-          blankLines(style -> style.withMinimum(style.getMinimum()
-            .withBeforeImports(0)
-            .withAfterPackage(1))),
-          java(
-            """
+                blankLines(style -> style.withMinimum(style.getMinimum()
+                        .withBeforeImports(0)
+                        .withAfterPackage(1))),
+                java(
+                        """
               package com.intellij.samples;
               import java.util.Vector;
               
               public class Test {
               }
               """,
-            """
+                        """
               package com.intellij.samples;
               
               import java.util.Vector;
@@ -456,47 +456,47 @@ class BlankLinesTest implements RewriteTest {
               public class Test {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void minimumAfterPackage() {
         rewriteRun(
-          blankLines(style -> style.withMinimum(style.getMinimum().withAfterPackage(1))),
-          java(
-            """
+                blankLines(style -> style.withMinimum(style.getMinimum().withAfterPackage(1))),
+                java(
+                        """
               package com.intellij.samples;
               public class Test {
               }
               """,
-            """
+                        """
               package com.intellij.samples;
               
               public class Test {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void minimumAfterImports() {
         rewriteRun(
-          blankLines(style -> style.withMinimum(style.getMinimum().withAfterImports(1))),
-          java(
-            """
+                blankLines(style -> style.withMinimum(style.getMinimum().withAfterImports(1))),
+                java(
+                        """
               import java.util.Vector;
               public class Test {
               }
               """,
-            """
+                        """
               import java.util.Vector;
               
               public class Test {
               }
               """
-          )
+                )
         );
     }
 
@@ -504,22 +504,22 @@ class BlankLinesTest implements RewriteTest {
     @Test
     void noImportsNoPackage() {
         rewriteRun(
-          java(
-            "\nclass Test {}",
-            "class Test {}",
-            spec -> spec
-              .afterRecipe(cu -> assertThat(cu.getClasses().get(0).getPrefix().getWhitespace()).isEmpty())
-              .noTrim()
-          )
+                java(
+                        "\nclass Test {}",
+                        "class Test {}",
+                        spec -> spec
+                                .afterRecipe(cu -> assertThat(cu.getClasses().get(0).getPrefix().getWhitespace()).isEmpty())
+                                .noTrim()
+                )
         );
     }
 
     @Test
     void minimumAroundClass() {
         rewriteRun(
-          blankLines(style -> style.withMinimum(style.getMinimum().withAroundClass(2))),
-          java(
-            """
+                blankLines(style -> style.withMinimum(style.getMinimum().withAroundClass(2))),
+                java(
+                        """
               import java.util.Vector;
               
               public class Test {
@@ -532,7 +532,7 @@ class BlankLinesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.Vector;
               
               public class Test {
@@ -548,7 +548,7 @@ class BlankLinesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -556,9 +556,9 @@ class BlankLinesTest implements RewriteTest {
     @Test
     void minimumAroundClassNestedEnum() {
         rewriteRun(
-          blankLines(style -> style.withMinimum(style.getMinimum().withAroundClass(2))),
-          java(
-            """
+                blankLines(style -> style.withMinimum(style.getMinimum().withAroundClass(2))),
+                java(
+                        """
               enum OuterEnum {
                   FIRST,
                   SECOND
@@ -575,7 +575,7 @@ class BlankLinesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               enum OuterEnum {
                   FIRST,
                   SECOND
@@ -595,27 +595,27 @@ class BlankLinesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void minimumAfterClassHeader() {
         rewriteRun(
-          blankLines(style -> style.withMinimum(style.getMinimum().withAfterClassHeader(1))),
-          java(
-            """
+                blankLines(style -> style.withMinimum(style.getMinimum().withAfterClassHeader(1))),
+                java(
+                        """
               public class Test {
                   private int field1;
               }
               """,
-            """
+                        """
               public class Test {
               
                   private int field1;
               }
               """
-          )
+                )
         );
     }
 
@@ -623,9 +623,9 @@ class BlankLinesTest implements RewriteTest {
     @Test
     void minimumAfterClassHeaderNestedClasses() {
         rewriteRun(
-          blankLines(style -> style.withMinimum(style.getMinimum().withAfterClassHeader(1))),
-          java(
-            """
+                blankLines(style -> style.withMinimum(style.getMinimum().withAfterClassHeader(1))),
+                java(
+                        """
               class OuterClass {
                   class InnerClass0 {
                       private int unused = 0;
@@ -636,7 +636,7 @@ class BlankLinesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class OuterClass {
               
                   class InnerClass0 {
@@ -650,7 +650,7 @@ class BlankLinesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -658,9 +658,9 @@ class BlankLinesTest implements RewriteTest {
     @Test
     void minimumAfterClassHeaderNestedEnum() {
         rewriteRun(
-          blankLines(style -> style.withMinimum(style.getMinimum().withAfterClassHeader(1))),
-          java(
-            """
+                blankLines(style -> style.withMinimum(style.getMinimum().withAfterClassHeader(1))),
+                java(
+                        """
               class OuterClass {
                   enum InnerEnum0 {
                       FIRST,
@@ -668,7 +668,7 @@ class BlankLinesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class OuterClass {
               
                   enum InnerEnum0 {
@@ -677,34 +677,34 @@ class BlankLinesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void minimumBeforeClassEnd() {
         rewriteRun(
-          blankLines(style -> style.withMinimum(style.getMinimum().withBeforeClassEnd(1))),
-          java(
-            """
+                blankLines(style -> style.withMinimum(style.getMinimum().withBeforeClassEnd(1))),
+                java(
+                        """
               public class Test {
               }
               """,
-            """
+                        """
               public class Test {
               
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void minimumAfterAnonymousClassHeader() {
         rewriteRun(
-          blankLines(style -> style.withMinimum(style.getMinimum().withAfterAnonymousClassHeader(1))),
-          java(
-            """
+                blankLines(style -> style.withMinimum(style.getMinimum().withAfterAnonymousClassHeader(1))),
+                java(
+                        """
               public class Test {
                   public void test1() {
                       new Runnable() {
@@ -714,7 +714,7 @@ class BlankLinesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class Test {
                   public void test1() {
                       new Runnable() {
@@ -725,104 +725,104 @@ class BlankLinesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void minimumAroundFieldInInterface() {
         rewriteRun(
-          blankLines(style -> style.withMinimum(style.getMinimum().withAroundFieldInInterface(1))),
-          java(
-            """
+                blankLines(style -> style.withMinimum(style.getMinimum().withAroundFieldInInterface(1))),
+                java(
+                        """
               interface TestInterface {
                   int MAX = 10;
                   int MIN = 1;
               }
               """,
-            """
+                        """
               interface TestInterface {
                   int MAX = 10;
               
                   int MIN = 1;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void minimumAroundField() {
         rewriteRun(
-          blankLines(style -> style.withMinimum(style.getMinimum().withAroundField(1))),
-          java(
-            """
+                blankLines(style -> style.withMinimum(style.getMinimum().withAroundField(1))),
+                java(
+                        """
               class Test {
                   int max = 10;
                   int min = 1;
               }
               """,
-            """
+                        """
               class Test {
                   int max = 10;
               
                   int min = 1;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void minimumAroundMethodInInterface() {
         rewriteRun(
-          blankLines(style -> style.withMinimum(style.getMinimum().withAroundMethodInInterface(1))),
-          java(
-            """
+                blankLines(style -> style.withMinimum(style.getMinimum().withAroundMethodInInterface(1))),
+                java(
+                        """
               interface TestInterface {
                   void method1();
                   void method2();
               }
               """,
-            """
+                        """
               interface TestInterface {
                   void method1();
               
                   void method2();
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void minimumAroundMethod() {
         rewriteRun(
-          blankLines(style -> style.withMinimum(style.getMinimum().withAroundMethod(1))),
-          java(
-            """
+                blankLines(style -> style.withMinimum(style.getMinimum().withAroundMethod(1))),
+                java(
+                        """
               class Test {
                   void method1() {}
                   void method2() {}
               }
               """,
-            """
+                        """
               class Test {
                   void method1() {}
               
                   void method2() {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void beforeMethodBody() {
         rewriteRun(
-          blankLines(style -> style.withMinimum(style.getMinimum().withBeforeMethodBody(1))),
-          java(
-            """
+                blankLines(style -> style.withMinimum(style.getMinimum().withBeforeMethodBody(1))),
+                java(
+                        """
               class Test {
                   void method1() {}
               
@@ -831,7 +831,7 @@ class BlankLinesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   void method1() {
               
@@ -843,7 +843,7 @@ class BlankLinesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -851,9 +851,9 @@ class BlankLinesTest implements RewriteTest {
     @Test
     void aroundInitializer() {
         rewriteRun(
-          blankLines(style -> style.withMinimum(style.getMinimum().withAroundInitializer(1))),
-          java(
-            """
+                blankLines(style -> style.withMinimum(style.getMinimum().withAroundInitializer(1))),
+                java(
+                        """
               public class Test {
                   private int field1;
                   {
@@ -869,7 +869,7 @@ class BlankLinesTest implements RewriteTest {
                   private int field;
               }
               """,
-            """
+                        """
               public class Test {
                   private int field1;
               
@@ -890,22 +890,22 @@ class BlankLinesTest implements RewriteTest {
                   private int field;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void unchanged() {
         rewriteRun(
-          blankLines(),
-          java(
-            """
+                blankLines(),
+                java(
+                        """
               package com.intellij.samples;
               
               public class Test {
               }
               """
-          )
+                )
         );
     }
 
@@ -913,9 +913,9 @@ class BlankLinesTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3089")
     void enumAnnotations() {
         rewriteRun(
-          blankLines(),
-          java(
-            """
+                blankLines(),
+                java(
+                        """
               public enum Test {
                   @Deprecated
                   A,
@@ -923,7 +923,7 @@ class BlankLinesTest implements RewriteTest {
                   B
               }
               """
-          )
+                )
         );
     }
 
@@ -931,9 +931,9 @@ class BlankLinesTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/4154")
     void eachMethodOnItsOwnLineAnonymousInnerClass() {
         rewriteRun(
-          blankLines(),
-          java(
-            """
+                blankLines(),
+                java(
+                        """
               public class Test {
                   void a() {
                       new Runnable() {
@@ -953,7 +953,7 @@ class BlankLinesTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class Test {
                   void a() {
                       new Runnable() {
@@ -975,7 +975,7 @@ class BlankLinesTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

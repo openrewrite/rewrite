@@ -35,7 +35,7 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
 
     @Option(displayName = "Old file path",
             description = "The file path to the YAML file to copy the value from. " +
-                          "If `null` then the value will be copied from any yaml file it appears within.",
+                    "If `null` then the value will be copied from any yaml file it appears within.",
             example = "src/main/resources/application.yaml",
             required = false)
     @Nullable
@@ -48,7 +48,7 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
 
     @Option(displayName = "New file path",
             description = "The file path to the YAML file to copy the value to. " +
-                          "If `null` then the value will be copied only into the same file it was found in.",
+                    "If `null` then the value will be copied only into the same file it was found in.",
             example = "src/main/resources/application.yaml",
             required = false)
     @Nullable
@@ -71,9 +71,9 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
     @Override
     public String getDescription() {
         return "Copies a YAML value from one key to another. " +
-               "The existing key/value pair remains unaffected by this change. " +
-               "Attempts to merge the copied value into the new key if it already exists. " +
-               "Attempts to create the new key if it does not exist.";
+                "The existing key/value pair remains unaffected by this change. " +
+                "Attempts to merge the copied value into the new key if it already exists. " +
+                "Attempts to create the new key if it does not exist.";
     }
 
     @Data
@@ -97,7 +97,7 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
 
             @Override
             public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
-                if(acc.snippet == null) {
+                if (acc.snippet == null) {
                     return super.visitDocuments(documents, ctx);
                 }
                 return documents;
@@ -113,7 +113,7 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
                 return source;
             }
         };
-        if(oldFilePath != null) {
+        if (oldFilePath != null) {
             visitor = Preconditions.check(new FindSourceFiles(oldFilePath).getVisitor(), visitor);
         }
 
@@ -122,11 +122,11 @@ public class CopyValue extends ScanningRecipe<CopyValue.Accumulator> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
-        if(acc.snippet == null) {
+        if (acc.snippet == null) {
             return TreeVisitor.noop();
         }
         TreeVisitor<?, ExecutionContext> visitor = new MergeYaml(newKey, acc.snippet, false, null, null).getVisitor();
-        if(newFilePath == null) {
+        if (newFilePath == null) {
             visitor = Preconditions.check(new FindSourceFiles(acc.path.toString()).getVisitor(), visitor);
         } else {
             visitor = Preconditions.check(new FindSourceFiles(newFilePath).getVisitor(), visitor);

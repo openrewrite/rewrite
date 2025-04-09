@@ -27,8 +27,8 @@ class ImportTest implements RewriteTest {
     @Test
     void typeName() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import static java.util.Map.Entry;
               import java.util.Map.Entry;
               
@@ -38,24 +38,24 @@ class ImportTest implements RewriteTest {
               import static java.nio.charset.StandardCharsets.UTF_8;
               import static java.util.Collections.emptyList;
               """,
-            spec -> spec.afterRecipe(cu -> assertThat(cu.getImports().stream().map(J.Import::getTypeName))
-              .containsExactly(
-                "java.util.Map$Entry",
-                "java.util.Map$Entry",
-                "java.util.List",
-                "java.util.*",
-                "java.nio.charset.StandardCharsets",
-                "java.util.Collections"
-              ))
-          )
+                        spec -> spec.afterRecipe(cu -> assertThat(cu.getImports().stream().map(J.Import::getTypeName))
+                                .containsExactly(
+                                        "java.util.Map$Entry",
+                                        "java.util.Map$Entry",
+                                        "java.util.List",
+                                        "java.util.*",
+                                        "java.nio.charset.StandardCharsets",
+                                        "java.util.Collections"
+                                ))
+                )
         );
     }
 
     @Test
     void packageName() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import static java.util.Map.Entry;
               import java.util.Map.Entry;
               
@@ -65,76 +65,76 @@ class ImportTest implements RewriteTest {
               import static java.nio.charset.StandardCharsets.UTF_8;
               import static java.util.Collections.emptyList;
               """,
-            spec -> spec.afterRecipe(cu -> assertThat(cu.getImports().stream().map(J.Import::getPackageName))
-              .containsExactly(
-                "java.util",
-                "java.util",
-                "java.util",
-                "java.util",
-                "java.nio.charset",
-                "java.util"
-              ))
-          )
+                        spec -> spec.afterRecipe(cu -> assertThat(cu.getImports().stream().map(J.Import::getPackageName))
+                                .containsExactly(
+                                        "java.util",
+                                        "java.util",
+                                        "java.util",
+                                        "java.util",
+                                        "java.nio.charset",
+                                        "java.util"
+                                ))
+                )
         );
     }
 
     @Test
     void classImport() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.List;
               public class A {}
               """
-          )
+                )
         );
     }
 
     @Test
     void starImport() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.*;
               public class A {}
               """
-          )
+                )
         );
     }
 
     @Test
     void compare() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import b.B;
               import c.c.C;
               """,
-            spec -> spec.afterRecipe(cu -> {
-                var b = cu.getImports().get(0);
-                var c = cu.getImports().get(1);
-                assertThat(b.compareTo(c)).isLessThan(0);
-                assertThat(c.compareTo(b)).isGreaterThan(0);
-            })
-          )
+                        spec -> spec.afterRecipe(cu -> {
+                            var b = cu.getImports().get(0);
+                            var c = cu.getImports().get(1);
+                            assertThat(b.compareTo(c)).isLessThan(0);
+                            assertThat(c.compareTo(b)).isGreaterThan(0);
+                        })
+                )
         );
     }
 
     @Test
     void compareSamePackageDifferentNameLengths() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import org.springframework.context.annotation.Bean;
               import org.springframework.context.annotation.Configuration;
               """,
-            spec -> spec.afterRecipe(cu -> {
-                var b = cu.getImports().get(0);
-                var c = cu.getImports().get(1);
-                assertThat(b.compareTo(c)).isLessThan(0);
-                assertThat(c.compareTo(b)).isGreaterThan(0);
-            })
-          )
+                        spec -> spec.afterRecipe(cu -> {
+                            var b = cu.getImports().get(0);
+                            var c = cu.getImports().get(1);
+                            assertThat(b.compareTo(c)).isLessThan(0);
+                            assertThat(c.compareTo(b)).isGreaterThan(0);
+                        })
+                )
         );
     }
 
@@ -143,8 +143,8 @@ class ImportTest implements RewriteTest {
     void uppercasePackage() {
         //noinspection ConstantConditions
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               package org.openrewrite.BadPackage;
               
               public class Foo {
@@ -152,11 +152,11 @@ class ImportTest implements RewriteTest {
                   }
               }
               """,
-            spec -> spec.afterRecipe(cu -> assertThat(cu.getPackageDeclaration().getPackageName())
-              .isEqualTo("org.openrewrite.BadPackage"))
-          ),
-          java(
-            """
+                        spec -> spec.afterRecipe(cu -> assertThat(cu.getPackageDeclaration().getPackageName())
+                                .isEqualTo("org.openrewrite.BadPackage"))
+                ),
+                java(
+                        """
               package org.openrewrite;
               
               import org.openrewrite.BadPackage.Foo;
@@ -166,11 +166,11 @@ class ImportTest implements RewriteTest {
                   private Foo foo;
               }
               """,
-            spec -> spec.afterRecipe(cu -> {
-                assertThat(cu.getImports().get(0).getPackageName()).isEqualTo("org.openrewrite.BadPackage");
-                assertThat(cu.getImports().get(1).getPackageName()).isEqualTo("org.openrewrite.BadPackage");
-            })
-          )
+                        spec -> spec.afterRecipe(cu -> {
+                            assertThat(cu.getImports().get(0).getPackageName()).isEqualTo("org.openrewrite.BadPackage");
+                            assertThat(cu.getImports().get(1).getPackageName()).isEqualTo("org.openrewrite.BadPackage");
+                        })
+                )
         );
     }
 
@@ -178,11 +178,11 @@ class ImportTest implements RewriteTest {
     @Test
     void spaceBeforeSemiColon() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.List ;
               """
-          )
+                )
         );
     }
 }

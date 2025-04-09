@@ -34,19 +34,19 @@ class ChangeParentPomTest implements RewriteTest {
     @Test
     void changeParent() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeParentPom(
-            "org.springframework.boot",
-            "com.fasterxml.jackson",
-            "spring-boot-starter-parent",
-            "jackson-parent",
-            "2.12",
-            null,
-            null,
-            null,
-            false
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeParentPom(
+                        "org.springframework.boot",
+                        "com.fasterxml.jackson",
+                        "spring-boot-starter-parent",
+                        "jackson-parent",
+                        "2.12",
+                        null,
+                        null,
+                        null,
+                        false
+                )),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -61,7 +61,7 @@ class ChangeParentPomTest implements RewriteTest {
                 <version>1</version>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -76,26 +76,26 @@ class ChangeParentPomTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void changeParentShouldResolveDependenciesMangementWithMavenProperties() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeParentPom(
-            "org.jenkins-ci.plugins",
-            "org.jenkins-ci.plugins",
-            "plugin",
-            "plugin",
-            "5.3",
-            null,
-            null,
-            null,
-            false
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeParentPom(
+                        "org.jenkins-ci.plugins",
+                        "org.jenkins-ci.plugins",
+                        "plugin",
+                        "plugin",
+                        "5.3",
+                        null,
+                        null,
+                        null,
+                        false
+                )),
+                pomXml(
+                        """
               <project>
                   <parent>
                       <groupId>org.jenkins-ci.plugins</groupId>
@@ -134,7 +134,7 @@ class ChangeParentPomTest implements RewriteTest {
                   </repositories>
               </project>
               """,
-            """
+                        """
               <project>
                   <parent>
                       <groupId>org.jenkins-ci.plugins</groupId>
@@ -173,26 +173,26 @@ class ChangeParentPomTest implements RewriteTest {
                   </repositories>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void changeParentWithRelativePath() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeParentPom(
-            "org.springframework.boot",
-            "com.fasterxml.jackson",
-            "spring-boot-starter-parent",
-            "jackson-parent",
-            "2.12",
-            "",
-            "../../pom.xml",
-            null,
-            false
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeParentPom(
+                        "org.springframework.boot",
+                        "com.fasterxml.jackson",
+                        "spring-boot-starter-parent",
+                        "jackson-parent",
+                        "2.12",
+                        "",
+                        "../../pom.xml",
+                        null,
+                        false
+                )),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -208,7 +208,7 @@ class ChangeParentPomTest implements RewriteTest {
                 <version>1</version>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -224,26 +224,26 @@ class ChangeParentPomTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void changeParentAddRelativePathEmptyValue() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeParentPom(
-            "org.springframework.boot",
-            "com.fasterxml.jackson",
-            "spring-boot-starter-parent",
-            "jackson-parent",
-            "2.12",
-            null,
-            "",
-            null,
-            false
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeParentPom(
+                        "org.springframework.boot",
+                        "com.fasterxml.jackson",
+                        "spring-boot-starter-parent",
+                        "jackson-parent",
+                        "2.12",
+                        null,
+                        "",
+                        null,
+                        false
+                )),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -258,7 +258,7 @@ class ChangeParentPomTest implements RewriteTest {
                 <version>1</version>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -274,26 +274,26 @@ class ChangeParentPomTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void changeParentAddRelativePathNonEmptyValue() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeParentPom(
-            "org.springframework.boot",
-            "com.fasterxml.jackson",
-            "spring-boot-starter-parent",
-            "jackson-parent",
-            "2.12",
-            null,
-            "../pom.xml",
-            null,
-            false
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeParentPom(
+                        "org.springframework.boot",
+                        "com.fasterxml.jackson",
+                        "spring-boot-starter-parent",
+                        "jackson-parent",
+                        "2.12",
+                        null,
+                        "../pom.xml",
+                        null,
+                        false
+                )),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -308,7 +308,7 @@ class ChangeParentPomTest implements RewriteTest {
                 <version>1</version>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -324,7 +324,7 @@ class ChangeParentPomTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -332,10 +332,10 @@ class ChangeParentPomTest implements RewriteTest {
     void multiModuleRelativePath() {
         ChangeParentPom recipe = new ChangeParentPom("org.springframework.boot", null, "spring-boot-starter-parent", null, "2.6.7", null, "", null, false);
         rewriteRun(
-          spec -> spec.recipe(recipe),
-          mavenProject("parent",
-            pomXml(
-              """
+                spec -> spec.recipe(recipe),
+                mavenProject("parent",
+                        pomXml(
+                                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
@@ -355,7 +355,7 @@ class ChangeParentPomTest implements RewriteTest {
                   </modules>
                 </project>
                 """,
-              """
+                                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
@@ -376,10 +376,10 @@ class ChangeParentPomTest implements RewriteTest {
                   </modules>
                 </project>
                 """
-            ),
-            mavenProject("module1",
-              pomXml(
-                """
+                        ),
+                        mavenProject("module1",
+                                pomXml(
+                                        """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -391,10 +391,10 @@ class ChangeParentPomTest implements RewriteTest {
                     <artifactId>module1</artifactId>
                   </project>
                   """
-              )),
-            mavenProject("module2",
-              pomXml(
-                """
+                                )),
+                        mavenProject("module2",
+                                pomXml(
+                                        """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -406,9 +406,9 @@ class ChangeParentPomTest implements RewriteTest {
                     <artifactId>module2</artifactId>
                   </project>
                   """
-              )
-            )
-          )
+                                )
+                        )
+                )
         );
     }
 
@@ -416,10 +416,10 @@ class ChangeParentPomTest implements RewriteTest {
     void multiModuleRelativePathChangeChildren() {
         ChangeParentPom recipe = new ChangeParentPom("org.sample", "org.springframework.boot", "sample", "spring-boot-starter-parent", "2.5.0", null, "", null, true);
         rewriteRun(
-          spec -> spec.recipe(recipe),
-          mavenProject("parent",
-            pomXml(
-              """
+                spec -> spec.recipe(recipe),
+                mavenProject("parent",
+                        pomXml(
+                                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
@@ -439,10 +439,10 @@ class ChangeParentPomTest implements RewriteTest {
                   </modules>
                 </project>
                 """
-            ),
-            mavenProject("module1",
-              pomXml(
-                """
+                        ),
+                        mavenProject("module1",
+                                pomXml(
+                                        """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -454,7 +454,7 @@ class ChangeParentPomTest implements RewriteTest {
                     <artifactId>module1</artifactId>
                   </project>
                   """,
-                """
+                                        """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -467,10 +467,10 @@ class ChangeParentPomTest implements RewriteTest {
                     <artifactId>module1</artifactId>
                   </project>
                   """
-              )),
-            mavenProject("module2",
-              pomXml(
-                """
+                                )),
+                        mavenProject("module2",
+                                pomXml(
+                                        """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -482,7 +482,7 @@ class ChangeParentPomTest implements RewriteTest {
                     <artifactId>module2</artifactId>
                   </project>
                   """,
-                """
+                                        """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -495,41 +495,41 @@ class ChangeParentPomTest implements RewriteTest {
                     <artifactId>module2</artifactId>
                   </project>
                   """
-              )
-            )
-          )
+                                )
+                        )
+                )
         );
     }
 
     @ParameterizedTest
     @CsvSource({
-      "../pom.xml,'',,<relativePath />", // self-closing tag gets added
-      "../pom.xml,,<relativePath>../pom.xml</relativePath>,<relativePath>../pom.xml</relativePath>", // no change, targetRelativePath is null
-      "../pom.xml,../../pom.xml,,<relativePath>../../pom.xml</relativePath>", // tag gets added
-      "../pom.xml,../../pom.xml,<relativePath>../pom.xml</relativePath>,<relativePath>../../pom.xml</relativePath>", // tag gets updated
-      "../*,'',,<relativePath />", // self-closing tag gets added
-      "../*,,<relativePath>../pom.xml</relativePath>,<relativePath>../pom.xml</relativePath>", // no change, targetRelativePath is null
-      "../*,../../pom.xml,,<relativePath>../../pom.xml</relativePath>", // tag gets added
-      "../*,../../pom.xml,<relativePath>../pom.xml</relativePath>,<relativePath>../../pom.xml</relativePath>", // tag gets updated
-      "../../pom.xml,'',<relativePath>../../pom.xml</relativePath>,<relativePath />", // tag converted to self-closing
-      "'','',<relativePath></relativePath>,<relativePath></relativePath>", // matches but new = old, left untouched
-      "'','',<relativePath/>,<relativePath/>", // matches but new = old, left untouched
-      "'','../pom.xml',<relativePath></relativePath>,<relativePath>../pom.xml</relativePath>", // tag gets updated
-      "'','../pom.xml',<relativePath/>,<relativePath>../pom.xml</relativePath>", // tag gets expanded and updated
+            "../pom.xml,'',,<relativePath />", // self-closing tag gets added
+            "../pom.xml,,<relativePath>../pom.xml</relativePath>,<relativePath>../pom.xml</relativePath>", // no change, targetRelativePath is null
+            "../pom.xml,../../pom.xml,,<relativePath>../../pom.xml</relativePath>", // tag gets added
+            "../pom.xml,../../pom.xml,<relativePath>../pom.xml</relativePath>,<relativePath>../../pom.xml</relativePath>", // tag gets updated
+            "../*,'',,<relativePath />", // self-closing tag gets added
+            "../*,,<relativePath>../pom.xml</relativePath>,<relativePath>../pom.xml</relativePath>", // no change, targetRelativePath is null
+            "../*,../../pom.xml,,<relativePath>../../pom.xml</relativePath>", // tag gets added
+            "../*,../../pom.xml,<relativePath>../pom.xml</relativePath>,<relativePath>../../pom.xml</relativePath>", // tag gets updated
+            "../../pom.xml,'',<relativePath>../../pom.xml</relativePath>,<relativePath />", // tag converted to self-closing
+            "'','',<relativePath></relativePath>,<relativePath></relativePath>", // matches but new = old, left untouched
+            "'','',<relativePath/>,<relativePath/>", // matches but new = old, left untouched
+            "'','../pom.xml',<relativePath></relativePath>,<relativePath>../pom.xml</relativePath>", // tag gets updated
+            "'','../pom.xml',<relativePath/>,<relativePath>../pom.xml</relativePath>", // tag gets expanded and updated
     })
     void multiModuleChangeChildrenBasedOnRelativePath(String oldRelativePath, String newRelativePath, String oldRelativePathTag, String expectedNewRelativePathTag) {
         ChangeParentPom recipe = new ChangeParentPom(
-          "org.sample", "org.springframework.boot",
-          "sample", "spring-boot-starter-parent",
-          "2.5.0",
-          oldRelativePath, newRelativePath,
-          null,
-          true);
+                "org.sample", "org.springframework.boot",
+                "sample", "spring-boot-starter-parent",
+                "2.5.0",
+                oldRelativePath, newRelativePath,
+                null,
+                true);
         rewriteRun(
-          spec -> spec.recipe(recipe),
-          mavenProject("parent",
-            pomXml(
-              """
+                spec -> spec.recipe(recipe),
+                mavenProject("parent",
+                        pomXml(
+                                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
@@ -548,10 +548,10 @@ class ChangeParentPomTest implements RewriteTest {
                   </modules>
                 </project>
                 """
-            ),
-            mavenProject("module1",
-              pomXml(
-                """
+                        ),
+                        mavenProject("module1",
+                                pomXml(
+                                        """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -563,7 +563,7 @@ class ChangeParentPomTest implements RewriteTest {
                     <artifactId>module1</artifactId>
                   </project>
                   """.formatted(StringUtils.isBlank(oldRelativePathTag) ? "" : "\n    " + oldRelativePathTag),
-                """
+                                        """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -575,12 +575,12 @@ class ChangeParentPomTest implements RewriteTest {
                     <artifactId>module1</artifactId>
                   </project>
                   """.formatted(StringUtils.isBlank(expectedNewRelativePathTag) ? "" : "\n    " + expectedNewRelativePathTag)
-              )
-            ),
-            mavenProject("module2",
-              // “control” module: same parent gav but different relativePath should not be affected
-              pomXml(
-                """
+                                )
+                        ),
+                        mavenProject("module2",
+                                // “control” module: same parent gav but different relativePath should not be affected
+                                pomXml(
+                                        """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -593,31 +593,31 @@ class ChangeParentPomTest implements RewriteTest {
                     <artifactId>module3</artifactId>
                   </project>
                   """
-              )
-            )
-          )
+                                )
+                        )
+                )
         );
     }
 
     @ParameterizedTest
     @CsvSource({
-      "../pom.xml,<relativePath />", // self-closing means empty string
-      "../pom.xml,<relativePath>../../pom.xml</relativePath>", // different value
-      "..,,", // absent tag means '../pom.xml' not '..'
+            "../pom.xml,<relativePath />", // self-closing means empty string
+            "../pom.xml,<relativePath>../../pom.xml</relativePath>", // different value
+            "..,,", // absent tag means '../pom.xml' not '..'
     })
     void multiModuleRelativePathNotMatching(String oldRelativePath, String oldRelativePathTag) {
         ChangeParentPom recipe = new ChangeParentPom(
-          "org.sample", "org.springframework.boot",
-          "sample", "spring-boot-starter-parent",
-          "2.5.0",
-          oldRelativePath, "invalid",
-          null,
-          true);
+                "org.sample", "org.springframework.boot",
+                "sample", "spring-boot-starter-parent",
+                "2.5.0",
+                oldRelativePath, "invalid",
+                null,
+                true);
         rewriteRun(
-          spec -> spec.recipe(recipe),
-          mavenProject("parent",
-            pomXml(
-              """
+                spec -> spec.recipe(recipe),
+                mavenProject("parent",
+                        pomXml(
+                                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
@@ -635,10 +635,10 @@ class ChangeParentPomTest implements RewriteTest {
                   </modules>
                 </project>
                 """
-            ),
-            mavenProject("module1",
-              pomXml(
-                """
+                        ),
+                        mavenProject("module1",
+                                pomXml(
+                                        """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -650,28 +650,28 @@ class ChangeParentPomTest implements RewriteTest {
                     <artifactId>module1</artifactId>
                   </project>
                   """.formatted(StringUtils.isBlank(oldRelativePathTag) ? "" : "\n    " + oldRelativePathTag)
-              )
-            )
-          )
+                                )
+                        )
+                )
         );
     }
 
     @Test
     void upgradeVersion() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeParentPom(
-            "org.springframework.boot",
-            null,
-            "spring-boot-starter-parent",
-            null,
-            "~1.5",
-            null,
-            null,
-            null,
-            false
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeParentPom(
+                        "org.springframework.boot",
+                        null,
+                        "spring-boot-starter-parent",
+                        null,
+                        "~1.5",
+                        null,
+                        null,
+                        null,
+                        false
+                )),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -687,7 +687,7 @@ class ChangeParentPomTest implements RewriteTest {
                 <version>1</version>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -703,26 +703,26 @@ class ChangeParentPomTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void upgradeToExactVersion() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeParentPom(
-            "org.springframework.boot",
-            null,
-            "spring-boot-starter-parent",
-            null,
-            "1.5.22.RELEASE",
-            null,
-            null,
-            null,
-            false
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeParentPom(
+                        "org.springframework.boot",
+                        null,
+                        "spring-boot-starter-parent",
+                        null,
+                        "1.5.22.RELEASE",
+                        null,
+                        null,
+                        null,
+                        false
+                )),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -738,7 +738,7 @@ class ChangeParentPomTest implements RewriteTest {
                 <version>1</version>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -754,26 +754,26 @@ class ChangeParentPomTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void doNotDowngradeToLowerVersionWhenArtifactsAreTheSame() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeParentPom(
-            "org.springframework.boot",
-            null,
-            "spring-boot-starter-parent",
-            null,
-            "1.5.12.RELEASE",
-            null,
-            null,
-            null,
-            false
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeParentPom(
+                        "org.springframework.boot",
+                        null,
+                        "spring-boot-starter-parent",
+                        null,
+                        "1.5.12.RELEASE",
+                        null,
+                        null,
+                        null,
+                        false
+                )),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -789,26 +789,26 @@ class ChangeParentPomTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void downgradeToLowerVersionWhenFlagIsSet() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeParentPom(
-            "org.springframework.boot",
-            null,
-            "spring-boot-starter-parent",
-            null,
-            "1.5.12.RELEASE",
-            null,
-            null,
-            null,
-            true
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeParentPom(
+                        "org.springframework.boot",
+                        null,
+                        "spring-boot-starter-parent",
+                        null,
+                        "1.5.12.RELEASE",
+                        null,
+                        null,
+                        null,
+                        true
+                )),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -824,7 +824,7 @@ class ChangeParentPomTest implements RewriteTest {
                 <version>1</version>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -840,26 +840,26 @@ class ChangeParentPomTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void wildcardVersionUpdate() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeParentPom(
-            "*",
-            null,
-            "*",
-            null,
-            "~1.5",
-            null,
-            null,
-            null,
-            false
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeParentPom(
+                        "*",
+                        null,
+                        "*",
+                        null,
+                        "~1.5",
+                        null,
+                        null,
+                        null,
+                        false
+                )),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -875,7 +875,7 @@ class ChangeParentPomTest implements RewriteTest {
                 <version>1</version>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -891,26 +891,26 @@ class ChangeParentPomTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void removesRedundantExplicitVersionsMatchingOldParent() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeParentPom(
-            "org.junit",
-            null,
-            "junit-bom",
-            null,
-            "5.9.1",
-            null,
-            null,
-            null,
-            false
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeParentPom(
+                        "org.junit",
+                        null,
+                        "junit-bom",
+                        null,
+                        "5.9.1",
+                        null,
+                        null,
+                        null,
+                        false
+                )),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -934,7 +934,7 @@ class ChangeParentPomTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -957,26 +957,26 @@ class ChangeParentPomTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void removesRedundantExplicitVersionsMatchingNewParent() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeParentPom(
-            "org.junit",
-            null,
-            "junit-bom",
-            null,
-            "5.9.1",
-            null,
-            null,
-            null,
-            false
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeParentPom(
+                        "org.junit",
+                        null,
+                        "junit-bom",
+                        null,
+                        "5.9.1",
+                        null,
+                        null,
+                        null,
+                        false
+                )),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -1000,7 +1000,7 @@ class ChangeParentPomTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -1023,26 +1023,26 @@ class ChangeParentPomTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void takesNewVersionFromParent() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeParentPom(
-            "org.junit",
-            null,
-            "junit-bom",
-            null,
-            "5.9.1",
-            null,
-            null,
-            null,
-            false
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeParentPom(
+                        "org.junit",
+                        null,
+                        "junit-bom",
+                        null,
+                        "5.9.1",
+                        null,
+                        null,
+                        null,
+                        false
+                )),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -1066,7 +1066,7 @@ class ChangeParentPomTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
               
@@ -1089,16 +1089,16 @@ class ChangeParentPomTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void upgradeNonSemverVersion() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeParentPom("org.springframework.cloud", null, "spring-cloud-starter-parent", null, "2021.0.5", null, null, null, false)),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeParentPom("org.springframework.cloud", null, "spring-cloud-starter-parent", null, "2021.0.5", null, null, null, false)),
+                pomXml(
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <modelVersion>4.0.0</modelVersion>
@@ -1113,7 +1113,7 @@ class ChangeParentPomTest implements RewriteTest {
                 </parent>
               </project>
               """,
-            """
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <modelVersion>4.0.0</modelVersion>
@@ -1128,7 +1128,7 @@ class ChangeParentPomTest implements RewriteTest {
                 </parent>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -1139,9 +1139,9 @@ class ChangeParentPomTest implements RewriteTest {
         @Test
         void dependencyWithExplicitVersionRemovedFromDepMgmt() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeParentPom("org.springframework.cloud", null, "spring-cloud-config-dependencies", null, "3.1.4", null, null, null, null)),
-              pomXml(
-                """
+                    spec -> spec.recipe(new ChangeParentPom("org.springframework.cloud", null, "spring-cloud-config-dependencies", null, "3.1.4", null, null, null, null)),
+                    pomXml(
+                            """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -1164,7 +1164,7 @@ class ChangeParentPomTest implements RewriteTest {
                     </dependencies>
                   </project>
                   """,
-                """
+                            """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -1187,16 +1187,16 @@ class ChangeParentPomTest implements RewriteTest {
                     </dependencies>
                   </project>
                   """
-              )
+                    )
             );
         }
 
         @Test
         void preservesExplicitVersionIfNotRequested() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeParentPom("org.springframework.cloud", null, "spring-cloud-dependencies", null, "2021.0.5", null, null, null, true)),
-              pomXml(
-                """
+                    spec -> spec.recipe(new ChangeParentPom("org.springframework.cloud", null, "spring-cloud-dependencies", null, "2021.0.5", null, null, null, true)),
+                    pomXml(
+                            """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -1219,7 +1219,7 @@ class ChangeParentPomTest implements RewriteTest {
                     </dependencies>
                   </project>
                   """,
-                """
+                            """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -1242,7 +1242,7 @@ class ChangeParentPomTest implements RewriteTest {
                     </dependencies>
                   </project>
                   """
-              )
+                    )
             );
         }
 
@@ -1250,13 +1250,13 @@ class ChangeParentPomTest implements RewriteTest {
         @Test
         void bringsDownRemovedProperty() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeParentPom(
-                "org.springframework.boot", "org.springframework.boot",
-                "spring-boot-dependencies", "spring-boot-dependencies",
-                "3.2.4",
-                null, null, null, null)),
-              pomXml(
-                """
+                    spec -> spec.recipe(new ChangeParentPom(
+                            "org.springframework.boot", "org.springframework.boot",
+                            "spring-boot-dependencies", "spring-boot-dependencies",
+                            "3.2.4",
+                            null, null, null, null)),
+                    pomXml(
+                            """
                   <project>
                       <modelVersion>4.0.0</modelVersion>
                       <groupId>com.mycompany</groupId>
@@ -1276,7 +1276,7 @@ class ChangeParentPomTest implements RewriteTest {
                       </dependencies>
                   </project>
                   """,
-                """
+                            """
                   <project>
                       <modelVersion>4.0.0</modelVersion>
                       <groupId>com.mycompany</groupId>
@@ -1305,13 +1305,13 @@ class ChangeParentPomTest implements RewriteTest {
         @Test
         void bringsDownRemovedManagedVersion() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeParentPom(
-                "org.springframework.boot", "org.springframework.boot",
-                "spring-boot-dependencies", "spring-boot-dependencies",
-                "3.2.4",
-                null, null, null, null)),
-              pomXml(
-                """
+                    spec -> spec.recipe(new ChangeParentPom(
+                            "org.springframework.boot", "org.springframework.boot",
+                            "spring-boot-dependencies", "spring-boot-dependencies",
+                            "3.2.4",
+                            null, null, null, null)),
+                    pomXml(
+                            """
                   <project>
                       <modelVersion>4.0.0</modelVersion>
                       <groupId>com.mycompany</groupId>
@@ -1330,7 +1330,7 @@ class ChangeParentPomTest implements RewriteTest {
                       </dependencies>
                   </project>
                   """,
-                """
+                            """
                   <project>
                       <modelVersion>4.0.0</modelVersion>
                       <groupId>com.mycompany</groupId>
@@ -1367,10 +1367,10 @@ class ChangeParentPomTest implements RewriteTest {
     void multiModule() {
         ChangeParentPom recipe = new ChangeParentPom("org.springframework.boot", null, "spring-boot-starter-parent", null, "2.6.7", null, null, null, true);
         rewriteRun(
-          spec -> spec.recipe(recipe),
-          mavenProject("parent",
-            pomXml(
-              """
+                spec -> spec.recipe(recipe),
+                mavenProject("parent",
+                        pomXml(
+                                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
@@ -1390,7 +1390,7 @@ class ChangeParentPomTest implements RewriteTest {
                   </modules>
                 </project>
                 """,
-              """
+                                """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
@@ -1410,10 +1410,10 @@ class ChangeParentPomTest implements RewriteTest {
                   </modules>
                 </project>
                 """
-            ),
-            mavenProject("module1",
-              pomXml(
-                """
+                        ),
+                        mavenProject("module1",
+                                pomXml(
+                                        """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -1425,10 +1425,10 @@ class ChangeParentPomTest implements RewriteTest {
                     <artifactId>module1</artifactId>
                   </project>
                   """
-              )),
-            mavenProject("module2",
-              pomXml(
-                """
+                                )),
+                        mavenProject("module2",
+                                pomXml(
+                                        """
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
@@ -1440,18 +1440,18 @@ class ChangeParentPomTest implements RewriteTest {
                     <artifactId>module2</artifactId>
                   </project>
                   """
-              )
-            )
-          )
+                                )
+                        )
+                )
         );
     }
 
     @Test
     void changeParentToSameVersion() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeParentPom("org.springframework.boot", null, "spring-boot-dependencies", "spring-boot-starter-parent", "latest.patch", null, null, null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeParentPom("org.springframework.boot", null, "spring-boot-dependencies", "spring-boot-starter-parent", "latest.patch", null, null, null, null)),
+                pomXml(
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <modelVersion>4.0.0</modelVersion>
@@ -1466,7 +1466,7 @@ class ChangeParentPomTest implements RewriteTest {
                 </parent>
               </project>
               """,
-            """
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <modelVersion>4.0.0</modelVersion>
@@ -1481,18 +1481,18 @@ class ChangeParentPomTest implements RewriteTest {
                 </parent>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void doNotAddUnnecessaryManagedVersion() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeParentPom("org.springframework.boot", "org.springframework.boot",
-            "spring-boot-starter-parent", "spring-boot-starter-parent",
-            "2.3.12.RELEASE", null, null, null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeParentPom("org.springframework.boot", "org.springframework.boot",
+                        "spring-boot-starter-parent", "spring-boot-starter-parent",
+                        "2.3.12.RELEASE", null, null, null, null)),
+                pomXml(
+                        """
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
                   <parent>
@@ -1511,7 +1511,7 @@ class ChangeParentPomTest implements RewriteTest {
                   </dependencies>
               </project>
               """,
-            """
+                        """
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
                   <modelVersion>4.0.0</modelVersion>
                   <parent>
@@ -1536,10 +1536,10 @@ class ChangeParentPomTest implements RewriteTest {
     @Test
     void shouldNotAddToDependencyManagement() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeParentPom("org.jenkins-ci.plugins", "org.jenkins-ci.plugins", "plugin", "plugin", "4.81", null, null, null, null)),
-          // language=xml
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeParentPom("org.jenkins-ci.plugins", "org.jenkins-ci.plugins", "plugin", "plugin", "4.81", null, null, null, null)),
+                // language=xml
+                pomXml(
+                        """
               <project>
                   <artifactId>example</artifactId>
                   <modelVersion>4.0.0</modelVersion>
@@ -1583,7 +1583,7 @@ class ChangeParentPomTest implements RewriteTest {
                   </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                   <artifactId>example</artifactId>
                   <modelVersion>4.0.0</modelVersion>
@@ -1627,15 +1627,15 @@ class ChangeParentPomTest implements RewriteTest {
                   </dependencies>
               </project>
               """
-          ));
+                ));
     }
 
     @Test
     void doesNotAddMavenDefaultProperties() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeParentPom("org.springframework.boot", null, "spring-boot-starter-parent", null, "2.7.18", null, null, null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeParentPom("org.springframework.boot", null, "spring-boot-starter-parent", null, "2.7.18", null, null, null, null)),
+                pomXml(
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <modelVersion>4.0.0</modelVersion>
@@ -1654,7 +1654,7 @@ class ChangeParentPomTest implements RewriteTest {
                 </properties>
               </project>
               """,
-            """
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <modelVersion>4.0.0</modelVersion>
@@ -1673,16 +1673,16 @@ class ChangeParentPomTest implements RewriteTest {
                 </properties>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void doesNotAddGrandparentProperties() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeParentPom("org.springframework.boot", null, "spring-boot-starter-parent", null, "2.7.18", null, null, null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeParentPom("org.springframework.boot", null, "spring-boot-starter-parent", null, "2.7.18", null, null, null, null)),
+                pomXml(
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <modelVersion>4.0.0</modelVersion>
@@ -1701,7 +1701,7 @@ class ChangeParentPomTest implements RewriteTest {
                 </properties>
               </project>
               """,
-            """
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <modelVersion>4.0.0</modelVersion>
@@ -1720,16 +1720,16 @@ class ChangeParentPomTest implements RewriteTest {
                 </properties>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void doesNotAddGlobalProperties() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeParentPom("org.springframework.boot", null, "spring-boot-starter-parent", null, "2.7.18", null, null, null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeParentPom("org.springframework.boot", null, "spring-boot-starter-parent", null, "2.7.18", null, null, null, null)),
+                pomXml(
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <modelVersion>4.0.0</modelVersion>
@@ -1753,7 +1753,7 @@ class ChangeParentPomTest implements RewriteTest {
                 </properties>
               </project>
               """,
-            """
+                        """
               <?xml version="1.0" encoding="UTF-8"?>
               <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <modelVersion>4.0.0</modelVersion>
@@ -1777,7 +1777,7 @@ class ChangeParentPomTest implements RewriteTest {
                 </properties>
               </project>
               """
-          )
+                )
         );
     }
 }

@@ -144,15 +144,15 @@ public class ClasspathScanningLoader implements ResourceLoader {
 
             for (ClassInfo classInfo : result.getSubclasses(NamedStyles.class.getName())) {
                 Class<?> styleClass = classInfo.loadClass();
-                    Constructor<?> constructor = RecipeIntrospectionUtils.getZeroArgsConstructor(styleClass);
-                    if (constructor != null) {
-                        constructor.setAccessible(true);
-                        try {
-                            styles.add((NamedStyles) constructor.newInstance());
-                        } catch (Exception e) {
-                            throw new RuntimeException(e);
-                        }
+                Constructor<?> constructor = RecipeIntrospectionUtils.getZeroArgsConstructor(styleClass);
+                if (constructor != null) {
+                    constructor.setAccessible(true);
+                    try {
+                        styles.add((NamedStyles) constructor.newInstance());
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
                     }
+                }
 
             }
         }
@@ -162,9 +162,9 @@ public class ClasspathScanningLoader implements ResourceLoader {
         for (ClassInfo classInfo : result.getSubclasses(className)) {
             Class<?> recipeClass = classInfo.loadClass();
             if (recipeClass.getName().equals(DeclarativeRecipe.class.getName()) ||
-                (recipeClass.getModifiers() & Modifier.PUBLIC) == 0 ||
-                // `ScanningRecipe` is an example of an abstract `Recipe` subtype
-                (recipeClass.getModifiers() & Modifier.ABSTRACT) != 0) {
+                    (recipeClass.getModifiers() & Modifier.PUBLIC) == 0 ||
+                    // `ScanningRecipe` is an example of an abstract `Recipe` subtype
+                    (recipeClass.getModifiers() & Modifier.ABSTRACT) != 0) {
                 continue;
             }
             Timer.Builder builder = Timer.builder("rewrite.scan.configure.recipe");

@@ -28,9 +28,9 @@ class DeleteKeyTest implements RewriteTest {
     @Test
     void deleteNestedKey() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteKey("$.metadata.name")),
-          json(
-                """
+                spec -> spec.recipe(new DeleteKey("$.metadata.name")),
+                json(
+                        """
               {
                 "apiVersion": "v1",
                 "metadata": {
@@ -39,7 +39,7 @@ class DeleteKeyTest implements RewriteTest {
                 }
               }
               """,
-            """
+                        """
               {
                 "apiVersion": "v1",
                 "metadata": {
@@ -47,16 +47,16 @@ class DeleteKeyTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void deleteArrayKey() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteKey("$.subjects.kind")),
-          json(
-                """
+                spec -> spec.recipe(new DeleteKey("$.subjects.kind")),
+                json(
+                        """
               {
                 "subjects": [
                   {
@@ -66,7 +66,7 @@ class DeleteKeyTest implements RewriteTest {
                 ]
               }
               """,
-            """
+                        """
               {
                 "subjects": [
                   {
@@ -75,7 +75,7 @@ class DeleteKeyTest implements RewriteTest {
                 ]
               }
               """
-          )
+                )
         );
     }
 
@@ -84,9 +84,9 @@ class DeleteKeyTest implements RewriteTest {
     @Disabled
     void deleteNestedKeyRemovingUnusedKeysRecursively() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteKey("$.b.c.d")),
-          json(
-                """
+                spec -> spec.recipe(new DeleteKey("$.b.c.d")),
+                json(
+                        """
               {
                 "a": "a-value",
                 "b": {
@@ -96,12 +96,12 @@ class DeleteKeyTest implements RewriteTest {
                 }
               }
               """,
-            """
+                        """
               {
                 "a": "a-value"
               }
               """
-          )
+                )
         );
     }
 }

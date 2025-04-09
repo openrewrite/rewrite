@@ -64,7 +64,7 @@ public class Assertions {
 
     private static void assertValidTypes(TypeValidation typeValidation, J sf) {
         if (typeValidation.identifiers() || typeValidation.methodInvocations() || typeValidation.methodDeclarations() || typeValidation.classDeclarations() ||
-            typeValidation.constructorInvocations()) {
+                typeValidation.constructorInvocations()) {
             List<FindMissingTypes.MissingTypeResult> missingTypeResults = FindMissingTypes.findMissingTypes(sf);
             missingTypeResults = missingTypeResults.stream()
                     .filter(missingType -> {
@@ -91,7 +91,7 @@ public class Assertions {
                         .collect(Collectors.joining("\n\n"));
                 throw new IllegalStateException(
                         "LST contains missing or invalid type information\n" + missingTypes +
-                        "\nhttps://docs.openrewrite.org/reference/faq#im-seeing-lst-contains-missing-or-invalid-type-information-in-my-recipe-unit-tests-how-to-resolve");
+                                "\nhttps://docs.openrewrite.org/reference/faq#im-seeing-lst-contains-missing-or-invalid-type-information-in-my-recipe-unit-tests-how-to-resolve");
             }
         }
     }
@@ -121,7 +121,7 @@ public class Assertions {
     }
 
     public static SourceSpecs java(@Language("java") @Nullable String before, @Language("java") @Nullable String after,
-                                   Consumer<SourceSpec<J.CompilationUnit>> spec) {
+            Consumer<SourceSpec<J.CompilationUnit>> spec) {
         SourceSpec<J.CompilationUnit> java = new SourceSpec<>(J.CompilationUnit.class, null, javaParser, before,
                 Assertions::validateTypes,
                 Assertions::customizeExecutionContext).after(s -> after);

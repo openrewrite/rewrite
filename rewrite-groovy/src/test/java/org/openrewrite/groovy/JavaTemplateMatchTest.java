@@ -32,25 +32,25 @@ class JavaTemplateMatchTest implements RewriteTest {
     @Test
     void nonJavaCode() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              private final JavaTemplate template = JavaTemplate.builder(
-                "\"a\" + \"b\""
-              ).build();
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    private final JavaTemplate template = JavaTemplate.builder(
+                            "\"a\" + \"b\""
+                    ).build();
 
-              @Override
-              public J visitExpression(Expression expression, ExecutionContext ctx) {
-                  return expression.getMarkers().findFirst(SearchResult.class).isEmpty() && template.matches(getCursor()) ?
-                    SearchResult.found(expression) : super.visitExpression(expression, ctx);
-              }
-          })),
-          groovy(
-            //language=groovy
-            """
+                    @Override
+                    public J visitExpression(Expression expression, ExecutionContext ctx) {
+                        return expression.getMarkers().findFirst(SearchResult.class).isEmpty() && template.matches(getCursor()) ?
+                                SearchResult.found(expression) : super.visitExpression(expression, ctx);
+                    }
+                })),
+                groovy(
+                        //language=groovy
+                        """
               class T {
                   def foo = "${1}"
               }
               """
-          )
+                )
         );
     }
 }

@@ -53,10 +53,10 @@ public class ExactVersion extends LatestRelease {
             versionOnly = pattern.substring(0, hyphenIndex);
         }
         if (versionOnly.startsWith("latest") ||
-            versionOnly.contains("x") ||
-            versionOnly.contains("^") ||
-            versionOnly.contains("~") ||
-            versionOnly.contains(" ")) {
+                versionOnly.contains("x") ||
+                versionOnly.contains("^") ||
+                versionOnly.contains("~") ||
+                versionOnly.contains(" ")) {
             return Validated.invalid("exactVersion", pattern, "not an exact version number");
         }
         return Validated.valid("exactVersion", new ExactVersion(pattern));

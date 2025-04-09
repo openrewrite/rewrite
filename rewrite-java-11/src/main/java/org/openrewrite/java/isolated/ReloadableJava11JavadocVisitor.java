@@ -125,7 +125,7 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 } else {
                     // Handle consecutive new lines.
                     if ((prev == '\n' ||
-                         prev == '\r' && source.charAt(i - 2) == '\n')) {
+                            prev == '\r' && source.charAt(i - 2) == '\n')) {
                         String prevLineLine = prev == '\n' ? "\n" : "\r\n";
                         lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), prevLineLine, Markers.EMPTY));
                     } else if (marginBuilder != null) { // A new line with no '*' that only contains whitespace.
@@ -868,14 +868,14 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     @Override
     public Tree visitText(TextTree node, List<Javadoc> body) {
         throw new UnsupportedOperationException("Anywhere text can occur, we need to call the visitText override that " +
-                                                "returns a list of Javadoc elements.");
+                "returns a list of Javadoc elements.");
     }
 
     public List<Javadoc> visitText(String node) {
         List<Javadoc> texts = new ArrayList<>();
 
         if (!node.isEmpty() && Character.isWhitespace(node.charAt(0)) &&
-            !Character.isWhitespace(source.charAt(cursor))) {
+                !Character.isWhitespace(source.charAt(cursor))) {
             node = node.stripLeading();
         }
 

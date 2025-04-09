@@ -34,8 +34,8 @@ class DependencyConstraintToRuleTest implements RewriteTest {
     @Test
     void newResolutionStrategyBlock() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id 'java'
               }
@@ -49,7 +49,7 @@ class DependencyConstraintToRuleTest implements RewriteTest {
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """,
-            """
+                        """
               plugins {
                   id 'java'
               }
@@ -66,15 +66,15 @@ class DependencyConstraintToRuleTest implements RewriteTest {
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void updateExistingResolutionStrategyBlock() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id 'java'
               }
@@ -95,7 +95,7 @@ class DependencyConstraintToRuleTest implements RewriteTest {
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """,
-            """
+                        """
               plugins {
                   id 'java'
               }
@@ -115,15 +115,15 @@ class DependencyConstraintToRuleTest implements RewriteTest {
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void leaveDifficultConstraintAlone() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id 'java'
               }
@@ -142,7 +142,7 @@ class DependencyConstraintToRuleTest implements RewriteTest {
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """,
-            """
+                        """
               plugins {
                   id 'java'
               }
@@ -167,7 +167,7 @@ class DependencyConstraintToRuleTest implements RewriteTest {
                   implementation 'org.openrewrite:rewrite-java:7.0.0'
               }
               """
-          )
+                )
         );
     }
 }

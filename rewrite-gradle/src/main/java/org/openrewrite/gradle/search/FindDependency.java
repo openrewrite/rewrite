@@ -79,9 +79,9 @@ public class FindDependency extends Recipe {
                             String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                             assert gav != null;
                             String[] parts = gav.split(":");
-                            if(gav.length() >= 2) {
+                            if (gav.length() >= 2) {
                                 if (StringUtils.matchesGlob(parts[0], groupId) &&
-                                    StringUtils.matchesGlob(parts[1], artifactId)) {
+                                        StringUtils.matchesGlob(parts[1], artifactId)) {
                                     return SearchResult.found(method);
                                 }
                             }

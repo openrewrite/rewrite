@@ -36,8 +36,8 @@ class ExplicitPluginVersionTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/2735")
     void shouldAddLatest() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -56,7 +56,7 @@ class ExplicitPluginVersionTest implements RewriteTest {
                 </build>
               </project>
               """,
-            spec -> spec.after(actual -> """
+                        spec -> spec.after(actual -> """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -76,17 +76,17 @@ class ExplicitPluginVersionTest implements RewriteTest {
                 </build>
               </project>
               """.formatted(
-              Pattern.compile("<version>(3\\.\\d+\\.\\d+)</version>")
-                .matcher(actual).results().reduce((a, b) -> b).map(m -> m.group(1)).get()))
-          )
+                                Pattern.compile("<version>(3\\.\\d+\\.\\d+)</version>")
+                                        .matcher(actual).results().reduce((a, b) -> b).map(m -> m.group(1)).get()))
+                )
         );
     }
 
     @Test
     void shouldNotUpgradeExisting() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -107,15 +107,15 @@ class ExplicitPluginVersionTest implements RewriteTest {
                 </build>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void shouldNotOverrideParentPluginVersion() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <parent>
                       <groupId>org.springframework.boot</groupId>
@@ -135,7 +135,7 @@ class ExplicitPluginVersionTest implements RewriteTest {
                   </build>
               </project>
               """
-          )
+                )
         );
     }
 }

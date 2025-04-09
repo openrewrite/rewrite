@@ -28,19 +28,19 @@ class ChangeKeyTest implements RewriteTest {
     @Test
     void simpleChangeRootKey() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeKey("$.description", "newDescription")),
-          yaml(
-            """
+                spec -> spec.recipe(new ChangeKey("$.description", "newDescription")),
+                yaml(
+                        """
               id: something
               description: desc
               other: whatever
               """,
-            """
+                        """
               id: something
               newDescription: desc
               other: whatever
               """
-          )
+                )
         );
     }
 
@@ -48,96 +48,96 @@ class ChangeKeyTest implements RewriteTest {
     @Test
     void changeNestedKey() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeKey("$.metadata.name", "name2")),
-          yaml(
-            """
+                spec -> spec.recipe(new ChangeKey("$.metadata.name", "name2")),
+                yaml(
+                        """
                   apiVersion: v1
                   metadata:
                     name: monitoring-tools
                     namespace: monitoring-tools
               """,
-            """
+                        """
                   apiVersion: v1
                   metadata:
                     name2: monitoring-tools
                     namespace: monitoring-tools
               """
-          )
+                )
         );
     }
 
     @Test
     void changeRelativeKey() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeKey(".name", "name2")),
-          yaml(
-            """
+                spec -> spec.recipe(new ChangeKey(".name", "name2")),
+                yaml(
+                        """
                   apiVersion: v1
                   metadata:
                     name: monitoring-tools
                     namespace: monitoring-tools
               """,
-            """
+                        """
                   apiVersion: v1
                   metadata:
                     name2: monitoring-tools
                     namespace: monitoring-tools
               """
-          )
+                )
         );
     }
 
     @Test
     void changeSequenceKeyByWildcard() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeKey("$.subjects[*].kind", "kind2")),
-          yaml(
-            """
+                spec -> spec.recipe(new ChangeKey("$.subjects[*].kind", "kind2")),
+                yaml(
+                        """
                   subjects:
                     - kind: ServiceAccount
                       name: monitoring-tools
               """,
-            """
+                        """
                   subjects:
                     - kind2: ServiceAccount
                       name: monitoring-tools
               """
-          )
+                )
         );
     }
 
     @Test
     void changeSequenceKeyByExactMatch() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeKey("$.subjects[?(@.kind == 'ServiceAccount')].kind", "kind2")),
-          yaml(
-            """
+                spec -> spec.recipe(new ChangeKey("$.subjects[?(@.kind == 'ServiceAccount')].kind", "kind2")),
+                yaml(
+                        """
                   subjects:
                     - kind: User
                       name: some-user
                     - kind: ServiceAccount
                       name: monitoring-tools
               """,
-            """
+                        """
                   subjects:
                     - kind: User
                       name: some-user
                     - kind2: ServiceAccount
                       name: monitoring-tools
               """
-          )
+                )
         );
     }
 
     @Test
     void relocatesPropertyWithVariableInfix() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeKey(
-            "\\$.spring.security.saml2.relyingparty.registration.*[?(@.identityprovider)]",
-            "assertingparty"
-          )),
-          yaml(
-            """
+                spec -> spec.recipe(new ChangeKey(
+                        "\\$.spring.security.saml2.relyingparty.registration.*[?(@.identityprovider)]",
+                        "assertingparty"
+                )),
+                yaml(
+                        """
                   spring:
                     security:
                       saml2:
@@ -151,7 +151,7 @@ class ChangeKeyTest implements RewriteTest {
                                   credentials:
                                     - certificate-location: "classpath:saml/idpone.crt"
               """,
-            """
+                        """
                   spring:
                     security:
                       saml2:
@@ -165,7 +165,7 @@ class ChangeKeyTest implements RewriteTest {
                                   credentials:
                                     - certificate-location: "classpath:saml/idpone.crt"
               """
-          )
+                )
         );
     }
 }

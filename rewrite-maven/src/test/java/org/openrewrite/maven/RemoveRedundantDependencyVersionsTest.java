@@ -39,8 +39,8 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     @Test
     void givenScopeIsDefinedWhenVersionMatchesParentDmForDifferentScopeThenStillRemoveIt() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>parent</artifactId>
@@ -60,10 +60,10 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          ),
-          mavenProject("child",
-            pomXml(
-              """
+                ),
+                mavenProject("child",
+                        pomXml(
+                                """
                     <project>
                         <parent>
                             <groupId>org.example</groupId>
@@ -81,7 +81,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """,
-              """
+                                """
                     <project>
                         <parent>
                             <groupId>org.example</groupId>
@@ -98,16 +98,16 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void givenScopeIsDefinedWhenVersionMatchesParentDmForSameScopeAndCompileAndEmptyThenRemoveIt() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>parent</artifactId>
@@ -127,10 +127,10 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          ),
-          mavenProject("child",
-            pomXml(
-              """
+                ),
+                mavenProject("child",
+                        pomXml(
+                                """
                     <project>
                         <parent>
                             <groupId>org.example</groupId>
@@ -147,7 +147,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """,
-              """
+                                """
                     <project>
                         <parent>
                             <groupId>org.example</groupId>
@@ -163,16 +163,16 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void givenScopeIsDefinedWhenVersionMatchesParentDmForSameScopeAndEmptyAndCompileThenRemoveIt() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>parent</artifactId>
@@ -191,10 +191,10 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          ),
-          mavenProject("child",
-            pomXml(
-              """
+                ),
+                mavenProject("child",
+                        pomXml(
+                                """
                     <project>
                         <parent>
                             <groupId>org.example</groupId>
@@ -212,7 +212,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """,
-              """
+                                """
                     <project>
                         <parent>
                             <groupId>org.example</groupId>
@@ -229,16 +229,16 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void givenScopeIsDefinedWhenVersionMatchesParentDmForSameScopeThenRemoveIt() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>parent</artifactId>
@@ -258,10 +258,10 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          ),
-          mavenProject("child",
-            pomXml(
-              """
+                ),
+                mavenProject("child",
+                        pomXml(
+                                """
                     <project>
                         <parent>
                             <groupId>org.example</groupId>
@@ -279,7 +279,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """,
-              """
+                                """
                     <project>
                         <parent>
                             <groupId>org.example</groupId>
@@ -296,16 +296,16 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void matchesParentDmThenRemoveIt() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>parent</artifactId>
@@ -324,10 +324,10 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          ),
-          mavenProject("child",
-            pomXml(
-              """
+                ),
+                mavenProject("child",
+                        pomXml(
+                                """
                     <project>
                         <parent>
                             <groupId>org.example</groupId>
@@ -344,7 +344,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """,
-              """
+                                """
                 <project>
                     <parent>
                         <groupId>org.example</groupId>
@@ -360,8 +360,8 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                     </dependencies>
                 </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
@@ -369,8 +369,8 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     @Test
     void matchesOwnDmThenRemoveIt() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>parent</artifactId>
@@ -393,7 +393,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>parent</artifactId>
@@ -415,15 +415,15 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void givenVersionMatchesParentDmWhenOwnDmIsDifferentThenKeepIt() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>parent</artifactId>
@@ -442,10 +442,10 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          ),
-          mavenProject("child",
-            pomXml(
-              """
+                ),
+                mavenProject("child",
+                        pomXml(
+                                """
                     <project>
                         <parent>
                             <groupId>org.example</groupId>
@@ -471,16 +471,16 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void whenNoParentOrOwnDmThenKeepIt() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany</groupId>
@@ -488,10 +488,10 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   <version>1.0.0</version>
               </project>
               """
-          ),
-          mavenProject("child",
-            pomXml(
-              """
+                ),
+                mavenProject("child",
+                        pomXml(
+                                """
                     <project>
                         <modelVersion>4.0.0</modelVersion>
                         <groupId>com.mycompany</groupId>
@@ -512,16 +512,16 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void whenNoVersionDefinedThenMakeNoChanges() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <groupId>com.mycompany</groupId>
                   <artifactId>myApiApp</artifactId>
@@ -537,10 +537,10 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          ),
-          mavenProject("child",
-            pomXml(
-              """
+                ),
+                mavenProject("child",
+                        pomXml(
+                                """
                     <project>
                         <modelVersion>4.0.0</modelVersion>
                         <groupId>com.mycompany</groupId>
@@ -560,16 +560,16 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void doesntMatchParentDmOrOwnDmThenKeepIt() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <groupId>com.mycompany</groupId>
                   <artifactId>myApiApp</artifactId>
@@ -585,10 +585,10 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          ),
-          mavenProject("child",
-            pomXml(
-              """
+                ),
+                mavenProject("child",
+                        pomXml(
+                                """
                     <project>
                         <groupId>com.mycompany</groupId>
                         <artifactId>mySharedLibrary</artifactId>
@@ -616,16 +616,16 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void givenNestedPomsWhenVersionMatchesImmediateParentThenRemoveIt() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>parent</artifactId>
@@ -644,10 +644,10 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          ),
-          mavenProject("child",
-            pomXml(
-              """
+                ),
+                mavenProject("child",
+                        pomXml(
+                                """
                     <project>
                         <parent>
                             <groupId>org.example</groupId>
@@ -675,10 +675,10 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            ),
-            mavenProject("child-2",
-              pomXml(
-                """
+                        ),
+                        mavenProject("child-2",
+                                pomXml(
+                                        """
                       <project>
                           <parent>
                               <groupId>org.example</groupId>
@@ -695,7 +695,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                           </dependencies>
                       </project>
                   """,
-                """
+                                        """
                   <project>
                       <parent>
                           <groupId>org.example</groupId>
@@ -711,17 +711,17 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                       </dependencies>
                   </project>
                   """
-              )
-            )
-          )
+                                )
+                        )
+                )
         );
     }
 
     @Test
     void givenNestedPomsWhenVersionMatchesTopLevelParentThenRemoveIt() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>parent</artifactId>
@@ -740,10 +740,10 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          ),
-          mavenProject("child",
-            pomXml(
-              """
+                ),
+                mavenProject("child",
+                        pomXml(
+                                """
                     <project>
                         <parent>
                             <groupId>org.example</groupId>
@@ -762,10 +762,10 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            ),
-            mavenProject("child-2",
-              pomXml(
-                """
+                        ),
+                        mavenProject("child-2",
+                                pomXml(
+                                        """
                       <project>
                           <parent>
                               <groupId>org.example</groupId>
@@ -782,7 +782,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                           </dependencies>
                       </project>
                   """,
-                """
+                                        """
                   <project>
                       <parent>
                           <groupId>org.example</groupId>
@@ -798,17 +798,17 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                       </dependencies>
                   </project>
                   """
-              )
-            )
-          )
+                                )
+                        )
+                )
         );
     }
 
     @Test
     void givenNestedPomsWhenVersionMatchesTopLevelParentAndDoesntMatchFirstLevelParentThenKeepIt() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>parent</artifactId>
@@ -827,10 +827,10 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          ),
-          mavenProject("child",
-            pomXml(
-              """
+                ),
+                mavenProject("child",
+                        pomXml(
+                                """
                     <project>
                         <parent>
                             <groupId>org.example</groupId>
@@ -852,10 +852,10 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                         </dependencyManagement>
                     </project>
                 """
-            ),
-            mavenProject("child-2",
-              pomXml(
-                """
+                        ),
+                        mavenProject("child-2",
+                                pomXml(
+                                        """
                       <project>
                           <parent>
                               <groupId>org.example</groupId>
@@ -872,17 +872,17 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                           </dependencies>
                       </project>
                   """
-              )
-            )
-          )
+                                )
+                        )
+                )
         );
     }
 
     @Test
     void givenNestedPomsWhenVersionDoesntMatchAnyDmThenKeepIt() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>parent</artifactId>
@@ -901,10 +901,10 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          ),
-          mavenProject("child",
-            pomXml(
-              """
+                ),
+                mavenProject("child",
+                        pomXml(
+                                """
                     <project>
                         <parent>
                             <groupId>org.example</groupId>
@@ -926,10 +926,10 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                         </dependencyManagement>
                     </project>
                 """
-            ),
-            mavenProject("child-2",
-              pomXml(
-                """
+                        ),
+                        mavenProject("child-2",
+                                pomXml(
+                                        """
                       <project>
                           <parent>
                               <groupId>org.example</groupId>
@@ -946,18 +946,18 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                           </dependencies>
                       </project>
                   """
-              )
-            )
-          )
+                                )
+                        )
+                )
         );
     }
 
     @Test
     void onlyIfVersionsMatchFalse() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, null)),
+                pomXml(
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>parent</artifactId>
@@ -976,9 +976,9 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          ),
-          mavenProject("child",
-            pomXml("""
+                ),
+                mavenProject("child",
+                        pomXml("""
                     <project>
                         <parent>
                             <groupId>org.example</groupId>
@@ -995,7 +995,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """,
-              """
+                                """
                     <project>
                         <parent>
                             <groupId>org.example</groupId>
@@ -1011,18 +1011,18 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void except() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE,
-                  Collections.singletonList("org.junit.jupiter:junit-jupiter-api"))),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE,
+                        Collections.singletonList("org.junit.jupiter:junit-jupiter-api"))),
+                pomXml(
+                        """
               <project>
                   <parent>
                       <groupId>org.junit</groupId>
@@ -1044,7 +1044,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                   <parent>
                       <groupId>org.junit</groupId>
@@ -1065,7 +1065,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -1073,8 +1073,8 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3268")
     void unmanagedDependency() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <groupId>org.sample</groupId>
                   <artifactId>sample</artifactId>
@@ -1088,7 +1088,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -1096,9 +1096,9 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3268")
     void unmanagedDependencyAnyMatch() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.ANY, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.ANY, null)),
+                pomXml(
+                        """
               <project>
                   <groupId>org.sample</groupId>
                   <artifactId>sample</artifactId>
@@ -1112,15 +1112,15 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void removeRedundantVersionsFromManagedPlugins() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>org.sample</groupId>
@@ -1146,7 +1146,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </build>
               </project>
               """,
-            """
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>org.sample</groupId>
@@ -1171,15 +1171,15 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </build>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void removeRedundantVersionsFromManagedButNonInheritedPlugins() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>org.sample</groupId>
@@ -1206,7 +1206,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </build>
               </project>
               """,
-            """
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>org.sample</groupId>
@@ -1232,7 +1232,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </build>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -1240,9 +1240,9 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3932")
     void removeRedundantVersionsFromPluginsManagedByParent() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>org.sample</groupId>
@@ -1265,7 +1265,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </build>
               </project>
               """,
-            """
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>org.sample</groupId>
@@ -1287,16 +1287,16 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </build>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void removeRedundantVersionsFromPluginsManagedByParentNotSpecifyingGroupId() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>org.sample</groupId>
@@ -1320,8 +1320,8 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </build>
               </project>
               """, SourceSpec::skip),
-          mavenProject("child", pomXml(
-              """
+                mavenProject("child", pomXml(
+                        """
                 <project>
                     <modelVersion>4.0.0</modelVersion>
                     <parent>
@@ -1344,7 +1344,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                     </build>
                 </project>
                 """,
-              """
+                        """
                 <project>
                     <modelVersion>4.0.0</modelVersion>
                     <parent>
@@ -1366,17 +1366,17 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                     </build>
                 </project>
                 """
-            )
-          )
+                )
+                )
         );
     }
 
     @Test
     void removeRedundantDmVersionsFromPluginsManagedByParentNotSpecifyingGroupId() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>org.sample</groupId>
@@ -1400,8 +1400,8 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </build>
               </project>
               """, SourceSpec::skip),
-          mavenProject("child", pomXml(
-              """
+                mavenProject("child", pomXml(
+                        """
                 <project>
                     <modelVersion>4.0.0</modelVersion>
                     <parent>
@@ -1426,7 +1426,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                     </build>
                 </project>
                 """,
-              """
+                        """
                 <project>
                     <modelVersion>4.0.0</modelVersion>
                     <parent>
@@ -1450,16 +1450,16 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                     </build>
                 </project>
                 """
-            )
-          )
+                )
+                )
         );
     }
 
     @Test
     void keepPluginIfParentInheritanceDisabled() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>parent</artifactId>
@@ -1482,10 +1482,10 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </build>
               </project>
               """
-          ),
-          mavenProject("child-with-pluginManagement",
-            pomXml(
-              """
+                ),
+                mavenProject("child-with-pluginManagement",
+                        pomXml(
+                                """
                 <project>
                     <parent>
                         <groupId>org.example</groupId>
@@ -1506,11 +1506,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                     </build>
                 </project>
                 """
-            )
-          ),
-          mavenProject("child-with-plugin-execution",
-            pomXml(
-              """
+                        )
+                ),
+                mavenProject("child-with-plugin-execution",
+                        pomXml(
+                                """
                 <project>
                     <parent>
                         <groupId>org.example</groupId>
@@ -1529,17 +1529,17 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                     </build>
                 </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
     @Test
     void removeRedundantManagedVersionFromPluginsManagedByParentAndKeepOtherElements() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>org.sample</groupId>
@@ -1565,7 +1565,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </build>
               </project>
               """,
-            """
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>org.sample</groupId>
@@ -1590,16 +1590,16 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </build>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void removeRedundantManagedPluginWhenPluginManagedByParentAndNoOtherElement() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>org.sample</groupId>
@@ -1624,7 +1624,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </build>
               </project>
               """,
-            """
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>org.sample</groupId>
@@ -1640,7 +1640,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </build>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -1648,9 +1648,9 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3932")
     void noChangesIfManagedPluginVersionDoesNotMatch() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.EQ, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.EQ, null)),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>org.sample</groupId>
@@ -1673,16 +1673,16 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </build>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void doesNotDowngradeVersion() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>org.sample</groupId>
@@ -1706,16 +1706,16 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </build>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void allowUpgradeOfManagedVersion() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
+                pomXml(
+                        """
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
                     <parent>
@@ -1743,7 +1743,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                     </dependencies>
                 </project>
                 """,
-            """
+                        """
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
                     <parent>
@@ -1762,16 +1762,16 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                     </dependencies>
                 </project>
                 """
-          )
+                )
         );
     }
 
     @Test
     void pluginPropertySubstitution() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
+                pomXml(
+                        """
             <project>
                 <parent>
                     <groupId>org.springframework.boot</groupId>
@@ -1819,16 +1819,16 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                 </build>
             </project>
             """
-          )
+                )
         );
     }
 
     @Test
     void dependencyPropertySubstitution() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
+                pomXml(
+                        """
             <project>
                 <parent>
                     <groupId>org.springframework.boot</groupId>
@@ -1874,17 +1874,17 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                 </dependencies>
             </project>
             """
-          )
+                )
         );
     }
 
     @ParameterizedTest
-    @CsvSource({ "GT,2.5.0", "GTE,2.5.0", "ANY,2.5.0", "EQ,2.5.1", "LTE,2.5.1", "GTE,2.5.1", "ANY,2.5.1", "LT,2.5.2", "LTE,2.5.2", "ANY,2.5.2" })
+    @CsvSource({"GT,2.5.0", "GTE,2.5.0", "ANY,2.5.0", "EQ,2.5.1", "LTE,2.5.1", "GTE,2.5.1", "ANY,2.5.1", "LT,2.5.2", "LTE,2.5.2", "ANY,2.5.2"})
     void onlyIfManagedVersionIs_removals(String comparator, String projectVersion) {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.valueOf(comparator), null)),
-          pomXml(
-            String.format("""
+                spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.valueOf(comparator), null)),
+                pomXml(
+                        String.format("""
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
                     <parent>
@@ -1904,7 +1904,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                     </dependencies>
                 </project>
                 """, projectVersion),
-            """
+                        """
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
                     <parent>
@@ -1923,17 +1923,17 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                     </dependencies>
                 </project>
                 """
-          )
+                )
         );
     }
 
     @ParameterizedTest
-    @CsvSource({ "LT,2.5.0", "LTE,2.5.0", "EQ,2.5.0", "LT,2.5.1", "GT,2.5.1", "GT,2.5.2", "GTE,2.5.2", "EQ,2.5.2" })
+    @CsvSource({"LT,2.5.0", "LTE,2.5.0", "EQ,2.5.0", "LT,2.5.1", "GT,2.5.1", "GT,2.5.2", "GTE,2.5.2", "EQ,2.5.2"})
     void onlyIfManagedVersionIs_nonremovals(String comparator, String projectVersion) {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.valueOf(comparator), null)),
-          pomXml(
-            String.format("""
+                spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.valueOf(comparator), null)),
+                pomXml(
+                        String.format("""
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
                     <parent>
@@ -1953,15 +1953,15 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                     </dependencies>
                 </project>
                 """, projectVersion)
-          )
+                )
         );
     }
 
     @Test
     void keepVersionIfManagedIsNonExact() {
         rewriteRun(
-          pomXml(
-            """
+                pomXml(
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>parent</artifactId>
@@ -1980,10 +1980,10 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          ),
-          mavenProject("child",
-            pomXml(
-              """
+                ),
+                mavenProject("child",
+                        pomXml(
+                                """
                     <project>
                         <parent>
                             <groupId>org.example</groupId>
@@ -2000,8 +2000,8 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
@@ -2009,9 +2009,9 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/discussions/4386")
     void dontOverrideDependencyConfigurations() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, RemoveRedundantDependencyVersions.Comparator.GTE, null)),
+                pomXml(
+                        """
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
                     <parent>
@@ -2046,7 +2046,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                     </dependencies>
                 </project>
                 """
-          )
+                )
         );
     }
 }

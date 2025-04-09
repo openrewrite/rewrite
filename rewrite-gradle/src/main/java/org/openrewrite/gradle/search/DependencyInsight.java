@@ -64,8 +64,8 @@ public class DependencyInsight extends Recipe {
 
     @Option(displayName = "Version",
             description = "Match only dependencies with the specified version. " +
-                          "Node-style [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors) may be used." +
-                          "All versions are searched by default.",
+                    "Node-style [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors) may be used." +
+                    "All versions are searched by default.",
             example = "1.x",
             required = false)
     @Nullable
@@ -86,7 +86,7 @@ public class DependencyInsight extends Recipe {
     @Override
     public String getDescription() {
         return "Find direct and transitive dependencies matching a group, artifact, and optionally a configuration name. " +
-               "Results include dependencies that either directly match or transitively include a matching dependency.";
+                "Results include dependencies that either directly match or transitively include a matching dependency.";
     }
 
     @Override
@@ -244,7 +244,7 @@ public class DependencyInsight extends Recipe {
                 }
             }
             if (!DEPENDENCY_CONFIGURATION_MATCHER.matches(m) || !configurationToDirectDependency.containsKey(m.getSimpleName()) ||
-                m.getArguments().isEmpty()) {
+                    m.getArguments().isEmpty()) {
                 return m;
             }
 

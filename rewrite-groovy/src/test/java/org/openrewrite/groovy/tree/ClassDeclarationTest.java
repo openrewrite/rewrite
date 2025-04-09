@@ -35,8 +35,8 @@ class ClassDeclarationTest implements RewriteTest {
     @Test
     void multipleClassDeclarationsInOneCompilationUnit() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               public class A {
                   int n
 
@@ -46,80 +46,80 @@ class ClassDeclarationTest implements RewriteTest {
               }
               class B {}
               """
-          )
+                )
         );
     }
 
     @Test
     void classImplements() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               public interface B {}
               interface C {}
               class A implements B, C {}
               """
-          )
+                )
         );
     }
 
     @Test
     void classExtends() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               public class Test {}
               class A extends Test {}
               """
-          )
+                )
         );
     }
 
     @Test
     void modifierOrdering() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               public abstract class A {}
               """
-          )
+                )
         );
     }
 
     @Test
     void interfaceExtendsInterface() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               interface A {}
               interface C {}
               interface B extends A , C {}
               """
-          )
+                )
         );
     }
 
     @Test
     void transitiveInterfaces() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               interface A {}
               interface B extends A {}
               interface C extends B {}
               """
-          )
+                )
         );
     }
 
     @Test
     void annotation() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               @interface A{}
               """
-          )
+                )
         );
     }
 
@@ -127,13 +127,13 @@ class ClassDeclarationTest implements RewriteTest {
     @Test
     void hasPackage() {
         rewriteRun(
-          groovy(
-            """ 
+                groovy(
+                        """ 
               package org.openrewrite
 
               public class A{}
               """
-          )
+                )
         );
     }
 
@@ -141,57 +141,57 @@ class ClassDeclarationTest implements RewriteTest {
     @Test
     void parameterizedFieldDoesNotAffectClassType() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               class A {
                   List<String> a
               }
               """,
-            spec -> spec.afterRecipe(cu -> {
-                var aType = cu.getClasses().get(0).getType();
-                assertThat(aType).isNotNull();
-                assertThat(aType).isInstanceOf(JavaType.Class.class);
-                assertThat(((JavaType.Class) aType).getFullyQualifiedName()).isEqualTo("A");
-            })
-          )
+                        spec -> spec.afterRecipe(cu -> {
+                            var aType = cu.getClasses().get(0).getType();
+                            assertThat(aType).isNotNull();
+                            assertThat(aType).isInstanceOf(JavaType.Class.class);
+                            assertThat(((JavaType.Class) aType).getFullyQualifiedName()).isEqualTo("A");
+                        })
+                )
         );
     }
 
     @Test
     void implicitlyPublic() {
         rewriteRun(
-          groovy("class A{}")
+                groovy("class A{}")
         );
     }
 
     @Test
     void packagePrivate() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               import groovy.transform.PackageScope
 
               @PackageScope
               class A {}
               """,
-            spec ->
-              spec.beforeRecipe(cu -> {
-                  var clazz = cu.getClasses().get(0);
-                  assertThat(clazz.getModifiers())
-                    .as("Groovy's default visibility is public, applying @PackageScope should prevent the public modifier from being present")
-                    .hasSize(0);
-                  var annotations = cu.getClasses().get(0).getAllAnnotations();
-                  assertThat(annotations).hasSize(1);
-              })
-          )
+                        spec ->
+                                spec.beforeRecipe(cu -> {
+                                    var clazz = cu.getClasses().get(0);
+                                    assertThat(clazz.getModifiers())
+                                            .as("Groovy's default visibility is public, applying @PackageScope should prevent the public modifier from being present")
+                                            .hasSize(0);
+                                    var annotations = cu.getClasses().get(0).getAllAnnotations();
+                                    assertThat(annotations).hasSize(1);
+                                })
+                )
         );
     }
 
     @Test
     void typeParameters() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               class A <T, S extends PT<S> & C> {
                   T t
                   S s
@@ -199,39 +199,39 @@ class ClassDeclarationTest implements RewriteTest {
               interface PT<T> {}
               interface C {}
               """,
-            spec -> spec.beforeRecipe(cu -> {
-                var typeParameters = cu.getClasses().get(0).getTypeParameters();
-                assertThat(typeParameters).isNotNull();
-                assertThat(typeParameters).hasSize(2);
-                assertThat(requireNonNull(typeParameters.get(0)).getBounds()).isNull();
-                var sParam = typeParameters.get(1);
-                assertThat(sParam.getBounds()).isNotNull();
-                assertThat(sParam.getBounds()).hasSize(2);
-                assertThat(sParam.getBounds().get(0)).isInstanceOf(J.ParameterizedType.class);
-            })
-          )
+                        spec -> spec.beforeRecipe(cu -> {
+                            var typeParameters = cu.getClasses().get(0).getTypeParameters();
+                            assertThat(typeParameters).isNotNull();
+                            assertThat(typeParameters).hasSize(2);
+                            assertThat(requireNonNull(typeParameters.get(0)).getBounds()).isNull();
+                            var sParam = typeParameters.get(1);
+                            assertThat(sParam.getBounds()).isNotNull();
+                            assertThat(sParam.getBounds()).hasSize(2);
+                            assertThat(sParam.getBounds().get(0)).isInstanceOf(J.ParameterizedType.class);
+                        })
+                )
         );
     }
 
     @Test
     void innerClass() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               interface C {
                   class Inner {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void newParameterizedConstructor() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               class Outer {
                   PT<TypeA> parameterizedField = new PT<TypeA>() {
                   }
@@ -240,62 +240,62 @@ class ClassDeclarationTest implements RewriteTest {
               interface PT<T> {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void parameterizedField() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               class A {
                   List<String> a
                   Map<Object, Object> b
               }
               """,
-            spec -> spec.beforeRecipe(cu -> {
-                var statements = cu.getClasses().get(0).getBody().getStatements();
-                assertThat(statements).hasSize(2);
-                var a = ((J.VariableDeclarations) statements.get(0)).getVariables().get(0);
-                assertThat(requireNonNull(TypeUtils.asParameterized(a.getType())).toString())
-                  .isEqualTo("java.util.List<java.lang.String>");
-                var b = ((J.VariableDeclarations) statements.get(1)).getVariables().get(0);
-                assertThat(requireNonNull(TypeUtils.asParameterized(b.getType())).toString())
-                  .isEqualTo("java.util.Map<java.lang.Object, java.lang.Object>");
-            })
-          )
+                        spec -> spec.beforeRecipe(cu -> {
+                            var statements = cu.getClasses().get(0).getBody().getStatements();
+                            assertThat(statements).hasSize(2);
+                            var a = ((J.VariableDeclarations) statements.get(0)).getVariables().get(0);
+                            assertThat(requireNonNull(TypeUtils.asParameterized(a.getType())).toString())
+                                    .isEqualTo("java.util.List<java.lang.String>");
+                            var b = ((J.VariableDeclarations) statements.get(1)).getVariables().get(0);
+                            assertThat(requireNonNull(TypeUtils.asParameterized(b.getType())).toString())
+                                    .isEqualTo("java.util.Map<java.lang.Object, java.lang.Object>");
+                        })
+                )
         );
     }
 
     @Test
     void singleLineCommentBeforeModifier() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               @Deprecated
               // Some comment
               public final class A {}
               """,
-            spec -> spec.beforeRecipe(cu -> {
-                var annotations = cu.getClasses().get(0).getAllAnnotations();
-                assertThat(annotations.size()).isEqualTo(1);
-                var annotation = annotations.get(0);
-                var type = annotation.getType();
-                assertThat(type).isNotNull();
-                assertThat(type).isInstanceOf(JavaType.FullyQualified.class);
-                assertThat(requireNonNull(TypeUtils.asFullyQualified(type)).getFullyQualifiedName())
-                  .isEqualTo("java.lang.Deprecated");
-            })
-          )
+                        spec -> spec.beforeRecipe(cu -> {
+                            var annotations = cu.getClasses().get(0).getAllAnnotations();
+                            assertThat(annotations.size()).isEqualTo(1);
+                            var annotation = annotations.get(0);
+                            var type = annotation.getType();
+                            assertThat(type).isNotNull();
+                            assertThat(type).isInstanceOf(JavaType.FullyQualified.class);
+                            assertThat(requireNonNull(TypeUtils.asFullyQualified(type)).getFullyQualifiedName())
+                                    .isEqualTo("java.lang.Deprecated");
+                        })
+                )
         );
     }
 
     @Test
     void instanceInitializerBlock() {
         rewriteRun(
-          groovy(
-                """
+                groovy(
+                        """
             class A {
                 int a
                 {
@@ -303,15 +303,15 @@ class ClassDeclarationTest implements RewriteTest {
                 }
             }
             """
-          )
+                )
         );
     }
 
     @Test
     void staticInitializer() {
         rewriteRun(
-          groovy(
-                """
+                groovy(
+                        """
             class A {
                 static int a
                 static {
@@ -319,7 +319,7 @@ class ClassDeclarationTest implements RewriteTest {
                 }
             }
             """
-          )
+                )
         );
     }
 
@@ -328,15 +328,15 @@ class ClassDeclarationTest implements RewriteTest {
     @Disabled("Known issue; still need to explore a fix")
     void classExtendsGroovyLangScript() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
-          // Reduced from https://github.com/openrewrite/rewrite/blob/3de7723ba43d8c44d7b524273ad7548d4fcd04eb/rewrite-gradle/src/main/groovy/RewriteSettings.groovy#L32
-          // "Source file was parsed into an LST that contains non-whitespace characters in its whitespace. This is indicative of a bug in the parser."
-          groovy(
-            """
+                spec -> spec.typeValidationOptions(TypeValidation.none()),
+                // Reduced from https://github.com/openrewrite/rewrite/blob/3de7723ba43d8c44d7b524273ad7548d4fcd04eb/rewrite-gradle/src/main/groovy/RewriteSettings.groovy#L32
+                // "Source file was parsed into an LST that contains non-whitespace characters in its whitespace. This is indicative of a bug in the parser."
+                groovy(
+                        """
               class RewriteSettings extends groovy.lang.Script {
               }
               """
-          )
+                )
         );
     }
 }

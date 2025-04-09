@@ -162,7 +162,7 @@ public class NormalizeFormatVisitor<P> extends JavaIsoVisitor<P> {
                         }.visitNonNull((Javadoc) c, 0);
                     }
 
-                    if(c.getSuffix().contains("\n")) {
+                    if (c.getSuffix().contains("\n")) {
                         c = c.withSuffix(c.getSuffix().replace("\n", "\n" + shift));
                     }
 

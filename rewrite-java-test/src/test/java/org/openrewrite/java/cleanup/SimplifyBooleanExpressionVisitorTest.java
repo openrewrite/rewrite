@@ -39,8 +39,8 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     @Test
     void simplifyEqualsLiteralTrueIf() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   boolean a;
                   {
@@ -49,7 +49,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   boolean a;
                   {
@@ -58,7 +58,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -66,22 +66,22 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     @Test
     void skipMissingTypeAttribution() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).build()),
-          java(
-            """
+                spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).build()),
+                java(
+                        """
               public class A {
                   boolean a = null instanceof Unknown || null instanceof java.lang.Unknown;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void simplifyEqualsLiteralFalseIf() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   boolean a;
                   boolean b;
@@ -93,7 +93,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   boolean a;
                   boolean b;
@@ -105,15 +105,15 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void simplifyBooleanExpressionComprehensive() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   {
                       boolean a = !false;
@@ -130,7 +130,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   {
                       boolean a = true;
@@ -147,15 +147,15 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void simplifyInvertedBooleanLiteral() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   {
                       boolean a = !false;
@@ -167,7 +167,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   {
                       boolean a = true;
@@ -179,15 +179,15 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doubleNegationWithParentheses() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   {
                       boolean a = !!(!(!true));
@@ -195,7 +195,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   {
                       boolean a = true;
@@ -203,15 +203,15 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doubleNegatedBinaryWithParentheses() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   {
                       boolean a1 = !(1 == 1);
@@ -223,7 +223,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   {
                       boolean a1 = 1 != 1;
@@ -235,15 +235,15 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void simplifyEqualsLiteralTrue() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   {
                       boolean a = true;
@@ -251,7 +251,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   {
                       boolean a = true;
@@ -259,15 +259,15 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void simplifyOrLiteralTrue() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   {
                       boolean b = true;
@@ -275,7 +275,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   {
                       boolean b = true;
@@ -283,15 +283,15 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void simplifyOrAlwaysTrue() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   {
                       boolean c = true;
@@ -299,7 +299,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   {
                       boolean c = true;
@@ -307,15 +307,15 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void simplifyAndAlwaysTrue() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   {
                       boolean d = true;
@@ -323,7 +323,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   {
                       boolean d = true;
@@ -331,15 +331,15 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void simplifyEqualsLiteralTrueAlwaysTrue() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   {
                       boolean e = true;
@@ -347,7 +347,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   {
                       boolean e = true;
@@ -355,15 +355,15 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void simplifyLiteralFalseAlwaysFalse() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   {
                       boolean f = true;
@@ -371,7 +371,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   {
                       boolean f = true;
@@ -379,30 +379,30 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void simplifyDoubleNegation() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   public void doubleNegation(boolean g) {
                       boolean h = g;
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void simplifyNotEqualsFalse() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   {
                       boolean a = true;
@@ -410,7 +410,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   {
                       boolean a = true;
@@ -418,7 +418,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -426,8 +426,8 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     @Test
     void autoFormatIsConditionallyApplied() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   {
                       boolean a=true;
@@ -435,7 +435,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   {
                       boolean a=true;
@@ -443,15 +443,15 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void binaryOrBothFalse() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   {
                       if (!true || !true) {
@@ -460,7 +460,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   {
                       if (false) {
@@ -469,15 +469,15 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void ternaryConstant() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class A {
                   String alwaysA() {
                       return true ? "a" : "b";
@@ -502,7 +502,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class A {
                   String alwaysA() {
                       return "a";
@@ -527,37 +527,37 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void ternaryDoubleNegation() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class A {
                   boolean orElse(Boolean nullable, boolean nonnull) {
                       return !(nullable != null ? nullable : nonnull);
                   }
               }
               """,
-            """
+                        """
               class A {
                   boolean orElse(Boolean nullable, boolean nonnull) {
                       return nullable == null ? nonnull : nullable;
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void ternayNegation() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   boolean m1(boolean a, boolean b, boolean c) {
                       return !(a ? b : c);
@@ -573,7 +573,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   boolean m1(boolean a, boolean b, boolean c) {
                       return a ? c : b;
@@ -589,15 +589,15 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void differentFieldAccesses() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   Object f = null;
                   class B extends A {
@@ -611,15 +611,15 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void preserveComments() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   boolean m(boolean a) {
                       if (/*a*/!!a) {
@@ -629,7 +629,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               public class A {
                   boolean m(boolean a) {
                       if (/*a*/a) {
@@ -639,15 +639,15 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void doubleMethodInvocationNotSimplified() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public class A {
                   void foo() {
                       boolean a = booleanExpression() || booleanExpression();
@@ -660,7 +660,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -738,8 +738,8 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     @Test
     void simplifyStringLiteralEqualsStringLiteral() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class A {
                   {
                       String foo = "foo";
@@ -751,7 +751,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class A {
                   {
                       String foo = "foo";
@@ -763,7 +763,7 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

@@ -32,8 +32,8 @@ class AutodetectTest implements RewriteTest {
     @Test
     void groovyTabsAndIndents() {
         Stream<SourceFile> parse = GroovyParser.builder().build()
-          .parse(
-            """
+                .parse(
+                        """
               class Example {
                   static void main(String[] args) {
                      String name = "Joe"
@@ -42,7 +42,7 @@ class AutodetectTest implements RewriteTest {
                   }
                }
               """
-          );
+                );
         var detector = Autodetect.detector();
         parse.forEach(detector::sample);
         var styles = detector.build();

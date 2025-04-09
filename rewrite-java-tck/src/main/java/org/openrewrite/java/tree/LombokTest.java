@@ -54,8 +54,8 @@ class LombokTest implements RewriteTest {
     @Test
     void cleanup() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import lombok.Cleanup;
               import java.io.*;
               
@@ -72,15 +72,15 @@ class LombokTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void getter() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import lombok.Getter;
               
               @Getter
@@ -92,15 +92,15 @@ class LombokTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void builder() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import lombok.Builder;
               
               @Builder
@@ -114,15 +114,15 @@ class LombokTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void tostring() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import lombok.ToString;
               
               @ToString
@@ -146,15 +146,15 @@ class LombokTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void equalsAndHashCode() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import lombok.EqualsAndHashCode;
               
               @EqualsAndHashCode
@@ -178,15 +178,15 @@ class LombokTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void constructor() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import lombok.*;
               
               @RequiredArgsConstructor(staticName = "of")
@@ -201,15 +201,15 @@ class LombokTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void data() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import lombok.AccessLevel;
               import lombok.Setter;
               import lombok.Data;
@@ -229,15 +229,15 @@ class LombokTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void value() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import lombok.*;
               import lombok.experimental.*;
               
@@ -255,15 +255,15 @@ class LombokTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void synchronize() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import lombok.Synchronized;
               
               public class SynchronizedExample {
@@ -285,15 +285,15 @@ class LombokTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void locked() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import lombok.Locked;
               
               public class LockedExample {
@@ -315,15 +315,15 @@ class LombokTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void with() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import lombok.AccessLevel;
               import lombok.NonNull;
               import lombok.With;
@@ -338,15 +338,15 @@ class LombokTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void lazyGetter() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import lombok.Getter;
               
               public class GetterLazyExample {
@@ -361,15 +361,15 @@ class LombokTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void singular() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import lombok.Builder;
               import lombok.Singular;
               import java.util.Collection;
@@ -383,15 +383,15 @@ class LombokTest implements RewriteTest {
                   private @Singular Collection<?> minutiae;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void jul() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import lombok.extern.java.Log;
               
               import java.util.Map;
@@ -406,15 +406,15 @@ class LombokTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void val() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import lombok.val;
               
               class A {
@@ -423,15 +423,15 @@ class LombokTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void sneakyThrows() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import lombok.SneakyThrows;
               
               import java.io.UnsupportedEncodingException;
@@ -453,15 +453,15 @@ class LombokTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void accessors() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import lombok.experimental.Accessors;
               import lombok.Getter;
               import lombok.Setter;
@@ -483,15 +483,15 @@ class LombokTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void fieldDefaults() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import lombok.AccessLevel;
               import lombok.experimental.FieldDefaults;
               import lombok.experimental.NonFinal;
@@ -510,30 +510,30 @@ class LombokTest implements RewriteTest {
                 }
               }
               """,
-            spec -> spec.afterRecipe(cu -> {
-                List<Statement> statements = cu.getClasses().get(0).getBody().getStatements();
-                assertThatCollection(requireNonNull(((J.VariableDeclarations) statements.get(0)).getVariables().get(0).getVariableType()).getFlags())
-                  .as("Field 'a' explicitly specifies its modifiers, overriding the lombok defaults")
-                  .containsExactlyInAnyOrder(Flag.Public, Flag.Final);
-                assertThatCollection(requireNonNull(((J.VariableDeclarations) statements.get(1)).getVariables().get(0).getVariableType()).getFlags())
-                  .as("Field 'b' does not specify its modifiers, so it should use the lombok defaults")
-                  .containsExactlyInAnyOrder(Flag.Private, Flag.Final);
-                assertThatCollection(requireNonNull(((J.VariableDeclarations) statements.get(2)).getVariables().get(0).getVariableType()).getFlags())
-                  .as("Field 'c' is annotated with @NonFinal, so it should not be final")
-                  .containsExactlyInAnyOrder(Flag.Private);
-                assertThatCollection(requireNonNull(((J.VariableDeclarations) statements.get(3)).getVariables().get(0).getVariableType()).getFlags())
-                  .as("Field 'd' is annotated with @PackagePrivate, so it should be package-private")
-                  .containsExactlyInAnyOrder(Flag.Final);
-            })
-          )
+                        spec -> spec.afterRecipe(cu -> {
+                            List<Statement> statements = cu.getClasses().get(0).getBody().getStatements();
+                            assertThatCollection(requireNonNull(((J.VariableDeclarations) statements.get(0)).getVariables().get(0).getVariableType()).getFlags())
+                                    .as("Field 'a' explicitly specifies its modifiers, overriding the lombok defaults")
+                                    .containsExactlyInAnyOrder(Flag.Public, Flag.Final);
+                            assertThatCollection(requireNonNull(((J.VariableDeclarations) statements.get(1)).getVariables().get(0).getVariableType()).getFlags())
+                                    .as("Field 'b' does not specify its modifiers, so it should use the lombok defaults")
+                                    .containsExactlyInAnyOrder(Flag.Private, Flag.Final);
+                            assertThatCollection(requireNonNull(((J.VariableDeclarations) statements.get(2)).getVariables().get(0).getVariableType()).getFlags())
+                                    .as("Field 'c' is annotated with @NonFinal, so it should not be final")
+                                    .containsExactlyInAnyOrder(Flag.Private);
+                            assertThatCollection(requireNonNull(((J.VariableDeclarations) statements.get(3)).getVariables().get(0).getVariableType()).getFlags())
+                                    .as("Field 'd' is annotated with @PackagePrivate, so it should be package-private")
+                                    .containsExactlyInAnyOrder(Flag.Final);
+                        })
+                )
         );
     }
 
     @Test
     void delegate() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.util.ArrayList;
               import java.util.Collection;
               
@@ -572,15 +572,15 @@ class LombokTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void utilityClass() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import lombok.experimental.UtilityClass;
               
               @UtilityClass
@@ -592,15 +592,15 @@ class LombokTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void fieldNameConstants() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import lombok.experimental.FieldNameConstants;
               
               @FieldNameConstants
@@ -615,15 +615,15 @@ class LombokTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void tolerate() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import lombok.experimental.Tolerate;
               import lombok.Setter;
               
@@ -642,16 +642,16 @@ class LombokTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void jacksonized() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().classpath("jackson-annotations", "lombok")),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().classpath("jackson-annotations", "lombok")),
+                java(
+                        """
               import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
               import lombok.Builder;
               import lombok.extern.jackson.Jacksonized;
@@ -663,22 +663,22 @@ class LombokTest implements RewriteTest {
                   private List<String> strings;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void standardException() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import lombok.experimental.StandardException;
               
               @StandardException
               public class ExampleException extends Exception {
               }
               """
-          )
+                )
         );
     }
 
@@ -692,9 +692,9 @@ class LombokTest implements RewriteTest {
         @Test
         void extensionMethod() {
             rewriteRun(
-              spec -> spec.typeValidationOptions(TypeValidation.none()),
-              java(
-                """
+                    spec -> spec.typeValidationOptions(TypeValidation.none()),
+                    java(
+                            """
                   import lombok.experimental.ExtensionMethod;
                   
                   @ExtensionMethod({java.util.Arrays.class, Extensions.class})
@@ -717,16 +717,16 @@ class LombokTest implements RewriteTest {
                       }
                   }
                   """
-              )
+                    )
             );
         }
 
         @Test
         void onConstructor() {
             rewriteRun(
-              spec -> spec.typeValidationOptions(TypeValidation.none()),
-              java(
-                """
+                    spec -> spec.typeValidationOptions(TypeValidation.none()),
+                    java(
+                            """
                   import lombok.AllArgsConstructor;
                   import lombok.Getter;
                   import lombok.Setter;
@@ -744,16 +744,16 @@ class LombokTest implements RewriteTest {
                       private long unid;
                   }
                   """
-              )
+                    )
             );
         }
 
         @Test
         void onConstructorNoArgs() {
             rewriteRun(
-              spec -> spec.typeValidationOptions(TypeValidation.none()),
-              java(
-                """
+                    spec -> spec.typeValidationOptions(TypeValidation.none()),
+                    java(
+                            """
                   import lombok.NoArgsConstructor;
                   import lombok.Getter;
                   import lombok.RequiredArgsConstructor;import lombok.Setter;
@@ -766,16 +766,16 @@ class LombokTest implements RewriteTest {
                       private long unid;
                   }
                   """
-              )
+                    )
             );
         }
 
         @Test
         void helper() {
             rewriteRun(
-              spec -> spec.typeValidationOptions(TypeValidation.none()),
-              java(
-                """
+                    spec -> spec.typeValidationOptions(TypeValidation.none()),
+                    java(
+                            """
                   import lombok.experimental.Helper;
                   
                   public class HelperExample {
@@ -794,7 +794,7 @@ class LombokTest implements RewriteTest {
                       }
                   }
                   """
-              )
+                    )
             );
         }
     }

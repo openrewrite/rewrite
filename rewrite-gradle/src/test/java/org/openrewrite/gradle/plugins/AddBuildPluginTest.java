@@ -35,105 +35,105 @@ class AddBuildPluginTest implements RewriteTest {
     @Test
     void addPluginWithoutVersionToNewBlock() {
         rewriteRun(
-          spec -> spec.recipe(new AddBuildPlugin("java-library", null, null, null)),
-          buildGradle(
-            "",
-            """
+                spec -> spec.recipe(new AddBuildPlugin("java-library", null, null, null)),
+                buildGradle(
+                        "",
+                        """
               plugins {
                   id 'java-library'
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void addPluginWithoutVersionToExistingBlock() {
         rewriteRun(
-          spec -> spec.recipe(new AddBuildPlugin("java-library", null, null, null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new AddBuildPlugin("java-library", null, null, null)),
+                buildGradle(
+                        """
               plugins {
                   id "java"
               }
               """,
-            """
+                        """
               plugins {
                   id "java"
                   id "java-library"
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void addThirdPartyPluginWithoutVersion() {
         rewriteRun(
-          spec -> spec.recipe(new AddBuildPlugin("org.openrewrite.rewrite", null, null, null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new AddBuildPlugin("org.openrewrite.rewrite", null, null, null)),
+                buildGradle(
+                        """
               plugins {
                   id "java"
               }
               """,
-            """
+                        """
               plugins {
                   id "java"
                   id "org.openrewrite.rewrite"
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void addPluginWithVersionToNewBlock() {
         rewriteRun(
-          spec -> spec.recipe(new AddBuildPlugin("com.jfrog.bintray", "1.0", null, null)),
-          buildGradle(
-            "",
-            """
+                spec -> spec.recipe(new AddBuildPlugin("com.jfrog.bintray", "1.0", null, null)),
+                buildGradle(
+                        "",
+                        """
               plugins {
                   id 'com.jfrog.bintray' version '1.0'
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void addPluginWithVersionToExistingBlock() {
         rewriteRun(
-          spec -> spec.recipe(new AddBuildPlugin("com.jfrog.bintray", "1.0", null, null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new AddBuildPlugin("com.jfrog.bintray", "1.0", null, null)),
+                buildGradle(
+                        """
               plugins {
                   id "java"
               }
               """,
-            """
+                        """
               plugins {
                   id "java"
                   id "com.jfrog.bintray" version "1.0"
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void addPluginAfterBuildscriptBlock() {
         rewriteRun(
-          spec -> spec.recipe(new AddBuildPlugin("com.jfrog.bintray", "1.0", null, null)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new AddBuildPlugin("com.jfrog.bintray", "1.0", null, null)),
+                buildGradle(
+                        """
               import java.util.List
                             
               buildscript {
               }
               """,
-            """
+                        """
               import java.util.List
                             
               buildscript {
@@ -143,19 +143,19 @@ class AddBuildPluginTest implements RewriteTest {
                   id 'com.jfrog.bintray' version '1.0'
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void addPluginToNewBlockWithLicenseHeader() {
         rewriteRun(
-          spec -> {
-              spec.recipe(new AddBuildPlugin("com.jfrog.bintray", "1.0", null, null));
-              spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")));
-          },
-          buildGradle(
-            """
+                spec -> {
+                    spec.recipe(new AddBuildPlugin("com.jfrog.bintray", "1.0", null, null));
+                    spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")));
+                },
+                buildGradle(
+                        """
               /*
                * License header
                */
@@ -174,19 +174,19 @@ class AddBuildPluginTest implements RewriteTest {
               dependencies {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void addPluginToNewBlockWithLicenseHeaderAndComment() {
         rewriteRun(
-          spec -> {
-              spec.recipe(new AddBuildPlugin("com.jfrog.bintray", "1.0", null, null));
-              spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")));
-          },
-          buildGradle(
-            """
+                spec -> {
+                    spec.recipe(new AddBuildPlugin("com.jfrog.bintray", "1.0", null, null));
+                    spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")));
+                },
+                buildGradle(
+                        """
               /*
                * License header
                */
@@ -207,19 +207,19 @@ class AddBuildPluginTest implements RewriteTest {
               dependencies {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void addPluginToNewBlockWithOnlyLicenseHeader() {
         rewriteRun(
-          spec -> {
-              spec.recipe(new AddBuildPlugin("com.jfrog.bintray", "1.0", null, null));
-              spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")));
-          },
-          buildGradle(
-            """
+                spec -> {
+                    spec.recipe(new AddBuildPlugin("com.jfrog.bintray", "1.0", null, null));
+                    spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")));
+                },
+                buildGradle(
+                        """
               /*
                * License header
                */
@@ -232,27 +232,27 @@ class AddBuildPluginTest implements RewriteTest {
                   id 'com.jfrog.bintray' version '1.0'
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void addPluginApplyFalse() {
         rewriteRun(
-          spec -> spec.recipe(new AddBuildPlugin("com.jfrog.bintray", "1.0", null, false)),
-          buildGradle(
-            """
+                spec -> spec.recipe(new AddBuildPlugin("com.jfrog.bintray", "1.0", null, false)),
+                buildGradle(
+                        """
             plugins {
                 id "java"
             }
             """,
-            """
+                        """
             plugins {
                 id "java"
                 id "com.jfrog.bintray" version "1.0" apply false
             }
             """
-          )
+                )
         );
     }
 }

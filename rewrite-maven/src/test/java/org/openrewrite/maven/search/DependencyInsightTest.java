@@ -28,9 +28,9 @@ class DependencyInsightTest implements RewriteTest {
     @Test
     void doesNotMatchTestScope() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyInsight("*guava*", "*", "compile", null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new DependencyInsight("*guava*", "*", "compile", null, null)),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -45,7 +45,7 @@ class DependencyInsightTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -53,9 +53,9 @@ class DependencyInsightTest implements RewriteTest {
     @Test
     void findDependency() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyInsight("*guava*", "*", "compile", null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new DependencyInsight("*guava*", "*", "compile", null, null)),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -69,7 +69,7 @@ class DependencyInsightTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -83,16 +83,16 @@ class DependencyInsightTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void findDependencyTransitively() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyInsight("*", "*simpleclient*", "compile", null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new DependencyInsight("*", "*simpleclient*", "compile", null, null)),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -106,7 +106,7 @@ class DependencyInsightTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -120,16 +120,16 @@ class DependencyInsightTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void onlyDirect() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyInsight("*", "*simpleclient*", "compile", null, true)),
-          pomXml(
-            """
+                spec -> spec.recipe(new DependencyInsight("*", "*simpleclient*", "compile", null, true)),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -143,7 +143,7 @@ class DependencyInsightTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -151,9 +151,9 @@ class DependencyInsightTest implements RewriteTest {
     @Test
     void versionSelector() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyInsight("org.openrewrite", "*", "compile", "8.0.0", true)),
-          pomXml(
-            """
+                spec -> spec.recipe(new DependencyInsight("org.openrewrite", "*", "compile", "8.0.0", true)),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -172,7 +172,7 @@ class DependencyInsightTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -191,7 +191,7 @@ class DependencyInsightTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 }

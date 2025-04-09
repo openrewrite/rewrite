@@ -50,26 +50,26 @@ class RecipeSchedulerTest implements RewriteTest {
     @Test
     void exceptionsCauseResult() {
         rewriteRun(
-          spec -> spec
-            .executionContext(new InMemoryExecutionContext())
-            .recipe(new BoomRecipe())
-            .afterRecipe(run -> {
-                  SourceFile after = run.getChangeset().getAllResults().get(0).getAfter();
-                  assertThat(after).isNotNull();
-                  assertThat(after.getMarkers().findFirst(Markup.Error.class))
-                    .hasValueSatisfying(err -> {
-                        assertThat(err.getMessage()).isEqualTo("boom");
-                        assertThat(err.getDetail())
-                          .matches("org.openrewrite.BoomException: boom" +
-                                   "\\s+org.openrewrite.BoomRecipe\\$1.visitText\\(RecipeSchedulerTest.java:\\d+\\)" +
-                                   "\\s+org.openrewrite.BoomRecipe\\$1.visitText\\(RecipeSchedulerTest.java:\\d+\\)");
-                    });
-              }
-            ),
-          text(
-            "hello",
-            "~~(boom)~~>hello"
-          )
+                spec -> spec
+                        .executionContext(new InMemoryExecutionContext())
+                        .recipe(new BoomRecipe())
+                        .afterRecipe(run -> {
+                                    SourceFile after = run.getChangeset().getAllResults().get(0).getAfter();
+                                    assertThat(after).isNotNull();
+                                    assertThat(after.getMarkers().findFirst(Markup.Error.class))
+                                            .hasValueSatisfying(err -> {
+                                                assertThat(err.getMessage()).isEqualTo("boom");
+                                                assertThat(err.getDetail())
+                                                        .matches("org.openrewrite.BoomException: boom" +
+                                                                "\\s+org.openrewrite.BoomRecipe\\$1.visitText\\(RecipeSchedulerTest.java:\\d+\\)" +
+                                                                "\\s+org.openrewrite.BoomRecipe\\$1.visitText\\(RecipeSchedulerTest.java:\\d+\\)");
+                                            });
+                                }
+                        ),
+                text(
+                        "hello",
+                        "~~(boom)~~>hello"
+                )
         );
     }
 
@@ -79,24 +79,24 @@ class RecipeSchedulerTest implements RewriteTest {
         WorkingDirectoryExecutionContextView.view(ctx).setRoot(path);
         AtomicInteger cycle = new AtomicInteger(0);
         rewriteRun(
-          spec -> spec.executionContext(ctx).recipe(toRecipe(() -> new TreeVisitor<>() {
-              @Override
-              public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                  assert tree != null;
-                  PlainText plainText = (PlainText) tree;
-                  Path workingDirectory = WorkingDirectoryExecutionContextView.view(ctx)
-                    .getWorkingDirectory();
-                  assertThat(workingDirectory).hasParent(path);
-                  if (cycle.incrementAndGet() == 2) {
-                      assertThat(workingDirectory.resolve("foo.txt")).hasContent("foo");
-                  }
-                  assertDoesNotThrow(() -> {
-                      Files.writeString(workingDirectory.resolve("foo.txt"), plainText.getText());
-                  });
-                  return plainText.withText("bar");
-              }
-          })),
-          text("foo", "bar")
+                spec -> spec.executionContext(ctx).recipe(toRecipe(() -> new TreeVisitor<>() {
+                    @Override
+                    public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                        assert tree != null;
+                        PlainText plainText = (PlainText) tree;
+                        Path workingDirectory = WorkingDirectoryExecutionContextView.view(ctx)
+                                .getWorkingDirectory();
+                        assertThat(workingDirectory).hasParent(path);
+                        if (cycle.incrementAndGet() == 2) {
+                            assertThat(workingDirectory.resolve("foo.txt")).hasContent("foo");
+                        }
+                        assertDoesNotThrow(() -> {
+                            Files.writeString(workingDirectory.resolve("foo.txt"), plainText.getText());
+                        });
+                        return plainText.withText("bar");
+                    }
+                })),
+                text("foo", "bar")
         );
         assertThat(path).doesNotExist();
     }
@@ -106,8 +106,8 @@ class RecipeSchedulerTest implements RewriteTest {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext();
         WorkingDirectoryExecutionContextView.view(ctx).setRoot(path);
         rewriteRun(
-          spec -> spec.executionContext(ctx).recipe(new RecipeWritingToFile(0)),
-          text("foo", "bar")
+                spec -> spec.executionContext(ctx).recipe(new RecipeWritingToFile(0)),
+                text("foo", "bar")
         );
         assertThat(path).doesNotExist();
     }
@@ -117,21 +117,21 @@ class RecipeSchedulerTest implements RewriteTest {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext();
         WorkingDirectoryExecutionContextView.view(ctx).setRoot(path);
         DeclarativeRecipe recipe = new DeclarativeRecipe(
-          "root",
-          "Root recipe",
-          "Root recipe.",
-          emptySet(),
-          null,
-          URI.create("dummy:recipe.yml"),
-          false,
-          emptyList()
+                "root",
+                "Root recipe",
+                "Root recipe.",
+                emptySet(),
+                null,
+                URI.create("dummy:recipe.yml"),
+                false,
+                emptyList()
         );
         recipe.addUninitialized(new RecipeWritingToFile(1));
         recipe.addUninitialized(new RecipeWritingToFile(2));
         recipe.initialize(List.of(), Map.of());
         rewriteRun(
-          spec -> spec.executionContext(ctx).recipe(recipe),
-          text("foo", "bar")
+                spec -> spec.executionContext(ctx).recipe(recipe),
+                text("foo", "bar")
         );
         assertThat(path).doesNotExist();
     }
@@ -171,8 +171,8 @@ class BoomException extends RuntimeException {
     @Override
     public StackTraceElement[] getStackTrace() {
         return Arrays.stream(super.getStackTrace())
-          .filter(st -> st.getClassName().startsWith(BoomRecipe.class.getName()))
-          .toArray(StackTraceElement[]::new);
+                .filter(st -> st.getClassName().startsWith(BoomRecipe.class.getName()))
+                .toArray(StackTraceElement[]::new);
     }
 }
 
@@ -199,12 +199,12 @@ class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator
 
     private Path validateExecutionContext(ExecutionContext ctx) {
         Path workingDirectory = WorkingDirectoryExecutionContextView.view(ctx)
-          .getWorkingDirectory();
+                .getWorkingDirectory();
         assertThat(workingDirectory).isDirectory();
         assertThat(workingDirectory).hasParent(ctx.getMessage(WORKING_DIRECTORY_ROOT));
         assertThat(ctx.getCycleDetails().getRecipePosition()).isEqualTo(position);
         assertThat(workingDirectory.getFileName().toString())
-          .isEqualTo("cycle" + ctx.getCycle() + "_recipe" + position);
+                .isEqualTo("cycle" + ctx.getCycle() + "_recipe" + position);
         return workingDirectory;
     }
 
@@ -242,7 +242,7 @@ class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 Path workingDirectory = WorkingDirectoryExecutionContextView
-                  .view(ctx).getWorkingDirectory();
+                        .view(ctx).getWorkingDirectory();
                 assertThat(workingDirectory).isDirectory();
                 assertThat(acc.workingDirectory()).isEqualTo(workingDirectory);
                 assertThat(workingDirectory).isDirectoryContaining(path -> path.getFileName().toString().equals("manifest.txt"));

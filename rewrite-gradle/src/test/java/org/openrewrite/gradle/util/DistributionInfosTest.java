@@ -31,16 +31,16 @@ class DistributionInfosTest {
     void fetch() throws IOException {
         HttpSender httpSender = new HttpUrlConnectionSender(Duration.ofSeconds(30), Duration.ofMinutes(1));
         GradleWrapper.GradleVersion gradleVersion = new GradleWrapper.GradleVersion(
-          "7.6",
-          "https://services.gradle.org/distributions/gradle-7.6-bin.zip",
-          "https://services.gradle.org/distributions/gradle-7.6-bin.zip.sha256",
-          "https://services.gradle.org/distributions/gradle-7.6-wrapper.jar.sha256"
-          );
+                "7.6",
+                "https://services.gradle.org/distributions/gradle-7.6-bin.zip",
+                "https://services.gradle.org/distributions/gradle-7.6-bin.zip.sha256",
+                "https://services.gradle.org/distributions/gradle-7.6-wrapper.jar.sha256"
+        );
         DistributionInfos infos = DistributionInfos.fetch(httpSender, GradleWrapper.DistributionType.Bin, gradleVersion);
 
         assertThat(infos).isEqualTo(new DistributionInfos(
-          "https://services.gradle.org/distributions/gradle-7.6-bin.zip",
-          Checksum.fromHex("SHA-256", "7ba68c54029790ab444b39d7e293d3236b2632631fb5f2e012bb28b4ff669e4b"),
-          Checksum.fromHex("SHA-256", "c5a643cf80162e665cc228f7b16f343fef868e47d3a4836f62e18b7e17ac018a")));
+                "https://services.gradle.org/distributions/gradle-7.6-bin.zip",
+                Checksum.fromHex("SHA-256", "7ba68c54029790ab444b39d7e293d3236b2632631fb5f2e012bb28b4ff669e4b"),
+                Checksum.fromHex("SHA-256", "c5a643cf80162e665cc228f7b16f343fef868e47d3a4836f62e18b7e17ac018a")));
     }
 }

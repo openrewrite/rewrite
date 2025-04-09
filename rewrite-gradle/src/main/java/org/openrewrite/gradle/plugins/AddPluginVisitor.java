@@ -79,7 +79,7 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
 
     private static boolean isLicenseHeader(Comment comment) {
         return comment instanceof TextComment && comment.isMultiline() &&
-               ((TextComment) comment).getText().contains("License");
+                ((TextComment) comment).getText().contains("License");
     }
 
     private static G.CompilationUnit removeLicenseHeader(G.CompilationUnit cu) {
@@ -139,8 +139,8 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
 
             String delimiter = singleQuote.get() < doubleQuote.get() ? "\"" : "'";
             String source = "plugins {\n" +
-                            "    id " + delimiter + pluginId + delimiter + (version != null ? " version " + delimiter + version + delimiter : "") + (version != null && Boolean.FALSE.equals(apply) ? " apply " + apply : "") + "\n" +
-                            "}";
+                    "    id " + delimiter + pluginId + delimiter + (version != null ? " version " + delimiter + version + delimiter : "") + (version != null && Boolean.FALSE.equals(apply) ? " apply " + apply : "") + "\n" +
+                    "}";
             Statement statement = GradleParser.builder().build()
                     .parseInputs(singletonList(Parser.Input.fromString(source)), null, ctx)
                     .findFirst()
@@ -155,9 +155,9 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
 
             if (FindMethods.find(cu, "RewriteGradleProject plugins(..)").isEmpty() && FindMethods.find(cu, "RewriteSettings plugins(..)").isEmpty()) {
                 if (cu.getSourcePath().endsWith(Paths.get("settings.gradle")) &&
-                    !cu.getStatements().isEmpty() &&
-                    cu.getStatements().get(0) instanceof J.MethodInvocation &&
-                    ((J.MethodInvocation) cu.getStatements().get(0)).getSimpleName().equals("pluginManagement")) {
+                        !cu.getStatements().isEmpty() &&
+                        cu.getStatements().get(0) instanceof J.MethodInvocation &&
+                        ((J.MethodInvocation) cu.getStatements().get(0)).getSimpleName().equals("pluginManagement")) {
                     return cu.withStatements(ListUtils.insert(cu.getStatements(), autoFormat(statement.withPrefix(Space.format("\n\n")), ctx, getCursor()), 1));
                 } else {
                     int insertAtIdx = 0;

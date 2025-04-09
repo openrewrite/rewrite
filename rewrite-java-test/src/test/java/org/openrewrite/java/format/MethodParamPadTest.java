@@ -53,11 +53,11 @@ class MethodParamPadTest implements RewriteTest {
     @Test
     void addSpacePadding() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(namedStyles(singletonList(
-            new MethodParamPadStyle(true, false)
-          )))),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(namedStyles(singletonList(
+                        new MethodParamPadStyle(true, false)
+                )))),
+                java(
+                        """
               enum E {
                   E1()
               }
@@ -76,7 +76,7 @@ class MethodParamPadTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               enum E {
                   E1 ()
               }
@@ -95,19 +95,19 @@ class MethodParamPadTest implements RewriteTest {
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
     @Test
     void removeSpacePadding() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(namedStyles(singletonList(
-            new MethodParamPadStyle(false, false)
-          )))),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(namedStyles(singletonList(
+                        new MethodParamPadStyle(false, false)
+                )))),
+                java(
+                        """
               enum E {
                   E1 ()
               }
@@ -126,7 +126,7 @@ class MethodParamPadTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               enum E {
                   E1()
               }
@@ -145,19 +145,19 @@ class MethodParamPadTest implements RewriteTest {
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
     @Test
     void allowLineBreaks() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(namedStyles(singletonList(
-            new MethodParamPadStyle(true, true)
-          )))),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(namedStyles(singletonList(
+                        new MethodParamPadStyle(true, true)
+                )))),
+                java(
+                        """
               enum E {
                   E1
                           ()
@@ -182,18 +182,18 @@ class MethodParamPadTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void removeLineBreaks() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(namedStyles(singletonList(
-            new MethodParamPadStyle(false, false)
-          )))),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(namedStyles(singletonList(
+                        new MethodParamPadStyle(false, false)
+                )))),
+                java(
+                        """
               enum E {
                   E1
                           ()
@@ -218,7 +218,7 @@ class MethodParamPadTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               enum E {
                   E1()
               }
@@ -237,19 +237,19 @@ class MethodParamPadTest implements RewriteTest {
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
     @Test
     void removeLineBreaksAndAddSpaces() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(namedStyles(singletonList(
-            new MethodParamPadStyle(true, false)
-          )))),
-          java(
-            """
+                spec -> spec.parser(JavaParser.fromJavaVersion().styles(namedStyles(singletonList(
+                        new MethodParamPadStyle(true, false)
+                )))),
+                java(
+                        """
               enum E {
                   E1
                           ()
@@ -274,7 +274,7 @@ class MethodParamPadTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               enum E {
                   E1 ()
               }
@@ -293,21 +293,21 @@ class MethodParamPadTest implements RewriteTest {
                   }
               }
               """,
-            autoFormatIsIdempotent()
-          )
+                        autoFormatIsIdempotent()
+                )
         );
     }
 
     @Test
     void initializeStyleWhenOtherwiseNotProvided() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               enum E {
                   E1()
               }
               """
-          )
+                )
         );
     }
 
@@ -315,24 +315,24 @@ class MethodParamPadTest implements RewriteTest {
     @Test
     void bodyNotFormatted() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class A {
                   void test() {
                       for  (int i=0;i<10;i++) {}
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void javadocNotFormatted() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
-          java(
-            """
+                spec -> spec.typeValidationOptions(TypeValidation.none()),
+                java(
+                        """
               class A {
                   /**
                    * @see java.sql.Connection#createArrayOf(String, Object[])
@@ -341,15 +341,15 @@ class MethodParamPadTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void recordWithCompactConstructor() {
         rewriteRun(
-          version(java(
-            """
+                version(java(
+                        """
               import java.util.Objects;
 
               public record HttpClientTrafficLogData(
@@ -364,12 +364,12 @@ class MethodParamPadTest implements RewriteTest {
                   }
               }
               """
-          ), 17)
+                ), 17)
         );
     }
 
     private static Consumer<SourceSpec<J.CompilationUnit>> autoFormatIsIdempotent() {
         return spec -> spec.afterRecipe(cu ->
-          assertThat(new AutoFormatVisitor<>().visit(cu, 0)).isEqualTo(cu));
+                assertThat(new AutoFormatVisitor<>().visit(cu, 0)).isEqualTo(cu));
     }
 }

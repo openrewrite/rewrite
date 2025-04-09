@@ -73,7 +73,7 @@ public class FindGradleProject extends Recipe {
                     stopAfterPreVisit();
                     SourceFile sourceFile = (SourceFile) tree;
                     if (sourceFile.getSourcePath().endsWith(Paths.get("build.gradle")) ||
-                        sourceFile.getSourcePath().endsWith(Paths.get("build.gradle.kts"))) {
+                            sourceFile.getSourcePath().endsWith(Paths.get("build.gradle.kts"))) {
                         return SearchResult.found(sourceFile);
                     }
                 }

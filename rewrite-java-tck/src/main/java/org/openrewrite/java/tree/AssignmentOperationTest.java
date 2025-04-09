@@ -25,8 +25,8 @@ class AssignmentOperationTest implements RewriteTest {
     @Test
     void compoundAssignment() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       int n = 0;
@@ -34,7 +34,7 @@ class AssignmentOperationTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

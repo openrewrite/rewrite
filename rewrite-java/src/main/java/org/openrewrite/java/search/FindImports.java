@@ -59,7 +59,7 @@ public class FindImports extends Recipe {
     @Override
     public String getDescription() {
         return "Locates source files that have imports matching the given type pattern, regardless of whether " +
-               "that import is used in the code.";
+                "that import is used in the code.";
     }
 
     @Override

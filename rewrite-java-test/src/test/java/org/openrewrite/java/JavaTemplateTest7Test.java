@@ -31,36 +31,36 @@ class JavaTemplateTest7Test implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1198")
     @Test
     @SuppressWarnings({
-      "CachedNumberConstructorCall",
-      "Convert2MethodRef"
-      , "removal"})
+            "CachedNumberConstructorCall",
+            "Convert2MethodRef"
+    , "removal"})
     void lambdaIsVariableInitializer() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final MethodMatcher matcher = new MethodMatcher("Integer valueOf(..)");
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    final MethodMatcher matcher = new MethodMatcher("Integer valueOf(..)");
 
-              @Override
-              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
-                  if (matcher.matches(method)) {
-                      return JavaTemplate.apply("new Integer(#{any()})", getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
-                  }
-                  return super.visitMethodInvocation(method, p);
-              }
-          })),
-          java(
-            """
+                    @Override
+                    public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
+                        if (matcher.matches(method)) {
+                            return JavaTemplate.apply("new Integer(#{any()})", getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
+                        }
+                        return super.visitMethodInvocation(method, p);
+                    }
+                })),
+                java(
+                        """
               import java.util.function.Function;
               class Test {
                   Function<String, Integer> asInteger = it -> Integer.valueOf(it);
               }
               """,
-            """
+                        """
               import java.util.function.Function;
               class Test {
                   Function<String, Integer> asInteger = it -> new Integer(it);
               }
               """
-          )
+                )
         );
     }
 
@@ -68,35 +68,35 @@ class JavaTemplateTest7Test implements RewriteTest {
     @Test
     void methodDeclarationWithComment() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              @Override
-              public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
-                  var cd = classDecl;
-                  if (cd.getBody().getStatements().isEmpty()) {
-                      cd = JavaTemplate.builder(
-                          //language=groovy
-                          """
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    @Override
+                    public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
+                        var cd = classDecl;
+                        if (cd.getBody().getStatements().isEmpty()) {
+                            cd = JavaTemplate.builder(
+                                    //language=groovy
+                                    """
                             /**
                              * comment
                              */
                             void foo() {
                             }
                             """
-                        )
-                        .contextSensitive()
-                        .build()
-                        .apply(getCursor(), cd.getBody().getCoordinates().firstStatement());
-                  }
-                  return cd;
-              }
-          })),
-          java(
-            """
+                            )
+                            .contextSensitive()
+                                    .build()
+                                    .apply(getCursor(), cd.getBody().getCoordinates().firstStatement());
+                        }
+                        return cd;
+                    }
+                })),
+                java(
+                        """
               class A {
 
               }
               """,
-            """
+                        """
               class A {
                   /**
                    * comment
@@ -106,7 +106,7 @@ class JavaTemplateTest7Test implements RewriteTest {
 
               }
               """
-          )
+                )
         );
     }
 
@@ -115,19 +115,19 @@ class JavaTemplateTest7Test implements RewriteTest {
     @Test
     void assignmentNotPartOfVariableDeclaration() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext p) {
-                  var a = assignment;
-                  if (a.getAssignment() instanceof J.MethodInvocation) {
-                      J.MethodInvocation mi = (J.MethodInvocation) a.getAssignment();
-                      a = JavaTemplate.apply("1", getCursor(), mi.getCoordinates().replace());
-                  }
-                  return a;
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext p) {
+                        var a = assignment;
+                        if (a.getAssignment() instanceof J.MethodInvocation) {
+                            J.MethodInvocation mi = (J.MethodInvocation) a.getAssignment();
+                            a = JavaTemplate.apply("1", getCursor(), mi.getCoordinates().replace());
+                        }
+                        return a;
+                    }
+                })),
+                java(
+                        """
               class A {
                   void foo() {
                       int i;
@@ -135,7 +135,7 @@ class JavaTemplateTest7Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class A {
                   void foo() {
                       int i;
@@ -143,7 +143,7 @@ class JavaTemplateTest7Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -151,27 +151,27 @@ class JavaTemplateTest7Test implements RewriteTest {
     @Test
     void changeMethodInvocation() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final MethodMatcher GET_BYTES = new MethodMatcher("java.lang.String getBytes()");
-              final JavaTemplate WITH_ENCODING = JavaTemplate
-                .builder("getBytes(StandardCharsets.#{})")
-                .contextSensitive()
-                .imports("java.nio.charset.StandardCharsets")
-                .build();
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    final MethodMatcher GET_BYTES = new MethodMatcher("java.lang.String getBytes()");
+                    final JavaTemplate WITH_ENCODING = JavaTemplate
+                            .builder("getBytes(StandardCharsets.#{})")
+                            .contextSensitive()
+                            .imports("java.nio.charset.StandardCharsets")
+                            .build();
 
-              @Override
-              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                  J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
-                  if (GET_BYTES.matches(method)) {
-                      maybeAddImport("java.nio.charset.StandardCharsets");
-                      m = WITH_ENCODING.apply(updateCursor(m), m.getCoordinates().replaceMethod(), "UTF_8");
-                      assertThat(m.getName().getType()).isEqualTo(m.getMethodType());
-                  }
-                  return m;
-              }
-          })),
-          java(
-            """
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                        J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
+                        if (GET_BYTES.matches(method)) {
+                            maybeAddImport("java.nio.charset.StandardCharsets");
+                            m = WITH_ENCODING.apply(updateCursor(m), m.getCoordinates().replaceMethod(), "UTF_8");
+                            assertThat(m.getName().getType()).isEqualTo(m.getMethodType());
+                        }
+                        return m;
+                    }
+                })),
+                java(
+                        """
               public class Test {
                   byte[] test() {
                       String s = "hello";
@@ -179,7 +179,7 @@ class JavaTemplateTest7Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.nio.charset.StandardCharsets;
               
               public class Test {
@@ -189,7 +189,7 @@ class JavaTemplateTest7Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

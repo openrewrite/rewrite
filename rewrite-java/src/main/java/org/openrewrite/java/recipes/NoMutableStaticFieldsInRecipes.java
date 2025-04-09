@@ -47,19 +47,19 @@ public class NoMutableStaticFieldsInRecipes extends Recipe {
                         J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, ctx);
                         if (TypeUtils.isAssignableTo("org.openrewrite.Recipe", cd.getType())) {
                             return cd.withBody(cd.getBody().withStatements(ListUtils.map(cd.getBody().getStatements(), stmt -> {
-                                        if (stmt instanceof J.VariableDeclarations) {
-                                            J.VariableDeclarations field = (J.VariableDeclarations) stmt;
-                                            if (field.hasModifier(J.Modifier.Type.Static) &&
-                                                !field.hasModifier(J.Modifier.Type.Final) &&
-                                                FindAnnotations.find(field, "@java.lang.SuppressWarnings").isEmpty()) {
-                                                // We want to discourage the use of mutable static fields in recipes,
-                                                // so rather than make them immutable, we'll just remove the field.
-                                                // Any fields that were intended as constants should be made final.
-                                                return null;
-                                            }
-                                        }
-                                        return stmt;
-                                    })
+                                if (stmt instanceof J.VariableDeclarations) {
+                                    J.VariableDeclarations field = (J.VariableDeclarations) stmt;
+                                    if (field.hasModifier(J.Modifier.Type.Static) &&
+                                            !field.hasModifier(J.Modifier.Type.Final) &&
+                                            FindAnnotations.find(field, "@java.lang.SuppressWarnings").isEmpty()) {
+                                        // We want to discourage the use of mutable static fields in recipes,
+                                        // so rather than make them immutable, we'll just remove the field.
+                                        // Any fields that were intended as constants should be made final.
+                                        return null;
+                                    }
+                                }
+                                return stmt;
+                            })
                             ));
                         }
                         return cd;

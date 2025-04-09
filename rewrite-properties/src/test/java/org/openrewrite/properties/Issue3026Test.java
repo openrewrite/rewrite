@@ -36,26 +36,26 @@ class Issue3026Test implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3026")
     void modifyContents() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new PropertiesVisitor<>() {
-              @Override
-              public Properties visitFile(Properties.File file, ExecutionContext ctx) {
-                  List<Properties.Content> content = file.getContent();
-                  if (content.size() != 1) {
-                      return file;
-                  }
-                  content = ListUtils.concat(new Properties.Comment(randomId(), "", Markers.EMPTY, Properties.Comment.Delimiter.HASH_TAG, "foo\n"), content);
-                  return file.withContent(content);
-              }
-          })),
-          properties(
-            """
+                spec -> spec.recipe(toRecipe(() -> new PropertiesVisitor<>() {
+                    @Override
+                    public Properties visitFile(Properties.File file, ExecutionContext ctx) {
+                        List<Properties.Content> content = file.getContent();
+                        if (content.size() != 1) {
+                            return file;
+                        }
+                        content = ListUtils.concat(new Properties.Comment(randomId(), "", Markers.EMPTY, Properties.Comment.Delimiter.HASH_TAG, "foo\n"), content);
+                        return file.withContent(content);
+                    }
+                })),
+                properties(
+                        """
               foo=bar
               """,
-            """
+                        """
               #foo
               foo=bar
               """
-          )
+                )
         );
     }
 }

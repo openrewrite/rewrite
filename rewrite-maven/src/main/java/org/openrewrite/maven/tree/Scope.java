@@ -143,7 +143,7 @@ public enum Scope {
      */
     @SuppressWarnings("unused")
     public static @Nullable String asGradleConfigurationName(@Nullable Scope scope) {
-        if(scope == null) {
+        if (scope == null) {
             return null;
         }
         switch (scope) {

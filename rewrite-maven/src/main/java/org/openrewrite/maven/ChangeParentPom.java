@@ -77,7 +77,7 @@ public class ChangeParentPom extends Recipe {
 
     @Option(displayName = "Old relative path",
             description = "The relativePath of the maven parent pom to be changed away from. " +
-                          "Use an empty String to match `<relativePath />`, use `../pom.xml` to match the default value.",
+                    "Use an empty String to match `<relativePath />`, use `../pom.xml` to match the default value.",
             example = "../../pom.xml",
             required = false)
     @Nullable
@@ -92,7 +92,7 @@ public class ChangeParentPom extends Recipe {
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
@@ -100,7 +100,7 @@ public class ChangeParentPom extends Recipe {
 
     @Option(displayName = "Allow version downgrades",
             description = "If the new parent has the same group/artifact, this flag can be used to only upgrade the " +
-                          "version if the target version is newer than the current.",
+                    "version if the target version is newer than the current.",
             required = false)
     @Nullable
     Boolean allowVersionDowngrades;
@@ -140,8 +140,8 @@ public class ChangeParentPom extends Recipe {
             public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
                 Parent parent = getResolutionResult().getPom().getRequested().getParent();
                 if (parent != null &&
-                    matchesGlob(parent.getArtifactId(), oldArtifactId) &&
-                    matchesGlob(parent.getGroupId(), oldGroupId)) {
+                        matchesGlob(parent.getArtifactId(), oldArtifactId) &&
+                        matchesGlob(parent.getGroupId(), oldGroupId)) {
                     return SearchResult.found(document);
                 }
                 return document;
@@ -160,8 +160,8 @@ public class ChangeParentPom extends Recipe {
                     ResolvedPom resolvedPom = mrr.getPom();
 
                     if (matchesGlob(resolvedPom.getValue(tag.getChildValue("groupId").orElse(null)), oldGroupId) &&
-                        matchesGlob(resolvedPom.getValue(tag.getChildValue("artifactId").orElse(null)), oldArtifactId) &&
-                        (oldRelativePath == null || matchesGlob(determineRelativePath(tag, resolvedPom), oldRelativePath))) {
+                            matchesGlob(resolvedPom.getValue(tag.getChildValue("artifactId").orElse(null)), oldArtifactId) &&
+                            (oldRelativePath == null || matchesGlob(determineRelativePath(tag, resolvedPom), oldRelativePath))) {
                         String oldVersion = resolvedPom.getValue(tag.getChildValue("version").orElse(null));
                         assert oldVersion != null;
                         String currentGroupId = tag.getChildValue("groupId").orElse(oldGroupId);
@@ -172,10 +172,10 @@ public class ChangeParentPom extends Recipe {
                         try {
                             Optional<String> targetVersion = findAcceptableVersion(targetGroupId, targetArtifactId, oldVersion, ctx);
                             if (!targetVersion.isPresent() ||
-                                (Objects.equals(targetGroupId, currentGroupId) &&
-                                 Objects.equals(targetArtifactId, currentArtifactId) &&
-                                 Objects.equals(targetVersion.get(), oldVersion) &&
-                                 Objects.equals(targetRelativePath, oldRelativePath))) {
+                                    (Objects.equals(targetGroupId, currentGroupId) &&
+                                            Objects.equals(targetArtifactId, currentArtifactId) &&
+                                            Objects.equals(targetVersion.get(), oldVersion) &&
+                                            Objects.equals(targetRelativePath, oldRelativePath))) {
                                 return t;
                             }
 
@@ -208,7 +208,7 @@ public class ChangeParentPom extends Recipe {
                             Map<String, String> propertiesInUse = getPropertiesInUse(getCursor().firstEnclosingOrThrow(Xml.Document.class), ctx);
                             Map<String, String> newParentProps = newParent.getProperties();
                             for (Map.Entry<String, String> propInUse : propertiesInUse.entrySet()) {
-                                if(!newParentProps.containsKey(propInUse.getKey())) {
+                                if (!newParentProps.containsKey(propInUse.getKey())) {
                                     changeParentTagVisitors.add(new UnconditionalAddProperty(propInUse.getKey(), propInUse.getValue()));
                                 }
                             }
@@ -266,7 +266,7 @@ public class ChangeParentPom extends Recipe {
             }
 
             private Optional<String> findAcceptableVersion(String groupId, String artifactId, String currentVersion,
-                                                                ExecutionContext ctx) throws MavenDownloadingException {
+                    ExecutionContext ctx) throws MavenDownloadingException {
                 String finalCurrentVersion = !Semver.isVersion(currentVersion) ? "0.0.0" : currentVersion;
 
                 if (availableVersions == null) {
@@ -306,14 +306,15 @@ public class ChangeParentPom extends Recipe {
 
             @Nullable
             ResolvedPom resolvedPom = null;
+
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
-                if(t.getContent() != null && t.getContent().size() == 1 && t.getContent().get(0) instanceof Xml.CharData) {
+                if (t.getContent() != null && t.getContent().size() == 1 && t.getContent().get(0) instanceof Xml.CharData) {
                     String text = ((Xml.CharData) t.getContent().get(0)).getText().trim();
                     Matcher m = PROPERTY_PATTERN.matcher(text);
-                    while(m.find()) {
-                        if(resolvedPom == null) {
+                    while (m.find()) {
+                        if (resolvedPom == null) {
                             resolvedPom = getResolutionResult().getPom();
                         }
                         String propertyName = m.group(1).trim();
@@ -359,7 +360,7 @@ public class ChangeParentPom extends Recipe {
                 .map(dep -> new GroupArtifactVersion(dep.getGroupId(), dep.getArtifactId(), null))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
 
-        if(requestedWithoutExplicitVersion.isEmpty()) {
+        if (requestedWithoutExplicitVersion.isEmpty()) {
             return emptyList();
         }
 
@@ -382,7 +383,7 @@ public class ChangeParentPom extends Recipe {
                         }))
                 .collect(Collectors.toList());
 
-        if(depsWithoutExplicitVersion.isEmpty()) {
+        if (depsWithoutExplicitVersion.isEmpty()) {
             return emptyList();
         }
 
@@ -398,12 +399,12 @@ public class ChangeParentPom extends Recipe {
     }
 
 
-
     @Value
     @EqualsAndHashCode(callSuper = false)
     private static class UnconditionalAddProperty extends MavenIsoVisitor<ExecutionContext> {
         String key;
         String value;
+
         @Override
         public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
             Xml.Document d = super.visitDocument(document, ctx);
@@ -426,7 +427,7 @@ public class ChangeParentPom extends Recipe {
         public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
             Xml.Tag t = super.visitTag(tag, ctx);
             if (isPropertyTag() && key.equals(tag.getName()) &&
-                !value.equals(tag.getValue().orElse(null))) {
+                    !value.equals(tag.getValue().orElse(null))) {
                 t = (Xml.Tag) new ChangeTagValueVisitor<>(tag, value).visitNonNull(t, ctx);
             }
             return t;

@@ -28,47 +28,47 @@ class ExecutionContextParameterNameTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec
-          .recipe(new ExecutionContextParameterName())
-          .parser(JavaParser.fromJavaVersion()
-            .dependsOn(
+                .recipe(new ExecutionContextParameterName())
+                .parser(JavaParser.fromJavaVersion()
+                        .dependsOn(
 
-              """
+                                """
                 package org.openrewrite;
                 public class Recipe {}
                 """,
-              """
+                                """
                 package org.openrewrite;
                 public class Visitor {}
                 """,
-              """
+                                """
                 package org.openrewrite;
                 public class TreeVisitor extends Visitor {}
                 """,
-              """
+                                """
                 package org.openrewrite;
                 public class ExecutionContext {}
                 """
-            ));
+                        ));
     }
 
     @DocumentExample
     @Test
     void recipe() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import org.openrewrite.*;
               class SampleRecipe extends Recipe {
                   public void test(ExecutionContext executionContext) {}
               }
               """,
-            """
+                        """
               import org.openrewrite.*;
               class SampleRecipe extends Recipe {
                   public void test(ExecutionContext ctx) {}
               }
               """
-          )
+                )
         );
     }
 
@@ -76,40 +76,40 @@ class ExecutionContextParameterNameTest implements RewriteTest {
     @Test
     void visitor() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import org.openrewrite.*;
               class SampleVisitor extends Visitor {
                   public void test(ExecutionContext executionContext) {}
               }
               """,
-            """
+                        """
               import org.openrewrite.*;
               class SampleVisitor extends Visitor {
                   public void test(ExecutionContext ctx) {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void treeVisitor() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import org.openrewrite.*;
               class SampleTreeVisitor extends TreeVisitor {
                   public void test(ExecutionContext executionContext) {}
               }
               """,
-            """
+                        """
               import org.openrewrite.*;
               class SampleTreeVisitor extends TreeVisitor {
                   public void test(ExecutionContext ctx) {}
               }
               """
-          )
+                )
         );
     }
 }

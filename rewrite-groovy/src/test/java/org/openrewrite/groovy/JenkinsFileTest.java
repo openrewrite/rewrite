@@ -26,8 +26,8 @@ class JenkinsFileTest implements RewriteTest {
     void jenkinsfile() {
         // the Jenkinsfile from spring-projects/spring-data-release
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def p = [:]
               node {
                 checkout scm
@@ -115,8 +115,8 @@ class JenkinsFileTest implements RewriteTest {
                 }
               }
               """,
-            spec -> spec.path("Jenkinsfile")
-          )
+                        spec -> spec.path("Jenkinsfile")
+                )
         );
     }
 }

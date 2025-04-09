@@ -30,8 +30,8 @@ class TryCatchTest implements RewriteTest {
     @Test
     void catchRightPadding() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void method() {
                       try {
@@ -42,23 +42,23 @@ class TryCatchTest implements RewriteTest {
                   }
               }
               """,
-            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
-                @Override
-                public J.Try.Catch visitCatch(J.Try.Catch c, Object o) {
-                    assertThat(c.getParameter().getPadding().getTree().getAfter().getWhitespace())
-                      .isEqualTo(" ");
-                    return c;
-                }
-            }.visit(cu, 0))
-          )
+                        spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                            @Override
+                            public J.Try.Catch visitCatch(J.Try.Catch c, Object o) {
+                                assertThat(c.getParameter().getPadding().getTree().getAfter().getWhitespace())
+                                        .isEqualTo(" ");
+                                return c;
+                            }
+                        }.visit(cu, 0))
+                )
         );
     }
 
     @Test
     void tryFinally() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       try {
@@ -68,15 +68,15 @@ class TryCatchTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void tryCatchNoFinally() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       try {
@@ -86,15 +86,15 @@ class TryCatchTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void tryWithResources() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.io.*;
               class Test {
                   void test() {
@@ -106,7 +106,7 @@ class TryCatchTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -114,8 +114,8 @@ class TryCatchTest implements RewriteTest {
     @Test
     void tryWithResourcesSemiTerminated() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
                             import java.io.File;
               import java.io.FileInputStream;
               import java.io.IOException;
@@ -129,15 +129,15 @@ class TryCatchTest implements RewriteTest {
                                 }
                             }
                             """
-          )
+                )
         );
     }
 
     @Test
     void multiCatch() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.io.*;
               class Test {
                   void test() {
@@ -147,15 +147,15 @@ class TryCatchTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void multipleResources() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.io.*;
               class Test {
                   void test() {
@@ -165,7 +165,7 @@ class TryCatchTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -173,8 +173,8 @@ class TryCatchTest implements RewriteTest {
     @Test
     void tryCatchFinally() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                       try {}
@@ -185,7 +185,7 @@ class TryCatchTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -194,8 +194,8 @@ class TryCatchTest implements RewriteTest {
     @Test
     void tryWithResourcesIdentifier() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.io.InputStream;
               class A {
                   void test() {
@@ -205,7 +205,7 @@ class TryCatchTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -214,8 +214,8 @@ class TryCatchTest implements RewriteTest {
     @Test
     void tryWithResourcesIdentifierAndVariables() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.io.File;
               import java.io.FileInputStream;
               import java.util.Scanner;
@@ -228,7 +228,7 @@ class TryCatchTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -238,8 +238,8 @@ class TryCatchTest implements RewriteTest {
     @Test
     void tryWithResourcesIdentifierAndSemicolon() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               import java.io.File;
               import java.io.FileInputStream;
               import java.util.Scanner;
@@ -252,7 +252,7 @@ class TryCatchTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

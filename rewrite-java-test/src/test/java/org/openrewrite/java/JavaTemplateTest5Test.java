@@ -36,46 +36,46 @@ class JavaTemplateTest5Test implements RewriteTest {
     @Test
     void lastStatementInClassBlock() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              @Override
-              public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
-                  if (classDecl.getBody().getStatements().isEmpty()) {
-                      return JavaTemplate.apply("int n;", getCursor(), classDecl.getBody().getCoordinates().lastStatement());
-                  }
-                  return classDecl;
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    @Override
+                    public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                        if (classDecl.getBody().getStatements().isEmpty()) {
+                            return JavaTemplate.apply("int n;", getCursor(), classDecl.getBody().getCoordinates().lastStatement());
+                        }
+                        return classDecl;
+                    }
+                })),
+                java(
+                        """
               class Test {
               }
               """,
-            """
+                        """
               class Test {
                   int n;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void lastStatementInMethodBlock() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              @Override
-              public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                  if (method.getBody().getStatements().size() == 1) {
-                      return JavaTemplate.builder("n = 1;")
-                        .contextSensitive()
-                        .build()
-                        .apply(getCursor(), method.getBody().getCoordinates().lastStatement());
-                  }
-                  return method;
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    @Override
+                    public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                        if (method.getBody().getStatements().size() == 1) {
+                            return JavaTemplate.builder("n = 1;")
+                                    .contextSensitive()
+                                    .build()
+                                    .apply(getCursor(), method.getBody().getCoordinates().lastStatement());
+                        }
+                        return method;
+                    }
+                })),
+                java(
+                        """
               class Test {
                   int n;
                   void test() {
@@ -83,7 +83,7 @@ class JavaTemplateTest5Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   int n;
                   void test() {
@@ -92,25 +92,25 @@ class JavaTemplateTest5Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void replaceStatementRequiringNewImport() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              @Override
-              public J visitAssert(J.Assert assert_, ExecutionContext ctx) {
-                  maybeAddImport("java.util.List");
-                  return JavaTemplate.builder("List<String> s = null;")
-                    .imports("java.util.List")
-                    .build()
-                    .apply(getCursor(), assert_.getCoordinates().replace());
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    @Override
+                    public J visitAssert(J.Assert assert_, ExecutionContext ctx) {
+                        maybeAddImport("java.util.List");
+                        return JavaTemplate.builder("List<String> s = null;")
+                                .imports("java.util.List")
+                                .build()
+                                .apply(getCursor(), assert_.getCoordinates().replace());
+                    }
+                })),
+                java(
+                        """
               class Test {
                   int n;
                   void test() {
@@ -118,7 +118,7 @@ class JavaTemplateTest5Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.List;
 
               class Test {
@@ -128,7 +128,7 @@ class JavaTemplateTest5Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -136,30 +136,30 @@ class JavaTemplateTest5Test implements RewriteTest {
     @Test
     void replaceArguments() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  if (method.getArguments().size() == 1) {
-                      method = JavaTemplate.builder("m, Integer.valueOf(n), \"foo\"")
-                        .contextSensitive()
-                        .build()
-                        .apply(getCursor(), method.getCoordinates().replaceArguments());
-                      method = method.withName(method.getName().withType(method.getMethodType()));
-                  }
-                  return method;
-              }
-          })).afterRecipe(run -> {
-              J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().get(0).getAfter();
-              J.MethodInvocation m = (J.MethodInvocation) ((J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(2)).getBody()
-                .getStatements().get(0);
-              JavaType.Method type = m.getMethodType();
-              assertThat(type.getParameterTypes().get(0)).isEqualTo(JavaType.Primitive.Int);
-              assertThat(type.getParameterTypes().get(1)).isEqualTo(JavaType.Primitive.Int);
-              assertThat(type.getParameterTypes().get(2)).matches(jt ->
-                TypeUtils.asFullyQualified(jt).getFullyQualifiedName().equals("java.lang.String"));
-          }),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                        if (method.getArguments().size() == 1) {
+                            method = JavaTemplate.builder("m, Integer.valueOf(n), \"foo\"")
+                                    .contextSensitive()
+                                    .build()
+                                    .apply(getCursor(), method.getCoordinates().replaceArguments());
+                            method = method.withName(method.getName().withType(method.getMethodType()));
+                        }
+                        return method;
+                    }
+                })).afterRecipe(run -> {
+                    J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().get(0).getAfter();
+                    J.MethodInvocation m = (J.MethodInvocation) ((J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(2)).getBody()
+                            .getStatements().get(0);
+                    JavaType.Method type = m.getMethodType();
+                    assertThat(type.getParameterTypes().get(0)).isEqualTo(JavaType.Primitive.Int);
+                    assertThat(type.getParameterTypes().get(1)).isEqualTo(JavaType.Primitive.Int);
+                    assertThat(type.getParameterTypes().get(2)).matches(jt ->
+                            TypeUtils.asFullyQualified(jt).getFullyQualifiedName().equals("java.lang.String"));
+                }),
+                java(
+                        """
               abstract class Test {
                   abstract void test();
                   abstract void test(int m, int n, String foo);
@@ -168,7 +168,7 @@ class JavaTemplateTest5Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               abstract class Test {
                   abstract void test();
                   abstract void test(int m, int n, String foo);
@@ -177,7 +177,7 @@ class JavaTemplateTest5Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -196,45 +196,45 @@ class JavaTemplateTest5Test implements RewriteTest {
     @Test
     void replaceClassAnnotation() {
         rewriteRun(
-          spec -> spec.recipe(replaceAnnotationRecipe),
-          java(
-            """
+                spec -> spec.recipe(replaceAnnotationRecipe),
+                java(
+                        """
               @SuppressWarnings("ALL") class Test {}
               """,
-            """
+                        """
               @Deprecated class Test {}
               """
-          )
+                )
         );
     }
 
     @Test
     void replaceMethodDeclarationAnnotation() {
         rewriteRun(
-          spec -> spec.recipe(replaceAnnotationRecipe),
-          java(
-            """
+                spec -> spec.recipe(replaceAnnotationRecipe),
+                java(
+                        """
               class A {
                   @SuppressWarnings("ALL")
                   void someTest() {}
               }
               """,
-            """
+                        """
               class A {
                   @Deprecated
                   void someTest() {}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void replaceVariableDeclarationAnnotation() {
         rewriteRun(
-          spec -> spec.recipe(replaceAnnotationRecipe),
-          java(
-            """
+                spec -> spec.recipe(replaceAnnotationRecipe),
+                java(
+                        """
               class A {
                   @interface A1{}
                   @interface A2{}
@@ -243,7 +243,7 @@ class JavaTemplateTest5Test implements RewriteTest {
                   Object someObject;
               }
               """,
-            """
+                        """
               class A {
                   @interface A1{}
                   @interface A2{}
@@ -252,16 +252,16 @@ class JavaTemplateTest5Test implements RewriteTest {
                   Object someObject;
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void replaceMethodDeclarationVariableDeclarationAnnotation() {
         rewriteRun(
-          spec -> spec.recipe(replaceAnnotationRecipe),
-          java(
-            """
+                spec -> spec.recipe(replaceAnnotationRecipe),
+                java(
+                        """
               class A {
                   @interface A1{}
                   @interface A2{}
@@ -269,7 +269,7 @@ class JavaTemplateTest5Test implements RewriteTest {
                   void someMethod(@A1 String a){}
               }
               """,
-            """
+                        """
               class A {
                   @interface A1{}
                   @interface A2{}
@@ -277,25 +277,25 @@ class JavaTemplateTest5Test implements RewriteTest {
                   void someMethod(@A2 String a){}
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void replaceMethodAnnotations() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                  if (method.getLeadingAnnotations().isEmpty()) {
-                      return JavaTemplate.apply("@SuppressWarnings(\"other\")",
-                        getCursor(), method.getCoordinates().replaceAnnotations());
-                  }
-                  return super.visitMethodDeclaration(method, ctx);
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                        if (method.getLeadingAnnotations().isEmpty()) {
+                            return JavaTemplate.apply("@SuppressWarnings(\"other\")",
+                                    getCursor(), method.getCoordinates().replaceAnnotations());
+                        }
+                        return super.visitMethodDeclaration(method, ctx);
+                    }
+                })),
+                java(
+                        """
               class Test {
                   static final String WARNINGS = "ALL";
 
@@ -309,7 +309,7 @@ class JavaTemplateTest5Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   static final String WARNINGS = "ALL";
 
@@ -326,24 +326,24 @@ class JavaTemplateTest5Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void replaceClassAnnotations() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
-                  if (classDecl.getLeadingAnnotations().isEmpty() && !classDecl.getSimpleName().equals("Test")) {
-                      return JavaTemplate.apply("@SuppressWarnings(\"other\")", getCursor(), classDecl.getCoordinates().replaceAnnotations());
-                  }
-                  return super.visitClassDeclaration(classDecl, ctx);
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                        if (classDecl.getLeadingAnnotations().isEmpty() && !classDecl.getSimpleName().equals("Test")) {
+                            return JavaTemplate.apply("@SuppressWarnings(\"other\")", getCursor(), classDecl.getCoordinates().replaceAnnotations());
+                        }
+                        return super.visitClassDeclaration(classDecl, ctx);
+                    }
+                })),
+                java(
+                        """
               class Test {
                   static final String WARNINGS = "ALL";
 
@@ -351,7 +351,7 @@ class JavaTemplateTest5Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   static final String WARNINGS = "ALL";
 
@@ -360,24 +360,24 @@ class JavaTemplateTest5Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void replaceVariableAnnotations() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-                  if (multiVariable.getLeadingAnnotations().isEmpty()) {
-                      return JavaTemplate.apply("@SuppressWarnings(\"other\")", getCursor(), multiVariable.getCoordinates().replaceAnnotations());
-                  }
-                  return super.visitVariableDeclarations(multiVariable, ctx);
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                        if (multiVariable.getLeadingAnnotations().isEmpty()) {
+                            return JavaTemplate.apply("@SuppressWarnings(\"other\")", getCursor(), multiVariable.getCoordinates().replaceAnnotations());
+                        }
+                        return super.visitVariableDeclarations(multiVariable, ctx);
+                    }
+                })),
+                java(
+                        """
               class Test {
                   void test() {
                       // the m
@@ -386,7 +386,7 @@ class JavaTemplateTest5Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   void test() {
                       // the m
@@ -397,24 +397,24 @@ class JavaTemplateTest5Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void addVariableAnnotationsToVariableAlreadyAnnotated() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-                  if (multiVariable.getLeadingAnnotations().size() == 1) {
-                      return JavaTemplate.apply("@Deprecated", getCursor(), multiVariable.getCoordinates().addAnnotation(comparing(a -> 0)));
-                  }
-                  return super.visitVariableDeclarations(multiVariable, ctx);
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                        if (multiVariable.getLeadingAnnotations().size() == 1) {
+                            return JavaTemplate.apply("@Deprecated", getCursor(), multiVariable.getCoordinates().addAnnotation(comparing(a -> 0)));
+                        }
+                        return super.visitVariableDeclarations(multiVariable, ctx);
+                    }
+                })),
+                java(
+                        """
               class Test {
                   @SuppressWarnings("ALL") private final int m, a;
                   void test() {
@@ -430,7 +430,7 @@ class JavaTemplateTest5Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               class Test {
                   @SuppressWarnings("ALL")
                   @Deprecated
@@ -453,7 +453,7 @@ class JavaTemplateTest5Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

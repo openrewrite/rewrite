@@ -138,7 +138,7 @@ public class DeclarativeRecipe extends Recipe {
         @Override
         public String getDescription() {
             return "Evaluates a precondition and makes that result available to the preconditions of other recipes. " +
-                   "\"bellwether\", noun - One that serves as a leader or as a leading indicator of future trends. ";
+                    "\"bellwether\", noun - One that serves as a leader or as a leading indicator of future trends. ";
         }
 
         Supplier<TreeVisitor<?, ExecutionContext>> precondition;
@@ -263,7 +263,7 @@ public class DeclarativeRecipe extends Recipe {
             if (isScanningRecipe(precondition)) {
                 throw new IllegalArgumentException(
                         getName() + " declares the ScanningRecipe " + precondition.getName() + " as a precondition." +
-                        "ScanningRecipe cannot be used as Preconditions.");
+                                "ScanningRecipe cannot be used as Preconditions.");
             }
             andPreconditions.add(() -> orVisitors(precondition));
         }

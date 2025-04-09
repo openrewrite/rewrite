@@ -215,7 +215,7 @@ public class Namespaced implements Trait<Xml> {
         }
 
         public Matcher xPath(@Nullable String xPath) {
-            if(xPath != null) {
+            if (xPath != null) {
                 this.xPath = new XPathMatcher(xPath);
             }
             return this;
@@ -235,7 +235,7 @@ public class Namespaced implements Trait<Xml> {
             if (uri != null || prefix != null) {
                 Map<String, String> namespaces = namespaced.getNamespaces();
                 if ((uri != null && !namespaces.containsValue(uri)) ||
-                    (prefix != null && !namespaces.containsKey(prefix))) {
+                        (prefix != null && !namespaces.containsKey(prefix))) {
                     return null;
                 }
             }

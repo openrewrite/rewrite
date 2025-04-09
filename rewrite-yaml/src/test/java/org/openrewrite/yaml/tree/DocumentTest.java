@@ -26,26 +26,26 @@ class DocumentTest implements RewriteTest {
     @Test
     void explicitStart() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               ---
               type: specs.openrewrite.org/v1beta/visitor
               ---
               type: specs.openrewrite.org/v1beta/recipe
               """,
-            spec -> spec.afterRecipe(y -> {
-                assertThat(y.getDocuments()).hasSize(2);
-                assertThat(y.getDocuments().get(0).isExplicit()).isTrue();
-            })
-          )
+                        spec -> spec.afterRecipe(y -> {
+                            assertThat(y.getDocuments()).hasSize(2);
+                            assertThat(y.getDocuments().get(0).isExplicit()).isTrue();
+                        })
+                )
         );
     }
 
     @Test
     void explicitEnd() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               type: specs.openrewrite.org/v1beta/visitor
               ...
               ---
@@ -53,37 +53,37 @@ class DocumentTest implements RewriteTest {
               
               ...
               """,
-            spec -> spec.afterRecipe(y -> {
-                assertThat(y.getDocuments()).hasSize(2);
-                assertThat(y.getDocuments().get(0).getEnd().isExplicit()).isTrue();
-            })
-          )
+                        spec -> spec.afterRecipe(y -> {
+                            assertThat(y.getDocuments()).hasSize(2);
+                            assertThat(y.getDocuments().get(0).getEnd().isExplicit()).isTrue();
+                        })
+                )
         );
     }
 
     @Test
     void implicitStart() {
         rewriteRun(
-          yaml(
-            "type: specs.openrewrite.org/v1beta/visitor",
-            spec -> spec.afterRecipe(y -> {
-                assertThat(y.getDocuments()).hasSize(1);
-                assertThat(y.getDocuments().get(0).isExplicit()).isFalse();
-            })
-          )
+                yaml(
+                        "type: specs.openrewrite.org/v1beta/visitor",
+                        spec -> spec.afterRecipe(y -> {
+                            assertThat(y.getDocuments()).hasSize(1);
+                            assertThat(y.getDocuments().get(0).isExplicit()).isFalse();
+                        })
+                )
         );
     }
 
     @Test
     void implicitEnd() {
         rewriteRun(
-          yaml(
-            "type: specs.openrewrite.org/v1beta/visitor",
-            spec -> spec.afterRecipe(y -> {
-                assertThat(y.getDocuments()).hasSize(1);
-                assertThat(y.getDocuments().get(0).getEnd().isExplicit()).isFalse();
-            })
-          )
+                yaml(
+                        "type: specs.openrewrite.org/v1beta/visitor",
+                        spec -> spec.afterRecipe(y -> {
+                            assertThat(y.getDocuments()).hasSize(1);
+                            assertThat(y.getDocuments().get(0).getEnd().isExplicit()).isFalse();
+                        })
+                )
         );
     }
 }

@@ -27,9 +27,9 @@ class MaybeUsesImportTest implements RewriteTest {
     @Test
     void usesType() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new MaybeUsesImport<>("java.util.Collections"))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new MaybeUsesImport<>("java.util.Collections"))),
+                java(
+                        """
               import java.io.File;
               import java.util.Collections;
               import java.util.Collections.Inner;
@@ -43,7 +43,7 @@ class MaybeUsesImportTest implements RewriteTest {
               class Test {
               }
               """,
-            """
+                        """
               import java.io.File;
               /*~~>*/import java.util.Collections;
               /*~~>*/import java.util.Collections.Inner;
@@ -57,7 +57,7 @@ class MaybeUsesImportTest implements RewriteTest {
               class Test {
               }
               """
-          )
+                )
         );
     }
 
@@ -67,9 +67,9 @@ class MaybeUsesImportTest implements RewriteTest {
     @Test
     void usesTypeWildcard() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new MaybeUsesImport<>("java.util.*"))),
-          java(
-            """
+                spec -> spec.recipe(toRecipe(() -> new MaybeUsesImport<>("java.util.*"))),
+                java(
+                        """
               import java.io.File;
               import java.util.Collections;
               import java.util.Collections.Inner;
@@ -83,7 +83,7 @@ class MaybeUsesImportTest implements RewriteTest {
               class Test {
               }
               """,
-            """
+                        """
               import java.io.File;
               /*~~>*/import java.util.Collections;
               /*~~>*/import java.util.Collections.Inner;
@@ -97,7 +97,7 @@ class MaybeUsesImportTest implements RewriteTest {
               class Test {
               }
               """
-          )
+                )
         );
     }
 }

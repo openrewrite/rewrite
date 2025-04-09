@@ -25,12 +25,12 @@ class EmptyTest implements RewriteTest {
     @Test
     void empty() {
         rewriteRun(
-          proto(
-            """
+                proto(
+                        """
               syntax = 'proto2';
               ; ; ;
               """
-          )
+                )
         );
     }
 }

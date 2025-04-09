@@ -61,8 +61,8 @@ class JsonPathMatcherTest implements RewriteTest {
     @Test
     void match() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               provider "azurerm" {
                 features {
                   key_vault {
@@ -74,20 +74,20 @@ class JsonPathMatcherTest implements RewriteTest {
                 attr = 1
               }
               """,
-            spec ->
-              spec.beforeRecipe(configFile -> {
-                  assertThat(anyBlockMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault"))).isTrue();
-                  assertThat(anyBlockMatch(configFile, new JsonPathMatcher("$.provider.features.dne"))).isFalse();
-              })
-          )
+                        spec ->
+                                spec.beforeRecipe(configFile -> {
+                                    assertThat(anyBlockMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault"))).isTrue();
+                                    assertThat(anyBlockMatch(configFile, new JsonPathMatcher("$.provider.features.dne"))).isFalse();
+                                })
+                )
         );
     }
 
     @Test
     void binaryExpression() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               provider "azurerm" {
                 features {
                   key_vault {
@@ -96,19 +96,19 @@ class JsonPathMatcherTest implements RewriteTest {
                 }
               }
               """,
-            spec -> spec.beforeRecipe(configFile -> {
-                assertThat(anyAttributeMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(@.purge_soft_delete_on_destroy == 'true')]"))).isTrue();
-                assertThat(anyAttributeMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(@.purge_soft_delete_on_destroy == 'false')]"))).isFalse();
-            })
-          )
+                        spec -> spec.beforeRecipe(configFile -> {
+                            assertThat(anyAttributeMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(@.purge_soft_delete_on_destroy == 'true')]"))).isTrue();
+                            assertThat(anyAttributeMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(@.purge_soft_delete_on_destroy == 'false')]"))).isFalse();
+                        })
+                )
         );
     }
 
     @Test
     void unaryExpression() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               provider "azurerm" {
                 features {
                   key_vault {
@@ -117,11 +117,11 @@ class JsonPathMatcherTest implements RewriteTest {
                 }
               }
               """,
-            spec -> spec.beforeRecipe(configFile -> {
-                assertThat(anyAttributeMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(@.purge_soft_delete_on_destroy)]"))).isTrue();
-                assertThat(anyAttributeMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(@.no_match)]"))).isFalse();
-            })
-          )
+                        spec -> spec.beforeRecipe(configFile -> {
+                            assertThat(anyAttributeMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(@.purge_soft_delete_on_destroy)]"))).isTrue();
+                            assertThat(anyAttributeMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(@.no_match)]"))).isFalse();
+                        })
+                )
         );
     }
 
@@ -129,8 +129,8 @@ class JsonPathMatcherTest implements RewriteTest {
     @Test
     void unaryExpressionOnBlockName() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               provider "azurerm" {
                 features {
                   key_vault {
@@ -142,11 +142,11 @@ class JsonPathMatcherTest implements RewriteTest {
                 attr = 1
               }
               """,
-            spec -> spec.beforeRecipe(configFile -> {
-                assertThat(anyBlockMatch(configFile, new JsonPathMatcher("$.*[?(@.features)]"))).isTrue();
-                assertThat(anyBlockMatch(configFile, new JsonPathMatcher("$.*[?(@.no_match)]"))).isFalse();
-            })
-          )
+                        spec -> spec.beforeRecipe(configFile -> {
+                            assertThat(anyBlockMatch(configFile, new JsonPathMatcher("$.*[?(@.features)]"))).isTrue();
+                            assertThat(anyBlockMatch(configFile, new JsonPathMatcher("$.*[?(@.no_match)]"))).isFalse();
+                        })
+                )
         );
     }
 
@@ -154,8 +154,8 @@ class JsonPathMatcherTest implements RewriteTest {
     @Test
     void matchPropertyFromWildCardOnBlock() {
         rewriteRun(
-          hcl(
-            """
+                hcl(
+                        """
               provider "azurerm" {
                 features {
                   key_vault {
@@ -167,11 +167,11 @@ class JsonPathMatcherTest implements RewriteTest {
                 attr = 1
               }
               """,
-            spec -> spec.beforeRecipe(configFile -> {
-                assertThat(anyBlockMatch(configFile, new JsonPathMatcher("$.*.features"))).isTrue();
-                assertThat(anyBlockMatch(configFile, new JsonPathMatcher("$.*.no_match"))).isFalse();
-            })
-          )
+                        spec -> spec.beforeRecipe(configFile -> {
+                            assertThat(anyBlockMatch(configFile, new JsonPathMatcher("$.*.features"))).isTrue();
+                            assertThat(anyBlockMatch(configFile, new JsonPathMatcher("$.*.no_match"))).isFalse();
+                        })
+                )
         );
     }
 
@@ -179,8 +179,8 @@ class JsonPathMatcherTest implements RewriteTest {
     @Test
     void matchParentBlockWithWildCard() {
         assertMatched(
-          List.of(
-            """
+                List.of(
+                        """
               provider "azurerm" {
                 features {
                   key_vault {
@@ -192,9 +192,9 @@ class JsonPathMatcherTest implements RewriteTest {
                 attr = 1
               }
               """
-          ),
-          List.of(
-            """
+                ),
+                List.of(
+                        """
               provider "azurerm" {
                 features {
                   key_vault {
@@ -206,9 +206,9 @@ class JsonPathMatcherTest implements RewriteTest {
                 attr = 1
               }
               """.trim()
-          ),
-          "$.*",
-          false
+                ),
+                "$.*",
+                false
         );
     }
 
@@ -216,8 +216,8 @@ class JsonPathMatcherTest implements RewriteTest {
     @Test
     void findJsonPathMatches() {
         assertMatched(
-          List.of(
-            """
+                List.of(
+                        """
               provider "azurerm" {
                 features {
                   key_vault {
@@ -229,19 +229,19 @@ class JsonPathMatcherTest implements RewriteTest {
                 attr = 1
               }
               """
-          ),
-          List.of(
-            """
+                ),
+                List.of(
+                        """
               """
-          ),
-          "$.*",
-          true
+                ),
+                "$.*",
+                true
         );
     }
 
     @SuppressWarnings("SameParameterValue")
     private void assertMatched(List<String> before, List<String> after, String jsonPath,
-                               boolean printMatches) {
+            boolean printMatches) {
         var results = visit(before, jsonPath, printMatches);
         assertThat(results).hasSize(after.size());
         for (int i = 0; i < results.size(); i++) {
@@ -252,8 +252,8 @@ class JsonPathMatcherTest implements RewriteTest {
     private List<String> visit(List<String> before, String jsonPath, boolean printMatches) {
         var ctx = new InMemoryExecutionContext();
         var documents = HclParser.builder().build().parse(ctx, before.toArray(new String[0]))
-          .map(Hcl.ConfigFile.class::cast)
-          .toList();
+                .map(Hcl.ConfigFile.class::cast)
+                .toList();
         if (documents.isEmpty()) {
             return emptyList();
         }

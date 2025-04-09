@@ -260,7 +260,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     }
 
     private @Nullable SourceFile handleError(Recipe recipe, SourceFile sourceFile, @Nullable SourceFile after,
-                                             Throwable t) {
+            Throwable t) {
         ctx.getOnError().accept(t);
 
         if (t instanceof RecipeRunException) {

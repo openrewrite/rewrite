@@ -29,40 +29,40 @@ class MinimumViableSpacingVisitorTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(
-          toRecipe(() -> new YamlIsoVisitor<>() {
-                @Override
-                public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
-                    return new MinimumViableSpacingVisitor<>(null).visitDocuments(documents, ctx);
-                }
-            }
-          )
+                toRecipe(() -> new YamlIsoVisitor<>() {
+                            @Override
+                            public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
+                                return new MinimumViableSpacingVisitor<>(null).visitDocuments(documents, ctx);
+                            }
+                        }
+                )
         );
     }
 
     @Test
     void sameLineArrayNotChanged() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               build:
                 existing: value
                 steps: [run: publish]
               """
-          )
+                )
         );
     }
 
     @Test
     void nextLineArrayNotChanged() {
         rewriteRun(
-          yaml(
-            """
+                yaml(
+                        """
               build:
                 existing: value
                 steps:
                   - run: publish
               """
-          )
+                )
         );
     }
 }

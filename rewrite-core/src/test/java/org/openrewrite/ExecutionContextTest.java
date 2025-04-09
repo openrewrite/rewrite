@@ -32,17 +32,17 @@ class ExecutionContextTest implements RewriteTest {
     void anotherCycleIfNewMessagesInExecutionContext() {
         var cycles = new AtomicInteger();
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new PlainTextVisitor<>() {
-              @Override
-              public PlainText visitText(PlainText text, ExecutionContext ctx) {
-                  if (ctx.pollMessage("test") == null) {
-                      ctx.putMessage("test", "test");
-                  }
-                  cycles.incrementAndGet();
-                  return text;
-              }
-          }).withCausesAnotherCycle(true)),
-          text("hello world")
+                spec -> spec.recipe(toRecipe(() -> new PlainTextVisitor<>() {
+                    @Override
+                    public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                        if (ctx.pollMessage("test") == null) {
+                            ctx.putMessage("test", "test");
+                        }
+                        cycles.incrementAndGet();
+                        return text;
+                    }
+                }).withCausesAnotherCycle(true)),
+                text("hello world")
         );
         assertThat(cycles.get()).isEqualTo(2);
     }

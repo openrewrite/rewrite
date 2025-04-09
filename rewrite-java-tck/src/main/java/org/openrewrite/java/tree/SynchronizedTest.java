@@ -27,8 +27,8 @@ class SynchronizedTest implements RewriteTest {
     @Test
     void synchronizedBlock() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               class Test {
                   void test() {
                   
@@ -38,7 +38,7 @@ class SynchronizedTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

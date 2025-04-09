@@ -39,7 +39,7 @@ public class RemoveAnnotation extends Recipe {
     }
 
     @Override
-    public RemoveAnnotationVisitor  getVisitor() {
+    public RemoveAnnotationVisitor getVisitor() {
         return new RemoveAnnotationVisitor(new AnnotationMatcher(annotationPattern));
     }
 }

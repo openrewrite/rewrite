@@ -42,28 +42,28 @@ class ChangeTypeAdaptabilityTest implements RewriteTest {
     @Test
     void changeImport() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               package a.b
               class Original {}
               """
-          ),
-          groovy(
-            """
+                ),
+                groovy(
+                        """
               import a.b.Original
               
               class A {
                   Original type
               }
               """,
-            """
+                        """
               import x.y.Target
               
               class A {
                   Target type
               }
               """
-          )
+                )
         );
     }
 
@@ -71,28 +71,28 @@ class ChangeTypeAdaptabilityTest implements RewriteTest {
     @Test
     void changeType() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               package a.b
               class Original {}
               """
-          ),
-          groovy(
-            """
+                ),
+                groovy(
+                        """
               import a.b.Original
               
               class A {
                   Original type
               }
               """,
-            """
+                        """
               import x.y.Target
               
               class A {
                   Target type
               }
               """
-          )
+                )
         );
     }
 
@@ -100,21 +100,21 @@ class ChangeTypeAdaptabilityTest implements RewriteTest {
     @Test
     void changeDefinition() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("file", "newFile", false)),
-          groovy(
-            """
+                spec -> spec.recipe(new ChangeType("file", "newFile", false)),
+                groovy(
+                        """
               class file {
               }
               """,
-            """
+                        """
               class newFile {
               }
               """,
-            spec -> spec.path("file.groovy").afterRecipe(cu -> {
-                assertThat("newFile.groovy").isEqualTo(cu.getSourcePath().toString());
-                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "newFile")).isTrue();
-            })
-          )
+                        spec -> spec.path("file.groovy").afterRecipe(cu -> {
+                            assertThat("newFile.groovy").isEqualTo(cu.getSourcePath().toString());
+                            assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "newFile")).isTrue();
+                        })
+                )
         );
     }
 
@@ -124,25 +124,25 @@ class ChangeTypeAdaptabilityTest implements RewriteTest {
     @Test
     void changeTypeAttributionImplicitUsage() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.util.List", "java.util.ArrayList", false)),
-          groovy(
-            """
+                spec -> spec.recipe(new ChangeType("java.util.List", "java.util.ArrayList", false)),
+                groovy(
+                        """
               import java.util.Collections
                 
               class Test {
                   int zero = Collections.emptyList().size()
               }
               """,
-            spec -> spec.afterRecipe(cu -> {
-                J.VariableDeclarations varDecl = (J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0);
-                J.MethodInvocation sizeMi = (J.MethodInvocation) varDecl.getVariables().get(0).getInitializer();
-                assertThat(TypeUtils.isOfClassType(sizeMi.getMethodType().getDeclaringType(),
-                  "java.util.ArrayList")).isTrue();
-                J.MethodInvocation emptyListMi = (J.MethodInvocation) sizeMi.getSelect();
-                assertThat(TypeUtils.isOfClassType(emptyListMi.getMethodType().getReturnType(),
-                  "java.util.ArrayList")).isTrue();
-            })
-          )
+                        spec -> spec.afterRecipe(cu -> {
+                            J.VariableDeclarations varDecl = (J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0);
+                            J.MethodInvocation sizeMi = (J.MethodInvocation) varDecl.getVariables().get(0).getInitializer();
+                            assertThat(TypeUtils.isOfClassType(sizeMi.getMethodType().getDeclaringType(),
+                                    "java.util.ArrayList")).isTrue();
+                            J.MethodInvocation emptyListMi = (J.MethodInvocation) sizeMi.getSelect();
+                            assertThat(TypeUtils.isOfClassType(emptyListMi.getMethodType().getReturnType(),
+                                    "java.util.ArrayList")).isTrue();
+                        })
+                )
         );
     }
 }

@@ -62,7 +62,7 @@ public class SemanticallyEqual {
 
         protected boolean nullListSizeMissMatch(List<?> list1, List<?> list2) {
             return nullMissMatch(list1, list2) ||
-                   list1 != null && list2 != null && list1.size() != list2.size();
+                    list1 != null && list2 != null && list1.size() != list2.size();
         }
 
         protected boolean modifierListMissMatch(List<J.Modifier> list1, List<J.Modifier> list2) {
@@ -148,7 +148,7 @@ public class SemanticallyEqual {
 
                 J.Annotation compareTo = (J.Annotation) j;
                 if (!TypeUtils.isOfType(annotation.getType(), compareTo.getType()) ||
-                    nullListSizeMissMatch(annotation.getArguments(), compareTo.getArguments())) {
+                        nullListSizeMissMatch(annotation.getArguments(), compareTo.getArguments())) {
                     isEqual.set(false);
                     return annotation;
                 }
@@ -169,7 +169,7 @@ public class SemanticallyEqual {
 
                 J.AnnotatedType compareTo = (J.AnnotatedType) j;
                 if (!TypeUtils.isOfType(annotatedType.getType(), compareTo.getType()) ||
-                    annotatedType.getAnnotations().size() != compareTo.getAnnotations().size()) {
+                        annotatedType.getAnnotations().size() != compareTo.getAnnotations().size()) {
                     isEqual.set(false);
                     return annotatedType;
                 }
@@ -305,7 +305,7 @@ public class SemanticallyEqual {
 
                 J.Binary compareTo = (J.Binary) j;
                 if (binary.getOperator() != compareTo.getOperator() ||
-                    !TypeUtils.isOfType(binary.getType(), compareTo.getType())) {
+                        !TypeUtils.isOfType(binary.getType(), compareTo.getType())) {
                     isEqual.set(false);
                     return binary;
                 }
@@ -396,17 +396,17 @@ public class SemanticallyEqual {
 
                 J.ClassDeclaration compareTo = (J.ClassDeclaration) j;
                 if (!classDecl.getSimpleName().equals(compareTo.getSimpleName()) ||
-                    !TypeUtils.isOfType(classDecl.getType(), compareTo.getType()) ||
-                    modifierListMissMatch(classDecl.getModifiers(), compareTo.getModifiers()) ||
-                    classDecl.getKind() != compareTo.getKind() ||
-                    nullListSizeMissMatch(classDecl.getPermits(), compareTo.getPermits()) ||
-                    nullListSizeMissMatch(classDecl.getLeadingAnnotations(), compareTo.getLeadingAnnotations()) ||
+                        !TypeUtils.isOfType(classDecl.getType(), compareTo.getType()) ||
+                        modifierListMissMatch(classDecl.getModifiers(), compareTo.getModifiers()) ||
+                        classDecl.getKind() != compareTo.getKind() ||
+                        nullListSizeMissMatch(classDecl.getPermits(), compareTo.getPermits()) ||
+                        nullListSizeMissMatch(classDecl.getLeadingAnnotations(), compareTo.getLeadingAnnotations()) ||
 
-                    nullMissMatch(classDecl.getExtends(), compareTo.getExtends()) ||
+                        nullMissMatch(classDecl.getExtends(), compareTo.getExtends()) ||
 
-                    nullListSizeMissMatch(classDecl.getTypeParameters(), compareTo.getTypeParameters()) ||
+                        nullListSizeMissMatch(classDecl.getTypeParameters(), compareTo.getTypeParameters()) ||
 
-                    nullListSizeMissMatch(classDecl.getImplements(), compareTo.getImplements())) {
+                        nullListSizeMissMatch(classDecl.getImplements(), compareTo.getImplements())) {
                     isEqual.set(false);
                     return classDecl;
                 }
@@ -437,7 +437,7 @@ public class SemanticallyEqual {
 
                 J.CompilationUnit compareTo = (J.CompilationUnit) j;
                 if (nullMissMatch(cu.getPackageDeclaration(), compareTo.getPackageDeclaration()) ||
-                    cu.getClasses().size() != compareTo.getClasses().size()) {
+                        cu.getClasses().size() != compareTo.getClasses().size()) {
                     isEqual.set(false);
                     return cu;
                 }
@@ -549,9 +549,9 @@ public class SemanticallyEqual {
 
                 J.EnumValue compareTo = (J.EnumValue) j;
                 if (!_enum.getName().getSimpleName().equals(compareTo.getName().getSimpleName()) ||
-                    !TypeUtils.isOfType(_enum.getName().getType(), compareTo.getName().getType()) ||
-                    nullListSizeMissMatch(_enum.getAnnotations(), compareTo.getAnnotations()) ||
-                    nullMissMatch(_enum.getInitializer(), compareTo.getInitializer())) {
+                        !TypeUtils.isOfType(_enum.getName().getType(), compareTo.getName().getType()) ||
+                        nullListSizeMissMatch(_enum.getAnnotations(), compareTo.getAnnotations()) ||
+                        nullMissMatch(_enum.getInitializer(), compareTo.getInitializer())) {
                     isEqual.set(false);
                     return _enum;
                 }
@@ -584,8 +584,8 @@ public class SemanticallyEqual {
                 JavaType.Variable fieldType = fieldAccess.getName().getFieldType();
                 if (!(j instanceof J.FieldAccess)) {
                     if (!(j instanceof J.Identifier) ||
-                        !TypeUtils.isOfType(fieldType, ((J.Identifier) j).getFieldType()) ||
-                        !fieldAccess.getSimpleName().equals(((J.Identifier) j).getSimpleName())) {
+                            !TypeUtils.isOfType(fieldType, ((J.Identifier) j).getFieldType()) ||
+                            !fieldAccess.getSimpleName().equals(((J.Identifier) j).getSimpleName())) {
                         isEqual.set(false);
                     } else {
                         if (fieldType != null && !fieldType.hasFlags(Flag.Static)) {
@@ -602,7 +602,7 @@ public class SemanticallyEqual {
                         return fieldAccess;
                     }
                 } else if (!TypeUtils.isOfType(fieldAccess.getType(), compareTo.getType()) ||
-                           !TypeUtils.isOfType(fieldType, compareTo.getName().getFieldType())) {
+                        !TypeUtils.isOfType(fieldType, compareTo.getName().getFieldType())) {
                     isEqual.set(false);
                     return fieldAccess;
                 }
@@ -667,7 +667,7 @@ public class SemanticallyEqual {
 
                 J.ForLoop.Control compareTo = (J.ForLoop.Control) j;
                 if (control.getInit().size() != compareTo.getInit().size() ||
-                    control.getUpdate().size() != compareTo.getUpdate().size()) {
+                        control.getUpdate().size() != compareTo.getUpdate().size()) {
                     isEqual.set(false);
                     return control;
                 }
@@ -781,9 +781,9 @@ public class SemanticallyEqual {
 
                 J.Import compareTo = (J.Import) j;
                 if (_import.isStatic() != compareTo.isStatic() ||
-                    !_import.getPackageName().equals(compareTo.getPackageName()) ||
-                    !_import.getClassName().equals(compareTo.getClassName()) ||
-                    !TypeUtils.isOfType(_import.getQualid().getType(), compareTo.getQualid().getType())) {
+                        !_import.getPackageName().equals(compareTo.getPackageName()) ||
+                        !_import.getClassName().equals(compareTo.getClassName()) ||
+                        !TypeUtils.isOfType(_import.getQualid().getType(), compareTo.getQualid().getType())) {
                     isEqual.set(false);
                     return _import;
                 }
@@ -820,7 +820,7 @@ public class SemanticallyEqual {
 
                 J.Label compareTo = (J.Label) j;
                 if (!label.getLabel().getSimpleName().equals(compareTo.getLabel().getSimpleName()) ||
-                    !TypeUtils.isOfType(label.getLabel().getType(), compareTo.getLabel().getType())) {
+                        !TypeUtils.isOfType(label.getLabel().getType(), compareTo.getLabel().getType())) {
                     isEqual.set(false);
                     return label;
                 }
@@ -858,7 +858,7 @@ public class SemanticallyEqual {
 
                 J.Literal compareTo = (J.Literal) j;
                 if (!TypeUtils.isOfType(literal.getType(), compareTo.getType()) ||
-                    !Objects.equals(literal.getValue(), compareTo.getValue())) {
+                        !Objects.equals(literal.getValue(), compareTo.getValue())) {
                     isEqual.set(false);
                     return literal;
                 }
@@ -876,11 +876,11 @@ public class SemanticallyEqual {
 
                 J.MemberReference compareTo = (J.MemberReference) j;
                 if (!memberRef.getReference().getSimpleName().equals(compareTo.getReference().getSimpleName()) ||
-                    !TypeUtils.isOfType(memberRef.getReference().getType(), compareTo.getReference().getType()) ||
-                    !TypeUtils.isOfType(memberRef.getType(), compareTo.getType()) ||
-                    !TypeUtils.isOfType(memberRef.getVariableType(), compareTo.getVariableType()) ||
-                    !TypeUtils.isOfType(memberRef.getMethodType(), compareTo.getMethodType()) ||
-                    nullListSizeMissMatch(memberRef.getTypeParameters(), compareTo.getTypeParameters())) {
+                        !TypeUtils.isOfType(memberRef.getReference().getType(), compareTo.getReference().getType()) ||
+                        !TypeUtils.isOfType(memberRef.getType(), compareTo.getType()) ||
+                        !TypeUtils.isOfType(memberRef.getVariableType(), compareTo.getVariableType()) ||
+                        !TypeUtils.isOfType(memberRef.getMethodType(), compareTo.getMethodType()) ||
+                        nullListSizeMissMatch(memberRef.getTypeParameters(), compareTo.getTypeParameters())) {
                     isEqual.set(false);
                     return memberRef;
                 }
@@ -900,20 +900,20 @@ public class SemanticallyEqual {
 
                 J.MethodDeclaration compareTo = (J.MethodDeclaration) j;
                 if (!method.getSimpleName().equals(compareTo.getSimpleName()) ||
-                    !TypeUtils.isOfType(method.getMethodType(), compareTo.getMethodType()) ||
-                    modifierListMissMatch(method.getModifiers(), compareTo.getModifiers()) ||
+                        !TypeUtils.isOfType(method.getMethodType(), compareTo.getMethodType()) ||
+                        modifierListMissMatch(method.getModifiers(), compareTo.getModifiers()) ||
 
-                    method.getLeadingAnnotations().size() != compareTo.getLeadingAnnotations().size() ||
-                    method.getParameters().size() != compareTo.getParameters().size() ||
+                        method.getLeadingAnnotations().size() != compareTo.getLeadingAnnotations().size() ||
+                        method.getParameters().size() != compareTo.getParameters().size() ||
 
-                    nullMissMatch(method.getReturnTypeExpression(), compareTo.getReturnTypeExpression()) ||
+                        nullMissMatch(method.getReturnTypeExpression(), compareTo.getReturnTypeExpression()) ||
 
-                    nullListSizeMissMatch(method.getTypeParameters(), compareTo.getTypeParameters()) ||
+                        nullListSizeMissMatch(method.getTypeParameters(), compareTo.getTypeParameters()) ||
 
-                    nullListSizeMissMatch(method.getThrows(), compareTo.getThrows()) ||
+                        nullListSizeMissMatch(method.getThrows(), compareTo.getThrows()) ||
 
-                    nullMissMatch(method.getBody(), compareTo.getBody()) ||
-                    method.getBody() != null && compareTo.getBody() != null && nullListSizeMissMatch(method.getBody().getStatements(), compareTo.getBody().getStatements())) {
+                        nullMissMatch(method.getBody(), compareTo.getBody()) ||
+                        method.getBody() != null && compareTo.getBody() != null && nullListSizeMissMatch(method.getBody().getStatements(), compareTo.getBody().getStatements())) {
                     isEqual.set(false);
                     return method;
                 }
@@ -946,13 +946,13 @@ public class SemanticallyEqual {
                 boolean static_ = method.getMethodType() != null && method.getMethodType().hasFlags(Flag.Static);
                 J.MethodInvocation compareTo = (J.MethodInvocation) j;
                 if (!method.getSimpleName().equals(compareTo.getSimpleName()) ||
-                    method.getArguments().size() != compareTo.getArguments().size() ||
-                    !(static_ == (compareTo.getMethodType() != null && compareTo.getMethodType().hasFlags(Flag.Static)) ||
-                      !nullMissMatch(method.getSelect(), compareTo.getSelect())) ||
-                    method.getMethodType() == null ||
-                    compareTo.getMethodType() == null ||
-                    !TypeUtils.isAssignableTo(method.getMethodType().getReturnType(), compareTo.getMethodType().getReturnType()) ||
-                    nullListSizeMissMatch(method.getTypeParameters(), compareTo.getTypeParameters())) {
+                        method.getArguments().size() != compareTo.getArguments().size() ||
+                        !(static_ == (compareTo.getMethodType() != null && compareTo.getMethodType().hasFlags(Flag.Static)) ||
+                                !nullMissMatch(method.getSelect(), compareTo.getSelect())) ||
+                        method.getMethodType() == null ||
+                        compareTo.getMethodType() == null ||
+                        !TypeUtils.isAssignableTo(method.getMethodType().getReturnType(), compareTo.getMethodType().getReturnType()) ||
+                        nullListSizeMissMatch(method.getTypeParameters(), compareTo.getTypeParameters())) {
                     isEqual.set(false);
                     return method;
                 }
@@ -985,7 +985,7 @@ public class SemanticallyEqual {
                     }
                     if (!containsLiteral) {
                         if (nullMissMatch(method.getMethodType(), compareTo.getMethodType()) ||
-                            !TypeUtils.isOfType(method.getMethodType(), compareTo.getMethodType())) {
+                                !TypeUtils.isOfType(method.getMethodType(), compareTo.getMethodType())) {
                             isEqual.set(false);
                             return method;
                         }
@@ -1009,9 +1009,9 @@ public class SemanticallyEqual {
 
                 J.MultiCatch compareTo = (J.MultiCatch) j;
                 if (!(multiCatch.getType() instanceof JavaType.MultiCatch) ||
-                    !(compareTo.getType() instanceof JavaType.MultiCatch) ||
-                    ((JavaType.MultiCatch) multiCatch.getType()).getThrowableTypes().size() != ((JavaType.MultiCatch) compareTo.getType()).getThrowableTypes().size() ||
-                    multiCatch.getAlternatives().size() != compareTo.getAlternatives().size()) {
+                        !(compareTo.getType() instanceof JavaType.MultiCatch) ||
+                        ((JavaType.MultiCatch) multiCatch.getType()).getThrowableTypes().size() != ((JavaType.MultiCatch) compareTo.getType()).getThrowableTypes().size() ||
+                        multiCatch.getAlternatives().size() != compareTo.getAlternatives().size()) {
                     isEqual.set(false);
                     return multiCatch;
                 }
@@ -1040,9 +1040,9 @@ public class SemanticallyEqual {
 
                 J.NewArray compareTo = (J.NewArray) j;
                 if (!TypeUtils.isOfType(newArray.getType(), compareTo.getType()) ||
-                    newArray.getDimensions().size() != compareTo.getDimensions().size() ||
-                    nullMissMatch(newArray.getTypeExpression(), compareTo.getTypeExpression()) ||
-                    nullListSizeMissMatch(newArray.getInitializer(), compareTo.getInitializer())) {
+                        newArray.getDimensions().size() != compareTo.getDimensions().size() ||
+                        nullMissMatch(newArray.getTypeExpression(), compareTo.getTypeExpression()) ||
+                        nullListSizeMissMatch(newArray.getInitializer(), compareTo.getInitializer())) {
                     isEqual.set(false);
                     return newArray;
                 }
@@ -1066,12 +1066,12 @@ public class SemanticallyEqual {
 
                 J.NewClass compareTo = (J.NewClass) j;
                 if (!TypeUtils.isOfType(newClass.getType(), compareTo.getType()) ||
-                    !TypeUtils.isOfType(newClass.getConstructorType(), compareTo.getConstructorType()) ||
-                    nullMissMatch(newClass.getEnclosing(), compareTo.getEnclosing()) ||
-                    nullMissMatch(newClass.getClazz(), compareTo.getClazz()) ||
-                    nullMissMatch(newClass.getConstructorType(), compareTo.getConstructorType()) ||
-                    nullMissMatch(newClass.getBody(), compareTo.getBody()) ||
-                    nullListSizeMissMatch(newClass.getArguments(), compareTo.getArguments())) {
+                        !TypeUtils.isOfType(newClass.getConstructorType(), compareTo.getConstructorType()) ||
+                        nullMissMatch(newClass.getEnclosing(), compareTo.getEnclosing()) ||
+                        nullMissMatch(newClass.getClazz(), compareTo.getClazz()) ||
+                        nullMissMatch(newClass.getConstructorType(), compareTo.getConstructorType()) ||
+                        nullMissMatch(newClass.getBody(), compareTo.getBody()) ||
+                        nullListSizeMissMatch(newClass.getArguments(), compareTo.getArguments())) {
                     isEqual.set(false);
                     return newClass;
                 }
@@ -1096,7 +1096,7 @@ public class SemanticallyEqual {
                         }
                         if (!containsLiteral) {
                             if (nullMissMatch(newClass.getConstructorType(), compareTo.getConstructorType()) ||
-                                newClass.getConstructorType() != null && compareTo.getConstructorType() != null && !TypeUtils.isOfType(newClass.getConstructorType(), compareTo.getConstructorType())) {
+                                    newClass.getConstructorType() != null && compareTo.getConstructorType() != null && !TypeUtils.isOfType(newClass.getConstructorType(), compareTo.getConstructorType())) {
                                 isEqual.set(false);
                                 return newClass;
                             }
@@ -1120,7 +1120,7 @@ public class SemanticallyEqual {
 
                 J.Package compareTo = (J.Package) j;
                 if (pkg.getAnnotations().size() != compareTo.getAnnotations().size() ||
-                    !pkg.getExpression().toString().equals(compareTo.getExpression().toString())) {
+                        !pkg.getExpression().toString().equals(compareTo.getExpression().toString())) {
                     isEqual.set(false);
                     return pkg;
                 }
@@ -1139,7 +1139,7 @@ public class SemanticallyEqual {
 
                 J.ParameterizedType compareTo = (J.ParameterizedType) j;
                 if (!TypeUtils.isOfType(type.getType(), compareTo.getType()) ||
-                    nullListSizeMissMatch(type.getTypeParameters(), compareTo.getTypeParameters())) {
+                        nullListSizeMissMatch(type.getTypeParameters(), compareTo.getTypeParameters())) {
                     isEqual.set(false);
                     return type;
                 }
@@ -1290,8 +1290,8 @@ public class SemanticallyEqual {
 
                 J.Try compareTo = (J.Try) j;
                 if (_try.getCatches().size() != compareTo.getCatches().size() ||
-                    nullMissMatch(_try.getFinally(), compareTo.getFinally()) ||
-                    nullListSizeMissMatch(_try.getResources(), compareTo.getResources())) {
+                        nullMissMatch(_try.getFinally(), compareTo.getFinally()) ||
+                        nullListSizeMissMatch(_try.getResources(), compareTo.getResources())) {
                     isEqual.set(false);
                     return _try;
                 }
@@ -1351,7 +1351,7 @@ public class SemanticallyEqual {
 
                 J.TypeParameter compareTo = (J.TypeParameter) j;
                 if (typeParam.getAnnotations().size() != compareTo.getAnnotations().size() ||
-                    nullListSizeMissMatch(typeParam.getBounds(), compareTo.getBounds())) {
+                        nullListSizeMissMatch(typeParam.getBounds(), compareTo.getBounds())) {
                     isEqual.set(false);
                     return typeParam;
                 }
@@ -1372,7 +1372,7 @@ public class SemanticallyEqual {
 
                 J.Unary compareTo = (J.Unary) j;
                 if (unary.getOperator() != compareTo.getOperator() ||
-                    !TypeUtils.isOfType(unary.getType(), compareTo.getType())) {
+                        !TypeUtils.isOfType(unary.getType(), compareTo.getType())) {
                     isEqual.set(false);
                     return unary;
                 }
@@ -1392,9 +1392,9 @@ public class SemanticallyEqual {
 
                 J.VariableDeclarations compareTo = (J.VariableDeclarations) j;
                 if (!TypeUtils.isOfType(multiVariable.getType(), compareTo.getType()) ||
-                    nullMissMatch(multiVariable.getTypeExpression(), compareTo.getTypeExpression()) ||
-                    multiVariable.getVariables().size() != compareTo.getVariables().size() ||
-                    multiVariable.getLeadingAnnotations().size() != compareTo.getLeadingAnnotations().size()) {
+                        nullMissMatch(multiVariable.getTypeExpression(), compareTo.getTypeExpression()) ||
+                        multiVariable.getVariables().size() != compareTo.getVariables().size() ||
+                        multiVariable.getLeadingAnnotations().size() != compareTo.getLeadingAnnotations().size()) {
                     isEqual.set(false);
                     return multiVariable;
                 }
@@ -1425,7 +1425,7 @@ public class SemanticallyEqual {
                     return variable;
                 }
                 if (!TypeUtils.isOfType(variable.getType(), compareTo.getType()) ||
-                    nullMissMatch(variable.getInitializer(), compareTo.getInitializer())) {
+                        nullMissMatch(variable.getInitializer(), compareTo.getInitializer())) {
                     isEqual.set(false);
                     return variable;
                 }
@@ -1461,7 +1461,7 @@ public class SemanticallyEqual {
 
                 J.Wildcard compareTo = (J.Wildcard) j;
                 if (wildcard.getBound() != compareTo.getBound() ||
-                    nullMissMatch(wildcard.getBoundedType(), compareTo.getBoundedType())) {
+                        nullMissMatch(wildcard.getBoundedType(), compareTo.getBoundedType())) {
                     isEqual.set(false);
                     return wildcard;
                 }

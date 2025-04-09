@@ -27,17 +27,17 @@ class FindContentTest implements RewriteTest {
     @Test
     void find() {
         rewriteRun(
-          spec -> spec.recipe(new FindContent("$.provider")),
-          hcl(
-            """
+                spec -> spec.recipe(new FindContent("$.provider")),
+                hcl(
+                        """
               provider {
               }
               """,
-            """
+                        """
               /*~~>*/provider {
               }
               """
-          )
+                )
         );
     }
 }

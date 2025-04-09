@@ -75,10 +75,10 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
 
     @Option(displayName = "Version",
             description = "An exact version number or node-style semver selector used to select the version number. " +
-                          "You can also use `latest.release` for the latest available version and `latest.patch` if " +
-                          "the current version is a valid semantic version. For more details, you can look at the documentation " +
-                          "page of [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors). " +
-                          "Defaults to `latest.release`.",
+                    "You can also use `latest.release` for the latest available version and `latest.patch` if " +
+                    "the current version is a valid semantic version. For more details, you can look at the documentation " +
+                    "page of [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors). " +
+                    "Defaults to `latest.release`.",
             example = "29.X",
             required = false)
     @Nullable
@@ -86,7 +86,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                          "Setting 'newVersion' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+                    "Setting 'newVersion' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
@@ -114,9 +114,9 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
     @Override
     public String getDescription() {
         return "Upgrades the version of a transitive dependency in a Gradle build file. " +
-               "There are many ways to do this in Gradle, so the mechanism for upgrading a " +
-               "transitive dependency must be considered carefully depending on your style " +
-               "of dependency management.";
+                "There are many ways to do this in Gradle, so the mechanism for upgrading a " +
+                "transitive dependency must be considered carefully depending on your style " +
+                "of dependency management.";
     }
 
     @Override
@@ -183,7 +183,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                                                     }
                                                     if (c.getName().equals("testRuntimeOnly")) {
                                                         if (config.getName().equals("testImplementation") ||
-                                                            config.getName().equals("implementation")) {
+                                                                config.getName().equals("implementation")) {
                                                             return true;
                                                         }
                                                     }
@@ -323,10 +323,10 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                 J withConstraints = (J) GradleParser.builder().build().parse(
                         //language=groovy
                         "plugins { id 'java' }\n" +
-                        "dependencies {\n" +
-                        "    constraints {\n" +
-                        "    }\n" +
-                        "}\n"
+                                "dependencies {\n" +
+                                "    constraints {\n" +
+                                "    }\n" +
+                                "}\n"
                 ).findFirst().orElseThrow(() -> new IllegalStateException("Unable to parse constraints block"));
 
                 Statement constraints = FindMethods.find(withConstraints, "org.gradle.api.artifacts.dsl.DependencyHandler constraints(..)", true)
@@ -339,7 +339,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                         .withMarkers(Markers.EMPTY);
 
                 return autoFormat(m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
-                    if(!(arg instanceof J.Lambda)) {
+                    if (!(arg instanceof J.Lambda)) {
                         return arg;
                     }
                     J.Lambda dependencies = (J.Lambda) arg;
@@ -372,7 +372,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            if(!CONSTRAINTS_MATCHER.matches(m)) {
+            if (!CONSTRAINTS_MATCHER.matches(m)) {
                 return m;
             }
             String ga = gav.getGroupId() + ":" + gav.getArtifactId();
@@ -398,7 +398,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
             if (Objects.equals(gav.getVersion(), existingConstraintVersion.get())) {
                 return m;
             }
-            if(existingConstraint == null) {
+            if (existingConstraint == null) {
                 m = (J.MethodInvocation) new CreateConstraintVisitor(config, gav, because)
                         .visitNonNull(m, ctx, requireNonNull(getCursor().getParent()));
             } else {
@@ -408,6 +408,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
             return m;
         }
     }
+
     @Value
     @EqualsAndHashCode(callSuper = false)
     private static class CreateConstraintVisitor extends GroovyIsoVisitor<ExecutionContext> {
@@ -417,6 +418,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
 
         @Nullable
         String because;
+
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             if ("version".equals(method.getSimpleName())) {
@@ -425,20 +427,20 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
             Optional<G.CompilationUnit> withConstraint = GradleParser.builder().build().parse(String.format(
                     "plugins {\n" +
-                    "    id 'java'\n" +
-                    "}\n" +
-                    "dependencies {\n" +
-                    "    constraints {\n" +
-                    "        implementation('%s')%s\n" +
-                    "    }\n" +
-                    "}",
+                            "    id 'java'\n" +
+                            "}\n" +
+                            "dependencies {\n" +
+                            "    constraints {\n" +
+                            "        implementation('%s')%s\n" +
+                            "    }\n" +
+                            "}",
                     gav,
                     because == null ? "" : String.format(" {\n            because '%s'\n        }", because)
             )).findFirst().map(G.CompilationUnit.class::cast);
 
             J.MethodInvocation constraint = withConstraint.map(it -> (J.MethodInvocation) it.getStatements().get(1))
                     .map(dependenciesMethod -> (J.Lambda) dependenciesMethod.getArguments().get(0))
-                    .map(dependenciesClosure -> (J.Block)dependenciesClosure.getBody())
+                    .map(dependenciesClosure -> (J.Block) dependenciesClosure.getBody())
                     .map(dependenciesBody -> (J.Return) dependenciesBody.getStatements().get(0))
                     .map(returnConstraints -> (J.MethodInvocation) returnConstraints.getExpression())
                     .map(constraintsInvocation -> (J.Lambda) constraintsInvocation.getArguments().get(0))
@@ -449,7 +451,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                     .orElseThrow(() -> new IllegalStateException("Unable to find constraint"));
 
             m = autoFormat(m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
-                if(!(arg instanceof J.Lambda)) {
+                if (!(arg instanceof J.Lambda)) {
                     return arg;
                 }
                 J.Lambda dependencies = (J.Lambda) arg;
@@ -480,13 +482,13 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                 return method;
             }
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            if(existingConstraint.isScope(m)) {
+            if (existingConstraint.isScope(m)) {
                 AtomicBoolean updatedBecause = new AtomicBoolean(false);
                 m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
-                    if(arg instanceof J.Literal) {
+                    if (arg instanceof J.Literal) {
                         String valueSource = ((J.Literal) arg).getValueSource();
                         char quote;
-                        if(valueSource == null) {
+                        if (valueSource == null) {
                             quote = '\'';
                         } else {
                             quote = valueSource.charAt(0);
@@ -496,17 +498,17 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
                     } else if (arg instanceof J.Lambda) {
                         arg = (Expression) new RemoveVersionVisitor().visitNonNull(arg, ctx);
                     }
-                    if(because != null) {
+                    if (because != null) {
                         Expression arg2 = (Expression) new UpdateBecauseTextVisitor(because)
                                 .visitNonNull(arg, ctx, getCursor());
-                        if(arg2 != arg) {
+                        if (arg2 != arg) {
                             updatedBecause.set(true);
                         }
                         return arg2;
                     }
                     return arg;
                 }));
-                if(because != null && !updatedBecause.get()) {
+                if (because != null && !updatedBecause.get()) {
                     m = (J.MethodInvocation) new CreateBecauseVisitor(because).visitNonNull(m, ctx, requireNonNull(getCursor().getParent()));
                 }
             }
@@ -519,7 +521,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
         @Override
         public  J.@Nullable Return visitReturn(J.Return _return, ExecutionContext ctx) {
             J.Return r = super.visitReturn(_return, ctx);
-            if(r.getExpression() == null) {
+            if (r.getExpression() == null) {
                 //noinspection DataFlowIssue
                 return null;
             }
@@ -529,7 +531,7 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
         @Override
         public  J.@Nullable MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            if("version".equals(m.getSimpleName()) && m.getArguments().size() == 1 && m.getArguments().get(0) instanceof J.Lambda) {
+            if ("version".equals(m.getSimpleName()) && m.getArguments().size() == 1 && m.getArguments().get(0) instanceof J.Lambda) {
                 //noinspection DataFlowIssue
                 return null;
             }
@@ -541,16 +543,17 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
     @EqualsAndHashCode(callSuper = false)
     private static class UpdateBecauseTextVisitor extends GroovyIsoVisitor<ExecutionContext> {
         String because;
+
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            if(!"because".equals(m.getSimpleName())) {
+            if (!"because".equals(m.getSimpleName())) {
                 return m;
             }
             m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
-                if(arg instanceof J.Literal) {
+                if (arg instanceof J.Literal) {
                     char quote;
-                    if(((J.Literal) arg).getValueSource() == null) {
+                    if (((J.Literal) arg).getValueSource() == null) {
                         quote = '"';
                     } else {
                         quote = ((J.Literal) arg).getValueSource().charAt(0);
@@ -568,26 +571,27 @@ public class UpgradeTransitiveDependencyVersion extends Recipe {
     @EqualsAndHashCode(callSuper = false)
     private static class CreateBecauseVisitor extends GroovyIsoVisitor<ExecutionContext> {
         String because;
+
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
             J.Lambda becauseArg = GradleParser.builder().build().parse(String.format(
                     "plugin { id 'java' }\n" +
-                    "dependencies { constraints {\n" +
-                    "    implementation('org.openrewrite:rewrite-core:8.0.0') {\n" +
-                    "        because '%s'\n" +
-                    "    }\n" +
-                    "}}",
+                            "dependencies { constraints {\n" +
+                            "    implementation('org.openrewrite:rewrite-core:8.0.0') {\n" +
+                            "        because '%s'\n" +
+                            "    }\n" +
+                            "}}",
                     because))
                     .map(G.CompilationUnit.class::cast)
                     .map(cu -> (J.MethodInvocation) cu.getStatements().get(1))
                     .map(J.MethodInvocation.class::cast)
                     .map(dependencies -> (J.Lambda) dependencies.getArguments().get(0))
-                    .map(dependenciesClosure -> ((J.Block)dependenciesClosure.getBody()).getStatements().get(0))
+                    .map(dependenciesClosure -> ((J.Block) dependenciesClosure.getBody()).getStatements().get(0))
                     .map(J.Return.class::cast)
                     .map(returnConstraints -> ((J.MethodInvocation) requireNonNull(returnConstraints.getExpression())).getArguments().get(0))
                     .map(J.Lambda.class::cast)
-                    .map(constraintsClosure -> ((J.Block)constraintsClosure.getBody()).getStatements().get(0))
+                    .map(constraintsClosure -> ((J.Block) constraintsClosure.getBody()).getStatements().get(0))
                     .map(J.Return.class::cast)
                     .map(returnImplementation -> ((J.MethodInvocation) requireNonNull(returnImplementation.getExpression())).getArguments().get(1))
                     .map(J.Lambda.class::cast)
