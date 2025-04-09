@@ -18,12 +18,7 @@ package org.openrewrite.java;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JRightPadded;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 
 /**
  * Visitor that adds parentheses to Java expressions where needed based on operator precedence
@@ -40,53 +35,15 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
 
         J.Binary b = (J.Binary) j;
 
-        // Handle string concatenation specifically
-        if (b.getOperator() == J.Binary.Type.Addition) {
-            // Check if this is a string concatenation
-            boolean isStringConcatenation = isStringType(b.getType()) || 
-                                        isStringType(b.getLeft().getType()) || 
-                                        isStringType(b.getRight().getType());
-        
-            if (isStringConcatenation) {
-                // If right side is an arithmetic operation, it needs parentheses
-                if (b.getRight() instanceof J.Binary) {
-                    J.Binary rightBinary = (J.Binary) b.getRight();
-                    if (rightBinary.getOperator() == J.Binary.Type.Addition || 
-                        rightBinary.getOperator() == J.Binary.Type.Subtraction ||
-                        rightBinary.getOperator() == J.Binary.Type.Multiplication ||
-                        rightBinary.getOperator() == J.Binary.Type.Division) {
-                    
-                        // Check if any operand is a string
-                        boolean rightOpHasString = isStringType(rightBinary.getLeft().getType()) || 
-                                               isStringType(rightBinary.getRight().getType());
-                    
-                        // If the right binary operation isn't string concatenation, it needs parentheses
-                        if (!rightOpHasString) {
-                            return b.withRight(parenthesize(rightBinary));
-                        }
-                    }
-                }
-            }
-        }
-
         Cursor parent = getCursor().getParentTreeCursor();
         if (parent.getValue() instanceof J.Unary) {
             return parenthesize(b);
         } else if (parent.getValue() instanceof J.Binary) {
             J.Binary parentBinary = parent.getValue();
         
-            // Special handling for string concatenation in a chain
-            if (b.getOperator() == J.Binary.Type.Addition && 
-                parentBinary.getOperator() == J.Binary.Type.Addition) {
-            
-                // Check if this is string concatenation with an arithmetic operation
-                boolean isStringPlusArithmetic = isStringType(b.getType()) && 
-                                            b.getRight() instanceof J.Binary && 
-                                            !isStringType(b.getRight().getType());
-            
-                if (isStringPlusArithmetic) {
-                    return parenthesize(b);
-                }
+            // Check for string concatenation cases that need special handling
+            if (isStringConcatenationRequiringParentheses(b, parentBinary)) {
+                return parenthesize(b);
             }
         
             if (needsParenthesesForPrecedence(b, parentBinary)) {
@@ -97,6 +54,37 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
         }
 
         return b;
+    }
+
+    /**
+     * Determines if a binary expression within a string concatenation context requires parentheses.
+     * Specifically handles cases where removing parentheses would change the result.
+     */
+    private boolean isStringConcatenationRequiringParentheses(J.Binary inner, J.Binary outer) {
+        // We're only concerned with addition operations
+        if (inner.getOperator() != J.Binary.Type.Addition || outer.getOperator() != J.Binary.Type.Addition) {
+            return false;
+        }
+
+        // Case 1: "Value: " + (1 + 2) - arithmetic on right side of string
+        // We need parentheses if the outer operation is string concatenation (left operand is string)
+        // and the inner operation is purely numeric
+        if (isStringType(outer.getLeft().getType()) && !isStringType(inner.getLeft().getType()) && !isStringType(inner.getRight().getType())) {
+            // Only need parentheses if this is the right operand of the outer expression
+            return outer.getRight() == inner;
+        }
+
+        // Case 2: 1 + (2 + " is the result") - string on right side of arithmetic
+        // We need parentheses if the inner operation involves a string (either operand)
+        // and the outer left operand is numeric
+        if (!isStringType(outer.getLeft().getType()) &&
+            (isStringType(inner.getLeft().getType()) || isStringType(inner.getRight().getType()))) {
+            // Only need parentheses if this is the right operand of the outer expression
+            return outer.getRight() == inner;
+        }
+
+        // No other cases require special parentheses for string concatenation
+        return false;
     }
 
     private boolean isStringType(@Nullable JavaType type) {
