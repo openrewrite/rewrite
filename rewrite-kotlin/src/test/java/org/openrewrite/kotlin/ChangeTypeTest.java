@@ -30,7 +30,7 @@ import static org.openrewrite.kotlin.Assertions.kotlin;
 class ChangeTypeTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new ChangeType("a.b.Original", "x.y.Target", true));
+        spec.recipe(new ChangeType("a.b.Original", "x.y.Target", true, null));
     }
 
     @Test
@@ -268,7 +268,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void changeDefinition() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("file", "newFile", false)),
+          spec -> spec.recipe(new ChangeType("file", "newFile", false, null)),
           kotlin(
             """
               class file {
@@ -287,7 +287,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void addImportAlias() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", true)),
+          spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", true, null)),
           kotlin(
             """
               import java.util.ArrayList as MyList
@@ -314,7 +314,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void updateImportAlias() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", true)),
+          spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", true, null)),
           kotlin(
             """
               import java.util.ArrayList as MyList
@@ -341,7 +341,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void usingAliasOnly() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", true)),
+          spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", true, null)),
           kotlin(
             """
               import java.util.ArrayList as MyList
@@ -364,7 +364,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void implicitImport() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", true)),
+          spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", true, null)),
           kotlin(
             """
               fun main() {
@@ -385,7 +385,7 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void qualifiedReference() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", true)),
+          spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", true, null)),
           kotlin(
             """
               import java.util.ArrayList as MyList

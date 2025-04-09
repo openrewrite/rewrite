@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.test.RecipeSpec;
@@ -51,9 +52,10 @@ class ParenthesizeVisitorTest implements RewriteTest {
                       int a = 1 + (2 * 3);
                       int b = (1 * 2) + 3;
                       int c = (1 * 2) + (3 * 4);
+                      int d = 7 - (5 - 2);
               
-                      boolean d = a > 5 && b <= 10;
-                      boolean e = a > 5 || (b <= 10 && c == 9);
+                      boolean e = a > 5 && b <= 10;
+                      boolean f = a > 5 || (b <= 10 && c == 9);
                   }
               }
               """,
@@ -63,9 +65,10 @@ class ParenthesizeVisitorTest implements RewriteTest {
                       int a = 1 + 2 * 3;
                       int b = 1 * 2 + 3;
                       int c = 1 * 2 + 3 * 4;
+                      int d = 7 - (5 - 2);
               
-                      boolean d = a > 5 && b <= 10;
-                      boolean e = a > 5 || b <= 10 && c == 9;
+                      boolean e = a > 5 && b <= 10;
+                      boolean f = a > 5 || b <= 10 && c == 9;
                   }
               }
               """
@@ -388,6 +391,38 @@ class ParenthesizeVisitorTest implements RewriteTest {
     }
 
     @Test
+    void cast() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void method() {
+                      int a = ((Integer) 1).intValue();
+                      int b = (((Integer) 1).intValue());
+                      int c = ((Integer) 1) + 2;
+                      int d = ~((Integer) 1);
+
+                      boolean e = ((Integer) 1) instanceof Integer;
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void method() {
+                      int a = ((Integer) 1).intValue();
+                      int b = ((Integer) 1).intValue();
+                      int c = ((Integer) 1) + 2;
+                      int d = ~((Integer) 1);
+
+                      boolean e = ((Integer) 1) instanceof Integer;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void alreadyParenthesized() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(ParenthesizeVisitor::new))
@@ -430,6 +465,76 @@ class ParenthesizeVisitorTest implements RewriteTest {
                       boolean c = a + b > a * b && a - b < a / b;
                       boolean d = a + b > 0 || a * b > 0 && a / b > 0;
                       boolean e = a < b && a + b > 0 ? a > 0 || b > 0 : a < 0 && b < 0;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void maybeParenthesize() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<ExecutionContext>() {
+              @Override
+              public <T extends J> J visitParentheses(J.Parentheses<T> parens, ExecutionContext ctx) {
+                  return ParenthesizeVisitor.maybeParenthesize((Expression) parens.getTree(), getCursor()).withPrefix(parens.getPrefix());
+              }
+          })),
+          java(
+            """
+              class Test {
+                  void method() {
+                      int a = 1;
+                      int b = 2;
+                      int c = 3;
+              
+                      // Binary operations
+                      int result1 = a + (b * c);
+                      int result2 = (a + b) * c; 
+              
+                      // Non-associative operations
+                      int result3 = a - (b - c);
+              
+                      // Unary context
+                      boolean result4 = !(a > b);
+              
+                      // Method invocation context
+                      String s = ((String) "value").substring(0);
+              
+                      // Ternary expression
+                      int result5 = (a > b) ? c : 0;
+              
+                      // Assignment inside other expressions
+                      int result6 = (a = b) + c;
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void method() {
+                      int a = 1;
+                      int b = 2;
+                      int c = 3;
+              
+                      // Binary operations
+                      int result1 = a + b * c;
+                      int result2 = (a + b) * c; 
+              
+                      // Non-associative operations
+                      int result3 = a - (b - c);
+              
+                      // Unary context
+                      boolean result4 = !(a > b);
+              
+                      // Method invocation context
+                      String s = ((String) "value").substring(0);
+              
+                      // Ternary expression
+                      int result5 = a > b ? c : 0;
+              
+                      // Assignment inside other expressions
+                      int result6 = (a = b) + c;
                   }
               }
               """
