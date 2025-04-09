@@ -34,57 +34,77 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
         }
 
         J.Binary b = (J.Binary) j;
-
         Cursor parent = getCursor().getParentTreeCursor();
+        
         if (parent.getValue() instanceof J.Unary) {
             return parenthesize(b);
         } else if (parent.getValue() instanceof J.Binary) {
             J.Binary parentBinary = parent.getValue();
-        
-            // Check for string concatenation cases that need special handling
-            if (isStringConcatenationRequiringParentheses(b, parentBinary)) {
-                return parenthesize(b);
+            
+            // Special handling for string concatenation cases
+            if (b.getOperator() == J.Binary.Type.Addition && parentBinary.getOperator() == J.Binary.Type.Addition) {
+                // Only apply string concatenation rules if we're actually dealing with strings
+                boolean isStringContext = isStringType(b.getType()) || 
+                                          isStringType(parentBinary.getType()) ||
+                                          isStringType(b.getLeft().getType()) || 
+                                          isStringType(b.getRight().getType()) ||
+                                          isStringType(parentBinary.getLeft().getType()) || 
+                                          isStringType(parentBinary.getRight().getType());
+                
+                if (isStringContext) {
+                    return handleStringConcatenation(b, parentBinary);
+                }
             }
-        
+            
+            // Normal precedence rules for non-string operations
             if (needsParenthesesForPrecedence(b, parentBinary)) {
                 return parenthesize(b);
             }
         } else if (parent.getValue() instanceof J.InstanceOf) {
             return parenthesize(b);
+        } else if (parent.getValue() instanceof J.MethodInvocation) {
+            if (parent.<J.MethodInvocation>getValue().getSelect() == b) {
+                return parenthesize(b);
+            }
         }
 
         return b;
     }
 
-    /**
-     * Determines if a binary expression within a string concatenation context requires parentheses.
-     * Specifically handles cases where removing parentheses would change the result.
-     */
-    private boolean isStringConcatenationRequiringParentheses(J.Binary inner, J.Binary outer) {
-        // We're only concerned with addition operations
-        if (inner.getOperator() != J.Binary.Type.Addition || outer.getOperator() != J.Binary.Type.Addition) {
-            return false;
+    private J handleStringConcatenation(J.Binary inner, J.Binary outer) {
+        // Case 1: "Value: " + (1 + 2) - We need parentheses
+        // When right operand is a numeric addition inside a string context
+        if (isStringType(outer.getLeft().getType()) && 
+            !isStringType(inner.getLeft().getType()) && 
+            !isStringType(inner.getRight().getType()) &&
+            inner == outer.getRight()) {
+            return parenthesize(inner);
         }
-
-        // Case 1: "Value: " + (1 + 2) - arithmetic on right side of string
-        // We need parentheses if the outer operation is string concatenation (left operand is string)
-        // and the inner operation is purely numeric
-        if (isStringType(outer.getLeft().getType()) && !isStringType(inner.getLeft().getType()) && !isStringType(inner.getRight().getType())) {
-            // Only need parentheses if this is the right operand of the outer expression
-            return outer.getRight() == inner;
+        
+        // Case 2: 1 + (2 + " is the result") - We need parentheses
+        // When inner contains a string but outer left is numeric
+        if (!isStringType(outer.getLeft().getType()) && 
+            (isStringType(inner.getLeft().getType()) || isStringType(inner.getRight().getType())) &&
+            inner == outer.getRight()) {
+            return parenthesize(inner);
         }
-
-        // Case 2: 1 + (2 + " is the result") - string on right side of arithmetic
-        // We need parentheses if the inner operation involves a string (either operand)
-        // and the outer left operand is numeric
-        if (!isStringType(outer.getLeft().getType()) &&
-            (isStringType(inner.getLeft().getType()) || isStringType(inner.getRight().getType()))) {
-            // Only need parentheses if this is the right operand of the outer expression
-            return outer.getRight() == inner;
+        
+        // Case 3: 1 + 2 + " is the result" - NO parentheses needed
+        // This is a left-associative operation where inner is 1+2 and outer is (1+2)+" is the result"
+        if (!isStringType(inner.getLeft().getType()) && 
+            !isStringType(inner.getRight().getType()) && 
+            isStringType(outer.getRight().getType()) &&
+            inner == outer.getLeft()) {
+            // Don't add parentheses in this case
+            return inner;
         }
-
-        // No other cases require special parentheses for string concatenation
-        return false;
+        
+        // For other string concatenation cases, follow normal precedence rules
+        if (needsParenthesesForPrecedence(inner, outer)) {
+            return parenthesize(inner);
+        }
+        
+        return inner;
     }
 
     private boolean isStringType(@Nullable JavaType type) {
@@ -206,6 +226,10 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
             parent.getValue() instanceof J.Binary ||
             parent.getValue() instanceof J.InstanceOf) {
             return parenthesize(t);
+        } else if (parent.getValue() instanceof J.MethodInvocation) {
+            if (parent.<J.MethodInvocation>getValue().getSelect() == t) {
+                return parenthesize(t);
+            }
         }
         
         return t;

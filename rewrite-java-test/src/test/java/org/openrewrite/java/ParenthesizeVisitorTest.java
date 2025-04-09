@@ -235,7 +235,7 @@ class ParenthesizeVisitorTest implements RewriteTest {
                       // String concatenation with mixed types
                       String a = "Calculation: " + 1.5 * 2;
                       String b = "Item " + 1 + ": detail";
-                      String c = "Item " + (1 + ": detail");
+                      String c = "Item " + 1 + ": detail";
               
                       // String concatenation in conditions
                       boolean test1 = ("a" + "b").equals("ab");
