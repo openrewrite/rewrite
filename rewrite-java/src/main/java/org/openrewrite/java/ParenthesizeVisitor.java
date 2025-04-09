@@ -45,9 +45,7 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
             if (needsParenthesesForPrecedence(b, parentBinary)) {
                 return parenthesize(b);
             }
-        } else if (parent.getValue() instanceof J.InstanceOf ||
-                   parent.getValue() instanceof J.MethodInvocation ||
-                   parent.getValue() instanceof J.NewClass) {
+        } else if (parent.getValue() instanceof J.InstanceOf) {
             return parenthesize(b);
         }
 
@@ -87,9 +85,7 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
         Cursor parent = getCursor().getParentTreeCursor();
         if (parent.getValue() instanceof J.Unary ||
             parent.getValue() instanceof J.Binary ||
-            parent.getValue() instanceof J.InstanceOf ||
-            parent.getValue() instanceof J.MethodInvocation ||
-            parent.getValue() instanceof J.NewClass) {
+            parent.getValue() instanceof J.InstanceOf) {
             return parenthesize(t);
         }
         
@@ -111,9 +107,7 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
 
         Cursor parent = getCursor().getParentTreeCursor();
         if (parent.getValue() instanceof J.Binary ||
-            parent.getValue() instanceof J.Unary ||
-            parent.getValue() instanceof J.MethodInvocation ||
-            parent.getValue() instanceof J.NewClass) {
+            parent.getValue() instanceof J.Unary) {
             return parenthesize(i);
         }
 
@@ -132,9 +126,7 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
         Cursor parent = getCursor().getParentTreeCursor();
         if (parent.getValue() instanceof J.Binary ||
             parent.getValue() instanceof J.Unary ||
-            parent.getValue() instanceof J.Ternary ||
-            parent.getValue() instanceof J.MethodInvocation ||
-            parent.getValue() instanceof J.NewClass) {
+            parent.getValue() instanceof J.Ternary) {
             return parenthesize(a);
         }
 
