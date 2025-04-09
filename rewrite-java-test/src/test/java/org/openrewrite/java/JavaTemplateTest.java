@@ -65,6 +65,34 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
+    @Test
+    void addParentheses() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              private final JavaTemplate template = JavaTemplate.builder("#{any()}").build();
+
+              @Override
+              public <T extends J> J visitParentheses(J.Parentheses<T> parens, ExecutionContext ctx) {
+                  return template.apply(getCursor(), parens.getCoordinates().replace(), parens.getTree());
+              }
+          }))
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1),
+          java(
+            """
+              public class A {
+                  int a = (1 + 2) * 3;
+              }
+              """,
+            """
+              public class A {
+                  int a = (1 + 2) * 3;
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2090")
     @Test
     void assignmentWithinIfPredicate() {
