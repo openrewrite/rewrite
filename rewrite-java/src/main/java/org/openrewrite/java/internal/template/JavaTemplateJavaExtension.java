@@ -426,7 +426,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
 
             @Override
             public J visitNewClass(J.NewClass newClass, Integer p) {
-                if (newClass.isScope(insertionPoint)) {
+                if (isScope(newClass)) {
                     // allow a `J.NewClass` to also be replaced by an expression
                     return maybeReplaceStatement(newClass, J.class, p);
                 }
@@ -479,7 +479,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
 
             @Override
             public J visitVariableDeclarations(J.VariableDeclarations multiVariable, Integer p) {
-                if (multiVariable.isScope(insertionPoint)) {
+                if (isScope(multiVariable)) {
                     if (loc == ANNOTATIONS) {
                         J.VariableDeclarations v = multiVariable;
                         final List<J.Annotation> gen = unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate));
