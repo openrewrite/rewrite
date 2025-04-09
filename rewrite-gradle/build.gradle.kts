@@ -54,7 +54,7 @@ dependencies {
 
     compileOnly("org.codehaus.groovy:groovy:latest.release")
     compileOnly(gradleApi())
-    compileOnly("com.gradle:develocity-gradle-plugin:latest.release")
+    compileOnly("com.gradle:develocity-gradle-plugin:3.+")
 
     testImplementation(project(":rewrite-test")) {
         // because gradle-api fatjars this implementation already
