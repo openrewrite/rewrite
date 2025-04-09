@@ -69,13 +69,13 @@ class JavaTemplateTest implements RewriteTest {
     void addParentheses() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              private final JavaTemplate template = JavaTemplate.builder("#{any()}").build();
-
-              @Override
-              public <T extends J> J visitParentheses(J.Parentheses<T> parens, ExecutionContext ctx) {
-                  return template.apply(getCursor(), parens.getCoordinates().replace(), parens.getTree());
-              }
-          }))
+                @Override
+                public <T extends J> J visitParentheses(J.Parentheses<T> parens, ExecutionContext ctx) {
+                    return JavaTemplate.builder("#{any()}")
+                      .build()
+                      .apply(getCursor(), parens.getCoordinates().replace(), parens.getTree());
+                }
+            }))
             .cycles(1)
             .expectedCyclesThatMakeChanges(1),
           java(
@@ -101,7 +101,7 @@ class JavaTemplateTest implements RewriteTest {
               @Override
               public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
                   if ((assignment.getAssignment() instanceof J.Literal) &&
-                    ((J.Literal) assignment.getAssignment()).getValue().equals(1)) {
+                      ((J.Literal) assignment.getAssignment()).getValue().equals(1)) {
                       return JavaTemplate.builder("value = 0")
                         .contextSensitive()
                         .build()
@@ -1374,7 +1374,7 @@ class JavaTemplateTest implements RewriteTest {
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                   J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
                   if (new MethodMatcher("Foo bar(..)").matches(mi) &&
-                    mi.getArguments().get(0) instanceof J.Binary) {
+                      mi.getArguments().get(0) instanceof J.Binary) {
                       return JavaTemplate.builder("\"Hello, {}\", \"World!\"")
                         .build()
                         .apply(new Cursor(getCursor().getParent(), mi), mi.getCoordinates().replaceArguments());
