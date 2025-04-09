@@ -56,6 +56,7 @@ class ParenthesizeVisitorTest implements RewriteTest {
               
                       boolean e = a > 5 && b <= 10;
                       boolean f = a > 5 || (b <= 10 && c == 9);
+                      boolean g = !(!e);
                   }
               }
               """,
@@ -69,6 +70,7 @@ class ParenthesizeVisitorTest implements RewriteTest {
               
                       boolean e = a > 5 && b <= 10;
                       boolean f = a > 5 || b <= 10 && c == 9;
+                      boolean g = !!e;
                   }
               }
               """
@@ -425,7 +427,7 @@ class ParenthesizeVisitorTest implements RewriteTest {
     @Test
     void alreadyParenthesized() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(ParenthesizeVisitor::new))
+          spec -> spec.recipe(toRecipe(() -> new ParenthesizeVisitor()))
             .expectedCyclesThatMakeChanges(0),
           java(
             """
