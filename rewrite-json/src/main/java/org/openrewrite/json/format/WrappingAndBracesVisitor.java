@@ -30,10 +30,6 @@ import org.openrewrite.style.LineWrapSetting;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import static java.util.Collections.emptyList;
 
 public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
     @Nullable
@@ -60,8 +56,12 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
         List<JsonRightPadded<Json>> members = ret.getPadding().getMembers();
         LineWrapSetting wrappingSetting = this.wrappingAndBracesStyle.getWrapObjects();
 
-        members = ensureCollectionHasIndents(members, wrappingSetting);
-        members = applyWrappingStyleToSuffixes(members, wrappingSetting, getCurrentIndent());
+        if (!isEmpty(members)) {
+            members = ensureCollectionHasIndents(members, wrappingSetting);
+            members = applyWrappingStyleToSuffixes(members, wrappingSetting, getCurrentIndent());
+        } else {
+            members = collapseToNoSpaceIfEmpty(members);
+        }
         return ret.getPadding().withMembers(members);
     }
 
@@ -71,8 +71,12 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
         List<JsonRightPadded<JsonValue>> members = ret.getPadding().getValues();
         LineWrapSetting wrappingSetting = this.wrappingAndBracesStyle.getWrapArrays();
 
-        members = ensureCollectionHasIndents(members, wrappingSetting);
-        members = applyWrappingStyleToSuffixes(members, wrappingSetting, getCurrentIndent());
+        if (!isEmpty(members)) {
+            members = ensureCollectionHasIndents(members, wrappingSetting);
+            members = applyWrappingStyleToSuffixes(members, wrappingSetting, getCurrentIndent());
+        } else {
+            members = collapseToNoSpaceIfEmpty(members);
+        }
         return ret.getPadding().withValues(members);
     }
 
@@ -111,7 +115,7 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
             } else {
                 throw new UnsupportedOperationException("Unknown LineWrapSetting: " + wrapping);
             }
-            if (!newPrefixString.equals(prefix.getWhitespace())) {
+            if (!newPrefixString.equals(prefix.getWhitespace()) && elem.getAfter().getComments().isEmpty()) {
                 return elem.withElement(elem.getElement().withPrefix(prefix.withWhitespace((newPrefixString))));
             } else {
                 return elem;
@@ -134,8 +138,8 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
             } else {
                 newAfter = "";
             }
-            if (!newAfter.equals(currentAfter)) {
-                return elem.withAfter(Space.build(newAfter, emptyList()));
+            if (!newAfter.equals(currentAfter) && elem.getAfter().getComments().isEmpty()) {
+                return elem.withAfter(Space.build(newAfter, elem.getAfter().getComments()));
             } else {
                 return elem;
             }
@@ -153,5 +157,19 @@ public class WrappingAndBracesVisitor<P> extends JsonIsoVisitor<P> {
             return containingNode.map(node -> node.getPrefix().getWhitespaceIndent()).orElse("");
         }
         return ret;
+    }
+
+    public static <JS extends Json> boolean isEmpty(List<JsonRightPadded<JS>> list) {
+        return list.size() == 1 &&
+                (list.get(0).getElement() instanceof Json.Empty) &&
+                (list.get(0).getElement().getPrefix().getComments().isEmpty()) &&
+                (list.get(0).getAfter().getComments().isEmpty());
+    }
+
+    private <JS extends Json> List<JsonRightPadded<JS>> collapseToNoSpaceIfEmpty(List<JsonRightPadded<JS>> list) {
+        if (isEmpty(list)) {
+            return ListUtils.map(list, right -> right.withElement(right.getElement().withPrefix(Space.EMPTY)).withAfter(Space.EMPTY));
+        }
+        return list;
     }
 }

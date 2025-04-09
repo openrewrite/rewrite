@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Cursor;
 import org.openrewrite.DocumentExample;
@@ -159,4 +160,236 @@ class JavaTemplateContextFreeTest implements RewriteTest {
           ));
     }
 
+    @Test
+    void contextFreeTypeParameter() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  if (multiVariable.getVariables().get(0).getSimpleName().equals("o")) {
+                      return JavaTemplate.builder("var o = #{any()};")
+                        .build()
+                        .apply(getCursor(), multiVariable.getCoordinates().replace(), multiVariable.getVariables().get(0).getInitializer());
+                  }
+                  return multiVariable;
+              }
+          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          java(
+            """
+              import java.util.Optional;
+              
+              class Test {
+                  <T extends Number> void test(T element) {
+                      Optional<T> o = Optional.of(element);
+                  }
+              }
+              """,
+            """
+              import java.util.Optional;
+              
+              class Test {
+                  <T extends Number> void test(T element) {
+                      var o = Optional.of(element);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void contextFreeTypeParameterConflictNames() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                  if ("printf".equals(method.getSimpleName())) {
+                      return JavaTemplate.builder("java.util.Arrays.asList(#{any()}, #{any()});")
+                        .javaParser(JavaParser.fromJavaVersion().logCompilationWarningsAndErrors(true))
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().toArray());
+                  }
+                  return super.visitMethodInvocation(method, executionContext);
+              }
+          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          java(
+            """
+              class Test<T extends Number> {
+                  T parameter;
+                  <T extends String> void test(T element) {
+                      System.out.printf(element, parameter);
+                  }
+              }
+              """,
+            """
+              class Test<T extends Number> {
+                  T parameter;
+                  <T extends String> void test(T element) {
+                      java.util.Arrays.asList(element, parameter);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Disabled("Requires renaming generic variables in JavaTemplate")
+    void contextFreeTypeParameterConflictNames_broken() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                  if ("printf".equals(method.getSimpleName()) && method.getArguments().size() == 2) {
+                      return JavaTemplate.builder("System.out.printf(#{any()}, #{any()}, 0);")
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().toArray());
+                  }
+                  return super.visitMethodInvocation(method, executionContext);
+              }
+          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          java(
+            """
+              class Test<T extends Number> {
+                  T parameter;
+                  <T extends String> void test(T element) {
+                      System.out.printf(element, parameter);
+                  }
+              }
+              """,
+            """
+              class Test<T extends Number> {
+                  T parameter;
+                  <T extends String> void test(T element) {
+                      System.out.printf(element, parameter, 0);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void contextFreeRecursiveTypeParameters() {
+        rewriteRun(
+          spec -> spec
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  if (multiVariable.getVariables().get(0).getSimpleName().equals("o")) {
+                      return JavaTemplate.builder("var o = #{any()};")
+                        .build()
+                        .apply(getCursor(), multiVariable.getCoordinates().replace(), multiVariable.getVariables().get(0).getInitializer());
+                  }
+                  return multiVariable;
+              }
+          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          java(
+            """
+              import java.util.Map;
+              import java.util.function.Supplier;
+
+              class Test {
+                  <T extends Supplier<S>, S extends Supplier<T>> void test(S s, T t) {
+                      Map.Entry<S, T> o = Map.entry(s, t);
+                  }
+              }
+              """,
+            """
+              import java.util.Map;
+              import java.util.function.Supplier;
+
+              class Test {
+                  <T extends Supplier<S>, S extends Supplier<T>> void test(S s, T t) {
+                      var o = Map.entry(s, t);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void contextFreeSequenceTypeParameters() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().logCompilationWarningsAndErrors(true))
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  if (multiVariable.getVariables().get(0).getSimpleName().equals("o")) {
+                      return JavaTemplate.builder("var o = #{any()};")
+                        .build()
+                        .apply(getCursor(), multiVariable.getCoordinates().replace(), multiVariable.getVariables().get(0).getInitializer());
+                  }
+                  return multiVariable;
+              }
+          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          java(
+            """
+              import java.util.Comparator;
+              import java.util.Map;
+              import java.util.Optional;
+
+              class Test<A extends B, B extends C, C extends Number> {
+                  void test(A a, Comparator<? super B> comparator) {
+                      Map.Entry<A, Comparator<? super B>> o = Map.entry(a, comparator);
+                  }
+              }
+              """,
+            """
+              import java.util.Comparator;
+              import java.util.Map;
+              import java.util.Optional;
+
+              class Test<A extends B, B extends C, C extends Number> {
+                  void test(A a, Comparator<? super B> comparator) {
+                      var o = Map.entry(a, comparator);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void contextFreeMultipleBoundParameters() {
+        rewriteRun(
+          spec -> spec
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  if (multiVariable.getVariables().get(0).getSimpleName().equals("o")) {
+                      return JavaTemplate.builder("var o = #{any()};")
+                        .build()
+                        .apply(getCursor(), multiVariable.getCoordinates().replace(), multiVariable.getVariables().get(0).getInitializer());
+                  }
+                  return multiVariable;
+              }
+          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          java(
+            """
+              import java.io.Serializable;
+              import java.util.function.Supplier;
+              import java.util.Optional;
+
+              class Test {
+                  <A extends Comparable<? super A> & Serializable & Cloneable, B extends Supplier<A>> void test(B b) {
+                      Optional<B> o = Optional.of(b);
+                  }
+              }
+              """,
+            """
+              import java.io.Serializable;
+              import java.util.function.Supplier;
+              import java.util.Optional;
+
+              class Test {
+                  <A extends Comparable<? super A> & Serializable & Cloneable, B extends Supplier<A>> void test(B b) {
+                      var o = Optional.of(b);
+                  }
+              }
+              """
+          )
+        );
+    }
 }

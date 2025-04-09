@@ -17,7 +17,6 @@ package org.openrewrite.ipc.http;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.openrewrite.jgit.util.IO;
 
 import java.io.IOException;
 import java.nio.file.Files;

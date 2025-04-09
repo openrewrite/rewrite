@@ -21,15 +21,14 @@ import org.antlr.v4.runtime.*;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
+import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.internal.grammar.TemplateParameterLexer;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser.TypeContext;
 import org.openrewrite.java.tree.*;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -137,6 +136,8 @@ public class Substitutions {
                     ((J.NewClass) parameter).getClazz() != null) {
                     // for anonymous classes get the type from the supertype
                     type = ((J.NewClass) parameter).getClazz().getType();
+                } else if (parameter instanceof J.Empty && ((J.Empty) parameter).getMarkers().findFirst(TemplateParameter.class).isPresent()) {
+                    type = ((J.Empty) parameter).getMarkers().findFirst(TemplateParameter.class).get().getType();
                 } else if (parameter instanceof TypedTree) {
                     type = ((TypedTree) parameter).getType();
                 } else {
@@ -182,12 +183,15 @@ public class Substitutions {
         if (type == null) {
             return "java.lang.Object";
         } else if (type instanceof JavaType.GenericTypeVariable) {
-            JavaType.GenericTypeVariable genericTypeVariable = (JavaType.GenericTypeVariable) type;
-            if (genericTypeVariable.getName().equals("?")) {
-                // wildcards cannot be used as type parameters on method invocations
+            JavaType.GenericTypeVariable genericType = (JavaType.GenericTypeVariable) type;
+            if (!genericType.getName().equals("?")) {
+                return genericType.getName();
+            } else if (genericType.getVariance() != JavaType.GenericTypeVariable.Variance.COVARIANT || genericType.getBounds().size() != 1) {
+                // wildcards cannot be used as type parameters on method invocations as in `foo.<?> bar()`
                 return "java.lang.Object";
+            } else {
+                return TypeUtils.toString(genericType.getBounds().get(0));
             }
-            return genericTypeVariable.getName();
         }
         return TypeUtils.toString(type).replace("$", ".");
     }
@@ -221,12 +225,63 @@ public class Substitutions {
     }
 
     private static String typeHintFor(@Nullable JavaType t) {
-        if (t instanceof JavaType.Primitive) {
-            return ((JavaType.Primitive) t).getKeyword();
-        } else if (t instanceof JavaType.FullyQualified) {
-            return ((JavaType.FullyQualified) t).getFullyQualifiedName();
+        if (t == null || t instanceof JavaType.GenericTypeVariable) {
+            return "";
         }
-        return "";
+        return TypeUtils.toString(t);
+    }
+
+    public Collection<JavaType.GenericTypeVariable> getTypeVariablesReferencedByParameters() {
+        Set<JavaType.GenericTypeVariable> typeVariables = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (Object parameter : parameters) {
+            if (parameter instanceof Expression) {
+                new JavaTypeVisitor<Integer>() {
+                    @Override
+                    public JavaType visitAnnotation(JavaType.Annotation annotation, Integer p) {
+                        return annotation.getType();
+                    }
+
+                    @Override
+                    public JavaType visitArray(JavaType.Array array, Integer p) {
+                        return array;
+                    }
+
+                    @Override
+                    public JavaType visitClass(JavaType.Class aClass, Integer p) {
+                        return aClass;
+                    }
+
+                    @Override
+                    public JavaType visitGenericTypeVariable(JavaType.GenericTypeVariable generic, Integer p) {
+                        if (typeVariables.contains(generic)) {
+                            return generic;
+                        } else if (!generic.getName().equals("?")) {
+                            typeVariables.add(generic);
+                        }
+                        return super.visitGenericTypeVariable(generic, p);
+                    }
+
+                    @Override
+                    public JavaType visitMethod(JavaType.Method method, Integer p) {
+                        return method;
+                    }
+
+                    @Override
+                    public JavaType visitParameterized(JavaType.Parameterized parameterized, Integer p) {
+                        for (JavaType typeParameter : parameterized.getTypeParameters()) {
+                            visit(typeParameter, p);
+                        }
+                        return super.visitParameterized(parameterized, p);
+                    }
+
+                    @Override
+                    public JavaType visitVariable(JavaType.Variable variable, Integer p) {
+                        return variable;
+                    }
+                }.visit(((Expression) parameter).getType(), 0);
+            }
+        }
+        return typeVariables;
     }
 
     @SuppressWarnings("SpellCheckingInspection")

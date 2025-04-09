@@ -23,7 +23,7 @@ class GroovyParserTest {
 
     @Test
     void groovyPackageDefinition() {
-        assertThatCode(() -> {
+        assertThatCode(() ->
             GroovyParser.builder().build()
               .parse(
                 """
@@ -46,8 +46,7 @@ class GroovyParserTest {
                       }
                    }
                   """
-              );
-        }).doesNotThrowAnyException();
+              )).doesNotThrowAnyException();
     }
 
 }
