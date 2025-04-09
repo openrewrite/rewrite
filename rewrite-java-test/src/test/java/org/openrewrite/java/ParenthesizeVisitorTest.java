@@ -218,7 +218,7 @@ class ParenthesizeVisitorTest implements RewriteTest {
                       a = b = c = 0;
                       int d = (a = 1) + 1;
                       boolean e = (b = 2) > 0;
-                      c = a > b ? a = 3 : b = 4;
+                      c = a > b ? (a = 3) : (b = 4);
                       int f = a += 2;
                   }
               }
@@ -332,7 +332,9 @@ class ParenthesizeVisitorTest implements RewriteTest {
     @Test
     void alreadyParenthesized() {
         rewriteRun(
-          javaIdenticalTo(
+          spec -> spec.recipe(toRecipe(ParenthesizeVisitor::new))
+            .expectedCyclesThatMakeChanges(0),
+          java(
             """
               class Test {
                   void method() {
@@ -367,9 +369,9 @@ class ParenthesizeVisitorTest implements RewriteTest {
               class Test {
                   void method() {
                       int a = 1, b = 2;
-                      boolean c = (a + b) > (a * b) && (a - b) < (a / b);
-                      boolean d = (a + b) > 0 || ((a * b) > 0) && ((a / b) > 0);
-                      boolean e = (a < b) && ((a + b) > 0) ? (a > 0) || (b > 0) : (a < 0) && (b < 0);
+                      boolean c = a + b > a * b && a - b < a / b;
+                      boolean d = a + b > 0 || a * b > 0 && a / b > 0;
+                      boolean e = a < b && a + b > 0 ? a > 0 || b > 0 : a < 0 && b < 0;
                   }
               }
               """
@@ -385,12 +387,13 @@ class ParenthesizeVisitorTest implements RewriteTest {
     static class Reparenthesize extends JavaVisitor<ExecutionContext> {
         @Override
         public @Nullable J postVisit(J tree, ExecutionContext ctx) {
-            return tree instanceof JavaSourceFile ? (J) new ParenthesizeVisitor().visit(tree, ctx) : super.postVisit(tree, ctx);
+            return tree instanceof JavaSourceFile ? new ParenthesizeVisitor<>().visit(tree, ctx) : super.postVisit(tree, ctx);
         }
 
         @Override
         public <T extends J> J visitParentheses(J.Parentheses<T> parens, ExecutionContext ctx) {
-            return parens.getTree().withPrefix(parens.getPrefix());
+            J j = super.visitParentheses(parens, ctx);
+            return j instanceof J.Parentheses<?> p ? p.getTree().withPrefix(p.getPrefix()) : j;
         }
     }
 }

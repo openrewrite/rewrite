@@ -89,10 +89,13 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
             parent.getValue() instanceof J.Binary ||
             parent.getValue() instanceof J.InstanceOf ||
             parent.getValue() instanceof J.MethodInvocation ||
-            parent.getValue() instanceof J.NewClass ||
-            (parent.getValue() instanceof J.Ternary && parent.getValue() != t)) {
+            parent.getValue() instanceof J.NewClass) {
             return parenthesize(t);
         }
+        
+        // Don't add parentheses for nested ternary expressions
+        // This allows expressions like: a > b ? a > c ? a : c : b > c ? b : c
+        // to remain as is without unnecessary parentheses
 
         return t;
     }
@@ -143,48 +146,58 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
         int innerPrecedence = getPrecedence(inner.getOperator());
         int outerPrecedence = getPrecedence(outer.getOperator());
 
+        // If inner has higher precedence than outer, it does NOT need parentheses
+        if (innerPrecedence > outerPrecedence) {
+            return false;
+        }
+        
         // If inner has lower precedence than outer, it needs parentheses
         if (innerPrecedence < outerPrecedence) {
             return true;
         }
 
-        // If same precedence but non-associative operations
-        if (innerPrecedence == outerPrecedence && !isAssociative(outer.getOperator())) {
-            // Check if inner is the right operand of outer by checking the current cursor path
-            Cursor cursor = getCursor();
+        // From here, we're dealing with equal precedence
         
-            // Find the nearest binary expression cursor
-            Cursor binaryCursor = cursor;
-            while (binaryCursor != null && !(binaryCursor.getValue() instanceof J.Binary)) {
-                binaryCursor = binaryCursor.getParent();
+        // For operations with the same precedence, check if they're in the same mathematical group
+        boolean isAddSubGroup = isInAddSubGroup(inner.getOperator()) && isInAddSubGroup(outer.getOperator());
+        boolean isMulDivGroup = isInMulDivGroup(inner.getOperator()) && isInMulDivGroup(outer.getOperator());
+        
+        // If they're in the same group (like addition/subtraction), we need to consider associativity
+        if (isAddSubGroup || isMulDivGroup) {
+            // For associative operations with the same precedence level in the same group,
+            // we don't need parentheses
+            if (isAssociative(inner.getOperator()) && isAssociative(outer.getOperator())) {
+                return false;
             }
-        
-            if (binaryCursor != null && binaryCursor.getValue() == outer) {
-                // If we're in a right operand position of the outer binary
-                Cursor parent = cursor.getParent();
-                while (parent != null && parent != binaryCursor) {
-                    cursor = parent;
-                    parent = parent.getParent();
-                }
             
-                return cursor.getValue() == outer.getRight();
+            // For non-associative operations (like subtraction/division), we need parentheses 
+            // when the inner expression is on the right side of the outer expression
+            if (!isAssociative(outer.getOperator())) {
+                // Check if inner is the right operand of outer
+                Cursor cursor = getCursor();
+                
+                // Find the nearest binary expression cursor
+                Cursor binaryCursor = cursor;
+                while (binaryCursor != null && !(binaryCursor.getValue() instanceof J.Binary)) {
+                    binaryCursor = binaryCursor.getParent();
+                }
+                
+                if (binaryCursor != null && binaryCursor.getValue() == outer) {
+                    // If we're in a right operand position of the outer binary
+                    Cursor parent = cursor.getParent();
+                    while (parent != null && parent != binaryCursor) {
+                        cursor = parent;
+                        parent = parent.getParent();
+                    }
+                    
+                    return cursor.getValue() == outer.getRight();
+                }
             }
         }
-
-        // Special case for operators of same precedence level
-        if (innerPrecedence == outerPrecedence) {
-            // For addition/subtraction and multiplication/division pairs, they're part of the 
-            // same mathematical groups and can be mixed without parentheses
-            boolean isAddSubGroup = isInAddSubGroup(inner.getOperator()) && isInAddSubGroup(outer.getOperator());
-            boolean isMulDivGroup = isInMulDivGroup(inner.getOperator()) && isInMulDivGroup(outer.getOperator());
         
-            // Only add parentheses if operators are different AND they're not in the same mathematical group
-            if (inner.getOperator() != outer.getOperator() && !(isAddSubGroup || isMulDivGroup)) {
-                return true;
-            }
-        }
-
-        return false;
+        // For different operators with the same precedence level that aren't in the same group,
+        // we need parentheses for clarity
+        return inner.getOperator() != outer.getOperator() && !(isAddSubGroup || isMulDivGroup);
     }
 
     private boolean isInAddSubGroup(J.Binary.Type operator) {
