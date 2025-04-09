@@ -35,11 +35,6 @@ public class SpringXmlReference extends XmlReference {
     Cursor cursor;
     Kind kind;
 
-    @Override
-    public Kind getKind() {
-        return kind;
-    }
-
     public static class Provider extends AbstractProvider<SpringXmlReference> {
         private static final SimpleTraitMatcher<SpringXmlReference> matcher = new SimpleTraitMatcher<SpringXmlReference>() {
             private final Pattern referencePattern = Pattern.compile("\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*(?:\\.\\p{javaJavaIdentifierStart}\\p{javaJavaIdentifierPart}*)*");
