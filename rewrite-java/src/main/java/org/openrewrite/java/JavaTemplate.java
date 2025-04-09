@@ -25,6 +25,7 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.internal.template.JavaTemplateJavaExtension;
 import org.openrewrite.java.internal.template.JavaTemplateParser;
 import org.openrewrite.java.internal.template.Substitutions;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaCoordinates;
 import org.openrewrite.template.SourceTemplate;
@@ -110,9 +111,13 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         onAfterVariableSubstitution.accept(substitutedTemplate);
 
         //noinspection ConstantConditions
-        return (J2) new JavaTemplateJavaExtension(templateParser, substitutions, substitutedTemplate, coordinates)
+        J2 result = (J2) new JavaTemplateJavaExtension(templateParser, substitutions, substitutedTemplate, coordinates)
                 .getMixin()
                 .visit(scope.getValue(), 0, scope.getParentOrThrow());
+
+        return result != scope.getValue() && result instanceof Expression ?
+                (J2) ParenthesizeVisitor.maybeParenthesize((Expression) result, scope) :
+                result;
     }
 
     protected Substitutions substitutions(Object[] parameters) {
