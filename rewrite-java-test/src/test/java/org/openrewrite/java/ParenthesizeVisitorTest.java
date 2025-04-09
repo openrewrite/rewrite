@@ -15,56 +15,58 @@
  */
 package org.openrewrite.java;
 
+import org.intellij.lang.annotations.Language;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpecs;
 
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-@SuppressWarnings({"StatementWi«thEmptyBody", "ConstantConditions"})
+@SuppressWarnings({"ConstantValue", "PointlessArithmeticExpression", "PointlessBooleanExpression", "ManualMinMaxCalculation", "SimplifiableConditionalExpression", "ConditionCoveredByFurtherCondition", "UnusedAssignment"})
 class ParenthesizeVisitorTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.cycles(1).expectedCyclesThatMakeChanges(1);
+        spec
+          .recipe(toRecipe(Reparenthesize::new))
+          .cycles(1)
+          .expectedCyclesThatMakeChanges(1);
     }
 
     @DocumentExample
     @Test
-    void parenthesizeUnaryWithBinary() {
+    void binaryOperatorPrecedence() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.Unary visitUnary(J.Unary unary, ExecutionContext ctx) {
-                  J.Unary u = super.visitUnary(unary, ctx);
-                  if (u.getExpression() instanceof J.Parentheses &&
-                      ((J.Parentheses<?>) u.getExpression()).getTree() instanceof J.Binary) {
-                      // Remove parentheses from binary expression inside unary
-                      u = u.withExpression((Expression) ((J.Parentheses<?>) u.getExpression()).getTree());
-                  }
-                  return (J.Unary) new ParenthesizeVisitor().visit(u, ctx);
-              }
-          })),
           java(
             """
-              import java.util.Set;
-
-              public class A {
-                  static Set<String> set;
-                  static boolean notEmpty = !(set == null || set.isEmpty());
+              class Test {
+                  void method() {
+                      int a = 1 + (2 * 3);
+                      int b = (1 * 2) + 3;
+                      int c = (1 * 2) + (3 * 4);
+              
+                      boolean d = a > 5 && b <= 10;
+                      boolean e = a > 5 || (b <= 10 && c == 9);
+                  }
               }
               """,
             """
-              import java.util.Set;
-
-              public class A {
-                  static Set<String> set;
-                  static boolean notEmpty = !(set == null || set.isEmpty());
+              class Test {
+                  void method() {
+                      int a = 1 + 2 * 3;
+                      int b = 1 * 2 + 3;
+                      int c = 1 * 2 + 3 * 4;
+              
+                      boolean d = a > 5 && b <= 10;
+                      boolean e = a > 5 || b <= 10 && c == 9;
+                  }
               }
               """
           )
@@ -72,31 +74,31 @@ class ParenthesizeVisitorTest implements RewriteTest {
     }
 
     @Test
-    void parenthesizeBinaryForPrecedence() {
+    void binaryOperatorsSamePrecedence() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.Binary visitBinary(J.Binary binary, ExecutionContext ctx) {
-                  J.Binary b = super.visitBinary(binary, ctx);
-                  if (b.getOperator() == J.Binary.Type.Multiplication && 
-                      b.getLeft() instanceof J.Parentheses &&
-                      ((J.Parentheses<?>) b.getLeft()).getTree() instanceof J.Binary) {
-                      // Remove parentheses from binary expression inside multiplication
-                      J.Binary leftBinary = (J.Binary) ((J.Parentheses<?>) b.getLeft()).getTree();
-                      b = b.withLeft(leftBinary);
-                  }
-                  return (J.Binary) new ParenthesizeVisitor().visit(b, ctx);
-              }
-          })),
           java(
             """
-              public class A {
-                  int result = (1 + 2) * 3;
+              class Test {
+                  void method() {
+                      int a = (1 + 2) + 3;
+                      int b = (1 * 2) * 3;
+                      int c = (1 - 2) + 3;
+                      int d = (1 / 2) * 3;
+              
+                      boolean e = (a > b && c > d) && a != d;
+                  }
               }
               """,
             """
-              public class A {
-                  int result = (1 + 2) * 3;
+              class Test {
+                  void method() {
+                      int a = 1 + 2 + 3;
+                      int b = 1 * 2 * 3;
+                      int c = 1 - 2 + 3;
+                      int d = 1 / 2 * 3;
+              
+                      boolean e = a > b && c > d && a != d;
+                  }
               }
               """
           )
@@ -104,31 +106,29 @@ class ParenthesizeVisitorTest implements RewriteTest {
     }
 
     @Test
-    void parenthesizeTernary() {
+    void unaryOperatorsWithBinaries() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.Ternary visitTernary(J.Ternary ternary, ExecutionContext ctx) {
-                  J.Ternary t = super.visitTernary(ternary, ctx);
-                  if (t.getTruePart() instanceof J.Parentheses) {
-                      // Remove parentheses from true part of ternary
-                      J.Parentheses<?> parentheses = (J.Parentheses<?>) t.getTruePart();
-                      t = t.withTruePart((Expression) parentheses.getTree());
-                  }
-                  return (J.Ternary) new ParenthesizeVisitor().visit(t, ctx);
-              }
-          })),
           java(
             """
-              public class A {
-                  boolean condition = true;
-                  int result = condition ? (1 + 2) : 3;
+              class Test {
+                  void method() {
+                      boolean a = (!true) && false;
+                      int b = (-1) + 2;
+                      int c = (~1) & 2;
+                      int d = (++c) + 1;
+                      boolean e = !(a && b > 0);
+                  }
               }
               """,
             """
-              public class A {
-                  boolean condition = true;
-                  int result = condition ?1 + 2 : 3;
+              class Test {
+                  void method() {
+                      boolean a = !true && false;
+                      int b = -1 + 2;
+                      int c = ~1 & 2;
+                      int d = ++c + 1;
+                      boolean e = !(a && b > 0);
+                  }
               }
               """
           )
@@ -136,32 +136,31 @@ class ParenthesizeVisitorTest implements RewriteTest {
     }
 
     @Test
-    void parenthesizeInstanceOf() {
+    void ternaryConditions() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.Unary visitUnary(J.Unary unary, ExecutionContext ctx) {
-                  J.Unary u = super.visitUnary(unary, ctx);
-                  if (u.getExpression() instanceof J.Parentheses &&
-                      ((J.Parentheses<?>) u.getExpression()).getTree() instanceof J.InstanceOf) {
-                      // Remove parentheses from instanceof expression inside unary
-                      J.InstanceOf instanceOf = (J.InstanceOf) ((J.Parentheses<?>) u.getExpression()).getTree();
-                      u = u.withExpression(instanceOf);
-                  }
-                  return (J.Unary) new ParenthesizeVisitor().visit(u, ctx);
-              }
-          })),
           java(
             """
-              public class A {
-                  Object obj = new Object();
-                  boolean check = !(obj instanceof String);
+              class Test {
+                  void method() {
+                      int a = 1;
+                      int b = 2;
+                      int c = a > b ? (a + b) : (a - b);
+                      int d = a > b ? (a > 0 ? a : 0) : b;
+                      boolean e = (a > b || a < 0) ? true : false;
+                      int f = (-a) > 0 ? (-a) : a;
+                  }
               }
               """,
             """
-              public class A {
-                  Object obj = new Object();
-                  boolean check = !(obj instanceof String);
+              class Test {
+                  void method() {
+                      int a = 1;
+                      int b = 2;
+                      int c = a > b ? a + b : a - b;
+                      int d = a > b ? a > 0 ? a : 0 : b;
+                      boolean e = a > b || a < 0 ? true : false;
+                      int f = -a > 0 ? -a : a;
+                  }
               }
               """
           )
@@ -169,35 +168,229 @@ class ParenthesizeVisitorTest implements RewriteTest {
     }
 
     @Test
-    void parenthesizeAssignment() {
+    void instanceofExpressions() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.Unary visitUnary(J.Unary unary, ExecutionContext ctx) {
-                  J.Unary u = super.visitUnary(unary, ctx);
-                  if (u.getExpression() instanceof J.Parentheses &&
-                      ((J.Parentheses<?>) u.getExpression()).getTree() instanceof J.Assignment) {
-                      // Remove parentheses from assignment expression inside unary
-                      J.Assignment assignment = (J.Assignment) ((J.Parentheses<?>) u.getExpression()).getTree();
-                      u = u.withExpression(assignment);
-                  }
-                  return (J.Unary) new ParenthesizeVisitor().visit(u, ctx);
-              }
-          })),
           java(
             """
-              public class A {
-                  boolean x;
-                  boolean result = !(x = true);
+              class Test {
+                  void method(Object obj) {
+                      boolean a = (obj instanceof String) && obj != null;
+                      boolean b = obj != null && (obj instanceof String);
+                      boolean c = (!obj) instanceof String;
+                      boolean d = (obj instanceof String) ? true : false;
+                  }
               }
               """,
             """
-              public class A {
-                  boolean x;
-                  boolean result = !(x = true);
+              class Test {
+                  void method(Object obj) {
+                      boolean a = obj instanceof String && obj != null;
+                      boolean b = obj != null && obj instanceof String;
+                      boolean c = !obj instanceof String;
+                      boolean d = obj instanceof String ? true : false;
+                  }
               }
               """
           )
         );
+    }
+
+    @Test
+    void assignmentExpressions() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void method() {
+                      int a, b, c;
+                      a = b = c = 0;
+                      int d = (a = 1) + 1;
+                      boolean e = (b = 2) > 0;
+                      c = a > b ? (a = 3) : (b = 4);
+                      int f = (a += 2);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void method() {
+                      int a, b, c;
+                      a = b = c = 0;
+                      int d = (a = 1) + 1;
+                      boolean e = (b = 2) > 0;
+                      c = a > b ? a = 3 : b = 4;
+                      int f = a += 2;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void complexExpressions() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void method() {
+                      int a = 1, b = 2, c = 3;
+                      int d = (a + (b * c)) - (a / b);
+                      boolean e = (a > b && b > c) || (a < c && c < 10);
+                      int f = ((a++) + (++b)) + (c--);
+                      int g = a > b ? (a > c ? a : c) : (b > c ? b : c);
+                      boolean h = a < b ? (a < c && b < c) : (a > c || b > c);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void method() {
+                      int a = 1, b = 2, c = 3;
+                      int d = a + b * c - a / b;
+                      boolean e = a > b && b > c || a < c && c < 10;
+                      int f = a++ + ++b + c--;
+                      int g = a > b ? a > c ? a : c : b > c ? b : c;
+                      boolean h = a < b ? a < c && b < c : a > c || b > c;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodInvocationArgsAndNestedExpressions() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void method() {
+                      int a = 1, b = 2;
+                      System.out.println((a + (b * 3)));
+                      System.out.println((a > b && a < 10));
+                      System.out.println((a > b ? a : b));
+                      System.out.println((a += b));
+                      doSomething((a > b && a < 10) ? (a++) : (b--));
+                  }
+              
+                  void doSomething(int x) {}
+              }
+              """,
+            """
+              class Test {
+                  void method() {
+                      int a = 1, b = 2;
+                      System.out.println(a + b * 3);
+                      System.out.println(a > b && a < 10);
+                      System.out.println(a > b ? a : b);
+                      System.out.println(a += b);
+                      doSomething(a > b && a < 10 ? a++ : b--);
+                  }
+              
+                  void doSomething(int x) {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void bitOperations() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void method() {
+                      int a = 1, b = 2, c = 3;
+                      int d = (a & b) | c;
+                      int e = a | (b & c);
+                      int f = (a ^ (b & c)) | a;
+                      int g = (~a) & b;
+                      int h = a << (1 + b);
+                      int i = (a + b) >> c;
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void method() {
+                      int a = 1, b = 2, c = 3;
+                      int d = a & b | c;
+                      int e = a | b & c;
+                      int f = a ^ b & c | a;
+                      int g = ~a & b;
+                      int h = a << 1 + b;
+                      int i = a + b >> c;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void alreadyParenthesized() {
+        rewriteRun(
+          javaIdenticalTo(
+            """
+              class Test {
+                  void method() {
+                      int a = 1, b = 2, c = 3;
+                      int d = (a + b) * c;
+                      boolean e = (a > b) && (c > a);
+                      int f = (a + b) * (c - a);
+                      boolean g = !(a > b);
+                      int h = (a > b) ? (a + c) : (b - c);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void mixedOperatorTypes() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void method() {
+                      int a = 1, b = 2;
+                      boolean c = ((a + b) > (a * b)) && ((a - b) < (a / b));
+                      boolean d = ((a + b) > 0) || (((a * b) > 0) && ((a / b) > 0));
+                      boolean e = ((a < b) && ((a + b) > 0)) ? ((a > 0) || (b > 0)) : ((a < 0) && (b < 0));
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void method() {
+                      int a = 1, b = 2;
+                      boolean c = (a + b) > (a * b) && (a - b) < (a / b);
+                      boolean d = (a + b) > 0 || ((a * b) > 0) && ((a / b) > 0);
+                      boolean e = (a < b) && ((a + b) > 0) ? (a > 0) || (b > 0) : (a < 0) && (b < 0);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @SuppressWarnings("SameParameterValue")
+    private SourceSpecs javaIdenticalTo(@Language("java") String source) {
+        return java(source, source);
+    }
+
+    static class Reparenthesize extends JavaVisitor<ExecutionContext> {
+        @Override
+        public @Nullable J postVisit(J tree, ExecutionContext ctx) {
+            return tree instanceof JavaSourceFile ? (J) new ParenthesizeVisitor().visit(tree, ctx) : super.postVisit(tree, ctx);
+        }
+
+        @Override
+        public <T extends J> J visitParentheses(J.Parentheses<T> parens, ExecutionContext ctx) {
+            return parens.getTree().withPrefix(parens.getPrefix());
+        }
     }
 }
