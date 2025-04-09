@@ -29,7 +29,7 @@ import org.openrewrite.test.SourceSpecs;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-@SuppressWarnings({"ConstantValue", "PointlessArithmeticExpression", "PointlessBooleanExpression", "ManualMinMaxCalculation", "SimplifiableConditionalExpression", "ConditionCoveredByFurtherCondition", "UnusedAssignment"})
+@SuppressWarnings("ALL")
 class ParenthesizeVisitorTest implements RewriteTest {
 
     @Override
@@ -188,6 +188,64 @@ class ParenthesizeVisitorTest implements RewriteTest {
                       boolean b = obj != null && obj instanceof String;
                       boolean c = !obj instanceof String;
                       boolean d = obj instanceof String ? true : false;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void stringConcatenationWithAddition() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void method() {
+                      String s = "Value: " + (1 + 2);
+                      String t = "Value: " + 1 + 2;
+                      String u = 1 + 2 + " is the result";
+                      String v = 1 + (2 + " is the result");
+              
+                      // String concatenation with mixed types
+                      String a = "Calculation: " + (1.5 * 2);
+                      String b = ("Item " + 1) + ": detail";
+                      String c = "Item " + (1 + ": detail");
+              
+                      // String concatenation in conditions
+                      boolean test1 = ("a" + "b").equals("ab");
+                      boolean test2 = "a" + "b" == "ab";
+                      boolean test3 = "x" + 1 == "x" + 1;
+              
+                      // With method calls
+                      String m1 = "Length: " + (String.valueOf(123).length());
+                      String m2 = String.valueOf(1 + 2) + "0";
+                      String m3 = String.valueOf(1) + 2 + "0";
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void method() {
+                      String s = "Value: " + (1 + 2);
+                      String t = "Value: " + 1 + 2;
+                      String u = 1 + 2 + " is the result";
+                      String v = 1 + (2 + " is the result");
+              
+                      // String concatenation with mixed types
+                      String a = "Calculation: " + 1.5 * 2;
+                      String b = "Item " + 1 + ": detail";
+                      String c = "Item " + (1 + ": detail");
+              
+                      // String concatenation in conditions
+                      boolean test1 = ("a" + "b").equals("ab");
+                      boolean test2 = "a" + "b" == "ab";
+                      boolean test3 = "x" + 1 == "x" + 1;
+              
+                      // With method calls
+                      String m1 = "Length: " + String.valueOf(123).length();
+                      String m2 = String.valueOf(1 + 2) + "0";
+                      String m3 = String.valueOf(1) + 2 + "0";
                   }
               }
               """

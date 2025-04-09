@@ -15,12 +15,15 @@
  */
 package org.openrewrite.java;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 
 /**
  * Visitor that adds parentheses to Java expressions where needed based on operator precedence
@@ -37,11 +40,55 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
 
         J.Binary b = (J.Binary) j;
 
+        // Handle string concatenation specifically
+        if (b.getOperator() == J.Binary.Type.Addition) {
+            // Check if this is a string concatenation
+            boolean isStringConcatenation = isStringType(b.getType()) || 
+                                        isStringType(b.getLeft().getType()) || 
+                                        isStringType(b.getRight().getType());
+        
+            if (isStringConcatenation) {
+                // If right side is an arithmetic operation, it needs parentheses
+                if (b.getRight() instanceof J.Binary) {
+                    J.Binary rightBinary = (J.Binary) b.getRight();
+                    if (rightBinary.getOperator() == J.Binary.Type.Addition || 
+                        rightBinary.getOperator() == J.Binary.Type.Subtraction ||
+                        rightBinary.getOperator() == J.Binary.Type.Multiplication ||
+                        rightBinary.getOperator() == J.Binary.Type.Division) {
+                    
+                        // Check if any operand is a string
+                        boolean rightOpHasString = isStringType(rightBinary.getLeft().getType()) || 
+                                               isStringType(rightBinary.getRight().getType());
+                    
+                        // If the right binary operation isn't string concatenation, it needs parentheses
+                        if (!rightOpHasString) {
+                            return b.withRight(parenthesize(rightBinary));
+                        }
+                    }
+                }
+            }
+        }
+
         Cursor parent = getCursor().getParentTreeCursor();
         if (parent.getValue() instanceof J.Unary) {
             return parenthesize(b);
         } else if (parent.getValue() instanceof J.Binary) {
             J.Binary parentBinary = parent.getValue();
+        
+            // Special handling for string concatenation in a chain
+            if (b.getOperator() == J.Binary.Type.Addition && 
+                parentBinary.getOperator() == J.Binary.Type.Addition) {
+            
+                // Check if this is string concatenation with an arithmetic operation
+                boolean isStringPlusArithmetic = isStringType(b.getType()) && 
+                                            b.getRight() instanceof J.Binary && 
+                                            !isStringType(b.getRight().getType());
+            
+                if (isStringPlusArithmetic) {
+                    return parenthesize(b);
+                }
+            }
+        
             if (needsParenthesesForPrecedence(b, parentBinary)) {
                 return parenthesize(b);
             }
@@ -50,6 +97,90 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
         }
 
         return b;
+    }
+
+    private boolean isStringType(@Nullable JavaType type) {
+        if (type == JavaType.Primitive.String) {
+            return true;
+        } else if (type == null || type instanceof JavaType.Primitive) {
+            return false;
+        }
+
+        return TypeUtils.isAssignableTo("java.lang.String", type);
+    }
+
+    private boolean needsParenthesesForPrecedence(J.Binary inner, J.Binary outer) {
+        // Special case for string concatenation
+        if (inner.getOperator() == J.Binary.Type.Addition && 
+            outer.getOperator() == J.Binary.Type.Addition) {
+        
+            // If inner is arithmetic and outer is string concatenation, inner needs parentheses
+            boolean innerIsArithmetic = !isStringType(inner.getLeft().getType()) && 
+                                   !isStringType(inner.getRight().getType());
+            boolean outerIsString = isStringType(outer.getLeft().getType()) || 
+                                isStringType(outer.getType());
+        
+            if (innerIsArithmetic && outerIsString) {
+                return true;
+            }
+        }
+    
+        // Get precedence levels (higher number = higher precedence)
+        int innerPrecedence = getPrecedence(inner.getOperator());
+        int outerPrecedence = getPrecedence(outer.getOperator());
+
+        // If inner has higher precedence than outer, it does NOT need parentheses
+        if (innerPrecedence > outerPrecedence) {
+            return false;
+        }
+        
+        // If inner has lower precedence than outer, it needs parentheses
+        if (innerPrecedence < outerPrecedence) {
+            return true;
+        }
+
+        // From here, we're dealing with equal precedence
+        
+        // For operations with the same precedence, check if they're in the same mathematical group
+        boolean isAddSubGroup = isInAddSubGroup(inner.getOperator()) && isInAddSubGroup(outer.getOperator());
+        boolean isMulDivGroup = isInMulDivGroup(inner.getOperator()) && isInMulDivGroup(outer.getOperator());
+        
+        // If they're in the same group (like addition/subtraction), we need to consider associativity
+        if (isAddSubGroup || isMulDivGroup) {
+            // For associative operations with the same precedence level in the same group,
+            // we don't need parentheses
+            if (isAssociative(inner.getOperator()) && isAssociative(outer.getOperator())) {
+                return false;
+            }
+            
+            // For non-associative operations (like subtraction/division), we need parentheses 
+            // when the inner expression is on the right side of the outer expression
+            if (!isAssociative(outer.getOperator())) {
+                // Check if inner is the right operand of outer
+                Cursor cursor = getCursor();
+            
+                // Find the nearest binary expression cursor
+                Cursor binaryCursor = cursor;
+                while (binaryCursor != null && !(binaryCursor.getValue() instanceof J.Binary)) {
+                    binaryCursor = binaryCursor.getParent();
+                }
+            
+                if (binaryCursor != null && binaryCursor.getValue() == outer) {
+                    // If we're in a right operand position of the outer binary
+                    Cursor parent = cursor.getParent();
+                    while (parent != null && parent != binaryCursor) {
+                        cursor = parent;
+                        parent = parent.getParent();
+                    }
+                
+                    return cursor.getValue() == outer.getRight();
+                }
+            }
+        }
+        
+        // For different operators with the same precedence level that aren't in the same group,
+        // we need parentheses for clarity
+        return inner.getOperator() != outer.getOperator() && !(isAddSubGroup || isMulDivGroup);
     }
 
     @Override
@@ -89,10 +220,6 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
             return parenthesize(t);
         }
         
-        // Don't add parentheses for nested ternary expressions
-        // This allows expressions like: a > b ? a > c ? a : c : b > c ? b : c
-        // to remain as is without unnecessary parentheses
-
         return t;
     }
 
@@ -106,8 +233,6 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
         J.InstanceOf i = (J.InstanceOf) j;
 
         Cursor parent = getCursor().getParentTreeCursor();
-        // Only add parentheses when instanceof is used in certain contexts where
-        // precedence could be ambiguous, but not in simple binary expressions
         if (parent.getValue() instanceof J.Unary ||
             parent.getValue() instanceof J.MethodInvocation ||
             parent.getValue() instanceof J.NewClass) {
@@ -116,14 +241,11 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
         
         // For binary expressions, we need to be more selective
         if (parent.getValue() instanceof J.Binary) {
-            J.Binary parentBinary = (J.Binary) parent.getValue();
-            // Only add parentheses if the instanceof is on the right side of a binary operator
-            // with higher precedence than instanceOf
+            J.Binary parentBinary = parent.getValue();
             int instanceOfPrecedence = 2; // Same precedence as relational operators
             int parentPrecedence = getPrecedence(parentBinary.getOperator());
             
             if (parentPrecedence > instanceOfPrecedence) {
-                // Check if the instanceof is on the right side
                 if (parentBinary.getRight() == i) {
                     return parenthesize(i);
                 }
@@ -150,65 +272,6 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
         }
 
         return a;
-    }
-
-    private boolean needsParenthesesForPrecedence(J.Binary inner, J.Binary outer) {
-        // Get precedence levels (higher number = higher precedence)
-        int innerPrecedence = getPrecedence(inner.getOperator());
-        int outerPrecedence = getPrecedence(outer.getOperator());
-
-        // If inner has higher precedence than outer, it does NOT need parentheses
-        if (innerPrecedence > outerPrecedence) {
-            return false;
-        }
-        
-        // If inner has lower precedence than outer, it needs parentheses
-        if (innerPrecedence < outerPrecedence) {
-            return true;
-        }
-
-        // From here, we're dealing with equal precedence
-        
-        // For operations with the same precedence, check if they're in the same mathematical group
-        boolean isAddSubGroup = isInAddSubGroup(inner.getOperator()) && isInAddSubGroup(outer.getOperator());
-        boolean isMulDivGroup = isInMulDivGroup(inner.getOperator()) && isInMulDivGroup(outer.getOperator());
-        
-        // If they're in the same group (like addition/subtraction), we need to consider associativity
-        if (isAddSubGroup || isMulDivGroup) {
-            // For associative operations with the same precedence level in the same group,
-            // we don't need parentheses
-            if (isAssociative(inner.getOperator()) && isAssociative(outer.getOperator())) {
-                return false;
-            }
-            
-            // For non-associative operations (like subtraction/division), we need parentheses 
-            // when the inner expression is on the right side of the outer expression
-            if (!isAssociative(outer.getOperator())) {
-                // Check if inner is the right operand of outer
-                Cursor cursor = getCursor();
-                
-                // Find the nearest binary expression cursor
-                Cursor binaryCursor = cursor;
-                while (binaryCursor != null && !(binaryCursor.getValue() instanceof J.Binary)) {
-                    binaryCursor = binaryCursor.getParent();
-                }
-                
-                if (binaryCursor != null && binaryCursor.getValue() == outer) {
-                    // If we're in a right operand position of the outer binary
-                    Cursor parent = cursor.getParent();
-                    while (parent != null && parent != binaryCursor) {
-                        cursor = parent;
-                        parent = parent.getParent();
-                    }
-                    
-                    return cursor.getValue() == outer.getRight();
-                }
-            }
-        }
-        
-        // For different operators with the same precedence level that aren't in the same group,
-        // we need parentheses for clarity
-        return inner.getOperator() != outer.getOperator() && !(isAddSubGroup || isMulDivGroup);
     }
 
     private boolean isInAddSubGroup(J.Binary.Type operator) {
@@ -268,21 +331,16 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
         }
     }
 
-    private <T extends J> J parenthesize(T tree) {
+    private <T extends Expression> Expression parenthesize(T tree) {
         if (tree instanceof J.Parentheses) {
             return tree;
         }
 
-        if (tree instanceof Expression) {
-            Expression expression = (Expression) tree;
-            return new J.Parentheses<>(
-                    Tree.randomId(),
-                    expression.getPrefix(),
-                    expression.getMarkers(),
-                    JRightPadded.build(expression.withPrefix(Space.EMPTY))
-            );
-        }
-
-        return tree;
+        return new J.Parentheses<>(
+                Tree.randomId(),
+                tree.getPrefix(),
+                tree.getMarkers(),
+                JRightPadded.build(tree.withPrefix(Space.EMPTY))
+        );
     }
 }
