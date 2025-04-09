@@ -106,9 +106,28 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
         J.InstanceOf i = (J.InstanceOf) j;
 
         Cursor parent = getCursor().getParentTreeCursor();
-        if (parent.getValue() instanceof J.Binary ||
-            parent.getValue() instanceof J.Unary) {
+        // Only add parentheses when instanceof is used in certain contexts where
+        // precedence could be ambiguous, but not in simple binary expressions
+        if (parent.getValue() instanceof J.Unary ||
+            parent.getValue() instanceof J.MethodInvocation ||
+            parent.getValue() instanceof J.NewClass) {
             return parenthesize(i);
+        }
+        
+        // For binary expressions, we need to be more selective
+        if (parent.getValue() instanceof J.Binary) {
+            J.Binary parentBinary = (J.Binary) parent.getValue();
+            // Only add parentheses if the instanceof is on the right side of a binary operator
+            // with higher precedence than instanceOf
+            int instanceOfPrecedence = 2; // Same precedence as relational operators
+            int parentPrecedence = getPrecedence(parentBinary.getOperator());
+            
+            if (parentPrecedence > instanceOfPrecedence) {
+                // Check if the instanceof is on the right side
+                if (parentBinary.getRight() == i) {
+                    return parenthesize(i);
+                }
+            }
         }
 
         return i;
