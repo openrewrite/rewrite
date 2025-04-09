@@ -142,7 +142,8 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
     }
 
     public @Nullable T visit(@Nullable Tree tree, P p, Cursor parent) {
-        assert !(parent.getValue() instanceof Tree) ||
+        assert parent.isRoot() ||
+               !(parent.getValue() instanceof Tree) ||
                !((Tree) parent.getValue()).isScope(tree) ||
                !(p instanceof ExecutionContext) ||
                !CursorValidatingExecutionContextView.view((ExecutionContext) p).getValidateCursorAcyclic() :
@@ -223,7 +224,10 @@ public abstract class TreeVisitor<T extends @Nullable Tree, P> {
             return defaultValue(null, p);
         }
 
-        boolean topLevel = visitCount == 0;
+        boolean topLevel = false;
+        if (visitCount == 0) {
+            topLevel = true;
+        }
 
         visitCount++;
         setCursor(new Cursor(cursor, tree));

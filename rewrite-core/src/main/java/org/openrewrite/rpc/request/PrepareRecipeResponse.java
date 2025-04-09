@@ -19,8 +19,6 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.config.RecipeDescriptor;
 
-import java.util.List;
-
 @Value
 public class PrepareRecipeResponse {
     /**

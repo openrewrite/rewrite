@@ -201,7 +201,7 @@ public class JavaTemplateParser {
     public J.MethodInvocation parseMethodArguments(Cursor cursor, String template, Collection<JavaType.GenericTypeVariable> typeVariables, Space.Location location) {
         J.MethodInvocation method = cursor.getValue();
         String methodWithReplacementArgs = method.withArguments(Collections.emptyList()).printTrimmed(cursor.getParentOrThrow())
-                .replaceAll("\\)$", template + ")");
+                .replaceAll("\\)$", template + (isStatement(cursor) ? ");" : ")"));
         // TODO: The stub string includes the scoped elements of each original AST, and therefore is not a good
         //       cache key. There are virtual no cases where a stub key will result in re-use. If we can come up with
         //       a safe, reusable key, we can consider using the cache for block statements.
@@ -210,6 +210,19 @@ public class JavaTemplateParser {
         JavaSourceFile cu = compileTemplate(stub);
         return (J.MethodInvocation) statementTemplateGenerator
                 .listTemplatedTrees(cu, Statement.class).get(0);
+    }
+
+    private boolean isStatement(Cursor cursor) {
+        if (!(cursor.getValue() instanceof Statement)) {
+            return false;
+        } else if (cursor.getValue() instanceof Expression) {
+            J parent = cursor.getParentTreeCursor().getValue();
+            return parent instanceof J.Block ||
+                   parent instanceof J.If && ((J.If) parent).getThenPart() == cursor.getValue() ||
+                   parent instanceof J.If.Else && ((J.If.Else) parent).getBody() == cursor.getValue() ||
+                   parent instanceof Loop && ((Loop) parent).getBody() == cursor.getValue();
+        }
+        return false;
     }
 
     public List<J.Annotation> parseAnnotations(Cursor cursor, String template) {

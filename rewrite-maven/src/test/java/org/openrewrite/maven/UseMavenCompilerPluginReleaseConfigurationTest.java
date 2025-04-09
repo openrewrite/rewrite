@@ -558,4 +558,65 @@ class UseMavenCompilerPluginReleaseConfigurationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/5217")
+    @Test
+    void replacesSourceAndTargetConfig_InProfileSection() {
+        rewriteRun(
+          //language=xml
+          pomXml(
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+                <profiles>
+                  <profile>
+                    <build>
+                      <plugins>
+                        <plugin>
+                          <groupId>org.apache.maven.plugins</groupId>
+                          <artifactId>maven-compiler-plugin</artifactId>
+                          <version>3.8.0</version>
+                          <configuration>
+                            <source>1.8</source>
+                            <target>1.8</target>
+                          </configuration>
+                        </plugin>
+                      </plugins>
+                    </build>
+                  </profile>
+                </profiles>
+              </project>
+              """,
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.sample</groupId>
+                <artifactId>sample</artifactId>
+                <version>1.0.0</version>
+                <profiles>
+                  <profile>
+                    <build>
+                      <plugins>
+                        <plugin>
+                          <groupId>org.apache.maven.plugins</groupId>
+                          <artifactId>maven-compiler-plugin</artifactId>
+                          <version>3.8.0</version>
+                          <configuration>
+                            <release>11</release>
+                          </configuration>
+                        </plugin>
+                      </plugins>
+                    </build>
+                  </profile>
+                </profiles>
+              </project>
+              """
+          )
+        );
+    }
 }

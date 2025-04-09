@@ -793,7 +793,8 @@ public interface G extends J {
             Find,
             Match,
             In,
-            Access
+            Access,
+            Spaceship
         }
 
         public Padding getPadding() {

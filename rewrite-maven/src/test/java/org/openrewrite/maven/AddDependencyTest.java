@@ -1103,7 +1103,7 @@ class AddDependencyTest implements RewriteTest {
             toRecipe()
               .withDisplayName("Add dependency")
               .withName("Uses AddDependencyVisitor directly to validate that it will not add a dependency multiple times")
-              .withGetVisitor(r -> new AddDependencyVisitor(
+              .withGetVisitor(() -> new AddDependencyVisitor(
                 "com.google.guava",
                 "guava",
                 "29.0-jre",

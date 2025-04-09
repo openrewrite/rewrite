@@ -34,8 +34,7 @@ public class LombokSupport {
         // https://projectlombok.org/contributing/lombok-execution-path
         List<String> overrideClasspath = new ArrayList<>();
         for (Path entry : ReflectionUtils.findClassPathEntriesFor("lombok/Getter.class", parserClassLoader)) {
-            // FIXME remove hardcoded version once Lombok proper 1.18.37 is released
-            if (entry.getFileName().toString().contains("lombok-1.18.37") && !overrideClasspath.contains(entry.toString())) {
+            if (entry.getFileName().toString().contains("lombok") && !overrideClasspath.contains(entry.toString())) {
                 overrideClasspath.add(entry.toString());
             }
         }
