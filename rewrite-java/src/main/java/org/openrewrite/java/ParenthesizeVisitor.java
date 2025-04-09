@@ -36,7 +36,9 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
         J.Binary b = (J.Binary) j;
         Cursor parent = getCursor().getParentTreeCursor();
         
-        if (parent.getValue() instanceof J.Unary) {
+        if (needsParentheses(b, parent.getValue())) {
+            return parenthesize(b);
+        } else if (parent.getValue() instanceof J.InstanceOf) {
             return parenthesize(b);
         } else if (parent.getValue() instanceof J.Binary) {
             J.Binary parentBinary = parent.getValue();
@@ -60,50 +62,41 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
             if (needsParenthesesForPrecedence(b, parentBinary)) {
                 return parenthesize(b);
             }
-        } else if (parent.getValue() instanceof J.InstanceOf) {
-            return parenthesize(b);
-        } else if (parent.getValue() instanceof J.MethodInvocation) {
-            if (parent.<J.MethodInvocation>getValue().getSelect() == b) {
-                return parenthesize(b);
-            }
         }
 
         return b;
     }
 
     private J handleStringConcatenation(J.Binary inner, J.Binary outer) {
+        boolean outerLeftString = isStringType(outer.getLeft().getType());
+        boolean innerLeftString = isStringType(inner.getLeft().getType());
+        boolean innerRightString = isStringType(inner.getRight().getType());
+
         // Case 1: "Value: " + (1 + 2) - We need parentheses
         // When right operand is a numeric addition inside a string context
-        if (isStringType(outer.getLeft().getType()) && 
-            !isStringType(inner.getLeft().getType()) && 
-            !isStringType(inner.getRight().getType()) &&
-            inner == outer.getRight()) {
+        if (outerLeftString && !innerLeftString && !innerRightString && inner == outer.getRight()) {
             return parenthesize(inner);
         }
-        
+
         // Case 2: 1 + (2 + " is the result") - We need parentheses
         // When inner contains a string but outer left is numeric
-        if (!isStringType(outer.getLeft().getType()) && 
-            (isStringType(inner.getLeft().getType()) || isStringType(inner.getRight().getType())) &&
-            inner == outer.getRight()) {
+        if (!outerLeftString && (innerLeftString || innerRightString) && inner == outer.getRight()) {
             return parenthesize(inner);
         }
-        
+
         // Case 3: 1 + 2 + " is the result" - NO parentheses needed
         // This is a left-associative operation where inner is 1+2 and outer is (1+2)+" is the result"
-        if (!isStringType(inner.getLeft().getType()) && 
-            !isStringType(inner.getRight().getType()) && 
-            isStringType(outer.getRight().getType()) &&
-            inner == outer.getLeft()) {
+        boolean outerRightString = isStringType(outer.getRight().getType());
+        if (!innerLeftString && !innerRightString && outerRightString && inner == outer.getLeft()) {
             // Don't add parentheses in this case
             return inner;
         }
-        
+
         // For other string concatenation cases, follow normal precedence rules
         if (needsParenthesesForPrecedence(inner, outer)) {
             return parenthesize(inner);
         }
-        
+
         return inner;
     }
 
@@ -117,22 +110,13 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
         return TypeUtils.isAssignableTo("java.lang.String", type);
     }
 
+    private boolean needsParentheses(Expression expr, J parent) {
+        return parent instanceof J.Unary ||
+               (parent instanceof J.MethodInvocation &&
+                ((J.MethodInvocation) parent).getSelect() == expr);
+    }
+
     private boolean needsParenthesesForPrecedence(J.Binary inner, J.Binary outer) {
-        // Special case for string concatenation
-        if (inner.getOperator() == J.Binary.Type.Addition && 
-            outer.getOperator() == J.Binary.Type.Addition) {
-        
-            // If inner is arithmetic and outer is string concatenation, inner needs parentheses
-            boolean innerIsArithmetic = !isStringType(inner.getLeft().getType()) && 
-                                   !isStringType(inner.getRight().getType());
-            boolean outerIsString = isStringType(outer.getLeft().getType()) || 
-                                isStringType(outer.getType());
-        
-            if (innerIsArithmetic && outerIsString) {
-                return true;
-            }
-        }
-    
         // Get precedence levels (higher number = higher precedence)
         int innerPrecedence = getPrecedence(inner.getOperator());
         int outerPrecedence = getPrecedence(outer.getOperator());
@@ -185,7 +169,7 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
                 }
             }
         }
-        
+
         // For different operators with the same precedence level that aren't in the same group,
         // we need parentheses for clarity
         return inner.getOperator() != outer.getOperator() && !(isAddSubGroup || isMulDivGroup);
@@ -201,7 +185,9 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
         J.Unary u = (J.Unary) j;
 
         Cursor parent = getCursor().getParentTreeCursor();
-        if (parent.getValue() instanceof J.Unary) {
+        if (needsParentheses(u, parent.getValue())) {
+            return parenthesize(u);
+        } else if (parent.getValue() instanceof J.Unary) {
             J.Unary parentUnary = parent.getValue();
             // Ensure proper precedence for nested unary operations
             if (parentUnary.getOperator() != u.getOperator()) {
@@ -222,14 +208,11 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
         J.Ternary t = (J.Ternary) j;
 
         Cursor parent = getCursor().getParentTreeCursor();
-        if (parent.getValue() instanceof J.Unary ||
-            parent.getValue() instanceof J.Binary ||
+        if (needsParentheses(t, parent.getValue())) {
+            return parenthesize(t);
+        } else if (parent.getValue() instanceof J.Binary ||
             parent.getValue() instanceof J.InstanceOf) {
             return parenthesize(t);
-        } else if (parent.getValue() instanceof J.MethodInvocation) {
-            if (parent.<J.MethodInvocation>getValue().getSelect() == t) {
-                return parenthesize(t);
-            }
         }
         
         return t;
