@@ -93,6 +93,34 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
+    @Test
+    void addParenthesesToParameter() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                @Override
+                public J visitBinary(J.Binary binary, ExecutionContext ctx) {
+                    return JavaTemplate.builder("#{any(int)} * 3")
+                      .build()
+                      .apply(getCursor(), binary.getCoordinates().replace(), binary);
+                }
+            }))
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1),
+          java(
+            """
+              public class A {
+                  int a = 1 + 2;
+              }
+              """,
+            """
+              public class A {
+                  int a = (1 + 2) * 3;
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2090")
     @Test
     void assignmentWithinIfPredicate() {
