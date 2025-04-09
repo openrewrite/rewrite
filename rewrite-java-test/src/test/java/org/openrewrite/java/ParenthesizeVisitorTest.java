@@ -53,10 +53,11 @@ class ParenthesizeVisitorTest implements RewriteTest {
                       int b = (1 * 2) + 3;
                       int c = (1 * 2) + (3 * 4);
                       int d = 7 - (5 - 2);
+                      int e = -(-(1));
               
-                      boolean e = a > 5 && b <= 10;
-                      boolean f = a > 5 || (b <= 10 && c == 9);
-                      boolean g = !(!e);
+                      boolean k = a > 5 && b <= 10;
+                      boolean l = a > 5 || (b <= 10 && c == 9);
+                      boolean m = !(!k);
                   }
               }
               """,
@@ -67,10 +68,11 @@ class ParenthesizeVisitorTest implements RewriteTest {
                       int b = 1 * 2 + 3;
                       int c = 1 * 2 + 3 * 4;
                       int d = 7 - (5 - 2);
+                      int e = -(-1);
               
-                      boolean e = a > 5 && b <= 10;
-                      boolean f = a > 5 || b <= 10 && c == 9;
-                      boolean g = !!e;
+                      boolean k = a > 5 && b <= 10;
+                      boolean l = a > 5 || b <= 10 && c == 9;
+                      boolean m = !!k;
                   }
               }
               """

@@ -239,7 +239,8 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
         J.Unary u = (J.Unary) j;
         Cursor parent = getCursor().getParentTreeCursor();
 
-        if (parent.getValue() instanceof J.Unary) {
+        if (u.getOperator() == J.Unary.Type.Not && parent.getValue() instanceof J.Unary) {
+            // no parens for `!!true` but for `-(-1)` and for `+(+1)`
             return u;
         } else if (needsParentheses(u, parent.getValue())) {
             return parenthesize(u);
