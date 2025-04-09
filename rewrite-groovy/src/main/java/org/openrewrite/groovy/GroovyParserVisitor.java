@@ -935,6 +935,9 @@ public class GroovyParserVisitor {
                     case "in":
                         gBinaryOp = G.Binary.Type.In;
                         break;
+                    case "!in":
+                        gBinaryOp = G.Binary.Type.NotIn;
+                        break;
                     case "<=>":
                         gBinaryOp = G.Binary.Type.Spaceship;
                         break;

@@ -65,6 +65,18 @@ class BinaryTest implements RewriteTest {
     }
 
     @Test
+    void notIn() {
+        rewriteRun(
+          groovy(
+            """
+              def a = []
+              boolean b = 42 !in a;
+              """
+          )
+        );
+    }
+
+    @Test
     void withVariable() {
         rewriteRun(
           groovy(

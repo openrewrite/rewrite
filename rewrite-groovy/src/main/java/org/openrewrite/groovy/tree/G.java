@@ -793,6 +793,7 @@ public interface G extends J {
             Find,
             Match,
             In,
+            NotIn,
             Access,
             Spaceship
         }
