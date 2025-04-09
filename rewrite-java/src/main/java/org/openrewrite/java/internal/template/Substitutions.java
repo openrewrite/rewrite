@@ -33,6 +33,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static org.openrewrite.java.ParenthesizeVisitor.maybeParenthesize;
+
 @RequiredArgsConstructor
 @ToString
 public class Substitutions {
@@ -320,8 +322,8 @@ public class Substitutions {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, Integer integer) {
                 J param = maybeParameter(method.getName());
-                if (param != null) {
-                    return param;
+                if (param instanceof Expression) {
+                    return maybeParenthesize((Expression) param, getCursor());
                 }
                 return super.visitMethodInvocation(method, integer);
             }
@@ -329,7 +331,9 @@ public class Substitutions {
             @Override
             public <T extends J> J visitParentheses(J.Parentheses<T> parens, Integer integer) {
                 J param = maybeParameter(parens.getTree());
-                if (param != null) {
+                if (param instanceof Expression) {
+                    return maybeParenthesize((Expression) param, getCursor());
+                } else if (param != null) {
                     return param;
                 }
                 return super.visitParentheses(parens, integer);
@@ -338,8 +342,8 @@ public class Substitutions {
             @Override
             public J visitLiteral(J.Literal literal, Integer integer) {
                 J param = maybeParameter(literal);
-                if (param != null) {
-                    return param;
+                if (param instanceof Expression) {
+                    return maybeParenthesize((Expression) param, getCursor());
                 }
                 return super.visitLiteral(literal, integer);
             }

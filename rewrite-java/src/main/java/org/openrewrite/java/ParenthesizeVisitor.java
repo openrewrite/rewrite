@@ -155,7 +155,7 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
         return TypeUtils.isAssignableTo("java.lang.String", type);
     }
 
-    private boolean needsParentheses(Expression expr, J parent) {
+    private boolean needsParentheses(Expression expr, Object parent) {
         return parent instanceof J.Unary ||
                (parent instanceof J.MethodInvocation &&
                 expr.isScope(((J.MethodInvocation) parent).getSelect()));
