@@ -628,9 +628,9 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
     }
 
     @Test
-    void removeConstructorMethod() {
+    void removeEmptyConstructorMethod() {
         rewriteRun(
-          spec -> spec.recipe(createRemoveMethodsRecipe("java.util.Date <constructor>(..)")),
+          spec -> spec.recipe(createRemoveMethodsRecipe("java.util.Date <constructor>()")),
           // language=java
           java(
             """
@@ -643,8 +643,107 @@ class RemoveMethodInvocationsVisitorTest implements RewriteTest {
               }
               """,
             """
+              import java.util.Date;
+              
               class Test {
                   void method() {
+                      Date date;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeOneArgConstructorMethod() {
+        rewriteRun(
+          spec -> spec.recipe(createRemoveMethodsRecipe("java.util.Date <constructor>(long)")),
+          // language=java
+          java(
+            """
+              import java.util.Date;
+              
+              class Test {
+                  void method() {
+                      new Date(88);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void method() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeMultipleArgsConstructorMethod() {
+        rewriteRun(
+          spec -> spec.recipe(createRemoveMethodsRecipe("java.util.Date <constructor>(..)")),
+          // language=java
+          java(
+            """
+              import java.util.Date;
+              
+              class Test {
+                  void method() {
+                      new Date(2025, 4, 9);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void method() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeChainedEmptyConstructorMethod() {
+        rewriteRun(
+          spec -> spec.recipe(createRemoveMethodsRecipe("java.util.Date <constructor>()")),
+          // language=java
+          java(
+            """
+              import java.util.Date;
+              
+              class Test {
+                  void method() {
+                      new Date().toInstant();
+                  }
+              }
+              """,
+            // TODO - results in `toInstant()` remaining
+            """
+              class Test {
+                  void method() {
+                      toInstant();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepOneArgConstructorMethodWithEmptyPattern() {
+        rewriteRun(
+          spec -> spec.recipe(createRemoveMethodsRecipe("java.util.Date <constructor>()")),
+          // language=java
+          java(
+            """
+              import java.util.Date;
+              
+              class Test {
+                  void method() {
+                      new Date(88);
                   }
               }
               """
