@@ -292,6 +292,8 @@ public class Substitutions {
                 J param = maybeParameter(method.getName());
                 if (param instanceof Expression) {
                     return maybeParenthesize((Expression) param, getCursor());
+                } else if (param != null) {
+                    return param;
                 }
                 return super.visitMethodInvocation(method, integer);
             }
@@ -312,6 +314,8 @@ public class Substitutions {
                 J param = maybeParameter(literal);
                 if (param instanceof Expression) {
                     return maybeParenthesize((Expression) param, getCursor());
+                } else if (param != null) {
+                    return param;
                 }
                 return super.visitLiteral(literal, integer);
             }
