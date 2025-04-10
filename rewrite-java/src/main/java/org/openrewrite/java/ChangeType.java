@@ -218,7 +218,7 @@ public class ChangeType extends Recipe {
         public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
             J.Literal lit = literal;
             if (literal.getType() == JavaType.Primitive.String) {
-                Pattern pat = Pattern.compile("(?:\\A|\\s)" + oldFullyQualifiedTypeName + "(?:|\\s)");
+                Pattern pat = Pattern.compile("\\b" + oldFullyQualifiedTypeName + "\\b");
                 if (lit.getValue() != null && pat.matcher((String) lit.getValue()).find()) {
                     lit = lit.withValue(((String) lit.getValue()).replace(oldFullyQualifiedTypeName, newFullyQualifiedTypeName)).withValueSource(lit.getValueSource().replace(oldFullyQualifiedTypeName, newFullyQualifiedTypeName));
                 }
