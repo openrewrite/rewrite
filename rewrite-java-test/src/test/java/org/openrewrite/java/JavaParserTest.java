@@ -393,4 +393,24 @@ class JavaParserTest implements RewriteTest {
             """));
     }
 
+    @Test
+    void mutliLinePackageComment() {
+        rewriteRun(
+          // language=java
+          java(
+            """
+              package com.abc;
+              public class Server {
+                /**
+                 * @see com.abc.Server#load(
+                 * java.lang.
+                 * String)
+                 */
+                public void load(String str) {
+                }
+              }
+              """
+          )
+        );
+    }
 }
