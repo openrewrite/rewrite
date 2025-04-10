@@ -175,6 +175,7 @@ public class ChangePackage extends Recipe {
 
         private final Map<JavaType, JavaType> oldNameToChangedType = new IdentityHashMap<>();
         private final JavaType.Class newPackageType = JavaType.ShallowClass.build(newPackageName);
+        private final Pattern stringLiteralPattern = Pattern.compile("\\b" + oldPackageName + "\\b");
 
         @Override
         public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
@@ -253,11 +254,10 @@ public class ChangePackage extends Recipe {
         public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
             J.Literal lit = literal;
             if (literal.getType() == JavaType.Primitive.String && lit.getValue() != null) {
-                Pattern pat = Pattern.compile("\\b" + oldPackageName + "\\b");
-                Matcher matcher = pat.matcher((String) lit.getValue());
+                Matcher matcher = stringLiteralPattern.matcher((String) lit.getValue());
                 if (matcher.find()) {
                     lit = lit.withValue(matcher.replaceAll(newPackageName))
-                            .withValueSource(pat.matcher(lit.getValueSource()).replaceAll(newPackageName));
+                            .withValueSource(stringLiteralPattern.matcher(lit.getValueSource()).replaceAll(newPackageName));
                 }
             }
             return super.visitLiteral(lit, ctx);

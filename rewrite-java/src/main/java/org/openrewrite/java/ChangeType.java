@@ -158,6 +158,7 @@ public class ChangeType extends Recipe {
 
         private final Map<JavaType, JavaType> oldNameToChangedType = new IdentityHashMap<>();
         private final Set<String> topLevelClassnames = new HashSet<>();
+        private final Pattern stringLiteralPattern;
 
         private JavaChangeTypeVisitor(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName, @Nullable Boolean ignoreDefinition) {
             this.oldFullyQualifiedTypeName = oldFullyQualifiedTypeName;
@@ -165,7 +166,8 @@ public class ChangeType extends Recipe {
             this.originalType = JavaType.ShallowClass.build(oldFullyQualifiedTypeName);
             this.targetType = JavaType.buildType(newFullyQualifiedTypeName);
             this.ignoreDefinition = ignoreDefinition;
-            importAlias = null;
+            this.importAlias = null;
+            this.stringLiteralPattern = Pattern.compile("\\b" + oldFullyQualifiedTypeName + "\\b");
         }
 
         @Override
@@ -219,11 +221,10 @@ public class ChangeType extends Recipe {
         public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
             J.Literal lit = literal;
             if (literal.getType() == JavaType.Primitive.String && lit.getValue() != null) {
-                Pattern pat = Pattern.compile("\\b" + oldFullyQualifiedTypeName + "\\b");
-                Matcher matcher = pat.matcher((String) lit.getValue());
+                Matcher matcher = stringLiteralPattern.matcher((String) lit.getValue());
                 if (matcher.find()) {
                     lit = lit.withValue(matcher.replaceAll(newFullyQualifiedTypeName))
-                            .withValueSource(pat.matcher(lit.getValueSource()).replaceAll(newFullyQualifiedTypeName));
+                            .withValueSource(stringLiteralPattern.matcher(lit.getValueSource()).replaceAll(newFullyQualifiedTypeName));
                 }
             }
             return super.visitLiteral(lit, ctx);
