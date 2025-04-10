@@ -54,12 +54,10 @@ val tools = compiler.get().metadata.installationPath.file("lib/tools.jar")
 
 dependencies {
     implementation(project(":rewrite-core"))
-    //runtimeOnly("org.projectlombok:lombok:latest.release")
-    runtimeOnly("org.openrewrite.tools:lombok:latest.release") // Temporary pending the next stable release of lombok
+    runtimeOnly("org.projectlombok:lombok:latest.release")
 
     // Add lombok dependency to the newly created lombok configuration
-    //lombok("org.projectlombok:lombok:latest.release")
-    lombok("org.openrewrite.tools:lombok:latest.release") // Temporary pending the next stable release of lombok
+    lombok("org.projectlombok:lombok:latest.release")
     compileOnly(files(tools))
     compileOnly(files(unpackedAndRenamedLombokDir))
 }

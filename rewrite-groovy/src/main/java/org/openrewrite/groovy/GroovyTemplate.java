@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 the original author or authors.
+ * Copyright 2025 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,27 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.kotlin;
+package org.openrewrite.groovy;
 
 import org.openrewrite.Cursor;
+import org.openrewrite.groovy.internal.template.GroovySubstitutions;
+import org.openrewrite.groovy.internal.template.GroovyTemplateParser;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.internal.template.Substitutions;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaCoordinates;
-import org.openrewrite.kotlin.internal.template.KotlinSubstitutions;
-import org.openrewrite.kotlin.internal.template.KotlinTemplateParser;
 
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Consumer;
 
-public class KotlinTemplate extends JavaTemplate {
-    private KotlinTemplate(boolean contextSensitive, KotlinParser.Builder parser, String code, Set<String> imports, Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
+public class GroovyTemplate extends JavaTemplate {
+    private GroovyTemplate(boolean contextSensitive, GroovyParser.Builder parser, String code, Set<String> imports, Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
         super(
                 code,
                 onAfterVariableSubstitution,
-                new KotlinTemplateParser(
+                new GroovyTemplateParser(
                         contextSensitive,
                         augmentClasspath(parser),
                         onAfterVariableSubstitution,
@@ -43,13 +43,13 @@ public class KotlinTemplate extends JavaTemplate {
         );
     }
 
-    private static KotlinParser.Builder augmentClasspath(KotlinParser.Builder parserBuilder) {
+    private static GroovyParser.Builder augmentClasspath(GroovyParser.Builder parserBuilder) {
         return parserBuilder.addClasspathEntry(getTemplateClasspathDir());
     }
 
     @Override
     protected Substitutions substitutions(Object[] parameters) {
-        return new KotlinSubstitutions(getCode(), parameters);
+        return new GroovySubstitutions(getCode(), parameters);
     }
 
     public static <J2 extends J> J2 apply(String template, Cursor scope, JavaCoordinates coordinates, Object... parameters) {
@@ -70,7 +70,7 @@ public class KotlinTemplate extends JavaTemplate {
         private final String code;
         private final Set<String> imports = new HashSet<>();
 
-        private KotlinParser.Builder parser = KotlinParser.builder();
+        private GroovyParser.Builder parser = GroovyParser.builder();
 
         private Consumer<String> onAfterVariableSubstitution = s -> {
         };
@@ -106,7 +106,7 @@ public class KotlinTemplate extends JavaTemplate {
             }
         }
 
-        Builder parser(KotlinParser.Builder parser) {
+        Builder parser(GroovyParser.Builder parser) {
             this.parser = parser;
             return this;
         }
@@ -124,8 +124,8 @@ public class KotlinTemplate extends JavaTemplate {
         }
 
         @Override
-        public KotlinTemplate build() {
-            return new KotlinTemplate(false, parser.clone(), code, imports,
+        public GroovyTemplate build() {
+            return new GroovyTemplate(false, parser.clone(), code, imports,
                     onAfterVariableSubstitution, onBeforeParseTemplate);
         }
     }
