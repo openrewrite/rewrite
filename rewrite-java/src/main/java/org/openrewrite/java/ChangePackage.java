@@ -32,6 +32,7 @@ import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
@@ -251,11 +252,12 @@ public class ChangePackage extends Recipe {
         @Override
         public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
             J.Literal lit = literal;
-            if (literal.getType() == JavaType.Primitive.String) {
+            if (literal.getType() == JavaType.Primitive.String && lit.getValue() != null) {
                 Pattern pat = Pattern.compile("\\b" + oldPackageName + "\\b");
-                if (lit.getValue() != null && pat.matcher((String) lit.getValue()).find()) {
-                    lit = lit.withValue(((String) lit.getValue()).replace(oldPackageName, newPackageName))
-                            .withValueSource(lit.getValueSource().replace(oldPackageName, newPackageName));
+                Matcher matcher = pat.matcher((String) lit.getValue());
+                if (matcher.find()) {
+                    lit = lit.withValue(matcher.replaceAll(newPackageName))
+                            .withValueSource(pat.matcher(lit.getValueSource()).replaceAll(newPackageName));
                 }
             }
             return super.visitLiteral(lit, ctx);

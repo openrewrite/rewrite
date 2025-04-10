@@ -32,6 +32,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
@@ -217,10 +218,12 @@ public class ChangeType extends Recipe {
         @Override
         public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
             J.Literal lit = literal;
-            if (literal.getType() == JavaType.Primitive.String) {
+            if (literal.getType() == JavaType.Primitive.String && lit.getValue() != null) {
                 Pattern pat = Pattern.compile("\\b" + oldFullyQualifiedTypeName + "\\b");
-                if (lit.getValue() != null && pat.matcher((String) lit.getValue()).find()) {
-                    lit = lit.withValue(((String) lit.getValue()).replace(oldFullyQualifiedTypeName, newFullyQualifiedTypeName)).withValueSource(lit.getValueSource().replace(oldFullyQualifiedTypeName, newFullyQualifiedTypeName));
+                Matcher matcher = pat.matcher((String) lit.getValue());
+                if (matcher.find()) {
+                    lit = lit.withValue(matcher.replaceAll(newFullyQualifiedTypeName))
+                            .withValueSource(pat.matcher(lit.getValueSource()).replaceAll(newFullyQualifiedTypeName));
                 }
             }
             return super.visitLiteral(lit, ctx);
