@@ -64,6 +64,18 @@ public class AddBuildPlugin extends Recipe {
     @Nullable
     Boolean acceptTransitive;
 
+    public AddBuildPlugin(String pluginId, @Nullable String version, @Nullable String versionPattern, @Nullable Boolean apply) {
+        this(pluginId, version, versionPattern, apply, null);
+    }
+
+    public AddBuildPlugin(String pluginId, @Nullable String version, @Nullable String versionPattern, @Nullable Boolean apply, @Nullable Boolean acceptTransitive) {
+        this.pluginId = pluginId;
+        this.version = version;
+        this.versionPattern = versionPattern;
+        this.apply = apply;
+        this.acceptTransitive = acceptTransitive;
+    }
+
     @Override
     public String getDisplayName() {
         return "Add Gradle plugin";

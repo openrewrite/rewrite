@@ -47,6 +47,15 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
     @Nullable
     String fullyQualifiedConstantName;
 
+    public ReplaceStringLiteralWithConstant(@Nullable String literalValue, @Nullable String fullyQualifiedConstantName) {
+        this.literalValue = literalValue;
+        this.fullyQualifiedConstantName = fullyQualifiedConstantName;
+    }
+
+    public ReplaceStringLiteralWithConstant(@Nullable String fullyQualifiedConstantName) {
+        this(null, fullyQualifiedConstantName);
+    }
+
     @Override
     public String getDisplayName() {
         return "Replace String literal with constant";

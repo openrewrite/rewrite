@@ -86,6 +86,10 @@ public class MergeYaml extends Recipe {
     @Nullable
     Boolean createNewKeys;
 
+    public MergeYaml(String key, @Language("yml") String yaml, @Nullable Boolean acceptTheirs, @Nullable String objectIdentifyingProperty, @Nullable String filePattern) {
+        this(yaml, key, acceptTheirs, objectIdentifyingProperty, filePattern, null, null, null);
+    }
+
     /**
      * @deprecated Use {@link #MergeYaml(String, String, Boolean, String, String, InsertMode, String, Boolean)} instead.
      */

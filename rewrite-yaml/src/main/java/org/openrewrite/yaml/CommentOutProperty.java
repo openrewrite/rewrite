@@ -50,6 +50,16 @@ public class CommentOutProperty extends Recipe {
     @Nullable
     Boolean commentOutProperty;
 
+    public CommentOutProperty(String propertyKey, String commentText) {
+        this(propertyKey, commentText, null);
+    }
+
+    public CommentOutProperty(String propertyKey, String commentText, Boolean commentOutProperty) {
+        this.propertyKey = propertyKey;
+        this.commentText = commentText;
+        this.commentOutProperty = commentOutProperty;
+    }
+
     @Override
     public String getDisplayName() {
         return "Comment out property";
