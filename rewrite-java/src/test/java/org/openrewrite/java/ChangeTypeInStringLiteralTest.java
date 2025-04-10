@@ -24,24 +24,6 @@ import static org.openrewrite.java.Assertions.java;
 
 class ChangeTypeInStringLiteralTest implements RewriteTest {
 
-    @Language("java")
-    String a1 = """
-          package a;
-          public class A1 extends Exception {
-              public static void stat() {}
-              public void foo() {}
-          }
-      """;
-
-    @Language("java")
-    String a2 = """
-      package a;
-      public class A2 extends Exception {
-          public static void stat() {}
-          public void foo() {}
-      }
-      """;
-
     @Test
     @DocumentExample
     void changeTypeInLiteral() {
@@ -65,5 +47,4 @@ class ChangeTypeInStringLiteralTest implements RewriteTest {
           )
         );
     }
-
 }

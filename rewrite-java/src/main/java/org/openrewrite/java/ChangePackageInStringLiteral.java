@@ -20,17 +20,13 @@ import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.trait.Literal;
 import org.openrewrite.java.trait.Traits;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.SearchResult;
-import org.openrewrite.trait.Reference;
 
-import java.nio.file.Paths;
-import java.util.HashMap;
-import java.util.IdentityHashMap;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -73,12 +69,12 @@ public class ChangePackageInStringLiteral extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Rename package name";
+        return "Rename package name in String literals";
     }
 
     @Override
     public String getDescription() {
-        return "A recipe that will rename a package name in package statements, imports, and fully-qualified types.";
+        return "A recipe that will rename a package name in String literals.";
     }
 
     @Override
@@ -97,9 +93,11 @@ public class ChangePackageInStringLiteral extends Recipe {
                 if (tree instanceof JavaSourceFile) {
                     JavaSourceFile cu = (JavaSourceFile) tree;
                     if (Traits.literal().asVisitor((Literal lit, AtomicBoolean bool) -> {
-                        String string = lit.getString();
-                        if (string != null && string.contains(oldPackageName)) {
-                            bool.set(true);
+                        if (!Boolean.TRUE.equals(bool.get())) {
+                            String string = lit.getString();
+                            if (string != null && string.contains(oldPackageName)) {
+                                bool.set(true);
+                            }
                         }
                         return lit.getTree();
                     }).reduce(cu, new AtomicBoolean(false), getCursor().getParentTreeCursor()).get()) {
