@@ -17,7 +17,6 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.java.trait.Literal;
@@ -33,15 +32,6 @@ import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
 
-/**
- * A recipe that will rename a package name in package statements, imports, and fully-qualified types (see: NOTE).
- * <p>
- * NOTE: Does not currently transform all possible type references, and accomplishing this would be non-trivial.
- * For example, a method invocation select might refer to field `A a` whose type has now changed to `A2`, and so the type
- * on the select should change as well. But how do we identify the set of all method selects which refer to `a`? Suppose
- * it were prefixed like `this.a`, or `MyClass.this.a`, or indirectly via a separate method call like `getA()` where `getA()`
- * is defined on the super class.
- */
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class ChangePackageInStringLiteral extends Recipe {
@@ -54,13 +44,6 @@ public class ChangePackageInStringLiteral extends Recipe {
             description = "New package name to replace the old package name with.",
             example = "com.yourorg.bar")
     String newPackageName;
-
-    @With
-    @Option(displayName = "Recursive",
-            description = "Recursively change subpackage names",
-            required = false)
-    @Nullable
-    Boolean recursive;
 
     @Override
     public String getInstanceNameSuffix() {
