@@ -57,12 +57,6 @@ public class ChangeType extends Recipe {
     @Nullable
     Boolean ignoreDefinition;
 
-    @Option(displayName = "Apply to string literal",
-            description = "When set to `true`, String literal will also be taken into account.",
-            required = false)
-    @Nullable
-    Boolean visitStringLiterals;
-
     @Override
     public String getDisplayName() {
         return "Change type";
@@ -106,7 +100,7 @@ public class ChangeType extends Recipe {
                     if (!Boolean.TRUE.equals(ignoreDefinition) && containsClassDefinition(cu, oldFullyQualifiedTypeName)) {
                         return SearchResult.found(cu);
                     }
-                    if (Boolean.TRUE.equals(visitStringLiterals) && Traits.literal().asVisitor((Literal lit, AtomicBoolean bool) -> {
+                    if (Traits.literal().asVisitor((Literal lit, AtomicBoolean bool) -> {
                         String string = lit.getString();
                         if (string != null && string.contains(oldFullyQualifiedTypeName)) {
                             bool.set(true);
@@ -134,7 +128,7 @@ public class ChangeType extends Recipe {
             public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
                 if (tree instanceof J) {
-                    return new JavaChangeTypeVisitor(oldFullyQualifiedTypeName, newFullyQualifiedTypeName, ignoreDefinition, visitStringLiterals).visit(tree, ctx, requireNonNull(getCursor().getParent()));
+                    return new JavaChangeTypeVisitor(oldFullyQualifiedTypeName, newFullyQualifiedTypeName, ignoreDefinition).visit(tree, ctx, requireNonNull(getCursor().getParent()));
                 } else if (tree instanceof SourceFileWithReferences) {
                     SourceFileWithReferences sourceFile = (SourceFileWithReferences) tree;
                     SourceFileWithReferences.References references = sourceFile.getReferences();
@@ -161,19 +155,15 @@ public class ChangeType extends Recipe {
         @Nullable
         private final Boolean ignoreDefinition;
 
-        @Nullable
-        private final Boolean visitLiterals;
-
         private final Map<JavaType, JavaType> oldNameToChangedType = new IdentityHashMap<>();
         private final Set<String> topLevelClassnames = new HashSet<>();
 
-        private JavaChangeTypeVisitor(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName, @Nullable Boolean ignoreDefinition, @Nullable Boolean visitLiterals) {
+        private JavaChangeTypeVisitor(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName, @Nullable Boolean ignoreDefinition) {
             this.oldFullyQualifiedTypeName = oldFullyQualifiedTypeName;
             this.newFullyQualifiedTypeName = newFullyQualifiedTypeName;
             this.originalType = JavaType.ShallowClass.build(oldFullyQualifiedTypeName);
             this.targetType = JavaType.buildType(newFullyQualifiedTypeName);
             this.ignoreDefinition = ignoreDefinition;
-            this.visitLiterals = visitLiterals;
             importAlias = null;
         }
 
@@ -227,11 +217,10 @@ public class ChangeType extends Recipe {
         @Override
         public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
             J.Literal lit = literal;
-            if (Boolean.TRUE.equals(visitLiterals) && literal.getType() == JavaType.Primitive.String) {
-                Pattern pat = Pattern.compile("\\b" + oldFullyQualifiedTypeName + "\\b");
+            if (literal.getType() == JavaType.Primitive.String) {
+                Pattern pat = Pattern.compile("(?:\\A|\\s)" + oldFullyQualifiedTypeName + "(?:|\\s)");
                 if (lit.getValue() != null && pat.matcher((String) lit.getValue()).find()) {
-                    lit = lit.withValue(((String) lit.getValue()).replace(oldFullyQualifiedTypeName, newFullyQualifiedTypeName))
-                            .withValueSource(lit.getValueSource().replace(oldFullyQualifiedTypeName, newFullyQualifiedTypeName));
+                    lit = lit.withValue(((String) lit.getValue()).replace(oldFullyQualifiedTypeName, newFullyQualifiedTypeName)).withValueSource(lit.getValueSource().replace(oldFullyQualifiedTypeName, newFullyQualifiedTypeName));
                 }
             }
             return super.visitLiteral(lit, ctx);

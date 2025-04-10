@@ -35,7 +35,7 @@ class ChangeTypeAdaptabilityTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new ChangeType("a.b.Original", "x.y.Target", true, null));
+        spec.recipe(new ChangeType("a.b.Original", "x.y.Target", true));
     }
 
     @SuppressWarnings("GrPackage")
@@ -100,7 +100,7 @@ class ChangeTypeAdaptabilityTest implements RewriteTest {
     @Test
     void changeDefinition() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("file", "newFile", false, null)),
+          spec -> spec.recipe(new ChangeType("file", "newFile", false)),
           groovy(
             """
               class file {
@@ -124,7 +124,7 @@ class ChangeTypeAdaptabilityTest implements RewriteTest {
     @Test
     void changeTypeAttributionImplicitUsage() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("java.util.List", "java.util.ArrayList", false, null)),
+          spec -> spec.recipe(new ChangeType("java.util.List", "java.util.ArrayList", false)),
           groovy(
             """
               import java.util.Collections

@@ -65,12 +65,6 @@ public class ChangePackage extends Recipe {
     @Nullable
     Boolean recursive;
 
-    @Option(displayName = "Apply to string literal",
-            description = "When set to `true`, String literal will also be taken into account.",
-            required = false)
-    @Nullable
-    Boolean visitStringLiterals;
-
     @Override
     public String getInstanceNameSuffix() {
         return String.format("`%s` to `%s`", oldPackageName, newPackageName);
@@ -101,7 +95,7 @@ public class ChangePackage extends Recipe {
                 stopAfterPreVisit();
                 if (tree instanceof JavaSourceFile) {
                     JavaSourceFile cu = (JavaSourceFile) tree;
-                    if (Boolean.TRUE.equals(visitStringLiterals) && Traits.literal().asVisitor((Literal lit, AtomicBoolean bool) -> {
+                    if (Traits.literal().asVisitor((Literal lit, AtomicBoolean bool) -> {
                         String string = lit.getString();
                         if (string != null && string.contains(oldPackageName)) {
                             bool.set(true);
@@ -257,7 +251,7 @@ public class ChangePackage extends Recipe {
         @Override
         public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
             J.Literal lit = literal;
-            if (Boolean.TRUE.equals(visitStringLiterals) && literal.getType() == JavaType.Primitive.String) {
+            if (literal.getType() == JavaType.Primitive.String) {
                 Pattern pat = Pattern.compile("\\b" + oldPackageName + "\\b");
                 if (lit.getValue() != null && pat.matcher((String) lit.getValue()).find()) {
                     lit = lit.withValue(((String) lit.getValue()).replace(oldPackageName, newPackageName))
