@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
-import static org.junit.jupiter.api.Assertions.*;
 import static org.openrewrite.java.Assertions.java;
 
 class ChangePackageInStringLiteralTest implements RewriteTest {
@@ -28,7 +27,7 @@ class ChangePackageInStringLiteralTest implements RewriteTest {
     @DocumentExample
     void changePackageInLiteral() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePackage("javax.type", "jakarta.type", true)),
+          spec -> spec.recipe(new ChangePackageInStringLiteral("javax.type", "jakarta.type")),
           java(
             """
               class Test {

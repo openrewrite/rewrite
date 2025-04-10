@@ -81,6 +81,7 @@ public class ChangeTypeInStringLiteral extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         TreeVisitor<?, ExecutionContext> condition = new TreeVisitor<Tree, ExecutionContext>() {
+            private static final String STOP_AFTER_PRE_VISIT = "__org.openrewrite.stopVisitor__";
             @Override
             public @Nullable Tree preVisit(@Nullable Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
@@ -91,6 +92,7 @@ public class ChangeTypeInStringLiteral extends Recipe {
                             String string = lit.getString();
                             if (string != null && string.contains(oldFullyQualifiedTypeName)) {
                                 bool.set(true);
+                                lit.getCursor().putMessage(STOP_AFTER_PRE_VISIT, true);
                             }
                         }
                         return lit.getTree();
