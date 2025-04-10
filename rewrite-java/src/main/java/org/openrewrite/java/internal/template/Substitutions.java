@@ -50,6 +50,7 @@ public class Substitutions {
 
     public String substitute() {
         Map<String, JavaType.GenericTypeVariable> generics = TypeParameter.parseGenericTypes(genericTypes);
+        typeVariables.addAll(generics.values());
         AtomicInteger requiredParameters = new AtomicInteger(0);
         AtomicInteger index = new AtomicInteger(0);
         String substituted = code;
@@ -129,9 +130,9 @@ public class Substitutions {
             } else {
                 type = null;
             }
+            extractTypeVariables(type);
         }
 
-        extractTypeVariables(type);
         String fqn = getTypeName(type);
         JavaType.Primitive primitive = JavaType.Primitive.fromKeyword(fqn);
         s = primitive == null || primitive == JavaType.Primitive.String ?
@@ -214,7 +215,7 @@ public class Substitutions {
 
             @Override
             public JavaType visitArray(JavaType.Array array, Integer p) {
-                // TODO: Test this scenario
+                visit(array.getElemType(), p);
                 return array;
             }
 

@@ -75,12 +75,12 @@ public class TypeParameter {
                 JavaType type;
                 if (fqn.contains(".")) {
                     type = JavaType.ShallowClass.build(fqn);
+                } else if (genericTypes.containsKey(fqn)) {
+                    type = genericTypes.get(fqn);
                 } else if (fqn.equals("String")) {
                     type = JavaType.ShallowClass.build("java.lang.String");
                 } else if (fqn.equals("Object")) {
                     type = TYPE_OBJECT;
-                } else if (genericTypes.containsKey(fqn)) {
-                    type = genericTypes.get(fqn);
                 } else if ((type = JavaType.Primitive.fromKeyword(fqn)) != null) {
                     // empty
                 } else {
