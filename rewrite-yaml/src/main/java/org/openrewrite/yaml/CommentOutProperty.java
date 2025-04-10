@@ -16,6 +16,7 @@
 package org.openrewrite.yaml;
 
 import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
@@ -33,6 +34,7 @@ import static java.util.stream.StreamSupport.stream;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
+@NoArgsConstructor(force = true)
 public class CommentOutProperty extends Recipe {
     @Option(displayName = "Property key",
             description = "The key to be commented out.",
@@ -50,6 +52,7 @@ public class CommentOutProperty extends Recipe {
     @Nullable
     Boolean commentOutProperty;
 
+    @Deprecated
     public CommentOutProperty(String propertyKey, String commentText) {
         this(propertyKey, commentText, null);
     }

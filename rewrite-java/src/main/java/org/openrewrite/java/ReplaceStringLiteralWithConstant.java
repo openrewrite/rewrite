@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
 import lombok.Value;
 import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
@@ -31,6 +32,7 @@ import static org.openrewrite.Validated.invalid;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
+@NoArgsConstructor(force = true)
 public class ReplaceStringLiteralWithConstant extends Recipe {
 
     private static final String CONSTANT_FQN_PARAM = "fullyQualifiedConstantName";
@@ -52,6 +54,7 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
         this.fullyQualifiedConstantName = fullyQualifiedConstantName;
     }
 
+    @Deprecated
     public ReplaceStringLiteralWithConstant(@Nullable String fullyQualifiedConstantName) {
         this(null, fullyQualifiedConstantName);
     }
